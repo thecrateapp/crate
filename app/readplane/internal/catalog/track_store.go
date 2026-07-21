@@ -2,10 +2,117 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
+
+var ErrMediaFallback = errors.New("local media requires FastAPI fallback")
+
+type LocalMediaDescriptor struct {
+	TrackID         int64
+	TrackEntityUID  string
+	StoredPath      string
+	SourcePath      string
+	Root            string
+	MediaType       string
+	RequestedPolicy string
+	EffectivePolicy string
+	SourceFormat    string
+	DeliveryFormat  string
+	DeliveryBitrate int64
+	Transcoded      bool
+	VariantStatus   string
+	SourceSize      int64
+	SourceMtimeNS   int64
+}
+
+const localAdaptiveMediaQuery = `
+	SELECT t.id, t.entity_uid::text AS entity_uid, t.path, t.format, t.bitrate,
+	       sv.preset, sv.status, sv.relative_path, sv.delivery_format,
+	       sv.delivery_bitrate, sv.source_size, sv.source_mtime_ns
+	FROM library_tracks t
+	JOIN stream_variants sv
+	  ON sv.track_id = t.id
+	 AND sv.source_path = t.path
+	 AND sv.source_size = COALESCE(t.size, 0)
+	 AND sv.preset = $2
+	 AND sv.status = 'ready'
+	WHERE %s
+	ORDER BY sv.completed_at DESC NULLS LAST
+	LIMIT 1`
+
+func (s *Store) LocalMediaByID(ctx context.Context, id int64, policy string) (LocalMediaDescriptor, error) {
+	return s.localMedia(ctx, "t.id = $1", id, policy)
+}
+
+func (s *Store) LocalMediaByEntityUID(ctx context.Context, uid, policy string) (LocalMediaDescriptor, error) {
+	return s.localMedia(ctx, "t.entity_uid = $1::uuid", uid, policy)
+}
+
+func (s *Store) localMedia(ctx context.Context, predicate string, identity any, policy string) (LocalMediaDescriptor, error) {
+	if policy != "original" && policy != "balanced" && policy != "data_saver" {
+		return LocalMediaDescriptor{}, ErrMediaFallback
+	}
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	var query string
+	var args []any
+	if policy == "original" {
+		query = `SELECT t.id, t.entity_uid::text AS entity_uid, t.path, t.format, t.bitrate FROM library_tracks t WHERE ` + predicate + ` LIMIT 1`
+		args = []any{identity}
+	} else {
+		query = strings.Replace(localAdaptiveMediaQuery, "%s", predicate, 1)
+		args = []any{identity, policy}
+	}
+	rows, err := rowsToMaps(s.pool.Query(ctx, query, args...))
+	if err != nil {
+		return LocalMediaDescriptor{}, err
+	}
+	if len(rows) == 0 {
+		if policy == "original" {
+			return LocalMediaDescriptor{}, ErrNotFound
+		}
+		return LocalMediaDescriptor{}, ErrMediaFallback
+	}
+	return localMediaDescriptorFromRow(rows[0], policy)
+}
+
+func localMediaDescriptorFromRow(row map[string]any, policy string) (LocalMediaDescriptor, error) {
+	if policy != "original" && policy != "balanced" && policy != "data_saver" {
+		return LocalMediaDescriptor{}, ErrMediaFallback
+	}
+	descriptor := LocalMediaDescriptor{
+		TrackID: intValue(row["id"]), TrackEntityUID: stringValue(row["entity_uid"]),
+		RequestedPolicy: policy, SourceFormat: stringValue(row["format"]),
+		SourcePath: stringValue(row["path"]),
+	}
+	if policy == "original" {
+		descriptor.StoredPath = stringValue(row["path"])
+		descriptor.Root = "music"
+		descriptor.EffectivePolicy = "original"
+		descriptor.DeliveryFormat = descriptor.SourceFormat
+		descriptor.DeliveryBitrate = intValue(row["bitrate"])
+		if descriptor.StoredPath == "" {
+			return LocalMediaDescriptor{}, ErrMediaFallback
+		}
+		return descriptor, nil
+	}
+	if stringValue(row["status"]) != "ready" || stringValue(row["preset"]) != policy || stringValue(row["relative_path"]) == "" {
+		return LocalMediaDescriptor{}, ErrMediaFallback
+	}
+	descriptor.StoredPath = stringValue(row["relative_path"])
+	descriptor.Root = "data"
+	descriptor.EffectivePolicy = policy
+	descriptor.DeliveryFormat = stringValue(row["delivery_format"])
+	descriptor.DeliveryBitrate = intValue(row["delivery_bitrate"])
+	descriptor.Transcoded = true
+	descriptor.VariantStatus = "ready"
+	descriptor.SourceSize = intValue(row["source_size"])
+	descriptor.SourceMtimeNS = intValue(row["source_mtime_ns"])
+	return descriptor, nil
+}
 func (s *Store) TrackInfoByID(ctx context.Context, trackID int64) (map[string]any, error) {
 	row, err := s.trackInfoRow(ctx, "id = $1", trackID)
 	if err != nil {

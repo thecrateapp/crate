@@ -1,4 +1,5 @@
 import re
+import base64
 from datetime import date
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
@@ -6,7 +7,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from crate.api.auth import _require_auth
-from crate.api.image_variants import build_image_response
+from crate.api.artwork_delivery import deliver_artwork
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -35,6 +36,7 @@ from crate.api.schemas.genres import (
     SoundIntelligenceHealthResponse,
 )
 from crate.api.schemas.common import TaskEnqueueResponse
+from crate.artwork_variants import ArtworkAsset
 from crate.db.genres import (
     get_all_genres,
     get_genre_detail,
@@ -64,9 +66,7 @@ from crate.db.repositories.genres_delete import (
 )
 from crate.genre_covers import (
     genre_cover_abspath,
-    genre_cover_media_type,
     genre_cover_public_url,
-    persist_genre_cover_upload,
 )
 from crate.db.jobs.genre_taxonomy import assign_genre_alias_value
 from crate.genre_taxonomy import (
@@ -462,26 +462,23 @@ async def upload_taxonomy_cover(
         raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
 
     payload = await file.read()
-    try:
-        cover_path = persist_genre_cover_upload(
-            canonical_slug,
-            filename=file.filename or "",
-            content_type=file.content_type,
-            payload=payload,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    updated = update_genre_taxonomy_node_metadata(canonical_slug, cover_path=cover_path)
-    if not updated:
-        raise HTTPException(status_code=400, detail="No taxonomy cover changed")
-
-    invalidate_runtime_taxonomy_cache(broadcast=True)
-    _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
+    if not payload or len(payload) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Invalid genre cover image")
+    task_id = create_task(
+        "upload_image",
+        {
+            "type": "genre_cover",
+            "slug": canonical_slug,
+            "filename": file.filename or "",
+            "content_type": file.content_type,
+            "data_b64": base64.b64encode(payload).decode(),
+        },
+    )
     return {
         "ok": True,
         "slug": canonical_slug,
         "cover_url": genre_cover_public_url(canonical_slug),
+        "task_id": task_id,
     }
 
 
@@ -736,21 +733,17 @@ def genre_cover(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     _require_auth(request)
+    del image_format
     canonical_slug = _normalize_taxonomy_slug(slug)
     if not canonical_slug:
         return Response(status_code=404)
     cover_path = get_genre_taxonomy_cover_path(canonical_slug)
     absolute = genre_cover_abspath(cover_path)
-    if not absolute or not absolute.exists():
-        return Response(status_code=404)
-    return build_image_response(
-        absolute.read_bytes(),
-        genre_cover_media_type(absolute),
-        size=size,
-        output_format=image_format,
-        headers={
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
-        },
+    return deliver_artwork(
+        ArtworkAsset("genre-cover", canonical_slug),
+        requested_size=size,
+        local_original=absolute if absolute and absolute.is_file() else None,
+        missing_response=Response(status_code=404),
     )
 
 

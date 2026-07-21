@@ -32,6 +32,9 @@ services:
       READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS: "300"
       READPLANE_STATS_STALE_MAX_AGE_SECONDS: "86400"
       READPLANE_SESSION_TOUCH_INTERVAL_SECONDS: "60"
+      READPLANE_LOCAL_MEDIA_ENABLED: ${READPLANE_LOCAL_MEDIA_ENABLED:-false}
+      READPLANE_MUSIC_ROOT: /music
+      READPLANE_DATA_ROOT: /data
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       ALL_PROXY: ""
@@ -40,6 +43,9 @@ services:
       all_proxy: ""
       NO_PROXY: "localhost,127.0.0.1,::1,api,readplane,postgres,redis"
       no_proxy: "localhost,127.0.0.1,::1,api,readplane,postgres,redis"
+    volumes:
+      - ./test-music:/music:ro
+      - dev_data:/data:ro
     depends_on:
       postgres:
         condition: service_healthy

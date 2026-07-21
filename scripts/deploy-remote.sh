@@ -10,6 +10,7 @@ DEPLOY_PUBLIC_CHECKS="${DEPLOY_PUBLIC_CHECKS:-1}"
 DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
 DEPLOY_IMAGE_WAIT_INTERVAL="${DEPLOY_IMAGE_WAIT_INTERVAL:-20}"
 DEPLOY_HEALTH_WAIT_SECONDS="${DEPLOY_HEALTH_WAIT_SECONDS:-420}"
+CRATE_DEPLOY_PRUNE_UNUSED_IMAGES="${CRATE_DEPLOY_PRUNE_UNUSED_IMAGES:-1}"
 BACKUP_ROOT="${SERVER_PATH}/.deploy-backups"
 BACKUP_DIR="${BACKUP_ROOT}/${DEPLOY_ID}"
 ROLLBACK_TAG="rollback-${DEPLOY_ID}"
@@ -181,6 +182,7 @@ check_public_get_url() {
 }
 
 cmd_preflight() {
+  local cache_dir
   local puid
   local pgid
 
@@ -205,6 +207,15 @@ cmd_preflight() {
     data/crate/stream-cache \
     data/crate/playlist-covers \
     2>/dev/null || true
+
+  cache_dir="$(env_value CACHE_DIR)"
+  cache_dir="${cache_dir:-./data/cache}"
+  mkdir -p \
+    "${cache_dir}/stream-cache" \
+    "${cache_dir}/artwork-variants" \
+    "${cache_dir}/external-artist-artwork" \
+    "${cache_dir}/download-cache"
+  chown -R "${puid:-1000}:${pgid:-1000}" "$cache_dir" 2>/dev/null || true
 
   mkdir -p "$BACKUP_ROOT"
   dc config -q
@@ -429,6 +440,73 @@ cmd_cleanup() {
       fi
     done
   fi
+
+  cleanup_legacy_cache_layout
+  prune_unused_images
+}
+
+cleanup_legacy_cache_layout() {
+  local cache_dir
+  local data_dir
+  local legacy_root
+  local name
+
+  cache_dir="$(env_value CACHE_DIR)"
+  cache_dir="${cache_dir:-./data/cache}"
+  data_dir="$(env_value DATA_DIR)"
+  data_dir="${data_dir:-./data}"
+  cache_dir="$(realpath -m "$cache_dir")"
+  legacy_root="$(realpath -m "${data_dir}/crate")"
+  if [[ "$cache_dir" == "$legacy_root" || "$legacy_root" == "/" ]]; then
+    return
+  fi
+
+  log "Removing legacy regenerable caches from ${legacy_root}"
+  for name in stream-cache artwork-variants external-artist-artwork download-cache; do
+    rm -rf -- "${legacy_root:?}/${name}"
+  done
+}
+
+prune_unused_images() {
+  local full
+  local id
+  local removed=0
+  declare -A keep=()
+  declare -A candidates=()
+
+  if [[ "$CRATE_DEPLOY_PRUNE_UNUSED_IMAGES" != "1" ]]; then
+    log "Skipping unused image cleanup"
+    return
+  fi
+
+  while read -r id; do
+    [[ -n "$id" ]] && keep["$id"]=1
+  done < <(docker ps -aq | xargs -r docker inspect --format '{{.Image}}' | sort -u)
+  while read -r id; do
+    [[ -n "$id" ]] && keep["$id"]=1
+  done < <(
+    docker image ls --format '{{.Tag}} {{.ID}}' \
+      | awk -v tag="$ROLLBACK_TAG" '$1 == tag {print $2}' \
+      | xargs -r -n1 docker image inspect --format '{{.Id}}' \
+      | sort -u
+  )
+
+  while read -r id; do
+    full="$(docker image inspect "$id" --format '{{.Id}}' 2>/dev/null || true)"
+    if [[ -n "$full" && -z "${keep[$full]:-}" ]]; then
+      candidates["$full"]=1
+    fi
+  done < <(docker image ls -q | sort -u)
+
+  for id in "${!candidates[@]}"; do
+    if docker image rm -f "$id" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+    fi
+  done
+  docker image prune -f >/dev/null 2>&1 || true
+  docker builder prune -af >/dev/null 2>&1 || true
+  log "Removed ${removed} unused image IDs; retained active containers and ${ROLLBACK_TAG}"
+  df -h / /var 2>/dev/null || true
 }
 
 cmd_ps() {

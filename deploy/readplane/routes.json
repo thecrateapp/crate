@@ -76,7 +76,7 @@
     {
       "name": "artists",
       "path_prefix": "/api/artists/",
-      "methods": ["GET"],
+      "methods": ["GET", "HEAD"],
       "class": "interactive"
     },
     {
@@ -88,7 +88,7 @@
     {
       "name": "albums",
       "path_prefix": "/api/albums/",
-      "methods": ["GET"],
+      "methods": ["GET", "HEAD"],
       "class": "interactive"
     },
     {
@@ -112,7 +112,7 @@
     {
       "name": "tracks",
       "path_prefix": "/api/tracks/",
-      "methods": ["GET"],
+      "methods": ["GET", "HEAD"],
       "class": "stream"
     }
   ]

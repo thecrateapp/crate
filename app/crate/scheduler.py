@@ -18,6 +18,8 @@ DEFAULT_SCHEDULES = {
     "check_new_releases": 43200,  # 12h — check MusicBrainz for new releases
     "repair_duplicate_tracks": 43200,  # 12h — clean high-confidence duplicate tracks
     "cleanup_incomplete_downloads": 172800,  # 48h — remove incomplete soulseek downloads
+    "cleanup_artwork_variants": 172800,  # 48h — retain current + previous revisions
+    "cleanup_stream_variants": 3600,  # 1h — enforce playback cache LRU/TTL
     "sync_shows": 86400,  # 24h — sync shows from Ticketmaster
     "federation_health_poll": 60,  # 1min — poll approved peers for health
     "federation_sync_catalog": 120,  # 2min — consume peer catalog deltas
@@ -55,8 +57,11 @@ def get_schedules() -> dict[str, int]:
             # Migration: rename library_sync → library_pipeline
             if "library_sync" in schedules and "library_pipeline" not in schedules:
                 schedules["library_pipeline"] = schedules.pop("library_sync")
-                set_schedules(schedules)
-            return schedules
+            merged = dict(DEFAULT_SCHEDULES)
+            merged.update(schedules)
+            if merged != schedules:
+                set_schedules(merged)
+            return merged
         except Exception:
             pass
     return dict(DEFAULT_SCHEDULES)

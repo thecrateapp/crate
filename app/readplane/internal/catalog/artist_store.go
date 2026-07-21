@@ -10,6 +10,44 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
 
+func (s *Store) ArtistArtworkKeyByID(ctx context.Context, artistID int64) (string, error) {
+	return s.artistArtworkKey(ctx, "id = $1", artistID)
+}
+
+func (s *Store) ArtistArtworkKeyByEntityUID(ctx context.Context, uid string) (string, error) {
+	return s.artistArtworkKey(ctx, "entity_uid = $1::uuid", uid)
+}
+
+func (s *Store) GlobalArtistArtworkKey(ctx context.Context, globalUID string) (string, error) {
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(ctx, `SELECT local_artist_entity_uid::text AS entity_uid FROM global_catalog_artists WHERE global_artist_uid = $1::uuid AND local_artist_id IS NOT NULL LIMIT 1`, globalUID))
+	if err != nil {
+		return "", err
+	}
+	if len(rows) == 0 || stringValue(rows[0]["entity_uid"]) == "" {
+		return "", ErrNotFound
+	}
+	return stringValue(rows[0]["entity_uid"]), nil
+}
+
+func (s *Store) artistArtworkKey(ctx context.Context, predicate string, value any) (string, error) {
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(ctx, `SELECT entity_uid::text AS entity_uid FROM library_artists WHERE `+predicate+` LIMIT 1`, value))
+	if err != nil {
+		return "", err
+	}
+	if len(rows) == 0 {
+		return "", ErrNotFound
+	}
+	key := stringValue(rows[0]["entity_uid"])
+	if key == "" {
+		return "", ErrNotFound
+	}
+	return key, nil
+}
+
 func (s *Store) ArtistByID(ctx context.Context, artistID int64) (map[string]any, error) {
 	row, err := s.artistRow(ctx, "id = $1", artistID)
 	if err != nil {

@@ -5,6 +5,8 @@ from unittest.mock import MagicMock
 
 from crate.worker_handlers.artwork import (
     ARTWORK_TASK_HANDLERS,
+    _handle_cleanup_artwork_variants,
+    _handle_materialize_artwork_variants,
     _handle_fetch_artwork_all,
     _handle_batch_covers,
     _handle_fetch_cover,
@@ -49,6 +51,10 @@ def _mock_scan_missing(monkeypatch, return_value=None):
 class TestHandlerRegistration:
     def test_artwork_task_handlers_registers_all_handlers(self):
         expected = {
+            "backfill_artwork_variants",
+            "cleanup_artwork_variants",
+            "materialize_artwork_variants",
+            "repair_artwork_variants",
             "resolve_external_artist_artwork",
             "fetch_cover",
             "fetch_album_cover",
@@ -72,6 +78,132 @@ class TestHandlerRegistration:
 
         assert config.queue == "fast"
         assert config.priority == 0
+
+    def test_materialization_uses_default_queue(self):
+        from crate.actors import TASK_POOL_CONFIG
+
+        config = TASK_POOL_CONFIG["materialize_artwork_variants"]
+
+        assert config.queue == "default"
+        assert config.priority == 1
+
+
+class TestHandleMaterializeArtworkVariants:
+    def test_materializes_resolved_source(self, monkeypatch):
+        from crate.artwork_sources import ArtworkSource
+
+        resolved_assets = []
+        materialized = []
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda asset, *, allow_provider: (
+                resolved_assets.append((asset, allow_provider))
+                or ArtworkSource(b"image", "image/jpeg", "local-file")
+            ),
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.materialize_artwork",
+            lambda asset, content, *, source_media_type: (
+                materialized.append((asset, content, source_media_type))
+                or {"source_revision": "abc", "variant_count": 1}
+            ),
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-1",
+            {
+                "kind": "album-cover",
+                "entity_key": "album-entity",
+                "reason": "request-miss",
+            },
+            {},
+        )
+        assert result == {
+            "status": "materialized",
+            "kind": "album-cover",
+            "entity_key": "album-entity",
+            "origin": "local-file",
+            "revision": "abc",
+            "variant_count": 1,
+        }
+        assert resolved_assets[0][0].kind == "album-cover"
+        assert resolved_assets[0][0].entity_key == "album-entity"
+        assert resolved_assets[0][1] is True
+        assert materialized[0][1:] == (b"image", "image/jpeg")
+
+    def test_backfill_materialization_does_not_contact_providers(self, monkeypatch):
+        from crate.artwork_sources import ArtworkSource
+
+        provider_flags = []
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda _asset, *, allow_provider: (
+                provider_flags.append(allow_provider)
+                or ArtworkSource(b"image", "image/jpeg", "local-file")
+            ),
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.materialize_artwork",
+            lambda *_args, **_kwargs: {"source_revision": "abc", "variant_count": 1},
+        )
+
+        _handle_materialize_artwork_variants(
+            "task-1",
+            {
+                "kind": "artist-photo",
+                "entity_key": "artist-entity",
+                "reason": "backfill",
+            },
+            {},
+        )
+
+        assert provider_flags == [False]
+
+    def test_missing_source_is_a_bounded_success(self, monkeypatch):
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda _asset, *, allow_provider: None,
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-1",
+            {"kind": "artist-photo", "entity_key": "artist-entity"},
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-photo",
+            "entity_key": "artist-entity",
+        }
+
+    def test_rejects_client_paths_and_urls(self):
+        result = _handle_materialize_artwork_variants(
+            "task-1",
+            {
+                "kind": "album-cover",
+                "entity_key": "album-entity",
+                "path": "/music/Artist/Album/cover.jpg",
+                "provider_url": "https://example.test/cover.jpg",
+            },
+            {},
+        )
+
+        assert result == {"error": "Unsupported artwork task parameters"}
+
+
+class TestHandleArtworkVariantMaintenance:
+    def test_cleanup_defaults_to_a_bounded_full_library_pass(self, monkeypatch):
+        seen: list[int] = []
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.cleanup_artwork_variants",
+            lambda *, max_assets: seen.append(max_assets) or {"assets_checked": 0},
+        )
+
+        result = _handle_cleanup_artwork_variants("task-1", {}, {})
+
+        assert result == {"assets_checked": 0}
+        assert seen == [10_000]
 
 
 # ── _handle_fetch_cover ──────────────────────────────────────────
@@ -349,9 +481,14 @@ class TestHandleUploadImage:
         album_dir = tmp_path / "Band" / "Album"
         album_dir.mkdir(parents=True)
 
+        queued = []
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.get_library_album",
-            lambda artist, album: {"id": 1, "path": str(album_dir)},
+            lambda artist, album: {
+                "id": 1,
+                "entity_uid": "album-entity",
+                "path": str(album_dir),
+            },
         )
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.set_album_has_cover",
@@ -360,6 +497,12 @@ class TestHandleUploadImage:
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.start_scan",
             lambda: None,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: queued.append(
+                (asset.kind, asset.entity_key, reason)
+            ),
         )
         import requests as _requests
 
@@ -380,6 +523,7 @@ class TestHandleUploadImage:
         assert result["width"] == 100
         assert result["height"] == 50
         assert (album_dir / "cover.jpg").exists()
+        assert queued == [("album-cover", "album-entity", "source-write")]
 
     def test_release_cover_upload_updates_virtual_release(self, monkeypatch, tmp_path):
         from PIL import Image
@@ -389,12 +533,19 @@ class TestHandleUploadImage:
         img.save(buf, "PNG")
         data_b64 = base64.b64encode(buf.getvalue()).decode()
         updates: list[dict] = []
+        queued = []
 
         monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.update_new_release_cover",
             lambda release_id, **kwargs: (
                 updates.append({"release_id": release_id, **kwargs}) or True
+            ),
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: queued.append(
+                (asset.kind, asset.entity_key, reason)
             ),
         )
         import requests as _requests
@@ -422,6 +573,7 @@ class TestHandleUploadImage:
                 "cover_source": "manual",
             }
         ]
+        assert queued == [("release-cover", "42", "source-write")]
 
     def test_album_not_found_returns_error(self, monkeypatch, tmp_path):
         from PIL import Image
@@ -458,13 +610,20 @@ class TestHandleUploadImage:
         artist_dir = tmp_path / "ArtistName"
         artist_dir.mkdir(parents=True)
 
+        queued = []
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.get_library_artist",
-            lambda name: {"id": 5, "entity_uid": "ArtistName"},
+            lambda name: {"id": 5, "entity_uid": "artist-entity"},
         )
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.resolve_artist_dir",
             lambda lib, row, fallback_name, existing_only: artist_dir,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: queued.append(
+                (asset.kind, asset.entity_key, reason)
+            ),
         )
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.set_artist_has_photo",
@@ -486,6 +645,7 @@ class TestHandleUploadImage:
 
         assert result["type"] == "artist_photo"
         assert (artist_dir / "artist.jpg").exists()
+        assert queued == [("artist-photo", "artist-entity", "source-write")]
 
     def test_artist_directory_not_found_returns_error(self, monkeypatch, tmp_path):
         from PIL import Image
@@ -525,13 +685,20 @@ class TestHandleUploadImage:
         artist_dir = tmp_path / "ArtistBg"
         artist_dir.mkdir(parents=True)
 
+        queued = []
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.get_library_artist",
-            lambda name: {"id": 10},
+            lambda name: {"id": 10, "entity_uid": "artist-entity"},
         )
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.resolve_artist_dir",
             lambda lib, row, fallback_name, existing_only: artist_dir,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: queued.append(
+                (asset.kind, asset.entity_key, reason)
+            ),
         )
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.touch_artist_artwork",
@@ -553,6 +720,46 @@ class TestHandleUploadImage:
 
         assert result["type"] == "background"
         assert (artist_dir / "background.jpg").exists()
+        assert queued == [("artist-background", "artist-entity", "source-write")]
+
+    def test_genre_cover_upload_queues_variant_materialization(
+        self, monkeypatch, tmp_path
+    ):
+        from PIL import Image
+
+        img = Image.new("RGB", (320, 180), color="navy")
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        queued = []
+        monkeypatch.setattr(
+            "crate.genre_covers.persist_genre_cover_upload",
+            lambda slug, **kwargs: str(tmp_path / f"{slug}.webp"),
+        )
+        monkeypatch.setattr(
+            "crate.db.repositories.genres_taxonomy_metadata.update_genre_taxonomy_node_metadata",
+            lambda slug, *, cover_path: True,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: queued.append(
+                (asset.kind, asset.entity_key, reason)
+            ),
+        )
+
+        result = _handle_upload_image(
+            "task-1",
+            {
+                "type": "genre_cover",
+                "slug": "post-hardcore",
+                "filename": "cover.png",
+                "content_type": "image/png",
+                "data_b64": base64.b64encode(buf.getvalue()).decode(),
+            },
+            {"library_path": str(tmp_path / "music")},
+        )
+
+        assert result["type"] == "genre_cover"
+        assert queued == [("genre-cover", "post-hardcore", "source-write")]
 
     def test_path_traversal_blocked(self, monkeypatch, tmp_path):
         from PIL import Image
@@ -659,6 +866,17 @@ class TestHandleFetchAlbumCover:
             "crate.worker_handlers.artwork.set_album_has_cover",
             lambda album_id: None,
         )
+        queued = []
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_album_by_id",
+            lambda _album_id: {"entity_uid": "album-entity"},
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: queued.append(
+                (asset.kind, asset.entity_key, reason)
+            ),
+        )
 
         result = _handle_fetch_album_cover(
             "task-1",
@@ -667,11 +885,13 @@ class TestHandleFetchAlbumCover:
                 "album": "Album",
                 "path": str(album_dir),
                 "mbid": "real-mbid",
+                "album_id": 9,
             },
             {},
         )
         assert result["status"] == "found"
         assert result["source"] == "coverartarchive"
+        assert queued == [("album-cover", "album-entity", "source-write")]
 
     def test_not_found_returns_sources_tried(self, monkeypatch, tmp_path):
         album_dir = tmp_path / "Band" / "Album"

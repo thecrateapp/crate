@@ -20,6 +20,44 @@ const albumTracksQuery = `
 		ORDER BY disc_number, track_number
 	`
 
+func (s *Store) AlbumArtworkKeyByID(ctx context.Context, albumID int64) (string, error) {
+	return s.albumArtworkKey(ctx, "id = $1", albumID)
+}
+
+func (s *Store) AlbumArtworkKeyByEntityUID(ctx context.Context, uid string) (string, error) {
+	return s.albumArtworkKey(ctx, "entity_uid = $1::uuid", uid)
+}
+
+func (s *Store) GlobalAlbumArtworkKey(ctx context.Context, globalUID string) (string, error) {
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(ctx, `SELECT local_album_entity_uid::text AS entity_uid FROM global_catalog_albums WHERE global_album_uid = $1::uuid AND local_album_id IS NOT NULL LIMIT 1`, globalUID))
+	if err != nil {
+		return "", err
+	}
+	if len(rows) == 0 || stringValue(rows[0]["entity_uid"]) == "" {
+		return "", ErrNotFound
+	}
+	return stringValue(rows[0]["entity_uid"]), nil
+}
+
+func (s *Store) albumArtworkKey(ctx context.Context, predicate string, value any) (string, error) {
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(ctx, `SELECT entity_uid::text AS entity_uid FROM library_albums WHERE `+predicate+` LIMIT 1`, value))
+	if err != nil {
+		return "", err
+	}
+	if len(rows) == 0 {
+		return "", ErrNotFound
+	}
+	key := stringValue(rows[0]["entity_uid"])
+	if key == "" {
+		return "", ErrNotFound
+	}
+	return key, nil
+}
+
 func (s *Store) AlbumByID(ctx context.Context, albumID int64) (map[string]any, error) {
 	row, err := s.albumRow(ctx, "a.id = $1", albumID)
 	if err != nil {

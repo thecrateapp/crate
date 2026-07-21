@@ -45,6 +45,27 @@ def test_external_artist_artwork_remains_available_while_stale(tmp_path, monkeyp
     assert cached["content"].startswith(b"RIFF")
 
 
+def test_external_artist_artwork_path_lookup_does_not_read_image_bytes(
+    tmp_path, monkeypatch
+):
+    from crate import external_artist_artwork
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    external_artist_artwork.persist_external_artist_artwork("Converge", _jpeg_bytes())
+    monkeypatch.setattr(
+        "pathlib.Path.read_bytes",
+        lambda _path: (_ for _ in ()).throw(
+            AssertionError("path lookup must not copy artwork bytes")
+        ),
+    )
+
+    cached = external_artist_artwork.get_cached_external_artist_artwork_path("Converge")
+
+    assert cached is not None
+    assert cached["path"].is_file()
+    assert cached["stale"] is False
+
+
 def test_external_artist_artwork_negative_cache_survives_redis_eviction(
     tmp_path, monkeypatch
 ):
@@ -157,17 +178,22 @@ def test_external_artist_artwork_resolver_delegates_to_bounded_lookup(monkeypatc
 
 
 def test_external_artist_photo_serves_cached_bytes_without_remote_lookup(
-    monkeypatch,
+    monkeypatch, tmp_path
 ):
     from crate.api import browse_artist
 
     queued: list[str] = []
     monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
+    cached_path = tmp_path / "cached.webp"
+    cached_path.write_bytes(_jpeg_bytes())
     monkeypatch.setattr(
         browse_artist,
-        "get_cached_external_artist_artwork",
-        lambda _name: {"content": _jpeg_bytes(), "content_type": "image/jpeg"},
-        raising=False,
+        "get_cached_external_artist_artwork_path",
+        lambda _name: {
+            "path": cached_path,
+            "content_type": "image/webp",
+            "stale": False,
+        },
     )
     monkeypatch.setattr(
         browse_artist,
@@ -190,20 +216,23 @@ def test_external_artist_photo_serves_cached_bytes_without_remote_lookup(
     assert queued == []
 
 
-def test_external_artist_photo_serves_stale_bytes_while_revalidating(monkeypatch):
+def test_external_artist_photo_serves_stale_bytes_while_revalidating(
+    monkeypatch, tmp_path
+):
     from crate.api import browse_artist
 
     queued: list[str] = []
     monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
+    cached_path = tmp_path / "cached.webp"
+    cached_path.write_bytes(_jpeg_bytes())
     monkeypatch.setattr(
         browse_artist,
-        "get_cached_external_artist_artwork",
+        "get_cached_external_artist_artwork_path",
         lambda _name: {
-            "content": _jpeg_bytes(),
-            "content_type": "image/jpeg",
+            "path": cached_path,
+            "content_type": "image/webp",
             "stale": True,
         },
-        raising=False,
     )
     monkeypatch.setattr(
         browse_artist,

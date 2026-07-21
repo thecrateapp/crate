@@ -16,10 +16,11 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from crate.api import browse_artist as browse_artist_api
@@ -720,30 +721,30 @@ def _serve_federated_album_asset(
     image_format: str | None,
     not_found_detail: str,
 ):
-
     from crate.api._deps import COVER_NAMES
-    from crate.api.image_variants import build_image_response
+    from crate.api.artwork_delivery import deliver_artwork
+    from crate.artwork_variants import ArtworkAsset
     from crate.db.repositories.library import get_library_album_by_entity_uid
+
+    del image_format
 
     album = get_library_album_by_entity_uid(remote_entity_uid)
     if not album:
         raise HTTPException(status_code=404, detail=not_found_detail)
 
     album_dir = Path(str(album.get("path") or ""))
+    local_original = None
     for cover_name in COVER_NAMES:
         cover = album_dir / cover_name
-        if not cover.is_file():
-            continue
-        media_type = "image/png" if cover.suffix.lower() == ".png" else "image/jpeg"
-        return build_image_response(
-            cover.read_bytes(),
-            media_type,
-            size=size,
-            output_format=image_format,
-            headers={"Cache-Control": "public, max-age=3600"},
-        )
-
-    raise HTTPException(status_code=404, detail=not_found_detail)
+        if cover.is_file():
+            local_original = cover
+            break
+    return deliver_artwork(
+        ArtworkAsset("album-cover", remote_entity_uid),
+        requested_size=size,
+        local_original=local_original,
+        missing_response=Response(status_code=404),
+    )
 
 
 @router.get("/assets/artists/{remote_entity_uid}/photo")
@@ -781,6 +782,7 @@ async def federated_artist_photo(
         _federated_artist_sidecar_image,
         remote_entity_uid,
         candidate_names=_artist_photo_names(),
+        artwork_kind="artist-photo",
         size=size,
         image_format=image_format,
         not_found_detail="Artist photo not found",
@@ -822,6 +824,7 @@ async def federated_artist_background(
         _federated_artist_sidecar_image,
         remote_entity_uid,
         candidate_names=_artist_background_names(),
+        artwork_kind="artist-background",
         size=size,
         image_format=image_format,
         not_found_detail="Artist background not found",
@@ -894,6 +897,7 @@ def _serve_federated_asset(
         return _federated_artist_sidecar_image(
             remote_entity_uid,
             candidate_names=_artist_photo_names(),
+            artwork_kind="artist-photo",
             size=size,
             image_format=image_format,
             not_found_detail="Asset not found",
@@ -902,6 +906,7 @@ def _serve_federated_asset(
         return _federated_artist_sidecar_image(
             remote_entity_uid,
             candidate_names=_artist_background_names(),
+            artwork_kind="artist-background",
             size=size,
             image_format=image_format,
             not_found_detail="Asset not found",
@@ -933,14 +938,18 @@ def _federated_artist_sidecar_image(
     remote_entity_uid: str,
     *,
     candidate_names: tuple[str, ...],
+    artwork_kind: str,
     size: int | None,
     image_format: str | None,
     not_found_detail: str,
 ):
     from crate.api._deps import library_path
-    from crate.api.image_variants import build_image_response
+    from crate.api.artwork_delivery import deliver_artwork
+    from crate.artwork_variants import ArtworkAsset, ArtworkKind
     from crate.db.repositories.library import get_library_artist_by_entity_uid
     from crate.storage_layout import resolve_artist_dir
+
+    del image_format
 
     artist = get_library_artist_by_entity_uid(remote_entity_uid)
     if not artist:
@@ -955,20 +964,18 @@ def _federated_artist_sidecar_image(
     if not artist_dir or not artist_dir.is_dir():
         raise HTTPException(status_code=404, detail=not_found_detail)
 
+    local_original = None
     for image_name in candidate_names:
         image = artist_dir / image_name
-        if not image.is_file():
-            continue
-        media_type = _image_media_type(image.suffix)
-        return build_image_response(
-            image.read_bytes(),
-            media_type,
-            size=size,
-            output_format=image_format,
-            headers={"Cache-Control": "public, max-age=3600"},
-        )
-
-    raise HTTPException(status_code=404, detail=not_found_detail)
+        if image.is_file():
+            local_original = image
+            break
+    return deliver_artwork(
+        ArtworkAsset(cast(ArtworkKind, artwork_kind), remote_entity_uid),
+        requested_size=size,
+        local_original=local_original,
+        missing_response=Response(status_code=404),
+    )
 
 
 def _image_media_type(suffix: str) -> str:

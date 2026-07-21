@@ -4,6 +4,7 @@ import asyncio
 import json
 import uuid
 from io import BytesIO
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -520,6 +521,11 @@ def test_federated_artwork_serves_image_variants(tmp_path, monkeypatch):
     cover = BytesIO()
     Image.new("RGB", (64, 64), (18, 52, 86)).save(cover, format="PNG")
     (tmp_path / "cover.png").write_bytes(cover.getvalue())
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    from crate.artwork_materializer import materialize_artwork
+    from crate.artwork_variants import ArtworkAsset
+
+    materialize_artwork(ArtworkAsset("album-cover", "album-1"), cover.getvalue())
 
     async def fake_require_signed_node_request(_request):
         return {"node_uid": "node-a", "default_grant_preset": "catalog"}
@@ -552,8 +558,8 @@ def test_federated_artwork_serves_image_variants(tmp_path, monkeypatch):
     )
 
     assert response.headers["content-type"] == "image/webp"
-    assert response.headers["cache-control"] == "public, max-age=3600"
-    assert response.body
+    assert response.headers["cache-control"].startswith("public, max-age=86400")
+    assert Path(response.path).is_file()
 
 
 def test_federated_artist_photo_serves_sidecar_without_local_user_session(
@@ -566,6 +572,11 @@ def test_federated_artist_photo_serves_sidecar_without_local_user_session(
     photo = BytesIO()
     Image.new("RGB", (64, 64), (96, 32, 128)).save(photo, format="JPEG")
     (tmp_path / "artist.jpg").write_bytes(photo.getvalue())
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    from crate.artwork_materializer import materialize_artwork
+    from crate.artwork_variants import ArtworkAsset
+
+    materialize_artwork(ArtworkAsset("artist-photo", "artist-1"), photo.getvalue())
 
     async def fake_require_signed_node_request(_request):
         return {"node_uid": "node-a", "default_grant_preset": "catalog"}
@@ -607,8 +618,8 @@ def test_federated_artist_photo_serves_sidecar_without_local_user_session(
     )
 
     assert response.headers["content-type"] == "image/webp"
-    assert response.headers["cache-control"] == "public, max-age=3600"
-    assert response.body
+    assert response.headers["cache-control"].startswith("public, max-age=86400")
+    assert Path(response.path).is_file()
 
 
 def test_federated_generic_artist_background_serves_sidecar(tmp_path, monkeypatch):
@@ -619,6 +630,13 @@ def test_federated_generic_artist_background_serves_sidecar(tmp_path, monkeypatc
     background = BytesIO()
     Image.new("RGB", (96, 64), (12, 80, 140)).save(background, format="JPEG")
     (tmp_path / "background.jpg").write_bytes(background.getvalue())
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    from crate.artwork_materializer import materialize_artwork
+    from crate.artwork_variants import ArtworkAsset
+
+    materialize_artwork(
+        ArtworkAsset("artist-background", "artist-1"), background.getvalue()
+    )
 
     async def fake_require_signed_node_request(_request):
         return {"node_uid": "node-a", "default_grant_preset": "catalog"}
@@ -662,8 +680,8 @@ def test_federated_generic_artist_background_serves_sidecar(tmp_path, monkeypatc
     )
 
     assert response.headers["content-type"] == "image/webp"
-    assert response.headers["cache-control"] == "public, max-age=3600"
-    assert response.body
+    assert response.headers["cache-control"].startswith("public, max-age=86400")
+    assert Path(response.path).is_file()
 
 
 def test_artist_info_facet_preserves_remote_popularity_fields():

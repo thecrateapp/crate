@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -69,6 +72,9 @@ func main() {
 	if cfg.checkGlobalCatalog {
 		mustCheckGlobalCatalog(ctx, fastapi, readplane, token, cfg.p1Query)
 	}
+	for _, path := range cfg.mediaPaths {
+		mustCompareMedia(ctx, cfg, token, path)
+	}
 }
 
 type smokeConfig struct {
@@ -81,6 +87,7 @@ type smokeConfig struct {
 	checkP1            bool
 	checkGlobalCatalog bool
 	p1Query            string
+	mediaPaths         []string
 }
 
 func loadConfig() smokeConfig {
@@ -94,7 +101,85 @@ func loadConfig() smokeConfig {
 		checkP1:            boolEnv("READPLANE_CONTRACT_CHECK_P1", true),
 		checkGlobalCatalog: boolEnv("READPLANE_CONTRACT_CHECK_GLOBAL_CATALOG", true),
 		p1Query:            env("READPLANE_CONTRACT_P1_QUERY", "high"),
+		mediaPaths:         splitPaths(os.Getenv("READPLANE_CONTRACT_MEDIA_PATHS")),
 	}
+}
+
+type mediaResult struct {
+	status       int
+	contentType  string
+	contentRange string
+	body         []byte
+	headers      map[string]string
+}
+
+func splitPaths(value string) []string {
+	result := []string{}
+	for _, item := range strings.Split(value, ",") {
+		if path := strings.TrimSpace(item); path != "" {
+			result = append(result, path)
+		}
+	}
+	return result
+}
+
+func mustCompareMedia(ctx context.Context, cfg smokeConfig, token, path string) {
+	left, err := fetchMedia(ctx, cfg.fastapiBase+path, token)
+	if err != nil {
+		log.Fatalf("media %s FastAPI failed: %v", path, err)
+	}
+	right, err := fetchMedia(ctx, cfg.readplaneBase+path, token)
+	if err != nil {
+		log.Fatalf("media %s readplane failed: %v", path, err)
+	}
+	if err := compareMediaResult(left, right); err != nil {
+		log.Fatalf("media %s mismatch: %v", path, err)
+	}
+	fmt.Printf("ok %-32s source=media-contract\n", path)
+}
+
+func fetchMedia(ctx context.Context, url, token string) (mediaResult, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return mediaResult{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Range", "bytes=0-65535")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return mediaResult{}, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return mediaResult{}, err
+	}
+	headers := map[string]string{}
+	for _, key := range []string{"X-Crate-Delivery-Policy", "X-Crate-Delivery-Effective-Policy", "X-Crate-Delivery-Format", "X-Crate-Delivery-Bitrate", "X-Crate-Source-Format", "X-Crate-Transcoded", "X-Crate-Variant-Status"} {
+		headers[key] = resp.Header.Get(key)
+	}
+	return mediaResult{status: resp.StatusCode, contentType: resp.Header.Get("Content-Type"), contentRange: resp.Header.Get("Content-Range"), body: body, headers: headers}, nil
+}
+
+func compareMediaResult(left, right mediaResult) error {
+	if left.status != right.status {
+		return fmt.Errorf("status %d != %d", left.status, right.status)
+	}
+	if left.contentType != right.contentType {
+		return fmt.Errorf("content type %q != %q", left.contentType, right.contentType)
+	}
+	if left.contentRange != right.contentRange {
+		return fmt.Errorf("content range %q != %q", left.contentRange, right.contentRange)
+	}
+	if !bytes.Equal(left.body, right.body) {
+		return fmt.Errorf("response bytes differ")
+	}
+	for key, value := range left.headers {
+		if right.headers[key] != value {
+			return fmt.Errorf("header %s differs", key)
+		}
+	}
+	return nil
 }
 
 func mustCheckGlobalCatalog(ctx context.Context, fastapi contract.Client, readplane contract.Client, token string, query string) {

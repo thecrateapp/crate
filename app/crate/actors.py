@@ -96,6 +96,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "fetch_album_cover": TaskPoolConfig("fast", 0, 120, 1),
     "upload_image": TaskPoolConfig("fast", 0, 60, 0),
     "resolve_external_artist_artwork": TaskPoolConfig("fast", 0, 30, 1),
+    "materialize_artwork_variants": TaskPoolConfig("default", 1, 300, 1),
     "library_upload": TaskPoolConfig("default", 0, 7200, 1),
     "library_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
     "library_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
@@ -162,6 +163,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "remux_m4a_dash": TaskPoolConfig("maintenance", 3, 7200, 0),
     "scan_missing_covers": TaskPoolConfig("maintenance", 3, 3600, 0),
     "fetch_artwork_all": TaskPoolConfig("maintenance", 3, 3600, 0),
+    "backfill_artwork_variants": TaskPoolConfig("maintenance", 3, 900, 1),
+    "cleanup_artwork_variants": TaskPoolConfig("maintenance", 3, 1800, 0),
+    "repair_artwork_variants": TaskPoolConfig("maintenance", 3, 3600, 1),
     "backfill_similarities": TaskPoolConfig("maintenance", 3, 3600, 0),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
     "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),
@@ -185,6 +189,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Playback delivery
     "prepare_stream_variant": TaskPoolConfig("playback", 0, 1200, 1),
     "warmup_stream_variants": TaskPoolConfig("maintenance", 3, 900, 0),
+    "cleanup_stream_variants": TaskPoolConfig("maintenance", 3, 1800, 0),
     # Playlist generation
     "generate_system_playlist": TaskPoolConfig("fast", 1, 600, 0),
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),

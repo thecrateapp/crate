@@ -584,6 +584,7 @@ readplane-contract-smoke: ## Compare readplane P0/P1/P2 responses against local 
 		-e READPLANE_BASE="$(READPLANE_BASE)" \
 		-e READPLANE_CONTRACT_CHECK_P1="$(READPLANE_CONTRACT_CHECK_P1)" \
 		-e READPLANE_CONTRACT_P1_QUERY="$(READPLANE_CONTRACT_P1_QUERY)" \
+		-e READPLANE_CONTRACT_MEDIA_PATHS="$(READPLANE_CONTRACT_MEDIA_PATHS)" \
 		-e CRATE_AUTH_EMAIL="$(READPLANE_AUTH_EMAIL)" \
 		-e CRATE_AUTH_PASSWORD="$(READPLANE_AUTH_PASSWORD)" \
 		$(READPLANE_GO_IMAGE) \
@@ -615,6 +616,21 @@ dev-federation-stream-benchmark: ## Benchmark the selected Go federated stream d
 		--measurement-rounds "$${CRATE_BENCHMARK_ROUNDS:-3}" \
 		--go-proxy-binary .artifacts/bin/federation-benchmark-proxy \
 		--output .artifacts/benchmarks/federation-stream.json
+
+.PHONY: dev-artwork-delivery-benchmark
+dev-artwork-delivery-benchmark: ## Profile materialized artwork delivery
+	@PYTHONPATH=app .venv/bin/python app/tests/load/artwork_delivery_profile.py \
+		--url "$${CRATE_ARTWORK_BENCHMARK_URL:?set CRATE_ARTWORK_BENCHMARK_URL}" \
+		--token "$${CRATE_BENCHMARK_TOKEN:-}" \
+		--output .artifacts/benchmarks/artwork-delivery.json $${CRATE_BENCHMARK_SLO:+--enforce-slo}
+
+.PHONY: dev-local-stream-benchmark
+dev-local-stream-benchmark: ## Compare FastAPI and native readplane local stream delivery
+	@PYTHONPATH=app .venv/bin/python app/tests/load/local_stream_delivery_profile.py \
+		--fastapi-url "$${CRATE_FASTAPI_STREAM_BENCHMARK_URL:?set CRATE_FASTAPI_STREAM_BENCHMARK_URL}" \
+		--readplane-url "$${CRATE_READPLANE_STREAM_BENCHMARK_URL:?set CRATE_READPLANE_STREAM_BENCHMARK_URL}" \
+		--token "$${CRATE_BENCHMARK_TOKEN:-}" \
+		--output .artifacts/benchmarks/local-stream-delivery.json $${CRATE_BENCHMARK_SLO:+--enforce-slo}
 
 # ===========================================================================
 # LOCAL (full stack with Traefik)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import re
 import time
 from io import BytesIO
@@ -14,6 +13,7 @@ from typing import TypedDict
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from crate.db.cache_store import get_cache, set_cache
+from crate.streaming.paths import cache_root
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +25,12 @@ _MAX_DIMENSION = 640
 
 class CachedExternalArtistArtwork(TypedDict):
     content: bytes
+    content_type: str
+    stale: bool
+
+
+class CachedExternalArtistArtworkPath(TypedDict):
+    path: Path
     content_type: str
     stale: bool
 
@@ -44,11 +50,17 @@ def _status_cache_key(name: str) -> str:
 
 
 def external_artist_artwork_root() -> Path:
-    return Path(os.environ.get("DATA_DIR", "/data")) / "external-artist-artwork"
+    return cache_root() / "external-artist-artwork"
 
 
 def _artwork_path(name: str) -> Path:
     return external_artist_artwork_root() / f"{external_artist_artwork_key(name)}.webp"
+
+
+def external_artist_artwork_path_from_key(entity_key: str) -> Path | None:
+    if not re.fullmatch(r"[a-f0-9]{64}", entity_key or ""):
+        return None
+    return external_artist_artwork_root() / f"{entity_key}.webp"
 
 
 def _missing_marker_path(name: str) -> Path:
@@ -82,6 +94,27 @@ def get_cached_external_artist_artwork(
         }
     except OSError as exc:
         log.debug("External artist artwork read skipped: %s", exc)
+        return None
+
+
+def get_cached_external_artist_artwork_path(
+    name: str,
+) -> CachedExternalArtistArtworkPath | None:
+    """Resolve a durable cached file without copying it into Python memory."""
+    path = _artwork_path(name)
+    try:
+        if not path.is_file():
+            return None
+        age_seconds = max(0.0, time.time() - path.stat().st_mtime)
+        if age_seconds > _ARTWORK_TTL_SECONDS + _ARTWORK_STALE_TTL_SECONDS:
+            return None
+        return {
+            "path": path,
+            "content_type": "image/webp",
+            "stale": age_seconds > _ARTWORK_TTL_SECONDS,
+        }
+    except OSError as exc:
+        log.debug("External artist artwork path lookup skipped: %s", exc)
         return None
 
 
@@ -166,8 +199,10 @@ def resolve_external_artist_artwork(name: str) -> bytes | None:
 __all__ = [
     "CachedExternalArtistArtwork",
     "external_artist_artwork_key",
+    "external_artist_artwork_path_from_key",
     "external_artist_artwork_root",
     "get_cached_external_artist_artwork",
+    "get_cached_external_artist_artwork_path",
     "is_external_artist_artwork_missing",
     "mark_external_artist_artwork_missing",
     "persist_external_artist_artwork",

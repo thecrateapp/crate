@@ -102,6 +102,21 @@ def _queue_global_catalog_bootstrap() -> None:
     )
 
 
+def _queue_artwork_variant_backfill() -> None:
+    """Queue the versioned, restart-safe upgrade backfill once per installation."""
+    from crate.artwork_tasks import ARTWORK_BACKFILL_VERSION
+    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.tasks import create_task_dedup
+
+    if get_setting("artwork_variants_backfill_version") == ARTWORK_BACKFILL_VERSION:
+        return
+    create_task_dedup(
+        "backfill_artwork_variants",
+        {"batch_size": 100, "include_genres": True},
+        dedup_key=f"bootstrap:artwork-variants:v{ARTWORK_BACKFILL_VERSION}",
+    )
+
+
 async def _repair_musicbrainz_cache_ttls() -> int:
     from crate.db.cache_musicbrainz import repair_mb_cache_ttls
 
@@ -116,6 +131,7 @@ async def lifespan(app: FastAPI):
     init_db()
     _bootstrap_federation_identity()
     _queue_global_catalog_bootstrap()
+    _queue_artwork_variant_backfill()
     from crate.utils import init_musicbrainz
 
     init_musicbrainz()

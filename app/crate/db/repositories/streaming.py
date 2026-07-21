@@ -348,3 +348,50 @@ def mark_variant_missing(cache_key: str) -> None:
             ),
             {"cache_key": cache_key},
         )
+
+
+def list_stream_variants_for_cleanup(limit: int = 100_000) -> list[dict]:
+    safe_limit = max(1, min(int(limit), 500_000))
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT cache_key, status, relative_path, bytes,
+                           updated_at, completed_at
+                    FROM stream_variants
+                    WHERE status = 'ready' AND relative_path IS NOT NULL
+                    ORDER BY COALESCE(completed_at, updated_at), cache_key
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": safe_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
+
+
+def mark_stream_variants_missing(cache_keys: list[str]) -> int:
+    normalized = list(dict.fromkeys(str(key) for key in cache_keys if str(key)))
+    if not normalized:
+        return 0
+    with transaction_scope() as session:
+        result = session.execute(
+            text(
+                """
+                UPDATE stream_variants
+                SET status = 'pending',
+                    error = NULL,
+                    relative_path = NULL,
+                    bytes = NULL,
+                    completed_at = NULL,
+                    updated_at = NOW()
+                WHERE cache_key = ANY(:cache_keys)
+                  AND status = 'ready'
+                """
+            ),
+            {"cache_keys": normalized},
+        )
+        return max(0, int(result.rowcount or 0))

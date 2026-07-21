@@ -74,3 +74,11 @@ from an accepted benchmark and document the representative node/catalog shape;
 do not copy an arbitrary lab latency into a public SLO. See
 [Federation capacity](federation-capacity.md) and
 [Production acceptance](federation-production-acceptance.md).
+
+## Native local media dependency
+
+Local native delivery is governed by the gates in
+`local-media-delivery-slos.md`. Remote federation streaming remains on the
+existing ticketed proxy and is never replaced by filesystem delivery. A local
+native miss must fall back to FastAPI and must not change peer quotas, provenance
+or ticket validation.

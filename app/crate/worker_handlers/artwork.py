@@ -3,12 +3,38 @@ import io as _io
 import logging
 import time
 from pathlib import Path
+from typing import cast
 
+from crate.artwork_materializer import materialize_artwork
+from crate.artwork_maintenance import (
+    cleanup_artwork_variants,
+    find_corrupt_artwork_assets,
+)
+from crate.artwork_sources import resolve_artwork_source
+from crate.artwork_tasks import queue_artwork_materialization
+from crate.artwork_tasks import ARTWORK_BACKFILL_VERSION
+from crate.artwork_variants import (
+    ARTWORK_KINDS,
+    ArtworkAsset,
+    ArtworkKind,
+    external_artist_asset,
+)
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
-from crate.db.repositories.library import get_library_album, get_library_artist
+from crate.db.queries.artwork_backfill import (
+    list_artwork_backfill_albums,
+    list_artwork_backfill_artists,
+    list_artwork_backfill_genres,
+)
+from crate.db.repositories.library import (
+    get_library_album,
+    get_library_album_by_id,
+    get_library_artist,
+)
+from crate.db.repositories.tasks import create_task_dedup
 from crate.db.releases import update_new_release_cover
 from crate.release_covers import release_cover_abspath, release_cover_public_url
+from crate.metrics import record_later
 from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.db.jobs.artwork import (
     set_album_has_cover,
@@ -24,6 +50,191 @@ from crate.worker_handlers import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _handle_materialize_artwork_variants(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del config
+    allowed_params = {"kind", "entity_key", "reason"}
+    if set(params) - allowed_params:
+        return {"error": "Unsupported artwork task parameters"}
+
+    kind = str(params.get("kind") or "")
+    entity_key = str(params.get("entity_key") or "")
+    if kind not in ARTWORK_KINDS:
+        return {"error": "Unsupported artwork kind"}
+    try:
+        asset = ArtworkAsset(cast(ArtworkKind, kind), entity_key)
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    emit_progress(
+        task_id,
+        TaskProgress(phase="resolve_artwork_source", done=0, total=1),
+        force=True,
+    )
+    reason = str(params.get("reason") or "")
+    source = resolve_artwork_source(
+        asset,
+        allow_provider=reason not in {"backfill", "integrity-repair"},
+    )
+    if source is None:
+        return {
+            "status": "missing",
+            "kind": asset.kind,
+            "entity_key": asset.entity_key,
+        }
+
+    materialized = materialize_artwork(
+        asset,
+        source.content,
+        source_media_type=source.media_type,
+    )
+    emit_progress(
+        task_id,
+        TaskProgress(phase="materialize_artwork", done=1, total=1),
+        force=True,
+    )
+    return {
+        "status": "materialized",
+        "kind": asset.kind,
+        "entity_key": asset.entity_key,
+        "origin": source.origin,
+        "revision": materialized.get("source_revision"),
+        "variant_count": int(materialized.get("variant_count") or 0),
+    }
+
+
+def _handle_backfill_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
+    del config
+    batch_size = max(1, min(int(params.get("batch_size") or 100), 1000))
+    after_artist_id = max(0, int(params.get("after_artist_id") or 0))
+    after_album_id = max(0, int(params.get("after_album_id") or 0))
+    include_genres = bool(params.get("include_genres", True))
+    after_genre_slug = str(params.get("after_genre_slug") or "").strip().lower()
+
+    artists = list_artwork_backfill_artists(after_id=after_artist_id, limit=batch_size)
+    albums = list_artwork_backfill_albums(after_id=after_album_id, limit=batch_size)
+    genres = (
+        list_artwork_backfill_genres(after_slug=after_genre_slug, limit=batch_size)
+        if include_genres
+        else []
+    )
+    total_assets = len(artists) * 2 + len(albums) + len(genres)
+    progress = TaskProgress(phase="artwork_backfill", phase_count=1, total=total_assets)
+    emit_progress(task_id, progress, force=True)
+
+    queued = 0
+    skipped_missing_identity = 0
+    for row in artists:
+        entity_uid = str(row.get("entity_uid") or "")
+        if not entity_uid:
+            skipped_missing_identity += 1
+            continue
+        for kind in ("artist-photo", "artist-background"):
+            queue_artwork_materialization(
+                ArtworkAsset(cast(ArtworkKind, kind), entity_uid), reason="backfill"
+            )
+            queued += 1
+            progress.done += 1
+
+    for row in albums:
+        entity_uid = str(row.get("entity_uid") or "")
+        if not entity_uid:
+            skipped_missing_identity += 1
+            continue
+        queue_artwork_materialization(
+            ArtworkAsset("album-cover", entity_uid), reason="backfill"
+        )
+        queued += 1
+        progress.done += 1
+
+    for row in genres:
+        slug = str(row.get("slug") or "")
+        if not slug:
+            skipped_missing_identity += 1
+            continue
+        queue_artwork_materialization(
+            ArtworkAsset("genre-cover", slug), reason="backfill"
+        )
+        queued += 1
+        progress.done += 1
+
+    emit_progress(task_id, progress, force=True)
+    next_artist_id = int(artists[-1]["id"]) if artists else after_artist_id
+    next_album_id = int(albums[-1]["id"]) if albums else after_album_id
+    next_genre_slug = str(genres[-1]["slug"]) if genres else after_genre_slug
+    has_next_page = (
+        len(artists) >= batch_size
+        or len(albums) >= batch_size
+        or (include_genres and len(genres) >= batch_size)
+    )
+    if has_next_page:
+        next_params = {
+            "after_artist_id": next_artist_id,
+            "after_album_id": next_album_id,
+            "batch_size": batch_size,
+            "include_genres": include_genres,
+        }
+        if include_genres:
+            next_params["after_genre_slug"] = next_genre_slug
+        cursor_key = f"{next_artist_id}:{next_album_id}"
+        if include_genres:
+            cursor_key += f":{next_genre_slug}"
+        create_task_dedup(
+            "backfill_artwork_variants",
+            next_params,
+            dedup_key=(
+                f"artwork-backfill:{cursor_key}:{batch_size}:{int(include_genres)}"
+            ),
+        )
+
+    for kind, remaining in (
+        ("artist", len(artists) >= batch_size),
+        ("album", len(albums) >= batch_size),
+        ("genre", include_genres and len(genres) >= batch_size),
+    ):
+        record_later(
+            "artwork.backfill.remaining",
+            1.0 if remaining else 0.0,
+            {"kind": kind},
+        )
+
+    if not has_next_page:
+        try:
+            from crate.db.cache_settings import set_setting
+
+            set_setting("artwork_variants_backfill_version", ARTWORK_BACKFILL_VERSION)
+        except Exception:
+            log.warning("Failed to persist artwork backfill completion", exc_info=True)
+
+    return {
+        "status": "continued" if has_next_page else "completed",
+        "artists_seen": len(artists),
+        "albums_seen": len(albums),
+        "genres_seen": len(genres),
+        "queued": queued,
+        "skipped_missing_identity": skipped_missing_identity,
+        "next_queued": has_next_page,
+        "after_artist_id": next_artist_id,
+        "after_album_id": next_album_id,
+    }
+
+
+def _handle_cleanup_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
+    del task_id, config
+    max_assets = max(1, min(int(params.get("max_assets") or 10_000), 100_000))
+    return cleanup_artwork_variants(max_assets=max_assets)
+
+
+def _handle_repair_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
+    del task_id, config
+    max_assets = max(1, min(int(params.get("max_assets") or 1000), 100_000))
+    corrupt = find_corrupt_artwork_assets(max_assets=max_assets)
+    for asset in corrupt:
+        queue_artwork_materialization(asset, reason="integrity-repair")
+    return {"assets_checked": max_assets, "requeued": len(corrupt)}
 
 
 def _handle_resolve_external_artist_artwork(
@@ -51,6 +262,12 @@ def _handle_resolve_external_artist_artwork(
         log.debug("External artwork persistence failed for %s", artist_name)
         mark_external_artist_artwork_missing(artist_name)
         return {"status": "missing", "artist_name": artist_name}
+
+    materialize_artwork(
+        external_artist_asset(artist_name),
+        image,
+        source_media_type="image/jpeg",
+    )
 
     return {"status": "cached", "artist_name": artist_name}
 
@@ -532,6 +749,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         return resolved
 
     invalidation_scopes: list[str] = []
+    materialization_asset: ArtworkAsset | None = None
 
     if img_type == "cover":
         album_data = get_library_album(artist, album)
@@ -542,6 +760,10 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         if album_data.get("id"):
             set_album_has_cover(int(album_data["id"]))
             invalidation_scopes.append(f"album:{album_data['id']}")
+        if album_data.get("entity_uid"):
+            materialization_asset = ArtworkAsset(
+                "album-cover", str(album_data["entity_uid"])
+            )
         invalidation_scopes.extend(["library", "home"])
     elif img_type == "release_cover":
         if not release_id:
@@ -554,6 +776,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             cover_source="manual",
         ):
             return {"error": "Release not found"}
+        materialization_asset = ArtworkAsset("release-cover", str(int(release_id)))
         invalidation_scopes.extend(["library", "home", "upcoming"])
     elif img_type == "artist_photo":
         artist_row = get_library_artist(artist)
@@ -567,6 +790,10 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         set_artist_has_photo(artist)
         if artist_row and artist_row.get("id"):
             invalidation_scopes.append(f"artist:{artist_row['id']}")
+        if artist_row and artist_row.get("entity_uid"):
+            materialization_asset = ArtworkAsset(
+                "artist-photo", str(artist_row["entity_uid"])
+            )
         invalidation_scopes.extend(["library", "home", "shows", "upcoming"])
     elif img_type == "background":
         artist_row = get_library_artist(artist)
@@ -580,13 +807,43 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         touch_artist_artwork(artist)
         if artist_row and artist_row.get("id"):
             invalidation_scopes.append(f"artist:{artist_row['id']}")
+        if artist_row and artist_row.get("entity_uid"):
+            materialization_asset = ArtworkAsset(
+                "artist-background", str(artist_row["entity_uid"])
+            )
         invalidation_scopes.extend(["library", "home", "shows", "upcoming"])
+    elif img_type == "genre_cover":
+        from crate.db.repositories.genres_taxonomy_metadata import (
+            update_genre_taxonomy_node_metadata,
+        )
+        from crate.genre_covers import persist_genre_cover_upload
+
+        slug = str(params.get("slug") or "").strip().lower()
+        if not slug:
+            return {"error": "Genre slug is required"}
+        try:
+            cover_path = persist_genre_cover_upload(
+                slug,
+                filename=str(params.get("filename") or ""),
+                content_type=params.get("content_type"),
+                payload=raw,
+            )
+        except ValueError as exc:
+            return {"error": str(exc)}
+        if not update_genre_taxonomy_node_metadata(slug, cover_path=cover_path):
+            return {"error": "Genre not found"}
+        dest = Path(cover_path)
+        materialization_asset = ArtworkAsset("genre-cover", slug)
+        invalidation_scopes.extend(["library", "home", f"genre:{slug}"])
     else:
         return {"error": f"Unknown image type: {img_type}"}
 
     log.info(
         "Image uploaded: %s for %s (%dx%d)", img_type, artist, img.width, img.height
     )
+
+    if materialization_asset is not None:
+        queue_artwork_materialization(materialization_asset, reason="source-write")
 
     if img_type == "cover":
         try:
@@ -677,6 +934,12 @@ def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
         save_cover(album_dir, cover_data)
         if album_id:
             set_album_has_cover(album_id)
+            album_row = get_library_album_by_id(int(album_id))
+            if album_row and album_row.get("entity_uid"):
+                queue_artwork_materialization(
+                    ArtworkAsset("album-cover", str(album_row["entity_uid"])),
+                    reason="source-write",
+                )
         emit_task_event(
             task_id,
             "cover_applied",
@@ -701,6 +964,10 @@ def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
 
 
 ARTWORK_TASK_HANDLERS: dict[str, TaskHandler] = {
+    "materialize_artwork_variants": _handle_materialize_artwork_variants,
+    "backfill_artwork_variants": _handle_backfill_artwork_variants,
+    "cleanup_artwork_variants": _handle_cleanup_artwork_variants,
+    "repair_artwork_variants": _handle_repair_artwork_variants,
     "resolve_external_artist_artwork": _handle_resolve_external_artist_artwork,
     "fetch_cover": _handle_fetch_cover,
     "fetch_album_cover": _handle_fetch_album_cover,

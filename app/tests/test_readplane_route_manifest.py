@@ -15,7 +15,10 @@ def test_route_manifest_covers_interactive_sse_and_stream_reads():
     manifest = _manifest()
     routes = manifest["routes"]
 
-    assert all(route["methods"] == ["GET"] for route in routes)
+    assert all(route["methods"] in (["GET"], ["GET", "HEAD"]) for route in routes)
+    by_name = {route["name"]: route for route in routes}
+    for name in ("artists", "albums", "tracks"):
+        assert by_name[name]["methods"] == ["GET", "HEAD"]
     by_class = {
         route_class: {
             route.get("path") or route.get("path_prefix")
@@ -41,6 +44,7 @@ def test_listen_proxy_uses_bounded_route_specific_readplane_locations():
     assert "map $request_method $read_backend" in nginx
     method_map = nginx.split("map $request_method $read_backend", 1)[1].split("}", 1)[0]
     assert "GET http://crate_readplane_backend;" in method_map
+    assert "HEAD http://crate_readplane_backend;" in method_map
     assert "default http://crate-api:8585;" in method_map
     assert "upstream crate_readplane_backend" in nginx
     assert "server crate-api:8585 backup;" in nginx
@@ -71,7 +75,7 @@ def test_api_domain_routes_readplane_classes_with_explicit_priority():
     for router in ("interactive", "sse", "stream"):
         rule = labels[f"traefik.http.routers.crate-readplane-{router}.rule"]
         assert "Host(`api.${DOMAIN}`)" in rule
-        assert "Method(`GET`)" in rule
+        assert "Method(`GET`" in rule
         assert labels[f"traefik.http.routers.crate-readplane-{router}.priority"] >= 100
 
     assert (

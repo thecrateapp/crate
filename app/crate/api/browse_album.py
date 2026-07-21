@@ -5,13 +5,13 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Mapping
 
-import mutagen
 import requests
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
 
 from crate.api._deps import COVER_NAMES, extensions, library_path
+from crate.api.artwork_delivery import deliver_artwork
 from crate.api.auth import _require_auth
 from crate.api.browse_shared import (
     build_genre_profile,
@@ -20,7 +20,6 @@ from crate.api.browse_shared import (
     fs_album_detail,
     has_library_data,
 )
-from crate.api.image_variants import build_image_response
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -29,7 +28,7 @@ from crate.api.openapi_responses import (
 from crate.api.permissions import require_permission
 from crate.api.schemas.browse import AlbumDetailResponse, RelatedAlbumResponse
 from crate.api.schemas.common import TaskEnqueueResponse
-from crate.audio import get_audio_files
+from crate.artwork_variants import ArtworkAsset
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.queries.global_catalog import (
     GlobalCatalogPublicRouteConflict,
@@ -943,45 +942,13 @@ def _placeholder_cover(seed: str) -> Response:
     )
 
 
-def _extract_embedded_cover(audio_file: Path) -> tuple[bytes, str] | None:
-    """Return (data, mime) for the first embedded cover in ``audio_file``.
-
-    Handles FLAC (``audio.pictures``), Ogg/Opus (METADATA_BLOCK_PICTURE) and
-    ID3-tagged files (MP3/AIFF with APIC frames) without blowing up on the
-    tuple-vs-string iteration difference between ``VComment`` and ``ID3``.
-    """
-    try:
-        audio = getattr(mutagen, "File")(audio_file)
-    except Exception:
+def _local_album_cover(album_dir: Path | None) -> Path | None:
+    if album_dir is None or not album_dir.is_dir():
         return None
-    if audio is None:
-        return None
-
-    # FLAC / Ogg / Opus expose pictures directly.
-    pictures = getattr(audio, "pictures", None)
-    if pictures:
-        pic = pictures[0]
-        return pic.data, pic.mime
-
-    tags = getattr(audio, "tags", None)
-    if not tags:
-        return None
-
-    # ID3 (MP3, AIFF, WAV) — tags iterates as string frame keys and indexing
-    # returns the frame object. FLAC VComment iterates as (key, value) tuples
-    # where the value is a plain text string, so APIC never lives there.
-    try:
-        keys = list(tags.keys()) if hasattr(tags, "keys") else list(tags)
-    except Exception:
-        return None
-    for key in keys:
-        if not isinstance(key, str) or not key.startswith("APIC"):
-            continue
-        frame = tags.get(key) if hasattr(tags, "get") else tags[key]
-        data = getattr(frame, "data", None)
-        mime = getattr(frame, "mime", None) or "image/jpeg"
-        if data:
-            return data, mime
+    for cover_name in COVER_NAMES:
+        cover = album_dir / cover_name
+        if cover.is_file():
+            return cover
     return None
 
 
@@ -992,7 +959,9 @@ def api_cover(
     *,
     size: int | None = None,
     image_format: str | None = None,
+    album_entity_uid: str | None = None,
 ):
+    del image_format
     lib = library_path()
     # Prefer the caller-supplied canonical directory (from api_cover_by_id)
     # so we don't get fooled by a loose duplicate folder under /Artist/Album
@@ -1002,32 +971,25 @@ def api_cover(
     if not album_dir:
         return _placeholder_cover(album or artist)
 
-    _IMG_CACHE = {
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
-    }
-
-    for cover_name in COVER_NAMES:
-        cover = album_dir / cover_name
-        if cover.exists():
-            media_type = "image/jpeg" if cover.suffix == ".jpg" else "image/png"
-            return build_image_response(
-                cover.read_bytes(),
-                media_type,
-                size=size,
-                output_format=image_format,
-                headers=_IMG_CACHE,
-            )
-
-    exts = extensions()
-    tracks = get_audio_files(album_dir, exts)
-    for track in tracks:
-        extracted = _extract_embedded_cover(track)
-        if extracted:
-            data, mime = extracted
-            return build_image_response(
-                data, mime, size=size, output_format=image_format, headers=_IMG_CACHE
-            )
-
+    cover = _local_album_cover(album_dir)
+    entity_uid = album_entity_uid
+    if entity_uid is None:
+        album_row = find_album_row(artist, album)
+        entity_uid = str(album_row.get("entity_uid") or "") if album_row else ""
+    if entity_uid:
+        return deliver_artwork(
+            ArtworkAsset("album-cover", entity_uid),
+            requested_size=size,
+            local_original=cover,
+            missing_response=_placeholder_cover(album or artist),
+        )
+    if cover is not None:
+        return FileResponse(
+            cover,
+            headers={
+                "Cache-Control": "public, max-age=300, stale-while-revalidate=86400"
+            },
+        )
     return _placeholder_cover(album or artist)
 
 
@@ -1121,38 +1083,12 @@ def api_cover_by_id(
         if not release:
             return _placeholder_cover("?")
         cached_cover = release_cover_abspath(album_id)
-        if cached_cover.exists():
-            return build_image_response(
-                cached_cover.read_bytes(),
-                "image/jpeg",
-                size=size,
-                output_format=image_format,
-                headers={
-                    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
-                },
-            )
-        cover_url = str(release.get("cover_url") or "")
-        if cover_url:
-            try:
-                remote_cover = _fetch_remote_cover(cover_url)
-                if remote_cover:
-                    content, media_type = remote_cover
-                    return build_image_response(
-                        content,
-                        media_type,
-                        size=size,
-                        output_format=image_format,
-                        headers={
-                            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
-                        },
-                    )
-            except Exception:
-                log.debug(
-                    "Failed to proxy pre-release cover for %s",
-                    release.get("album_title"),
-                    exc_info=True,
-                )
-        return _placeholder_cover(str(release.get("album_title") or "?"))
+        return deliver_artwork(
+            ArtworkAsset("release-cover", str(release.get("id") or abs(album_id))),
+            requested_size=size,
+            local_original=cached_cover if cached_cover.is_file() else None,
+            missing_response=_placeholder_cover(str(release.get("album_title") or "?")),
+        )
 
     album = get_library_album_by_id(album_id)
     if not album:
@@ -1165,6 +1101,7 @@ def api_cover_by_id(
         album_dir=album_dir,
         size=size,
         image_format=image_format,
+        album_entity_uid=str(album.get("entity_uid") or "") or None,
     )
 
 
@@ -1189,6 +1126,7 @@ def api_cover_by_entity_uid(
         album_dir=album_dir,
         size=size,
         image_format=image_format,
+        album_entity_uid=str(album.get("entity_uid") or "") or None,
     )
 
 

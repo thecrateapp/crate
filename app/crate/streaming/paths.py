@@ -8,8 +8,12 @@ def data_root() -> Path:
     return Path(os.environ.get("DATA_DIR", "/data")).resolve()
 
 
+def cache_root() -> Path:
+    return Path(os.environ.get("CACHE_DIR", str(data_root()))).resolve()
+
+
 def stream_cache_root() -> Path:
-    return data_root() / "stream-cache"
+    return cache_root() / "stream-cache"
 
 
 def variant_relative_path(cache_key: str, preset: str, extension: str) -> str:
@@ -28,7 +32,8 @@ def variant_relative_path(cache_key: str, preset: str, extension: str) -> str:
 def resolve_data_file(relative_path: str | None) -> Path | None:
     if not relative_path:
         return None
-    root = data_root()
+    stored = Path(relative_path)
+    root = cache_root() if stored.parts[:1] == ("stream-cache",) else data_root()
     candidate = (root / relative_path).resolve()
     if not candidate.is_relative_to(root):
         return None

@@ -144,6 +144,33 @@
     "order": 130
   },
   {
+    "sourcePath": "docs/technical/artwork-delivery.md",
+    "route": "/operations/artwork-delivery",
+    "section": "operations",
+    "title": "Artwork delivery",
+    "summary": "Operate worker-owned persistent artwork variants and their non-blocking read path.",
+    "keywords": ["artwork", "variants", "backfill", "workers"],
+    "order": 140
+  },
+  {
+    "sourcePath": "docs/technical/local-media-delivery-slos.md",
+    "route": "/operations/local-media-delivery-slos",
+    "section": "operations",
+    "title": "Local media delivery SLOs",
+    "summary": "Gate native readplane delivery of local audio and artwork with measurable safety and rollback criteria.",
+    "keywords": ["media", "readplane", "streaming", "slos"],
+    "order": 150
+  },
+  {
+    "sourcePath": "docs/technical/storage-retention.md",
+    "route": "/operations/storage-retention",
+    "section": "operations",
+    "title": "Storage retention and disk pressure",
+    "summary": "Bound regenerable caches, container logs and image retention, and recover safely from disk pressure.",
+    "keywords": ["storage", "cache", "retention", "disk"],
+    "order": 160
+  },
+  {
     "sourcePath": "docs/technical/federation-overview.md",
     "route": "/federation/federation-overview",
     "section": "federation",

@@ -7,7 +7,6 @@ thresholds. Integrates with Telegram for proactive alerts.
 from __future__ import annotations
 
 import logging
-import shutil
 from dataclasses import dataclass, field
 
 from crate.db.cache_settings import get_setting
@@ -39,6 +38,10 @@ class HealthStatus:
         lines.append(
             f"\U0001f4be Disk: {m.get('disk_free_gb', 0):.0f} GB free ({m.get('disk_usage_pct', 0):.0f}%)"
         )
+        if m.get("disk_days_until_full") is not None:
+            lines.append(
+                f"\u23f3 Disk projection: {m['disk_days_until_full']:.1f} days remaining"
+            )
         lines.append(f"\U0001f9e0 RAM: {m.get('ram_usage_pct', 0):.0f}%")
         if self.breaches:
             lines.append("")
@@ -64,7 +67,9 @@ DEFAULT_THRESHOLDS = {
     "api_p95_latency_ms": 3000,
     "api_error_rate_pct": 5,
     "worker_queue_depth": 50,
-    "disk_usage_pct": 90,
+    "disk_warning_pct": 75,
+    "disk_critical_pct": 85,
+    "disk_emergency_pct": 90,
     "ram_usage_pct": 95,
     "task_failure_rate_pct": 20,
 }
@@ -116,23 +121,54 @@ def evaluate_health() -> HealthStatus:
             ThresholdBreach("Worker queue depth", queue_depth, threshold, "warning")
         )
 
-    # Disk
+    # Storage filesystems. CACHE_DIR may intentionally live on a different mount.
     try:
-        usage = shutil.disk_usage("/music")
-        disk_pct = (usage.used / usage.total) * 100
-        disk_free_gb = usage.free / (1024**3)
-        status.metrics["disk_usage_pct"] = disk_pct
-        status.metrics["disk_free_gb"] = disk_free_gb
-        threshold = _get_threshold(
-            "disk_usage_pct", DEFAULT_THRESHOLDS["disk_usage_pct"]
-        )
-        if disk_pct > threshold:
-            breaches.append(
-                ThresholdBreach("Disk usage", disk_pct, threshold, "critical")
-            )
+        from crate.storage_health import collect_storage_health
+
+        disks = collect_storage_health()
     except Exception:
-        status.metrics["disk_usage_pct"] = 0
-        status.metrics["disk_free_gb"] = 0
+        disks = {}
+    status.metrics["disks"] = disks
+    available_disks = [value for value in disks.values() if value]
+    worst = max(available_disks, key=lambda value: value.get("percent", 0), default={})
+    status.metrics["disk_usage_pct"] = float(worst.get("percent", 0))
+    status.metrics["disk_free_gb"] = float(worst.get("free_gb", 0))
+    status.metrics["disk_days_until_full"] = worst.get("days_until_full")
+    seen_filesystems: set[tuple[str, str]] = set()
+    warning_threshold = _get_threshold(
+        "disk_warning_pct", DEFAULT_THRESHOLDS["disk_warning_pct"]
+    )
+    critical_threshold = _get_threshold(
+        "disk_critical_pct", DEFAULT_THRESHOLDS["disk_critical_pct"]
+    )
+    emergency_threshold = _get_threshold(
+        "disk_emergency_pct", DEFAULT_THRESHOLDS["disk_emergency_pct"]
+    )
+    for label, disk in disks.items():
+        path = str(disk.get("path") or label)
+        filesystem_id = disk.get("filesystem_id")
+        identity = (
+            ("device", str(filesystem_id))
+            if filesystem_id is not None
+            else ("path", path)
+        )
+        if identity in seen_filesystems:
+            continue
+        seen_filesystems.add(identity)
+        percent = float(disk.get("percent", 0))
+        if percent >= emergency_threshold:
+            level, threshold, severity = "emergency", emergency_threshold, "critical"
+        elif percent >= critical_threshold:
+            level, threshold, severity = "critical", critical_threshold, "critical"
+        elif percent >= warning_threshold:
+            level, threshold, severity = "warning", warning_threshold, "warning"
+        else:
+            continue
+        breaches.append(
+            ThresholdBreach(
+                f"{label.title()} disk {level}", percent, threshold, severity
+            )
+        )
 
     # RAM
     try:

@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from crate.artwork_tasks import queue_artwork_materialization
+from crate.artwork_variants import ArtworkAsset
 from crate.bandcamp.search import BandcampSearchError, find_exact_artist_url
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import delete_cache, get_cache, set_cache
@@ -266,7 +268,9 @@ def _has_local_artist_photo(artist_dir: Path) -> bool:
     )
 
 
-def _download_artist_photo(name: str, artist_dir: Path) -> bool:
+def _download_artist_photo(
+    name: str, artist_dir: Path, *, entity_uid: str | None = None
+) -> bool:
     if not artist_dir.is_dir():
         return False
 
@@ -281,6 +285,10 @@ def _download_artist_photo(name: str, artist_dir: Path) -> bool:
             return False
         (artist_dir / "artist.jpg").write_bytes(image)
         update_artist_has_photo(name)
+        if entity_uid:
+            queue_artwork_materialization(
+                ArtworkAsset("artist-photo", entity_uid), reason="source-write"
+            )
         return True
     except OSError:
         return False
@@ -476,7 +484,11 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
 
     # ── Download photo ──
     if not _has_local_artist_photo(artist_dir):
-        _download_artist_photo(name, artist_dir)
+        _download_artist_photo(
+            name,
+            artist_dir,
+            entity_uid=str((db_artist or {}).get("entity_uid") or "") or None,
+        )
 
     return {
         "artist": name,

@@ -910,3 +910,67 @@ class TestArtistEnrichment:
         worker_enrichment._invalidate_artist_top_tracks_cache(" Birds In Row ")
 
         assert prefixes == ["listen:artist_top_tracks:v1:birds in row:"]
+
+
+def test_download_artist_photo_queues_persistent_variants(monkeypatch, tmp_path):
+    from crate import enrichment
+
+    queued = []
+    monkeypatch.setattr(
+        "crate.lastfm.get_best_artist_image", lambda _name: b"artist-image"
+    )
+    monkeypatch.setattr(enrichment, "update_artist_has_photo", lambda _name: None)
+    monkeypatch.setattr(
+        enrichment,
+        "queue_artwork_materialization",
+        lambda asset, *, reason: queued.append((asset.kind, asset.entity_key, reason)),
+    )
+
+    assert enrichment._download_artist_photo(
+        "Converge", tmp_path, entity_uid="artist-entity"
+    )
+    assert queued == [("artist-photo", "artist-entity", "source-write")]
+
+
+def test_new_content_cover_fetch_queues_persistent_variants(monkeypatch, tmp_path):
+    from crate.task_progress import TaskProgress
+    from crate.worker_handlers import enrichment as worker_enrichment
+
+    album_dir = tmp_path / "Album"
+    album_dir.mkdir()
+    queued = []
+    monkeypatch.setattr(
+        "crate.artwork.fetch_cover_from_caa", lambda _mbid: b"cover-image"
+    )
+    monkeypatch.setattr("crate.artwork.save_cover", lambda _path, _data: None)
+    monkeypatch.setattr(worker_enrichment, "wait_for_provider_slot", lambda *_args: 0)
+    monkeypatch.setattr(
+        worker_enrichment, "emit_progress", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(worker_enrichment, "update_album_has_cover", lambda _id: None)
+    monkeypatch.setattr(
+        worker_enrichment,
+        "queue_artwork_materialization",
+        lambda asset, *, reason: queued.append((asset.kind, asset.entity_key, reason)),
+    )
+    result = {"steps": {}}
+
+    worker_enrichment._process_new_content_missing_covers(
+        "task-1",
+        result,
+        [
+            {
+                "id": 2,
+                "entity_uid": "album-entity",
+                "name": "Album",
+                "path": str(album_dir),
+                "musicbrainz_albumid": "mbid",
+            }
+        ],
+        "Artist",
+        "",
+        TaskProgress(),
+    )
+
+    assert result["steps"]["covers"] == 1
+    assert queued == [("album-cover", "album-entity", "source-write")]

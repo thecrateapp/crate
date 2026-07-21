@@ -24,10 +24,16 @@ Core routes include:
 - `GET /api/catalog/tracks/{global_track_uid}/playback`
 - `GET /api/federation/remote/streams/{local_ticket_uid}`
 
-FastAPI remains the owner of writes, auth mutations, local media delivery,
+FastAPI remains the owner of writes, auth mutations, playback preparation,
 workers, tasks, enrichment, admin APIs, snapshots, federation authorization,
-URL policy, and signing. The readplane is the preferred byte relay for remote
-federation streams because the reproducible performance gate in
+URL policy, and signing. With `READPLANE_LOCAL_MEDIA_ENABLED=true`, the
+readplane may serve existing local originals, ready adaptive variants and
+worker-materialized artwork from read-only `/music` and `/data` mounts. Any
+disabled, missing, unsafe, stale or JIT-dependent case falls back to FastAPI.
+The default remains `false` for an immediate rollback.
+
+The readplane is also the preferred byte relay for remote federation streams
+because the reproducible performance gate in
 `docs/technical/federation-streaming-benchmark.md` failed for the Python proxy.
 FastAPI is used once as fallback only if authorization fails before material is
 issued.
@@ -74,6 +80,26 @@ Compare P0 contracts against FastAPI:
 ```bash
 make readplane-contract-smoke
 ```
+
+To include bounded byte-for-byte checks for local tracks and materialized
+artwork, provide comma-separated authenticated paths, for example:
+
+```bash
+READPLANE_CONTRACT_MEDIA_PATHS='/api/tracks/1/stream,/api/albums/1/cover' \
+  make readplane-contract-smoke
+```
+
+Native local delivery configuration:
+
+```bash
+READPLANE_LOCAL_MEDIA_ENABLED=false
+READPLANE_MUSIC_ROOT=/music
+READPLANE_DATA_ROOT=/data
+READPLANE_CACHE_ROOT=/cache
+```
+
+`READPLANE_CACHE_ROOT` must reference the same regenerable cache volume used by
+Python's `CACHE_DIR`; stream variants and materialized artwork are read from it.
 
 Set `READPLANE_CONTRACT_CHECK_SSE=false` to skip the SSE initial-event
 comparison while Redis or stream routing is being wired.

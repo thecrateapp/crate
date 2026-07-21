@@ -232,6 +232,7 @@ class GenreTaxonomyCoverUpdateResponse(BaseModel):
     ok: bool = True
     slug: str
     cover_url: str
+    task_id: str
 
 
 class GenreDeleteResponse(BaseModel):

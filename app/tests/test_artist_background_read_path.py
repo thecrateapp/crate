@@ -41,5 +41,4 @@ def test_artist_background_prefers_local_artist_photo_before_remote_lookups(
     )
 
     assert response.status_code == 200
-    assert response.media_type == "image/webp"
-    assert response.headers["cache-control"].startswith("public")
+    assert response.media_type == "image/jpeg"

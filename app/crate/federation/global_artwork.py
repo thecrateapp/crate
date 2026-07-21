@@ -138,10 +138,13 @@ def _serve_local_artist_photo(
     image_format: str | None,
 ) -> Response:
     from crate.api._deps import library_path
+    from crate.api.artwork_delivery import deliver_artwork
     from crate.api.browse_shared import ARTIST_PHOTO_NAMES
-    from crate.api.image_variants import build_image_response
+    from crate.artwork_variants import ArtworkAsset
     from crate.db.repositories.library import get_library_artist_by_entity_uid
     from crate.storage_layout import resolve_artist_dir
+
+    del image_format
 
     artist = get_library_artist_by_entity_uid(artist_entity_uid)
     if artist is None:
@@ -154,22 +157,18 @@ def _serve_local_artist_photo(
     )
     if artist_dir is None:
         raise HTTPException(status_code=404, detail="Artwork not found")
+    local_original = None
     for name in ARTIST_PHOTO_NAMES:
         path = artist_dir / name
-        if not path.is_file():
-            continue
-        media_type = {
-            ".png": "image/png",
-            ".webp": "image/webp",
-        }.get(path.suffix.lower(), "image/jpeg")
-        return build_image_response(
-            path.read_bytes(),
-            media_type,
-            size=size,
-            output_format=image_format,
-            headers={"Cache-Control": f"private, max-age={ARTWORK_CACHE_SECONDS}"},
-        )
-    raise HTTPException(status_code=404, detail="Artwork not found")
+        if path.is_file():
+            local_original = path
+            break
+    return deliver_artwork(
+        ArtworkAsset("artist-photo", artist_entity_uid),
+        requested_size=size,
+        local_original=local_original,
+        missing_response=Response(status_code=404),
+    )
 
 
 def _remote_artwork(

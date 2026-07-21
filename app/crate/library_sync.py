@@ -7,6 +7,8 @@ from typing import Any, Mapping
 
 import mutagen
 
+from crate.artwork_tasks import queue_artwork_materialization
+from crate.artwork_variants import ArtworkAsset
 from crate.audio import read_tags
 from crate.db.advisory_locks import artist_sync_lock as _artist_sync_lock
 from crate.db.repositories.library import (
@@ -364,13 +366,16 @@ class LibrarySync:
         formats_list = sorted(db_formats.keys())
         primary_format = db_formats.most_common(1)[0][0] if db_formats else None
         dir_mtimes = [d.stat().st_mtime for d in artist_dirs if d.exists()]
+        artist_entity_uid = (
+            entity_uid_for(existing, "entity_uid")
+            if existing
+            else canonical_entity_uid(primary_folder)
+        )
 
         upsert_artist(
             {
                 "name": canonical,
-                "entity_uid": entity_uid_for(existing, "entity_uid")
-                if existing
-                else canonical_entity_uid(primary_folder),
+                "entity_uid": artist_entity_uid,
                 "folder_name": primary_folder,
                 "album_count": len(all_albums),
                 "track_count": db_track_count,
@@ -381,6 +386,16 @@ class LibrarySync:
                 "dir_mtime": max(dir_mtimes) if dir_mtimes else None,
             }
         )
+        if has_photo:
+            queue_artwork_materialization(
+                ArtworkAsset("artist-photo", str(artist_entity_uid)),
+                reason="library-sync",
+            )
+        if any((directory / "background.jpg").is_file() for directory in artist_dirs):
+            queue_artwork_materialization(
+                ArtworkAsset("artist-background", str(artist_entity_uid)),
+                reason="library-sync",
+            )
 
     def _sync_artist_dirs_unlocked(
         self, artist_name: str, artist_dirs: list[Path]
@@ -811,6 +826,11 @@ class LibrarySync:
             album_payload=album_payload,
             track_payloads=track_data_list,
         )
+        if has_cover:
+            queue_artwork_materialization(
+                ArtworkAsset("album-cover", str(album_entity_uid)),
+                reason="library-sync",
+            )
 
         # Remove deleted tracks
         for old_path in set(existing_tracks_by_path.keys()) - synced_paths:

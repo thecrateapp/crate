@@ -100,6 +100,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import(
       "../../../docs/technical/10-development-deployment-and-operations.md?raw"
     ).then((module) => module.default),
+  "docs/technical/artwork-delivery.md": () =>
+    import("../../../docs/technical/artwork-delivery.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/developer-guide.md": () =>
     import("../../../docs/technical/developer-guide.md?raw").then(
       (module) => module.default,
@@ -156,8 +160,16 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/operations.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/local-media-delivery-slos.md": () =>
+    import("../../../docs/technical/local-media-delivery-slos.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/ops-runbook.md": () =>
     import("../../../docs/technical/ops-runbook.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/storage-retention.md": () =>
+    import("../../../docs/technical/storage-retention.md?raw").then(
       (module) => module.default,
     ),
 };

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
-from crate.streaming.paths import data_root
+from crate.streaming.paths import cache_root
 
 
 DOWNLOAD_CACHE_VERSION = "1"
@@ -73,7 +73,7 @@ def download_cache_enabled() -> bool:
 
 def download_cache_root() -> Path:
     raw = os.environ.get("CRATE_DOWNLOAD_CACHE_DIR")
-    return Path(raw).resolve() if raw else data_root() / "download-cache"
+    return Path(raw).resolve() if raw else cache_root() / "download-cache"
 
 
 def album_cache_ttl_seconds() -> int:

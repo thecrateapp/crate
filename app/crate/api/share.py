@@ -11,8 +11,9 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, Response
 
 from crate.api._deps import library_path
+from crate.api.artwork_delivery import deliver_artwork
 from crate.api.browse_shared import ARTIST_PHOTO_NAMES
-from crate.api.image_variants import build_image_response
+from crate.artwork_variants import ArtworkAsset
 from crate.db.queries.global_catalog import (
     GlobalCatalogPublicRouteConflict,
     get_global_album_detail_by_public_slugs,
@@ -501,17 +502,18 @@ def share_artist_image(
         fallback_name=str(artist.get("name") or ""),
         existing_only=True,
     )
+    entity_uid = str(artist.get("entity_uid") or "")
     if artist_dir and artist_dir.is_dir():
         for photo_name in ARTIST_PHOTO_NAMES:
             photo = Path(artist_dir) / photo_name
-            if photo.exists():
-                media_type = "image/jpeg" if photo.suffix == ".jpg" else "image/png"
-                return build_image_response(
-                    photo.read_bytes(),
-                    media_type,
-                    size=size,
-                    output_format=image_format,
-                    headers=_IMAGE_HEADERS,
+            if photo.is_file() and entity_uid:
+                return deliver_artwork(
+                    ArtworkAsset("artist-photo", entity_uid),
+                    requested_size=size,
+                    local_original=photo,
+                    missing_response=_placeholder_image(
+                        artist.get("name"), size=size, image_format=image_format
+                    ),
                 )
 
     albums = get_library_albums(str(artist.get("name") or ""))
@@ -534,6 +536,7 @@ def _placeholder_image(
     size: int | None,
     image_format: str | None,
 ) -> Response:
+    del size, image_format
     label = (str(seed or "?").strip()[:1] or "?").upper()
     hue = sum(ord(char) for char in str(seed or "?")) % 360
     svg = (
@@ -549,10 +552,8 @@ def _placeholder_image(
         f'font-weight="800" fill="rgba(255,255,255,0.42)" text-anchor="middle">{_safe_text(label)}</text>'
         "</svg>"
     )
-    return build_image_response(
-        svg.encode("utf-8"),
-        "image/svg+xml",
-        size=size,
-        output_format=image_format,
+    return Response(
+        content=svg.encode("utf-8"),
+        media_type="image/svg+xml",
         headers=_IMAGE_HEADERS,
     )

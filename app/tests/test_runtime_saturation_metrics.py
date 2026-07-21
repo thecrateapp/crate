@@ -78,6 +78,37 @@ def test_admin_metrics_reads_pool_state_through_public_runtime_api(monkeypatch):
     assert snapshot["db_pool"] == snapshot["db_pools"]["combined"]
 
 
+def test_admin_metrics_exposes_cache_pressure_and_growth_projection(monkeypatch):
+    from crate.api.admin_metrics import _build_metrics_system
+
+    disks = {
+        "data": {
+            "path": "/data",
+            "total_gb": 50.0,
+            "used_gb": 42.0,
+            "free_gb": 8.0,
+            "percent": 84.0,
+            "pressure": "warning",
+            "days_until_full": 12.5,
+        },
+        "cache": {
+            "path": "/cache",
+            "total_gb": 5000.0,
+            "used_gb": 12.0,
+            "free_gb": 1900.0,
+            "percent": 62.0,
+            "pressure": "healthy",
+            "days_until_full": None,
+        },
+    }
+    monkeypatch.setattr("crate.storage_health.collect_storage_health", lambda: disks)
+
+    snapshot = _build_metrics_system()
+
+    assert snapshot["disk"] == disks
+    assert snapshot["disk"]["data"]["days_until_full"] == 12.5
+
+
 def test_event_loop_lag_monitor_records_delay(monkeypatch):
     from crate import runtime_saturation
 

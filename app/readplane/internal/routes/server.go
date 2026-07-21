@@ -20,6 +20,8 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
 	readplanefederation "github.com/thecrateapp/crate/app/readplane/internal/federation"
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
+	"github.com/thecrateapp/crate/app/readplane/internal/media"
+	"github.com/thecrateapp/crate/app/readplane/internal/observability"
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 	"github.com/thecrateapp/crate/app/readplane/internal/redisx"
 	"github.com/thecrateapp/crate/app/readplane/internal/snapshots"
@@ -33,6 +35,10 @@ type Server struct {
 	auth            *auth.Authenticator
 	catalog         *catalog.Store
 	artistTopTracks artistTopTracksCatalog
+	localMedia      localMediaCatalog
+	artworkCatalog  artworkCatalog
+	artworkResolver *media.ArtworkResolver
+	mediaMetrics    *observability.MediaMetrics
 	snapshots       *snapshots.Store
 	fallback        *httpx.FallbackProxy
 	federationProxy *readplanefederation.Proxy
@@ -41,6 +47,20 @@ type Server struct {
 
 type artistTopTracksCatalog interface {
 	ArtistTopTracksBySlug(context.Context, string, int) ([]map[string]any, error)
+}
+
+type localMediaCatalog interface {
+	LocalMediaByID(context.Context, int64, string) (catalog.LocalMediaDescriptor, error)
+	LocalMediaByEntityUID(context.Context, string, string) (catalog.LocalMediaDescriptor, error)
+}
+
+type artworkCatalog interface {
+	ArtistArtworkKeyByID(context.Context, int64) (string, error)
+	ArtistArtworkKeyByEntityUID(context.Context, string) (string, error)
+	AlbumArtworkKeyByID(context.Context, int64) (string, error)
+	AlbumArtworkKeyByEntityUID(context.Context, string) (string, error)
+	GlobalArtistArtworkKey(context.Context, string) (string, error)
+	GlobalAlbumArtworkKey(context.Context, string) (string, error)
 }
 
 // NewServer assembles a Server from its dependencies.
@@ -68,7 +88,11 @@ func NewServer(
 	}
 	if catalogStore != nil {
 		server.artistTopTracks = catalogStore
+		server.localMedia = catalogStore
+		server.artworkCatalog = catalogStore
 	}
+	server.artworkResolver = media.NewArtworkResolver(cfg.CacheRoot)
+	server.mediaMetrics = observability.NewMediaMetrics()
 	return server
 }
 
@@ -103,16 +127,47 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/catalog/me/albums", s.route(http.MethodGet, s.globalCatalogAlbumsRoute))
 	mux.HandleFunc("/api/catalog/me/follows", s.route(http.MethodGet, s.globalCatalogArtistsRoute))
 	mux.HandleFunc("/api/catalog/me/albums/saved", s.route(http.MethodGet, s.globalCatalogAlbumsRoute))
-	mux.HandleFunc("/api/catalog/", s.route(http.MethodGet, s.fallbackOrRouteMiss))
+	mux.HandleFunc("/api/catalog/", s.routeGetHead(s.catalogArtworkRoute))
 	mux.HandleFunc("/api/favorites", s.route(http.MethodGet, s.favoritesRoute))
 	mux.HandleFunc("/api/genres", s.route(http.MethodGet, s.genresRoute))
 	mux.HandleFunc("/api/genres/", s.route(http.MethodGet, s.genresRoute))
 	mux.HandleFunc("/api/search", s.route(http.MethodGet, s.searchRoute))
-	mux.HandleFunc("/api/albums/", s.route(http.MethodGet, s.albumRoute))
+	mux.HandleFunc("/api/albums/", s.routeGetHead(s.albumRoute))
 	mux.HandleFunc("/api/artist-slugs/", s.route(http.MethodGet, s.artistSlugRoute))
-	mux.HandleFunc("/api/artists/", s.route(http.MethodGet, s.artistRoute))
-	mux.HandleFunc("/api/tracks/", s.route(http.MethodGet, s.trackRoute))
+	mux.HandleFunc("/api/artists/", s.routeGetHead(s.artistRoute))
+	mux.HandleFunc("/api/tracks/", s.routeGetHead(s.trackRoute))
 	return s.withCommonHeaders(s.withTraceID(s.withAccessLog(mux)))
+}
+
+func (s *Server) routeGetHead(handler handlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if strings.HasPrefix(r.URL.Path, "/api/") && s.tryFallback(w, r) {
+				return
+			}
+			httpx.MarkReadplane(w, "miss")
+			httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			return
+		}
+		handler(w, r)
+	}
+}
+
+func (s *Server) mediaDescriptor(value catalog.LocalMediaDescriptor) media.Descriptor {
+	descriptor := media.Descriptor{
+		RequestedPolicy: value.RequestedPolicy,
+		EffectivePolicy: value.EffectivePolicy,
+		SourceFormat:    value.SourceFormat,
+		DeliveryFormat:  value.DeliveryFormat,
+		DeliveryBitrate: value.DeliveryBitrate,
+		Transcoded:      value.Transcoded,
+		VariantStatus:   value.VariantStatus,
+		Category:        "stream",
+	}
+	if s.mediaMetrics != nil {
+		descriptor.Observer = s.mediaMetrics
+	}
+	return descriptor
 }
 
 func (s *Server) federatedStream(w http.ResponseWriter, r *http.Request) {
@@ -238,6 +293,9 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 		"redis":            nil,
 		"schema":           false,
 		"federation_model": "node-first",
+	}
+	if s.mediaMetrics != nil {
+		details["local_media"] = s.mediaMetrics.Snapshot()
 	}
 	if err := s.pool.Ping(ctx); err != nil {
 		httpx.MarkReadplane(w, "miss")

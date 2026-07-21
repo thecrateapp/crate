@@ -3,16 +3,14 @@ import json
 from typing import Any
 from urllib.parse import quote
 
-import mutagen
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 
+from crate.api.artwork_delivery import deliver_artwork
 from crate.api._deps import (
-    COVER_NAMES,
     artist_name_from_id,
     artist_name_from_ref,
     coerce_date,
-    extensions,
     library_path,
 )
 from crate.api.auth import _require_auth
@@ -24,7 +22,7 @@ from crate.api.browse_shared import (
     fs_build_artists_list,
     has_library_data,
 )
-from crate.api.image_variants import build_image_response
+from crate.artwork_variants import ArtworkAsset, external_artist_asset
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -50,11 +48,10 @@ from crate.api.schemas.browse import (
     ArtistTrackTitleResponse,
     BrowseFiltersResponse,
 )
-from crate.audio import get_audio_files
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.health import get_all_artist_issue_counts, get_artist_issue_count
 from crate.external_artist_artwork import (
-    get_cached_external_artist_artwork,
+    get_cached_external_artist_artwork_path,
     is_external_artist_artwork_missing,
     queue_external_artist_artwork,
 )
@@ -1161,120 +1158,34 @@ def api_artist_background(
 ):
     """Return artist background image."""
     _require_auth(request)
-    import random as _random
-
-    from crate.lastfm import (
-        _deezer_artist_image,
-        download_artist_image,
-        get_fanart_all_images,
-        get_fanart_background,
-    )
-
-    _IMG_CACHE = {
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
-    }
+    del image_format
 
     lib = library_path()
     artist_row = get_library_artist(name)
     artist_dir = resolve_artist_dir(
         lib, artist_row, fallback_name=name, existing_only=True
     )
+    candidates: list = []
     if artist_dir and artist_dir.is_dir():
-        bg_file = artist_dir / "background.jpg"
-        if bg_file.exists():
-            return build_image_response(
-                bg_file.read_bytes(),
-                "image/jpeg",
-                size=size,
-                output_format=image_format,
-                headers=_IMG_CACHE,
-            )
-
-        for photo_name in ARTIST_PHOTO_NAMES:
-            photo = artist_dir / photo_name
-            if photo.exists():
-                media_type = "image/jpeg" if photo.suffix == ".jpg" else "image/png"
-                return build_image_response(
-                    photo.read_bytes(),
-                    media_type,
-                    size=size,
-                    output_format=image_format,
-                    headers=_IMG_CACHE,
-                )
-
-    fanart = get_fanart_all_images(name)
-    backgrounds = fanart.get("backgrounds", []) if fanart else []
-    if backgrounds:
-        url = _random.choice(backgrounds) if random_pick else backgrounds[0]
-        image_data = download_artist_image(url)
-        if image_data:
-            return build_image_response(
-                image_data,
-                "image/jpeg",
-                size=size,
-                output_format=image_format,
-                headers=_IMG_CACHE,
-            )
-
-    url = get_fanart_background(name)
-    if url:
-        image_data = download_artist_image(url)
-        if image_data:
-            return build_image_response(
-                image_data,
-                "image/jpeg",
-                size=size,
-                output_format=image_format,
-                headers=_IMG_CACHE,
-            )
-
-    from crate.lastfm import get_lastfm_best_background
-
-    lfm_bg = get_lastfm_best_background(name)
-    if lfm_bg:
-        return build_image_response(
-            lfm_bg,
-            "image/jpeg",
-            size=size,
-            output_format=image_format,
-            headers=_IMG_CACHE,
+        candidates = [artist_dir / "background.jpg"] + [
+            artist_dir / photo_name for photo_name in ARTIST_PHOTO_NAMES
+        ]
+    available = [candidate for candidate in candidates if candidate.is_file()]
+    local_original = (
+        available[-1]
+        if random_pick and available
+        else (available[0] if available else None)
+    )
+    entity_uid = str((artist_row or {}).get("entity_uid") or "")
+    if entity_uid:
+        return deliver_artwork(
+            ArtworkAsset("artist-background", entity_uid),
+            requested_size=size,
+            local_original=local_original,
+            missing_response=Response(status_code=404),
         )
-
-    deezer_url = _deezer_artist_image(name)
-    if deezer_url:
-        image_data = download_artist_image(deezer_url)
-        if image_data:
-            return build_image_response(
-                image_data,
-                "image/jpeg",
-                size=size,
-                output_format=image_format,
-                headers=_IMG_CACHE,
-            )
-
-    try:
-        from crate.spotify import search_artist as spotify_search
-
-        spotify_artist = spotify_search(name)
-        if spotify_artist and spotify_artist.get("images"):
-            img_url = (
-                spotify_artist["images"][0].get("url")
-                if spotify_artist["images"]
-                else None
-            )
-            if img_url:
-                image_data = download_artist_image(img_url)
-                if image_data:
-                    return build_image_response(
-                        image_data,
-                        "image/jpeg",
-                        size=size,
-                        output_format=image_format,
-                        headers=_IMG_CACHE,
-                    )
-    except Exception:
-        pass
-
+    if local_original is not None:
+        return FileResponse(local_original)
     return Response(status_code=404)
 
 
@@ -1286,106 +1197,34 @@ def api_artist_photo(
     image_format: str | None = None,
 ):
     _require_auth(request)
-    import random as _random
-
-    from crate.lastfm import (
-        download_artist_image,
-        get_fanart_all_images,
-        get_best_artist_image,
-    )
+    del image_format
 
     lib = library_path()
     artist_row = get_library_artist(name)
     artist_dir = resolve_artist_dir(
         lib, artist_row, fallback_name=name, existing_only=True
     )
-    if not artist_dir or not artist_dir.is_dir():
-        return Response(status_code=404)
-
-    for photo_name in ARTIST_PHOTO_NAMES:
-        photo = artist_dir / photo_name
-        if photo.exists():
-            media_type = "image/jpeg" if photo.suffix == ".jpg" else "image/png"
-            return build_image_response(
-                photo.read_bytes(),
-                media_type,
-                size=size,
-                output_format=image_format,
-                headers={
-                    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
-                },
-            )
-
-    _IMG_CACHE = {
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
-    }
-
-    if random_pick:
-        fanart = get_fanart_all_images(name)
-        thumbs = fanart.get("thumbs", []) if fanart else []
-        if thumbs:
-            url = _random.choice(thumbs)
-            image_data = download_artist_image(url)
-            if image_data:
-                return build_image_response(
-                    image_data,
-                    "image/jpeg",
-                    size=size,
-                    output_format=image_format,
-                    headers=_IMG_CACHE,
-                )
-
-    image_data = get_best_artist_image(name)
-    if image_data:
-        save_path = artist_dir / "artist.jpg"
-        try:
-            save_path.write_bytes(image_data)
-        except OSError:
-            pass
-        return build_image_response(
-            image_data,
-            "image/jpeg",
-            size=size,
-            output_format=image_format,
-            headers=_IMG_CACHE,
+    candidates = (
+        [artist_dir / photo_name for photo_name in ARTIST_PHOTO_NAMES]
+        if artist_dir and artist_dir.is_dir()
+        else []
+    )
+    available = [candidate for candidate in candidates if candidate.is_file()]
+    local_original = (
+        available[-1]
+        if random_pick and available
+        else (available[0] if available else None)
+    )
+    entity_uid = str((artist_row or {}).get("entity_uid") or "")
+    if entity_uid:
+        return deliver_artwork(
+            ArtworkAsset("artist-photo", entity_uid),
+            requested_size=size,
+            local_original=local_original,
+            missing_response=Response(status_code=404),
         )
-
-    exts = extensions()
-    for album_dir in sorted(artist_dir.iterdir()):
-        if not album_dir.is_dir() or album_dir.name.startswith("."):
-            continue
-        for cover_name in COVER_NAMES:
-            cover = album_dir / cover_name
-            if cover.exists():
-                media_type = "image/jpeg" if cover.suffix == ".jpg" else "image/png"
-                return build_image_response(
-                    cover.read_bytes(),
-                    media_type,
-                    size=size,
-                    output_format=image_format,
-                    headers=_IMG_CACHE,
-                )
-        tracks = get_audio_files(album_dir, exts)
-        if tracks:
-            audio = getattr(mutagen, "File")(tracks[0])
-            if audio and hasattr(audio, "pictures") and audio.pictures:
-                pic = audio.pictures[0]
-                return build_image_response(
-                    pic.data,
-                    pic.mime,
-                    size=size,
-                    output_format=image_format,
-                    headers=_IMG_CACHE,
-                )
-            if audio and hasattr(audio, "tags") and audio.tags:
-                for key in audio.tags:
-                    if isinstance(key, str) and key.startswith("APIC"):
-                        pic = audio.tags[key]
-                        return build_image_response(
-                            pic.data, pic.mime, size=size, output_format=image_format
-                        )
-        break
-
+    if local_original is not None:
+        return FileResponse(local_original)
     return Response(status_code=404)
 
 
@@ -1779,7 +1618,7 @@ def api_external_artist_photo(
     if not artist_name:
         return Response(status_code=404)
 
-    cached = get_cached_external_artist_artwork(artist_name)
+    cached = get_cached_external_artist_artwork_path(artist_name)
     if cached is not None:
         headers = {
             "Cache-Control": "public, max-age=604800, stale-while-revalidate=2592000"
@@ -1791,13 +1630,14 @@ def api_external_artist_photo(
             if not is_external_artist_artwork_missing(artist_name):
                 queue_external_artist_artwork(artist_name)
                 headers["X-Crate-External-Artwork"] = "revalidating"
-        return build_image_response(
-            cached["content"],
-            cached["content_type"],
-            size=size,
-            output_format=image_format,
-            headers=headers,
+        response = deliver_artwork(
+            external_artist_asset(artist_name),
+            requested_size=size,
+            local_original=cached["path"],
+            missing_response=Response(status_code=404),
         )
+        response.headers.update(headers)
+        return response
 
     if is_external_artist_artwork_missing(artist_name):
         return Response(status_code=404, headers={"Cache-Control": "no-store"})

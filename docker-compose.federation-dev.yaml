@@ -200,9 +200,15 @@ services:
       - READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS=300
       - READPLANE_STATS_STALE_MAX_AGE_SECONDS=86400
       - READPLANE_SESSION_TOUCH_INTERVAL_SECONDS=60
+      - READPLANE_LOCAL_MEDIA_ENABLED=${READPLANE_LOCAL_MEDIA_ENABLED:-false}
+      - READPLANE_MUSIC_ROOT=/music
+      - READPLANE_DATA_ROOT=/data
       - API_FALLBACK_BASE=http://node-a-api:8585
       - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-a-readplane-service-token-000000
       - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+    volumes:
+      - ./test-music-federation/node-a:/music:ro
+      - fed_a_data:/data:ro
     ports:
       - "18686:8686"
     networks:
@@ -503,9 +509,15 @@ services:
       - READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS=300
       - READPLANE_STATS_STALE_MAX_AGE_SECONDS=86400
       - READPLANE_SESSION_TOUCH_INTERVAL_SECONDS=60
+      - READPLANE_LOCAL_MEDIA_ENABLED=${READPLANE_LOCAL_MEDIA_ENABLED:-false}
+      - READPLANE_MUSIC_ROOT=/music
+      - READPLANE_DATA_ROOT=/data
       - API_FALLBACK_BASE=http://node-b-api:8585
       - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-b-readplane-service-token-000000
       - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+    volumes:
+      - ./test-music-federation/node-b:/music:ro
+      - fed_b_data:/data:ro
     ports:
       - "28686:8686"
     networks:

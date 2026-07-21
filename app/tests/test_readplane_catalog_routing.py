@@ -27,7 +27,7 @@ def test_production_traefik_routes_canonical_catalog_gets_to_readplane():
     assert labels["traefik.enable"] is True
     rule = labels["traefik.http.routers.crate-readplane-interactive.rule"]
     assert "Host(`api.${DOMAIN}`)" in rule
-    assert "Method(`GET`)" in rule
+    assert "Method(`GET`" in rule
     assert "PathPrefix(`/api/catalog/`)" in rule
     assert labels["traefik.http.routers.crate-readplane-interactive.priority"] > 0
     assert (
@@ -37,3 +37,26 @@ def test_production_traefik_routes_canonical_catalog_gets_to_readplane():
         "READPLANE_ROUTE_MODE=${READPLANE_ROUTE_MODE:-active}"
         in readplane["environment"]
     )
+
+
+def test_readplane_media_mounts_are_read_only_and_cutover_defaults_off():
+    production = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())["services"][
+        "crate-readplane"
+    ]
+    home = yaml.safe_load((ROOT / "docker-compose.home.yaml").read_text())["services"][
+        "crate-readplane"
+    ]
+    development = yaml.safe_load(
+        (ROOT / "docker-compose.readplane.dev.yaml").read_text()
+    )["services"]["readplane"]
+
+    for service in (production, home, development):
+        environment = service["environment"]
+        rendered = (
+            "\n".join(environment)
+            if isinstance(environment, list)
+            else str(environment)
+        )
+        assert "READPLANE_LOCAL_MEDIA_ENABLED" in rendered
+        assert any(str(volume).endswith(":/music:ro") for volume in service["volumes"])
+        assert any(str(volume).endswith(":/data:ro") for volume in service["volumes"])

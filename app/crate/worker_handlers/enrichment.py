@@ -4,6 +4,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from crate.artwork_tasks import queue_artwork_materialization
+from crate.artwork_variants import ArtworkAsset
 from crate.bandcamp.search import BandcampSearchError, find_exact_album_url
 from crate.content import compute_dir_hash as _compute_dir_hash
 from crate.db.audit import log_audit
@@ -984,6 +986,11 @@ def _process_new_content_missing_covers(
                 save_cover(album_dir, cover_data)
                 covers_fetched += 1
                 update_album_has_cover(album["id"])
+                if album.get("entity_uid"):
+                    queue_artwork_materialization(
+                        ArtworkAsset("album-cover", str(album["entity_uid"])),
+                        reason="source-write",
+                    )
 
         result["steps"]["covers"] = covers_fetched
     except Exception:

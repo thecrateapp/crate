@@ -44,6 +44,13 @@ from crate.worker_handlers.migration import (
 log = logging.getLogger(__name__)
 
 
+def artwork_variant_health_sample(*, max_assets: int = 100) -> dict[str, int]:
+    """Return a bounded integrity sample suitable for interactive health views."""
+    from crate.artwork_maintenance import inspect_artwork_variants
+
+    return inspect_artwork_variants(max_assets=max(1, min(max_assets, 1000)))
+
+
 class LibraryHealthCheck:
     CHECK_METHODS: tuple[tuple[str, str], ...] = tuple(
         (entry.check_type, entry.scanner_method) for entry in REPAIR_CATALOG

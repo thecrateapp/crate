@@ -53,6 +53,7 @@ TASK_TYPE_LABELS: dict[str, str] = {
     "fetch_popularity": "Popularity Fetch",
     # Playback delivery
     "prepare_stream_variant": "Prepare Playback Stream",
+    "cleanup_stream_variants": "Clean Playback Cache",
     # Playlists
     "generate_system_playlist": "Playlist Generation",
     "refresh_system_smart_playlists": "Refresh Smart Playlists",
@@ -101,6 +102,7 @@ TASK_TYPE_ICONS: dict[str, str] = {
     "update_popularity": "\U0001f4ca",
     "fetch_popularity": "\U0001f4ca",
     "prepare_stream_variant": "\U0001f3a7",
+    "cleanup_stream_variants": "\U0001f9f9",
 }
 
 

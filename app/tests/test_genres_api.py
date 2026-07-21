@@ -1,6 +1,6 @@
 """Contract tests for the Genre API endpoints."""
 
-from unittest.mock import ANY, patch
+from unittest.mock import patch
 
 
 async def _unauthenticated(self, request):
@@ -338,16 +338,7 @@ class TestGenreTaxonomyAPI:
     def test_upload_taxonomy_cover_stores_cover_path(self, test_app):
         with (
             patch("crate.api.genres.get_genre_taxonomy_node_id", return_value=1),
-            patch(
-                "crate.api.genres.persist_genre_cover_upload",
-                return_value="post-hardcore.png",
-            ) as persist_cover,
-            patch(
-                "crate.api.genres.update_genre_taxonomy_node_metadata",
-                return_value=True,
-            ) as update_metadata,
-            patch("crate.api.genres.invalidate_runtime_taxonomy_cache") as invalidate,
-            patch("crate.api.genres._broadcast_genre_taxonomy_changed") as broadcast,
+            patch("crate.api.genres.create_task", return_value="task-1") as create_task,
         ):
             resp = test_app.post(
                 "/api/genres/taxonomy/Post-Hardcore/cover",
@@ -359,18 +350,11 @@ class TestGenreTaxonomyAPI:
             "ok": True,
             "slug": "post-hardcore",
             "cover_url": "/api/genres/post-hardcore/cover?size=640&format=webp",
+            "task_id": "task-1",
         }
-        persist_cover.assert_called_once_with(
-            "post-hardcore",
-            filename="cover.png",
-            content_type="image/png",
-            payload=ANY,
-        )
-        update_metadata.assert_called_once_with(
-            "post-hardcore", cover_path="post-hardcore.png"
-        )
-        invalidate.assert_called_once_with(broadcast=True)
-        broadcast.assert_called_once_with("genre:post-hardcore")
+        assert create_task.call_args.args[0] == "upload_image"
+        assert create_task.call_args.args[1]["type"] == "genre_cover"
+        assert create_task.call_args.args[1]["slug"] == "post-hardcore"
 
     def test_infer_taxonomy_node_proposal_returns_reviewable_diff(self, test_app):
         proposal = {

@@ -123,6 +123,24 @@ class TestGetSetSchedules:
             assert schedules["library_pipeline"] == 3600
             assert schedules["enrich_artists"] == 0
 
+    def test_get_schedules_merges_new_defaults_into_persisted_configuration(self):
+        import json
+
+        custom = {"library_pipeline": 3600, "enrich_artists": 0}
+        with (
+            patch("crate.scheduler.get_setting", return_value=json.dumps(custom)),
+            patch("crate.scheduler.set_setting") as set_setting,
+        ):
+            from crate.scheduler import get_schedules
+
+            schedules = get_schedules()
+
+        assert schedules["library_pipeline"] == 3600
+        assert schedules["enrich_artists"] == 0
+        assert schedules["cleanup_stream_variants"] == 3600
+        persisted = json.loads(set_setting.call_args.args[1])
+        assert persisted == schedules
+
     def test_set_schedules(self):
         with patch("crate.scheduler.set_setting") as mock_set:
             from crate.scheduler import set_schedules

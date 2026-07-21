@@ -13,6 +13,7 @@ from crate.db.repositories.streaming import (
     mark_variant_running,
 )
 from crate.streaming.service import prepare_playback
+from crate.streaming.maintenance import cleanup_stream_variants
 from crate.streaming.transcode import transcode_variant
 from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler, is_cancelled
@@ -292,7 +293,13 @@ def _handle_warmup_stream_variants(task_id: str, params: dict, config: dict) -> 
     return {"status": status, "enqueued": enqueued, "skipped": skipped}
 
 
+def _handle_cleanup_stream_variants(task_id: str, params: dict, config: dict) -> dict:
+    del task_id, params, config
+    return cleanup_stream_variants()
+
+
 PLAYBACK_TASK_HANDLERS: dict[str, TaskHandler] = {
     "prepare_stream_variant": _handle_prepare_stream_variant,
     "warmup_stream_variants": _handle_warmup_stream_variants,
+    "cleanup_stream_variants": _handle_cleanup_stream_variants,
 }

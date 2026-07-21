@@ -18,6 +18,8 @@ data/*
 data/caddy/*
 !data/caddy/Caddyfile.readplane.dev
 media/
+!app/readplane/internal/media/
+!app/readplane/internal/media/**
 !app/shared/ui/domain/media/
 !app/shared/ui/domain/media/**
 test-music/

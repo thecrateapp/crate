@@ -52,10 +52,15 @@ type Config struct {
 	FederationConnectTimeout       time.Duration
 	FederationHeaderTimeout        time.Duration
 	Version                        string
+	LocalMediaEnabled              bool
+	MusicRoot                      string
+	DataRoot                       string
+	CacheRoot                      string
 }
 
 // Load reads environment variables and returns a populated Config.
 func Load(version string) Config {
+	dataRoot := absolutePathEnv("READPLANE_DATA_ROOT", "/data")
 	return Config{
 		Addr:                           stringEnv("READPLANE_ADDR", defaultAddr),
 		DatabaseURL:                    databaseURL(),
@@ -87,7 +92,19 @@ func Load(version string) Config {
 		FederationConnectTimeout:       msEnv("READPLANE_FEDERATION_CONNECT_TIMEOUT_MS", 5000),
 		FederationHeaderTimeout:        msEnv("READPLANE_FEDERATION_HEADER_TIMEOUT_MS", 10000),
 		Version:                        version,
+		LocalMediaEnabled:              boolEnv("READPLANE_LOCAL_MEDIA_ENABLED", false),
+		MusicRoot:                      absolutePathEnv("READPLANE_MUSIC_ROOT", "/music"),
+		DataRoot:                       dataRoot,
+		CacheRoot:                      absolutePathEnv("READPLANE_CACHE_ROOT", dataRoot),
 	}
+}
+
+func absolutePathEnv(key string, fallback string) string {
+	value := stringEnv(key, fallback)
+	if !strings.HasPrefix(value, "/") {
+		return fallback
+	}
+	return strings.TrimRight(value, "/")
 }
 
 func databaseURL() string {
