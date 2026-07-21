@@ -59,4 +59,5 @@ def test_readplane_media_mounts_are_read_only_and_cutover_defaults_off():
         )
         assert "READPLANE_LOCAL_MEDIA_ENABLED" in rendered
         assert any(str(volume).endswith(":/music:ro") for volume in service["volumes"])
-        assert any(str(volume).endswith(":/data:ro") for volume in service["volumes"])
+        assert any(str(volume).endswith(":/cache:ro") for volume in service["volumes"])
+        assert all(":/data" not in str(volume) for volume in service["volumes"])
