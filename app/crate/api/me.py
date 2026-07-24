@@ -86,6 +86,10 @@ from crate.api.schemas.me import (
     UpdateProfileResponse,
     UserLibraryCountsResponse,
 )
+from crate.api.schemas.settings import (
+    RemoteScrobblingPreferenceResponse,
+    RemoteScrobblingPreferenceUpdate,
+)
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.home import (
     get_cached_home_discovery,
@@ -111,24 +115,12 @@ from crate.db.queries.user_library import (
     get_replay_mix,
     get_saved_albums,
     get_stats_overview,
-    get_stats_story,
     get_stats_trends,
     get_top_albums,
     get_top_artists,
     get_top_genres,
     get_top_tracks,
-    get_user_library_counts,
     is_following,
-)
-from crate.db.queries.user_library_stats_month import (
-    get_month_replay_mix,
-    get_month_stats_overview,
-    get_month_stats_trends,
-    get_month_top_albums,
-    get_month_top_artists,
-    get_month_top_genres,
-    get_month_top_tracks,
-    month_period_key,
 )
 from crate.db.repositories.artist_suggestions import (
     create_artist_suggestion,
@@ -145,6 +137,7 @@ from crate.db.repositories.library_contributions import (
     get_user_album_contribution,
     list_user_album_contributions,
 )
+from crate.db.repositories.global_user_library import get_user_global_library_counts
 from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
 from crate.db.repositories.recommendations import (
     record_recommendation_exposure,
@@ -162,10 +155,15 @@ from crate.db.repositories.user_library import (
     unlike_track,
     unsave_album,
 )
-from crate.db.repositories.user_library_shared import resolve_track_reference
+from crate.db.user_stats_dashboard_surface import get_user_stats_dashboard
+from crate.db.repositories.user_library_shared import resolve_track_reference_read
+from crate.db.repositories.users import (
+    get_remote_scrobbling_enabled,
+    set_remote_scrobbling_enabled,
+)
 from crate.db.snapshot_events import snapshot_channel
-from crate.db.tx import read_scope
 from crate.slugs import build_public_album_slug
+from crate.playback_provenance import PlaybackSessionInvalid, verify_playback_session
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 log = logging.getLogger(__name__)
@@ -180,6 +178,10 @@ _ME_RESPONSES = merge_responses(
 )
 
 _STATS_DASHBOARD_CACHE_TTL_SECONDS = 90
+
+
+def _listen_global_cache_mode() -> str:
+    return "global"
 
 
 @router.post(
@@ -401,29 +403,22 @@ async def _home_discovery_stream(
 
 
 def _probable_setlists_for_artists(artist_names: list[str]) -> dict[str, list[dict]]:
+    from crate.setlistfm import (
+        get_cached_probable_setlist,
+        queue_probable_setlist_refreshes,
+    )
+
     result: dict[str, list[dict]] = {}
     missing: list[str] = []
     for artist_name in artist_names:
-        cached = get_cache(
-            f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7
-        )
-        songs = cached.get("songs") if isinstance(cached, dict) else None
+        songs = get_cached_probable_setlist(artist_name)
         if songs:
             result[artist_name] = songs
         else:
             missing.append(artist_name)
 
-    # Lazy-fetch from setlist.fm for artists not yet cached
     if missing:
-        from crate.setlistfm import get_probable_setlist
-
-        for artist_name in missing:
-            try:
-                songs = get_probable_setlist(artist_name)
-                if songs:
-                    result[artist_name] = songs
-            except Exception:
-                pass
+        queue_probable_setlist_refreshes(missing)
 
     return result
 
@@ -439,67 +434,16 @@ def _get_cached_stats_dashboard(
     genres_limit: int,
     replay_limit: int,
 ) -> dict:
-    period_key = month_period_key(month) if month else window
-    cache_key = (
-        f"listen:stats_dashboard:v3:{user_id}:{period_key}:"
-        f"{tracks_limit}:{artists_limit}:{albums_limit}:{genres_limit}:{replay_limit}"
+    return get_user_stats_dashboard(
+        user_id,
+        window=window,
+        month=month,
+        tracks_limit=tracks_limit,
+        artists_limit=artists_limit,
+        albums_limit=albums_limit,
+        genres_limit=genres_limit,
+        replay_limit=replay_limit,
     )
-    cached = get_cache(cache_key, max_age_seconds=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
-    if cached is not None:
-        return cached
-
-    if month:
-        payload = {
-            "window": period_key,
-            "overview": get_month_stats_overview(user_id, month),
-            "trends": get_month_stats_trends(user_id, month),
-            "top_tracks": {
-                "window": period_key,
-                "items": get_month_top_tracks(user_id, month, limit=tracks_limit),
-            },
-            "top_artists": {
-                "window": period_key,
-                "items": get_month_top_artists(user_id, month, limit=artists_limit),
-            },
-            "top_albums": {
-                "window": period_key,
-                "items": get_month_top_albums(user_id, month, limit=albums_limit),
-            },
-            "top_genres": {
-                "window": period_key,
-                "items": get_month_top_genres(user_id, month, limit=genres_limit),
-            },
-            "replay": get_month_replay_mix(user_id, month, limit=replay_limit),
-            "story": get_stats_story(user_id, window=window, month=month),
-        }
-        set_cache(cache_key, payload, ttl=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
-        return payload
-
-    payload = {
-        "window": window,
-        "overview": get_stats_overview(user_id, window=window),
-        "trends": get_stats_trends(user_id, window=window),
-        "top_tracks": {
-            "window": window,
-            "items": get_top_tracks(user_id, window=window, limit=tracks_limit),
-        },
-        "top_artists": {
-            "window": window,
-            "items": get_top_artists(user_id, window=window, limit=artists_limit),
-        },
-        "top_albums": {
-            "window": window,
-            "items": get_top_albums(user_id, window=window, limit=albums_limit),
-        },
-        "top_genres": {
-            "window": window,
-            "items": get_top_genres(user_id, window=window, limit=genres_limit),
-        },
-        "replay": get_replay_mix(user_id, window=window, limit=replay_limit),
-        "story": get_stats_story(user_id, window=window),
-    }
-    set_cache(cache_key, payload, ttl=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
-    return payload
 
 
 def _build_upcoming_insights(
@@ -607,7 +551,7 @@ def _build_upcoming_insights(
 def my_library(request: Request):
     """Get counts for user's personal library."""
     user = _require_auth(request)
-    return get_user_library_counts(user["id"])
+    return get_user_global_library_counts(int(user["id"]))
 
 
 @router.get(
@@ -875,6 +819,7 @@ def like(request: Request, body: LikeTrackRequest):
     user = _require_auth(request)
     added = like_track(
         user["id"],
+        global_track_uid=body.global_track_uid,
         track_id=body.track_id,
         track_entity_uid=body.track_entity_uid,
         track_path=body.track_path,
@@ -894,6 +839,7 @@ def unlike(request: Request, body: LikeTrackRequest):
     user = _require_auth(request)
     removed = unlike_track(
         user["id"],
+        global_track_uid=body.global_track_uid,
         track_id=body.track_id,
         track_entity_uid=body.track_entity_uid,
         track_path=body.track_path,
@@ -952,13 +898,11 @@ def update_now_playing(request: Request, body: NowPlayingRequest):
 
     resolved_track = None
     if any((body.track_id, body.track_entity_uid, body.track_path)):
-        with read_scope() as session:
-            resolved_track = resolve_track_reference(
-                session,
-                track_id=body.track_id,
-                track_entity_uid=body.track_entity_uid,
-                track_path=body.track_path,
-            )
+        resolved_track = resolve_track_reference_read(
+            track_id=body.track_id,
+            track_entity_uid=body.track_entity_uid,
+            track_path=body.track_path,
+        )
 
     track_entity_uid = body.track_entity_uid or (resolved_track or {}).get(
         "track_entity_uid"
@@ -1313,8 +1257,9 @@ async def home_discovery_stream(request: Request, initial: bool = Query(True)):
 )
 def home_mix_detail(request: Request, mix_id: str, limit: int = Query(40, ge=1, le=80)):
     user = _require_auth(request)
+    cache_mode = _listen_global_cache_mode()
     mix = _get_cached_home_endpoint_response(
-        cache_key=f"home_mix:v2:{user['id']}:{mix_id}:{limit}",
+        cache_key=f"home_mix:v3:{cache_mode}:{user['id']}:{mix_id}:{limit}",
         max_age_seconds=300,
         ttl=300,
         compute=lambda: get_home_playlist(user["id"], mix_id, limit=limit),
@@ -1334,8 +1279,9 @@ def home_playlist_detail(
     request: Request, playlist_id: str, limit: int = Query(40, ge=1, le=80)
 ):
     user = _require_auth(request)
+    cache_mode = _listen_global_cache_mode()
     playlist = _get_cached_home_endpoint_response(
-        cache_key=f"home_playlist:v2:{user['id']}:{playlist_id}:{limit}",
+        cache_key=f"home_playlist:v3:{cache_mode}:{user['id']}:{playlist_id}:{limit}",
         max_age_seconds=300,
         ttl=300,
         compute=lambda: get_home_playlist(user["id"], playlist_id, limit=limit),
@@ -1355,8 +1301,9 @@ def home_section_detail(
     request: Request, section_id: str, limit: int = Query(42, ge=1, le=120)
 ):
     user = _require_auth(request)
+    cache_mode = _listen_global_cache_mode()
     section = _get_cached_home_endpoint_response(
-        cache_key=f"home_section:{user['id']}:{section_id}:{limit}",
+        cache_key=f"home_section:v4:{cache_mode}:{user['id']}:{section_id}:{limit}",
         max_age_seconds=300,
         ttl=300,
         compute=lambda: get_home_section(user["id"], section_id, limit=limit),
@@ -1374,10 +1321,24 @@ def home_section_detail(
 )
 def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
     user = _require_auth(request)
+    content_origin = "local"
+    source_node_uid = None
+    if body.playback_session:
+        try:
+            claims = verify_playback_session(
+                body.playback_session,
+                user_id=int(user["id"]),
+                global_track_uid=body.global_track_uid,
+            )
+        except PlaybackSessionInvalid as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        content_origin = claims.content_origin
+        source_node_uid = claims.source_node_uid
     event_id = record_play_event(
         user["id"],
         client_event_id=body.client_event_id,
         track_id=body.track_id,
+        global_track_uid=body.global_track_uid,
         track_entity_uid=body.track_entity_uid,
         track_path=body.track_path,
         title=body.title,
@@ -1398,6 +1359,8 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
         context_playlist_id=body.context_playlist_id,
         device_type=body.device_type,
         app_platform=body.app_platform,
+        content_origin=content_origin,
+        source_node_uid=source_node_uid,
     )
     return {"ok": True, "id": event_id}
 
@@ -1679,6 +1642,31 @@ def change_password(request: Request, body: ChangePasswordRequest):
 
 
 # ── Scrobble Services ──────────────────────────────────────────
+
+
+@router.get(
+    "/scrobble/preferences",
+    response_model=RemoteScrobblingPreferenceResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get remote scrobbling preference",
+)
+def remote_scrobbling_preferences(request: Request):
+    user = _require_auth(request)
+    return {"remote_scrobbling_enabled": get_remote_scrobbling_enabled(user["id"])}
+
+
+@router.put(
+    "/scrobble/preferences",
+    response_model=RemoteScrobblingPreferenceResponse,
+    responses=_ME_RESPONSES,
+    summary="Update remote scrobbling preference",
+)
+def update_remote_scrobbling_preferences(
+    request: Request, body: RemoteScrobblingPreferenceUpdate
+):
+    user = _require_auth(request)
+    enabled = set_remote_scrobbling_enabled(user["id"], body.remote_scrobbling_enabled)
+    return {"remote_scrobbling_enabled": enabled}
 
 
 @router.get(

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
+from crate.db.repositories.global_user_library import list_global_collection_artists
 from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
@@ -28,9 +29,11 @@ def _is_hidden_artist_name(value: object) -> bool:
 
 def _artist_station(row: dict) -> dict | None:
     artist_id = row.get("artist_id")
+    global_artist_uid = row.get("global_artist_uid")
     artist_name = (row.get("artist_name") or "").strip()
     artist_slug = row.get("artist_slug")
-    if artist_id is None or not artist_name or _is_hidden_artist_name(artist_name):
+    seed_value = str(artist_id) if artist_id is not None else global_artist_uid
+    if not seed_value or not artist_name or _is_hidden_artist_name(artist_name):
         return None
     if _is_hidden_artist_name(artist_slug):
         return None
@@ -38,10 +41,12 @@ def _artist_station(row: dict) -> dict | None:
     return {
         "type": "artist",
         "seed_type": "artist",
-        "seed_value": str(artist_id),
+        "seed_value": seed_value,
         "seed_label": artist_name,
         "seed_subtitle": "Artist",
         "artist_id": artist_id,
+        "global_artist_uid": global_artist_uid,
+        "artist_entity_uid": row.get("artist_entity_uid"),
         "artist_slug": artist_slug,
         "artist_name": artist_name,
         "title": f"{artist_name} Radio",
@@ -84,18 +89,32 @@ def _genre_station(row: dict) -> dict | None:
 
 def _build_artist_stations(context: dict, *, limit: int) -> list[dict]:
     stations: list[dict] = []
-    seen: set[int] = set()
+    seen: set[str] = set()
     for row in merged_artists_from_context(context):
         station = _artist_station(row)
         if not station:
             continue
-        artist_id = station["artist_id"]
-        if artist_id in seen:
+        seed_value = str(station["seed_value"])
+        if seed_value in seen:
             continue
-        seen.add(artist_id)
+        seen.add(seed_value)
         stations.append(station)
         if len(stations) >= limit:
-            break
+            return stations
+
+    for row in list_global_collection_artists(limit=limit * 2):
+        station = _artist_station(row)
+        if not station:
+            continue
+        seed_value = str(station["seed_value"])
+        if seed_value in seen:
+            continue
+        if row.get("photo_url"):
+            station["cover_url"] = row.get("photo_url")
+        seen.add(seed_value)
+        stations.append(station)
+        if len(stations) >= limit:
+            return stations
     return stations
 
 

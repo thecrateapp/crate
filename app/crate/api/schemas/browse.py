@@ -98,7 +98,9 @@ class ArtistCheckLibraryResponse(RootModel[dict[str, bool]]):
 
 
 class ArtistAlbumSummaryResponse(IdentityFieldsMixin):
-    id: int
+    model_config = ConfigDict(extra="allow")
+
+    id: int | None = None
     entity_uid: str | None = None
     slug: str | None = None
     name: str
@@ -123,6 +125,8 @@ class ArtistAlbumSummaryResponse(IdentityFieldsMixin):
 
 
 class ArtistDetailResponse(IdentityFieldsMixin):
+    model_config = ConfigDict(extra="allow")
+
     id: int | None = None
     entity_uid: str | None = None
     slug: str | None = None
@@ -152,8 +156,10 @@ class ArtistDetailResponse(IdentityFieldsMixin):
 
 
 class ArtistTopTrackResponse(IdentityFieldsMixin):
+    model_config = ConfigDict(extra="allow")
+
     id: str
-    track_id: int
+    track_id: int | None = None
     track_entity_uid: str | None = None
     title: str
     artist: str
@@ -406,7 +412,9 @@ class AlbumTrackLyricsResponse(BaseModel):
 
 
 class AlbumTrackResponse(BaseModel):
-    id: int
+    model_config = ConfigDict(extra="allow")
+
+    id: int | str
     entity_uid: str | None = None
     storage_id: str | None = None
     filename: str
@@ -417,8 +425,8 @@ class AlbumTrackResponse(BaseModel):
     bit_depth: int | None = None
     length_sec: int
     popularity: int | None = None
-    popularity_score: float | None = None
-    popularity_confidence: float | None = None
+    popularity_score: float | None = Field(default=None, exclude=True)
+    popularity_confidence: float | None = Field(default=None, exclude=True)
     rating: int | float = 0
     stream_variants: list[AlbumTrackStreamVariantResponse] = Field(default_factory=list)
     lyrics: AlbumTrackLyricsResponse = Field(default_factory=AlbumTrackLyricsResponse)
@@ -435,7 +443,9 @@ class AlbumTrackResponse(BaseModel):
 
 
 class AlbumDetailResponse(IdentityFieldsMixin):
-    id: int
+    model_config = ConfigDict(extra="allow")
+
+    id: int | None = None
     entity_uid: str | None = None
     slug: str | None = None
     artist_id: int | None = None

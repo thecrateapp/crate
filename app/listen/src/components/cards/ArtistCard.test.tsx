@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -63,6 +63,130 @@ beforeEach(() => {
 });
 
 describe("ArtistCard", () => {
+  it("renders responsive WebP candidates for generated artist photos", () => {
+    renderWithListenProviders(
+      <ArtistCard name="High Vis" artistId={9} layout="grid" />,
+    );
+
+    const image = screen.getByAltText("High Vis");
+    expect(image).toHaveAttribute("sizes");
+    expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);
+    expect(image.getAttribute("srcset")).toMatch(/size=320[^,]* 320w/);
+    expect(image.getAttribute("srcset")).toMatch(/format=webp/);
+    expect(screen.getByText("High Vis").closest('[role="button"]')).toHaveClass(
+      "listen-deferred-grid-item",
+    );
+  });
+
+  it("shows a flat monogram disc while external artwork is pending", () => {
+    renderWithListenProviders(
+      <ArtistCard
+        name="Poison The Well"
+        photo="/api/network/external-artist/photo?name=Poison%20The%20Well"
+        href="https://www.last.fm/music/Poison+The+Well"
+        external
+      />,
+    );
+
+    const placeholder = screen.getByTestId("artist-artwork-placeholder");
+    expect(placeholder).toHaveAttribute("aria-hidden", "true");
+    expect(placeholder).toHaveAttribute("data-placeholder-style", "flat-disc");
+    expect(placeholder).toHaveTextContent("PW");
+    expect(placeholder).toHaveClass("rounded-full");
+    expect(placeholder.childElementCount).toBe(1);
+    expect(placeholder.className).not.toMatch(
+      /gradient|border|shadow|backdrop/,
+    );
+    expect(placeholder.firstElementChild?.className).not.toMatch(
+      /gradient|border|shadow|backdrop|rounded/,
+    );
+  });
+
+  it("keeps polling pending external artwork beyond the initial burst", () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = renderWithListenProviders(
+        <ArtistCard
+          name="Poison The Well"
+          photo="/api/network/external-artist/photo?name=Poison%20The%20Well"
+          href="https://www.last.fm/music/Poison+The+Well"
+          external
+        />,
+      );
+
+      const image = screen.getByAltText("Poison The Well");
+      expect(image).toHaveAttribute("loading", "lazy");
+      expect(image).toHaveAttribute("decoding", "async");
+
+      fireEvent.error(image);
+      act(() => vi.advanceTimersByTime(2_000));
+
+      expect(container.querySelector("img")).toHaveAttribute(
+        "src",
+        expect.stringContaining("retry=1"),
+      );
+
+      fireEvent.error(screen.getByAltText("Poison The Well"));
+      act(() => vi.advanceTimersByTime(4_000));
+      expect(container.querySelector("img")).toHaveAttribute(
+        "src",
+        expect.stringContaining("retry=2"),
+      );
+
+      fireEvent.error(screen.getByAltText("Poison The Well"));
+      act(() => vi.advanceTimersByTime(8_000));
+      expect(container.querySelector("img")).toHaveAttribute(
+        "src",
+        expect.stringContaining("retry=3"),
+      );
+
+      fireEvent.error(screen.getByAltText("Poison The Well"));
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(container.querySelector("img")).toHaveAttribute(
+        "src",
+        expect.stringContaining("retry=4"),
+      );
+      expect(screen.getByAltText("Poison The Well")).not.toHaveStyle({
+        display: "none",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps failed artwork hidden until a retry loads", () => {
+    vi.useFakeTimers();
+    try {
+      renderWithListenProviders(
+        <ArtistCard
+          name="Le Temps Du Loup"
+          photo="/api/network/external-artist/photo?name=Le%20Temps%20Du%20Loup"
+          href="https://www.last.fm/music/Le+Temps+Du+Loup"
+          external
+        />,
+      );
+
+      const image = screen.getByAltText("Le Temps Du Loup");
+      expect(image).toHaveClass("invisible");
+
+      fireEvent.error(image);
+      act(() => vi.advanceTimersByTime(2_000));
+
+      const retryImage = screen.getByAltText("Le Temps Du Loup");
+      expect(retryImage).toHaveAttribute(
+        "src",
+        expect.stringContaining("retry=1"),
+      );
+      expect(retryImage).toHaveClass("invisible");
+
+      fireEvent.load(retryImage);
+
+      expect(screen.getByAltText("Le Temps Du Loup")).toHaveClass("visible");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renders external artists with muted imagery and no provider overlay", () => {
     renderWithListenProviders(
       <ArtistCard
@@ -108,6 +232,18 @@ describe("ArtistCard", () => {
       "src",
       "https://api.example.test/api/network/external-artist/photo?name=Poison%20The%20Well&token=desktop-token",
     );
+  });
+
+  it("does not request a generated artist photo when catalog says none exists", () => {
+    renderWithListenProviders(
+      <ArtistCard
+        name="High Vis"
+        globalArtistUid="artist-global-1"
+        hasPhoto={false}
+      />,
+    );
+
+    expect(screen.queryByAltText("High Vis")).not.toBeInTheDocument();
   });
 
   it("opens the desktop action menu when the artist only has stable route identifiers", async () => {

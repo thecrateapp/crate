@@ -69,7 +69,7 @@ import {
   getPlaybackDeliveryPolicyPreference,
   PLAYER_PLAYBACK_PREFS_EVENT,
   setPlaybackDeliveryPolicyPreference,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 
 interface HeroActionButtonProps
@@ -124,14 +124,17 @@ function searchTrackToTrack(track: SearchTrack): Track {
     },
     {
       cover: track.album
-        ? albumCoverApiUrl({
-            albumId: track.album_id,
-            albumEntityUid: track.album_entity_uid,
-            artistEntityUid: track.artist_entity_uid,
-            albumSlug: track.album_slug,
-            artistName: track.artist,
-            albumName: track.album,
-          })
+        ? albumCoverApiUrl(
+            {
+              albumId: track.album_id,
+              albumEntityUid: track.album_entity_uid,
+              artistEntityUid: track.artist_entity_uid,
+              albumSlug: track.album_slug,
+              artistName: track.artist,
+              albumName: track.album,
+            },
+            { size: 512 },
+          )
         : undefined,
     },
   );
@@ -388,7 +391,7 @@ export function JamSession() {
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
 
-  const prevQualityRef = useRef<PlaybackDeliveryPolicy | null>(null);
+  const prevQualityRef = useRef<PlaybackDeliveryPreference | null>(null);
 
   useEffect(() => {
     if (roomId) {
@@ -468,7 +471,7 @@ export function JamSession() {
     const timer = window.setTimeout(() => {
       setQueueSearchLoading(true);
       api<SearchData>(
-        `/api/search?q=${encodeURIComponent(query)}&limit=8`,
+        `/api/catalog/search?q=${encodeURIComponent(query)}&limit=8`,
         "GET",
         undefined,
         { signal: controller.signal },

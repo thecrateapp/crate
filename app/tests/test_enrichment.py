@@ -197,7 +197,7 @@ class TestArtistPageEnrichment:
         }
         mock_live.assert_not_called()
 
-    def test_artist_page_enrichment_falls_back_to_live_setlist_when_cache_misses(self):
+    def test_artist_page_enrichment_queues_refresh_when_cache_misses(self):
         with (
             patch("crate.api.enrichment.get_cache", return_value=None),
             patch(
@@ -205,23 +205,17 @@ class TestArtistPageEnrichment:
                 return_value=None,
             ),
             patch(
-                "crate.api.enrichment.setlistfm.get_probable_setlist",
-                return_value=[{"title": "Paranoid Android"}],
-            ) as mock_live,
+                "crate.api.enrichment.setlistfm.queue_probable_setlist_refresh"
+            ) as mock_queue,
         ):
             from crate.api.enrichment import get_artist_page_enrichment
 
             result = get_artist_page_enrichment("Radiohead")
 
-        assert result == {
-            "setlist": {
-                "probable_setlist": [{"title": "Paranoid Android"}],
-                "total_shows": 1,
-            }
-        }
-        mock_live.assert_called_once_with("Radiohead")
+        assert result == {}
+        mock_queue.assert_called_once_with("Radiohead")
 
-    def test_artist_enrichment_completes_stale_cache_without_setlist(self):
+    def test_artist_enrichment_queues_setlist_without_blocking_stale_cache(self):
         cached = {"lastfm": {"bio": "Bio"}}
         request = SimpleNamespace(state=SimpleNamespace(user={"role": "user"}))
 
@@ -233,23 +227,16 @@ class TestArtistPageEnrichment:
                 return_value=None,
             ),
             patch(
-                "crate.api.enrichment.setlistfm.get_probable_setlist",
-                return_value=[{"title": "Pure Morning"}],
-            ) as mock_live,
+                "crate.api.enrichment.setlistfm.queue_probable_setlist_refresh"
+            ) as mock_queue,
             patch("crate.api.enrichment.set_cache") as mock_set_cache,
         ):
             from crate.api.enrichment import get_artist_enrichment
 
             result = get_artist_enrichment(request, "Placebo")
 
-        assert result == {
-            "lastfm": {"bio": "Bio"},
-            "setlist": {
-                "probable_setlist": [{"title": "Pure Morning"}],
-                "total_shows": 1,
-            },
-        }
-        mock_live.assert_called_once_with("Placebo")
+        assert result == {"lastfm": {"bio": "Bio"}}
+        mock_queue.assert_called_once_with("Placebo")
         mock_set_cache.assert_called_once()
 
 
@@ -858,3 +845,132 @@ class TestArtistEnrichment:
             "reason": "hidden_library_path",
         }
         assert calls == []
+
+    def test_process_new_content_propagates_force_to_artist_enrichment(
+        self, monkeypatch, tmp_path
+    ):
+        from crate.worker_handlers import enrichment as worker_enrichment
+
+        forwarded_force: list[bool | None] = []
+
+        monkeypatch.setattr(
+            worker_enrichment, "get_library_artist", lambda _artist: None
+        )
+        monkeypatch.setattr(
+            worker_enrichment, "emit_progress", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_organize_folders",
+            lambda *args, **kwargs: None,
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_enrich_artist",
+            lambda *args, **kwargs: forwarded_force.append(kwargs.get("force")),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_album_genres",
+            lambda *args, **kwargs: [],
+        )
+        for helper in (
+            "_process_new_content_album_mbids",
+            "_process_new_content_bandcamp_urls",
+            "_process_new_content_lyrics",
+            "_process_new_content_audio_fingerprints",
+            "_process_new_content_popularity",
+            "_process_new_content_missing_covers",
+            "_process_new_content_portable_metadata",
+            "_process_new_content_update_artist_hash",
+        ):
+            monkeypatch.setattr(worker_enrichment, helper, lambda *args, **kwargs: None)
+        monkeypatch.setattr("requests.post", lambda *args, **kwargs: None)
+
+        worker_enrichment._process_new_content_inner(
+            "task-1",
+            {"force": True},
+            {"library_path": str(tmp_path)},
+            "Birds In Row",
+            "",
+        )
+
+        assert forwarded_force == [True]
+
+    def test_invalidate_artist_top_tracks_cache_uses_artist_prefix(self, monkeypatch):
+        from crate.worker_handlers import enrichment as worker_enrichment
+
+        prefixes: list[str] = []
+        monkeypatch.setattr(
+            worker_enrichment,
+            "delete_cache_prefix",
+            lambda prefix: prefixes.append(prefix),
+        )
+
+        worker_enrichment._invalidate_artist_top_tracks_cache(" Birds In Row ")
+
+        assert prefixes == ["listen:artist_top_tracks:v1:birds in row:"]
+
+
+def test_download_artist_photo_queues_persistent_variants(monkeypatch, tmp_path):
+    from crate import enrichment
+
+    queued = []
+    monkeypatch.setattr(
+        "crate.lastfm.get_best_artist_image", lambda _name: b"artist-image"
+    )
+    monkeypatch.setattr(enrichment, "update_artist_has_photo", lambda _name: None)
+    monkeypatch.setattr(
+        enrichment,
+        "queue_artwork_materialization",
+        lambda asset, *, reason: queued.append((asset.kind, asset.entity_key, reason)),
+    )
+
+    assert enrichment._download_artist_photo(
+        "Converge", tmp_path, entity_uid="artist-entity"
+    )
+    assert queued == [("artist-photo", "artist-entity", "source-write")]
+
+
+def test_new_content_cover_fetch_queues_persistent_variants(monkeypatch, tmp_path):
+    from crate.task_progress import TaskProgress
+    from crate.worker_handlers import enrichment as worker_enrichment
+
+    album_dir = tmp_path / "Album"
+    album_dir.mkdir()
+    queued = []
+    monkeypatch.setattr(
+        "crate.artwork.fetch_cover_from_caa", lambda _mbid: b"cover-image"
+    )
+    monkeypatch.setattr("crate.artwork.save_cover", lambda _path, _data: None)
+    monkeypatch.setattr(worker_enrichment, "wait_for_provider_slot", lambda *_args: 0)
+    monkeypatch.setattr(
+        worker_enrichment, "emit_progress", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(worker_enrichment, "update_album_has_cover", lambda _id: None)
+    monkeypatch.setattr(
+        worker_enrichment,
+        "queue_artwork_materialization",
+        lambda asset, *, reason: queued.append((asset.kind, asset.entity_key, reason)),
+    )
+    result = {"steps": {}}
+
+    worker_enrichment._process_new_content_missing_covers(
+        "task-1",
+        result,
+        [
+            {
+                "id": 2,
+                "entity_uid": "album-entity",
+                "name": "Album",
+                "path": str(album_dir),
+                "musicbrainz_albumid": "mbid",
+            }
+        ],
+        "Artist",
+        "",
+        TaskProgress(),
+    )
+
+    assert result["steps"]["covers"] == 1
+    assert queued == [("album-cover", "album-entity", "source-write")]

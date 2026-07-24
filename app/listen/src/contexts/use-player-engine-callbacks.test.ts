@@ -64,6 +64,9 @@ function createOptions() {
     rotateTrackerSession: vi.fn(),
     markSeekPosition: vi.fn(),
     recordProgress: vi.fn(),
+    recordPlaybackQualityProgress: vi.fn(),
+    recordPlaybackStarted: vi.fn(),
+    onActivePlaybackStarted: vi.fn(),
     pullFromEngine: vi.fn(() => ({ resolvedTrack: TRACK_A })),
     setAnalyserVersion: vi.fn(),
     setCrossfadeTransition: vi.fn(),
@@ -105,6 +108,7 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.bufferingIntentRef.current).toBe(false);
     expect(options.commitIsBuffering).toHaveBeenCalledWith(false);
     expect(options.commitCurrentTime).toHaveBeenCalledWith(12);
+    expect(options.recordPlaybackQualityProgress).toHaveBeenCalledWith(12);
   });
 
   it("marks playback active as soon as the engine accepts a play request", () => {
@@ -116,6 +120,28 @@ describe("usePlayerEngineCallbacks", () => {
 
     expect(options.bufferingIntentRef.current).toBe(true);
     expect(options.commitIsPlaying).toHaveBeenCalledWith(true);
+  });
+
+  it("starts bounded next-track resolution only after active playback starts", () => {
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onPlay?.("/stream/a");
+
+    expect(options.onActivePlaybackStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports elapsed startup time after a play request is fulfilled", () => {
+    const now = vi.spyOn(Date, "now");
+    now.mockReturnValueOnce(1_000).mockReturnValueOnce(1_250);
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onPlayRequest?.("/stream/a");
+    options.callbacksRef.current.onPlay?.("/stream/a");
+
+    expect(options.recordPlaybackStarted).toHaveBeenCalledWith(250);
+    now.mockRestore();
   });
 
   it("applies a deferred seek when the active track finishes loading", () => {

@@ -3,6 +3,18 @@ import { describe, expect, it } from "vitest";
 import { mergeTrackQualityParts, resolveTrackInfoUrl } from "./track-info";
 
 describe("resolveTrackInfoUrl", () => {
+  it("uses global catalog info when globalTrackUid is available", () => {
+    expect(
+      resolveTrackInfoUrl({
+        id: "global-42",
+        globalTrackUid: "global-42",
+        entityUid: "entity-42",
+        libraryTrackId: 42,
+        path: "Artist/Album/Track.flac",
+      }),
+    ).toBe("/api/catalog/tracks/global-42/info");
+  });
+
   it("prefers entity_uid over legacy ids when available", () => {
     expect(
       resolveTrackInfoUrl({

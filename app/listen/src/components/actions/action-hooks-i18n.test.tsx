@@ -1,7 +1,7 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/contexts/PlayerContext", () => ({
   usePlayerActions: () => ({
@@ -44,6 +44,7 @@ import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { useShowActionEntries } from "@/components/actions/show-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";
+import { fetchAlbumRadio, fetchArtistRadio } from "@/lib/radio";
 
 function i18nWrapper(locale: ListenLocale = "es") {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -69,6 +70,11 @@ function labels(
 }
 
 describe("action hooks i18n", () => {
+  beforeEach(() => {
+    vi.mocked(fetchAlbumRadio).mockReset();
+    vi.mocked(fetchArtistRadio).mockReset();
+  });
+
   it("localizes album, artist, playlist, and show action labels", () => {
     const { result } = renderHook(
       () => ({
@@ -159,5 +165,75 @@ describe("action hooks i18n", () => {
         "Abrir entradas",
       ]),
     );
+  });
+
+  it("starts artist radio from global artist ids", async () => {
+    vi.mocked(fetchArtistRadio).mockResolvedValue({
+      tracks: [],
+      source: { type: "radio", name: "High Vis Radio" },
+    });
+    const { result } = renderHook(
+      () =>
+        useArtistActionEntries({
+          globalArtistUid: "global-high-vis",
+          name: "High Vis",
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+    const radio = result.current.find((entry) => entry.key === "radio");
+    if (
+      !radio ||
+      radio.type === "divider" ||
+      radio.type === "label" ||
+      radio.type === "disclosure"
+    ) {
+      throw new Error("radio action missing");
+    }
+
+    expect(radio.disabled).toBe(false);
+    await act(async () => {
+      await radio.onSelect();
+    });
+
+    expect(fetchArtistRadio).toHaveBeenCalledWith(
+      "global-high-vis",
+      "High Vis",
+    );
+  });
+
+  it("starts album radio from global album ids", async () => {
+    vi.mocked(fetchAlbumRadio).mockResolvedValue({
+      tracks: [],
+      source: { type: "radio", name: "Blending Radio" },
+    });
+    const { result } = renderHook(
+      () =>
+        useAlbumActionEntries({
+          globalAlbumUid: "global-blending",
+          artist: "High Vis",
+          album: "Blending",
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+    const radio = result.current.find((entry) => entry.key === "radio");
+    if (
+      !radio ||
+      radio.type === "divider" ||
+      radio.type === "label" ||
+      radio.type === "disclosure"
+    ) {
+      throw new Error("radio action missing");
+    }
+
+    expect(radio.disabled).toBe(false);
+    await act(async () => {
+      await radio.onSelect();
+    });
+
+    expect(fetchAlbumRadio).toHaveBeenCalledWith({
+      albumId: "global-blending",
+      artistName: "High Vis",
+      albumName: "Blending",
+    });
   });
 });

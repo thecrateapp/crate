@@ -1,203 +1,53 @@
-# Development, Deployment, and Operations
+---
+title: Development, deployment and operations model
+summary: The shared runtime model behind local development, self-hosting and project deployment.
+section: operations
+audience: [developer, operator]
+status: canonical
+order: 100
+verified: 2026-07-21
+sources:
+  [
+    Makefile,
+    docker-compose.dev.yaml,
+    docker-compose.readplane.dev.yaml,
+    docker-compose.yaml,
+  ]
+---
 
-## Development stack
+# Development, deployment and operations model
 
-Local development centers on `docker-compose.dev.yaml` and the helper targets in
-`Makefile`.
+Crate deliberately uses different compositions for development, home hosting
+and the project-hosted environment. The invariant across them is service
+ownership: API is read-only for music, workers own filesystem mutations,
+PostgreSQL is authoritative, and readplane/projector maintain the fast read
+model.
 
-Other compose files are intentionally scoped:
+## Local stack
 
-- `docker-compose.yaml`: production/service definition used with project
-  overlays.
-- `docker-compose.project.yaml`: production domain/Traefik overlay for the
-  hosted Crate instance.
-- `docker-compose.home.yaml`: smaller self-hosted install used by the
-  one-line installer.
-- `docker-compose.local-stack.yaml`: local override for the production-style
-  stack on `*.crate.local`.
-- `docker-compose.readplane.dev.yaml`: local readplane service/proxy overlay.
-  The readplane is **not** included in the main `docker-compose.dev.yaml` by
-  default. Enable it with `docker compose -f docker-compose.dev.yaml -f docker-compose.readplane.dev.yaml up`.
+`make dev` includes `docker-compose.readplane.dev.yaml`; readplane is not an
+optional afterthought in the supported development path. It starts the backend
+containers and Vite apps on Admin 5173, Listen 5174, Docs 5175 and Site 5176.
+Readplane is exposed on 8686.
 
-### Core dev services
+## Production topology
 
-- PostgreSQL
-- Redis
-- `slskd`
-- `crate-dev-api`
-- `crate-dev-readplane`
-- `crate-dev-worker`
-- `crate-dev-maintenance-worker`
-- `crate-dev-analysis-worker`
-- `crate-dev-playback-worker`
-- `crate-dev-media-worker`
-- Caddy
-- Ollama when LLM work is enabled locally
+The project-hosted compose layers run API, readplane, projector, worker
+families, media worker, Admin, Listen, Site, Docs, PostgreSQL, cache Redis,
+durable Redis and Traefik. The home profile is a separate installer-owned
+compose installation and must be operated with its own variables and backup
+strategy.
 
-The frontends usually run as Vite dev servers outside Docker:
+## Startup and data safety
 
-- admin on `5173`
-- listen on `5174`
-- marketing site on `5175`
-- docs on `5176`
+API/worker startup serializes Alembic migration work with advisory locking.
+New database work must use Alembic migrations. PostgreSQL and durable Redis
+survive a normal restart; cache Redis has volatile eviction. Do not treat a
+compose restart as an atomic rollback after schema migration.
 
-## Local dev domains
+Use these detailed pages for instructions rather than duplicating them here:
 
-The normal local domains are:
-
-- `https://admin.dev.lespedants.org`
-- `https://listen.dev.lespedants.org`
-- `https://api.dev.lespedants.org`
-- `https://docs.dev.cratemusic.app`
-
-This matters because Crate's auth, cookies, and multi-origin topology are
-closer to production when developed against those hostnames.
-
-## Production stack
-
-Production composition is defined by `docker-compose.yaml` plus, on the project
-host, `docker-compose.project.yaml`.
-
-Core Crate services:
-
-- `crate-api`, `crate-readplane`
-- `crate-worker`, `crate-projector`, `crate-maintenance-worker`,
-  `crate-analysis-worker`, `crate-playback-worker`
-- `crate-media-worker`
-- `crate-ui`, `crate-listen`
-- `crate-postgres`, `crate-redis`
-- `slskd`
-
-Infrastructure around it:
-
-- Traefik for reverse proxy and TLS
-
-## Volumes and mounts
-
-One of the most important deployment truths is mount asymmetry:
-
-- API mounts library read-only
-- worker mounts library read-write
-- data directories hold DB/cache/config/runtime state
-
-This separation is essential to Crate's safety model.
-
-## Makefile as operations interface
-
-The Makefile is effectively part of the operator UX.
-
-Important command families:
-
-- dev lifecycle (`make dev`, `make dev-down`, `make dev-rebuild`)
-- regression/testing helpers
-- deploy helpers
-- Capacitor/mobile helpers
-
-## Startup schema bootstrap
-
-API and worker both call `init_db()`, but advisory locking ensures schema work
-is not applied concurrently.
-
-The current startup path is:
-
-1. advisory lock
-2. `alembic upgrade head`
-3. optional extension setup
-4. bootstrap seeds (genre taxonomy, admin user)
-
-Fresh installs and upgrades therefore follow the same Alembic-based path.
-
-## Database connection paths
-
-Crate still has two runtime DB access paths:
-
-- the legacy psycopg2 pool in `app/crate/db/core_provisioning.py`
-- the SQLAlchemy engine/session runtime in `app/crate/db/engine.py`
-
-This is a controlled compatibility posture rather than the desired end-state for
-all code. New runtime work should prefer the session-based path.
-
-## Worker operational behavior
-
-The worker layer is split by concern:
-
-- `crate-worker` runs fast/default queues plus the service loop.
-- `crate-maintenance-worker` runs maintenance queue work.
-- `crate-analysis-worker` runs heavy analysis/fingerprint/bliss work.
-- `crate-playback-worker` runs playback prepare/transcode work.
-- `crate-projector` runs the domain-event projector command.
-- `crate-media-worker` runs Rust package/download artifact generation.
-
-The service-loop runtime marks orphaned/zombie tasks, clears stale locks and
-semaphores, maintains watcher/scheduler/import queue/runtime state, and
-performs periodic cleanup.
-
-Expensive background work is guarded by `app/crate/resource_governor.py`. The
-`CRATE_RESOURCE_*` thresholds and `CRATE_MAINTENANCE_WINDOW_*` settings decide
-when governed tasks should run immediately or be deferred to protect playback
-and interactive usage.
-
-## Realtime and observability
-
-Crate now exposes system state through several overlapping mechanisms:
-
-- task list/status endpoints
-- worker status/runtime snapshots
-- SSE global and per-task feeds
-- replayable cache invalidation feed
-- snapshot-driven SSE surfaces
-- Redis Stream domain-event diagnostics
-- container logs and worker logs
-- Telegram notifications for some task outcomes
-
-### Admin ops snapshot
-
-The admin dashboard is now backed by a richer ops snapshot that includes:
-
-- core stats
-- live worker/task state
-- health counts
-- recent activity
-- domain-event runtime diagnostics
-- cache invalidation runtime
-- SSE surface catalog
-
-This is the main operator-facing observability surface inside the product.
-
-## Cache and eventing runtime
-
-Redis now carries several distinct concerns:
-
-- L2 cache
-- Dramatiq broker
-- cache invalidation replay feed
-- minute-bucket metrics
-- domain-event stream for the projector
-- media-worker job/progress/cancel/slot state
-
-That makes Redis operationally central even though PostgreSQL remains the
-durable source of truth.
-
-## External session material
-
-Bandcamp connection state is stored as encrypted credential payloads in
-PostgreSQL (`credential_secrets`) and referenced from `bandcamp_connections`.
-
-Operationally important variables:
-
-- `CRATE_CREDENTIAL_KEY`: stable Fernet key for encrypted external sessions.
-  If unset, Crate derives a key from `JWT_SECRET`, which is acceptable for dev
-  but fragile if production rotates JWT secrets.
-- `CRATE_BANDCAMP_COLLECTION_SYNC_*`: collection sync backend, timeout, page
-  size, and max page controls.
-- `CRATE_BANDCAMP_DOWNLOAD_*`: purchase download backend and timeout controls.
-- `CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_*`: optional server-side credential
-  bridge, disabled by default.
-
-## Deployment caveat
-
-`make deploy` is image-first: it expects the release images built by GitHub
-Actions/GHCR, checks that required manifests are pullable, syncs only the
-deployment files needed by the server, and restarts the compose stack from
-those images. Do not `rsync --delete` the whole repo root to production; the
-host keeps media/data outside the local tree.
+- [Development setup](00b-development-setup.md)
+- [Deployment profiles](deployment-profiles.md)
+- [Operations](operations.md)
+- [Backup and recovery](ops-runbook.md)

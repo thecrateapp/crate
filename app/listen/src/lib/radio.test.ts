@@ -259,6 +259,21 @@ describe("seeded radio wrappers", () => {
     );
   });
 
+  it("starts track radio with globalTrackUid", async () => {
+    mockApi.mockResolvedValue({
+      session_id: "tg",
+      seed_label: "Remote",
+      tracks: [],
+    });
+    await fetchTrackRadio({ globalTrackUid: "global-track-1", title: "Song" });
+    expect(mockApi).toHaveBeenCalledWith(
+      "/api/radio/start",
+      "POST",
+      { mode: "seeded", seed_type: "track", seed_value: "global-track-1" },
+      { signal: undefined },
+    );
+  });
+
   it("starts track radio with path", async () => {
     mockApi.mockResolvedValue({
       session_id: "t3",
@@ -276,7 +291,7 @@ describe("seeded radio wrappers", () => {
 
   it("throws when track radio has no seed", async () => {
     await expect(fetchTrackRadio({ title: "Song" })).rejects.toThrow(
-      "track radio requires libraryTrackId, entityUid or path",
+      "track radio requires libraryTrackId, globalTrackUid, entityUid or path",
     );
   });
 
@@ -347,6 +362,45 @@ describe("startShapedRadio", () => {
     expect(result!.sessionId).toBe("sess-1");
     expect(result!.source.radio!.seedType).toBe("artist");
     expect(result!.source.radio!.seedId).toBe(7);
+  });
+
+  it("preserves global track refs from shaped radio sessions", async () => {
+    mockApi.mockResolvedValue({
+      session_id: "sess-global",
+      seed_label: "High Vis",
+      tracks: [
+        {
+          track_id: null,
+          global_track_uid: "global-track-1",
+          global_artist_uid: "global-high-vis",
+          global_album_uid: "global-blending",
+          title: "0151",
+          artist: "High Vis",
+          album: "Blending",
+          distance: 0,
+        },
+      ],
+    });
+
+    const result = await startShapedRadio(
+      "seeded",
+      "artist",
+      "global-high-vis",
+    );
+
+    expect(result?.tracks[0]).toMatchObject({
+      id: "global-track-1",
+      globalTrackUid: "global-track-1",
+      globalArtistUid: "global-high-vis",
+      globalAlbumUid: "global-blending",
+      title: "0151",
+      artist: "High Vis",
+    });
+    expect(result?.source.radio).toMatchObject({
+      seedType: "artist",
+      seedId: "global-high-vis",
+      shapedSessionId: "sess-global",
+    });
   });
 
   it("returns null for 404 unavailable", async () => {

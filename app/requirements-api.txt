@@ -7,6 +7,7 @@ uvicorn[standard]>=0.34
 python-multipart>=0.0.18
 email-validator>=2.0
 requests>=2.31
+httpx>=0.27
 psycopg2-binary>=2.9
 sqlalchemy>=2.0
 alembic>=1.13

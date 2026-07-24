@@ -2539,6 +2539,18 @@ def _handle_import_queue_item(task_id: str, params: dict, config: dict) -> dict:
     return result
 
 
+_FEDERATION_EXT_BY_CONTENT_TYPE = {
+    "audio/flac": ".flac",
+    "audio/mpeg": ".mp3",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
+    "audio/ogg": ".ogg",
+    "audio/opus": ".opus",
+    "audio/wav": ".wav",
+}
+_FEDERATION_ALLOWED_FORMATS = {"flac", "mp3", "m4a", "aac", "ogg", "opus", "wav"}
+
+
 def _handle_import_queue_all(task_id: str, params: dict, config: dict) -> dict:
     from crate.db.import_queue_read_models import (
         list_import_queue_items,

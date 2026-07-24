@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -37,4 +38,49 @@ func TestParseLastEventID(t *testing.T) {
 
 	_, ok = parseLastEventID("nope")
 	assert.False(t, ok, "accepted invalid id")
+}
+
+func TestCacheEventResumeID(t *testing.T) {
+	tests := []struct {
+		name       string
+		header     string
+		query      string
+		wantID     int64
+		wantResume bool
+	}{
+		{name: "header cursor", header: "42", query: "last_event_id=41", wantID: 42, wantResume: true},
+		{name: "persisted query cursor", query: "last_event_id=41", wantID: 41, wantResume: true},
+		{name: "missing cursor", wantResume: false},
+		{name: "invalid cursor", query: "last_event_id=nope", wantResume: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/cache/events?"+tt.query, nil)
+			if tt.header != "" {
+				req.Header.Set("Last-Event-ID", tt.header)
+			}
+
+			gotID, gotResume := cacheEventResumeID(req)
+
+			assert.Equal(t, tt.wantID, gotID)
+			assert.Equal(t, tt.wantResume, gotResume)
+		})
+	}
+}
+
+func TestFilterCacheInvalidationEventsReplaysOnlyTheReconnectGap(t *testing.T) {
+	raw := []string{
+		`{"id":5,"scope":"home"}`,
+		`{"id":4,"scope":"history"}`,
+		`{"id":3,"scope":"library"}`,
+	}
+
+	events, latest := filterCacheInvalidationEvents(raw, 3)
+
+	assert.Equal(t, []cacheInvalidationEvent{
+		{ID: 4, Scope: "history"},
+		{ID: 5, Scope: "home"},
+	}, events)
+	assert.Equal(t, int64(5), latest)
 }

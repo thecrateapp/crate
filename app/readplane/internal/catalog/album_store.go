@@ -7,6 +7,57 @@ import (
 
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
+
+const albumTracksQuery = `
+		SELECT id, entity_uid::text AS entity_uid, storage_id::text AS storage_id, filename,
+		       format, size, bitrate, sample_rate, bit_depth, bpm, audio_key, audio_scale,
+		       energy, danceability, valence, bliss_vector, duration, popularity,
+		       rating, title, artist, album,
+		       albumartist, track_number, disc_number, year, genre, musicbrainz_albumid,
+		       musicbrainz_trackid, path
+		FROM library_tracks
+		WHERE album_id = $1
+		ORDER BY disc_number, track_number
+	`
+
+func (s *Store) AlbumArtworkKeyByID(ctx context.Context, albumID int64) (string, error) {
+	return s.albumArtworkKey(ctx, "id = $1", albumID)
+}
+
+func (s *Store) AlbumArtworkKeyByEntityUID(ctx context.Context, uid string) (string, error) {
+	return s.albumArtworkKey(ctx, "entity_uid = $1::uuid", uid)
+}
+
+func (s *Store) GlobalAlbumArtworkKey(ctx context.Context, globalUID string) (string, error) {
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(ctx, `SELECT local_album_entity_uid::text AS entity_uid FROM global_catalog_albums WHERE global_album_uid = $1::uuid AND local_album_id IS NOT NULL LIMIT 1`, globalUID))
+	if err != nil {
+		return "", err
+	}
+	if len(rows) == 0 || stringValue(rows[0]["entity_uid"]) == "" {
+		return "", ErrNotFound
+	}
+	return stringValue(rows[0]["entity_uid"]), nil
+}
+
+func (s *Store) albumArtworkKey(ctx context.Context, predicate string, value any) (string, error) {
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(ctx, `SELECT entity_uid::text AS entity_uid FROM library_albums WHERE `+predicate+` LIMIT 1`, value))
+	if err != nil {
+		return "", err
+	}
+	if len(rows) == 0 {
+		return "", ErrNotFound
+	}
+	key := stringValue(rows[0]["entity_uid"])
+	if key == "" {
+		return "", ErrNotFound
+	}
+	return key, nil
+}
+
 func (s *Store) AlbumByID(ctx context.Context, albumID int64) (map[string]any, error) {
 	row, err := s.albumRow(ctx, "a.id = $1", albumID)
 	if err != nil {
@@ -69,17 +120,7 @@ func (s *Store) albumPayload(ctx context.Context, album map[string]any) (map[str
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 
-	tracks, err := rowsToMaps(s.pool.Query(ctx, `
-		SELECT id, entity_uid::text AS entity_uid, storage_id::text AS storage_id, filename,
-		       format, size, bitrate, sample_rate, bit_depth, bpm, audio_key, audio_scale,
-		       energy, danceability, valence, bliss_vector, duration, popularity,
-		       popularity_score, popularity_confidence, rating, title, artist, album,
-		       albumartist, track_number, disc_number, year, genre, musicbrainz_albumid,
-		       musicbrainz_trackid, path
-		FROM library_tracks
-		WHERE album_id = $1
-		ORDER BY disc_number, track_number
-	`, albumID))
+	tracks, err := rowsToMaps(s.pool.Query(ctx, albumTracksQuery, albumID))
 	if err != nil {
 		return nil, err
 	}
@@ -117,29 +158,27 @@ func (s *Store) albumPayload(ctx context.Context, album map[string]any) (map[str
 			}
 		}
 		trackList = append(trackList, map[string]any{
-			"id":                    trackID,
-			"entity_uid":            track["entity_uid"],
-			"storage_id":            track["storage_id"],
-			"filename":              stringValue(track["filename"]),
-			"format":                stringValue(track["format"]),
-			"size_mb":               roundFloat(float64(size)/(1024*1024), 1),
-			"bitrate":               bitrateKbps(track["bitrate"]),
-			"sample_rate":           track["sample_rate"],
-			"bit_depth":             track["bit_depth"],
-			"bpm":                   track["bpm"],
-			"audio_key":             track["audio_key"],
-			"audio_scale":           track["audio_scale"],
-			"energy":                track["energy"],
-			"danceability":          track["danceability"],
-			"valence":               track["valence"],
-			"bliss_vector":          normalizeFloatSlice(track["bliss_vector"]),
-			"length_sec":            length,
-			"popularity":            track["popularity"],
-			"popularity_score":      track["popularity_score"],
-			"popularity_confidence": track["popularity_confidence"],
-			"rating":                intValue(track["rating"]),
-			"stream_variants":       variantMap[trackID],
-			"lyrics":                lyricsForTrack(lyricsMap, trackID),
+			"id":              trackID,
+			"entity_uid":      track["entity_uid"],
+			"storage_id":      track["storage_id"],
+			"filename":        stringValue(track["filename"]),
+			"format":          stringValue(track["format"]),
+			"size_mb":         roundFloat(float64(size)/(1024*1024), 1),
+			"bitrate":         bitrateKbps(track["bitrate"]),
+			"sample_rate":     track["sample_rate"],
+			"bit_depth":       track["bit_depth"],
+			"bpm":             track["bpm"],
+			"audio_key":       track["audio_key"],
+			"audio_scale":     track["audio_scale"],
+			"energy":          track["energy"],
+			"danceability":    track["danceability"],
+			"valence":         track["valence"],
+			"bliss_vector":    normalizeFloatSlice(track["bliss_vector"]),
+			"length_sec":      length,
+			"popularity":      track["popularity"],
+			"rating":          intValue(track["rating"]),
+			"stream_variants": variantMap[trackID],
+			"lyrics":          lyricsForTrack(lyricsMap, trackID),
 			"tags": map[string]any{
 				"title":               stringValue(track["title"]),
 				"artist":              stringValue(track["artist"]),

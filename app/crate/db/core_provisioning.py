@@ -126,4 +126,19 @@ def ensure_optional_superuser_extension(extension_name: str) -> bool:
         return False
 
 
-__all__ = ["ensure_database", "ensure_optional_superuser_extension"]
+def confirm_database_target(confirmed_database: str) -> str:
+    """Fail closed before a maintenance script mutates an unintended database."""
+    *_, configured_database = get_pg_connection_settings()
+    confirmed = str(confirmed_database or "").strip()
+    if not confirmed or confirmed != configured_database:
+        raise ValueError(
+            "Database confirmation does not match configured CRATE_POSTGRES_DB"
+        )
+    return configured_database
+
+
+__all__ = [
+    "confirm_database_target",
+    "ensure_database",
+    "ensure_optional_superuser_extension",
+]

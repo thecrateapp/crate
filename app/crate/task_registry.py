@@ -10,6 +10,10 @@ TASK_TYPE_LABELS: dict[str, str] = {
     "import_queue_item": "Import Staged Album",
     "import_queue_all": "Import Staged Albums",
     "import_queue_remove": "Remove Staged Import",
+    "federation_import_album": "Import Federated Album",
+    "federation_sync_catalog": "Sync Federated Catalog",
+    "global_catalog_reconcile_incremental": "Global Catalog Reconciliation",
+    "global_catalog_reconcile_full": "Full Global Catalog Reconciliation",
     "scan": "Health Check",
     "process_new_content": "Process New Content",
     "repair_library": "Library Repair",
@@ -49,6 +53,7 @@ TASK_TYPE_LABELS: dict[str, str] = {
     "fetch_popularity": "Popularity Fetch",
     # Playback delivery
     "prepare_stream_variant": "Prepare Playback Stream",
+    "cleanup_stream_variants": "Clean Playback Cache",
     # Playlists
     "generate_system_playlist": "Playlist Generation",
     "refresh_system_smart_playlists": "Refresh Smart Playlists",
@@ -61,6 +66,10 @@ TASK_TYPE_ICONS: dict[str, str] = {
     "import_queue_item": "\U0001f4e5",
     "import_queue_all": "\U0001f4e5",
     "import_queue_remove": "\U0001f5d1",
+    "federation_import_album": "\U0001f4e5",
+    "federation_sync_catalog": "\U0001f504",
+    "global_catalog_reconcile_incremental": "\U0001f504",
+    "global_catalog_reconcile_full": "\U0001f504",
     "scan": "\U0001f50d",
     "process_new_content": "\u2728",
     "repair_library": "\U0001f527",
@@ -93,6 +102,7 @@ TASK_TYPE_ICONS: dict[str, str] = {
     "update_popularity": "\U0001f4ca",
     "fetch_popularity": "\U0001f4ca",
     "prepare_stream_variant": "\U0001f3a7",
+    "cleanup_stream_variants": "\U0001f9f9",
 }
 
 

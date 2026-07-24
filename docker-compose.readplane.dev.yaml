@@ -13,17 +13,28 @@ services:
       READPLANE_ADDR: :8686
       DATABASE_URL: postgresql://crate:crate@postgres:5432/crate?sslmode=disable
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      REDIS_CACHE_URL: ${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      REDIS_DURABLE_URL: ${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       JWT_SECRET: dev-secret-not-for-production
       READPLANE_ENABLED: "true"
       READPLANE_ENABLE_SSE: "true"
-      READPLANE_ROUTE_MODE: shadow
+      READPLANE_ROUTE_MODE: active
       READPLANE_FALLBACK_ENABLED: "true"
+      READPLANE_FEDERATION_PROXY_ENABLED: "true"
+      CRATE_READPLANE_SERVICE_TOKEN: crate-dev-readplane-service-token-at-least-32-bytes
+      CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS: "true"
       API_FALLBACK_BASE: http://api:8585
       READPLANE_MAX_DB_CONNS: "4"
       READPLANE_MIN_DB_CONNS: "1"
       READPLANE_QUERY_TIMEOUT_MS: "800"
       READPLANE_SNAPSHOT_MAX_AGE_SECONDS: "600"
       READPLANE_STALE_MAX_AGE_SECONDS: "3600"
+      READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS: "300"
+      READPLANE_STATS_STALE_MAX_AGE_SECONDS: "86400"
+      READPLANE_SESSION_TOUCH_INTERVAL_SECONDS: "60"
+      READPLANE_LOCAL_MEDIA_ENABLED: ${READPLANE_LOCAL_MEDIA_ENABLED:-false}
+      READPLANE_MUSIC_ROOT: /music
+      READPLANE_CACHE_ROOT: /cache
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       ALL_PROXY: ""
@@ -32,10 +43,15 @@ services:
       all_proxy: ""
       NO_PROXY: "localhost,127.0.0.1,::1,api,readplane,postgres,redis"
       no_proxy: "localhost,127.0.0.1,::1,api,readplane,postgres,redis"
+    volumes:
+      - ./test-music:/music:ro
+      - dev_cache:/cache:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-durable:
         condition: service_healthy
       api:
         condition: service_started
@@ -85,5 +101,6 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
+  dev_cache:
   dev_readplane_caddy_data:
   dev_readplane_caddy_config:

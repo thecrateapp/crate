@@ -80,6 +80,48 @@ def get_track_delivery_row_by_path(filepath: str) -> dict | None:
         return dict(row) if row else None
 
 
+def list_recent_local_delivery_tracks(limit: int = 25) -> list[dict]:
+    """Return a bounded, local-only warmup candidate set ordered by recent play."""
+    safe_limit = max(1, min(int(limit or 25), 100))
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        lt.id,
+                        lt.entity_uid,
+                        lt.path,
+                        lt.title,
+                        lt.artist,
+                        lt.album,
+                        lt.format,
+                        lt.bitrate,
+                        lt.sample_rate,
+                        lt.bit_depth,
+                        lt.duration,
+                        lt.size
+                    FROM (
+                        SELECT track_id, MAX(ended_at) AS last_played_at
+                        FROM user_play_events
+                        WHERE track_id IS NOT NULL
+                        GROUP BY track_id
+                        ORDER BY last_played_at DESC
+                        LIMIT :limit
+                    ) recent
+                    JOIN library_tracks lt ON lt.id = recent.track_id
+                    WHERE lt.path IS NOT NULL AND lt.path <> ''
+                    ORDER BY recent.last_played_at DESC
+                    """
+                ),
+                {"limit": safe_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
+
+
 def _track_path_candidates(filepath: str) -> list[str]:
     cleaned = str(filepath or "").strip()
     if not cleaned:
@@ -306,3 +348,50 @@ def mark_variant_missing(cache_key: str) -> None:
             ),
             {"cache_key": cache_key},
         )
+
+
+def list_stream_variants_for_cleanup(limit: int = 100_000) -> list[dict]:
+    safe_limit = max(1, min(int(limit), 500_000))
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT cache_key, status, relative_path, bytes,
+                           updated_at, completed_at
+                    FROM stream_variants
+                    WHERE status = 'ready' AND relative_path IS NOT NULL
+                    ORDER BY COALESCE(completed_at, updated_at), cache_key
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": safe_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
+
+
+def mark_stream_variants_missing(cache_keys: list[str]) -> int:
+    normalized = list(dict.fromkeys(str(key) for key in cache_keys if str(key)))
+    if not normalized:
+        return 0
+    with transaction_scope() as session:
+        result = session.execute(
+            text(
+                """
+                UPDATE stream_variants
+                SET status = 'pending',
+                    error = NULL,
+                    relative_path = NULL,
+                    bytes = NULL,
+                    completed_at = NULL,
+                    updated_at = NOW()
+                WHERE cache_key = ANY(:cache_keys)
+                  AND status = 'ready'
+                """
+            ),
+            {"cache_keys": normalized},
+        )
+        return max(0, int(getattr(result, "rowcount", 0) or 0))

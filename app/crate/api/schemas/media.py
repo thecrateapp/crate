@@ -1,7 +1,7 @@
 """Schema models for search, track metadata, and media-browse endpoints."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -54,7 +54,7 @@ class TrackRefResponse(IdentityFieldsMixin):
     album_entity_uid: str | None = None
     album_slug: str | None = None
     album: str
-    path: str
+    path: str | None = None
     duration: float | int | None = None
     bpm: float | None = None
     audio_key: str | None = None
@@ -65,10 +65,19 @@ class TrackRefResponse(IdentityFieldsMixin):
     bliss_vector: list[float] | None = None
 
 
+class FederationSearchStatusResponse(BaseModel):
+    complete: bool
+    attempted_peers: int = 0
+    completed_peers: int = 0
+    failed_peer_uids: list[str] = Field(default_factory=list)
+    timed_out_peer_uids: list[str] = Field(default_factory=list)
+
+
 class SearchResponse(BaseModel):
     artists: list[SearchArtistResultResponse] = Field(default_factory=list)
     albums: list[SearchAlbumResultResponse] = Field(default_factory=list)
     tracks: list[TrackRefResponse] = Field(default_factory=list)
+    federation: FederationSearchStatusResponse | None = None
 
 
 class FavoriteItemResponse(BaseModel):
@@ -109,6 +118,7 @@ class TrackInfoResponse(IdentityFieldsMixin):
     title: str | None = None
     artist: str | None = None
     album: str | None = None
+    genre: str | None = None
     format: str | None = None
     bitrate: int | None = None
     sample_rate: int | None = None
@@ -193,6 +203,8 @@ class GenrePresetResponse(BaseModel):
 
 
 class TrackGenreResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     primary: GenreRefResponse | None = None
     topLevel: GenreRefResponse | None = None
     source: str | None = None
@@ -282,12 +294,15 @@ class PlaybackResolutionResponse(BaseModel):
     task_id: str | None = None
     variant_id: str | None = None
     variant_status: str | None = None
+    playback_session: str
+    content_origin: Literal["local", "remote", "imported"]
 
 
 class PlaybackPrepareTrackRequest(BaseModel):
     track_id: int | None = None
     entity_uid: str | None = None
     path: str | None = None
+    global_track_uid: str | None = None
 
 
 class PlaybackPrepareRequest(BaseModel):
@@ -311,6 +326,17 @@ class PlaybackPrepareItemResponse(BaseModel):
 class PlaybackPrepareResponse(BaseModel):
     policy: str
     items: list[PlaybackPrepareItemResponse] = Field(default_factory=list)
+
+
+class PlaybackWarmupRequest(BaseModel):
+    limit: int = Field(default=25, ge=1, le=100)
+    max_source_bytes: int = Field(
+        default=1024 * 1024 * 1024,
+        ge=1,
+        le=5 * 1024 * 1024 * 1024,
+    )
+    max_seconds: int = Field(default=60, ge=1, le=600)
+    include_data_saver: bool = False
 
 
 class PlaybackDeliveryStatsResponse(BaseModel):

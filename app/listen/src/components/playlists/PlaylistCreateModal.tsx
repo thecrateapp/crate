@@ -34,28 +34,31 @@ import {
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
-import { toPlayableTrack } from "@/lib/playable-track";
 import { formatDuration } from "@/lib/utils";
 
 export interface PlaylistComposerTrack {
   entityUid?: string;
+  globalTrackUid?: string;
   title: string;
   artist: string;
   album?: string;
   duration?: number;
-  path?: string;
+  path?: string | null;
   libraryTrackId?: number;
   playlistEntryId?: number;
   playlistPosition?: number;
 }
 
 interface SearchTrackResult {
-  id: number;
+  id?: number | string;
   entity_uid?: string;
+  global_track_uid?: string;
+  globalTrackUid?: string;
+  global_uid?: string;
   title: string;
   artist: string;
   album: string;
-  path: string;
+  path?: string | null;
   duration: number;
 }
 
@@ -81,10 +84,37 @@ interface PlaylistCreateModalProps {
 }
 
 function getTrackKey(track: PlaylistComposerTrack): string {
+  if (track.globalTrackUid) return `global:${track.globalTrackUid}`;
   if (track.entityUid) return `entity:${track.entityUid}`;
   if (track.libraryTrackId != null) return `id:${track.libraryTrackId}`;
   if (track.path) return `path:${track.path}`;
   return `${track.artist}:${track.album}:${track.title}`;
+}
+
+function searchTrackGlobalUid(track: SearchTrackResult): string | undefined {
+  return track.globalTrackUid ?? track.global_track_uid ?? track.global_uid;
+}
+
+function searchTrackKey(track: SearchTrackResult): string {
+  const globalUid = searchTrackGlobalUid(track);
+  if (globalUid) return `global:${globalUid}`;
+  if (track.entity_uid) return `entity:${track.entity_uid}`;
+  if (typeof track.id === "number") return `id:${track.id}`;
+  if (track.path) return `path:${track.path}`;
+  return `${track.artist}:${track.album}:${track.title}`;
+}
+
+function toComposerTrack(track: SearchTrackResult): PlaylistComposerTrack {
+  return {
+    globalTrackUid: searchTrackGlobalUid(track),
+    entityUid: track.entity_uid,
+    libraryTrackId: typeof track.id === "number" ? track.id : undefined,
+    path: track.path,
+    title: track.title,
+    artist: track.artist,
+    album: track.album,
+    duration: track.duration,
+  };
 }
 
 function SortableTrackItem({
@@ -250,7 +280,7 @@ export function PlaylistCreateModal({
       setSearching(true);
       try {
         const response = await api<{ tracks: SearchTrackResult[] }>(
-          `/api/search?q=${encodeURIComponent(query)}`,
+          `/api/catalog/search?q=${encodeURIComponent(query)}&limit=20`,
         );
         if (!cancelled) {
           setResults(response.tracks || []);
@@ -502,10 +532,10 @@ export function PlaylistCreateModal({
                   <div className="max-h-44 overflow-y-auto py-1.5">
                     {results.map((track) => (
                       <button
-                        key={`${track.id}-${track.path}`}
+                        key={searchTrackKey(track)}
                         type="button"
                         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
-                        onClick={() => addTrack(toPlayableTrack(track))}
+                        onClick={() => addTrack(toComposerTrack(track))}
                       >
                         <div className="min-w-0">
                           <div className="truncate text-sm text-foreground">

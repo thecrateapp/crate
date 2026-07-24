@@ -134,4 +134,69 @@ describe("playable track mapper", () => {
     expect(track.entityUid).toBe(uuid);
     expect(hasPlayableTrackReference({ id: uuid })).toBe(true);
   });
+
+  it("uses global catalog track ids as the playback identity when present", () => {
+    const track = toPlayableTrack({
+      id: "local-entity-1",
+      entity_uid: "local-entity-1",
+      globalTrackUid: "global-track-1",
+      title: "Canonical Track",
+      artist: "Artist",
+    });
+
+    expect(track.id).toBe("global-track-1");
+    expect(track.globalTrackUid).toBe("global-track-1");
+    expect(track.entityUid).toBe("local-entity-1");
+    expect(
+      hasPlayableTrackReference({ globalTrackUid: "global-track-1" }),
+    ).toBe(true);
+  });
+
+  it("does not treat remote-only global ids as local entity ids", () => {
+    const globalUid = "123e4567-e89b-12d3-a456-426614174000";
+    const track = toPlayableTrack({
+      id: globalUid,
+      globalTrackUid: globalUid,
+      title: "Remote Canonical Track",
+      artist: "Artist",
+    });
+
+    expect(track.id).toBe(globalUid);
+    expect(track.globalTrackUid).toBe(globalUid);
+    expect(track.entityUid).toBeUndefined();
+  });
+
+  it("normalizes remote federation tracks into player refs", () => {
+    const track = toPlayableTrack({
+      title: "Travel by Telephone",
+      artist: "Rival Schools",
+      album: "United By Fate",
+      origin: "remote",
+      node_uid: "node-b",
+      node_name: "Friend Crate",
+      remote_entity_uid: "123e4567-e89b-12d3-a456-426614174000",
+      availability: { catalog: true, stream: true, import: false },
+    });
+
+    expect(track).toEqual(
+      expect.objectContaining({
+        id: "remote:node-b:123e4567-e89b-12d3-a456-426614174000",
+        origin: "remote",
+        remote: expect.objectContaining({
+          nodeUid: "node-b",
+          nodeName: "Friend Crate",
+          remoteEntityUid: "123e4567-e89b-12d3-a456-426614174000",
+          availability: { catalog: true, stream: true, import: false },
+        }),
+      }),
+    );
+    expect(
+      hasPlayableTrackReference({
+        origin: "remote",
+        node_uid: "node-b",
+        remote_entity_uid: "123e4567-e89b-12d3-a456-426614174000",
+        availability: { catalog: true, stream: true, import: false },
+      }),
+    ).toBe(true);
+  });
 });

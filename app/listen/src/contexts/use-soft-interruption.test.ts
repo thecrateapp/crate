@@ -9,6 +9,7 @@ vi.mock("@/lib/gapless-player", () => ({
   play: vi.fn(),
   pause: vi.fn(),
   restoreVolume: vi.fn(),
+  getCurrentBufferedAheadSeconds: vi.fn(() => 0),
   // Default: track is NOT fully buffered in RAM, so interruption paths
   // proceed normally. Tests that want to exercise the "fully buffered"
   // short-circuit override this per-case.
@@ -43,6 +44,13 @@ function createRefs(
     isPlaying?: boolean;
     isBuffering?: boolean;
     bufferingIntent?: boolean;
+    onPlaybackStall?: () => void;
+    onPlaybackStallEnded?: (
+      durationMs: number,
+      bufferedAheadSeconds: number,
+    ) => void;
+    onPlaybackRecovered?: (attempt: number) => void;
+    recoverCurrentTrack?: () => Promise<boolean>;
   } = {},
 ) {
   const has = (k: keyof typeof overrides) =>
@@ -62,6 +70,10 @@ function createRefs(
     } as MutableRefObject<boolean>,
     commitIsPlaying: vi.fn(),
     commitIsBuffering: vi.fn(),
+    onPlaybackStall: overrides.onPlaybackStall,
+    onPlaybackStallEnded: overrides.onPlaybackStallEnded,
+    onPlaybackRecovered: overrides.onPlaybackRecovered,
+    recoverCurrentTrack: overrides.recoverCurrentTrack,
   };
   return refs;
 }
@@ -88,6 +100,7 @@ afterEach(() => {
   // stateful mocks so each test starts with a clean slate.
   vi.clearAllMocks();
   vi.mocked(gaplessPlayer.isCurrentTrackFullyBuffered).mockReturnValue(false);
+  vi.mocked(gaplessPlayer.getCurrentBufferedAheadSeconds).mockReturnValue(0);
 });
 
 describe("useSoftInterruption", () => {
@@ -109,6 +122,40 @@ describe("useSoftInterruption", () => {
     expect(refs.commitIsBuffering).toHaveBeenCalledWith(true);
     expect(mockFadeOutAndPause).toHaveBeenCalled();
     expect(refs.bufferingIntentRef.current).toBe(false);
+  });
+
+  it("records one quality stall for a single interrupted track", () => {
+    const onPlaybackStall = vi.fn();
+    const refs = createRefs({ onPlaybackStall });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+      result.current.beginSoftInterruption("stream");
+    });
+
+    expect(onPlaybackStall).toHaveBeenCalledOnce();
+  });
+
+  it("refreshes only the active source after two failed recovery probes", async () => {
+    const recoverCurrentTrack = vi.fn(async () => true);
+    const onPlaybackRecovered = vi.fn();
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 401, body: null } as Response),
+    ) as typeof fetch;
+    const refs = createRefs({ recoverCurrentTrack, onPlaybackRecovered });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_100);
+      await vi.advanceTimersByTimeAsync(3_100);
+    });
+
+    expect(recoverCurrentTrack).toHaveBeenCalledOnce();
+    expect(onPlaybackRecovered).toHaveBeenCalledWith(2);
   });
 
   it("beginSoftInterruption hard-pauses when not playing", () => {
@@ -136,7 +183,8 @@ describe("useSoftInterruption", () => {
   });
 
   it("cancelSoftInterruption resets state", () => {
-    const refs = createRefs();
+    const onPlaybackStallEnded = vi.fn();
+    const refs = createRefs({ onPlaybackStallEnded });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
     act(() => {
@@ -145,9 +193,11 @@ describe("useSoftInterruption", () => {
     expect(result.current.isSoftInterrupted()).toBe(true);
 
     act(() => {
+      vi.advanceTimersByTime(240);
       result.current.cancelSoftInterruption();
     });
     expect(result.current.isSoftInterrupted()).toBe(false);
+    expect(onPlaybackStallEnded).toHaveBeenCalledWith(240, 0);
   });
 
   it("requireUserGestureToResume stops automatic recovery and emits a resume event", () => {
@@ -299,6 +349,40 @@ describe("useSoftInterruption", () => {
     expect(result.current.isSoftInterrupted()).toBe(false);
     expect(gaplessPlayer.fadeOutAndPause).not.toHaveBeenCalled();
     expect(refs.commitIsBuffering).not.toHaveBeenCalled();
+  });
+
+  it("keeps playing when the live source has a safe buffer ahead", () => {
+    vi.mocked(gaplessPlayer.getCurrentBufferedAheadSeconds).mockReturnValue(5);
+    const refs = createRefs({ isPlaying: true });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+
+    expect(result.current.isSoftInterrupted()).toBe(false);
+    expect(gaplessPlayer.fadeOutAndPause).not.toHaveBeenCalled();
+  });
+
+  it("waits for the remaining buffer to become critical before recovery", async () => {
+    vi.mocked(gaplessPlayer.getCurrentBufferedAheadSeconds).mockReturnValue(3);
+    const refs = createRefs({ isPlaying: true });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.scheduleStallProtection();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2600);
+    });
+
+    expect(result.current.isSoftInterrupted()).toBe(false);
+    vi.mocked(gaplessPlayer.getCurrentBufferedAheadSeconds).mockReturnValue(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2600);
+    });
+
+    expect(result.current.isSoftInterrupted()).toBe(true);
   });
 
   it("cleans up timers on unmount", () => {

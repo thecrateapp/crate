@@ -18,7 +18,10 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/auth"
 	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
+	readplanefederation "github.com/thecrateapp/crate/app/readplane/internal/federation"
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
+	"github.com/thecrateapp/crate/app/readplane/internal/media"
+	"github.com/thecrateapp/crate/app/readplane/internal/observability"
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 	"github.com/thecrateapp/crate/app/readplane/internal/redisx"
 	"github.com/thecrateapp/crate/app/readplane/internal/snapshots"
@@ -26,14 +29,38 @@ import (
 
 // Server is the readplane HTTP server with routing, auth, and fallback support.
 type Server struct {
-	cfg       config.Config
-	pool      *pgxpool.Pool
-	redis     *redis.Client
-	auth      *auth.Authenticator
-	catalog   *catalog.Store
-	snapshots *snapshots.Store
-	fallback  *httpx.FallbackProxy
-	logger    *slog.Logger
+	cfg             config.Config
+	pool            *pgxpool.Pool
+	redis           *redis.Client
+	auth            *auth.Authenticator
+	catalog         *catalog.Store
+	artistTopTracks artistTopTracksCatalog
+	localMedia      localMediaCatalog
+	artworkCatalog  artworkCatalog
+	artworkResolver *media.ArtworkResolver
+	mediaMetrics    *observability.MediaMetrics
+	snapshots       *snapshots.Store
+	fallback        *httpx.FallbackProxy
+	federationProxy *readplanefederation.Proxy
+	logger          *slog.Logger
+}
+
+type artistTopTracksCatalog interface {
+	ArtistTopTracksBySlug(context.Context, string, int) ([]map[string]any, error)
+}
+
+type localMediaCatalog interface {
+	LocalMediaByID(context.Context, int64, string) (catalog.LocalMediaDescriptor, error)
+	LocalMediaByEntityUID(context.Context, string, string) (catalog.LocalMediaDescriptor, error)
+}
+
+type artworkCatalog interface {
+	ArtistArtworkKeyByID(context.Context, int64) (string, error)
+	ArtistArtworkKeyByEntityUID(context.Context, string) (string, error)
+	AlbumArtworkKeyByID(context.Context, int64) (string, error)
+	AlbumArtworkKeyByEntityUID(context.Context, string) (string, error)
+	GlobalArtistArtworkKey(context.Context, string) (string, error)
+	GlobalAlbumArtworkKey(context.Context, string) (string, error)
 }
 
 // NewServer assembles a Server from its dependencies.
@@ -45,18 +72,28 @@ func NewServer(
 	catalogStore *catalog.Store,
 	snapshotStore *snapshots.Store,
 	fallback *httpx.FallbackProxy,
+	federationProxy *readplanefederation.Proxy,
 	logger *slog.Logger,
 ) *Server {
-	return &Server{
-		cfg:       cfg,
-		pool:      pool,
-		redis:     redisClient,
-		auth:      authenticator,
-		catalog:   catalogStore,
-		snapshots: snapshotStore,
-		fallback:  fallback,
-		logger:    logger,
+	server := &Server{
+		cfg:             cfg,
+		pool:            pool,
+		redis:           redisClient,
+		auth:            authenticator,
+		catalog:         catalogStore,
+		snapshots:       snapshotStore,
+		fallback:        fallback,
+		federationProxy: federationProxy,
+		logger:          logger,
 	}
+	if catalogStore != nil {
+		server.artistTopTracks = catalogStore
+		server.localMedia = catalogStore
+		server.artworkCatalog = catalogStore
+	}
+	server.artworkResolver = media.NewArtworkResolver(cfg.CacheRoot)
+	server.mediaMetrics = observability.NewMediaMetrics()
+	return server
 }
 
 // Handler returns the complete HTTP handler with routing and middleware.
@@ -76,21 +113,85 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/me/home/essentials", s.route(http.MethodGet, s.homeSlice))
 	mux.HandleFunc("/api/me/home/discovery", s.route(http.MethodGet, s.homeDiscovery))
 	mux.HandleFunc("/api/me/home/discovery-stream", s.route(http.MethodGet, s.homeDiscoveryStream))
+	mux.HandleFunc("/api/me/stats/dashboard", s.route(http.MethodGet, s.statsDashboard))
 	mux.HandleFunc("/api/me/albums", s.route(http.MethodGet, s.myAlbumsRoute))
 	mux.HandleFunc("/api/me/follows", s.route(http.MethodGet, s.myFollowsRoute))
 	mux.HandleFunc("/api/me/follows/", s.route(http.MethodGet, s.myFollowStateRoute))
 	mux.HandleFunc("/api/me/history", s.route(http.MethodGet, s.myHistoryRoute))
 	mux.HandleFunc("/api/me/likes", s.route(http.MethodGet, s.myLikesRoute))
 	mux.HandleFunc("/api/cache/events", s.route(http.MethodGet, s.cacheEvents))
+	mux.HandleFunc("/api/federation/remote/streams/", s.route(http.MethodGet, s.federatedStream))
+	mux.HandleFunc("/api/catalog/search", s.route(http.MethodGet, s.globalCatalogSearchRoute))
+	mux.HandleFunc("/api/catalog/genres", s.route(http.MethodGet, s.globalCatalogGenresRoute))
+	mux.HandleFunc("/api/catalog/me/artists", s.route(http.MethodGet, s.globalCatalogArtistsRoute))
+	mux.HandleFunc("/api/catalog/me/albums", s.route(http.MethodGet, s.globalCatalogAlbumsRoute))
+	mux.HandleFunc("/api/catalog/me/follows", s.route(http.MethodGet, s.globalCatalogArtistsRoute))
+	mux.HandleFunc("/api/catalog/me/albums/saved", s.route(http.MethodGet, s.globalCatalogAlbumsRoute))
+	mux.HandleFunc("/api/catalog/", s.routeGetHead(s.catalogArtworkRoute))
 	mux.HandleFunc("/api/favorites", s.route(http.MethodGet, s.favoritesRoute))
 	mux.HandleFunc("/api/genres", s.route(http.MethodGet, s.genresRoute))
 	mux.HandleFunc("/api/genres/", s.route(http.MethodGet, s.genresRoute))
 	mux.HandleFunc("/api/search", s.route(http.MethodGet, s.searchRoute))
-	mux.HandleFunc("/api/albums/", s.route(http.MethodGet, s.albumRoute))
+	mux.HandleFunc("/api/albums/", s.routeGetHead(s.albumRoute))
 	mux.HandleFunc("/api/artist-slugs/", s.route(http.MethodGet, s.artistSlugRoute))
-	mux.HandleFunc("/api/artists/", s.route(http.MethodGet, s.artistRoute))
-	mux.HandleFunc("/api/tracks/", s.route(http.MethodGet, s.trackRoute))
+	mux.HandleFunc("/api/artists/", s.routeGetHead(s.artistRoute))
+	mux.HandleFunc("/api/tracks/", s.routeGetHead(s.trackRoute))
 	return s.withCommonHeaders(s.withTraceID(s.withAccessLog(mux)))
+}
+
+func (s *Server) routeGetHead(handler handlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if strings.HasPrefix(r.URL.Path, "/api/") && s.tryFallback(w, r) {
+				return
+			}
+			httpx.MarkReadplane(w, "miss")
+			httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			return
+		}
+		handler(w, r)
+	}
+}
+
+func (s *Server) mediaDescriptor(value catalog.LocalMediaDescriptor) media.Descriptor {
+	descriptor := media.Descriptor{
+		RequestedPolicy: value.RequestedPolicy,
+		EffectivePolicy: value.EffectivePolicy,
+		SourceFormat:    value.SourceFormat,
+		DeliveryFormat:  value.DeliveryFormat,
+		DeliveryBitrate: value.DeliveryBitrate,
+		Transcoded:      value.Transcoded,
+		VariantStatus:   value.VariantStatus,
+		Category:        "stream",
+	}
+	if s.mediaMetrics != nil {
+		descriptor.Observer = s.mediaMetrics
+	}
+	return descriptor
+}
+
+func (s *Server) federatedStream(w http.ResponseWriter, r *http.Request) {
+	if s.federationProxy == nil {
+		if s.tryFallback(w, r) {
+			return
+		}
+		httpx.MarkReadplane(w, "miss")
+		httpx.WriteError(w, http.StatusServiceUnavailable, "Federation stream proxy unavailable")
+		return
+	}
+	user, err := s.auth.Authenticate(r, false)
+	if err != nil {
+		s.fallbackOrAuthError(w, r, err)
+		return
+	}
+	ticketUID := strings.TrimPrefix(r.URL.Path, "/api/federation/remote/streams/")
+	if ticketUID == "" || strings.Contains(ticketUID, "/") {
+		httpx.MarkReadplane(w, "miss")
+		httpx.WriteError(w, http.StatusNotFound, "Federation stream ticket not found")
+		return
+	}
+	httpx.MarkReadplane(w, "hit")
+	s.federationProxy.ServeHTTP(w, r, user.ID, ticketUID)
 }
 
 type contextKey string
@@ -108,7 +209,7 @@ func generateTraceID() string {
 func (s *Server) route(method string, handler handlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != method {
-			if s.fallback != nil && strings.HasPrefix(r.URL.Path, "/api/") && s.fallback.ServeHTTP(w, r) {
+			if strings.HasPrefix(r.URL.Path, "/api/") && s.tryFallback(w, r) {
 				return
 			}
 			httpx.MarkReadplane(w, "miss")
@@ -151,6 +252,7 @@ func (s *Server) withAccessLog(next http.Handler) http.Handler {
 			"status", recorder.status,
 			"duration_ms", time.Since(start).Milliseconds(),
 			"route_source", recorder.Header().Get("X-Crate-Readplane"),
+			"catalog_mode", recorder.Header().Get("X-Crate-Catalog-Mode"),
 			"trace_id", traceID,
 		)
 	})
@@ -175,9 +277,10 @@ func (r *statusRecorder) Flush() {
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
 	httpx.MarkReadplane(w, "hit")
 	_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"ok":      true,
-		"service": "crate-readplane",
-		"version": s.cfg.Version,
+		"ok":               true,
+		"service":          "crate-readplane",
+		"version":          s.cfg.Version,
+		"federation_model": "node-first",
 	})
 }
 
@@ -185,7 +288,15 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := postgres.WithTimeout(r.Context(), s.cfg.QueryTimeout)
 	defer cancel()
 
-	details := map[string]any{"postgres": false, "redis": nil, "schema": false}
+	details := map[string]any{
+		"postgres":         false,
+		"redis":            nil,
+		"schema":           false,
+		"federation_model": "node-first",
+	}
+	if s.mediaMetrics != nil {
+		details["local_media"] = s.mediaMetrics.Snapshot()
+	}
 	if err := s.pool.Ping(ctx); err != nil {
 		httpx.MarkReadplane(w, "miss")
 		details["error"] = err.Error()
@@ -193,6 +304,21 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	details["postgres"] = true
+	details["postgres_pool"] = postgres.PoolRuntime(s.pool)
+	if s.fallback != nil {
+		fallbackStats := s.fallback.Stats()
+		details["fallback"] = map[string]any{
+			"attempts":      fallbackStats.Attempts,
+			"successes":     fallbackStats.Successes,
+			"failures":      fallbackStats.Failures,
+			"timeouts":      fallbackStats.Timeouts,
+			"rejected":      fallbackStats.Rejected,
+			"success_ratio": fallbackSuccessRatio(fallbackStats),
+		}
+	}
+	if s.auth != nil {
+		details["auth_cache"] = s.auth.Stats()
+	}
 	if err := postgres.RequiredTablesReady(ctx, s.pool); err != nil {
 		httpx.MarkReadplane(w, "miss")
 		details["error"] = err.Error()
@@ -201,29 +327,44 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	}
 	details["schema"] = true
 
+	redisReady := !s.cfg.EnableSSE
 	if s.cfg.EnableSSE {
 		details["redis"] = false
 		if s.redis == nil {
-			httpx.MarkReadplane(w, "miss")
-			details["error"] = "redis client is nil"
-			_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
-			return
+			details["redis_error"] = "redis client is nil"
+		} else if err := redisx.Ping(ctx, s.redis); err != nil {
+			details["redis_error"] = err.Error()
+		} else {
+			redisReady = true
+			details["redis"] = true
 		}
-		if err := redisx.Ping(ctx, s.redis); err != nil {
-			httpx.MarkReadplane(w, "miss")
-			details["error"] = err.Error()
-			_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
-			return
-		}
-		details["redis"] = true
 	}
 
+	status, degraded := readinessStatus(true, true, redisReady, s.cfg.EnableSSE)
+	details["degraded"] = degraded
 	httpx.MarkReadplane(w, "hit")
-	_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "details": details})
+	_ = httpx.WriteJSON(w, status, map[string]any{"ok": status == http.StatusOK, "details": details})
+}
+
+func readinessStatus(postgresReady, schemaReady, redisReady, enableSSE bool) (int, bool) {
+	if !postgresReady || !schemaReady {
+		return http.StatusServiceUnavailable, false
+	}
+	return http.StatusOK, enableSSE && !redisReady
+}
+
+func fallbackSuccessRatio(stats httpx.FallbackStats) float64 {
+	if stats.Attempts == 0 {
+		return 0
+	}
+	return float64(stats.Successes) / float64(stats.Attempts)
 }
 
 func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
-	user, err := s.auth.Authenticate(r, false)
+	if s.tryFallback(w, r) {
+		return
+	}
+	user, err := s.auth.AuthenticateProfile(r, false)
 	if err != nil {
 		s.fallbackOrAuthError(w, r, err)
 		return
@@ -241,7 +382,7 @@ func (s *Server) homeDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Query().Get("fresh") == "1" {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -250,7 +391,7 @@ func (s *Server) homeDiscovery(w http.ResponseWriter, r *http.Request) {
 	}
 	row, err := s.snapshots.Get(r.Context(), "home:discovery", strconv.FormatInt(user.ID, 10))
 	if err != nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		status := http.StatusServiceUnavailable
@@ -277,7 +418,7 @@ func (s *Server) homeDiscoveryStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.cfg.EnableSSE || s.redis == nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -293,7 +434,7 @@ func (s *Server) homeDiscoveryStream(w http.ResponseWriter, r *http.Request) {
 
 	subjectKey := strconv.FormatInt(user.ID, 10)
 	if r.URL.Query().Get("initial") != "0" {
-		if _, err := s.snapshots.Get(r.Context(), "home:discovery", subjectKey); err != nil && s.fallback.ServeHTTP(w, r) {
+		if _, err := s.snapshots.Get(r.Context(), "home:discovery", subjectKey); err != nil && s.tryFallback(w, r) {
 			return
 		}
 	}
@@ -302,7 +443,7 @@ func (s *Server) homeDiscoveryStream(w http.ResponseWriter, r *http.Request) {
 	pubsub := s.redis.Subscribe(r.Context(), channel)
 	defer pubsub.Close()
 	if _, err := pubsub.Receive(r.Context()); err != nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -389,7 +530,7 @@ func (s *Server) fallbackOrAuthError(w http.ResponseWriter, r *http.Request, err
 		httpx.WriteError(w, http.StatusUnauthorized, "Not authenticated")
 		return
 	}
-	if s.fallback.ServeHTTP(w, r) {
+	if s.tryFallback(w, r) {
 		return
 	}
 	httpx.MarkReadplane(w, "miss")

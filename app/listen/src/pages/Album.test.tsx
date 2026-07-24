@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { useApi } from "@/hooks/use-api";
+import { fetchAlbumRadio } from "@/lib/radio";
 
 import { Album } from "./Album";
 
@@ -64,6 +65,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
     resolveMaybeApiAssetUrl: vi.fn((url?: string | null) => url ?? null),
   };
 });
+
+vi.mock("@/lib/radio", () => ({
+  fetchAlbumRadio: vi.fn(),
+}));
 
 const ALBUM_DATA = {
   id: 42,
@@ -236,6 +241,10 @@ beforeEach(() => {
   });
   mockDesktopPointer();
   vi.clearAllMocks();
+  vi.mocked(fetchAlbumRadio).mockResolvedValue({
+    tracks: [],
+    source: { type: "radio", name: "Album Radio" },
+  });
   vi.mocked(useApi).mockReturnValue({
     data: ALBUM_DATA,
     loading: false,
@@ -265,6 +274,45 @@ function rect(top: number, bottom: number, width = 320): DOMRect {
 }
 
 describe("Album page", () => {
+  it("offers explicit import only for remote-only albums", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        ...ALBUM_DATA,
+        id: null,
+        global_album_uid: "global-morir",
+        availability: {
+          local: false,
+          remote: true,
+          healthy: true,
+          source_name: "Node B",
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Make available locally" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not offer remote import when the album is already local", () => {
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Make available locally" }),
+    ).toBeNull();
+  });
+
   it("groups desktop hero actions into primary pills and secondary icon labels", () => {
     renderWithListenProviders(<Album />, {
       route: "/artists/crossed/morir",
@@ -333,6 +381,97 @@ describe("Album page", () => {
     expect(
       within(secondary).getByRole("button", { name: "Más" }),
     ).toHaveTextContent("Más");
+  });
+
+  it("uses global album identity from a human remote album route", async () => {
+    const playAll = vi.fn();
+    const baseTrack = ALBUM_DATA.tracks[0]!;
+    vi.mocked(fetchAlbumRadio).mockResolvedValue({
+      tracks: [
+        {
+          id: "global-track-1",
+          globalTrackUid: "global-track-1",
+          title: "Water Wings",
+          artist: "Birds In Row",
+          album: "Gris Klein",
+          duration: 210,
+        },
+      ],
+      source: { type: "radio", name: "Gris Klein Radio" },
+    });
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        ...ALBUM_DATA,
+        id: null,
+        entity_uid: undefined,
+        global_album_uid: "global-gris-klein",
+        global_artist_uid: "global-birds-in-row",
+        artist_id: undefined,
+        artist_entity_uid: undefined,
+        artist_slug: "birds-in-row",
+        artist: "Birds In Row",
+        name: "Gris Klein",
+        display_name: "Gris Klein",
+        slug: "gris-klein",
+        tracks: [
+          {
+            ...baseTrack,
+            id: "global-track-1",
+            entity_uid: undefined,
+            global_track_uid: "global-track-1",
+            global_album_uid: "global-gris-klein",
+            global_artist_uid: "global-birds-in-row",
+            tags: {
+              ...baseTrack.tags,
+              title: "Water Wings",
+              artist: "Birds In Row",
+              album: "Gris Klein",
+              albumartist: "Birds In Row",
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Album />, {
+      route: "/artists/birds-in-row/gris-klein",
+      path: "/artists/:artistSlug/:albumSlug",
+      playerActions: { playAll },
+    });
+
+    const secondary = screen.getByRole("group", {
+      name: "Secondary album actions",
+    });
+    expect(
+      within(secondary).getByRole("button", { name: "Add to collection" }),
+    ).toHaveTextContent("Add");
+    expect(
+      within(secondary).queryByRole("button", {
+        name: "Make available offline",
+      }),
+    ).toBeNull();
+
+    fireEvent.click(
+      within(secondary).getByRole("button", { name: "Album Radio" }),
+    );
+
+    await waitFor(() => {
+      expect(fetchAlbumRadio).toHaveBeenCalledWith({
+        albumId: "global-gris-klein",
+        artistName: "Birds In Row",
+        albumName: "Gris Klein",
+      });
+    });
+    expect(playAll).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ globalTrackUid: "global-track-1" }),
+      ]),
+      0,
+      { type: "radio", name: "Gris Klein Radio" },
+    );
   });
 
   it("renders the desktop more menu outside the horizontally scrolling action row", async () => {

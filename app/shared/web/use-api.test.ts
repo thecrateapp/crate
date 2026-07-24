@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createUseApi } from "./use-api";
+import { ApiError } from "./api";
 
 const originalFetch = globalThis.fetch;
 
@@ -80,6 +81,29 @@ describe("createUseApi", () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBe("Network error");
     expect(result.current.data).toBeNull();
+  });
+
+  it("retries catalog warming responses without exposing an error", async () => {
+    const apiFn = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new ApiError(503, JSON.stringify({ detail: "catalog_warming" }), 3_000),
+      )
+      .mockResolvedValueOnce({ items: [1] });
+    const useApi = makeUseApi(apiFn);
+
+    const { result } = renderHook(() => useApi("/api/catalog/search"));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBeNull();
+    expect(apiFn).toHaveBeenCalledTimes(1);
+
+    await act(() => vi.advanceTimersByTimeAsync(3_000));
+
+    expect(apiFn).toHaveBeenCalledTimes(2);
+    expect(result.current.data).toEqual({ items: [1] });
+    expect(result.current.loading).toBe(false);
   });
 
   it("ignores abort errors", async () => {

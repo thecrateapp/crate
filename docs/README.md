@@ -1,57 +1,65 @@
-# Crate
+---
+title: Documentation contract
+summary: Canonical reading paths and the source-of-truth policy for Crate documentation.
+section: reference
+audience: [developer, operator]
+status: canonical
+order: 0
+verified: 2026-07-21
+sources:
+  [
+    Makefile,
+    docker-compose.dev.yaml,
+    docker-compose.home.yaml,
+    docker-compose.yaml,
+  ]
+---
 
-Crate is a self-hosted music platform: it manages your library, enriches it
-with external metadata, analyzes the audio, streams it through native and web
-clients, and exposes two first-party frontends on top of one backend.
+# Crate technical documentation
 
-These docs are intended to match the current code, not a historical design.
-The technical set below is the canonical architectural documentation.
+Crate is a self-hosted music platform with a Python/FastAPI write plane, a Go
+read plane, background workers, PostgreSQL and two Redis roles. This directory
+is the source of truth for the hosted documentation site and for repository
+readers.
 
-## Start here
+## Choose a path
 
-Read the technical set in order when you need an accurate picture of how the
-system works today.
+- **Run Crate at home:** start with [Quickstart](technical/00-quickstart.md),
+  then [Deployment profiles](technical/deployment-profiles.md) and
+  [Operations](technical/operations.md).
+- **Contribute to Crate:** read [Development setup](technical/00b-development-setup.md),
+  [Developer guide](technical/developer-guide.md) and
+  [System overview](technical/01-system-overview.md).
+- **Work on federation:** read [Federation overview](technical/federation-overview.md)
+  before the protocol, security and operations references.
+- **Operate the project-hosted stack:** use the image-first deployment section
+  in [Deployment profiles](technical/deployment-profiles.md). It is a project
+  operator workflow, not the generic self-hosting path.
 
-1. [System Overview](/technical/system-overview) — services, boundaries, read/write split, and product shape.
-2. [Backend API and Data Layer](/technical/backend-api-and-data) — FastAPI, PostgreSQL, read models, domain events, and cache architecture.
-3. [Worker, Tasks, and Background Services](/technical/worker-tasks-and-background-services) — Dramatiq, daemons, projector, watcher, and scheduler.
-4. [Library, Storage, Sync, and Imports](/technical/library-storage-sync-and-imports) — filesystem normalization and library ingestion.
-5. [Enrichment, Acquisition, and External Integrations](/technical/enrichment-acquisition-and-integrations) — metadata providers, Tidal, Soulseek, and post-download normalization.
-6. [Audio Analysis, Similarity, and Discovery Intelligence](/technical/audio-analysis-similarity-and-discovery) — Essentia, Bliss, and discovery primitives.
-7. [Auth, Sessions, Users, and Social Layer](/technical/auth-users-social-and-sessions) — persisted sessions, OAuth, presence, and social graph.
-8. [Frontend Architecture: Admin and Listen](/technical/frontends-admin-and-listen) — React app structure, context boundaries, and shared UI strategy.
-9. [Playback, Realtime, and Subsonic](/technical/playback-realtime-and-subsonic) — player engine, telemetry, realtime feeds, and `/rest`.
-10. [Development, Deployment, and Operations](/technical/development-deployment-and-operations) — dev stack, deploy model, observability, and operator workflows.
-11. [Documentation Platform and Hosted Site](/technical/documentation-platform-and-hosted-site) — how the hosted docs surface is built.
+## Canonical map
 
-## Practical deployment guides
+| Area               | Canonical documents                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Start              | [Quickstart](technical/00-quickstart.md), [Development setup](technical/00b-development-setup.md)                                                                                                                                                                                                                                                                                            |
+| Architecture       | [System overview](technical/01-system-overview.md), [Backend and data](technical/02-backend-api-and-data.md), [Workers](technical/03-worker-tasks-and-background-services.md), [Developer guide](technical/developer-guide.md)                                                                                                                                                               |
+| Product subsystems | [Storage/imports](technical/04-library-storage-sync-and-imports.md), [Enrichment](technical/05-enrichment-acquisition-and-integrations.md), [Analysis](technical/06-audio-analysis-similarity-and-discovery.md), [Auth](technical/07-auth-users-social-and-sessions.md), [Frontends](technical/08-frontends-admin-and-listen.md), [Playback](technical/09-playback-realtime-and-subsonic.md) |
+| Deploy and operate | [Deployment profiles](technical/deployment-profiles.md), [Operations](technical/operations.md), [Backup and recovery](technical/ops-runbook.md)                                                                                                                                                                                                                                              |
+| Federation         | [Overview](technical/federation-overview.md), [Protocol](technical/federation-protocol.md), [Security](technical/federation-threat-model.md), [Operations](technical/federation-operations-runbook.md), [Acceptance](technical/federation-production-acceptance.md)                                                                                                                          |
+| Reference          | [Architecture summary](architecture.md), [API](api.md), [Audio analysis](audio-analysis.md), [Enrichment notes](enrichment.md)                                                                                                                                                                                                                                                               |
 
-- [Dedicated laptop deployment guide](./dedicated-laptop-deployment.md) — Debian stable netinst on a reused laptop, Docker Compose, Traefik, Cloudflare, and DDNS.
+## Documentation contract
 
-## Focused references
+The application code and runtime configuration are authoritative. In
+particular, verify deployment instructions against `Makefile`, compose files,
+`install.sh` and `scripts/deploy*.sh`; verify HTTP contracts against the
+OpenAPI served by the API. A canonical page declares the source files and its
+last verification date in its frontmatter.
 
-These are shorter companion notes. They are intentionally high-level and should
-not be treated as the authoritative contract when they disagree with the live
-technical set or generated API docs.
+When a change affects a public command, compose profile, environment variable,
+service boundary, migration/rollback behaviour or federation contract, update
+the relevant canonical document in the same change. Add an automated check when
+the statement can be derived from source.
 
-- [Architecture summary](/reference/architecture)
-- [API notes](/reference/api)
-- [Audio analysis notes](/reference/audio-analysis)
-- [Enrichment notes](/reference/enrichment)
-
-## Historical plans and audits
-
-`docs/plans/` and dated technical audits are kept as historical working notes.
-They are useful for understanding why the system changed, but they are not the
-source of truth for current runtime behavior.
-
-## API contract
-
-The exhaustive HTTP contract lives in the generated OpenAPI schema exposed by
-the API at `/openapi.json`. Use that schema for exact request and response
-shapes.
-
-## Source code
-
-The repository lives at [github.com/thecrateapp/crate](https://github.com/thecrateapp/crate).
-Code references in the technical set link to files on `main`.
+Only the canonical documents declared in `docs/manifest.json` are versioned.
+Local plans, roadmaps, archives and audits are ignored and must not be linked
+from the repository or treated as a current runbook.

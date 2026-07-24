@@ -1,6 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crate.db.engine import Base
@@ -43,6 +52,9 @@ class User(Base):
     crate_connect_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
+    remote_scrobbling_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="user")
     external_identities: Mapped[list["UserExternalIdentity"]] = relationship(
@@ -75,6 +87,18 @@ class UserRole(Base):
     )
 
 
+class UserGlobalTrackLike(Base):
+    __tablename__ = "user_global_track_likes"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    global_track_uid: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
 class Session(Base):
     __tablename__ = "sessions"
 
@@ -101,6 +125,7 @@ class Session(Base):
 
 class UserExternalIdentity(Base):
     __tablename__ = "user_external_identities"
+    __table_args__ = (UniqueConstraint("user_id", "provider"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(

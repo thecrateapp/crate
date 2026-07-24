@@ -36,17 +36,23 @@ export async function fetchPlayableSetlist(input: {
   return (response.tracks || []).map((track) =>
     toPlayableTrack(track, {
       cover:
-        albumCoverApiUrl({
-          albumId: track.album_id,
-          albumSlug: track.album_slug,
-          artistName: track.artist,
-          albumName: track.album,
-        }) ||
-        artistPhotoApiUrl({
-          artistId: track.artist_id,
-          artistSlug: track.artist_slug,
-          artistName: track.artist,
-        }) ||
+        albumCoverApiUrl(
+          {
+            albumId: track.album_id,
+            albumSlug: track.album_slug,
+            artistName: track.artist,
+            albumName: track.album,
+          },
+          { size: 512 },
+        ) ||
+        artistPhotoApiUrl(
+          {
+            artistId: track.artist_id,
+            artistSlug: track.artist_slug,
+            artistName: track.artist,
+          },
+          { size: 512 },
+        ) ||
         undefined,
     }),
   );

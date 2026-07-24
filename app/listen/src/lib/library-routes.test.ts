@@ -15,15 +15,21 @@ vi.mock("@/lib/api", () => ({
 import {
   albumApiPath,
   albumCoverApiUrl,
+  globalAlbumPagePath,
+  globalAlbumUidFromRouteRef,
+  globalArtistPagePath,
+  globalArtistUidFromRouteRef,
   albumPagePath,
   albumSharePath,
   artistApiPath,
   artistBackgroundApiUrl,
+  genreCoverApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
   artistSharePath,
   artistTopTracksPath,
   isReservedArtistChildSlug,
+  responsiveImageSrcSet,
   recordAssetInvalidationScope,
   trackDownloadApiPath,
   trackEffectiveEqApiPath,
@@ -53,6 +59,18 @@ describe("library route asset helpers", () => {
     expect(url).toBe(
       "https://api.example.test/api/albums/42/cover?size=256&format=webp&token=listen-token",
     );
+  });
+
+  it("builds responsive candidates without duplicating image query params", () => {
+    const srcSet = responsiveImageSrcSet([160, 320], (size) =>
+      albumCoverApiUrl({ albumId: 42 }, { size }),
+    );
+
+    expect(srcSet).toBe(
+      "https://api.example.test/api/albums/42/cover?size=160&format=webp&token=listen-token 160w, " +
+        "https://api.example.test/api/albums/42/cover?size=320&format=webp&token=listen-token 320w",
+    );
+    expect(srcSet).not.toContain("size=160&size=");
   });
 
   it("does not double-prefix URLs already resolved by the shared asset resolver", () => {
@@ -103,6 +121,17 @@ describe("library route asset helpers", () => {
     );
   });
 
+  it("builds canonical artist background URLs for global artists", () => {
+    const url = artistBackgroundApiUrl(
+      { globalArtistUid: "artist-global-1" },
+      { size: 1280 },
+    );
+
+    expect(url).toBe(
+      "https://api.example.test/api/catalog/artists/artist-global-1/background?size=1280&format=webp&token=listen-token",
+    );
+  });
+
   it("adds a cache-busting artist asset version after invalidation", () => {
     recordAssetInvalidationScope("artist:9", "artwork-2");
 
@@ -110,6 +139,51 @@ describe("library route asset helpers", () => {
 
     expect(url).toBe(
       "https://api.example.test/api/artists/9/photo?size=128&v=artwork-2&format=webp&token=listen-token",
+    );
+  });
+
+  it("adds the local artist invalidation version to canonical asset URLs", () => {
+    recordAssetInvalidationScope("artist:19", "artwork-global-19");
+
+    const url = artistBackgroundApiUrl(
+      { artistId: 19, globalArtistUid: "artist-global-19" },
+      { size: 1280 },
+    );
+
+    expect(url).toBe(
+      "https://api.example.test/api/catalog/artists/artist-global-19/background?size=1280&v=artwork-global-19&format=webp&token=listen-token",
+    );
+
+    expect(
+      artistPhotoApiUrl(
+        { artistId: 19, globalArtistUid: "artist-global-19" },
+        { size: 640 },
+      ),
+    ).toBe(
+      "https://api.example.test/api/catalog/artists/artist-global-19/photo?size=640&v=artwork-global-19&format=webp&token=listen-token",
+    );
+  });
+
+  it("adds the local album invalidation version to canonical cover URLs", () => {
+    recordAssetInvalidationScope("album:23", "artwork-global-23");
+
+    const url = albumCoverApiUrl(
+      { albumId: 23, globalAlbumUid: "album-global-23" },
+      { size: 640 },
+    );
+
+    expect(url).toBe(
+      "https://api.example.test/api/catalog/albums/album-global-23/cover?size=640&v=artwork-global-23&format=webp&token=listen-token",
+    );
+  });
+
+  it("versions curated genre covers from genre invalidation events", () => {
+    recordAssetInvalidationScope("genre:post-metal", "genre-artwork-4");
+
+    const url = genreCoverApiUrl("post-metal", { size: 640 });
+
+    expect(url).toBe(
+      "https://api.example.test/api/genres/post-metal/cover?size=640&v=genre-artwork-4&format=webp&token=listen-token",
     );
   });
 
@@ -149,7 +223,18 @@ describe("library route asset helpers", () => {
     ).toBe("/artists/quicksand/top-tracks");
   });
 
-  it("builds public artist share paths from stable identity", () => {
+  it("prefers local artist paths when a local artist also has a global uid", () => {
+    expect(
+      artistPagePath({
+        artistId: 7,
+        globalArtistUid: "artist-global-7",
+        artistSlug: "quicksand",
+        artistName: "Quicksand",
+      }),
+    ).toBe("/artists/quicksand");
+  });
+
+  it("builds fully human artist share paths", () => {
     expect(
       artistSharePath({
         artistId: 7,
@@ -157,7 +242,7 @@ describe("library route asset helpers", () => {
         artistSlug: "quicksand",
         artistName: "Quicksand",
       }),
-    ).toBe("/share/artist/artist-entity-7/quicksand");
+    ).toBe("/share/artist/quicksand");
   });
 
   it("builds nested album paths under the artist when the slug is not reserved", () => {
@@ -170,6 +255,27 @@ describe("library route asset helpers", () => {
     });
 
     expect(path).toBe("/artists/quicksand/slip");
+  });
+
+  it("builds human album paths from names when stored slugs are absent", () => {
+    expect(
+      albumPagePath({
+        albumId: 9,
+        artistName: "High Vis",
+        albumName: "No Sense No Feeling",
+      }),
+    ).toBe("/artists/high-vis/no-sense-no-feeling");
+  });
+
+  it("prefers local album paths when a local album also has a global uid", () => {
+    expect(
+      albumPagePath({
+        albumId: 9,
+        globalAlbumUid: "785621b5-738e-5922-b6e3-108984976091",
+        artistName: "Birds In Row",
+        albumName: "Gris Klein",
+      }),
+    ).toBe("/artists/birds-in-row/gris-klein");
   });
 
   it("strips stored artist prefixes even when the album name is absent", () => {
@@ -216,7 +322,7 @@ describe("library route asset helpers", () => {
     ).toBe("/artists/lip-critic/lip-critic-ii");
   });
 
-  it("falls back to the legacy album route for reserved child slugs", () => {
+  it("keeps reserved album slugs human without colliding with artist children", () => {
     const path = albumPagePath({
       albumId: 9,
       artistSlug: "quicksand",
@@ -225,7 +331,7 @@ describe("library route asset helpers", () => {
       albumName: "Top Tracks",
     });
 
-    expect(path).toBe("/albums/9/quicksand-top-tracks");
+    expect(path).toBe("/artists/quicksand/albums/top-tracks");
     expect(isReservedArtistChildSlug("top-tracks")).toBe(true);
   });
 
@@ -240,15 +346,16 @@ describe("library route asset helpers", () => {
     expect(path).toBe("/api/artist-slugs/quicksand/albums/slip");
   });
 
-  it("builds public album share paths from stable identity", () => {
+  it("builds fully human album share paths", () => {
     expect(
       albumSharePath({
         albumId: 9,
         albumEntityUid: "album-entity-9",
+        artistName: "Quicksand",
         albumSlug: "quicksand-slip",
         albumName: "Slip",
       }),
-    ).toBe("/share/album/album-entity-9/slip");
+    ).toBe("/share/album/quicksand/slip");
   });
 
   it("falls back to entity UID album APIs and artwork when slugs and numeric ids are unavailable", () => {
@@ -262,6 +369,64 @@ describe("library route asset helpers", () => {
     expect(cover).toBe(
       "https://api.example.test/api/albums/by-entity/album-entity-42/cover?size=256&format=webp&token=listen-token",
     );
+  });
+
+  it("builds human global catalog page URLs while keeping global asset URLs internal", () => {
+    expect(
+      globalArtistPagePath({
+        globalArtistUid: "257828ee-c041-574d-aedf-2f74ca60e1fa",
+        artistName: "High Vis",
+      }),
+    ).toBe("/artists/high-vis");
+    expect(
+      globalArtistPagePath({
+        globalArtistUid: "artist-global-1",
+        artistName: "Birds In Row",
+      }),
+    ).toBe("/artists/birds-in-row");
+    expect(
+      globalAlbumPagePath({
+        globalAlbumUid: "album-global-1",
+        artistName: "High Vis",
+        albumName: "No Sense No Feeling",
+      }),
+    ).toBe("/artists/high-vis/no-sense-no-feeling");
+    expect(
+      albumCoverApiUrl({ globalAlbumUid: "album-global-1" }, { size: 256 }),
+    ).toBe(
+      "https://api.example.test/api/catalog/albums/album-global-1/cover?size=256&format=webp&token=listen-token",
+    );
+  });
+
+  it("never exposes global identifiers in public share URLs", () => {
+    expect(
+      artistSharePath({
+        globalArtistUid: "257828ee-c041-574d-aedf-2f74ca60e1fa",
+        artistName: "High Vis",
+      }),
+    ).toBe("/share/artist/high-vis");
+    expect(
+      albumSharePath({
+        globalAlbumUid: "40919666-af53-5810-a574-9cfeb5cec68b",
+        artistName: "High Vis",
+        albumName: "Blending",
+      }),
+    ).toBe("/share/album/high-vis/blending");
+  });
+
+  it("parses human global catalog route refs back to stable UIDs", () => {
+    expect(
+      globalArtistUidFromRouteRef(
+        "high-vis--257828ee-c041-574d-aedf-2f74ca60e1fa",
+      ),
+    ).toBe("257828ee-c041-574d-aedf-2f74ca60e1fa");
+    expect(
+      globalArtistUidFromRouteRef("257828ee-c041-574d-aedf-2f74ca60e1fa"),
+    ).toBe("257828ee-c041-574d-aedf-2f74ca60e1fa");
+    expect(globalAlbumUidFromRouteRef("slip--album-global-1")).toBe(
+      "album-global-1",
+    );
+    expect(globalAlbumUidFromRouteRef("album-global-1")).toBe("album-global-1");
   });
 
   it("builds canonical track routes preferring entity_uid", () => {
@@ -295,6 +460,51 @@ describe("library route asset helpers", () => {
     expect(trackOfflineManifestApiPath({ entityUid: "track-entity-1" })).toBe(
       "/api/offline/tracks/by-entity/track-entity-1/manifest",
     );
+  });
+
+  it("builds global catalog playback routes when a global track uid exists", () => {
+    expect(
+      trackInfoApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/info");
+    expect(
+      trackPlaybackApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/playback");
+    expect(
+      trackStreamApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/stream");
+    expect(
+      trackEqFeaturesApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/eq-features");
+    expect(
+      trackEffectiveEqApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/eq");
+    expect(
+      trackGenreApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/genre");
   });
 
   it("builds track download and offline manifest routes from numeric ids", () => {
@@ -333,6 +543,15 @@ describe("library route asset helpers", () => {
         title: "Head to Wall",
       }),
     ).toBe("/share/track/123e4567-e89b-12d3-a456-426614174000/head-to-wall");
+  });
+
+  it("builds public track share paths from global track uids", () => {
+    expect(
+      trackSharePath({
+        globalTrackUid: "global-track-1",
+        title: "Head to Wall",
+      }),
+    ).toBe("/share/track/global-track-1/head-to-wall");
   });
 
   it("falls back to id/path routes only when canonical identity is missing", () => {

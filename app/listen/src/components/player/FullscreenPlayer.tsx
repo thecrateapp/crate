@@ -245,6 +245,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         currentTrack.libraryTrackId ?? null,
         currentTrack.entityUid ?? null,
         currentTrack.path || currentTrack.id,
+        currentTrack.globalTrackUid ?? null,
       )
     : false;
 
@@ -282,6 +283,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         currentTrack.libraryTrackId ?? null,
         currentTrack.entityUid ?? null,
         currentTrack.path || currentTrack.id,
+        currentTrack.globalTrackUid ?? null,
       );
       toast.success(
         nextLiked
@@ -350,14 +352,21 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
 
   function goToArtist() {
     const targetArtist = resolvedArtist;
-    if (!targetArtist?.id) return;
+    if (!targetArtist?.id && !targetArtist?.globalArtistUid) return;
     onClose();
     navigate(
-      artistPagePath({
-        artistId: targetArtist.id,
-        artistSlug: targetArtist.slug,
-        artistName: targetArtist.name,
-      }),
+      targetArtist.globalArtistUid
+        ? artistPagePath({
+            artistId: targetArtist.id,
+            globalArtistUid: targetArtist.globalArtistUid,
+            artistSlug: targetArtist.slug,
+            artistName: targetArtist.name,
+          })
+        : artistPagePath({
+            artistId: targetArtist.id,
+            artistSlug: targetArtist.slug,
+            artistName: targetArtist.name,
+          }),
     );
   }
 

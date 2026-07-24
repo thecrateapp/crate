@@ -128,22 +128,31 @@ export interface GenreDetail {
   artists: {
     artist_name: string;
     artist_id?: number;
+    global_artist_uid?: string;
+    artist_entity_uid?: string;
     artist_slug?: string;
     album_count: number;
     track_count: number;
     has_photo: boolean;
+    photo_url?: string | null;
     listeners: number | null;
+    membership?: "direct" | "inherited";
   }[];
   albums: {
-    album_id: number;
+    album_id?: number | null;
+    global_album_uid?: string;
+    album_entity_uid?: string;
     album_slug?: string;
     artist: string;
     artist_id?: number;
+    artist_entity_uid?: string;
     artist_slug?: string;
     name: string;
     year: string;
     track_count: number;
     has_cover: boolean;
+    cover_url?: string | null;
+    membership?: "direct" | "inherited";
   }[];
   shows?: UpcomingItem[];
   related_genres?: {
@@ -157,6 +166,8 @@ export interface GenreDetail {
     album_count: number;
     content_score?: number;
     cover_url?: string | null;
+    top_artist_global_uid?: string | null;
+    top_artist_id?: number | null;
     top_artist_photo_url?: string | null;
   }[];
 }
@@ -164,6 +175,9 @@ export interface GenreDetail {
 export interface DecadeArtists {
   items: {
     id?: number;
+    entity_uid?: string | null;
+    global_uid?: string | null;
+    global_artist_uid?: string | null;
     slug?: string;
     name: string;
     albums: number;
@@ -189,14 +203,17 @@ export async function loadSystemPlaylistTracks(playlistId: number): Promise<{
       toPlayableTrack(track, {
         cover:
           track.artist && track.album
-            ? albumCoverApiUrl({
-                albumId: track.album_id,
-                albumEntityUid: track.album_entity_uid,
-                artistEntityUid: track.artist_entity_uid,
-                albumSlug: track.album_slug,
-                artistName: track.artist,
-                albumName: track.album,
-              })
+            ? albumCoverApiUrl(
+                {
+                  albumId: track.album_id,
+                  albumEntityUid: track.album_entity_uid,
+                  artistEntityUid: track.artist_entity_uid,
+                  albumSlug: track.album_slug,
+                  artistName: track.artist,
+                  albumName: track.album,
+                },
+                { size: 512 },
+              )
             : data.cover_data_url || undefined,
       }),
     ),

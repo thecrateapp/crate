@@ -75,6 +75,7 @@ def _search_params(query: str, limit: int) -> dict[str, Any]:
         "prefix": build_prefix_pattern(normalized),
         "substring": build_substring_pattern(normalized),
         "limit": limit,
+        "candidate_limit": max(100, min(limit * 20, 1000)),
     }
 
 
@@ -155,14 +156,31 @@ def _track_payload(row: Mapping[Any, Any]) -> dict:
 
 _HYBRID_ARTISTS_SQL = text(
     """
-    WITH ranked AS (
-        SELECT id, entity_uid::text AS entity_uid, slug, name, album_count, has_photo,
-               COALESCE(ts_rank(search_vector, to_tsquery('simple', :fts_query)), 0) AS fts_rank,
-               CASE WHEN name ILIKE :prefix ESCAPE '\\' THEN 0.3 ELSE 0 END AS prefix_bonus,
-               CASE WHEN name ILIKE :substring ESCAPE '\\' THEN 0.15 ELSE 0 END AS substring_bonus
+    WITH fts_candidates AS (
+        SELECT id
         FROM library_artists
-        WHERE (:fts_query IS NOT NULL AND search_vector @@ to_tsquery('simple', :fts_query))
-           OR name ILIKE :substring ESCAPE '\\'
+        WHERE :fts_query IS NOT NULL
+          AND search_vector @@ to_tsquery('simple', :fts_query)
+        ORDER BY ts_rank(search_vector, to_tsquery('simple', :fts_query)) DESC, id
+        LIMIT :candidate_limit
+    ), substring_candidates AS (
+        SELECT id
+        FROM library_artists
+        WHERE name ILIKE :substring ESCAPE '\\'
+        ORDER BY CASE WHEN name ILIKE :prefix ESCAPE '\\' THEN 0 ELSE 1 END, id
+        LIMIT :candidate_limit
+    ), candidates AS (
+        SELECT id FROM fts_candidates
+        UNION
+        SELECT id FROM substring_candidates
+    ), ranked AS (
+        SELECT a.id, a.entity_uid::text AS entity_uid, a.slug, a.name,
+               a.album_count, a.has_photo,
+               COALESCE(ts_rank(a.search_vector, to_tsquery('simple', :fts_query)), 0) AS fts_rank,
+               CASE WHEN a.name ILIKE :prefix ESCAPE '\\' THEN 0.3 ELSE 0 END AS prefix_bonus,
+               CASE WHEN a.name ILIKE :substring ESCAPE '\\' THEN 0.15 ELSE 0 END AS substring_bonus
+        FROM candidates c
+        JOIN library_artists a ON a.id = c.id
     )
     SELECT *, (fts_rank + prefix_bonus + substring_bonus) AS score
     FROM ranked
@@ -173,7 +191,29 @@ _HYBRID_ARTISTS_SQL = text(
 
 _HYBRID_ALBUMS_SQL = text(
     """
-    WITH ranked AS (
+    WITH fts_candidates AS (
+        SELECT id
+        FROM library_albums
+        WHERE :fts_query IS NOT NULL
+          AND search_vector @@ to_tsquery('simple', :fts_query)
+        ORDER BY ts_rank(search_vector, to_tsquery('simple', :fts_query)) DESC, id
+        LIMIT :candidate_limit
+    ), substring_candidates AS (
+        SELECT id
+        FROM library_albums
+        WHERE name ILIKE :substring ESCAPE '\\'
+           OR artist ILIKE :substring ESCAPE '\\'
+        ORDER BY CASE
+            WHEN name ILIKE :prefix ESCAPE '\\' THEN 0
+            WHEN artist ILIKE :prefix ESCAPE '\\' THEN 1
+            ELSE 2
+        END, id
+        LIMIT :candidate_limit
+    ), candidates AS (
+        SELECT id FROM fts_candidates
+        UNION
+        SELECT id FROM substring_candidates
+    ), ranked AS (
         SELECT a.id, a.entity_uid::text AS entity_uid, a.slug,
                a.artist, a.name, a.year, a.has_cover,
                ar.id AS artist_id,
@@ -186,11 +226,9 @@ _HYBRID_ALBUMS_SQL = text(
                CASE WHEN a.name ILIKE :substring ESCAPE '\\' THEN 0.15
                     WHEN a.artist ILIKE :substring ESCAPE '\\' THEN 0.1
                     ELSE 0 END AS substring_bonus
-        FROM library_albums a
+        FROM candidates c
+        JOIN library_albums a ON a.id = c.id
         LEFT JOIN library_artists ar ON ar.name = a.artist
-        WHERE (:fts_query IS NOT NULL AND a.search_vector @@ to_tsquery('simple', :fts_query))
-           OR a.name ILIKE :substring ESCAPE '\\'
-           OR a.artist ILIKE :substring ESCAPE '\\'
     )
     SELECT *, (fts_rank + prefix_bonus + substring_bonus) AS score
     FROM ranked
@@ -201,7 +239,31 @@ _HYBRID_ALBUMS_SQL = text(
 
 _HYBRID_TRACKS_SQL = text(
     """
-    WITH ranked AS (
+    WITH fts_candidates AS (
+        SELECT id
+        FROM library_tracks
+        WHERE :fts_query IS NOT NULL
+          AND search_vector @@ to_tsquery('simple', :fts_query)
+        ORDER BY ts_rank(search_vector, to_tsquery('simple', :fts_query)) DESC, id
+        LIMIT :candidate_limit
+    ), substring_candidates AS (
+        SELECT id
+        FROM library_tracks t
+        WHERE t.title ILIKE :substring ESCAPE '\\'
+           OR t.artist ILIKE :substring ESCAPE '\\'
+           OR t.album ILIKE :substring ESCAPE '\\'
+        ORDER BY CASE
+            WHEN t.title ILIKE :prefix ESCAPE '\\' THEN 0
+            WHEN t.artist ILIKE :prefix ESCAPE '\\' THEN 1
+            WHEN t.album ILIKE :prefix ESCAPE '\\' THEN 2
+            ELSE 3
+        END, id
+        LIMIT :candidate_limit
+    ), candidates AS (
+        SELECT id FROM fts_candidates
+        UNION
+        SELECT id FROM substring_candidates
+    ), ranked AS (
         SELECT t.id, t.entity_uid::text AS entity_uid, t.slug,
                t.title, t.artist,
                a.id AS album_id, a.slug AS album_slug, a.has_cover,
@@ -219,15 +281,12 @@ _HYBRID_TRACKS_SQL = text(
                     ELSE 0 END AS prefix_bonus,
                CASE WHEN t.title ILIKE :substring ESCAPE '\\' THEN 0.15
                     WHEN t.artist ILIKE :substring ESCAPE '\\' THEN 0.1
-                    WHEN a.name ILIKE :substring ESCAPE '\\' THEN 0.05
+                    WHEN t.album ILIKE :substring ESCAPE '\\' THEN 0.05
                     ELSE 0 END AS substring_bonus
-        FROM library_tracks t
+        FROM candidates c
+        JOIN library_tracks t ON t.id = c.id
         JOIN library_albums a ON t.album_id = a.id
         LEFT JOIN library_artists ar ON ar.name = t.artist
-        WHERE (:fts_query IS NOT NULL AND t.search_vector @@ to_tsquery('simple', :fts_query))
-           OR t.title ILIKE :substring ESCAPE '\\'
-           OR t.artist ILIKE :substring ESCAPE '\\'
-           OR a.name ILIKE :substring ESCAPE '\\'
     )
     SELECT *, (fts_rank + prefix_bonus + substring_bonus) AS score
     FROM ranked

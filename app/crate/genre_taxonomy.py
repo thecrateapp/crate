@@ -3,9 +3,12 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
+import json
 import re
 import time
 import unicodedata
+import uuid
 
 
 def slugify_genre(value: str) -> str:
@@ -610,6 +613,58 @@ _RAW_GENRE_DEFINITIONS: tuple[GenreDefinition, ...] = (
 _GENRE_DEFINITIONS: tuple[GenreDefinition, ...] = tuple(
     _normalize_genre_definition(definition) for definition in _RAW_GENRE_DEFINITIONS
 )
+
+CORE_TAXONOMY_ID = "crate-core"
+CORE_TAXONOMY_VERSION = "1.0.0"
+_CORE_TAXONOMY_NAMESPACE = uuid.UUID("5efca2fe-3e26-5a35-a589-2015dd9a9957")
+
+
+def core_genre_uid(slug: str) -> str:
+    """Return the immutable ID assigned to a core genre's original key."""
+    normalized_slug = slugify_genre(slug)
+    if not normalized_slug:
+        raise ValueError("Core genre slug is required")
+    return str(uuid.uuid5(_CORE_TAXONOMY_NAMESPACE, normalized_slug))
+
+
+def get_core_taxonomy_descriptor(*, include_release: bool = True) -> dict:
+    """Describe the shipped taxonomy without consulting node-local overlays."""
+    genres = [
+        {
+            "global_genre_uid": core_genre_uid(definition.slug),
+            "slug": definition.slug,
+            "name": definition.name,
+            "top_level": definition.top_level,
+            "aliases": sorted(definition.aliases),
+            "parents": sorted(definition.parents),
+            "related": sorted(definition.related),
+            "eq_gains": list(definition.eq_gains)
+            if definition.eq_gains is not None
+            else None,
+        }
+        for definition in sorted(_GENRE_DEFINITIONS, key=lambda item: item.slug)
+    ]
+    payload = {
+        "taxonomy_id": CORE_TAXONOMY_ID,
+        "version": CORE_TAXONOMY_VERSION,
+        "genres": genres,
+    }
+    serialized = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+    descriptor = {
+        **payload,
+        "digest": f"sha256:{sha256(serialized).hexdigest()}",
+    }
+    if include_release:
+        from crate.federation.global_genres import taxonomy_release_health
+
+        release = taxonomy_release_health()
+        descriptor["release"] = release
+        descriptor["signature"] = release.get("signature")
+        descriptor["key_id"] = release.get("key_id")
+    return descriptor
+
 
 _RUNTIME_GRAPH_CACHE: dict | None = None
 _RUNTIME_GRAPH_CACHE_REVISION: str | None = None

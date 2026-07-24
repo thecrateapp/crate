@@ -54,3 +54,9 @@ func TestHomeSlicePayload(t *testing.T) {
 		assert.Equal(t, "High Vis", got["name"])
 	})
 }
+
+func TestRecentlyPlayedUsesItsDedicatedSnapshot(t *testing.T) {
+	def := homeSliceRoutes["/api/me/home/recently-played"]
+	assert.Equal(t, "home:recently-played", def.snapshotScope)
+	assert.Equal(t, "recently_played", def.payloadKey)
+}

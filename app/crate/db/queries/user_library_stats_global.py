@@ -65,6 +65,121 @@ def _month_subtitle(top_artists: list[dict]) -> str:
     return f"{', '.join(names)} and more"
 
 
+def _attach_global_track_refs(items: list[dict]) -> list[dict]:
+    with read_scope() as session:
+        for item in items:
+            if item.get("global_track_uid") and item.get("global_album_uid"):
+                continue
+            artist = str(item.get("artist") or "").strip()
+            title = str(item.get("title") or "").strip()
+            album = str(item.get("album") or "").strip()
+            global_track_uid = item.get("global_track_uid")
+            row = (
+                session.execute(
+                    text(
+                        """
+                        SELECT
+                            global_track_uid::text AS global_track_uid,
+                            global_artist_uid::text AS global_artist_uid,
+                            global_album_uid::text AS global_album_uid
+                        FROM global_catalog_tracks
+                        WHERE (
+                            :global_track_uid IS NOT NULL
+                            AND global_track_uid::text = :global_track_uid
+                        )
+                        OR (
+                            COALESCE(NULLIF(:artist, ''), '') <> ''
+                            AND COALESCE(NULLIF(:title, ''), '') <> ''
+                            AND LOWER(artist_name) = LOWER(:artist)
+                            AND LOWER(canonical_title) = LOWER(:title)
+                            AND (
+                                COALESCE(NULLIF(:album, ''), '') = ''
+                                OR LOWER(COALESCE(album_name, '')) = LOWER(:album)
+                            )
+                        )
+                        ORDER BY has_local DESC, has_remote DESC, source_count DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {
+                        "global_track_uid": global_track_uid,
+                        "artist": artist,
+                        "title": title,
+                        "album": album,
+                    },
+                )
+                .mappings()
+                .first()
+            )
+            if row:
+                item.setdefault("global_track_uid", row["global_track_uid"])
+                item.setdefault("global_artist_uid", row["global_artist_uid"])
+                item.setdefault("global_album_uid", row["global_album_uid"])
+    return items
+
+
+def _attach_global_artist_refs(items: list[dict]) -> list[dict]:
+    with read_scope() as session:
+        for item in items:
+            if item.get("global_artist_uid"):
+                continue
+            artist = str(item.get("artist_name") or item.get("artist") or "").strip()
+            row = (
+                session.execute(
+                    text(
+                        """
+                        SELECT global_artist_uid::text AS global_artist_uid
+                        FROM global_catalog_artists
+                        WHERE COALESCE(NULLIF(:artist, ''), '') <> ''
+                          AND LOWER(canonical_name) = LOWER(:artist)
+                        ORDER BY has_local DESC, has_remote DESC, source_count DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"artist": artist},
+                )
+                .mappings()
+                .first()
+            )
+            if row:
+                item.setdefault("global_artist_uid", row["global_artist_uid"])
+    return items
+
+
+def _attach_global_album_refs(items: list[dict]) -> list[dict]:
+    with read_scope() as session:
+        for item in items:
+            if item.get("global_album_uid") and item.get("global_artist_uid"):
+                continue
+            artist = str(item.get("artist") or "").strip()
+            album = str(item.get("album") or "").strip()
+            row = (
+                session.execute(
+                    text(
+                        """
+                        SELECT
+                            global_album_uid::text AS global_album_uid,
+                            global_artist_uid::text AS global_artist_uid
+                        FROM global_catalog_albums
+                        WHERE COALESCE(NULLIF(:artist, ''), '') <> ''
+                          AND COALESCE(NULLIF(:album, ''), '') <> ''
+                          AND LOWER(artist_name) = LOWER(:artist)
+                          AND LOWER(canonical_name) = LOWER(:album)
+                        ORDER BY has_local DESC, has_remote DESC, source_count DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"artist": artist, "album": album},
+                )
+                .mappings()
+                .first()
+            )
+            if row:
+                item.setdefault("global_album_uid", row["global_album_uid"])
+                item.setdefault("global_artist_uid", row["global_artist_uid"])
+    return items
+
+
 def get_global_stats_overview(window: str = "30d", month: str | None = None) -> dict:
     period_key, start_day, end_day, start_ts, end_ts = _period_bounds(window, month)
     with read_scope() as session:
@@ -557,7 +672,7 @@ def get_global_top_tracks(
     for item in payload:
         if item.get("bliss_vector") is not None:
             item["bliss_vector"] = list(item["bliss_vector"])
-    return payload
+    return _attach_global_track_refs(payload)
 
 
 def get_global_top_artists(
@@ -650,7 +765,7 @@ def get_global_top_artists(
                 .mappings()
                 .all()
             )
-    return [dict(row) for row in rows]
+    return _attach_global_artist_refs([dict(row) for row in rows])
 
 
 def get_global_top_albums(
@@ -761,7 +876,7 @@ def get_global_top_albums(
                 .mappings()
                 .all()
             )
-    return [dict(row) for row in rows]
+    return _attach_global_album_refs([dict(row) for row in rows])
 
 
 def get_global_top_genres(

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
@@ -15,10 +17,321 @@ import (
 
 var ErrNotFound = errors.New("catalog item not found")
 
+const userLibraryCountsQuery = `
+		SELECT
+			(
+				(SELECT COUNT(*) FROM user_global_artist_follows WHERE user_id = $1)
+				+
+				(
+					SELECT COUNT(*)
+					FROM user_follows uf
+					LEFT JOIN library_artists local_artist
+					  ON lower(local_artist.name) = lower(uf.artist_name)
+					LEFT JOIN global_catalog_artists global_artist
+					  ON global_artist.local_artist_id = local_artist.id
+					LEFT JOIN user_global_artist_follows projected
+					  ON projected.user_id = uf.user_id
+					 AND projected.global_artist_uid = global_artist.global_artist_uid
+					WHERE uf.user_id = $1
+					  AND projected.user_id IS NULL
+				)
+			)::INTEGER AS followed_artists,
+			(
+				(SELECT COUNT(*) FROM user_global_album_saves WHERE user_id = $1)
+				+
+				(
+					SELECT COUNT(*)
+					FROM user_saved_albums usa
+					LEFT JOIN global_catalog_albums global_album
+					  ON global_album.local_album_id = usa.album_id
+					LEFT JOIN user_global_album_saves projected
+					  ON projected.user_id = usa.user_id
+					 AND projected.global_album_uid = global_album.global_album_uid
+					WHERE usa.user_id = $1
+					  AND projected.user_id IS NULL
+				)
+			)::INTEGER AS saved_albums,
+			(SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = $1)::INTEGER AS liked_tracks,
+			(SELECT COUNT(*) FROM playlists WHERE user_id = $1)::INTEGER AS playlists
+	`
+
+const followedArtistsQuery = `
+		WITH canonical AS (
+			SELECT
+				a.canonical_name AS artist_name,
+				f.created_at,
+				a.local_artist_id AS artist_id,
+				a.local_artist_entity_uid::text AS artist_entity_uid,
+				la.slug AS artist_slug,
+				COALESCE(album_counts.album_count, 0)::INTEGER AS album_count,
+				COALESCE(track_counts.track_count, 0)::INTEGER AS track_count,
+				a.has_photo,
+				a.global_artist_uid::text AS global_artist_uid,
+				CASE WHEN a.has_photo THEN
+					'/api/catalog/artists/' || a.global_artist_uid::text || '/photo'
+				ELSE NULL END AS photo_url
+			FROM user_global_artist_follows f
+			JOIN global_catalog_artists a ON a.global_artist_uid = f.global_artist_uid
+			LEFT JOIN library_artists la ON la.id = a.local_artist_id
+			LEFT JOIN (
+				SELECT global_artist_uid, COUNT(*) AS album_count
+				FROM global_catalog_albums
+				GROUP BY global_artist_uid
+			) album_counts ON album_counts.global_artist_uid = a.global_artist_uid
+			LEFT JOIN (
+				SELECT global_artist_uid, COUNT(*) AS track_count
+				FROM global_catalog_tracks
+				GROUP BY global_artist_uid
+			) track_counts ON track_counts.global_artist_uid = a.global_artist_uid
+			WHERE f.user_id = $1
+		), legacy_only AS (
+			SELECT
+				uf.artist_name,
+				uf.created_at,
+				local_artist.id AS artist_id,
+				local_artist.entity_uid::text AS artist_entity_uid,
+				local_artist.slug AS artist_slug,
+				COALESCE(local_artist.album_count, 0)::INTEGER AS album_count,
+				COALESCE(local_artist.track_count, 0)::INTEGER AS track_count,
+				(COALESCE(local_artist.has_photo, 0) != 0) AS has_photo,
+				NULL::text AS global_artist_uid,
+				NULL::text AS photo_url
+			FROM user_follows uf
+			LEFT JOIN library_artists local_artist
+			  ON lower(local_artist.name) = lower(uf.artist_name)
+			LEFT JOIN global_catalog_artists global_artist
+			  ON global_artist.local_artist_id = local_artist.id
+			LEFT JOIN user_global_artist_follows projected
+			  ON projected.user_id = uf.user_id
+			 AND projected.global_artist_uid = global_artist.global_artist_uid
+			WHERE uf.user_id = $1
+			  AND projected.user_id IS NULL
+		)
+		SELECT * FROM canonical
+		UNION ALL
+		SELECT * FROM legacy_only
+		ORDER BY created_at DESC
+	`
+
+const savedAlbumsQuery = `
+		WITH canonical AS (
+			SELECT
+				s.created_at AS saved_at,
+				a.local_album_id AS id,
+				a.global_album_uid::text AS global_album_uid,
+				a.global_artist_uid::text AS global_artist_uid,
+				a.local_album_entity_uid::text AS album_entity_uid,
+				la.slug,
+				a.artist_name AS artist,
+				art.local_artist_id AS artist_id,
+				art.local_artist_entity_uid::text AS artist_entity_uid,
+				lar.slug AS artist_slug,
+				a.canonical_name AS name,
+				a.year,
+				a.has_cover,
+				COALESCE(a.track_count, 0)::INTEGER AS track_count,
+				COALESCE(a.total_duration_seconds, 0) AS total_duration,
+				CASE WHEN a.has_cover THEN
+					'/api/catalog/albums/' || a.global_album_uid::text || '/cover'
+				ELSE NULL END AS cover_url
+			FROM user_global_album_saves s
+			JOIN global_catalog_albums a ON a.global_album_uid = s.global_album_uid
+			LEFT JOIN library_albums la ON la.id = a.local_album_id
+			LEFT JOIN global_catalog_artists art ON art.global_artist_uid = a.global_artist_uid
+			LEFT JOIN library_artists lar ON lar.id = art.local_artist_id
+			WHERE s.user_id = $1
+		), legacy_only AS (
+			SELECT
+				usa.created_at AS saved_at,
+				local_album.id,
+				NULL::text AS global_album_uid,
+				NULL::text AS global_artist_uid,
+				local_album.entity_uid::text AS album_entity_uid,
+				local_album.slug,
+				local_album.artist,
+				local_artist.id AS artist_id,
+				local_artist.entity_uid::text AS artist_entity_uid,
+				local_artist.slug AS artist_slug,
+				local_album.name,
+				local_album.year,
+				(COALESCE(local_album.has_cover, 0) != 0) AS has_cover,
+				COALESCE(local_album.track_count, 0)::INTEGER AS track_count,
+				COALESCE(local_album.total_duration, 0) AS total_duration,
+				NULL::text AS cover_url
+			FROM user_saved_albums usa
+			JOIN library_albums local_album ON local_album.id = usa.album_id
+			LEFT JOIN library_artists local_artist ON local_artist.name = local_album.artist
+			LEFT JOIN global_catalog_albums global_album
+			  ON global_album.local_album_id = usa.album_id
+			LEFT JOIN user_global_album_saves projected
+			  ON projected.user_id = usa.user_id
+			 AND projected.global_album_uid = global_album.global_album_uid
+			WHERE usa.user_id = $1
+			  AND projected.user_id IS NULL
+		)
+		SELECT * FROM canonical
+		UNION ALL
+		SELECT * FROM legacy_only
+		ORDER BY saved_at DESC
+	`
+
+const followingArtistNameQuery = `
+		SELECT 1
+		FROM user_global_artist_follows followed
+		JOIN global_catalog_artists artist
+		  ON artist.global_artist_uid = followed.global_artist_uid
+		WHERE followed.user_id = $1
+		  AND lower(artist.canonical_name) = lower($2)
+		UNION ALL
+		SELECT 1
+		FROM user_follows
+		WHERE user_id = $1
+		  AND lower(artist_name) = lower($2)
+		LIMIT 1
+	`
+
+const localArtistSearchSQL = `
+	WITH fts_candidates AS (
+		SELECT id
+		FROM library_artists
+		WHERE NULLIF($1, '') IS NOT NULL
+		  AND search_vector @@ to_tsquery('simple', $1)
+		ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC, id
+		LIMIT $4
+	), substring_candidates AS (
+		SELECT id
+		FROM library_artists
+		WHERE name ILIKE $2 ESCAPE '\'
+		ORDER BY CASE WHEN name ILIKE $3 ESCAPE '\' THEN 0 ELSE 1 END, id
+		LIMIT $4
+	), candidates AS (
+		SELECT id FROM fts_candidates
+		UNION
+		SELECT id FROM substring_candidates
+	), ranked AS (
+		SELECT a.id, a.entity_uid::text AS entity_uid, a.slug, a.name,
+		       a.album_count, a.has_photo,
+		       COALESCE(ts_rank(a.search_vector, to_tsquery('simple', NULLIF($1, ''))), 0) AS fts_rank,
+		       CASE WHEN a.name ILIKE $3 ESCAPE '\' THEN 0.3 ELSE 0 END AS prefix_bonus,
+		       CASE WHEN a.name ILIKE $2 ESCAPE '\' THEN 0.15 ELSE 0 END AS substring_bonus
+		FROM candidates c
+		JOIN library_artists a ON a.id = c.id
+	)
+	SELECT id, entity_uid, slug, name, album_count, has_photo
+	FROM ranked
+	ORDER BY (fts_rank + prefix_bonus + substring_bonus) DESC, album_count DESC, name ASC
+	LIMIT $5
+`
+
+const localAlbumSearchSQL = `
+	WITH fts_candidates AS (
+		SELECT id
+		FROM library_albums
+		WHERE NULLIF($1, '') IS NOT NULL
+		  AND search_vector @@ to_tsquery('simple', $1)
+		ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC, id
+		LIMIT $4
+	), substring_candidates AS (
+		SELECT id
+		FROM library_albums
+		WHERE name ILIKE $2 ESCAPE '\'
+		   OR artist ILIKE $2 ESCAPE '\'
+		ORDER BY CASE
+			WHEN name ILIKE $3 ESCAPE '\' THEN 0
+			WHEN artist ILIKE $3 ESCAPE '\' THEN 1
+			ELSE 2
+		END, id
+		LIMIT $4
+	), candidates AS (
+		SELECT id FROM fts_candidates
+		UNION
+		SELECT id FROM substring_candidates
+	), ranked AS (
+		SELECT a.id, a.entity_uid::text AS entity_uid, a.slug,
+		       a.artist, a.name, a.year, a.has_cover,
+		       ar.id AS artist_id,
+		       ar.entity_uid::text AS artist_entity_uid,
+		       ar.slug AS artist_slug,
+		       COALESCE(ts_rank(a.search_vector, to_tsquery('simple', NULLIF($1, ''))), 0) AS fts_rank,
+		       CASE WHEN a.name ILIKE $3 ESCAPE '\' THEN 0.3
+		            WHEN a.artist ILIKE $3 ESCAPE '\' THEN 0.2
+		            ELSE 0 END AS prefix_bonus,
+		       CASE WHEN a.name ILIKE $2 ESCAPE '\' THEN 0.15
+		            WHEN a.artist ILIKE $2 ESCAPE '\' THEN 0.1
+		            ELSE 0 END AS substring_bonus
+		FROM candidates c
+		JOIN library_albums a ON a.id = c.id
+		LEFT JOIN library_artists ar ON ar.name = a.artist
+	)
+	SELECT id, entity_uid, slug, artist, name, year, has_cover,
+	       artist_id, artist_entity_uid, artist_slug
+	FROM ranked
+	ORDER BY (fts_rank + prefix_bonus + substring_bonus) DESC, year DESC NULLS LAST, name ASC
+	LIMIT $5
+`
+
+const localTrackSearchSQL = `
+	WITH fts_candidates AS (
+		SELECT id
+		FROM library_tracks
+		WHERE NULLIF($1, '') IS NOT NULL
+		  AND search_vector @@ to_tsquery('simple', $1)
+		ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC, id
+		LIMIT $4
+	), substring_candidates AS (
+		SELECT id
+		FROM library_tracks t
+		WHERE t.title ILIKE $2 ESCAPE '\'
+		   OR t.artist ILIKE $2 ESCAPE '\'
+		   OR t.album ILIKE $2 ESCAPE '\'
+		ORDER BY CASE
+			WHEN t.title ILIKE $3 ESCAPE '\' THEN 0
+			WHEN t.artist ILIKE $3 ESCAPE '\' THEN 1
+			WHEN t.album ILIKE $3 ESCAPE '\' THEN 2
+			ELSE 3
+		END, id
+		LIMIT $4
+	), candidates AS (
+		SELECT id FROM fts_candidates
+		UNION
+		SELECT id FROM substring_candidates
+	), ranked AS (
+		SELECT t.id, t.entity_uid::text AS entity_uid, t.slug, t.title, t.artist,
+		       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
+		       a.id AS album_id, a.entity_uid::text AS album_entity_uid, a.slug AS album_slug,
+		       a.name AS album, t.path, t.duration,
+		       COALESCE(ts_rank(t.search_vector, to_tsquery('simple', NULLIF($1, ''))), 0) AS fts_rank,
+		       CASE WHEN t.title ILIKE $3 ESCAPE '\' THEN 0.3
+		            WHEN t.artist ILIKE $3 ESCAPE '\' THEN 0.2
+		            WHEN t.album ILIKE $3 ESCAPE '\' THEN 0.1
+		            ELSE 0 END AS prefix_bonus,
+		       CASE WHEN t.title ILIKE $2 ESCAPE '\' THEN 0.15
+		            WHEN t.artist ILIKE $2 ESCAPE '\' THEN 0.1
+		            WHEN t.album ILIKE $2 ESCAPE '\' THEN 0.05
+		            ELSE 0 END AS substring_bonus
+		FROM candidates c
+		JOIN library_tracks t ON t.id = c.id
+		JOIN library_albums a ON t.album_id = a.id
+		LEFT JOIN library_artists ar ON ar.name = t.artist
+	)
+	SELECT id, entity_uid, slug, title, artist,
+	       artist_id, artist_entity_uid, artist_slug,
+	       album_id, album_entity_uid, album_slug, album, path, duration
+	FROM ranked
+	ORDER BY (fts_rank + prefix_bonus + substring_bonus) DESC, title ASC
+	LIMIT $5
+`
+
 // Store provides read-only catalog queries backed by a PostgreSQL pool.
 type Store struct {
-	pool         *pgxpool.Pool
-	queryTimeout time.Duration
+	pool                       *pgxpool.Pool
+	queryTimeout               time.Duration
+	globalCatalogReadyFn       func(context.Context) (bool, error)
+	globalCatalogServingModeFn func(context.Context) (CatalogServingMode, error)
+	localSearchFn              func(context.Context, string, int) (map[string]any, error)
+	globalSearchFn             func(context.Context, string, int) (map[string]any, error)
+	artistRowFn                func(context.Context, string, ...any) (map[string]any, error)
+	artistTopTracksFn          func(context.Context, string, int) ([]map[string]any, error)
 }
 
 type historyFallbackRef struct {
@@ -34,12 +347,19 @@ func NewStore(pool *pgxpool.Pool, queryTimeout time.Duration) *Store {
 
 // Search runs parallel artist, album, and track queries for the given search text.
 func (s *Store) Search(ctx context.Context, query string, limit int) (map[string]any, error) {
+	if s.localSearchFn != nil {
+		return s.localSearchFn(ctx, query, limit)
+	}
 	q := strings.TrimSpace(query)
 	cappedLimit := clamp(limit, 1, 50)
-	if len(q) < 2 {
+	if utf8.RuneCountInString(q) < 2 {
 		return map[string]any{"artists": []any{}, "albums": []any{}, "tracks": []any{}}, nil
 	}
-	like := "%" + q + "%"
+	ftsQuery := buildLocalFTSQuery(q)
+	escaped := escapeLocalSearchLike(q)
+	substring := "%" + escaped + "%"
+	prefix := escaped + "%"
+	candidateLimit := clamp(cappedLimit*20, 100, 1000)
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 
@@ -51,13 +371,9 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 
 	g.Go(func() error {
 		var err error
-		artists, err = rowsToMaps(s.pool.Query(gCtx, `
-			SELECT id, entity_uid::text AS entity_uid, slug, name, album_count, has_photo
-			FROM library_artists
-			WHERE name ILIKE $1
-			ORDER BY listeners DESC NULLS LAST, album_count DESC, name ASC
-			LIMIT $2
-		`, like, cappedLimit))
+		artists, err = rowsToMaps(s.pool.Query(
+			gCtx, localArtistSearchSQL, ftsQuery, substring, prefix, candidateLimit, cappedLimit,
+		))
 		if err != nil {
 			return err
 		}
@@ -69,15 +385,9 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 
 	g.Go(func() error {
 		var err error
-		albums, err = rowsToMaps(s.pool.Query(gCtx, `
-			SELECT a.id, a.entity_uid::text AS entity_uid, a.slug, a.artist, a.name, a.year, a.has_cover,
-			       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug
-			FROM library_albums a
-			LEFT JOIN library_artists ar ON ar.name = a.artist
-			WHERE a.name ILIKE $1 OR a.artist ILIKE $1
-			ORDER BY year DESC NULLS LAST, name ASC
-			LIMIT $2
-		`, like, cappedLimit))
+		albums, err = rowsToMaps(s.pool.Query(
+			gCtx, localAlbumSearchSQL, ftsQuery, substring, prefix, candidateLimit, cappedLimit,
+		))
 		if err != nil {
 			return err
 		}
@@ -92,18 +402,9 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 
 	g.Go(func() error {
 		var err error
-		tracks, err = rowsToMaps(s.pool.Query(gCtx, `
-			SELECT t.id, t.entity_uid::text AS entity_uid, t.slug, t.title, t.artist,
-			       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
-			       a.id AS album_id, a.entity_uid::text AS album_entity_uid, a.slug AS album_slug,
-			       a.name AS album, t.path, t.duration
-			FROM library_tracks t
-			JOIN library_albums a ON t.album_id = a.id
-			LEFT JOIN library_artists ar ON ar.name = t.artist
-			WHERE t.title ILIKE $1 OR t.artist ILIKE $1 OR a.name ILIKE $1
-			ORDER BY t.title ASC
-			LIMIT $2
-		`, like, cappedLimit))
+		tracks, err = rowsToMaps(s.pool.Query(
+			gCtx, localTrackSearchSQL, ftsQuery, substring, prefix, candidateLimit, cappedLimit,
+		))
 		if err != nil {
 			return err
 		}
@@ -129,6 +430,28 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 	}, nil
 }
 
+func buildLocalFTSQuery(query string) string {
+	terms := strings.FieldsFunc(strings.TrimSpace(query), func(character rune) bool {
+		return !unicode.IsLetter(character) && !unicode.IsDigit(character) && character != '_'
+	})
+	if len(terms) == 0 {
+		return ""
+	}
+	for index, term := range terms {
+		terms[index] = strings.ToLower(term)
+	}
+	terms[len(terms)-1] += ":*"
+	return strings.Join(terms, " & ")
+}
+
+func escapeLocalSearchLike(query string) string {
+	return strings.NewReplacer(
+		`\`, `\\`,
+		`%`, `\%`,
+		`_`, `\_`,
+	).Replace(query)
+}
+
 // Favorites returns all favorited items ordered by creation time.
 func (s *Store) Favorites(ctx context.Context) (map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
@@ -148,48 +471,14 @@ func (s *Store) Favorites(ctx context.Context) (map[string]any, error) {
 func (s *Store) FollowedArtists(ctx context.Context, userID int64) ([]map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	return rowsToMaps(s.pool.Query(ctx, `
-		SELECT
-			uf.artist_name,
-			uf.created_at,
-			la.id AS artist_id,
-			la.entity_uid::text AS artist_entity_uid,
-			la.slug AS artist_slug,
-			la.album_count,
-			la.track_count,
-			la.has_photo
-		FROM user_follows uf
-		LEFT JOIN library_artists la ON la.name = uf.artist_name
-		WHERE uf.user_id = $1
-		ORDER BY uf.created_at DESC
-	`, userID))
+	return rowsToMaps(s.pool.Query(ctx, followedArtistsQuery, userID))
 }
 
 // SavedAlbums returns the albums saved by the given user.
 func (s *Store) SavedAlbums(ctx context.Context, userID int64) ([]map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	return rowsToMaps(s.pool.Query(ctx, `
-		SELECT
-			usa.created_at AS saved_at,
-			la.id,
-			la.entity_uid::text AS album_entity_uid,
-			la.slug,
-			la.artist,
-			art.id AS artist_id,
-			art.entity_uid::text AS artist_entity_uid,
-			art.slug AS artist_slug,
-			la.name,
-			la.year,
-			la.has_cover,
-			la.track_count,
-			la.total_duration
-		FROM user_saved_albums usa
-		JOIN library_albums la ON la.id = usa.album_id
-		LEFT JOIN library_artists art ON art.name = la.artist
-		WHERE usa.user_id = $1
-		ORDER BY usa.created_at DESC
-	`, userID))
+	return rowsToMaps(s.pool.Query(ctx, savedAlbumsQuery, userID))
 }
 
 // LikedTracks returns the tracks liked by the given user, newest first.
@@ -241,13 +530,7 @@ func (s *Store) LikedTracks(ctx context.Context, userID int64, limit int) ([]map
 func (s *Store) UserLibraryCounts(ctx context.Context, userID int64) (map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	rows, err := rowsToMaps(s.pool.Query(ctx, `
-		SELECT
-			(SELECT COUNT(*) FROM user_follows WHERE user_id = $1)::INTEGER AS followed_artists,
-			(SELECT COUNT(*) FROM user_saved_albums WHERE user_id = $1)::INTEGER AS saved_albums,
-			(SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = $1)::INTEGER AS liked_tracks,
-			(SELECT COUNT(*) FROM playlists WHERE user_id = $1)::INTEGER AS playlists
-	`, userID))
+	rows, err := rowsToMaps(s.pool.Query(ctx, userLibraryCountsQuery, userID))
 	if err != nil {
 		return nil, err
 	}
@@ -261,12 +544,7 @@ func (s *Store) UserLibraryCounts(ctx context.Context, userID int64) (map[string
 func (s *Store) IsFollowingArtistName(ctx context.Context, userID int64, artistName string) (map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	rows, err := rowsToMaps(s.pool.Query(ctx, `
-		SELECT 1
-		FROM user_follows
-		WHERE user_id = $1 AND artist_name = $2
-		LIMIT 1
-	`, userID, artistName))
+	rows, err := rowsToMaps(s.pool.Query(ctx, followingArtistNameQuery, userID, artistName))
 	if err != nil {
 		return nil, err
 	}

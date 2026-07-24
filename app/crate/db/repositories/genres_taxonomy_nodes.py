@@ -9,7 +9,10 @@ from crate.db.repositories.genres_taxonomy_shared import (
 )
 from crate.db.tx import transaction_scope
 from crate.entity_ids import genre_taxonomy_entity_uid
-from crate.genre_taxonomy import invalidate_runtime_taxonomy_cache_after_commit
+from crate.genre_taxonomy import (
+    CORE_TAXONOMY_ID,
+    invalidate_runtime_taxonomy_cache_after_commit,
+)
 
 
 def upsert_genre_taxonomy_node(
@@ -117,23 +120,47 @@ def upsert_genre_taxonomy_node(
                 .first()
             )
     else:
+        entity_uid = str(
+            genre_taxonomy_entity_uid(
+                slug=candidate_slug,
+                name=candidate_name,
+                musicbrainz_mbid=mbid,
+            )
+        )
         row = dict(
             session.execute(
                 text(
                     """
-                    INSERT INTO genre_taxonomy_nodes (entity_uid, slug, name, description, is_top_level, musicbrainz_mbid)
-                    VALUES (:entity_uid, :slug, :name, :description, :is_top_level, :mbid)
+                    INSERT INTO genre_taxonomy_nodes
+                        (
+                            entity_uid,
+                            global_genre_uid,
+                            taxonomy_id,
+                            origin,
+                            slug,
+                            name,
+                            description,
+                            is_top_level,
+                            musicbrainz_mbid
+                        )
+                    VALUES
+                        (
+                            CAST(:entity_uid AS uuid),
+                            CAST(:entity_uid AS uuid),
+                            :taxonomy_id,
+                            'overlay',
+                            :slug,
+                            :name,
+                            :description,
+                            :is_top_level,
+                            :mbid
+                        )
                     RETURNING id, entity_uid, slug, name, description, is_top_level, musicbrainz_mbid
                     """
                 ),
                 {
-                    "entity_uid": str(
-                        genre_taxonomy_entity_uid(
-                            slug=candidate_slug,
-                            name=candidate_name,
-                            musicbrainz_mbid=mbid,
-                        )
-                    ),
+                    "entity_uid": entity_uid,
+                    "taxonomy_id": CORE_TAXONOMY_ID,
                     "slug": candidate_slug,
                     "name": candidate_name,
                     "description": candidate_description,

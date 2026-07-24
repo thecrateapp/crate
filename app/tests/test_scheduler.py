@@ -103,6 +103,12 @@ class TestGetSetSchedules:
 
         assert DEFAULT_SCHEDULES["repair_duplicate_tracks"] == 43200
 
+    def test_default_schedules_include_global_catalog_reconciliation(self):
+        from crate.scheduler import DEFAULT_SCHEDULES
+
+        assert DEFAULT_SCHEDULES["global_catalog_reconcile_incremental"] == 300
+        assert DEFAULT_SCHEDULES["global_catalog_reconcile_full"] == 43200
+
     def test_get_schedules_custom(self):
         import json
 
@@ -116,6 +122,24 @@ class TestGetSetSchedules:
             schedules = get_schedules()
             assert schedules["library_pipeline"] == 3600
             assert schedules["enrich_artists"] == 0
+
+    def test_get_schedules_merges_new_defaults_into_persisted_configuration(self):
+        import json
+
+        custom = {"library_pipeline": 3600, "enrich_artists": 0}
+        with (
+            patch("crate.scheduler.get_setting", return_value=json.dumps(custom)),
+            patch("crate.scheduler.set_setting") as set_setting,
+        ):
+            from crate.scheduler import get_schedules
+
+            schedules = get_schedules()
+
+        assert schedules["library_pipeline"] == 3600
+        assert schedules["enrich_artists"] == 0
+        assert schedules["cleanup_stream_variants"] == 3600
+        persisted = json.loads(set_setting.call_args.args[1])
+        assert persisted == schedules
 
     def test_set_schedules(self):
         with patch("crate.scheduler.set_setting") as mock_set:

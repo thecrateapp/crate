@@ -109,12 +109,15 @@ function HomeReplayRowAction({
   const menuTrack = useMemo(
     () => ({
       id: item.track_id ?? item.track_path ?? item.title,
+      global_track_uid: item.global_track_uid ?? undefined,
       title: item.title,
       artist: item.artist,
       artist_id: item.artist_id ?? undefined,
+      global_artist_uid: item.global_artist_uid ?? undefined,
       artist_slug: item.artist_slug ?? undefined,
       album: item.album,
       album_id: item.album_id ?? undefined,
+      global_album_uid: item.global_album_uid ?? undefined,
       album_slug: item.album_slug ?? undefined,
       path: item.track_path ?? undefined,
       library_track_id: item.track_id ?? undefined,
@@ -280,15 +283,19 @@ function HomeQueueCardAction({
 }
 
 function replayCoverUrl(item: ReplayTrack): string | undefined {
-  if (item.album_id == null) return undefined;
-  return albumCoverApiUrl({
-    albumId: item.album_id,
-    albumEntityUid: item.album_entity_uid ?? undefined,
-    artistEntityUid: item.artist_entity_uid ?? undefined,
-    albumSlug: item.album_slug ?? undefined,
-    artistName: item.artist,
-    albumName: item.album,
-  });
+  if (item.album_id == null && !item.global_album_uid) return undefined;
+  return albumCoverApiUrl(
+    {
+      albumId: item.album_id,
+      globalAlbumUid: item.global_album_uid,
+      albumEntityUid: item.album_entity_uid ?? undefined,
+      artistEntityUid: item.artist_entity_uid ?? undefined,
+      albumSlug: item.album_slug ?? undefined,
+      artistName: item.artist,
+      albumName: item.album,
+    },
+    { size: 256 },
+  );
 }
 
 export function ContinueListeningSection({

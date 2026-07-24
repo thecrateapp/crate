@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
+import { recordAssetInvalidationScope } from "@/lib/library-routes";
 import { startShapedRadio } from "@/lib/radio";
 import { SHARE_REQUEST_EVENT, type SharePayload } from "@/lib/social-share";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -72,6 +73,24 @@ describe("Explore", () => {
       expect.anything(),
       expect.anything(),
       expect.anything(),
+    );
+  });
+
+  it("loads decade details from the canonical catalog", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: { items: [], total: 0, page: 1, per_page: 50 },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore?decade=1990s",
+      path: "/explore",
+    });
+
+    expect(useApi).toHaveBeenCalledWith(
+      "/api/catalog/artists?decade=1990s&per_page=50",
     );
   });
 
@@ -189,7 +208,7 @@ describe("Explore", () => {
         };
       }
 
-      if (url === "/api/genres/punk-hardcore?view=genre-detail-v5") {
+      if (url === "/api/catalog/genres/punk-hardcore") {
         return {
           data: {
             id: 1,
@@ -246,7 +265,7 @@ describe("Explore", () => {
         };
       }
 
-      if (url === "/api/genres/hardcore?view=genre-detail-v5") {
+      if (url === "/api/catalog/genres/hardcore") {
         return {
           data: {
             id: 1,
@@ -289,7 +308,17 @@ describe("Explore", () => {
     expect(screen.queryByText("Unmapped")).toBeNull();
     expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
       "src",
-      "/api/genres/hardcore/cover?size=1280&format=webp&hero=genre-detail-v5",
+      "/api/genres/hardcore/cover?size=1280&format=webp",
+    );
+    expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
+      "fetchpriority",
+      "high",
+    );
+    expect(useApi).toHaveBeenCalledWith(
+      "/api/catalog/genres/hardcore",
+      "GET",
+      undefined,
+      { revalidateIfCached: "never" },
     );
   });
 
@@ -426,8 +455,7 @@ describe("Explore", () => {
         kind: "genre",
         title: "hardcore",
         subtitle: "Genre",
-        imageUrl:
-          "/api/genres/hardcore/cover?size=1280&format=webp&hero=genre-detail-v5",
+        imageUrl: "/api/genres/hardcore/cover?size=1280&format=webp",
         url: expect.stringContaining("/explore?genre=hardcore"),
       });
     } finally {
@@ -445,7 +473,7 @@ describe("Explore", () => {
 
     expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
       "src",
-      "/api/genres/hardcore-punk/cover?size=1280&format=webp&hero=genre-detail-v5",
+      "/api/genres/hardcore-punk/cover?size=1280&format=webp",
     );
   });
 
@@ -461,7 +489,7 @@ describe("Explore", () => {
 
     expect(heroImage).toHaveAttribute(
       "src",
-      "/api/genres/hardcore/cover?size=1280&format=webp&hero=genre-detail-v5",
+      "/api/genres/hardcore/cover?size=1280&format=webp",
     );
 
     fireEvent.error(heroImage);
@@ -469,12 +497,12 @@ describe("Explore", () => {
     await waitFor(() => {
       expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
         "src",
-        "/api/genres/hardcore-punk/cover?size=1280&format=webp&hero=genre-detail-v5",
+        "/api/genres/hardcore-punk/cover?size=1280&format=webp",
       );
     });
   });
 
-  it("falls back to top artist photo when genre hero candidates fail", async () => {
+  it("uses top artist background without probing an absent genre cover", () => {
     mockGenreDetail({
       coverUrl: null,
       artists: [
@@ -504,21 +532,53 @@ describe("Explore", () => {
       path: "/explore",
     });
 
-    const heroImage = screen.getByAltText("hardcore genre cover");
-
-    expect(heroImage).toHaveAttribute(
+    expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
       "src",
-      "/api/genres/hardcore-punk/cover?size=1280&format=webp&hero=genre-detail-v5",
+      "/api/artists/222/background?size=1280&format=webp",
     );
+  });
 
-    fireEvent.error(heroImage);
-
-    await waitFor(() => {
-      expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
-        "src",
-        "/api/artists/222/photo?size=1280&format=webp&hero=genre-detail-v5",
-      );
+  it("rebuilds cached generated hero URLs through the invalidation-aware helper", () => {
+    recordAssetInvalidationScope("artist:222", "artist-artwork-222");
+    mockGenreDetail({
+      coverUrl:
+        "/api/catalog/artists/global-222/background?size=1280&format=webp",
+      artists: [
+        {
+          artist_id: 222,
+          global_artist_uid: "global-222",
+          artist_name: "Cached Artist",
+          artist_slug: "cached-artist",
+          album_count: 5,
+          track_count: 9,
+          has_photo: true,
+          listeners: 999,
+        },
+      ],
     });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore?genre=hardcore",
+      path: "/explore",
+    });
+
+    expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
+      "src",
+      "/api/catalog/artists/global-222/background?size=1280&v=artist-artwork-222&format=webp",
+    );
+  });
+
+  it("unmounts the genre hero after every artwork candidate fails", () => {
+    mockGenreDetail({ coverUrl: null, artists: [] });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore?genre=hardcore",
+      path: "/explore",
+    });
+
+    fireEvent.error(screen.getByAltText("hardcore genre cover"));
+
+    expect(screen.queryByAltText("hardcore genre cover")).toBeNull();
   });
 
   it("starts seeded radio from the canonical genre slug", async () => {
@@ -599,7 +659,7 @@ describe("Explore", () => {
     expect(screen.queryByText("Related Genre 7")).toBeNull();
   });
 
-  it("falls back related genre mini-card artwork through page genre, canonical genre, and top artist photo", () => {
+  it("uses available top artist artwork without probing missing genre covers", () => {
     mockGenreDetail({
       relatedGenres: [
         {
@@ -624,22 +684,40 @@ describe("Explore", () => {
     const card = screen.getByRole("button", { name: /Post-hardcore/i });
     const image = card.querySelector("img");
 
-    expect(image).toHaveAttribute(
-      "src",
-      "/api/genres/post-hardcore-scene/cover?size=640&format=webp",
-    );
-
-    fireEvent.error(image!);
-    expect(card.querySelector("img")).toHaveAttribute(
-      "src",
-      "/api/genres/post-hardcore/cover?size=640&format=webp",
-    );
-
-    fireEvent.error(card.querySelector("img")!);
+    expect(image).toHaveAttribute("loading", "eager");
+    expect(image).toHaveAttribute("decoding", "async");
     expect(card.querySelector("img")).toHaveAttribute(
       "src",
       "/api/artists/42/photo?size=640&format=webp",
     );
+  });
+
+  it("unmounts exhausted related genre artwork so fresh data can remount it", () => {
+    mockGenreDetail({
+      relatedGenres: [
+        {
+          slug: "emo",
+          page_slug: "emo",
+          name: "Emo",
+          relation_type: "related",
+          relation_label: "Related",
+          artist_count: 1,
+          album_count: 0,
+          cover_url: null,
+          top_artist_photo_url: null,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore?genre=hardcore",
+      path: "/explore",
+    });
+    const card = screen.getByRole("button", { name: /Emo/i });
+
+    fireEvent.error(card.querySelector("img")!);
+
+    expect(card.querySelector("img")).toBeNull();
   });
 
   it("keeps the full public genre grid on desktop", () => {
@@ -654,6 +732,72 @@ describe("Explore", () => {
     expect(screen.getByText("Genre Artist 13")).toBeInTheDocument();
     expect(screen.getByText("Genre Album 13")).toBeInTheDocument();
   });
+
+  it("keeps inherited taxonomy members out of the primary genre grids", () => {
+    viewportState.isDesktop = true;
+    mockGenreDetail({
+      artistCount: 2,
+      albumCount: 2,
+      trackCount: 12,
+      artists: [
+        {
+          artist_id: 1,
+          artist_name: "Direct Punk Artist",
+          album_count: 1,
+          track_count: 3,
+          has_photo: false,
+          listeners: 0,
+          membership: "direct",
+        },
+        {
+          artist_id: 2,
+          artist_name: "Inherited Hardcore Artist",
+          album_count: 1,
+          track_count: 9,
+          has_photo: false,
+          listeners: 0,
+          membership: "inherited",
+        },
+      ],
+      albums: [
+        {
+          album_id: 1,
+          artist: "Direct Punk Artist",
+          name: "Direct Punk Album",
+          year: "2024",
+          track_count: 3,
+          has_cover: false,
+          membership: "direct",
+        },
+        {
+          album_id: 2,
+          artist: "Inherited Hardcore Artist",
+          name: "Inherited Hardcore Album",
+          year: "2023",
+          track_count: 9,
+          has_cover: false,
+          membership: "inherited",
+        },
+      ],
+    });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore?genre=hardcore",
+      path: "/explore",
+    });
+
+    expect(screen.getByText("Direct Punk Artist")).toBeInTheDocument();
+    expect(screen.queryByText("Inherited Hardcore Artist")).toBeNull();
+    expect(screen.getByText("Direct Punk Album")).toBeInTheDocument();
+    expect(screen.queryByText("Inherited Hardcore Album")).toBeNull();
+    const hero = screen
+      .getByRole("heading", { level: 1, name: "hardcore" })
+      .closest("section");
+    expect(hero).not.toBeNull();
+    expect(within(hero!).getByText("1 artist")).toBeInTheDocument();
+    expect(within(hero!).getByText("1 album")).toBeInTheDocument();
+    expect(within(hero!).getByText("3 tracks")).toBeInTheDocument();
+  });
 });
 
 function mockGenreDetail(
@@ -661,13 +805,27 @@ function mockGenreDetail(
     coverUrl?: string | null;
     artists?: Array<{
       artist_id: number;
+      global_artist_uid?: string;
       artist_name: string;
       artist_slug?: string;
       album_count: number;
       track_count: number;
       has_photo: boolean;
       listeners: number | null;
+      membership?: "direct" | "inherited";
     }>;
+    albums?: Array<{
+      album_id: number;
+      artist: string;
+      name: string;
+      year: string;
+      track_count: number;
+      has_cover: boolean;
+      membership?: "direct" | "inherited";
+    }>;
+    artistCount?: number;
+    albumCount?: number;
+    trackCount?: number;
     relatedGenres?: Array<Record<string, unknown>>;
     shows?: Array<Record<string, unknown>>;
   } = {},
@@ -691,7 +849,7 @@ function mockGenreDetail(
       };
     }
 
-    if (url === "/api/genres/hardcore?view=genre-detail-v5") {
+    if (url === "/api/catalog/genres/hardcore") {
       return {
         data: {
           id: 1,
@@ -703,9 +861,9 @@ function mockGenreDetail(
             overrides.coverUrl === undefined
               ? "/api/genres/hardcore/cover?size=640&format=webp"
               : overrides.coverUrl,
-          artist_count: 13,
-          album_count: 13,
-          track_count: 39,
+          artist_count: overrides.artistCount ?? 13,
+          album_count: overrides.albumCount ?? 13,
+          track_count: overrides.trackCount ?? 39,
           related_genres: overrides.relatedGenres || [],
           artists: Array.from({ length: 13 }, (_, index) => ({
             artist_id: index + 1,
@@ -730,6 +888,11 @@ function mockGenreDetail(
             track_count: 1,
             has_cover: true,
           })),
+          ...(overrides.albums
+            ? {
+                albums: overrides.albums,
+              }
+            : {}),
           shows: overrides.shows || [],
         },
         loading: false,

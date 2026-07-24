@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.repositories.field_locks import list_locked_fields, lock_fields
+from crate.db.repositories.global_catalog_dirty_sources import (
+    enqueue_local_dirty_source,
+)
 from crate.db.repositories.library_shared import coerce_uuid_or_none
 from crate.db.tx import optional_scope
 
@@ -41,6 +44,12 @@ def _artist_metadata_snapshot(artist: LibraryArtist) -> dict[str, Any]:
         "artist_type": artist.artist_type,
         "bandcamp_url": artist.bandcamp_url,
     }
+
+
+def _required_artist_id(artist: LibraryArtist) -> int:
+    if artist.id is None:
+        raise RuntimeError(f"Library artist {artist.name!r} is missing numeric id")
+    return artist.id
 
 
 def update_artist_metadata(
@@ -76,6 +85,7 @@ def update_artist_metadata(
         ).scalar_one_or_none()
         if artist is None:
             return None
+        numeric_artist_id = _required_artist_id(artist)
 
         before = _artist_metadata_snapshot(artist)
         for key, value in values.items():
@@ -90,7 +100,7 @@ def update_artist_metadata(
             artist.updated_at = datetime.now(timezone.utc)
             lock_fields(
                 entity_type="artist",
-                entity_id=int(artist.id),
+                entity_id=numeric_artist_id,
                 field_names=changed_fields,
                 locked_by_user_id=locked_by_user_id,
                 reason="Manual artist metadata edit",
@@ -122,10 +132,11 @@ def update_artist_enrichment(
         ).scalar_one_or_none()
         if artist is None:
             return
+        numeric_artist_id = _required_artist_id(artist)
 
         locked_fields = list_locked_fields(
             entity_type="artist",
-            entity_id=int(artist.id),
+            entity_id=numeric_artist_id,
             session=s,
         )
         field_map = {
@@ -184,13 +195,40 @@ def update_artist_has_photo(name: str, *, session: Session | None = None) -> Non
 
 def delete_artist(name: str, *, session: Session | None = None) -> None:
     def _impl(s: Session) -> None:
-        album_ids = (
-            s.execute(select(LibraryAlbum.id).where(LibraryAlbum.artist == name))
-            .scalars()
-            .all()
-        )
+        artist_entity_uid = s.execute(
+            select(LibraryArtist.entity_uid).where(LibraryArtist.name == name).limit(1)
+        ).scalar_one_or_none()
+        albums = s.execute(
+            select(LibraryAlbum.id, LibraryAlbum.entity_uid).where(
+                LibraryAlbum.artist == name
+            )
+        ).all()
+        album_ids = [int(album_id) for album_id, _entity_uid in albums]
         if album_ids:
+            track_entity_uids = (
+                s.execute(
+                    select(LibraryTrack.entity_uid).where(
+                        LibraryTrack.album_id.in_(album_ids)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for entity_uid in track_entity_uids:
+                if entity_uid is not None:
+                    enqueue_local_dirty_source(
+                        "track", str(entity_uid), "delete", session=s
+                    )
+            for _album_id, entity_uid in albums:
+                if entity_uid is not None:
+                    enqueue_local_dirty_source(
+                        "album", str(entity_uid), "delete", session=s
+                    )
             s.execute(delete(LibraryTrack).where(LibraryTrack.album_id.in_(album_ids)))
+        if artist_entity_uid is not None:
+            enqueue_local_dirty_source(
+                "artist", str(artist_entity_uid), "delete", session=s
+            )
         s.execute(delete(LibraryAlbum).where(LibraryAlbum.artist == name))
         s.execute(delete(LibraryArtist).where(LibraryArtist.name == name))
 
@@ -200,10 +238,31 @@ def delete_artist(name: str, *, session: Session | None = None) -> None:
 
 def delete_album(path: str, *, session: Session | None = None) -> None:
     def _impl(s: Session) -> None:
-        album_id = s.execute(
-            select(LibraryAlbum.id).where(LibraryAlbum.path == path).limit(1)
-        ).scalar_one_or_none()
-        if album_id is not None:
+        album = s.execute(
+            select(LibraryAlbum.id, LibraryAlbum.entity_uid)
+            .where(LibraryAlbum.path == path)
+            .limit(1)
+        ).first()
+        if album is not None:
+            album_id, album_entity_uid = album
+            track_entity_uids = (
+                s.execute(
+                    select(LibraryTrack.entity_uid).where(
+                        LibraryTrack.album_id == album_id
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for entity_uid in track_entity_uids:
+                if entity_uid is not None:
+                    enqueue_local_dirty_source(
+                        "track", str(entity_uid), "delete", session=s
+                    )
+            if album_entity_uid is not None:
+                enqueue_local_dirty_source(
+                    "album", str(album_entity_uid), "delete", session=s
+                )
             s.execute(delete(LibraryTrack).where(LibraryTrack.album_id == album_id))
             s.execute(delete(LibraryAlbum).where(LibraryAlbum.id == album_id))
 
@@ -213,6 +272,11 @@ def delete_album(path: str, *, session: Session | None = None) -> None:
 
 def delete_track(path: str, *, session: Session | None = None) -> None:
     def _impl(s: Session) -> None:
+        entity_uid = s.execute(
+            select(LibraryTrack.entity_uid).where(LibraryTrack.path == path).limit(1)
+        ).scalar_one_or_none()
+        if entity_uid is not None:
+            enqueue_local_dirty_source("track", str(entity_uid), "delete", session=s)
         s.execute(delete(LibraryTrack).where(LibraryTrack.path == path))
 
     with optional_scope(session) as s:

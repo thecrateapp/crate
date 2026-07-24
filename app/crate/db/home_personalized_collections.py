@@ -15,16 +15,33 @@ from crate.db.home_builders import (
     _build_suggested_albums,
     _get_home_hero,
     _get_library_artist,
+    _global_rows_for_mix,
     _track_payload,
 )
 from crate.db.home_builder_curated_lists import SYSTEM_PLAYLIST_HOME_PREFIX
+from crate.db.home_builder_curated_lists import GLOBAL_ARTIST_CORE_HOME_PREFIX
+from crate.db.home_builder_global_recommendations import (
+    global_artist_uids_from_context,
+    global_recommended_track_rows,
+    global_suggested_albums,
+    merge_global_track_rows,
+    merge_suggested_albums,
+)
 from crate.db.home_context import (
     get_cached_home_context,
     merged_artists_from_context,
     recent_releases_from_context,
 )
+from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.repositories.playlists import get_playlist, get_playlist_tracks
 from crate.track_versions import dedupe_track_variants
+
+
+def _global_home_track_rows(context: dict, *, limit: int) -> list[dict]:
+    return global_recommended_track_rows(
+        global_artist_uids_from_context(context),
+        limit=limit,
+    )
 
 
 def get_home_mix(user_id: int, mix_id: str, limit: int = 40) -> dict | None:
@@ -41,8 +58,20 @@ def get_home_mix(user_id: int, mix_id: str, limit: int = 40) -> dict | None:
         limit=limit,
         recent_releases=recent_releases,
     )
+    global_rows = _global_rows_for_mix(
+        mix_id,
+        _global_home_track_rows(context, limit=max(limit, 40)),
+    )
     if not name or not rows:
-        return None
+        if not name or not global_rows:
+            return None
+        rows = global_rows
+    else:
+        rows = merge_global_track_rows(
+            rows,
+            global_rows,
+            limit=limit,
+        )
     rows = dedupe_track_variants(rows)
 
     return {
@@ -60,9 +89,17 @@ def get_home_mix(user_id: int, mix_id: str, limit: int = 40) -> dict | None:
 
 
 def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict | None:
-    mix = get_home_mix(user_id, playlist_id, limit=limit)
-    if mix:
-        return mix
+    core_prefix = "core-tracks-artist-"
+    if not playlist_id.startswith(
+        (
+            SYSTEM_PLAYLIST_HOME_PREFIX,
+            GLOBAL_ARTIST_CORE_HOME_PREFIX,
+            core_prefix,
+        )
+    ):
+        mix = get_home_mix(user_id, playlist_id, limit=limit)
+        if mix:
+            return mix
 
     if playlist_id.startswith(SYSTEM_PLAYLIST_HOME_PREFIX):
         try:
@@ -93,7 +130,28 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
             "tracks": [_track_payload(row) for row in tracks],
         }
 
-    core_prefix = "core-tracks-artist-"
+    if playlist_id.startswith(GLOBAL_ARTIST_CORE_HOME_PREFIX):
+        global_artist_uid = playlist_id.removeprefix(GLOBAL_ARTIST_CORE_HOME_PREFIX)
+        seed = get_global_radio_seed_tracks("artist", global_artist_uid, limit=limit)
+        if not seed:
+            return None
+        rows = list(seed.get("tracks") or [])[:limit]
+        if not rows:
+            return None
+        artist_name = str(seed.get("label") or rows[0].get("artist") or "Artist")
+        return {
+            "id": playlist_id,
+            "name": artist_name,
+            "description": f"The defining tracks from {artist_name}, shaped by what you keep coming back to.",
+            "artwork_tracks": _artwork_tracks(rows),
+            "artwork_artists": _artwork_artists(rows),
+            "track_count": len(rows),
+            "total_duration": sum(int(row.get("duration") or 0) for row in rows),
+            "badge": "Artist Set",
+            "kind": "core",
+            "tracks": [_track_payload(row) for row in rows],
+        }
+
     if not playlist_id.startswith(core_prefix):
         return None
 
@@ -154,12 +212,18 @@ def get_home_mixes(user_id: int) -> list[dict]:
         top_genres_lower=ctx["top_genres_lower"],
         mix_count=8,
         recent_releases=recent_releases,
+        global_track_rows=_global_home_track_rows(ctx, limit=64),
     )
 
 
 def get_home_suggested_albums(user_id: int) -> list[dict]:
     ctx = get_cached_home_context(user_id)
-    return _build_suggested_albums(recent_releases_from_context(ctx), 14)
+    local_albums = _build_suggested_albums(recent_releases_from_context(ctx), 14)
+    return merge_suggested_albums(
+        local_albums,
+        global_suggested_albums(14),
+        limit=14,
+    )
 
 
 def get_home_recommended_tracks(user_id: int) -> list[dict]:
@@ -168,6 +232,11 @@ def get_home_recommended_tracks(user_id: int) -> list[dict]:
         user_id,
         recent_releases=recent_releases_from_context(ctx),
         interest_artists_lower=ctx["interest_artists_lower"],
+        limit=18,
+    )
+    rows = merge_global_track_rows(
+        rows,
+        global_recommended_track_rows(global_artist_uids_from_context(ctx), limit=18),
         limit=18,
     )
     return [_track_payload(row) for row in rows]

@@ -40,6 +40,7 @@ import {
   fadeOutAndPause,
   getAnalyserNode,
   getCurrentTrackDuration,
+  getCurrentBufferedAheadSeconds,
   getCurrentTrackUrl,
   getPlayer,
   getPosition,
@@ -87,6 +88,7 @@ type MockGapless5Instance = {
   setPosition: MockFn;
   getPosition: MockFn;
   currentLength: MockFn;
+  getCurrentBufferedAheadSeconds: MockFn;
   getTrack: MockFn;
   getIndex: MockFn;
   getTracks: MockFn;
@@ -119,6 +121,7 @@ function mkMockInstance(
     setPosition: vi.fn(),
     getPosition: vi.fn().mockReturnValue(0),
     currentLength: vi.fn().mockReturnValue(0),
+    getCurrentBufferedAheadSeconds: vi.fn().mockReturnValue(0),
     getTrack: vi.fn().mockReturnValue(""),
     getIndex: vi.fn().mockReturnValue(0),
     getTracks: vi.fn().mockReturnValue([]),
@@ -161,6 +164,15 @@ afterEach(() => {
 describe("isCurrentTrackFullyBuffered", () => {
   it("returns false by default", () => {
     expect(isCurrentTrackFullyBuffered()).toBe(false);
+  });
+});
+
+describe("getCurrentBufferedAheadSeconds", () => {
+  it("returns the current engine buffer ahead without exposing the audio element", () => {
+    initPlayer();
+    mock.getCurrentBufferedAheadSeconds.mockReturnValue(6.5);
+
+    expect(getCurrentBufferedAheadSeconds()).toBe(6.5);
   });
 });
 
@@ -333,6 +345,42 @@ describe("initPlayer", () => {
 
     expect(isCurrentTrackFullyBuffered()).toBe(true);
     expect(onAnalyserReady).toHaveBeenCalledWith({});
+  });
+
+  it("clears the fully buffered marker when the current track advances", () => {
+    initPlayer();
+
+    const switched = (mock as unknown as Record<string, unknown>)
+      .onswitchtowebaudio as
+      | ((path: string, analyser: AnalyserNode) => void)
+      | undefined;
+    const next = (mock as unknown as Record<string, unknown>).onnext as
+      | ((from: string, to: string) => void)
+      | undefined;
+    switched?.("/tracks/1/stream", {} as AnalyserNode);
+    expect(isCurrentTrackFullyBuffered()).toBe(true);
+
+    next?.("/tracks/1/stream", "/tracks/2/stream");
+
+    expect(isCurrentTrackFullyBuffered()).toBe(false);
+  });
+
+  it("does not carry a decoded-buffer marker into a newly loading source", () => {
+    mock.getTrack.mockReturnValue("/tracks/2/stream");
+    initPlayer();
+
+    const switched = (mock as unknown as Record<string, unknown>)
+      .onswitchtowebaudio as
+      | ((path: string, analyser: AnalyserNode) => void)
+      | undefined;
+    const loadStart = (mock as unknown as Record<string, unknown>)
+      .onloadstart as ((path: string) => void) | undefined;
+    switched?.("/tracks/2/stream", {} as AnalyserNode);
+    expect(isCurrentTrackFullyBuffered()).toBe(true);
+
+    loadStart?.("/tracks/2/stream");
+
+    expect(isCurrentTrackFullyBuffered()).toBe(false);
   });
 });
 
@@ -507,6 +555,15 @@ describe("replaceTrack", () => {
     expect(mock.replaceTrack).toHaveBeenCalledWith(1, "/tracks/new/stream");
   });
 
+  it("restores sequential playlist indices after the underlying remove/insert", () => {
+    initPlayer();
+    mock.playlist.shuffledIndices = [2, 0, 1];
+
+    replaceTrack(1, "/tracks/new/stream");
+
+    expect(mock.playlist.shuffledIndices).toEqual([0, 1, 2]);
+  });
+
   it("is a no-op when no instance exists", () => {
     expect(() => replaceTrack(0, "/tracks/1/stream")).not.toThrow();
   });
@@ -533,6 +590,21 @@ describe("pause", () => {
     pause();
 
     expect(mock.pause).toHaveBeenCalled();
+  });
+
+  it("resumes the existing source without rebuilding or reloading the queue", async () => {
+    const onBuffering = vi.fn();
+    initPlayer({ onBuffering });
+    mock.getTracks.mockReturnValue(["/tracks/a.flac"]);
+
+    pause();
+    await play();
+
+    expect(mock.pause).toHaveBeenCalledTimes(1);
+    expect(mock.play).toHaveBeenCalledTimes(1);
+    expect(mock.removeAllTracks).not.toHaveBeenCalled();
+    expect(getTracks()).toEqual(["/tracks/a.flac"]);
+    expect(onBuffering).not.toHaveBeenCalled();
   });
 
   it("is a no-op when no instance exists", () => {

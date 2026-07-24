@@ -10,6 +10,9 @@ from crate.entity_ids import album_entity_uid
 from crate.db.orm.library import LibraryAlbum
 from crate.db.orm.library import LibraryArtist
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
+from crate.db.repositories.global_catalog_dirty_sources import (
+    enqueue_local_dirty_source,
+)
 from crate.db.repositories.library_shared import (
     allocate_unique_slug,
     coerce_uuid_or_none,
@@ -147,6 +150,7 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                     key_type="musicbrainz_releasegroupid",
                     key_value=requested_rgid,
                 )
+            enqueue_local_dirty_source("album", str(entity_uid), "upsert", session=s)
             return album_id
         insert_stmt = pg_insert(LibraryAlbum).values(
             storage_id=storage_id,
@@ -231,6 +235,7 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                 key_type="musicbrainz_releasegroupid",
                 key_value=requested_rgid,
             )
+        enqueue_local_dirty_source("album", str(entity_uid), "upsert", session=s)
         row = s.execute(
             select(LibraryAlbum.id).where(LibraryAlbum.path == data["path"]).limit(1)
         ).scalar_one()

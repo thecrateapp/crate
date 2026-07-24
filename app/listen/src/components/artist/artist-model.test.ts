@@ -76,6 +76,30 @@ describe("artist top track model", () => {
       }),
     );
   });
+
+  it("preserves global artist identity for remote top tracks", () => {
+    const track = buildArtistPlayerTrack(
+      {
+        id: "track-global-1",
+        global_track_uid: "track-global-1",
+        global_artist_uid: "artist-global-1",
+        global_album_uid: "album-global-1",
+        title: "0151",
+        artist: "High Vis",
+        album: "Blending",
+        duration: 181,
+        track: 1,
+      },
+      "High Vis",
+    );
+
+    expect(track).toMatchObject({
+      id: "track-global-1",
+      globalTrackUid: "track-global-1",
+      globalArtistUid: "artist-global-1",
+      globalAlbumUid: "album-global-1",
+    });
+  });
 });
 
 describe("artist show model", () => {

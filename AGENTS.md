@@ -61,7 +61,7 @@ app/listen-desktop/         Desktop listening app (Tauri)
 app/site/                   Marketing landing page
 app/tests/                  Python backend tests (35 files)
 tools/crate-cli/     Rust CLI for audio similarity (bliss-rs)
-docs/plans/                 Design documents
+docs/                       Canonical developer and operator documentation
 test-music/                 Local dev music (3 artists, not committed)
 ```
 

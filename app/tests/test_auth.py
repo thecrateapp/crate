@@ -7,10 +7,14 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 
 from tests.conftest import PG_AVAILABLE
+
+
+def _run(value):
+    return asyncio.run(value) if asyncio.iscoroutine(value) else value
 
 
 # ── Unit tests for crate.auth (no DB needed) ──────────────────────
@@ -249,7 +253,7 @@ class TestOAuthRedirectHelpers:
     def test_apple_app_site_association_uses_listen_app_id(self):
         from crate.api.auth import apple_app_site_association
 
-        response = asyncio.run(apple_app_site_association())
+        response = apple_app_site_association()
         payload = json.loads(response.body)
 
         assert payload == {
@@ -270,7 +274,7 @@ class TestOAuthRedirectHelpers:
     def test_apple_app_site_association_supports_multiple_app_ids(self):
         from crate.api.auth import apple_app_site_association
 
-        response = asyncio.run(apple_app_site_association())
+        response = apple_app_site_association()
         payload = json.loads(response.body)
 
         assert [item["appID"] for item in payload["applinks"]["details"]] == [
@@ -358,7 +362,7 @@ class TestOAuthStart:
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
         ):
-            result = asyncio.run(
+            result = _run(
                 oauth_start(
                     request,
                     "google",
@@ -395,7 +399,7 @@ class TestOAuthStart:
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
         ):
-            result = asyncio.run(
+            result = _run(
                 oauth_link(
                     request,
                     "google",
@@ -419,7 +423,7 @@ class TestOAuthStart:
         request.state.user = None
 
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
+            _run(
                 oauth_link(request, "google", OAuthStartRequest(return_to="/settings"))
             )
 
@@ -471,7 +475,7 @@ class TestOAuthStart:
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
         ):
-            asyncio.run(
+            _run(
                 oauth_start(
                     request,
                     "google",
@@ -506,7 +510,7 @@ class TestOAuthStart:
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
         ):
-            asyncio.run(
+            _run(
                 oauth_start(
                     request,
                     "google",
@@ -579,7 +583,7 @@ class TestOAuthStart:
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
         ):
-            asyncio.run(
+            _run(
                 oauth_start(
                     request,
                     "google",
@@ -629,7 +633,7 @@ class TestAuthUserAvatarProxy:
             ),
             patch("crate.api.auth.requests.get", return_value=upstream) as get,
         ):
-            response = asyncio.run(auth_user_avatar(self._request(), 7))
+            response = auth_user_avatar(self._request(), 7)
 
         assert response.body == b"avatar-bytes"
         assert response.headers["content-type"] == "image/jpeg"
@@ -646,7 +650,7 @@ class TestAuthUserAvatarProxy:
             return_value={"avatar": "https://example.test/avatar.jpg"},
         ):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.run(auth_user_avatar(self._request(), 7))
+                auth_user_avatar(self._request(), 7)
 
         assert exc_info.value.status_code == 404
 
@@ -707,7 +711,7 @@ class TestOAuthCallback:
                 return_value=("jwt-token", {"id": "sess-1"}, "refresh-token"),
             ),
         ):
-            response = asyncio.run(
+            response = _run(
                 oauth_callback(self._request(), "google", code="code", state="state")
             )
 
@@ -766,7 +770,7 @@ class TestOAuthCallback:
             ),
         ):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.run(
+                _run(
                     oauth_callback(
                         self._request(), "google", code="code", state="state"
                     )
@@ -812,7 +816,7 @@ class TestOAuthCallback:
             patch("crate.api.auth.create_user") as mock_create_user,
         ):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.run(
+                _run(
                     oauth_callback(
                         self._request(), "google", code="code", state="state"
                     )
@@ -853,7 +857,7 @@ class TestOAuthCallback:
             patch("crate.api.auth.consume_auth_invite") as mock_consume,
         ):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.run(
+                _run(
                     oauth_callback(
                         self._request(), "google", code="code", state="state"
                     )
@@ -926,7 +930,7 @@ class TestOAuthCallback:
                 return_value=("jwt-token", {"id": "sess-1"}, "refresh-token"),
             ),
         ):
-            response = asyncio.run(
+            response = _run(
                 oauth_callback(self._request(), "google", code="code", state="state")
             )
 
@@ -1095,6 +1099,57 @@ class TestLoginEndpoint:
             # check the Set-Cookie header directly
             set_cookie = resp.headers.get("set-cookie", "")
             assert "crate_session" in set_cookie
+
+    def test_set_login_cookies_clears_stale_auth_cookie_variants(self):
+        from crate.api import auth
+
+        response = Response()
+        request = Request(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": "/api/auth/login",
+                "headers": [(b"x-crate-app", b"listen-web")],
+                "query_string": b"",
+                "client": ("testclient", 50000),
+                "server": ("testserver", 80),
+                "scheme": "http",
+            }
+        )
+
+        auth._set_login_cookies(
+            response,
+            request,
+            "new-access-token",
+            "new-refresh-token",
+            app_id="listen-web",
+        )
+
+        set_cookies = [
+            value.decode("latin1")
+            for key, value in response.raw_headers
+            if key == b"set-cookie"
+        ]
+        assert any(
+            cookie.startswith('crate_session=""') and "Max-Age=0" in cookie
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith('crate_session_listen=""') and "Max-Age=0" in cookie
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith('crate_refresh_listen=""') and "Max-Age=0" in cookie
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith("crate_session_listen=new-access-token")
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith("crate_refresh_listen=new-refresh-token")
+            for cookie in set_cookies
+        )
 
     def test_login_wrong_password(self, test_app):
         fake_user = {
@@ -1585,9 +1640,7 @@ class TestAuthMiddleware:
             {"FORWARD_AUTH_SECRET": "", "CRATE_FORWARD_AUTH_SECRET": ""},
             clear=False,
         ):
-            user = asyncio.run(
-                AuthMiddleware(lambda *_args: None).resolve_user(request)
-            )
+            user = _run(AuthMiddleware(lambda *_args: None).resolve_user(request))
 
         assert user is None
 
@@ -1605,9 +1658,7 @@ class TestAuthMiddleware:
         with patch.dict(
             "os.environ", {"FORWARD_AUTH_SECRET": "shared-secret"}, clear=False
         ):
-            user = asyncio.run(
-                AuthMiddleware(lambda *_args: None).resolve_user(request)
-            )
+            user = _run(AuthMiddleware(lambda *_args: None).resolve_user(request))
 
         assert user == {
             "id": None,

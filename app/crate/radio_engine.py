@@ -42,6 +42,7 @@ from crate.db.paths_candidates import (
 )
 from crate.db.paths_similarity import _artist_affinity, make_radio_genre_overlap_scorer
 from crate.db.queries.paths import find_candidate_rows, find_seeded_radio_candidate_rows
+from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.queries.radio import (
     count_user_radio_signals,
     get_album_seed_context,
@@ -58,7 +59,6 @@ from crate.db.queries.paths import load_artist_radio_graphs
 from crate.db.repositories.radio import (
     persist_radio_feedback,
 )
-from crate.db.tx import read_scope
 from crate.track_versions import (
     canonical_track_title_key,
     dedupe_track_variants,
@@ -375,6 +375,106 @@ def _resolve_seed(
     return seed_vec, seed_label, _context_for_seed(seed_type, seed_value, seed_label)
 
 
+def _resolve_global_seed_tracks(
+    seed_type: str,
+    seed_value: str,
+    *,
+    session=None,
+    limit: int = 120,
+) -> dict | None:
+    return get_global_radio_seed_tracks(
+        seed_type,
+        seed_value,
+        limit=limit,
+        session=session,
+    )
+
+
+def _global_radio_track_payload(track: dict, distance: int = 0) -> dict:
+    return {
+        "track_id": track.get("track_id"),
+        "global_track_uid": track.get("global_track_uid"),
+        "global_artist_uid": track.get("global_artist_uid"),
+        "global_album_uid": track.get("global_album_uid"),
+        "entity_uid": track.get("entity_uid") or track.get("track_entity_uid"),
+        "title": track.get("title") or "",
+        "artist": track.get("artist") or "",
+        "artist_id": track.get("artist_id"),
+        "artist_entity_uid": track.get("artist_entity_uid"),
+        "album": track.get("album"),
+        "album_id": track.get("album_id"),
+        "album_entity_uid": track.get("album_entity_uid"),
+        "bpm": track.get("bpm"),
+        "audio_key": track.get("audio_key"),
+        "audio_scale": track.get("audio_scale"),
+        "energy": track.get("energy"),
+        "danceability": track.get("danceability"),
+        "valence": track.get("valence"),
+        "duration": track.get("duration"),
+        "year": track.get("year"),
+        "bliss_vector": list(track["bliss_vector"])
+        if track.get("bliss_vector")
+        else None,
+        "distance": distance,
+    }
+
+
+def _reload_global_tracks(session: dict, count: int) -> list[dict]:
+    tracks = list(session.get("global_tracks") or [])
+    if session.get("global_source_exhausted"):
+        return tracks
+
+    seed_type = str(session.get("seed_type") or "")
+    seed_value = str(session.get("seed_value") or "")
+    if not seed_type or not seed_value:
+        return tracks
+
+    next_limit = min(max(len(tracks) + max(count * 6, count), 120), 5_000)
+    if next_limit <= len(tracks):
+        return tracks
+
+    refreshed = _resolve_global_seed_tracks(
+        seed_type,
+        seed_value,
+        limit=next_limit,
+    )
+    if not refreshed:
+        return tracks
+
+    refreshed_tracks = list(refreshed.get("tracks") or [])
+    if len(refreshed_tracks) <= len(tracks):
+        session["global_source_exhausted"] = True
+        return tracks
+
+    session["global_tracks"] = refreshed_tracks
+    session["seed_label"] = refreshed.get("seed_label") or session.get("seed_label")
+    session["global_exhausted"] = False
+    session["global_source_exhausted"] = len(refreshed_tracks) < next_limit
+    return refreshed_tracks
+
+
+def _generate_global_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict]:
+    tracks = list(session.get("global_tracks") or [])
+    cursor = int(session.get("global_cursor") or 0)
+    if cursor >= len(tracks):
+        tracks = _reload_global_tracks(session, count)
+
+    excluded = set(session.get("excluded_global_track_uids") or [])
+    selected: list[dict] = []
+    while cursor < len(tracks) and len(selected) < count:
+        track = tracks[cursor]
+        cursor += 1
+        if track.get("global_track_uid") in excluded:
+            continue
+        selected.append(track)
+    session["global_cursor"] = cursor
+    queue_exhausted = session["global_cursor"] >= len(tracks)
+    session["global_exhausted"] = bool(
+        queue_exhausted and session.get("global_source_exhausted")
+    )
+    return [_global_radio_track_payload(track) for track in selected]
+
+
 def start_radio(
     user_id: int,
     mode: str = "seeded",
@@ -382,74 +482,104 @@ def start_radio(
     seed_value: str | None = None,
 ) -> dict | None:
     """Start a new radio session. Returns session with first batch of tracks."""
-    with read_scope() as db_session:
-        if mode == "seeded":
-            if not seed_type or not seed_value:
-                return None
-            resolved_seed = _resolve_seed(
-                user_id, seed_type, seed_value, session=db_session
-            )
-            if not resolved_seed:
-                return None
-            seed_vec, seed_label, seed_context = resolved_seed
-        elif mode == "discovery":
-            result = resolve_discovery_seed(user_id, session=db_session)
-            if not result:
-                return None
-            seed_vec, seed_label, seed_context = result
-            seed_type = "discovery"
-            seed_value = "auto"
-        else:
+    if mode == "seeded":
+        if not seed_type or not seed_value:
             return None
-
-        # Pre-seed with historical feedback
-        hist_liked, hist_disliked = load_feedback_history(user_id, session=db_session)
-        log.info(
-            "Radio start: %d historical likes, %d dislikes for user %d",
-            len(hist_liked),
-            len(hist_disliked),
-            user_id,
-        )
-
-        initial_target = seed_vec
-        if hist_liked:
-            hist_centroid = _centroid(hist_liked)
-            blend = min(0.15, 0.03 * len(hist_liked))
-            initial_target = _lerp(seed_vec, hist_centroid, blend)
-
-        session_id = str(uuid.uuid4())
-        session = {
-            "id": session_id,
-            "user_id": user_id,
-            "mode": mode,
-            "seed_type": seed_type,
-            "seed_value": seed_value,
-            "seed_label": seed_label,
-            "seed_vector": seed_vec,
-            "seed_artists": seed_context.get("seed_artists") or [],
-            "seed_genres": seed_context.get("seed_genres") or [],
-            "seed_track_ids": seed_context.get("seed_track_ids") or [],
-            "discovery_excluded_artist_keys": seed_context.get(
-                "discovery_excluded_artist_keys"
+        resolved_seed = _resolve_seed(user_id, seed_type, seed_value)
+        if not resolved_seed:
+            global_seed = _resolve_global_seed_tracks(
+                seed_type,
+                seed_value,
+                limit=max(_BATCH_SIZE * 6, 120),
             )
-            or [],
-            "initial_target": initial_target,
-            "current_target": initial_target,
-            "liked_vectors": [],
-            "disliked_vectors": hist_disliked[:10],
-            "used_track_ids": [],
-            "used_titles": [],
-            "used_song_keys": seed_context.get("seed_song_keys") or [],
-            "used_artist_counts": {},
-            "recent_artists": [],
-            "recent_tracks": [],
-            "track_count": 0,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+            if global_seed:
+                initial_limit = max(_BATCH_SIZE * 6, 120)
+                global_tracks = list(global_seed["tracks"])
+                session_id = str(uuid.uuid4())
+                session = {
+                    "id": session_id,
+                    "user_id": user_id,
+                    "mode": mode,
+                    "seed_type": seed_type,
+                    "seed_value": seed_value,
+                    "seed_label": global_seed["seed_label"],
+                    "radio_profile": "global_catalog",
+                    "global_tracks": global_tracks,
+                    "global_cursor": 0,
+                    "global_source_exhausted": len(global_tracks) < initial_limit,
+                    "liked_vectors": [],
+                    "disliked_vectors": [],
+                    "track_count": 0,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                tracks = _generate_global_batch(session, _BATCH_SIZE)
+                session["track_count"] = len(tracks)
+                _save_session(session)
+                return {
+                    "session_id": session_id,
+                    "mode": mode,
+                    "seed_label": global_seed["seed_label"],
+                    "tracks": tracks,
+                }
+            return None
+        seed_vec, seed_label, seed_context = resolved_seed
+    elif mode == "discovery":
+        result = resolve_discovery_seed(user_id)
+        if not result:
+            return None
+        seed_vec, seed_label, seed_context = result
+        seed_type = "discovery"
+        seed_value = "auto"
+    else:
+        return None
 
-        tracks = _generate_batch(session, db_session=db_session)
-        session["track_count"] = len(tracks)
-        _save_session(session)
+    hist_liked, hist_disliked = load_feedback_history(user_id)
+    log.info(
+        "Radio start: %d historical likes, %d dislikes for user %d",
+        len(hist_liked),
+        len(hist_disliked),
+        user_id,
+    )
+
+    initial_target = seed_vec
+    if hist_liked:
+        hist_centroid = _centroid(hist_liked)
+        blend = min(0.15, 0.03 * len(hist_liked))
+        initial_target = _lerp(seed_vec, hist_centroid, blend)
+
+    session_id = str(uuid.uuid4())
+    session = {
+        "id": session_id,
+        "user_id": user_id,
+        "mode": mode,
+        "seed_type": seed_type,
+        "seed_value": seed_value,
+        "seed_label": seed_label,
+        "seed_vector": seed_vec,
+        "seed_artists": seed_context.get("seed_artists") or [],
+        "seed_genres": seed_context.get("seed_genres") or [],
+        "seed_track_ids": seed_context.get("seed_track_ids") or [],
+        "discovery_excluded_artist_keys": seed_context.get(
+            "discovery_excluded_artist_keys"
+        )
+        or [],
+        "initial_target": initial_target,
+        "current_target": initial_target,
+        "liked_vectors": [],
+        "disliked_vectors": hist_disliked[:10],
+        "used_track_ids": [],
+        "used_titles": [],
+        "used_song_keys": seed_context.get("seed_song_keys") or [],
+        "used_artist_counts": {},
+        "recent_artists": [],
+        "recent_tracks": [],
+        "track_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    tracks = _generate_batch(session)
+    session["track_count"] = len(tracks)
+    _save_session(session)
 
     return {
         "session_id": session_id,
@@ -468,50 +598,78 @@ def next_tracks(session_id: str, count: int = _BATCH_SIZE) -> dict | None:
     if not session:
         return None
 
-    tracks = _generate_batch(session, count)
+    if session.get("radio_profile") == "global_catalog":
+        tracks = _generate_global_batch(session, count)
+    else:
+        tracks = _generate_batch(session, count)
     session["track_count"] += len(tracks)
     _save_session(session)
 
-    return {"session_id": session_id, "tracks": tracks}
+    result = {"session_id": session_id, "tracks": tracks}
+    if session.get("radio_profile") == "global_catalog" and session.get(
+        "global_exhausted"
+    ):
+        result["exhausted"] = True
+    return result
 
 
 # ── Feedback ──────────────────────────────────────────────────────
 
 
-def radio_feedback(session_id: str, track_id: int, action: str) -> dict | None:
+def radio_feedback(
+    session_id: str,
+    track_id: int | None,
+    action: str,
+    *,
+    global_track_uid: str | None = None,
+) -> dict | None:
     """Process like/dislike feedback — updates session AND persists to DB."""
     session = _load_session(session_id)
     if not session:
         return None
 
-    vec = get_track_bliss_vector(track_id)
+    vec = get_track_bliss_vector(track_id) if track_id is not None else None
+    if not vec and global_track_uid:
+        vec = _global_track_feedback_vector(session, global_track_uid)
     if not vec:
+        if (
+            session.get("radio_profile") == "global_catalog"
+            and global_track_uid
+            and action == "dislike"
+        ):
+            excluded = list(session.get("excluded_global_track_uids") or [])
+            if global_track_uid not in excluded:
+                excluded.append(global_track_uid)
+                session["excluded_global_track_uids"] = excluded
+                _save_session(session)
+            return {"status": "ok", "effect": "exclusion_added"}
         return {"status": "ok", "effect": "none"}
 
     if action == "like":
-        session["liked_vectors"].append(vec)
+        session.setdefault("liked_vectors", []).append(vec)
         liked = session["liked_vectors"]
         like_centroid = _centroid(liked)
         blend = min(0.4, 0.08 * len(liked))
-        session["current_target"] = _lerp(
-            session["initial_target"], like_centroid, blend
-        )
+        initial_target = session.get("initial_target") or vec
+        session.setdefault("initial_target", initial_target)
+        session["current_target"] = _lerp(initial_target, like_centroid, blend)
         effect = "target_shifted"
     elif action == "dislike":
-        session["disliked_vectors"].append(vec)
+        session.setdefault("disliked_vectors", []).append(vec)
         effect = "exclusion_added"
     else:
         return {"status": "ok", "effect": "none"}
 
     _save_session(session)
 
-    persist_radio_feedback(
-        user_id=session["user_id"],
-        track_id=track_id,
-        action=action,
-        bliss_vector=vec,
-        session_seed=session.get("seed_label", ""),
-    )
+    if track_id is not None:
+        persist_radio_feedback(
+            user_id=session["user_id"],
+            track_id=track_id,
+            action=action,
+            bliss_vector=vec,
+            session_seed=session.get("seed_label", ""),
+        )
 
     return {
         "status": "ok",
@@ -519,6 +677,19 @@ def radio_feedback(session_id: str, track_id: int, action: str) -> dict | None:
         "liked_count": len(session["liked_vectors"]),
         "disliked_count": len(session["disliked_vectors"]),
     }
+
+
+def _global_track_feedback_vector(
+    session: dict, global_track_uid: str
+) -> list[float] | None:
+    for track in session.get("global_tracks") or []:
+        if str(track.get("global_track_uid") or "") != global_track_uid:
+            continue
+        vector = track.get("bliss_vector")
+        if isinstance(vector, list) and vector:
+            return vector
+        return None
+    return None
 
 
 # ── Track generation ──────────────────────────────────────────────

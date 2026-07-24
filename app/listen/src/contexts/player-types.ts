@@ -1,5 +1,30 @@
+export type TrackOrigin = "local" | "remote";
+
+export interface RemoteTrackRef {
+  nodeUid: string;
+  nodeName: string;
+  remoteEntityUid: string;
+  streamUrl?: string;
+  streamUrlExpiresAt?: string;
+  playbackSession?: string;
+  availability: RemoteTrackAvailability;
+}
+
+export interface RemoteTrackAvailability {
+  catalog: boolean;
+  stream: boolean;
+  import: boolean;
+  stale?: boolean;
+  local?: boolean;
+  remote?: boolean;
+  healthy?: boolean;
+}
+
 export interface Track {
   id: string;
+  globalTrackUid?: string;
+  globalArtistUid?: string;
+  globalAlbumUid?: string;
   entityUid?: string;
   title: string;
   artist: string;
@@ -27,6 +52,8 @@ export interface Track {
   blissVector?: number[] | null;
   isSuggested?: boolean;
   suggestionSource?: "playlist";
+  origin?: TrackOrigin;
+  remote?: RemoteTrackRef;
 }
 
 export type RepeatMode = "off" | "one" | "all";

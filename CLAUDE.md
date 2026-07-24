@@ -51,7 +51,7 @@ app/site/                   Marketing landing page
 app/reference/              Scalar API docs viewer
 app/tests/                  Python backend tests (35 files)
 tools/grooveyard-bliss/     Rust CLI for audio similarity (bliss-rs)
-docs/plans/                 Design documents
+docs/                       Canonical developer and operator documentation
 test-music/                 Local dev music (3 artists, not committed)
 ```
 

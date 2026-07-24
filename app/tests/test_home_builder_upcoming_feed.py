@@ -90,19 +90,18 @@ def test_build_show_items_preserves_home_card_metadata():
     }
 
 
-def test_load_probable_setlists_uses_cached_values_and_fetches_missing(monkeypatch):
+def test_load_probable_setlists_uses_cached_values_and_queues_missing(monkeypatch):
     cached = {"Placebo": [{"title": "Pure Morning"}]}
-    fetched: list[str] = []
+    queued: list[list[str]] = []
 
     def fake_cached(artist_name: str):
         return cached.get(artist_name)
 
-    def fake_live(artist_name: str):
-        fetched.append(artist_name)
-        return [{"title": "Una historia con las manos"}]
-
     monkeypatch.setattr("crate.setlistfm.get_cached_probable_setlist", fake_cached)
-    monkeypatch.setattr("crate.setlistfm.get_probable_setlist", fake_live)
+    monkeypatch.setattr(
+        "crate.setlistfm.queue_probable_setlist_refreshes",
+        lambda names: queued.append(list(names)),
+    )
 
     result = _load_probable_setlists(
         ["Placebo", "Biznaga"],
@@ -111,31 +110,26 @@ def test_load_probable_setlists_uses_cached_values_and_fetches_missing(monkeypat
 
     assert result == {
         "Placebo": [{"title": "Pure Morning"}],
-        "Biznaga": [{"title": "Una historia con las manos"}],
     }
-    assert fetched == ["Biznaga"]
+    assert queued == [["Biznaga"]]
 
 
-def test_load_probable_setlists_limits_live_fetches(monkeypatch):
-    fetched: list[str] = []
+def test_load_probable_setlists_limits_background_refreshes(monkeypatch):
+    queued: list[list[str]] = []
 
     monkeypatch.setattr(
         "crate.setlistfm.get_cached_probable_setlist", lambda _artist_name: None
     )
 
-    def fake_live(artist_name: str):
-        fetched.append(artist_name)
-        return [{"title": artist_name}]
-
-    monkeypatch.setattr("crate.setlistfm.get_probable_setlist", fake_live)
+    monkeypatch.setattr(
+        "crate.setlistfm.queue_probable_setlist_refreshes",
+        lambda names: queued.append(list(names)),
+    )
 
     result = _load_probable_setlists(
         ["Artist A", "Artist B", "Artist C"],
         live_fetch_limit=2,
     )
 
-    assert result == {
-        "Artist A": [{"title": "Artist A"}],
-        "Artist B": [{"title": "Artist B"}],
-    }
-    assert fetched == ["Artist A", "Artist B"]
+    assert result == {}
+    assert queued == [["Artist A", "Artist B"]]

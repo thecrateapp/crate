@@ -21,16 +21,19 @@ def get_playlist_tracks(
                 SELECT
                     pt.id,
                     pt.playlist_id,
+                    pt.global_track_uid::text AS global_track_uid,
+                    gt.global_artist_uid::text AS global_artist_uid,
+                    gt.global_album_uid::text AS global_album_uid,
                     COALESCE(lt.id, pt.track_id) AS track_id,
                     COALESCE(lt.entity_uid::text, pt.track_entity_uid::text) AS track_entity_uid,
                     COALESCE(lt.storage_id::text, pt.track_storage_id::text) AS track_storage_id,
                     COALESCE(lt.path, pt.track_path) AS track_path,
-                    COALESCE(lt.title, NULLIF(pt.title, ''), lt.filename, 'Unknown') AS title,
-                    COALESCE(lt.artist, NULLIF(pt.artist, ''), '') AS artist,
-                    COALESCE(lt.album, NULLIF(pt.album, ''), '') AS album,
+                    COALESCE(lt.title, NULLIF(pt.title, ''), gt.canonical_title, lt.filename, 'Unknown') AS title,
+                    COALESCE(lt.artist, NULLIF(pt.artist, ''), gt.artist_name, '') AS artist,
+                    COALESCE(lt.album, NULLIF(pt.album, ''), gt.album_name, '') AS album,
                     CASE
                         WHEN COALESCE(pt.duration, 0) > 0 THEN pt.duration
-                        ELSE COALESCE(lt.duration, pt.duration, 0)
+                        ELSE COALESCE(lt.duration, gt.duration_seconds, pt.duration, 0)
                     END AS duration,
                     lt.bpm,
                     lt.audio_key,
@@ -76,13 +79,20 @@ def get_playlist_tracks(
                      AND lt_path.path = pt.track_path
                     WHERE pt.playlist_id = :playlist_id
                 ) pt
-                JOIN library_tracks lt
+                LEFT JOIN library_tracks lt
                   ON lt.id = pt.resolved_track_id
                  AND (lt.entity_uid IS NOT NULL OR lt.storage_id IS NOT NULL)
+                LEFT JOIN global_catalog_tracks gt
+                  ON gt.global_track_uid = pt.global_track_uid
                 LEFT JOIN library_albums alb
                   ON alb.id = lt.album_id
-                  OR (lt.album_id IS NULL AND alb.artist = COALESCE(lt.artist, pt.artist) AND alb.name = COALESCE(lt.album, pt.album))
-                LEFT JOIN library_artists ar ON ar.name = COALESCE(lt.artist, pt.artist)
+                  OR (
+                    lt.album_id IS NULL
+                    AND alb.artist = COALESCE(lt.artist, pt.artist, gt.artist_name)
+                    AND alb.name = COALESCE(lt.album, pt.album, gt.album_name)
+                  )
+                LEFT JOIN library_artists ar
+                  ON ar.name = COALESCE(lt.artist, pt.artist, gt.artist_name)
                 ORDER BY pt.position
                 """
                 ),

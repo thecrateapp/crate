@@ -13,7 +13,7 @@ import {
   setSmartCrossfadePreference,
   setSmartPlaylistSuggestionsCadencePreference,
   setSmartPlaylistSuggestionsPreference,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -226,6 +226,7 @@ function ToggleRow({
       </div>
       <button
         type="button"
+        aria-label={label}
         aria-pressed={checked}
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full border transition-colors ${
@@ -245,10 +246,15 @@ function ToggleRow({
 }
 
 const PLAYBACK_DELIVERY_OPTIONS: {
-  value: PlaybackDeliveryPolicy;
+  value: PlaybackDeliveryPreference;
   labelKey: string;
   descriptionKey: string;
 }[] = [
+  {
+    value: "auto",
+    labelKey: "settings.playback.delivery.auto",
+    descriptionKey: "settings.playback.delivery.autoDescription",
+  },
   {
     value: "balanced",
     labelKey: "settings.playback.delivery.balanced",
@@ -345,7 +351,7 @@ export function Settings() {
             </p>
           </div>
           <div
-            className="grid gap-2 sm:grid-cols-3"
+            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
             role="radiogroup"
             aria-label={t("settings.playback.streamQuality")}
           >
@@ -1128,14 +1134,40 @@ function ScrobbleSection() {
   >({});
   const [lbToken, setLbToken] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [remoteScrobblingEnabled, setRemoteScrobblingEnabled] = useState(false);
+  const [savingRemotePreference, setSavingRemotePreference] = useState(false);
 
   useEffect(() => {
-    api<Record<string, { connected: boolean; username?: string }>>(
-      "/api/me/scrobble/status",
-    )
-      .then(setStatus)
-      .catch(() => {});
+    void Promise.allSettled([
+      api<Record<string, { connected: boolean; username?: string }>>(
+        "/api/me/scrobble/status",
+      ).then(setStatus),
+      api<{ remote_scrobbling_enabled: boolean }>(
+        "/api/me/scrobble/preferences",
+      ).then((preference) =>
+        setRemoteScrobblingEnabled(preference.remote_scrobbling_enabled),
+      ),
+    ]);
   }, []);
+
+  const updateRemoteScrobbling = async (enabled: boolean) => {
+    const previous = remoteScrobblingEnabled;
+    setRemoteScrobblingEnabled(enabled);
+    setSavingRemotePreference(true);
+    try {
+      const preference = await api<{ remote_scrobbling_enabled: boolean }>(
+        "/api/me/scrobble/preferences",
+        "PUT",
+        { remote_scrobbling_enabled: enabled },
+      );
+      setRemoteScrobblingEnabled(preference.remote_scrobbling_enabled);
+    } catch {
+      setRemoteScrobblingEnabled(previous);
+      toast.error(t("settings.scrobbling.toasts.preferenceFailed"));
+    } finally {
+      setSavingRemotePreference(false);
+    }
+  };
 
   const handleLastfmConnect = async () => {
     setConnecting("lastfm");
@@ -1227,6 +1259,15 @@ function ScrobbleSection() {
       title={t("settings.scrobbling.title")}
       description={t("settings.scrobbling.description")}
     >
+      <div className={savingRemotePreference ? "opacity-70" : undefined}>
+        <ToggleRow
+          label={t("settings.scrobbling.remotePlays")}
+          description={t("settings.scrobbling.remotePlaysDescription")}
+          checked={remoteScrobblingEnabled}
+          onChange={(enabled) => void updateRemoteScrobbling(enabled)}
+        />
+      </div>
+
       {/* Last.fm */}
       <div className="flex items-center justify-between">
         <div className="min-w-0">

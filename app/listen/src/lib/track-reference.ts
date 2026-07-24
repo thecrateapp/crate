@@ -7,6 +7,7 @@ import {
 
 export interface TrackReferencePayload {
   track_id?: number;
+  global_track_uid?: string;
   entity_uid?: string;
   path?: string;
   title?: string;
@@ -27,6 +28,8 @@ export function toTrackReferencePayload(
 ): TrackReferencePayload {
   return {
     track_id: getPlayableTrackLibraryId(input),
+    global_track_uid:
+      input.globalTrackUid ?? input.global_track_uid ?? undefined,
     entity_uid: input.entityUid ?? input.entity_uid ?? undefined,
     path: input.path ?? undefined,
     title: input.title ?? undefined,

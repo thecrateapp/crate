@@ -27,7 +27,7 @@ class GenreArtistRef(BaseModel):
 class GenreAlbumRef(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    album_id: int
+    album_id: int | None = None
     album_slug: str | None = None
     artist: str
     artist_id: int | None = None
@@ -232,6 +232,7 @@ class GenreTaxonomyCoverUpdateResponse(BaseModel):
     ok: bool = True
     slug: str
     cover_url: str
+    task_id: str
 
 
 class GenreDeleteResponse(BaseModel):

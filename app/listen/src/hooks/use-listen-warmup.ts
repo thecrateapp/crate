@@ -254,6 +254,7 @@ export function collectHomeWarmupAssets(
       artistPhotoApiUrl(
         {
           artistId: artist.artist_id,
+          globalArtistUid: artist.global_artist_uid,
           artistEntityUid: artist.artist_entity_uid,
           artistSlug: artist.artist_slug,
           artistName: artist.artist_name,
@@ -324,9 +325,13 @@ export function useListenWarmup(user: AuthUser | null): void {
               () => undefined,
             ),
           (signal) =>
-            warmApiCache("/api/me/albums", signal).then(() => undefined),
+            warmApiCache("/api/catalog/me/albums", signal).then(
+              () => undefined,
+            ),
           (signal) =>
-            warmApiCache("/api/me/follows", signal).then(() => undefined),
+            warmApiCache("/api/catalog/me/follows", signal).then(
+              () => undefined,
+            ),
           (signal) =>
             warmApiCache("/api/me/upcoming", signal).then(() => undefined),
         ];

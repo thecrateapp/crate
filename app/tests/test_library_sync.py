@@ -8,6 +8,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from crate.entity_ids import artist_entity_uid
+
+
+ALBUM_ENTITY_UID = "22222222-2222-5222-8222-222222222222"
+
 
 def _create_test_library(base: Path):
     """Create a minimal test music library structure."""
@@ -34,7 +41,12 @@ def _create_test_library(base: Path):
 def _fake_upsert_scanned_album(
     *, artist_payload: dict, album_payload: dict, track_payloads: list[dict]
 ):
-    return artist_payload["name"], 1, {track["path"] for track in track_payloads}
+    return (
+        artist_payload["name"],
+        1,
+        ALBUM_ENTITY_UID,
+        {track["path"] for track in track_payloads},
+    )
 
 
 def _fake_upsert_artist(payload: dict):
@@ -45,6 +57,7 @@ class TestLibrarySyncFullSync:
     def test_full_sync_discovers_artists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             lib = _create_test_library(Path(tmpdir))
+            (lib / "Artist One" / "artist.jpg").write_bytes(b"photo")
             config = {
                 "library_path": str(lib),
                 "audio_extensions": [".flac", ".mp3"],
@@ -69,6 +82,7 @@ class TestLibrarySyncFullSync:
                 patch("crate.library_sync.delete_album"),
                 patch("crate.library_sync.mutagen.File", return_value=None),
                 patch("crate.library_sync.read_tags", return_value={}),
+                patch("crate.library_sync.queue_artwork_materialization") as mock_queue,
             ):
                 from crate.library_sync import LibrarySync
 
@@ -84,6 +98,13 @@ class TestLibrarySyncFullSync:
                         for call in mock_upsert_scanned.call_args_list
                     )
                     == 4
+                )
+                assert any(
+                    call.args[0].kind == "artist-photo"
+                    and call.args[0].entity_key
+                    == str(artist_entity_uid(name="Artist One"))
+                    and call.kwargs == {"reason": "library-sync"}
+                    for call in mock_queue.call_args_list
                 )
 
     def test_full_sync_skips_unchanged_artists(self):
@@ -148,6 +169,11 @@ class TestLibrarySyncFullSync:
 
 
 class TestSyncAlbum:
+    @pytest.fixture(autouse=True)
+    def _isolate_artwork_task_queue(self):
+        with patch("crate.library_sync.queue_artwork_materialization"):
+            yield
+
     def test_sync_album_preserves_existing_quality_metadata_for_unchanged_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             lib = Path(tmpdir)
@@ -224,6 +250,7 @@ class TestSyncAlbum:
             album_dir.mkdir(parents=True)
             (album_dir / "01.flac").write_bytes(b"\x00" * 1024)
             (album_dir / "02.flac").write_bytes(b"\x00" * 2048)
+            (album_dir / "cover.jpg").write_bytes(b"cover")
 
             config = {
                 "library_path": str(lib),
@@ -255,6 +282,7 @@ class TestSyncAlbum:
                         "title": "Track",
                     },
                 ),
+                patch("crate.library_sync.queue_artwork_materialization") as mock_queue,
             ):
                 from crate.library_sync import LibrarySync
 
@@ -265,6 +293,10 @@ class TestSyncAlbum:
                 assert result["total_size"] == 3072
                 assert "flac" in result["formats"]
                 assert len(mock_upsert_scanned.call_args.kwargs["track_payloads"]) == 2
+                queued_asset = mock_queue.call_args.args[0]
+                assert queued_asset.kind == "album-cover"
+                assert queued_asset.entity_key == ALBUM_ENTITY_UID
+                assert mock_queue.call_args.kwargs == {"reason": "library-sync"}
 
     def test_sync_album_refreshes_artist_summary_after_album_upsert(self):
         with tempfile.TemporaryDirectory() as tmpdir:

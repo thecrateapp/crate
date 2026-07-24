@@ -1,0 +1,7 @@
+{
+  "released_at": "2026-07-14T00:00:00Z",
+  "schema": "crate-taxonomy-release-v1",
+  "taxonomy_digest": "sha256:9d6af6a06c7b0d404820f2c4014d976a7251433ad3f61ddea3e03b7dc65c1de3",
+  "taxonomy_id": "crate-core",
+  "version": "1.0.0"
+}

@@ -8,8 +8,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/text/unicode/norm"
 )
 
 var yearPrefixRE = regexp.MustCompile(`^\d{4}\s*[-–]\s*`)
@@ -199,10 +201,13 @@ func publicAlbumSlug(value string, artistSlug string) string {
 }
 
 func slugify(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ToLower(norm.NFKD.String(strings.TrimSpace(value)))
 	var builder strings.Builder
 	previousDash := false
 	for _, r := range value {
+		if unicode.Is(unicode.Mn, r) || r > unicode.MaxASCII {
+			continue
+		}
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
 			builder.WriteRune(r)
 			previousDash = false

@@ -65,13 +65,33 @@ _tc_container = None  # Testcontainers instance, kept alive for session
 TEST_DB_NAME = "crate_test"
 
 
+def approve_federation_node(session, node_uid: str) -> None:
+    from sqlalchemy import text
+
+    session.execute(
+        text(
+            """
+            INSERT INTO federation_nodes
+                (node_uid, display_name, api_base_url, active_key_id, trust_state)
+            VALUES
+                (CAST(:node_uid AS uuid), 'Remote fixture', :api_base_url, 'key-1', 'approved')
+            ON CONFLICT (node_uid) DO UPDATE
+            SET trust_state = 'approved', disabled_at = NULL
+            """
+        ),
+        {
+            "node_uid": node_uid,
+            "api_base_url": f"https://{node_uid}.example.test",
+        },
+    )
+
+
 def _try_env_pg() -> bool:
     """Try connecting to a PG instance for testing.
 
     CRITICAL: always uses ``crate_test`` as database name, never the
-    main application database. The pg_db fixture does
-    ``DROP SCHEMA public CASCADE`` on every test — running that against
-    the real database would wipe all user data.
+    main application database. The pg_db fixture creates disposable
+    clones from a migrated template and drops only names it owns.
     """
     global PG_AVAILABLE, _test_dsn
     if not _HAS_PSYCOPG2:
@@ -191,54 +211,104 @@ atexit.register(_shutdown_tc)
 # ── Fixtures ───────────────────────────────────────────────────────
 
 
-@pytest.fixture
-def pg_db():
-    """Provide a clean test database with all tables created.
+@pytest.fixture(scope="session", autouse=True)
+def test_runtime_data_dir(tmp_path_factory):
+    previous = os.environ.get("DATA_DIR")
+    os.environ["DATA_DIR"] = str(tmp_path_factory.mktemp("crate_runtime_data"))
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("DATA_DIR", None)
+        else:
+            os.environ["DATA_DIR"] = previous
 
-    Drops and recreates the public schema on every test so tests are
-    fully isolated. The init_db() call creates all tables + seeds
-    defaults (admin user, genre taxonomy, etc.).
-    """
+
+@pytest.fixture
+def pg_db(pg_database_factory):
+    """Provide an isolated clone of the migrated and seeded test template."""
     if not PG_AVAILABLE or not _test_dsn:
         pytest.skip("PostgreSQL not available")
 
-    # FORCE all DB access to use crate_test for the duration of this
-    # fixture. Without this, init_db() and db functions would use the
-    # env var CRATE_POSTGRES_DB which may point at the real database.
-    os.environ["CRATE_POSTGRES_DB"] = TEST_DB_NAME
     if not _test_dsn.endswith(f"/{TEST_DB_NAME}"):
         raise RuntimeError(f"Refusing to run pg_db against non-test DSN: {_test_dsn!r}")
     original_admin_password = os.environ.get("DEFAULT_ADMIN_PASSWORD")
     if not original_admin_password:
         os.environ["DEFAULT_ADMIN_PASSWORD"] = "admin"
-
-    conn = psycopg2.connect(_test_dsn)
-    conn.autocommit = True
-    cur = conn.cursor()
-    cur.execute("DROP SCHEMA IF EXISTS public CASCADE")
-    cur.execute("CREATE SCHEMA public")
-    cur.execute("GRANT ALL ON SCHEMA public TO PUBLIC")
-    cur.close()
-    conn.close()
+    original_database = os.environ.get("CRATE_POSTGRES_DB")
+    database_name = pg_database_factory.create_clone()
+    os.environ["CRATE_POSTGRES_DB"] = database_name
 
     import crate.db as db_mod
 
-    # Reset the SQLAlchemy engine — it caches the DSN from first
-    # creation. Without this, transaction_scope() would still talk to
-    # the main database even though env says crate_test.
     from crate.db.engine import reset_engine
 
     reset_engine()
-
-    db_mod.init_db()
     try:
         yield db_mod
     finally:
         reset_engine()
+        if original_database is None:
+            os.environ.pop("CRATE_POSTGRES_DB", None)
+        else:
+            os.environ["CRATE_POSTGRES_DB"] = original_database
+        pg_database_factory.drop_database(database_name)
         if original_admin_password is None:
             os.environ.pop("DEFAULT_ADMIN_PASSWORD", None)
         else:
             os.environ["DEFAULT_ADMIN_PASSWORD"] = original_admin_password
+
+
+@pytest.fixture(scope="session")
+def pg_database_factory():
+    """Build the migrated/seeded PostgreSQL template once per pytest process."""
+    if not PG_AVAILABLE or not _test_dsn:
+        pytest.skip("PostgreSQL not available")
+    if not _test_dsn.endswith(f"/{TEST_DB_NAME}"):
+        raise RuntimeError(f"Refusing to template non-test DSN: {_test_dsn!r}")
+
+    from tests.postgres_test_database import PostgresTestDatabaseFactory
+
+    factory = PostgresTestDatabaseFactory(
+        base_dsn=_test_dsn,
+        database_prefix=TEST_DB_NAME,
+    )
+    original_database = os.environ.get("CRATE_POSTGRES_DB")
+    original_admin_password = os.environ.get("DEFAULT_ADMIN_PASSWORD")
+    if not original_admin_password:
+        os.environ["DEFAULT_ADMIN_PASSWORD"] = "admin"
+
+    def initialize(database_name: str) -> None:
+        import crate.db as db_mod
+        from crate.db.engine import reset_engine
+
+        os.environ["CRATE_POSTGRES_DB"] = database_name
+        reset_engine()
+        try:
+            db_mod.init_db()
+        finally:
+            reset_engine()
+
+    try:
+        factory.create_template_database(initialize)
+        if original_database is None:
+            os.environ.pop("CRATE_POSTGRES_DB", None)
+        else:
+            os.environ["CRATE_POSTGRES_DB"] = original_database
+        yield factory
+    finally:
+        from crate.db.engine import reset_engine
+
+        reset_engine()
+        if original_database is None:
+            os.environ.pop("CRATE_POSTGRES_DB", None)
+        else:
+            os.environ["CRATE_POSTGRES_DB"] = original_database
+        if original_admin_password is None:
+            os.environ.pop("DEFAULT_ADMIN_PASSWORD", None)
+        else:
+            os.environ["DEFAULT_ADMIN_PASSWORD"] = original_admin_password
+        factory.close()
 
 
 @pytest.fixture
@@ -270,6 +340,14 @@ def test_app():
         patch("crate.api._deps.load_config", return_value=mock_config),
         patch("crate.db.init_db"),
         patch("crate.api.cache_events.broadcast_invalidation"),
+        patch(
+            "crate.db.repositories.global_catalog_state.get_catalog_state",
+            return_value={"status": "ready"},
+        ),
+        patch(
+            "crate.api.catalog.get_catalog_state",
+            return_value={"status": "ready"},
+        ),
         patch("crate.api.auth.AuthMiddleware.resolve_user", _fake_resolve_user),
     ):
         from crate.api import create_app

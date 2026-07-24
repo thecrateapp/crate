@@ -30,6 +30,31 @@ class TestCreateTaskDedup:
         second = pg_db.create_task_dedup("enrich_artist", params)
         assert second is None
 
+    def test_promotes_a_pending_duplicate_to_the_best_explicit_priority(self, pg_db):
+        params = {"cache_key": "playback-variant"}
+        task_id = pg_db.create_task_dedup(
+            "process_new_content",
+            params,
+            dedup_key="playback-variant",
+            priority=2,
+            pool="playback",
+        )
+        assert task_id is not None
+
+        duplicate = pg_db.create_task_dedup(
+            "process_new_content",
+            params,
+            dedup_key="playback-variant",
+            priority=0,
+            pool="playback",
+        )
+
+        assert duplicate is None
+        task = pg_db.get_task(task_id)
+        assert task is not None
+        assert task["priority"] == 0
+        assert task["pool"] == "playback"
+
     def test_returns_none_for_duplicate_running(self, pg_db):
         """Same type+params while first is running should also be deduplicated."""
         params = {"artist": "Mogwai"}

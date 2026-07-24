@@ -1791,10 +1791,26 @@ def _handle_move_artist(task_id: str, params: dict, config: dict) -> dict:
     old_dir = lib / folder
     new_dir = lib / new_name
 
-    if old_dir.is_dir():
-        shutil.move(str(old_dir), str(new_dir))
+    if new_dir.exists() and old_dir != new_dir:
+        return {"error": f"Target artist directory already exists: {new_name}"}
 
-    rename_artist_in_db(name, new_name, folder)
+    moved_directory = False
+    if old_dir.is_dir() and old_dir != new_dir:
+        shutil.move(str(old_dir), str(new_dir))
+        moved_directory = True
+
+    try:
+        rename_artist_in_db(name, new_name, folder)
+    except Exception:
+        if moved_directory and new_dir.exists() and not old_dir.exists():
+            try:
+                shutil.move(str(new_dir), str(old_dir))
+            except Exception:
+                log.exception(
+                    "Failed to restore artist directory after database rename failure: %s",
+                    name,
+                )
+        raise
 
     try:
         import mutagen

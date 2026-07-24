@@ -149,6 +149,7 @@ function recentArtwork(item: HomeRecentItem): string | null {
         {
           artistId: item.artist_id,
           artistEntityUid: item.artist_entity_uid,
+          globalArtistUid: item.global_artist_uid,
           artistSlug: item.artist_slug,
           artistName: item.artist_name,
         },
@@ -161,6 +162,7 @@ function recentArtwork(item: HomeRecentItem): string | null {
       {
         albumId: item.album_id,
         albumEntityUid: item.album_entity_uid,
+        globalAlbumUid: item.global_album_uid,
         artistEntityUid: item.artist_entity_uid,
         albumSlug: item.album_slug,
         artistName: item.artist_name,
@@ -191,6 +193,7 @@ function radioArtwork(station: HomeRadioStation): string | null {
       albumCoverApiUrl(
         {
           albumId: station.album_id,
+          globalAlbumUid: station.global_album_uid,
           albumEntityUid: station.album_entity_uid,
           artistEntityUid: station.artist_entity_uid,
           albumSlug: station.album_slug,
@@ -205,6 +208,7 @@ function radioArtwork(station: HomeRadioStation): string | null {
     artistPhotoApiUrl(
       {
         artistId: station.artist_id,
+        globalArtistUid: station.global_artist_uid,
         artistEntityUid: station.artist_entity_uid,
         artistSlug: station.artist_slug,
         artistName: station.artist_name,
@@ -785,6 +789,7 @@ function RecentAlbumEntityRow({
     album: item.album_name,
     albumId: item.album_id,
     albumEntityUid: item.album_entity_uid,
+    globalAlbumUid: item.global_album_uid,
     albumSlug: item.album_slug,
     cover: artworkUrl ?? undefined,
   });
@@ -818,6 +823,7 @@ function RecentArtistEntityRow({
   const actions = useArtistActionEntries({
     artistId: item.artist_id,
     artistEntityUid: item.artist_entity_uid,
+    globalArtistUid: item.global_artist_uid,
     artistSlug: item.artist_slug,
     imageUrl: artworkUrl,
     name: item.artist_name,
@@ -1258,15 +1264,19 @@ export function SuggestedAlbumsSection({
         {albums.map((album) => (
           <AlbumCard
             key={`${
-              album.album_id ?? `${album.artist_name}-${album.album_name}`
+              album.global_album_uid ??
+              album.album_id ??
+              `${album.artist_name}-${album.album_name}`
             }`}
             artist={album.artist_name}
             album={album.album_name}
             albumId={album.album_id}
             albumEntityUid={album.album_entity_uid}
+            globalAlbumUid={album.global_album_uid}
             artistEntityUid={album.artist_entity_uid}
             albumSlug={album.album_slug}
             year={album.year}
+            cover={album.cover_url ?? undefined}
             layout="grid"
           />
         ))}
@@ -1401,7 +1411,12 @@ export function RadioStationsSection({
         {stations.map((station) => (
           <RadioStationCard
             key={`${station.type}-${
-              station.artist_id ?? station.album_id ?? station.title
+              station.seed_value ??
+              station.global_artist_uid ??
+              station.global_album_uid ??
+              station.artist_id ??
+              station.album_id ??
+              station.title
             }`}
             station={station}
             onPlay={() => onPlayStation(station)}
@@ -1435,9 +1450,12 @@ export function FavoriteArtistsSection({
       <SectionRail railRef={rail.railRef} fit="square-card">
         {artists.map((artist) => (
           <ArtistCard
-            key={artist.artist_id ?? artist.artist_name}
+            key={
+              artist.global_artist_uid ?? artist.artist_id ?? artist.artist_name
+            }
             name={artist.artist_name}
             artistId={artist.artist_id}
+            globalArtistUid={artist.global_artist_uid}
             artistEntityUid={artist.artist_entity_uid}
             artistSlug={artist.artist_slug}
             subtitle={t("common.playCount", { count: artist.play_count })}
@@ -1588,6 +1606,7 @@ export function openRecentItemPath(item: HomeRecentItem): string {
     return artistPagePath({
       artistId: item.artist_id,
       artistEntityUid: item.artist_entity_uid,
+      globalArtistUid: item.global_artist_uid,
       artistSlug: item.artist_slug,
       artistName: item.artist_name,
     });
@@ -1595,6 +1614,7 @@ export function openRecentItemPath(item: HomeRecentItem): string {
   return albumPagePath({
     albumId: item.album_id,
     albumEntityUid: item.album_entity_uid,
+    globalAlbumUid: item.global_album_uid,
     artistEntityUid: item.artist_entity_uid,
     albumSlug: item.album_slug,
     artistName: item.artist_name,

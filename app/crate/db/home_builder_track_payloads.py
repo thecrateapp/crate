@@ -18,7 +18,7 @@ def _track_payload(row: dict) -> dict:
         else None
     )
     bliss_vector = row.get("bliss_vector")
-    return {
+    payload = {
         "track_id": row.get("track_id"),
         "track_entity_uid": track_entity_uid,
         "track_path": row.get("track_path"),
@@ -48,36 +48,46 @@ def _track_payload(row: dict) -> dict:
         "release_week_label": row.get("release_week_label"),
         "source_release_date": row.get("source_release_date"),
     }
+    for key in ("global_track_uid", "global_artist_uid", "global_album_uid"):
+        if row.get(key):
+            payload[key] = row.get(key)
+    return payload
 
 
 def _artwork_tracks(rows: list[dict], limit: int = 4) -> list[dict]:
     artwork: list[dict] = []
     seen: set[tuple[object, str, str]] = set()
     for row in rows:
-        key = (row.get("album_id"), row.get("artist") or "", row.get("album") or "")
+        key = (
+            row.get("global_album_uid") or row.get("album_id"),
+            row.get("artist") or "",
+            row.get("album") or "",
+        )
         if key in seen:
             continue
         seen.add(key)
-        artwork.append(
-            {
-                "artist": row.get("artist"),
-                "artist_id": row.get("artist_id"),
-                "artist_entity_uid": (
-                    str(row["artist_entity_uid"])
-                    if row.get("artist_entity_uid") is not None
-                    else None
-                ),
-                "artist_slug": row.get("artist_slug"),
-                "album": row.get("album"),
-                "album_id": row.get("album_id"),
-                "album_entity_uid": (
-                    str(row["album_entity_uid"])
-                    if row.get("album_entity_uid") is not None
-                    else None
-                ),
-                "album_slug": row.get("album_slug"),
-            }
-        )
+        item = {
+            "artist": row.get("artist"),
+            "artist_id": row.get("artist_id"),
+            "artist_entity_uid": (
+                str(row["artist_entity_uid"])
+                if row.get("artist_entity_uid") is not None
+                else None
+            ),
+            "artist_slug": row.get("artist_slug"),
+            "album": row.get("album"),
+            "album_id": row.get("album_id"),
+            "album_entity_uid": (
+                str(row["album_entity_uid"])
+                if row.get("album_entity_uid") is not None
+                else None
+            ),
+            "album_slug": row.get("album_slug"),
+        }
+        for global_key in ("global_artist_uid", "global_album_uid"):
+            if row.get(global_key):
+                item[global_key] = row.get(global_key)
+        artwork.append(item)
         if len(artwork) >= limit:
             break
     return artwork
@@ -87,22 +97,27 @@ def _artwork_artists(rows: list[dict], limit: int = 4) -> list[dict]:
     artwork: list[dict] = []
     seen: set[object] = set()
     for row in rows:
-        artist_key = row.get("artist_id") or (row.get("artist") or "").strip().lower()
+        artist_key = (
+            row.get("global_artist_uid")
+            or row.get("artist_id")
+            or (row.get("artist") or "").strip().lower()
+        )
         if not artist_key or artist_key in seen:
             continue
         seen.add(artist_key)
-        artwork.append(
-            {
-                "artist_name": row.get("artist") or "",
-                "artist_id": row.get("artist_id"),
-                "artist_entity_uid": (
-                    str(row["artist_entity_uid"])
-                    if row.get("artist_entity_uid") is not None
-                    else None
-                ),
-                "artist_slug": row.get("artist_slug"),
-            }
-        )
+        item = {
+            "artist_name": row.get("artist") or "",
+            "artist_id": row.get("artist_id"),
+            "artist_entity_uid": (
+                str(row["artist_entity_uid"])
+                if row.get("artist_entity_uid") is not None
+                else None
+            ),
+            "artist_slug": row.get("artist_slug"),
+        }
+        if row.get("global_artist_uid"):
+            item["global_artist_uid"] = row.get("global_artist_uid")
+        artwork.append(item)
         if len(artwork) >= limit:
             break
     return artwork

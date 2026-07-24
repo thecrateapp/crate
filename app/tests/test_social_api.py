@@ -293,6 +293,18 @@ class TestSocialProfilePage:
                 return_value=dict(_AFFINITY),
             ),
             patch(
+                "crate.api.social.get_profile_card_summary",
+                return_value={
+                    "top_genre": None,
+                    "stats": {},
+                    "bandcamp_contributions": 0,
+                },
+            ),
+            patch(
+                "crate.api.social.get_profile_contributions_preview",
+                return_value=[],
+            ),
+            patch(
                 "crate.api.social.get_followers",
                 return_value=_FOLLOWERS,
             ),
@@ -307,6 +319,7 @@ class TestSocialProfilePage:
             assert data["username"] == "listener"
             assert data["followers_preview"] == _FOLLOWERS
             assert data["following_preview"] == _FOLLOWING
+            assert data["contributions_preview"] == []
             assert len(data["followers_preview"]) == 2
             assert len(data["following_preview"]) == 1
 

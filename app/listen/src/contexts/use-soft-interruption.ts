@@ -11,6 +11,7 @@ import { isOnline as isRuntimeOnline } from "@/lib/capacitor";
 import {
   fadeInAndPlay as gpFadeInAndPlay,
   fadeOutAndPause as gpFadeOutAndPause,
+  getCurrentBufferedAheadSeconds,
   isCurrentTrackFullyBuffered,
   pause as gpPause,
   restoreVolume as gpRestoreVolume,
@@ -20,6 +21,8 @@ const STREAM_STALL_GRACE_MS = 2500;
 const RECOVERY_RETRY_MS = 3000;
 const STREAM_PROBE_TIMEOUT_MS = 4000;
 const SOFT_PAUSE_FADE_MS = 220;
+export const BUFFERED_AHEAD_SAFE_SECONDS = 5;
+export const BUFFERED_AHEAD_CRITICAL_SECONDS = 1.5;
 
 export const PLAYBACK_NEEDS_USER_GESTURE_EVENT =
   "crate:playback-needs-user-gesture";
@@ -31,6 +34,13 @@ interface UseSoftInterruptionOptions {
   bufferingIntentRef: MutableRefObject<boolean>;
   commitIsPlaying: (value: boolean) => void;
   commitIsBuffering: (value: boolean) => void;
+  onPlaybackStall?: () => void;
+  onPlaybackStallEnded?: (
+    durationMs: number,
+    bufferedAheadSeconds: number,
+  ) => void;
+  onPlaybackRecovered?: (attempt: number) => void;
+  recoverCurrentTrack?: () => Promise<boolean>;
 }
 
 export interface SoftInterruptionController {
@@ -64,14 +74,28 @@ export function useSoftInterruption({
   bufferingIntentRef,
   commitIsPlaying,
   commitIsBuffering,
+  onPlaybackStall,
+  onPlaybackStallEnded,
+  onPlaybackRecovered,
+  recoverCurrentTrack,
 }: UseSoftInterruptionOptions): SoftInterruptionController {
   const softInterruptionReasonRef = useRef<"offline" | "stream" | null>(null);
   const shouldAutoResumeAfterInterruptionRef = useRef(false);
   const stallTimerRef = useRef<number | null>(null);
   const recoveryTimerRef = useRef<number | null>(null);
   const recoveryProbeInFlightRef = useRef(false);
+  const recoveryFailuresRef = useRef(0);
+  const interruptionStartedAtRef = useRef<number | null>(null);
   // Forward-declared so callbacks can reach the latest implementation.
   const maybeResumeRef = useRef<() => Promise<void>>(async () => {});
+  const scheduleStallProtectionRef = useRef<() => void>(() => {});
+
+  const hasSafeBufferedAhead = useCallback(
+    () =>
+      isCurrentTrackFullyBuffered() ||
+      getCurrentBufferedAheadSeconds() >= BUFFERED_AHEAD_SAFE_SECONDS,
+    [],
+  );
 
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current != null) {
@@ -134,7 +158,7 @@ export function useSoftInterruption({
       // The audio is already in RAM — no network dependency. Interrupting
       // would pause a perfectly-playing track. Defensive guard so every
       // caller (offline event, error, stall timer) is consistent.
-      if (isCurrentTrackFullyBuffered()) return;
+      if (hasSafeBufferedAhead()) return;
       if (softInterruptionReasonRef.current) {
         // Upgrade to "offline" if a stream interruption is later revealed
         // to be a network issue.
@@ -147,7 +171,10 @@ export function useSoftInterruption({
 
       softInterruptionReasonRef.current = reason;
       shouldAutoResumeAfterInterruptionRef.current = true;
+      onPlaybackStall?.();
+      interruptionStartedAtRef.current = Date.now();
       recoveryProbeInFlightRef.current = false;
+      recoveryFailuresRef.current = 0;
       clearStallTimer();
       clearRecoveryTimer();
       bufferingIntentRef.current = false;
@@ -169,18 +196,28 @@ export function useSoftInterruption({
       clearStallTimer,
       commitIsBuffering,
       currentTrackRef,
+      hasSafeBufferedAhead,
       isPlayingRef,
+      onPlaybackStall,
       scheduleRecoveryCheck,
     ],
   );
 
   const cancelSoftInterruption = useCallback(() => {
+    if (interruptionStartedAtRef.current !== null) {
+      onPlaybackStallEnded?.(
+        Math.max(0, Date.now() - interruptionStartedAtRef.current),
+        getCurrentBufferedAheadSeconds(),
+      );
+      interruptionStartedAtRef.current = null;
+    }
     softInterruptionReasonRef.current = null;
     shouldAutoResumeAfterInterruptionRef.current = false;
     recoveryProbeInFlightRef.current = false;
+    recoveryFailuresRef.current = 0;
     clearStallTimer();
     clearRecoveryTimer();
-  }, [clearRecoveryTimer, clearStallTimer]);
+  }, [clearRecoveryTimer, clearStallTimer, onPlaybackStallEnded]);
 
   const settleAfterAppLifecycle = useCallback(() => {
     // Returning from background should be inert: keep the current
@@ -190,6 +227,8 @@ export function useSoftInterruption({
     softInterruptionReasonRef.current = null;
     shouldAutoResumeAfterInterruptionRef.current = false;
     recoveryProbeInFlightRef.current = false;
+    recoveryFailuresRef.current = 0;
+    interruptionStartedAtRef.current = null;
     bufferingIntentRef.current = false;
     clearStallTimer();
     clearRecoveryTimer();
@@ -209,6 +248,8 @@ export function useSoftInterruption({
     softInterruptionReasonRef.current = "stream";
     shouldAutoResumeAfterInterruptionRef.current = false;
     recoveryProbeInFlightRef.current = false;
+    recoveryFailuresRef.current = 0;
+    interruptionStartedAtRef.current = null;
     bufferingIntentRef.current = false;
     clearStallTimer();
     clearRecoveryTimer();
@@ -239,6 +280,12 @@ export function useSoftInterruption({
         softInterruptionReasonRef.current
       )
         return;
+      const bufferedAhead = getCurrentBufferedAheadSeconds();
+      if (bufferedAhead >= BUFFERED_AHEAD_SAFE_SECONDS) return;
+      if (bufferedAhead > BUFFERED_AHEAD_CRITICAL_SECONDS) {
+        scheduleStallProtectionRef.current();
+        return;
+      }
       void isRuntimeOnline().then((online) => {
         beginSoftInterruption(online ? "stream" : "offline");
       });
@@ -250,6 +297,8 @@ export function useSoftInterruption({
     isPlayingRef,
   ]);
 
+  scheduleStallProtectionRef.current = scheduleStallProtection;
+
   maybeResumeRef.current = async () => {
     if (!shouldAutoResumeAfterInterruptionRef.current) return;
     if (!currentTrackRef.current || recoveryProbeInFlightRef.current) return;
@@ -258,6 +307,28 @@ export function useSoftInterruption({
     try {
       const available = await probeCurrentTrackAvailability();
       if (!available) {
+        recoveryFailuresRef.current += 1;
+        if (
+          recoveryFailuresRef.current >= 2 &&
+          recoveryFailuresRef.current <= 3 &&
+          recoverCurrentTrack
+        ) {
+          const refreshed = await recoverCurrentTrack();
+          if (refreshed) {
+            onPlaybackRecovered?.(recoveryFailuresRef.current);
+            return;
+          }
+        }
+        if (recoveryFailuresRef.current > 3) {
+          shouldAutoResumeAfterInterruptionRef.current = false;
+          bufferingIntentRef.current = false;
+          commitIsPlaying(false);
+          commitIsBuffering(false);
+          window.dispatchEvent(
+            new CustomEvent(PLAYBACK_NEEDS_USER_GESTURE_EVENT),
+          );
+          return;
+        }
         scheduleRecoveryCheck();
         return;
       }
@@ -270,6 +341,7 @@ export function useSoftInterruption({
     } catch {
       // Fade failed — restore volume and schedule another recovery
       // attempt so we don't sit on muted audio indefinitely.
+      recoveryFailuresRef.current += 1;
       gpRestoreVolume();
       scheduleRecoveryCheck();
     } finally {
@@ -286,7 +358,7 @@ export function useSoftInterruption({
       // here would be actively destructive — the user would hear
       // silence for a track that would otherwise play to the end.
       // Let it play; we'll re-check on actual stall events.
-      if (isCurrentTrackFullyBuffered()) return;
+      if (hasSafeBufferedAhead()) return;
       if (isPlayingRef.current || isBufferingRef.current) {
         beginSoftInterruption("offline");
       }
@@ -343,6 +415,7 @@ export function useSoftInterruption({
   }, [
     beginSoftInterruption,
     currentTrackRef,
+    hasSafeBufferedAhead,
     isBufferingRef,
     isPlayingRef,
     scheduleRecoveryCheck,

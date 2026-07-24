@@ -62,12 +62,86 @@ async def _refresh_radio_graphs_periodically() -> None:
             log.warning("Radio graph background refresh failed", exc_info=True)
 
 
+def _bootstrap_federation_identity() -> None:
+    from crate.federation.bootstrap import bootstrap_federation_identity
+
+    bootstrap_federation_identity(
+        display_name=os.environ.get("CRATE_INSTANCE_NAME")
+        or os.environ.get("INSTANCE_NAME")
+        or "Crate Node",
+        api_base_url=os.environ.get("CRATE_PUBLIC_API_BASE_URL")
+        or os.environ.get("CRATE_PUBLIC_URL")
+        or "",
+    )
+
+
+def _queue_global_catalog_bootstrap() -> None:
+    """Ensure the canonical catalog and historical user refs are projected."""
+    from crate.db.global_catalog_search_projection import (
+        get_global_catalog_search_projection_status,
+    )
+    from crate.db.repositories.global_catalog_state import get_catalog_state
+    from crate.db.repositories.global_user_library import (
+        USER_LIBRARY_REFS_BACKFILL_VERSION,
+    )
+    from crate.db.repositories.tasks import create_task_dedup
+
+    state = get_catalog_state()
+    if (
+        state["status"] not in {"cold", "failed"}
+        and state.get("user_refs_backfilled_at") is not None
+        and state.get("user_refs_backfill_version", 0)
+        >= USER_LIBRARY_REFS_BACKFILL_VERSION
+        and get_global_catalog_search_projection_status() == "ready"
+    ):
+        return
+    create_task_dedup(
+        "global_catalog_reconcile_full",
+        {"triggered_by": "api_startup"},
+        dedup_key="bootstrap:global-catalog",
+    )
+
+
+def _queue_artwork_variant_backfill() -> None:
+    """Queue the versioned, restart-safe upgrade backfill once per installation."""
+    from crate.artwork_tasks import ARTWORK_BACKFILL_VERSION
+    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.tasks import create_task_dedup
+
+    if get_setting("artwork_variants_backfill_version") == ARTWORK_BACKFILL_VERSION:
+        return
+    create_task_dedup(
+        "backfill_artwork_variants",
+        {"batch_size": 100, "include_genres": True},
+        dedup_key=f"bootstrap:artwork-variants:v{ARTWORK_BACKFILL_VERSION}",
+    )
+
+
+async def _repair_musicbrainz_cache_ttls() -> int:
+    from crate.db.cache_musicbrainz import repair_mb_cache_ttls
+
+    repaired = await asyncio.to_thread(repair_mb_cache_ttls)
+    if repaired:
+        log.info("Applied TTLs to %s legacy MusicBrainz cache entries", repaired)
+    return repaired
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    _bootstrap_federation_identity()
+    _queue_global_catalog_bootstrap()
+    _queue_artwork_variant_backfill()
     from crate.utils import init_musicbrainz
 
     init_musicbrainz()
+    from crate.api.cache_events import (
+        start_cache_invalidation_runtime,
+        stop_cache_invalidation_runtime,
+    )
+
+    start_cache_invalidation_runtime()
+    mb_cache_ttl_repair_task = asyncio.create_task(_repair_musicbrainz_cache_ttls())
 
     # Pre-warm radio graphs so the first radio request does not pay
     # the cost of loading artist similarities, genres, and members
@@ -80,12 +154,28 @@ async def lifespan(app: FastAPI):
         log.warning("Radio graph pre-warm failed", exc_info=True)
 
     radio_refresh_task = asyncio.create_task(_refresh_radio_graphs_periodically())
+    from crate.runtime_saturation import monitor_event_loop_lag
+
+    event_loop_monitor_task = asyncio.create_task(monitor_event_loop_lag())
     try:
         yield
     finally:
+        stop_cache_invalidation_runtime()
+        from crate.federation.client import close_shared_clients
+
+        await asyncio.to_thread(close_shared_clients)
+        federation_stream_client = getattr(app.state, "federation_stream_client", None)
+        if federation_stream_client is not None:
+            await federation_stream_client.aclose()
         radio_refresh_task.cancel()
+        event_loop_monitor_task.cancel()
         try:
-            await radio_refresh_task
+            await asyncio.gather(
+                radio_refresh_task,
+                event_loop_monitor_task,
+                mb_cache_ttl_repair_task,
+                return_exceptions=True,
+            )
         except asyncio.CancelledError:
             pass
 
@@ -262,10 +352,16 @@ def create_app() -> FastAPI:
     from crate.api.auth import AuthMiddleware
     from crate.api.cache_events import CacheInvalidationMiddleware
     from crate.api.metrics_middleware import MetricsMiddleware
+    from crate.api.trace_middleware import (
+        TraceMiddleware,
+        install_trace_id_log_record_factory,
+    )
 
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)
+    install_trace_id_log_record_factory()
+    app.add_middleware(TraceMiddleware)
 
     from crate.api.setup import router as setup_router
     from crate.api.auth import router as auth_router, admin_router as admin_auth_router
@@ -315,6 +411,19 @@ def create_app() -> FastAPI:
     from crate.api.paths import router as paths_router
     from crate.api.admin_ops import router as admin_ops_router
     from crate.api.playback_admin import router as playback_admin_router
+    from crate.api.playback_telemetry import router as playback_telemetry_router
+    from crate.api.admin_federation import router as admin_federation_router
+    from crate.api.admin_global_catalog import router as admin_global_catalog_router
+    from crate.api.federation import (
+        router as federation_router,
+        well_known as federation_well_known,
+    )
+    from crate.api.federation_remote import router as federation_remote_router
+    from crate.api.internal_federation import router as internal_federation_router
+    from crate.api.catalog import router as catalog_router
+
+    # Public well-known (no auth required)
+    app.include_router(federation_well_known)
 
     # Auth + management + settings + enrichment BEFORE browse (browse has {name:path} catch-all)
     app.include_router(setup_router)
@@ -350,6 +459,10 @@ def create_app() -> FastAPI:
     app.include_router(matcher_router)
     app.include_router(duplicates_router)
     app.include_router(subsonic_router)
+    app.include_router(federation_router)
+    app.include_router(internal_federation_router)
+    app.include_router(federation_remote_router)
+    app.include_router(catalog_router)
     app.include_router(browse_router)
     app.include_router(tags_router)
     app.include_router(organizer_router)
@@ -361,9 +474,12 @@ def create_app() -> FastAPI:
     app.include_router(tasks_router)
     app.include_router(stack_router)
     app.include_router(playback_admin_router)
+    app.include_router(playback_telemetry_router)
     from crate.api.admin_metrics import router as admin_metrics_router
 
     app.include_router(admin_ops_router)
+    app.include_router(admin_federation_router)
+    app.include_router(admin_global_catalog_router)
     app.include_router(admin_metrics_router)
 
     # Static files

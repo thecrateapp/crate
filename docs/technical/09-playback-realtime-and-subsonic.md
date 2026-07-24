@@ -1,3 +1,15 @@
+---
+title: Playback, realtime and Subsonic
+summary: Playback surfaces, resilience gates, realtime and compatibility contracts.
+section: architecture
+audience: [developer, operator]
+status: canonical
+order: 98
+verified: 2026-07-21
+sources:
+  [app/listen, app/readplane, app/crate/api, app/crate/federation, Makefile]
+---
+
 # Playback, Realtime, and Subsonic
 
 ## Listen playback architecture
@@ -131,6 +143,48 @@ On the server:
   `user.listening_aggregates.updated` drive snapshot warming
 
 The old `/api/me/history` path is now deprecated compatibility only.
+
+## Playback resilience release gates
+
+A remote reusable playback session must authorize the initial request and
+later Range/seek recovery until expiry. Revocation, changed grant revision,
+user mismatch or an invalid range denies the next request. The browser never
+receives a peer URL, ticket, local path or cache key.
+
+Queue start resolves only the active track. At most two remote tracks may be
+included in preparation; active playback always outranks lookahead and
+warmup. Owner preparation is bounded to four reservations per peer and twenty
+reservations per owner. A denial or rate limit leaves normal ticketed playback
+available through its original-source fallback.
+
+Release telemetry is aggregate only. It must not contain raw URLs, tokens,
+track IDs, titles, paths, peer URLs, IP addresses or network measurements.
+Run the unrestricted, **5 Mbps / 150 ms**, and loss/reconnect profiles while
+recording only fixture, cache state and timing evidence.
+
+Warmup is disabled by default. An operator enables it with
+`CRATE_PLAYBACK_WARMUP_ENABLED=true` only after confirming disk, CPU and
+iowait headroom. Keep interactive transcoding ahead of warmup; disabling
+warmup is the first containment action for worker pressure.
+
+## Playback SLOs and rollback
+
+| Signal                  | Objective                                     | Alert window           |
+| ----------------------- | --------------------------------------------- | ---------------------- |
+| startup p95             | local and remote first play at or below 2 s   | 15 minutes             |
+| stall ratio             | below 2% of playback starts                   | 15 minutes and 6 hours |
+| range retry             | remote authorization succeeds at 99.5%        | 15 minutes             |
+| transcode queue wait    | interactive work starts within 30 seconds     | 15 minutes             |
+| fallback-original ratio | below 10% after a warm cache                  | 15 minutes             |
+| prepare saturation      | below 5% unavailable or rate-limited requests | 15 minutes             |
+
+Track `federation.playback.prepare.requested`, `.ready`, `.preparing`,
+`.unavailable`, `.rate_limited`, `ready_before_play` and
+`fallback_original` only as bounded aggregate counters. A regression rolls
+back by hiding Auto, disabling warmup or setting the affected owner's
+preparation ceiling to zero; it does not reintroduce one-shot tickets or
+delete cache during an incident. See the [playback preparation incident
+runbook](federation-operations-runbook.md#playback-preparation-incident).
 
 ## Realtime surfaces
 

@@ -121,6 +121,10 @@ export function isCurrentTrackFullyBuffered(): boolean {
   return currentTrackFullyBuffered;
 }
 
+export function getCurrentBufferedAheadSeconds(): number {
+  return instance?.getCurrentBufferedAheadSeconds() ?? 0;
+}
+
 export function isPlaybackGestureRequiredError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as Partial<PlaybackGestureRequiredError>;
@@ -228,10 +232,10 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
     volume: lastVolume,
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
-    // Keep the live HTML5 pipeline conservative on mobile. Gapless-5's
-    // range math loads the current track plus the next track even with
-    // loadLimit=1; higher values create multiple parallel <audio> loads
-    // and Android WebView/emulators can start dropping audio frames.
+    // Keep the live HTML5 pipeline conservative on mobile. The vendored
+    // loader treats loadLimit=1 as the active source only; higher values
+    // create parallel <audio> loads and Android WebView/emulators can
+    // start dropping audio frames.
     loadLimit: preferHtml5Audio ? 1 : 2,
   });
   appliedVolume = lastVolume;
@@ -259,6 +263,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onprev = (from, to) => {
+    currentTrackFullyBuffered = false;
     currentCallbacks.onPrev?.(from, to);
   };
 
@@ -272,6 +277,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onnext = (from, to) => {
+    currentTrackFullyBuffered = false;
     currentCallbacks.onNext?.(from, to);
   };
 
@@ -286,6 +292,9 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onloadstart = (path) => {
+    if (path === instance?.getTrack()) {
+      currentTrackFullyBuffered = false;
+    }
     recordDevLog("gapless", "load start", redactUrl(path), "debug");
     currentCallbacks.onBuffering?.(path);
   };
@@ -368,13 +377,16 @@ export function loadQueue(
     urls.every((url, i) => url === currentUrls[i]);
   if (same) {
     if (urls.length > 0 && instance.getIndex() !== startIndex) {
+      currentTrackFullyBuffered = false;
       instance.gotoTrack(startIndex);
     } else if (urls.length > 0 && options.restartIfSameIndex) {
+      currentTrackFullyBuffered = false;
       instance.gotoTrack(startIndex, true);
     }
     return;
   }
 
+  currentTrackFullyBuffered = false;
   instance.removeAllTracks();
   for (const url of urls) {
     instance.addTrack(url);
@@ -428,7 +440,9 @@ export function removeTrack(indexOrUrl: number | string): void {
 
 export function replaceTrack(index: number, url: string): void {
   instance?.replaceTrack(index, url);
-  // replaceTrack swaps in-place, no shuffledIndices change needed.
+  // Gapless-5 replaces by removing then inserting, and insertion mutates
+  // shuffledIndices. React owns the queue order, so restore identity order.
+  normalizeShuffledIndices();
 }
 
 function getAudioContext(): AudioContext | null {

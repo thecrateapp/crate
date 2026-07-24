@@ -43,6 +43,8 @@ func TestHomeDiscoveryHTTPPayload(t *testing.T) {
 
 	_, ok = payload["recommended_tracks"].([]any)
 	assert.True(t, ok, "recommended_tracks default missing: %#v", payload["recommended_tracks"])
+	_, ok = payload["listening_history"].([]any)
+	assert.True(t, ok, "listening_history default missing: %#v", payload["listening_history"])
 
 	mixes := payload["custom_mixes"].([]any)
 	card := mixes[0].(map[string]any)

@@ -2,14 +2,15 @@ import json
 import logging
 import subprocess
 from collections import Counter
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Mapping
 
 import mutagen
 
+from crate.artwork_tasks import queue_artwork_materialization
+from crate.artwork_variants import ArtworkAsset
 from crate.audio import read_tags
-from crate.db.engine import get_engine
+from crate.db.advisory_locks import artist_sync_lock as _artist_sync_lock
 from crate.db.repositories.library import (
     delete_album,
     delete_artist,
@@ -19,6 +20,7 @@ from crate.db.repositories.library import (
 )
 from crate.db.repositories.library_writes import upsert_artist
 from crate.db.repositories.library_sync_writes import upsert_scanned_album
+from crate.entity_ids import artist_entity_uid as build_artist_entity_uid
 from crate.db.jobs.sync import (
     delete_track_by_path,
     get_album_id_by_path,
@@ -175,37 +177,6 @@ def _read_audio_info(
         duration, bitrate = _ffprobe_duration_bitrate(filepath)
 
     return duration, bitrate, sample_rate, bit_depth
-
-
-@contextmanager
-def _artist_sync_lock(artist_name: str):
-    """Serialize filesystem→DB sync per canonical artist across workers.
-
-    Tidal imports can trigger multiple ``sync_artist()`` calls for the same
-    artist at once. Without a cross-process lock, overlapping scans race on
-    ``existing_paths - synced_paths`` and can delete albums the other sync just
-    imported. A session-level advisory lock is a good fit here: it is scoped to
-    the connection lifetime and does not require us to keep a transaction open
-    while reading tags or walking the filesystem.
-    """
-    lock_key = f"library-sync:{artist_name.strip().lower()}"
-    raw = get_engine().raw_connection()
-    try:
-        cursor = raw.cursor()
-        try:
-            cursor.execute("SELECT pg_advisory_lock(hashtext(%s))", (lock_key,))
-        finally:
-            cursor.close()
-        yield
-    finally:
-        try:
-            cursor = raw.cursor()
-            try:
-                cursor.execute("SELECT pg_advisory_unlock(hashtext(%s))", (lock_key,))
-            finally:
-                cursor.close()
-        finally:
-            raw.close()
 
 
 def _album_artist_root(album_dir: Path) -> Path:
@@ -396,13 +367,21 @@ class LibrarySync:
         formats_list = sorted(db_formats.keys())
         primary_format = db_formats.most_common(1)[0][0] if db_formats else None
         dir_mtimes = [d.stat().st_mtime for d in artist_dirs if d.exists()]
+        artist_entity_uid = (
+            entity_uid_for(existing, "entity_uid")
+            if existing
+            else canonical_entity_uid(primary_folder)
+        )
+        if artist_entity_uid is None:
+            artist_entity_uid = build_artist_entity_uid(
+                name=canonical,
+                mbid=existing.get("mbid") if existing else None,
+            )
 
         upsert_artist(
             {
                 "name": canonical,
-                "entity_uid": entity_uid_for(existing, "entity_uid")
-                if existing
-                else canonical_entity_uid(primary_folder),
+                "entity_uid": artist_entity_uid,
                 "folder_name": primary_folder,
                 "album_count": len(all_albums),
                 "track_count": db_track_count,
@@ -413,6 +392,16 @@ class LibrarySync:
                 "dir_mtime": max(dir_mtimes) if dir_mtimes else None,
             }
         )
+        if has_photo:
+            queue_artwork_materialization(
+                ArtworkAsset("artist-photo", str(artist_entity_uid)),
+                reason="library-sync",
+            )
+        if any((directory / "background.jpg").is_file() for directory in artist_dirs):
+            queue_artwork_materialization(
+                ArtworkAsset("artist-background", str(artist_entity_uid)),
+                reason="library-sync",
+            )
 
     def _sync_artist_dirs_unlocked(
         self, artist_name: str, artist_dirs: list[Path]
@@ -838,11 +827,16 @@ class LibrarySync:
                 exc_info=True,
             )
 
-        _, album_id, synced_paths = upsert_scanned_album(
+        _, album_id, persisted_album_entity_uid, synced_paths = upsert_scanned_album(
             artist_payload=artist_payload,
             album_payload=album_payload,
             track_payloads=track_data_list,
         )
+        if has_cover:
+            queue_artwork_materialization(
+                ArtworkAsset("album-cover", persisted_album_entity_uid),
+                reason="library-sync",
+            )
 
         # Remove deleted tracks
         for old_path in set(existing_tracks_by_path.keys()) - synced_paths:

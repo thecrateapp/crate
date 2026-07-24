@@ -57,7 +57,7 @@ def create_playlist_schema(cur) -> None:
             track_id INTEGER REFERENCES library_tracks(id) ON DELETE SET NULL,
             track_entity_uid UUID,
             track_storage_id UUID,
-            track_path TEXT NOT NULL,
+            track_path TEXT,
             title TEXT,
             artist TEXT,
             album TEXT,
@@ -78,6 +78,7 @@ def create_playlist_schema(cur) -> None:
     cur.execute(
         "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_storage_id UUID"
     )
+    cur.execute("ALTER TABLE playlist_tracks ALTER COLUMN track_path DROP NOT NULL")
     cur.execute(
         "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'"
     )
@@ -130,15 +131,27 @@ def create_playlist_schema(cur) -> None:
         """
     )
     cur.execute(
+        "ALTER TABLE playlist_track_exclusions ADD COLUMN IF NOT EXISTS global_track_uid UUID"
+    )
+    cur.execute("DROP INDEX IF EXISTS idx_playlist_track_exclusions_identity")
+    cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_track_exclusions_identity
         ON playlist_track_exclusions(
             playlist_id,
+            COALESCE(global_track_uid::text, ''),
             COALESCE(track_entity_uid::text, ''),
             COALESCE(track_storage_id::text, ''),
             COALESCE(track_path, ''),
             COALESCE(track_id::text, '')
         )
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_playlist_track_exclusions_global_track_uid
+        ON playlist_track_exclusions(global_track_uid)
+        WHERE global_track_uid IS NOT NULL
         """
     )
 

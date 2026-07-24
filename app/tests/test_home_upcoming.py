@@ -256,6 +256,10 @@ def test_home_upcoming_trims_preview_items_but_keeps_full_summary(monkeypatch):
             {"type": "show_prep", "show_id": 100}
         ],
     )
+    monkeypatch.setattr(
+        "crate.db.home_builder_upcoming_feed._load_probable_setlists",
+        lambda _artist_names: {},
+    )
 
     payload = _build_home_upcoming(1, lookup_limit=120, item_limit=5)
 

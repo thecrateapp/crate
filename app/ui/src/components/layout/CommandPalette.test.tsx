@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: vi.fn(),
@@ -18,6 +18,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import { CommandPalette } from "./CommandPalette";
 
 beforeAll(() => {
@@ -31,6 +32,33 @@ beforeAll(() => {
     configurable: true,
   });
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
+});
+
+function mockAuth(capabilities: string[]) {
+  vi.mocked(useAuth).mockReturnValue({
+    user: {
+      id: 8,
+      email: "fed-admin@example.test",
+      name: "Federation Admin",
+      role: "admin",
+      capabilities,
+    },
+    loading: false,
+    logout: vi.fn(),
+    isAdmin: true,
+    canAccessAdmin: true,
+    hasCapability: vi.fn((capability: string) =>
+      capabilities.includes(capability),
+    ),
+    hasAnyCapability: vi.fn((required: readonly string[]) =>
+      required.some((capability) => capabilities.includes(capability)),
+    ),
+    refetch: vi.fn(),
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
 });
 
 describe("CommandPalette", () => {
@@ -300,5 +328,72 @@ describe("CommandPalette", () => {
     expect(screen.getByText("Upcoming")).toBeInTheDocument();
     expect(screen.getByText("New Releases")).toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+  });
+
+  it("shows federation surfaces and reconciliation tasks to federation admins", () => {
+    mockAuth([
+      "federation.nodes.view",
+      "federation.catalog.sync.manage",
+      "federation.policy.manage",
+    ]);
+
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(screen.getByText("Federation")).toBeInTheDocument();
+    expect(screen.getByText("Global Catalog")).toBeInTheDocument();
+    expect(screen.getByText("Sync Federated Catalogs")).toBeInTheDocument();
+    expect(screen.getByText("Reconcile Global Catalog")).toBeInTheDocument();
+    expect(
+      screen.getByText("Full Global Catalog Reconciliation"),
+    ).toBeInTheDocument();
+  });
+
+  it("queues all-peer federation catalog sync from the palette", async () => {
+    mockAuth(["federation.catalog.sync.manage"]);
+    vi.mocked(api).mockResolvedValue({});
+
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    fireEvent.click(screen.getByText("Sync Federated Catalogs"));
+
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/federation/sync-catalog",
+        "POST",
+      ),
+    );
+  });
+
+  it("queues global catalog reconciliation from the palette", async () => {
+    mockAuth(["federation.policy.manage"]);
+    vi.mocked(api).mockResolvedValue({});
+
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    fireEvent.click(screen.getByText("Reconcile Global Catalog"));
+
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/global-catalog/reconcile",
+        "POST",
+        { mode: "incremental" },
+      ),
+    );
   });
 });

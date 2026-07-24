@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -55,6 +56,9 @@ interface UsePlayerEngineCallbacksParams {
   ) => void;
   markSeekPosition: (seconds: number) => void;
   recordProgress: (seconds: number) => void;
+  recordPlaybackQualityProgress: (seconds: number) => void;
+  recordPlaybackStarted: (durationMs: number) => void;
+  onActivePlaybackStarted: () => void;
   pullFromEngine: (sourceQueue?: Track[]) => {
     resolvedTrack: Track | undefined;
   };
@@ -101,10 +105,14 @@ export function usePlayerEngineCallbacks({
   rotateTrackerSession,
   markSeekPosition,
   recordProgress,
+  recordPlaybackQualityProgress,
+  recordPlaybackStarted,
+  onActivePlaybackStarted,
   pullFromEngine,
   setAnalyserVersion,
   setCrossfadeTransition,
 }: UsePlayerEngineCallbacksParams) {
+  const playbackRequestStartedAtRef = useRef<number | null>(null);
   callbacksRef.current = {
     onTimeUpdate: (positionMs, trackIndex) => {
       const positionSeconds = positionMs / 1000;
@@ -115,6 +123,7 @@ export function usePlayerEngineCallbacks({
       }
       commitCurrentTime(positionSeconds);
       recordProgress(positionSeconds);
+      recordPlaybackQualityProgress(positionSeconds);
       if (trackIndex !== currentIndexRef.current && trackIndex >= 0) {
         pullFromEngine();
       }
@@ -142,12 +151,19 @@ export function usePlayerEngineCallbacks({
       tryRestoreAutoplay();
     },
     onPlayRequest: () => {
+      playbackRequestStartedAtRef.current ??= Date.now();
       bufferingIntentRef.current = true;
       if (!isPlayingRef.current) {
         commitIsPlaying(true);
       }
     },
     onPlay: () => {
+      if (playbackRequestStartedAtRef.current !== null) {
+        recordPlaybackStarted(
+          Math.max(0, Date.now() - playbackRequestStartedAtRef.current),
+        );
+        playbackRequestStartedAtRef.current = null;
+      }
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       cancelSoftInterruption();
@@ -155,6 +171,7 @@ export function usePlayerEngineCallbacks({
       commitIsBuffering(false);
       bufferingIntentRef.current = false;
       ensureTrackerSession(currentTrackRef.current, playSourceRef.current);
+      onActivePlaybackStarted();
     },
     onPause: () => {
       if (bufferingIntentRef.current && isPlayingRef.current) {

@@ -348,9 +348,9 @@ def _worker_process_entry(
     wlog = logging.getLogger(f"worker-{worker_id}")
 
     # Each process needs its own DB pool (don't call init_db — orchestrator does that)
-    from crate.db.engine import reset_engine
+    from crate.db.process_lifecycle import reset_database_runtime_after_fork
 
-    reset_engine()
+    reset_database_runtime_after_fork()
 
     from crate.utils import init_musicbrainz
 

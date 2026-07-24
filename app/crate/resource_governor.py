@@ -20,6 +20,8 @@ log = logging.getLogger(__name__)
 RESOURCE_GOVERNED_TASK_TYPES = frozenset(
     {
         "backfill_track_audio_fingerprints",
+        "backfill_artwork_variants",
+        "cleanup_artwork_variants",
         "batch_covers",
         "batch_retag",
         "compute_analytics",
@@ -32,17 +34,20 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "health_check",
         "library_pipeline",
         "library_sync",
+        "materialize_artwork_variants",
         "migrate_storage_v2",
         "process_new_content",
         "rebuild_library",
         "rehydrate_portable_metadata",
         "repair",
+        "repair_artwork_variants",
         "resolve_duplicates",
         "scan",
         "scan_missing_covers",
         "verify_storage_v2",
         "wipe_library",
         "write_portable_metadata",
+        "warmup_stream_variants",
     }
 )
 
@@ -64,6 +69,7 @@ MAINTENANCE_WINDOW_TASK_TYPES = frozenset(
         "verify_storage_v2",
         "wipe_library",
         "write_portable_metadata",
+        "warmup_stream_variants",
     }
 )
 

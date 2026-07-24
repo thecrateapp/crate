@@ -26,12 +26,15 @@ function toPlayerTracks(tracks: ArtistTopTrack[]): Track[] {
     buildArtistPlayerTrack(
       track,
       track.artist,
-      artistPhotoApiUrl({
-        artistId: track.artist_id,
-        artistEntityUid: track.artist_entity_uid,
-        artistSlug: track.artist_slug,
-        artistName: track.artist,
-      }),
+      artistPhotoApiUrl(
+        {
+          artistId: track.artist_id,
+          artistEntityUid: track.artist_entity_uid,
+          artistSlug: track.artist_slug,
+          artistName: track.artist,
+        },
+        { size: 512 },
+      ),
     ),
   );
 }
@@ -137,20 +140,27 @@ export function ArtistTopTracks() {
             showAlbum
             albumCover={
               track.artist && track.album
-                ? albumCoverApiUrl({
-                    albumId: track.album_id,
-                    albumEntityUid: track.album_entity_uid,
-                    artistEntityUid: track.artist_entity_uid,
-                    albumSlug: track.album_slug,
-                    artistName: track.artist,
-                    albumName: track.album,
-                  })
-                : artistPhotoApiUrl({
-                    artistId: track.artist_id,
-                    artistEntityUid: track.artist_entity_uid,
-                    artistSlug: track.artist_slug,
-                    artistName: track.artist,
-                  })
+                ? albumCoverApiUrl(
+                    {
+                      albumId: track.album_id,
+                      albumEntityUid: track.album_entity_uid,
+                      globalAlbumUid: track.global_album_uid,
+                      artistEntityUid: track.artist_entity_uid,
+                      albumSlug: track.album_slug,
+                      artistName: track.artist,
+                      albumName: track.album,
+                    },
+                    { size: 128 },
+                  )
+                : artistPhotoApiUrl(
+                    {
+                      artistId: track.artist_id,
+                      artistEntityUid: track.artist_entity_uid,
+                      artistSlug: track.artist_slug,
+                      artistName: track.artist,
+                    },
+                    { size: 128 },
+                  )
             }
             showCoverThumb
             queueTracks={trackRows}

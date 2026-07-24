@@ -6,6 +6,10 @@ import pytest
 from fastapi import HTTPException
 
 
+def _run(value):
+    return asyncio.run(value) if asyncio.iscoroutine(value) else value
+
+
 def _request_for(role: str | None, user_id: int = 1):
     return SimpleNamespace(
         state=SimpleNamespace(
@@ -43,6 +47,24 @@ def test_multi_roles_union_capabilities():
     assert has_capability(user, "curation.playlists.write")
     assert "library.analysis.manage" in get_user_capabilities(user)
     assert "curation.playlists.write" in get_user_capabilities(user)
+
+
+def test_federation_import_request_is_librarian_admin_only():
+    from crate.api.permissions import has_capability
+
+    assert has_capability({"role": "admin"}, "federation.import.request")
+    assert has_capability({"role": "librarian"}, "federation.import.request")
+    assert not has_capability({"role": "curator"}, "federation.import.request")
+    assert not has_capability({"role": "contributor"}, "federation.import.request")
+    assert not has_capability({"role": "user"}, "federation.import.request")
+
+
+def test_federation_listen_access_is_available_to_regular_users():
+    from crate.api.permissions import has_capability
+
+    assert has_capability({"role": "user"}, "federation.catalog.search")
+    assert has_capability({"role": "user"}, "federation.stream.play")
+    assert not has_capability({"role": "user"}, "federation.import.request")
 
 
 def test_require_permission_returns_user_for_allowed_role():
@@ -138,7 +160,7 @@ def test_admin_update_user_role_validates_persists_and_audits(monkeypatch):
     monkeypatch.setattr("crate.api.auth.get_user_presence", lambda _id: {})
     monkeypatch.setattr("crate.api.auth.log_audit", audit)
 
-    result = asyncio.run(
+    result = _run(
         admin_update_user_role(
             _request_for("admin", user_id=1),  # type: ignore[arg-type]
             2,
@@ -173,7 +195,7 @@ def test_admin_update_user_role_prevents_self_lockout(monkeypatch):
     )
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(
+        _run(
             admin_update_user_role(
                 _request_for("admin", user_id=1),  # type: ignore[arg-type]
                 1,
@@ -224,7 +246,7 @@ def test_admin_update_user_status_suspends_revokes_and_audits(monkeypatch):
     monkeypatch.setattr("crate.api.auth.get_user_presence", lambda _id: {})
     monkeypatch.setattr("crate.api.auth.log_audit", audit)
 
-    result = asyncio.run(
+    result = _run(
         admin_update_user_status(
             _request_for("admin", user_id=1),  # type: ignore[arg-type]
             2,
@@ -261,7 +283,7 @@ def test_admin_update_user_status_prevents_self_disable(monkeypatch):
     )
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(
+        _run(
             admin_update_user_status(
                 _request_for("admin", user_id=1),  # type: ignore[arg-type]
                 1,
@@ -298,7 +320,7 @@ def test_admin_delete_user_is_soft_delete(monkeypatch):
     monkeypatch.setattr("crate.api.auth._invalidate_auth_user", lambda _id: None)
     monkeypatch.setattr("crate.api.auth.log_audit", MagicMock())
 
-    result = asyncio.run(
+    result = _run(
         admin_delete_user(_request_for("admin", user_id=1), 2)  # type: ignore[arg-type]
     )
 
@@ -310,7 +332,7 @@ def test_admin_list_users_rejects_regular_user():
     from crate.api.auth import admin_list_users
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(admin_list_users(_request_for("user")))  # type: ignore[arg-type]
+        admin_list_users(_request_for("user"))  # type: ignore[arg-type]
 
     assert exc.value.status_code == 403
 
@@ -320,7 +342,7 @@ def test_admin_create_invite_rejects_user_without_manage_capability():
     from crate.api.schemas.auth import AuthInviteRequest
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(
+        _run(
             admin_create_auth_invite(  # type: ignore[arg-type]
                 _request_for("user"),
                 AuthInviteRequest(email="invitee@example.test"),
@@ -334,7 +356,7 @@ def test_auth_provider_config_requires_auth_manage():
     from crate.api.auth import admin_get_auth_config
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(
+        _run(
             admin_get_auth_config(_request_for("ops"))  # type: ignore[arg-type]
         )
 
@@ -406,7 +428,7 @@ def test_admin_update_user_role_requires_roles_manage():
     from crate.api.schemas.auth import UpdateUserRoleRequest
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(
+        _run(
             admin_update_user_role(  # type: ignore[arg-type]
                 _request_for("editor"),
                 2,

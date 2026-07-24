@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -66,29 +69,131 @@ func main() {
 		mustCheckP1(ctx, fastapi, readplane, token, cfg.p1Query)
 	}
 	mustCheckGenres(ctx, fastapi, readplane, token)
+	if cfg.checkGlobalCatalog {
+		mustCheckGlobalCatalog(ctx, fastapi, readplane, token, cfg.p1Query)
+	}
+	for _, path := range cfg.mediaPaths {
+		mustCompareMedia(ctx, cfg, token, path)
+	}
 }
 
 type smokeConfig struct {
-	fastapiBase   string
-	readplaneBase string
-	email         string
-	password      string
-	timeout       time.Duration
-	checkSSE      bool
-	checkP1       bool
-	p1Query       string
+	fastapiBase        string
+	readplaneBase      string
+	email              string
+	password           string
+	timeout            time.Duration
+	checkSSE           bool
+	checkP1            bool
+	checkGlobalCatalog bool
+	p1Query            string
+	mediaPaths         []string
 }
 
 func loadConfig() smokeConfig {
 	return smokeConfig{
-		fastapiBase:   env("FASTAPI_BASE", "http://127.0.0.1:8585"),
-		readplaneBase: env("READPLANE_BASE", "http://127.0.0.1:8686"),
-		email:         env("CRATE_AUTH_EMAIL", "admin@cratemusic.app"),
-		password:      env("CRATE_AUTH_PASSWORD", "admin"),
-		timeout:       durationEnv("READPLANE_CONTRACT_TIMEOUT", 15*time.Second),
-		checkSSE:      boolEnv("READPLANE_CONTRACT_CHECK_SSE", true),
-		checkP1:       boolEnv("READPLANE_CONTRACT_CHECK_P1", true),
-		p1Query:       env("READPLANE_CONTRACT_P1_QUERY", "high"),
+		fastapiBase:        env("FASTAPI_BASE", "http://127.0.0.1:8585"),
+		readplaneBase:      env("READPLANE_BASE", "http://127.0.0.1:8686"),
+		email:              env("CRATE_AUTH_EMAIL", "admin@cratemusic.app"),
+		password:           env("CRATE_AUTH_PASSWORD", "admin"),
+		timeout:            durationEnv("READPLANE_CONTRACT_TIMEOUT", 15*time.Second),
+		checkSSE:           boolEnv("READPLANE_CONTRACT_CHECK_SSE", true),
+		checkP1:            boolEnv("READPLANE_CONTRACT_CHECK_P1", true),
+		checkGlobalCatalog: boolEnv("READPLANE_CONTRACT_CHECK_GLOBAL_CATALOG", true),
+		p1Query:            env("READPLANE_CONTRACT_P1_QUERY", "high"),
+		mediaPaths:         splitPaths(os.Getenv("READPLANE_CONTRACT_MEDIA_PATHS")),
+	}
+}
+
+type mediaResult struct {
+	status       int
+	contentType  string
+	contentRange string
+	body         []byte
+	headers      map[string]string
+}
+
+func splitPaths(value string) []string {
+	result := []string{}
+	for _, item := range strings.Split(value, ",") {
+		if path := strings.TrimSpace(item); path != "" {
+			result = append(result, path)
+		}
+	}
+	return result
+}
+
+func mustCompareMedia(ctx context.Context, cfg smokeConfig, token, path string) {
+	left, err := fetchMedia(ctx, cfg.fastapiBase+path, token)
+	if err != nil {
+		log.Fatalf("media %s FastAPI failed: %v", path, err)
+	}
+	right, err := fetchMedia(ctx, cfg.readplaneBase+path, token)
+	if err != nil {
+		log.Fatalf("media %s readplane failed: %v", path, err)
+	}
+	if err := compareMediaResult(left, right); err != nil {
+		log.Fatalf("media %s mismatch: %v", path, err)
+	}
+	fmt.Printf("ok %-32s source=media-contract\n", path)
+}
+
+func fetchMedia(ctx context.Context, url, token string) (mediaResult, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return mediaResult{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Range", "bytes=0-65535")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return mediaResult{}, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return mediaResult{}, err
+	}
+	headers := map[string]string{}
+	for _, key := range []string{"X-Crate-Delivery-Policy", "X-Crate-Delivery-Effective-Policy", "X-Crate-Delivery-Format", "X-Crate-Delivery-Bitrate", "X-Crate-Source-Format", "X-Crate-Transcoded", "X-Crate-Variant-Status"} {
+		headers[key] = resp.Header.Get(key)
+	}
+	return mediaResult{status: resp.StatusCode, contentType: resp.Header.Get("Content-Type"), contentRange: resp.Header.Get("Content-Range"), body: body, headers: headers}, nil
+}
+
+func compareMediaResult(left, right mediaResult) error {
+	if left.status != right.status {
+		return fmt.Errorf("status %d != %d", left.status, right.status)
+	}
+	if left.contentType != right.contentType {
+		return fmt.Errorf("content type %q != %q", left.contentType, right.contentType)
+	}
+	if left.contentRange != right.contentRange {
+		return fmt.Errorf("content range %q != %q", left.contentRange, right.contentRange)
+	}
+	if !bytes.Equal(left.body, right.body) {
+		return fmt.Errorf("response bytes differ")
+	}
+	for key, value := range left.headers {
+		if right.headers[key] != value {
+			return fmt.Errorf("header %s differs", key)
+		}
+	}
+	return nil
+}
+
+func mustCheckGlobalCatalog(ctx context.Context, fastapi contract.Client, readplane contract.Client, token string, query string) {
+	checks := []check{
+		{name: "catalog/search", path: "/api/catalog/search?q=" + queryEscape(query) + "&limit=5"},
+		{name: "catalog/genres", path: "/api/catalog/genres"},
+		{name: "catalog/me/artists", path: "/api/catalog/me/artists"},
+		{name: "catalog/me/albums", path: "/api/catalog/me/albums"},
+		{name: "catalog/me/follows", path: "/api/catalog/me/follows"},
+		{name: "catalog/me/albums/saved", path: "/api/catalog/me/albums/saved"},
+	}
+	for _, item := range checks {
+		mustEnsureGET(ctx, fastapi, readplane, item, token, "hit")
+		mustCompareGET(ctx, fastapi, readplane, item, token)
 	}
 }
 
@@ -199,8 +304,23 @@ func mustEnsureGET(ctx context.Context, fastapi contract.Client, readplane contr
 	if expectedSource != "" && source != expectedSource {
 		log.Fatalf("%s source=%s, want %s", item.name, source, expectedSource)
 	}
+	if err := validateCatalogMode(item.path, headers.Get("X-Crate-Catalog-Mode")); err != nil {
+		log.Fatalf("%s catalog mode invalid: %v", item.name, err)
+	}
 	fmt.Printf("ok %-32s source=%s\n", item.name, source)
 	return right
+}
+
+func validateCatalogMode(path string, mode string) error {
+	if !strings.HasPrefix(path, "/api/catalog/search") {
+		return nil
+	}
+	for _, supported := range []string{"local-fallback", "global-ready", "global-refreshing", "global-degraded"} {
+		if mode == supported {
+			return nil
+		}
+	}
+	return fmt.Errorf("X-Crate-Catalog-Mode=%q", mode)
 }
 
 func mustCompareSSE(ctx context.Context, fastapi contract.Client, readplane contract.Client, item check, token string) {

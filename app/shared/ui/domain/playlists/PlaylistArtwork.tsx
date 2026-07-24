@@ -3,10 +3,12 @@ import { ListMusic } from "@crate/ui/icons";
 export interface PlaylistArtworkTrack {
   artist?: string;
   artist_id?: number;
+  global_artist_uid?: string;
   artist_entity_uid?: string;
   artist_slug?: string;
   album?: string;
   album_id?: number;
+  global_album_uid?: string;
   album_entity_uid?: string;
   album_slug?: string;
 }

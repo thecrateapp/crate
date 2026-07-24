@@ -243,6 +243,31 @@ describe("usePlayEventTracker — explicit lifecycle", () => {
     expect(payload.played_seconds).toBe(0);
   });
 
+  it("posts the signed playback session selected by the resolver", () => {
+    const { result } = setup();
+    const remoteTrack: Track = {
+      ...TRACK_A,
+      origin: "remote",
+      remote: {
+        nodeUid: "node-b",
+        nodeName: "Node B",
+        remoteEntityUid: "remote-track-a",
+        playbackSession: "signed-playback-session",
+        availability: { catalog: true, stream: true, import: false },
+      },
+    };
+
+    act(() => {
+      result.current.startSession(remoteTrack, null);
+      result.current.flushCurrentPlayEvent("completed", remoteTrack);
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/me/play-events",
+      expect.objectContaining({ playback_session: "signed-playback-session" }),
+    );
+  });
+
   it("skipped flush with <2s listened is dropped", () => {
     const { result } = setup();
     act(() => {
@@ -278,6 +303,39 @@ describe("usePlayEventTracker — explicit lifecycle", () => {
     // 1s of accumulated progress (0→1), then the 20s jump is rejected
     // because delta > cap. lastKnownTime moves but listenedSeconds doesn't grow.
     expect(payload.played_seconds).toBeCloseTo(1, 5);
+  });
+
+  it("posts global catalog identity for remote/global tracks", () => {
+    const { result } = setup();
+    const track: Track = {
+      id: "track-global-1",
+      globalTrackUid: "track-global-1",
+      globalAlbumUid: "album-global-1",
+      title: "0151",
+      artist: "High Vis",
+      album: "Blending",
+    };
+
+    act(() => {
+      result.current.startSession(track, null);
+    });
+    for (let t = 1; t <= 3; t++) {
+      act(() => {
+        result.current.recordProgress(t);
+      });
+    }
+    act(() => {
+      result.current.flushCurrentPlayEvent("completed");
+    });
+
+    const payload = mockPost.mock.calls[0]![1] as {
+      global_track_uid?: string;
+      track_id?: number | null;
+      track_entity_uid?: string | null;
+    };
+    expect(payload.global_track_uid).toBe("track-global-1");
+    expect(payload.track_id).toBeNull();
+    expect(payload.track_entity_uid).toBeNull();
   });
 });
 

@@ -93,14 +93,17 @@ export function HomePlaylist() {
         toPlayableTrack(track, {
           cover:
             track.artist && track.album
-              ? albumCoverApiUrl({
-                  albumId: track.album_id || undefined,
-                  albumEntityUid: track.album_entity_uid || undefined,
-                  artistEntityUid: track.artist_entity_uid || undefined,
-                  albumSlug: track.album_slug || undefined,
-                  artistName: track.artist,
-                  albumName: track.album,
-                }) || undefined
+              ? albumCoverApiUrl(
+                  {
+                    albumId: track.album_id || undefined,
+                    albumEntityUid: track.album_entity_uid || undefined,
+                    artistEntityUid: track.artist_entity_uid || undefined,
+                    albumSlug: track.album_slug || undefined,
+                    artistName: track.artist,
+                    albumName: track.album,
+                  },
+                  { size: 512 },
+                ) || undefined
               : undefined,
         }),
     );

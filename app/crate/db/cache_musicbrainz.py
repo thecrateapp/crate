@@ -11,6 +11,8 @@ from sqlalchemy import text
 from crate.db.cache_runtime import get_redis, _mem_get, _mem_set
 from crate.db.tx import read_scope, transaction_scope
 
+_MB_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
+
 
 def get_mb_cache(key: str) -> Any | None:
     cache_key = f"mb:{key}"
@@ -45,7 +47,11 @@ def get_mb_cache(key: str) -> Any | None:
                     val = json.loads(val)
                 if redis_client:
                     try:
-                        redis_client.set(cache_key, json.dumps(val, default=str))
+                        redis_client.set(
+                            cache_key,
+                            json.dumps(val, default=str),
+                            ex=_MB_CACHE_TTL_SECONDS,
+                        )
                     except Exception:
                         pass
                 _mem_set(cache_key, val, ttl=3600)
@@ -62,7 +68,11 @@ def set_mb_cache(key: str, value: Any) -> None:
     redis_client = get_redis()
     if redis_client:
         try:
-            redis_client.set(cache_key, json.dumps(value, default=str))
+            redis_client.set(
+                cache_key,
+                json.dumps(value, default=str),
+                ex=_MB_CACHE_TTL_SECONDS,
+            )
             return
         except Exception:
             pass
@@ -85,4 +95,42 @@ def set_mb_cache(key: str, value: Any) -> None:
         pass
 
 
-__all__ = ["get_mb_cache", "set_mb_cache"]
+def repair_mb_cache_ttls(
+    redis_client: Any | None = None,
+    *,
+    scan_count: int = 100,
+    max_keys: int = 10_000,
+) -> int:
+    """Apply a bounded TTL to legacy MusicBrainz Redis entries."""
+    client = redis_client or get_redis()
+    if client is None or max_keys <= 0:
+        return 0
+
+    cursor = 0
+    inspected = 0
+    repaired = 0
+    try:
+        while inspected < max_keys:
+            cursor, keys = client.scan(
+                cursor,
+                match="mb:*",
+                count=max(1, min(scan_count, max_keys - inspected)),
+            )
+            for key in keys:
+                if inspected >= max_keys:
+                    break
+                inspected += 1
+                key_text = key.decode() if isinstance(key, bytes) else str(key)
+                if not key_text.startswith("mb:"):
+                    continue
+                if client.ttl(key) == -1:
+                    client.expire(key, _MB_CACHE_TTL_SECONDS)
+                    repaired += 1
+            if cursor == 0:
+                break
+    except Exception:
+        return repaired
+    return repaired
+
+
+__all__ = ["get_mb_cache", "repair_mb_cache_ttls", "set_mb_cache"]

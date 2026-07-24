@@ -1,0 +1,34 @@
+http:
+  services:
+    crate-readplane-interactive:
+      failover:
+        service: crate-readplane-primary
+        fallback: crate-api-read-fallback
+
+    crate-readplane-sse:
+      failover:
+        service: crate-readplane-primary
+        fallback: crate-api-read-fallback
+
+    crate-readplane-stream:
+      failover:
+        service: crate-readplane-primary
+        fallback: crate-api-read-fallback
+
+    crate-readplane-primary:
+      loadBalancer:
+        servers:
+          - url: http://crate-readplane:8686
+        healthCheck:
+          path: /readyz
+          interval: 5s
+          timeout: 2s
+
+    crate-api-read-fallback:
+      loadBalancer:
+        servers:
+          - url: http://crate-api:8585
+        healthCheck:
+          path: /api/status
+          interval: 5s
+          timeout: 2s

@@ -837,7 +837,9 @@ def test_compute_scene_path_expands_long_genre_routes_with_adjacent_scenes(
             for index, slug in enumerate(dict.fromkeys(route), start=1)
         }
 
-    monkeypatch.setattr(paths_scene_queries, "list_scene_path_candidates", fake_candidates)
+    monkeypatch.setattr(
+        paths_scene_queries, "list_scene_path_candidates", fake_candidates
+    )
     monkeypatch.setattr(paths_scene, "load_artist_radio_graphs", lambda: ({}, {}, {}))
 
     tracks = paths_scene.compute_scene_path(
@@ -1496,7 +1498,9 @@ def test_compute_scene_path_expands_sparse_artist_routes_for_long_paths(monkeypa
         captured_routes.append(list(route))
         return {
             "classic-rock": [
-                _track(2, title="Classic", artist="Classic Band", genre_slug="classic-rock")
+                _track(
+                    2, title="Classic", artist="Classic Band", genre_slug="classic-rock"
+                )
             ],
             "rock": [_track(3, title="Rock", artist="Rock Band", genre_slug="rock")],
             "alternative-rock": [
@@ -1520,7 +1524,9 @@ def test_compute_scene_path_expands_sparse_artist_routes_for_long_paths(monkeypa
             ],
         }
 
-    monkeypatch.setattr(paths_scene_queries, "list_scene_path_candidates", fake_candidates)
+    monkeypatch.setattr(
+        paths_scene_queries, "list_scene_path_candidates", fake_candidates
+    )
     monkeypatch.setattr(paths_scene, "load_artist_radio_graphs", lambda: ({}, {}, {}))
 
     tracks = paths_scene.compute_scene_path(

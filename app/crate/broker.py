@@ -18,12 +18,12 @@ from dramatiq.middleware import (
     TimeLimit,
 )
 
-from crate.config import get_redis_url
+from crate.config import get_durable_redis_url
 
 log = logging.getLogger(__name__)
 
 # Switch to DB 1 for broker (DB 0 is cache)
-_BROKER_URL = get_redis_url().rsplit("/", 1)[0] + "/1"
+_BROKER_URL = get_durable_redis_url().rsplit("/", 1)[0] + "/1"
 
 
 def get_broker() -> RedisBroker:

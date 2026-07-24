@@ -8,6 +8,27 @@ from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
 MIN_GENRE_MEMBERSHIP_SCORE = 0.45
 
 
+def artist_decade_filter_sql(artist_alias: str) -> str:
+    return f"""
+        (
+            (
+                {artist_alias}.formed IS NOT NULL
+                AND substring({artist_alias}.formed, 1, 4) ~ '^[0-9]{{4}}$'
+                AND CAST(substring({artist_alias}.formed, 1, 4) AS INTEGER)
+                    BETWEEN :decade_start AND :decade_end
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM library_albums decade_albums
+                WHERE LOWER(decade_albums.artist) = LOWER({artist_alias}.name)
+                  AND substring(COALESCE(decade_albums.year, ''), 1, 4) ~ '^[0-9]{{4}}$'
+                  AND CAST(substring(decade_albums.year, 1, 4) AS INTEGER)
+                    BETWEEN :decade_start AND :decade_end
+            )
+        )
+    """
+
+
 def get_browse_filter_genres(
     country: str = "", decade: str = "", format: str = ""
 ) -> list[dict]:
@@ -23,12 +44,7 @@ def get_browse_filter_genres(
     if decade:
         try:
             decade_start = int(decade.rstrip("s"))
-            where_clauses.append(
-                "{artist_alias}.formed IS NOT NULL AND length({artist_alias}.formed) >= 4"
-            )
-            where_clauses.append(
-                "CAST(substring({artist_alias}.formed, 1, 4) AS INTEGER) BETWEEN :decade_start AND :decade_end"
-            )
+            where_clauses.append("{artist_decade_filter}")
             params["decade_start"] = decade_start
             params["decade_end"] = decade_start + 9
         except (ValueError, TypeError):
@@ -39,10 +55,17 @@ def get_browse_filter_genres(
         params["format"] = format
 
     where_sql = " AND ".join(
-        clause.format(artist_alias="la") for clause in where_clauses
+        clause.format(
+            artist_alias="la", artist_decade_filter=artist_decade_filter_sql("la")
+        )
+        for clause in where_clauses
     )
     top_artist_where_sql = " AND ".join(
-        clause.format(artist_alias="la2") for clause in where_clauses
+        clause.format(
+            artist_alias="la2",
+            artist_decade_filter=artist_decade_filter_sql("la2"),
+        )
+        for clause in where_clauses
     )
 
     with read_scope() as session:
@@ -141,7 +164,146 @@ def get_browse_filter_genres(
                     "cover_url": item.get("cover_url"),
                 }
             )
-        return items
+        _merge_remote_global_genres(
+            session,
+            items,
+            country=country,
+            decade=decade,
+            format=format,
+            decade_start=int(params["decade_start"])
+            if "decade_start" in params
+            else None,
+            decade_end=int(params["decade_end"]) if "decade_end" in params else None,
+        )
+        return sorted(items, key=lambda item: (-int(item["count"] or 0), item["name"]))
+
+
+def _merge_remote_global_genres(
+    session,
+    items: list[dict],
+    *,
+    country: str,
+    decade: str,
+    format: str,
+    decade_start: int | None,
+    decade_end: int | None,
+) -> None:
+    if country or format:
+        return
+
+    decade_sql = ""
+    params: dict[str, int] = {}
+    if decade:
+        if decade_start is None or decade_end is None:
+            return
+        decade_sql = """
+            AND EXISTS (
+                SELECT 1
+                FROM global_catalog_albums decade_albums
+                WHERE decade_albums.global_artist_uid = a.global_artist_uid
+                  AND substring(COALESCE(decade_albums.year, ''), 1, 4) ~ '^[0-9]{4}$'
+                  AND CAST(substring(decade_albums.year, 1, 4) AS INTEGER)
+                    BETWEEN :decade_start AND :decade_end
+            )
+        """
+        params["decade_start"] = decade_start
+        params["decade_end"] = decade_end
+
+    rows = (
+        session.execute(
+            text(
+                f"""
+                SELECT DISTINCT
+                    LOWER(TRIM(genre.value)) AS genre_name,
+                    a.canonical_name AS artist_name,
+                    a.global_artist_uid::text AS global_artist_uid,
+                    a.has_photo,
+                    a.source_count
+                FROM global_catalog_sources src
+                JOIN global_catalog_artists a
+                  ON a.global_artist_uid = src.global_entity_uid
+                CROSS JOIN LATERAL jsonb_array_elements_text(
+                    CASE
+                        WHEN jsonb_typeof(src.source_payload_json->'genres') = 'array'
+                        THEN src.source_payload_json->'genres'
+                        ELSE '[]'::jsonb
+                    END
+                ) AS genre(value)
+                WHERE src.entity_type = 'artist'
+                  AND src.source_kind = 'federated'
+                  AND src.source_deleted_at IS NULL
+                  AND NOT src.source_stale
+                  AND NOT a.has_local
+                  AND TRIM(genre.value) != ''
+                  {decade_sql}
+                ORDER BY
+                    LOWER(TRIM(genre.value)) ASC,
+                    a.source_count DESC,
+                    a.canonical_name ASC
+                """
+            ),
+            params,
+        )
+        .mappings()
+        .all()
+    )
+    if not rows:
+        return
+
+    by_name = {str(item["name"]).casefold(): item for item in items}
+    grouped: dict[str, list[dict]] = {}
+    for row in rows:
+        genre_name = str(row["genre_name"] or "").strip()
+        if not genre_name:
+            continue
+        grouped.setdefault(genre_name.casefold(), []).append(dict(row))
+
+    for genre_key, genre_rows in grouped.items():
+        genre_name = str(genre_rows[0]["genre_name"])
+        existing = by_name.get(genre_key)
+        top_artists = []
+        cover_url = None
+        for row in genre_rows:
+            artist_name = str(row["artist_name"] or "").strip()
+            if artist_name and artist_name not in top_artists and len(top_artists) < 3:
+                top_artists.append(artist_name)
+            if cover_url is None and row.get("has_photo"):
+                cover_url = (
+                    f"/api/catalog/artists/{row['global_artist_uid']}"
+                    "/background?size=640&format=webp"
+                )
+
+        remote_count = len(
+            {
+                str(row.get("artist_name") or "").strip().casefold()
+                for row in genre_rows
+                if row.get("artist_name")
+            }
+        )
+        if existing is not None:
+            existing["cnt"] = int(existing.get("cnt") or 0) + remote_count
+            existing["count"] = int(existing.get("count") or 0) + remote_count
+            current_top = list(existing.get("top_artists") or [])
+            for artist_name in top_artists:
+                if artist_name not in current_top and len(current_top) < 3:
+                    current_top.append(artist_name)
+            existing["top_artists"] = current_top
+            if not existing.get("cover_url") and cover_url:
+                existing["cover_url"] = cover_url
+            continue
+
+        slug = resolve_genre_slug(genre_name) or slugify_genre(genre_name)
+        item = {
+            "name": genre_name,
+            "slug": slug,
+            "cnt": remote_count,
+            "count": remote_count,
+            "description": None,
+            "top_artists": top_artists,
+            "cover_url": cover_url,
+        }
+        items.append(item)
+        by_name[genre_key] = item
 
 
 def get_browse_filter_countries() -> list[dict]:
@@ -168,8 +330,13 @@ def get_browse_filter_decades() -> list[str]:
             session.execute(
                 text(
                     """
-                SELECT DISTINCT formed FROM library_artists
-                WHERE formed IS NOT NULL AND formed != '' AND length(formed) >= 4
+                SELECT DISTINCT substring(formed, 1, 4) AS year
+                FROM library_artists
+                WHERE substring(COALESCE(formed, ''), 1, 4) ~ '^[0-9]{4}$'
+                UNION
+                SELECT DISTINCT substring(year, 1, 4) AS year
+                FROM library_albums
+                WHERE substring(COALESCE(year, ''), 1, 4) ~ '^[0-9]{4}$'
                 """
                 )
             )
@@ -179,7 +346,7 @@ def get_browse_filter_decades() -> list[str]:
         decades_set = set()
         for row in rows:
             try:
-                decade = f"{int(row['formed'][:4]) // 10 * 10}s"
+                decade = f"{int(row['year'][:4]) // 10 * 10}s"
                 decades_set.add(decade)
             except (ValueError, TypeError):
                 pass
@@ -204,6 +371,7 @@ def get_browse_filter_formats() -> list[dict]:
 
 
 __all__ = [
+    "artist_decade_filter_sql",
     "get_browse_filter_countries",
     "get_browse_filter_decades",
     "get_browse_filter_formats",

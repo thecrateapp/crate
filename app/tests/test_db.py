@@ -12,7 +12,7 @@ import psycopg2
 import pytest
 from sqlalchemy import text
 
-from tests.conftest import PG_AVAILABLE, TEST_DB_NAME
+from tests.conftest import PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -87,7 +87,7 @@ class TestBootstrap:
             finally:
                 conn.close()
 
-        assert _count(TEST_DB_NAME) == 1
+        assert _count(os.environ["CRATE_POSTGRES_DB"]) == 1
         # The main "crate" database only exists in local dev environments.
         # In CI there is only the test database, and a local dev DB can also
         # exist before its schema is bootstrapped, so skip when there is no
@@ -316,6 +316,36 @@ class TestPlaylistTrackEntityRefs:
                 }
             )
 
+        pg_db.upsert_artist({"name": "Other Duplicate Query Artist"})
+        other_album_id = pg_db.upsert_album(
+            {
+                "artist": "Other Duplicate Query Artist",
+                "name": "Other Safe Duplicate Album",
+                "path": "/music/other-duplicate-query-artist/other-safe-duplicate-album",
+                "track_count": 2,
+                "total_size": 2048,
+                "total_duration": 240.0,
+                "formats": ["flac"],
+            }
+        )
+        for filename in ("01-other-a.flac", "01-other-b.flac"):
+            pg_db.upsert_track(
+                {
+                    "album_id": other_album_id,
+                    "artist": "Other Duplicate Query Artist",
+                    "album": "Other Safe Duplicate Album",
+                    "filename": filename,
+                    "title": "Other Safe Duplicate",
+                    "path": f"/music/other-duplicate-query-artist/other-safe-duplicate-album/{filename}",
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "duration": 120.0,
+                    "size": 1024,
+                    "format": "flac",
+                    "audio_fingerprint": "same-other-fingerprint",
+                }
+            )
+
         rows = get_duplicate_tracks()
         by_title = {row["title"]: row for row in rows}
 
@@ -333,6 +363,13 @@ class TestPlaylistTrackEntityRefs:
         filtered_rows = get_duplicate_tracks(album_id=safe_album_id)
         assert [row["album_id"] for row in filtered_rows] == [safe_album_id]
         assert filtered_rows[0]["title"] == "Safe Duplicate"
+        artist_rows = get_duplicate_tracks(artist_name="duplicate query artist")
+        assert {row["artist"] for row in artist_rows} == {"Duplicate Query Artist"}
+        assert {row["title"] for row in artist_rows} == {
+            "Safe Duplicate",
+            "Strong Duplicate",
+            "Partial Fingerprint Duplicate",
+        }
         assert "Featured Duplicate" not in by_title
         assert "Unsafe Duplicate" not in by_title
 
@@ -530,7 +567,7 @@ class TestPlaylistTrackEntityRefs:
         assert tracks[0]["artist"] == "Playlist Resolve Artist"
         assert tracks[0]["album"] == "Playlist Resolve Album"
 
-    def test_get_playlist_tracks_skips_stale_track_refs(self, pg_db):
+    def test_get_playlist_tracks_preserves_unresolved_legacy_snapshot(self, pg_db):
         from crate.db.repositories.playlists_create import create_playlist
         from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
         from crate.db.tx import transaction_scope
@@ -584,7 +621,16 @@ class TestPlaylistTrackEntityRefs:
 
         tracks = get_playlist_tracks(playlist_id)
 
-        assert tracks == []
+        assert len(tracks) == 1
+        assert tracks[0]["global_track_uid"] is None
+        assert tracks[0]["track_id"] is None
+        assert tracks[0]["track_entity_uid"] == stale_entity_uid
+        assert tracks[0]["track_storage_id"] == stale_storage_id
+        assert tracks[0]["track_path"] == "legacy/relative/path.flac"
+        assert tracks[0]["title"] == "Legacy Snapshot Title"
+        assert tracks[0]["artist"] == "Legacy Snapshot Artist"
+        assert tracks[0]["album"] == "Legacy Snapshot Album"
+        assert tracks[0]["duration"] == 123.0
 
     def test_replace_playlist_tracks_skips_unresolvable_tracks(self, pg_db):
         from crate.db.repositories.playlists_create import create_playlist
@@ -687,6 +733,9 @@ class TestAnalyticsQueries:
     def test_count_mood_presets_counts_multiple_presets_in_one_read(self, pg_db):
         from crate.db.queries.browse_media_mood import count_mood_presets
         from crate.db.tx import transaction_scope
+        from crate.federation.global_reconciliation import (
+            reconcile_dirty_catalog_sources,
+        )
 
         pg_db.upsert_artist({"name": "Mood Browse Artist"})
         album_id = pg_db.upsert_album(
@@ -760,6 +809,10 @@ class TestAnalyticsQueries:
                     ),
                     {"id": row["id"], **audio},
                 )
+
+        projection = reconcile_dirty_catalog_sources(limit=100)
+        assert projection["failed"] == 0
+        assert projection["remaining"] == 0
 
         counts = count_mood_presets(
             {
@@ -948,6 +1001,104 @@ class TestHealthQueries:
 
 
 class TestRepairJobs:
+    def test_management_rename_artist_preserves_fk_children_and_paths(self, pg_db):
+        from crate.db.jobs.management import rename_artist_in_db
+        from crate.db.tx import transaction_scope
+
+        old_name = f"Rename Source {uuid4().hex[:8]}"
+        new_name = f"Rename Target {uuid4().hex[:8]}"
+        old_folder = "rename-source"
+        old_root = f"/music/{old_folder}"
+        new_root = f"/music/{new_name}"
+
+        pg_db.upsert_artist({"name": old_name, "folder_name": old_folder})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": old_name,
+                "name": "Rename Album",
+                "path": f"{old_root}/Rename Album",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": old_name,
+                "albumartist": old_name,
+                "album": "Rename Album",
+                "filename": "01 - Rename.flac",
+                "title": "Rename",
+                "track_number": 1,
+                "format": "flac",
+                "path": f"{old_root}/Rename Album/01 - Rename.flac",
+            }
+        )
+        with transaction_scope() as session:
+            user_id = session.execute(
+                text(
+                    "INSERT INTO users (email, created_at) VALUES (:email, NOW()) "
+                    "RETURNING id"
+                ),
+                {"email": f"rename-{uuid4().hex}@example.test"},
+            ).scalar_one()
+            session.execute(
+                text(
+                    "INSERT INTO user_follows (user_id, artist_name, created_at) "
+                    "VALUES (:user_id, :artist_name, NOW())"
+                ),
+                {"user_id": user_id, "artist_name": old_name},
+            )
+
+        rename_artist_in_db(old_name, new_name, old_folder)
+
+        with transaction_scope() as session:
+            artist = (
+                session.execute(
+                    text(
+                        "SELECT name, folder_name FROM library_artists WHERE name = :name"
+                    ),
+                    {"name": new_name},
+                )
+                .mappings()
+                .one()
+            )
+            album = (
+                session.execute(
+                    text(
+                        "SELECT artist, path FROM library_albums WHERE id = :album_id"
+                    ),
+                    {"album_id": album_id},
+                )
+                .mappings()
+                .one()
+            )
+            track = (
+                session.execute(
+                    text(
+                        "SELECT artist, albumartist, path FROM library_tracks "
+                        "WHERE album_id = :album_id"
+                    ),
+                    {"album_id": album_id},
+                )
+                .mappings()
+                .one()
+            )
+            followed_artist = session.execute(
+                text("SELECT artist_name FROM user_follows WHERE user_id = :user_id"),
+                {"user_id": user_id},
+            ).scalar_one()
+
+        assert dict(artist) == {"name": new_name, "folder_name": new_name}
+        assert dict(album) == {
+            "artist": new_name,
+            "path": f"{new_root}/Rename Album",
+        }
+        assert dict(track) == {
+            "artist": new_name,
+            "albumartist": new_name,
+            "path": f"{new_root}/Rename Album/01 - Rename.flac",
+        }
+        assert followed_artist == new_name
+
     def test_rename_artist_updates_fk_children_without_violation(self, pg_db):
         from crate.db.jobs.repair import rename_artist
         from crate.db.tx import transaction_scope
@@ -2388,6 +2539,49 @@ class TestLibraryCRUD:
         assert artist["tags_json"] == ["manual"]
         assert artist["country"] == "GB"
         assert artist["listeners"] == 200
+
+    def test_manual_artist_metadata_rejects_artist_without_numeric_id(self, pg_db):
+        from crate.db.repositories.library_enrichment_writes import (
+            update_artist_metadata,
+        )
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Artist Without ID"})
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_artists SET id = NULL "
+                    "WHERE name = 'Artist Without ID'"
+                )
+            )
+
+        with pytest.raises(RuntimeError, match="missing numeric id"):
+            update_artist_metadata(
+                artist_name="Artist Without ID",
+                metadata={"bio": "Must not be written"},
+                locked_by_user_id=1,
+            )
+
+    def test_artist_enrichment_rejects_artist_without_numeric_id(self, pg_db):
+        from crate.db.repositories.library_enrichment_writes import (
+            update_artist_enrichment,
+        )
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Enrichment Artist Without ID"})
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_artists SET id = NULL "
+                    "WHERE name = 'Enrichment Artist Without ID'"
+                )
+            )
+
+        with pytest.raises(RuntimeError, match="missing numeric id"):
+            update_artist_enrichment(
+                "Enrichment Artist Without ID",
+                {"bio": "Must not be written"},
+            )
 
     def test_manual_bandcamp_url_clear_blocks_bandcamp_backfill(self, pg_db):
         from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url

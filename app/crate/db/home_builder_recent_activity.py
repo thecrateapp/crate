@@ -15,7 +15,8 @@ from crate.db.queries.user_library import get_play_history
 
 def _has_artist_route(row: dict) -> bool:
     return bool(
-        row.get("artist_entity_uid")
+        row.get("global_artist_uid")
+        or row.get("artist_entity_uid")
         or row.get("artist_slug")
         or row.get("artist_id") is not None
     )
@@ -23,7 +24,8 @@ def _has_artist_route(row: dict) -> bool:
 
 def _has_album_route(row: dict) -> bool:
     return bool(
-        row.get("album_entity_uid")
+        row.get("global_album_uid")
+        or row.get("album_entity_uid")
         or row.get("album_slug")
         or row.get("album_id") is not None
     )
@@ -47,6 +49,7 @@ def build_recently_played(user_id: int, limit: int = 9) -> list[dict]:
                     "type": "artist",
                     "artist_id": row.get("artist_id"),
                     "artist_entity_uid": row.get("artist_entity_uid"),
+                    "global_artist_uid": row.get("global_artist_uid"),
                     "artist_slug": row.get("artist_slug"),
                     "artist_name": row.get("artist") or "",
                     "subtitle": "Artist",
@@ -61,11 +64,13 @@ def build_recently_played(user_id: int, limit: int = 9) -> list[dict]:
                     "type": "album",
                     "album_id": row.get("album_id"),
                     "album_entity_uid": row.get("album_entity_uid"),
+                    "global_album_uid": row.get("global_album_uid"),
                     "album_slug": row.get("album_slug"),
                     "album_name": row.get("album") or "",
                     "artist_name": row.get("artist") or "",
                     "artist_id": row.get("artist_id"),
                     "artist_entity_uid": row.get("artist_entity_uid"),
+                    "global_artist_uid": row.get("global_artist_uid"),
                     "artist_slug": row.get("artist_slug"),
                     "subtitle": "Album",
                     "played_at": row.get("played_at"),

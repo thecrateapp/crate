@@ -25,6 +25,7 @@ import { useHoverCapability } from "@/hooks/use-hover-capability";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
 
 import {
   addTopBarSearchRecent,
@@ -227,7 +228,7 @@ export function TopBarSearch() {
     setSearchError(null);
     debounceRef.current = setTimeout(() => {
       api<SearchResult>(
-        `/api/search?q=${encodeURIComponent(requestQuery)}&limit=10`,
+        `/api/catalog/search?q=${encodeURIComponent(requestQuery)}&limit=10`,
       )
         .then((data) => {
           if (queryRef.current.trim() !== requestQuery) return;
@@ -301,14 +302,20 @@ export function TopBarSearch() {
   });
 
   const selectItem = useCallback(
-    (item: TopBarSearchItem) => {
+    async (item: TopBarSearchItem) => {
       addTopBarSearchRecent(item);
       setRecents(getTopBarSearchRecents());
       if (item.trackData) {
-        play(
-          { ...item.trackData, albumCover: item.imageUrl },
-          { type: "queue", name: "Search" },
-        );
+        try {
+          const resolved = await resolveRemotePlayableTrack({
+            ...item.trackData,
+            albumCover: item.imageUrl,
+          });
+          play(resolved, { type: "queue", name: "Search" });
+        } catch {
+          setSearchError(t("search.tryAgain"));
+          return;
+        }
       } else if (item.navigateTo) {
         navigate(item.navigateTo);
       }
@@ -318,7 +325,7 @@ export function TopBarSearch() {
       setCompletedQuery(null);
       setSearchError(null);
     },
-    [navigate, play],
+    [navigate, play, t],
   );
 
   const selectRecent = useCallback(
@@ -358,7 +365,7 @@ export function TopBarSearch() {
     } else if (e.key === "Enter" && activeIdx >= 0) {
       e.preventDefault();
       if (query.trim() && results[activeIdx]) {
-        selectItem(results[activeIdx]);
+        void selectItem(results[activeIdx]);
       } else if (!query.trim() && recents[activeIdx]) {
         selectRecent(recents[activeIdx]);
       }
@@ -405,7 +412,7 @@ export function TopBarSearch() {
                 {results.map((item, index) => (
                   <button
                     key={`${item.type}-${item.label}-${index}`}
-                    onClick={() => selectItem(item)}
+                    onClick={() => void selectItem(item)}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
                       index === activeIdx ? "bg-white/10" : "hover:bg-white/5"
                     }`}
@@ -421,9 +428,16 @@ export function TopBarSearch() {
                         </p>
                       ) : null}
                     </div>
-                    <span className="shrink-0 text-[10px] capitalize text-white/20">
-                      {t(`search.resultType.${item.type}`)}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
+                      {item.origin === "remote" ? (
+                        <span className="rounded-full border border-cyan-300/15 bg-cyan-300/8 px-1.5 py-0.5 text-cyan-200/70">
+                          {item.nodeName || t("search.remoteSource")}
+                        </span>
+                      ) : null}
+                      <span className="capitalize text-white/20">
+                        {t(`search.resultType.${item.type}`)}
+                      </span>
+                    </div>
                   </button>
                 ))}
                 {showSearchError ? (

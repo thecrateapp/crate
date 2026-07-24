@@ -17,7 +17,11 @@ from crate.db.home_builder_shared import (
     _select_home_mix_tracks,
 )
 from crate.db.releases import get_new_releases
-from crate.genre_taxonomy import get_genre_display_name, get_related_genre_terms
+from crate.genre_taxonomy import (
+    expand_genre_terms_with_aliases,
+    get_genre_display_name,
+    get_related_genre_terms,
+)
 
 _COLD_START_DISCOVERY_GENRES = ["rock", "punk", "metal", "alternative", "electronic"]
 
@@ -100,6 +104,44 @@ def _with_recommendation_source(rows: list[dict], source: str) -> list[dict]:
 
 def _normalized_terms(terms: list[str]) -> set[str]:
     return {term.strip().lower() for term in terms if term.strip()}
+
+
+def _coerce_genre_values(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value if item is not None]
+    return []
+
+
+def _direct_genre_terms_for_mix(mix_id: str) -> set[str]:
+    if not mix_id.startswith("genre-"):
+        return set()
+    genre_slug = mix_id.removeprefix("genre-")
+    genre_name = get_genre_display_name(genre_slug)
+    return _normalized_terms(expand_genre_terms_with_aliases([genre_slug, genre_name]))
+
+
+def _track_genre_terms(row: dict) -> set[str]:
+    values = _coerce_genre_values(row.get("genres"))
+    for key in ("genre", "genre_name", "main_genre"):
+        values.extend(_coerce_genre_values(row.get(key)))
+    return _normalized_terms(expand_genre_terms_with_aliases(values))
+
+
+def _global_rows_for_mix(mix_id: str, global_track_rows: list[dict]) -> list[dict]:
+    if not global_track_rows or not mix_id.startswith("genre-"):
+        return global_track_rows
+    direct_terms = _direct_genre_terms_for_mix(mix_id)
+    if not direct_terms:
+        return []
+    return [
+        row
+        for row in global_track_rows
+        if _track_genre_terms(row).intersection(direct_terms)
+    ]
 
 
 def _with_release_week_metadata(
@@ -315,6 +357,14 @@ def _mix_summary_payload(mix: dict) -> dict:
     }
 
 
+def _profile_id_for_mix(mix_id: str) -> str:
+    if mix_id == "my-new-arrivals":
+        return "home_new_arrivals_v1"
+    if mix_id.startswith("genre-"):
+        return "home_genre_mix_v1"
+    return "home_daily_discovery_v1"
+
+
 def _build_custom_mix_summaries(
     user_id: int,
     *,
@@ -325,6 +375,7 @@ def _build_custom_mix_summaries(
     summary_track_limit: int = 8,
     recent_releases: list[dict] | None = None,
     precomputed_mixes: dict[str, tuple[str, str, list[dict]]] | None = None,
+    global_track_rows: list[dict] | None = None,
 ) -> list[dict]:
     custom_mix_ids = ["daily-discovery", "my-new-arrivals"]
     custom_mix_ids.extend(
@@ -347,6 +398,18 @@ def _build_custom_mix_summaries(
                 mix_id=mix_id,
                 limit=summary_track_limit,
                 recent_releases=recent_releases,
+            )
+        extra_rows = _global_rows_for_mix(mix_id, global_track_rows or [])
+        if extra_rows:
+            rows = _merge_track_rows(rows, extra_rows)
+            rows = _select_home_mix_tracks(
+                _prepare_mix_candidate_rows(_daily_rotate_rows(rows, user_id)),
+                limit=summary_track_limit,
+                max_per_artist=2,
+                max_per_album=2,
+                mix_id=mix_id,
+                profile_id=_profile_id_for_mix(mix_id),
+                user_id=user_id,
             )
         if not name or not rows:
             continue
@@ -371,5 +434,6 @@ __all__ = [
     "_daily_rotate_rows",
     "_build_custom_mix_summaries",
     "_build_mix_rows",
+    "_global_rows_for_mix",
     "_mix_summary_payload",
 ]

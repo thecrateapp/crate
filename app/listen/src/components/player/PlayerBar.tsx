@@ -33,11 +33,15 @@ import {
   getTrackQualityFromInfo,
   mergeTrackQualityParts,
 } from "@/lib/track-info";
-import { getTrackQualityFromPlaybackQuality } from "@/lib/track-playback";
+import {
+  getTrackQualityFromPlaybackQuality,
+  playbackResolutionShowsDeliveryQuality,
+} from "@/lib/track-playback";
 import {
   getPlaybackDeliveryPolicyPreference,
+  getEffectivePlaybackDeliveryPolicy,
   PLAYER_PLAYBACK_PREFS_EVENT,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { triggerHaptic } from "@/lib/haptics";
@@ -548,7 +552,7 @@ export function PlayerBar() {
   const [showLyrics, setShowLyrics] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] =
-    useState<PlaybackDeliveryPolicy>(getPlaybackDeliveryPolicyPreference);
+    useState<PlaybackDeliveryPreference>(getPlaybackDeliveryPolicyPreference);
   const [shouldRenderQueuePanel, setShouldRenderQueuePanel] = useState(false);
   const [shouldRenderLyricsPanel, setShouldRenderLyricsPanel] = useState(false);
   const [shouldRenderEqualizerPopover, setShouldRenderEqualizerPopover] =
@@ -661,7 +665,7 @@ export function PlayerBar() {
     const onPrefsChanged = (event: Event) => {
       const nextPolicy = (
         event as CustomEvent<{
-          playbackDeliveryPolicy?: PlaybackDeliveryPolicy;
+          playbackDeliveryPolicy?: PlaybackDeliveryPreference;
         }>
       ).detail?.playbackDeliveryPolicy;
       setPlaybackDeliveryPolicy(
@@ -749,7 +753,7 @@ export function PlayerBar() {
   });
   const { resolution: currentTrackPlayback } = useTrackPlayback(
     displayTrackForQueries,
-    playbackDeliveryPolicy,
+    getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy),
     {
       enabled: !!displayTrack,
     },
@@ -761,8 +765,10 @@ export function PlayerBar() {
         getTrackQualityFromPlaybackQuality(currentTrackPlayback?.source),
       )
     : null;
+  const showsDeliveryQuality =
+    playbackResolutionShowsDeliveryQuality(currentTrackPlayback);
   const activeTrackQuality =
-    currentTrackPlayback && currentTrackPlayback.effective_policy !== "original"
+    currentTrackPlayback && showsDeliveryQuality
       ? mergeTrackQualityParts(
           sourceTrackQuality,
           getTrackQualityFromPlaybackQuality(currentTrackPlayback.delivery, {
@@ -787,10 +793,6 @@ export function PlayerBar() {
           ),
         )
       : 0;
-  const showsDeliveryQuality = Boolean(
-    currentTrackPlayback &&
-      currentTrackPlayback.effective_policy !== "original",
-  );
   const shapedRadioSessionId = displayPlaySource?.radio?.shapedSessionId;
   const isShapedRadioTrack = !!(
     shapedRadioSessionId && displayTrack?.libraryTrackId
@@ -877,6 +879,7 @@ export function PlayerBar() {
     displayTrack.libraryTrackId ?? null,
     displayTrack.entityUid ?? null,
     displayTrack.path || displayTrack.id,
+    displayTrack.globalTrackUid ?? null,
   );
 
   function prepareQueuePanel() {
@@ -958,10 +961,20 @@ export function PlayerBar() {
     const trackPath = displayTrack.path || displayTrack.id;
     try {
       if (liked) {
-        await unlikeTrack(trackId, trackEntityUid, trackPath);
+        await unlikeTrack(
+          trackId,
+          trackEntityUid,
+          trackPath,
+          displayTrack.globalTrackUid ?? null,
+        );
         return false;
       } else {
-        await likeTrack(trackId, trackEntityUid, trackPath);
+        await likeTrack(
+          trackId,
+          trackEntityUid,
+          trackPath,
+          displayTrack.globalTrackUid ?? null,
+        );
         return true;
       }
     } catch {
@@ -1002,6 +1015,7 @@ export function PlayerBar() {
         displayTrack.libraryTrackId ?? null,
         displayTrack.entityUid ?? null,
         displayTrack.path || displayTrack.id,
+        displayTrack.globalTrackUid ?? null,
       );
       toast.success("Added to collection");
     } catch {
@@ -1075,7 +1089,10 @@ export function PlayerBar() {
               <div
                 aria-label={isDesktop ? undefined : "Track artwork"}
                 className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-white/5 md:h-12 md:w-12 ${
-                  isDesktop && displayTrack.albumId ? "cursor-pointer" : ""
+                  isDesktop &&
+                  (displayTrack.globalAlbumUid || displayTrack.albumId)
+                    ? "cursor-pointer"
+                    : ""
                 }`}
                 onTouchStart={handleCoverTouchStart}
                 onTouchMove={handleCoverTouchMove}
@@ -1088,15 +1105,26 @@ export function PlayerBar() {
                     coverLongPressTriggeredRef.current = false;
                     return;
                   }
-                  if (isDesktop && displayTrack.albumId) {
+                  if (
+                    isDesktop &&
+                    (displayTrack.globalAlbumUid || displayTrack.albumId)
+                  ) {
                     e.stopPropagation();
                     navigate(
-                      albumPagePath({
-                        albumId: displayTrack.albumId,
-                        albumSlug: displayTrack.albumSlug,
-                        albumName: displayTrack.album,
-                        artistName: displayTrack.artist,
-                      }),
+                      displayTrack.globalAlbumUid
+                        ? albumPagePath({
+                            albumId: displayTrack.albumId,
+                            globalAlbumUid: displayTrack.globalAlbumUid,
+                            albumSlug: displayTrack.albumSlug,
+                            albumName: displayTrack.album,
+                            artistName: displayTrack.artist,
+                          })
+                        : albumPagePath({
+                            albumId: displayTrack.albumId,
+                            albumSlug: displayTrack.albumSlug,
+                            albumName: displayTrack.album,
+                            artistName: displayTrack.artist,
+                          }),
                     );
                   }
                 }}
@@ -1174,18 +1202,27 @@ export function PlayerBar() {
                     </>
                   ) : (
                     <div key={displayTrack.id} className="animate-track-in">
-                      {isDesktop && displayTrack.albumId ? (
+                      {isDesktop &&
+                      (displayTrack.globalAlbumUid || displayTrack.albumId) ? (
                         <p
                           className="text-[13px] font-semibold text-white truncate leading-tight hover:underline cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
-                              albumPagePath({
-                                albumId: displayTrack.albumId,
-                                albumSlug: displayTrack.albumSlug,
-                                albumName: displayTrack.album,
-                                artistName: displayTrack.artist,
-                              }),
+                              displayTrack.globalAlbumUid
+                                ? albumPagePath({
+                                    albumId: displayTrack.albumId,
+                                    globalAlbumUid: displayTrack.globalAlbumUid,
+                                    albumSlug: displayTrack.albumSlug,
+                                    albumName: displayTrack.album,
+                                    artistName: displayTrack.artist,
+                                  })
+                                : albumPagePath({
+                                    albumId: displayTrack.albumId,
+                                    albumSlug: displayTrack.albumSlug,
+                                    albumName: displayTrack.album,
+                                    artistName: displayTrack.artist,
+                                  }),
                             );
                           }}
                         >
@@ -1196,17 +1233,27 @@ export function PlayerBar() {
                           {displayTrack.title}
                         </p>
                       )}
-                      {isDesktop && displayTrack.artistId ? (
+                      {isDesktop &&
+                      (displayTrack.globalArtistUid ||
+                        displayTrack.artistId) ? (
                         <p
                           className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 hover:text-foreground hover:underline cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
-                              artistPagePath({
-                                artistId: displayTrack.artistId,
-                                artistSlug: displayTrack.artistSlug,
-                                artistName: displayTrack.artist,
-                              }),
+                              displayTrack.globalArtistUid
+                                ? artistPagePath({
+                                    artistId: displayTrack.artistId,
+                                    globalArtistUid:
+                                      displayTrack.globalArtistUid,
+                                    artistSlug: displayTrack.artistSlug,
+                                    artistName: displayTrack.artist,
+                                  })
+                                : artistPagePath({
+                                    artistId: displayTrack.artistId,
+                                    artistSlug: displayTrack.artistSlug,
+                                    artistName: displayTrack.artist,
+                                  }),
                             );
                           }}
                         >
@@ -1276,6 +1323,7 @@ export function PlayerBar() {
                     <RadioFeedback
                       sessionId={shapedRadioSessionId!}
                       trackId={displayTrack.libraryTrackId}
+                      globalTrackUid={displayTrack.globalTrackUid}
                       onDislike={handleNextTrack}
                     />
                   )}

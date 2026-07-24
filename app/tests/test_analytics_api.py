@@ -1,5 +1,6 @@
 """Contract tests for the Admin Analytics API endpoints."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -220,6 +221,48 @@ class TestMissingAlbumsAPI:
         ):
             resp = test_app.get("/api/artists/by-entity/nonexistent/missing")
         assert resp.status_code == 404
+
+    def test_missing_albums_by_entity_uid_resolves_managed_storage(
+        self, test_app, tmp_path
+    ):
+        entity_uid = "695179a0-3863-50c2-9302-61f5cf144daa"
+        artist_dir = tmp_path / entity_uid
+        artist_dir.mkdir()
+        result = {
+            "artist": "Birds In Row",
+            "local": [],
+            "missing": [],
+            "local_count": 0,
+            "mb_count": 0,
+            "missing_count": 0,
+        }
+
+        with (
+            patch(
+                "crate.api.analytics.artist_name_from_entity_uid",
+                return_value="Birds In Row",
+            ),
+            patch(
+                "crate.api.analytics.get_library_artist",
+                return_value={
+                    "name": "Birds In Row",
+                    "folder_name": entity_uid,
+                    "entity_uid": entity_uid,
+                },
+            ),
+            patch("crate.api.analytics.library_path", return_value=tmp_path),
+            patch("crate.api.analytics.extensions", return_value={".flac"}),
+            patch(
+                "crate.api.analytics.find_missing_albums", return_value=result
+            ) as missing_albums,
+        ):
+            resp = test_app.get(f"/api/artists/by-entity/{entity_uid}/missing")
+
+        assert resp.status_code == 200
+        assert resp.json() == result
+        missing_albums.assert_called_once_with(
+            Path(artist_dir), {".flac"}, artist_name="Birds In Row"
+        )
 
     def test_missing_search_empty_query_returns_404(self, test_app):
         resp = test_app.get("/api/missing-search?q=")

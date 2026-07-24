@@ -1,5 +1,6 @@
-import { memo, useId, type MouseEvent } from "react";
+import { memo, useId, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   CRATE_ICON_SIZE,
   Disc3,
@@ -29,10 +30,12 @@ import {
   resolvePlayableTrackId,
   toPlayableTrack,
 } from "@/lib/playable-track";
+import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { cn, formatDuration } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   albumCoverApiUrl,
   artistPagePath,
@@ -41,6 +44,9 @@ import {
 
 export interface TrackRowData {
   id?: string | number;
+  global_track_uid?: string;
+  global_artist_uid?: string;
+  global_album_uid?: string;
   entity_uid?: string;
   title: string;
   artist: string;
@@ -66,6 +72,19 @@ export interface TrackRowData {
   valence?: number | null;
   bliss_vector?: number[] | null;
   library_track_id?: number;
+  origin?: "local" | "remote";
+  node_uid?: string;
+  node_name?: string;
+  remote_entity_uid?: string;
+  availability?: {
+    catalog: boolean;
+    stream: boolean;
+    import: boolean;
+    stale?: boolean;
+    local?: boolean;
+    remote?: boolean;
+    healthy?: boolean;
+  };
   disabled?: boolean;
 }
 
@@ -216,37 +235,64 @@ export const TrackRow = memo(function TrackRow({
   queueTracks,
 }: TrackRowProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { isPlaying } = usePlayerState();
   const { currentTrack, play, playAll, pause, resume } = usePlayerActions();
   const { isLiked, toggleTrackLike } = useLikedTracks();
   const { getTrackState } = useOffline();
+  const [resolvingRemote, setResolvingRemote] = useState(false);
   const hasTrackRef = hasPlayableTrackReference(track);
-  const disabled = Boolean(track.disabled);
-
-  const liked = isLiked(
-    track.library_track_id ?? (typeof track.id === "number" ? track.id : null),
-    track.entity_uid,
-    track.path,
-  );
-  const offlineState = getTrackState(track.entity_uid);
-  const offlineLabel = getOfflineStateLabel(offlineState);
+  const globalArtistUid = track.global_artist_uid;
+  const globalAlbumUid = track.global_album_uid;
   const cover =
     albumCover ||
-    (track.album_id != null
+    (globalAlbumUid
       ? albumCoverApiUrl(
           {
-            albumId: track.album_id,
-            albumEntityUid: track.album_entity_uid,
-            artistEntityUid: track.artist_entity_uid,
-            albumSlug: track.album_slug,
-            artistName: track.artist,
-            albumName: track.album,
+            globalAlbumUid,
           },
           { size: 128 },
         )
-      : undefined);
+      : track.album_id != null
+        ? albumCoverApiUrl(
+            {
+              albumId: track.album_id,
+              albumEntityUid: track.album_entity_uid,
+              artistEntityUid: track.artist_entity_uid,
+              albumSlug: track.album_slug,
+              artistName: track.artist,
+              albumName: track.album,
+            },
+            { size: 128 },
+          )
+        : undefined);
 
   const playerTrack: Track = toPlayableTrack(track, { cover });
+  const isRemote = playerTrack.origin === "remote";
+  const isGlobalCatalogOnly =
+    Boolean(playerTrack.globalTrackUid || track.global_track_uid) &&
+    track.availability?.local === false &&
+    playerTrack.libraryTrackId == null;
+  const showLocalActions = !isRemote && !isGlobalCatalogOnly;
+  const disabled =
+    Boolean(track.disabled) ||
+    (isRemote && playerTrack.remote?.availability.stream === false) ||
+    (isGlobalCatalogOnly && track.availability?.healthy === false);
+  const liked = hasTrackRef
+    ? isLiked(
+        track.library_track_id ??
+          (typeof track.id === "number" ? track.id : null),
+        track.entity_uid,
+        track.path,
+        track.global_track_uid,
+      )
+    : false;
+  const offlineState = showLocalActions
+    ? getTrackState(track.entity_uid)
+    : "idle";
+  const offlineLabel = showLocalActions
+    ? getOfflineStateLabel(offlineState)
+    : "";
   const playbackId = resolvePlayableTrackId(track);
   const isActive = currentTrack?.id === playbackId;
   const actions = useTrackActionEntries({
@@ -259,7 +305,20 @@ export const TrackRow = memo(function TrackRow({
   });
   const actionMenu = useItemActionMenu(actions);
 
-  function handleActivate() {
+  async function handleRemotePlayback() {
+    if (resolvingRemote) return;
+    setResolvingRemote(true);
+    try {
+      const resolved = await resolveRemotePlayableTrack(playerTrack);
+      play(resolved);
+    } catch {
+      toast.error(t("search.tryAgain"));
+    } finally {
+      setResolvingRemote(false);
+    }
+  }
+
+  async function handleActivate() {
     if (disabled) return;
     if (isActive) {
       if (isPlaying) {
@@ -270,7 +329,11 @@ export const TrackRow = memo(function TrackRow({
       return;
     }
     if (onPlayOverride) {
-      onPlayOverride();
+      await onPlayOverride();
+      return;
+    }
+    if (isRemote) {
+      await handleRemotePlayback();
       return;
     }
     if (queueTracks && queueTracks.length > 1) {
@@ -287,14 +350,14 @@ export const TrackRow = memo(function TrackRow({
     play(playerTrack);
   }
 
-  const playControlLabel = `${isActive && isPlaying ? "Pause" : "Play"} ${
-    track.title || "track"
-  }`;
+  const playControlLabel = `${
+    resolvingRemote ? "Resolving" : isActive && isPlaying ? "Pause" : "Play"
+  } ${track.title || "track"}`;
 
   function handlePlayControlClick(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
-    handleActivate();
+    void handleActivate();
   }
 
   return (
@@ -312,6 +375,7 @@ export const TrackRow = memo(function TrackRow({
       aria-selected={selectable ? selected : undefined}
       onContextMenu={(event) => {
         if (disabled) return;
+        if (!showLocalActions) return;
         if (selectable && onSelectionContextMenu?.(track, event)) return;
         onActionMenuOpen?.();
         actionMenu.handleContextMenu(event);
@@ -322,13 +386,13 @@ export const TrackRow = memo(function TrackRow({
           onSelect(track, event);
           return;
         }
-        handleActivate();
+        void handleActivate();
       }}
       onDoubleClick={
         selectable
           ? (event) => {
               event.preventDefault();
-              handleActivate();
+              void handleActivate();
             }
           : undefined
       }
@@ -406,12 +470,14 @@ export const TrackRow = memo(function TrackRow({
           >
             {track.title || "Unknown"}
           </div>
-          <OfflineBadge
-            state={offlineState}
-            compact
-            subtle
-            className="flex-shrink-0"
-          />
+          {!isRemote ? (
+            <OfflineBadge
+              state={offlineState}
+              compact
+              subtle
+              className="flex-shrink-0"
+            />
+          ) : null}
           {disabled ? (
             <span className="flex-shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-white/45">
               Soon
@@ -421,17 +487,25 @@ export const TrackRow = memo(function TrackRow({
         {(showArtist || showAlbum || offlineLabel) && (
           <div className="text-xs text-muted-foreground truncate">
             {showArtist &&
-              (track.artist_id ? (
+              (globalArtistUid || track.artist_id ? (
                 <span
                   className="hover:text-foreground hover:underline transition-colors cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(
-                      artistPagePath({
-                        artistId: track.artist_id,
-                        artistSlug: track.artist_slug,
-                        artistName: track.artist,
-                      }),
+                      globalArtistUid
+                        ? artistPagePath({
+                            artistId: track.artist_id,
+                            artistEntityUid: track.artist_entity_uid,
+                            globalArtistUid,
+                            artistSlug: track.artist_slug,
+                            artistName: track.artist,
+                          })
+                        : artistPagePath({
+                            artistId: track.artist_id,
+                            artistSlug: track.artist_slug,
+                            artistName: track.artist,
+                          }),
                     );
                   }}
                 >
@@ -442,18 +516,28 @@ export const TrackRow = memo(function TrackRow({
               ))}
             {showArtist && showAlbum && " · "}
             {showAlbum &&
-              (track.album_id ? (
+              (globalAlbumUid || track.album_id ? (
                 <span
                   className="hover:text-foreground hover:underline transition-colors cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(
-                      albumPagePath({
-                        albumId: track.album_id,
-                        albumSlug: track.album_slug,
-                        artistName: track.artist,
-                        albumName: track.album,
-                      }),
+                      globalAlbumUid
+                        ? albumPagePath({
+                            albumId: track.album_id,
+                            albumEntityUid: track.album_entity_uid,
+                            globalAlbumUid,
+                            albumSlug: track.album_slug,
+                            artistEntityUid: track.artist_entity_uid,
+                            artistName: track.artist,
+                            albumName: track.album,
+                          })
+                        : albumPagePath({
+                            albumId: track.album_id,
+                            albumSlug: track.album_slug,
+                            artistName: track.artist,
+                            albumName: track.album,
+                          }),
                     );
                   }}
                 >
@@ -490,7 +574,7 @@ export const TrackRow = memo(function TrackRow({
       )}
 
       {/* Like + Actions */}
-      {!disabled ? (
+      {hasTrackRef ? (
         <ActionIconButton
           variant="row"
           active={liked}
@@ -511,6 +595,7 @@ export const TrackRow = memo(function TrackRow({
                 libraryTrackId ?? null,
                 trackEntityUid,
                 path,
+                track.global_track_uid,
               );
             } catch {
               // Keep row interaction non-blocking; caller surfaces persistence elsewhere.
@@ -530,7 +615,7 @@ export const TrackRow = memo(function TrackRow({
         <div className="h-9 w-9 flex-shrink-0" />
       )}
 
-      {!disabled ? (
+      {showLocalActions && !disabled ? (
         <div className="flex-shrink-0 flex gap-1 opacity-100 md:opacity-65 md:group-hover:opacity-100 transition-opacity">
           <ItemActionMenuButton
             buttonRef={actionMenu.triggerRef}
@@ -555,7 +640,7 @@ export const TrackRow = memo(function TrackRow({
       ) : (
         <div className="h-9 w-9 flex-shrink-0" />
       )}
-      {!disabled ? (
+      {showLocalActions && !disabled ? (
         <ItemActionMenu
           actions={actions}
           header={{

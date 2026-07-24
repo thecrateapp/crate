@@ -14,6 +14,7 @@ export interface StatsOverview {
   skip_rate: number;
   top_artist: {
     artist_name: string;
+    global_artist_uid?: string | null;
     artist_id?: number | null;
     artist_slug?: string | null;
     play_count: number;
@@ -36,6 +37,9 @@ export interface StatsTrends {
 
 export interface StatsTrack {
   track_id: number | null;
+  global_track_uid?: string | null;
+  global_artist_uid?: string | null;
+  global_album_uid?: string | null;
   track_entity_uid?: string | null;
   track_path: string | null;
   title: string;
@@ -59,6 +63,7 @@ export interface StatsTrack {
 
 export interface StatsArtist {
   artist_name: string;
+  global_artist_uid?: string | null;
   artist_id?: number | null;
   artist_slug?: string | null;
   play_count: number;
@@ -68,9 +73,11 @@ export interface StatsArtist {
 
 export interface StatsAlbum {
   artist: string;
+  global_artist_uid?: string | null;
   artist_id?: number | null;
   artist_slug?: string | null;
   album: string;
+  global_album_uid?: string | null;
   album_id?: number | null;
   album_slug?: string | null;
   play_count: number;
@@ -134,6 +141,8 @@ export interface StatsMonthlySnapshotArtist {
 
 export interface StatsMonthlySnapshotCover {
   track_id?: number | null;
+  global_track_uid?: string | null;
+  global_album_uid?: string | null;
   track_entity_uid?: string | null;
   track_path?: string | null;
   title: string;

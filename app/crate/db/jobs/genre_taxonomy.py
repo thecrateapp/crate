@@ -179,46 +179,42 @@ def merge_duplicate_library_genres() -> list[dict]:
 
 
 def seed_genre_taxonomy_definitions(session, definitions) -> None:
-    slugs_with_gains = [
-        definition.slug for definition in definitions if definition.eq_gains is not None
-    ]
-    existing_count = (
-        session.execute(
-            text(
-                "SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes WHERE slug = ANY(:slugs)"
-            ),
-            {"slugs": [definition.slug for definition in definitions]},
-        )
-        .mappings()
-        .first()["cnt"]
-    )
-    existing_gains_count = (
-        session.execute(
-            text(
-                "SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes "
-                "WHERE slug = ANY(:slugs) AND eq_gains IS NOT NULL"
-            ),
-            {"slugs": slugs_with_gains},
-        )
-        .mappings()
-        .first()["cnt"]
-    )
-    if existing_count == len(definitions) and existing_gains_count == len(
-        slugs_with_gains
-    ):
-        return
+    # Keep the seed idempotent, but always apply it so upgrades from the
+    # pre-global taxonomy schema receive the stable core identity as well.
+    from crate.genre_taxonomy import CORE_TAXONOMY_ID, core_genre_uid
 
     for definition in definitions:
         session.execute(
             text(
                 """
-                INSERT INTO genre_taxonomy_nodes (slug, name, description, is_top_level, eq_gains)
-                VALUES (:slug, :name, :description, :is_top_level, :eq_gains)
+                INSERT INTO genre_taxonomy_nodes (
+                    slug,
+                    name,
+                    description,
+                    is_top_level,
+                    eq_gains,
+                    global_genre_uid,
+                    taxonomy_id,
+                    origin
+                )
+                VALUES (
+                    :slug,
+                    :name,
+                    :description,
+                    :is_top_level,
+                    :eq_gains,
+                    :global_genre_uid,
+                    :taxonomy_id,
+                    'core'
+                )
                 ON CONFLICT (slug) DO UPDATE
                 SET name = EXCLUDED.name,
                     description = EXCLUDED.description,
                     is_top_level = EXCLUDED.is_top_level,
-                    eq_gains = EXCLUDED.eq_gains
+                    eq_gains = EXCLUDED.eq_gains,
+                    global_genre_uid = EXCLUDED.global_genre_uid,
+                    taxonomy_id = EXCLUDED.taxonomy_id,
+                    origin = 'core'
                 """
             ),
             {
@@ -229,6 +225,8 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
                 "eq_gains": list(definition.eq_gains)
                 if definition.eq_gains is not None
                 else None,
+                "global_genre_uid": core_genre_uid(definition.slug),
+                "taxonomy_id": CORE_TAXONOMY_ID,
             },
         )
 
@@ -292,10 +290,21 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
             session.execute(
                 text(
                     """
-                    INSERT INTO genre_taxonomy_edges (source_genre_id, target_genre_id, relation_type, weight)
-                    VALUES (:source_id, :target_id, 'parent', 1.0)
+                    INSERT INTO genre_taxonomy_edges (
+                        source_genre_id,
+                        target_genre_id,
+                        relation_type,
+                        weight,
+                        source,
+                        confidence,
+                        locked
+                    )
+                    VALUES (:source_id, :target_id, 'parent', 1.0, 'crate-core', 1.0, TRUE)
                     ON CONFLICT (source_genre_id, target_genre_id, relation_type) DO UPDATE
-                    SET weight = EXCLUDED.weight
+                    SET weight = EXCLUDED.weight,
+                        source = EXCLUDED.source,
+                        confidence = EXCLUDED.confidence,
+                        locked = TRUE
                     """
                 ),
                 {"source_id": source_id, "target_id": target_id},
@@ -307,10 +316,21 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
             session.execute(
                 text(
                     """
-                    INSERT INTO genre_taxonomy_edges (source_genre_id, target_genre_id, relation_type, weight)
-                    VALUES (:source_id, :target_id, 'related', 0.7)
+                    INSERT INTO genre_taxonomy_edges (
+                        source_genre_id,
+                        target_genre_id,
+                        relation_type,
+                        weight,
+                        source,
+                        confidence,
+                        locked
+                    )
+                    VALUES (:source_id, :target_id, 'related', 0.7, 'crate-core', 1.0, TRUE)
                     ON CONFLICT (source_genre_id, target_genre_id, relation_type) DO UPDATE
-                    SET weight = EXCLUDED.weight
+                    SET weight = EXCLUDED.weight,
+                        source = EXCLUDED.source,
+                        confidence = EXCLUDED.confidence,
+                        locked = TRUE
                     """
                 ),
                 {"source_id": source_id, "target_id": target_id},

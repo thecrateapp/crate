@@ -56,7 +56,7 @@ import {
   connectCacheEvents,
 } from "./cache";
 
-const STORAGE_KEY = "crate-api-cache";
+const STORAGE_KEY = "crate-api-cache:v2";
 
 beforeEach(() => {
   cacheClear();
@@ -158,6 +158,21 @@ describe("scopesForUrl", () => {
     expect(scopesForUrl("/api/me/albums")).toEqual(["saved_albums"]);
   });
 
+  it("returns user catalog scopes", () => {
+    expect(scopesForUrl("/api/catalog/me/follows")).toEqual([
+      "follows",
+      "library",
+    ]);
+    expect(scopesForUrl("/api/catalog/me/artists")).toEqual([
+      "follows",
+      "library",
+    ]);
+    expect(scopesForUrl("/api/catalog/me/albums")).toEqual([
+      "saved_albums",
+      "library",
+    ]);
+  });
+
   it("returns history scope", () => {
     expect(scopesForUrl("/api/me/history")).toEqual(["history"]);
     expect(scopesForUrl("/api/me/stats")).toEqual(["history"]);
@@ -235,7 +250,8 @@ describe("scopesForUrl", () => {
 
   // Browse, search, genres
   it("returns library scope for search", () => {
-    expect(scopesForUrl("/api/search?q=foo")).toEqual(["library"]);
+    expect(scopesForUrl("/api/catalog/search?q=foo")).toEqual(["library"]);
+    expect(scopesForUrl("/api/catalog/search?q=foo")).toEqual(["library"]);
   });
 
   it("returns library scope for browse", () => {
@@ -331,6 +347,16 @@ describe("cacheGet / cacheSet", () => {
     };
     localStorage.setItem(`${STORAGE_KEY}:/api/foo`, JSON.stringify(entry));
     expect(cacheGet("/api/foo")).toEqual({ bar: 2 });
+  });
+
+  it("ignores legacy localStorage entries from older cache namespaces", () => {
+    const entry = {
+      data: { stale: true },
+      timestamp: Date.now(),
+      scopes: ["library"],
+    };
+    localStorage.setItem(`crate-api-cache:/api/foo`, JSON.stringify(entry));
+    expect(cacheGet("/api/foo")).toBeNull();
   });
 
   it("promotes localStorage entries to memory on read", () => {
@@ -693,6 +719,7 @@ afterEach(() => {
 
 describe("connectCacheEvents", () => {
   let origEventSource: typeof EventSource;
+  let constructedUrl: string | null;
   let mockEs: {
     onopen: (() => void) | null;
     onmessage: ((e: MessageEvent) => void) | null;
@@ -703,6 +730,7 @@ describe("connectCacheEvents", () => {
 
   beforeEach(() => {
     origEventSource = globalThis.EventSource;
+    constructedUrl = null;
 
     mockEs = {
       onopen: null,
@@ -715,7 +743,8 @@ describe("connectCacheEvents", () => {
     // Return the pre-built mock from the constructor so that
     // connectCacheEvents's property assignments (eventSource.onopen,
     // eventSource.onmessage, etc.) land directly on mockEs.
-    function MockEventSource() {
+    function MockEventSource(url: string | URL) {
+      constructedUrl = String(url);
       return mockEs;
     }
 
@@ -758,6 +787,18 @@ describe("connectCacheEvents", () => {
     );
     expect(mockRecordAssetInvalidationScope).toHaveBeenCalledWith("likes");
     expect(listener).toHaveBeenCalledWith("likes");
+  });
+
+  it("resumes from the last event persisted before a page reload", () => {
+    _safeConnect();
+    mockEs.onmessage!({ data: "library", lastEventId: "42" } as MessageEvent);
+    _disconnectCacheEvents!();
+
+    _safeConnect();
+
+    expect(constructedUrl).toBe(
+      "https://api.example.test/api/cache/events?last_event_id=42",
+    );
   });
 
   it("ignores empty messages", () => {

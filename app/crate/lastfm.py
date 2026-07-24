@@ -215,12 +215,12 @@ def _lastfm_image_url(images: list[dict] | None) -> str | None:
     return None
 
 
-def download_artist_image(image_url: str) -> bytes | None:
+def download_artist_image(image_url: str, *, timeout: int = 15) -> bytes | None:
     """Download image from URL."""
     if not image_url or LASTFM_PLACEHOLDER_HASH in image_url:
         return None
     try:
-        resp = requests.get(image_url, timeout=15)
+        resp = requests.get(image_url, timeout=timeout)
         resp.raise_for_status()
         if resp.headers.get("content-type", "").startswith("image/"):
             return resp.content
@@ -375,7 +375,7 @@ def get_fanart_all_images(artist_name: str) -> dict | None:
     return result
 
 
-def _deezer_artist_image(artist_name: str) -> str | None:
+def _deezer_artist_image(artist_name: str, *, timeout: int = 10) -> str | None:
     """Search Deezer for artist image URL. No auth needed."""
     cache_key = f"deezer:artist_img:{artist_name.lower()}"
     cached = get_cache(cache_key, max_age_seconds=86400 * 7)
@@ -386,7 +386,7 @@ def _deezer_artist_image(artist_name: str) -> str | None:
         resp = requests.get(
             "https://api.deezer.com/search/artist",
             params={"q": artist_name},
-            timeout=10,
+            timeout=timeout,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -408,6 +408,53 @@ def _deezer_artist_image(artist_name: str) -> str | None:
 
     set_cache(cache_key, {"url": None}, ttl=604800)
     return None
+
+
+def _lastfm_external_artist_image_url(
+    artist_name: str, *, timeout: int = 5
+) -> str | None:
+    """Return Last.fm artwork without enriching the artist or similar graph."""
+    cache_key = f"lastfm:external_artist_image:{artist_name.lower()}"
+    cached = get_cache(cache_key, max_age_seconds=86400 * 7)
+    if cached is not None:
+        return cached.get("url")
+
+    api_key = _lastfm_key()
+    if not api_key:
+        return None
+    try:
+        response = requests.get(
+            LASTFM_BASE,
+            params={
+                "method": "artist.getinfo",
+                "artist": artist_name,
+                "api_key": api_key,
+                "format": "json",
+            },
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        artist = response.json().get("artist") or {}
+        image_url = _lastfm_image_url(artist.get("image"))
+    except Exception:
+        log.debug("Last.fm external image lookup failed for %s", artist_name)
+        image_url = None
+
+    set_cache(cache_key, {"url": image_url}, ttl=604800)
+    return image_url
+
+
+def get_external_artist_image(artist_name: str) -> bytes | None:
+    """Fetch ancillary external artwork with bounded providers only.
+
+    External related-artist cards must never depend on the MusicBrainz/Fanart
+    path because MusicBrainz can block without a request timeout.  Library
+    enrichment retains the richer source ordering in ``get_best_artist_image``.
+    """
+    image_url = _deezer_artist_image(artist_name, timeout=5)
+    if not image_url:
+        image_url = _lastfm_external_artist_image_url(artist_name, timeout=5)
+    return download_artist_image(image_url, timeout=5) if image_url else None
 
 
 def get_best_artist_image_url(artist_name: str) -> str | None:

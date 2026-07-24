@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 import logging
 
 from sqlalchemy import text
@@ -26,28 +25,39 @@ def _schedule_stats_refresh(user_id: int) -> None:
     set_cache(debounce_key, True, ttl=_STATS_REFRESH_DEBOUNCE_SECONDS)
 
 
-def _queue_scrobble(
-    user_id: int,
-    *,
-    artist: str,
-    title: str,
-    album: str,
-    started_at: str,
-) -> None:
-    if not artist or not title:
-        return
+def _resolve_global_track_uid(
+    session, *, track_id: int | None, track_entity_uid: str | None
+) -> str | None:
+    if track_id is None and not track_entity_uid:
+        return None
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT global_track_uid::text AS global_track_uid
+                FROM global_catalog_tracks
+                WHERE local_track_id = :track_id
+                   OR (
+                        :track_entity_uid IS NOT NULL
+                        AND local_track_entity_uid = CAST(:track_entity_uid AS uuid)
+                   )
+                ORDER BY local_track_id = :track_id DESC
+                LIMIT 1
+                """
+            ),
+            {"track_id": track_id, "track_entity_uid": track_entity_uid},
+        )
+        .mappings()
+        .first()
+    )
+    return str(row["global_track_uid"]) if row else None
 
-    timestamp = None
-    if started_at:
-        try:
-            timestamp = int(datetime.fromisoformat(started_at).timestamp())
-        except ValueError:
-            timestamp = None
 
+def _queue_scrobble(event_id: int) -> None:
     try:
         from crate.actors import scrobble_play_event_actor
 
-        scrobble_play_event_actor.send(user_id, artist, title, album, timestamp)
+        scrobble_play_event_actor.send(event_id)
     except Exception:
         log.warning("Failed to dispatch scrobble follow-up", exc_info=True)
 
@@ -55,10 +65,7 @@ def _queue_scrobble(
 def _schedule_play_event_followups(
     user_id: int,
     *,
-    title: str,
-    artist: str,
-    album: str,
-    started_at: str,
+    event_id: int,
     was_completed: bool,
 ) -> None:
     try:
@@ -67,13 +74,7 @@ def _schedule_play_event_followups(
         pass
 
     if was_completed:
-        _queue_scrobble(
-            user_id,
-            artist=artist,
-            title=title,
-            album=album,
-            started_at=started_at,
-        )
+        _queue_scrobble(event_id)
 
 
 def record_play(
@@ -137,6 +138,7 @@ def record_play_event(
     *,
     client_event_id: str | None = None,
     track_id: int | None = None,
+    global_track_uid: str | None = None,
     track_entity_uid: str | None = None,
     track_path: str | None = None,
     title: str = "",
@@ -157,6 +159,8 @@ def record_play_event(
     context_playlist_id: int | None = None,
     device_type: str | None = None,
     app_platform: str | None = None,
+    content_origin: str = "local",
+    source_node_uid: str | None = None,
 ) -> int:
     created_at = utc_now_iso()
     with transaction_scope() as session:
@@ -191,6 +195,11 @@ def record_play_event(
             "track_entity_uid"
         ) or track_entity_uid
         resolved_track_path = track_path or (resolved_track or {}).get("track_path")
+        resolved_global_track_uid = global_track_uid or _resolve_global_track_uid(
+            session,
+            track_id=resolved_track_id,
+            track_entity_uid=resolved_track_entity_uid,
+        )
         row = (
             session.execute(
                 text(
@@ -199,6 +208,7 @@ def record_play_event(
                     user_id,
                     client_event_id,
                     track_id,
+                    global_track_uid,
                     track_entity_uid,
                     track_path,
                     title,
@@ -219,15 +229,18 @@ def record_play_event(
                     context_playlist_id,
                     device_type,
                     app_platform,
+                    content_origin,
+                    source_node_uid,
                     created_at
                 )
                 VALUES (
-                    :user_id, :client_event_id, :track_id, :track_entity_uid, :track_path, :title, :artist, :album,
+                    :user_id, :client_event_id, :track_id, CAST(:global_track_uid AS uuid), :track_entity_uid, :track_path, :title, :artist, :album,
                     :started_at, :ended_at, :played_seconds, :track_duration_seconds,
                     :completion_ratio, :was_skipped, :was_completed,
                     :play_source_type, :play_source_id, :play_source_name,
                     :context_artist, :context_album, :context_playlist_id,
-                    :device_type, :app_platform, :created_at
+                    :device_type, :app_platform, :content_origin,
+                    CAST(:source_node_uid AS uuid), :created_at
                 )
                 RETURNING id
                 """
@@ -236,6 +249,7 @@ def record_play_event(
                     "user_id": user_id,
                     "client_event_id": client_event_id,
                     "track_id": resolved_track_id,
+                    "global_track_uid": resolved_global_track_uid,
                     "track_entity_uid": resolved_track_entity_uid,
                     "track_path": resolved_track_path,
                     "title": title,
@@ -256,6 +270,8 @@ def record_play_event(
                     "context_playlist_id": context_playlist_id,
                     "device_type": device_type,
                     "app_platform": app_platform,
+                    "content_origin": content_origin,
+                    "source_node_uid": source_node_uid,
                     "created_at": created_at,
                 },
             )
@@ -274,6 +290,7 @@ def record_play_event(
                 "event_id": event_id,
                 "client_event_id": client_event_id,
                 "track_id": resolved_track_id,
+                "global_track_uid": resolved_global_track_uid,
                 "track_entity_uid": resolved_track_entity_uid,
                 "title": title,
                 "artist": artist,
@@ -282,16 +299,15 @@ def record_play_event(
                 "was_completed": was_completed,
                 "was_skipped": was_skipped,
                 "play_source_type": play_source_type,
+                "content_origin": content_origin,
+                "source_node_uid": source_node_uid,
             },
         )
         register_after_commit(
             session,
             lambda: _schedule_play_event_followups(
                 user_id,
-                title=title,
-                artist=artist,
-                album=album,
-                started_at=started_at,
+                event_id=int(event_id),
                 was_completed=was_completed,
             ),
         )

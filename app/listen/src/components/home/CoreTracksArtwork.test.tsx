@@ -37,6 +37,29 @@ describe("CoreTracksArtwork", () => {
     expect(img?.tagName).toBe("IMG");
   });
 
+  it("renders global artist photo for remote-only artist sets", () => {
+    render(
+      <CoreTracksArtwork
+        item={{
+          ...baseItem,
+          name: "High Vis",
+          artwork_tracks: [
+            {
+              artist: "High Vis",
+              global_artist_uid: "global-high-vis",
+            },
+          ],
+        }}
+      />,
+    );
+
+    const img = document.querySelector("img[alt='High Vis']");
+    expect(img).toBeInTheDocument();
+    expect(img?.getAttribute("src")).toContain(
+      "/api/catalog/artists/global-high-vis/photo",
+    );
+  });
+
   it("applies custom className", () => {
     const { container } = render(
       <CoreTracksArtwork

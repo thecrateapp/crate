@@ -260,6 +260,12 @@ def add_tracks(request: Request, playlist_id: int, body: AddTracksRequest):
     if not body.tracks:
         raise HTTPException(status_code=422, detail="No tracks provided")
     tracks = [track.model_dump(exclude_none=True) for track in body.tracks]
+    from crate.federation.cross_instance import deny_remote_for_local_action
+
+    for track in tracks:
+        if track.get("global_track_uid") or track.get("globalTrackUid"):
+            continue
+        deny_remote_for_local_action(track, "add to playlist")
     added = add_playlist_tracks(playlist_id, tracks)
     return {"ok": True, "added": added}
 

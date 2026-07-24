@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from crate.db.queries.browse_artist_filters import (
+    artist_decade_filter_sql,
     get_browse_filter_countries,
     get_browse_filter_decades,
     get_browse_filter_formats,
@@ -33,6 +34,7 @@ from crate.db.queries.browse_artist_tracks import (
 
 __all__ = [
     "check_artists_in_library",
+    "artist_decade_filter_sql",
     "get_all_artist_genre_map",
     "get_all_artist_genre_map_for_shows",
     "get_artist_all_tracks",

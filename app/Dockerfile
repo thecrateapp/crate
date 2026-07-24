@@ -11,7 +11,8 @@ WORKDIR /app
 FROM base AS api
 
 COPY requirements-api.txt .
-RUN pip install --no-cache-dir --prefer-binary -r requirements-api.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefer-binary --retries 10 --timeout 60 -r requirements-api.txt
 
 COPY alembic.ini .
 COPY crate ./crate

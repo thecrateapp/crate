@@ -1,6 +1,5 @@
 """Tests for the FastAPI API endpoints with mocked DB layer."""
 
-import io
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
@@ -9,18 +8,12 @@ from uuid import UUID
 from crate.api import _extra_cors_origins
 
 
-def test_virtual_pre_release_cover_proxies_release_cover_url(monkeypatch, tmp_path):
+def test_virtual_pre_release_cover_uses_worker_materialized_asset(
+    monkeypatch, tmp_path
+):
     from crate.api.browse_album import api_cover_by_id
-    from PIL import Image
 
-    buf = io.BytesIO()
-    Image.new("RGB", (256, 256), color="black").save(buf, format="JPEG")
-    cover_bytes = buf.getvalue()
-
-    class Response:
-        status_code = 200
-        content = cover_bytes
-        headers = {"content-type": "image/jpeg"}
+    delivered = []
 
     monkeypatch.setattr(
         "crate.api.browse_album.get_release_by_virtual_album_id",
@@ -32,14 +25,21 @@ def test_virtual_pre_release_cover_proxies_release_cover_url(monkeypatch, tmp_pa
     )
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setattr(
-        "crate.api.browse_album._REMOTE_COVER_SESSION.get",
-        lambda *args, **kwargs: Response(),
+        "crate.api.browse_album.deliver_artwork",
+        lambda asset, **kwargs: (
+            delivered.append((asset, kwargs)) or kwargs["missing_response"]
+        ),
     )
 
     response = api_cover_by_id(-42, size=None, image_format=None)
 
-    assert response.body == cover_bytes
-    assert response.media_type == "image/jpeg"
+    assert response.media_type == "image/svg+xml"
+    assert len(delivered) == 1
+    asset, options = delivered[0]
+    assert asset.kind == "release-cover"
+    assert asset.entity_key == "42"
+    assert options["local_original"] is None
+    assert options["requested_size"] is None
 
 
 def test_extra_cors_origins_parse_operator_env(monkeypatch):
@@ -314,16 +314,17 @@ class TestArtistDetailAPI:
                 "crate.api.browse_artist.get_artist_all_tracks", return_value=all_tracks
             ),
             patch(
-                "crate.api.browse_artist.get_top_tracks",
+                "crate.api.browse_artist.get_cached_top_tracks",
                 return_value=[{"title": "Track Two"}, {"title": "Track One"}],
-            ) as mock_top_tracks,
+            ) as mock_cached_top_tracks,
         ):
             payload = browse_artist._get_artist_top_tracks_payload("Tool", count=5)
 
         assert [item["title"] for item in payload[:2]] == ["Track Two", "Track One"]
-        mock_top_tracks.assert_called_once_with("Tool", limit=100)
+        mock_cached_top_tracks.assert_called_once_with("Tool", limit=100)
 
-    def test_get_artist_found(self, test_app):
+    def test_get_artist_found(self, pg_db, test_app):
+        del pg_db
         mock_artist = {
             "name": "Tool",
             "track_count": 50,
@@ -408,7 +409,8 @@ class TestArtistDetailAPI:
         assert resp.json()["name"] == "Tool"
         mock_api_artist.assert_called_once_with(ANY, "Tool")
 
-    def test_get_artist_page_by_slug(self, test_app):
+    def test_get_artist_page_by_slug(self, pg_db, test_app):
+        del pg_db
         artist_payload = {
             "artist": {
                 "id": 7,
@@ -432,11 +434,11 @@ class TestArtistDetailAPI:
 
         with (
             patch(
-                "crate.api.browse_artist.get_library_artist_by_slug",
+                "crate.api.catalog_artist_compat.get_library_artist_by_slug",
                 return_value={"id": 7, "slug": "tool", "name": "Tool"},
             ),
             patch(
-                "crate.api.browse_artist._build_artist_page_payload",
+                "crate.api.catalog_artist_compat._build_artist_page_payload",
                 return_value=artist_payload,
             ) as mock_payload,
         ):
@@ -455,7 +457,8 @@ class TestArtistDetailAPI:
             stats_limit=12,
         )
 
-    def test_get_artist_page_bundles_listen_payload(self, test_app):
+    def test_get_artist_page_bundles_listen_payload(self, pg_db, test_app):
+        del pg_db
         artist_payload = {
             "id": 7,
             "slug": "tool",
@@ -559,7 +562,10 @@ class TestArtistDetailAPI:
         mock_enrichment.assert_called_once_with("Tool")
         mock_set_cache.assert_called_once()
 
-    def test_get_artist_page_falls_back_to_slug_when_artist_id_is_stale(self, test_app):
+    def test_get_artist_page_falls_back_to_slug_when_artist_id_is_stale(
+        self, pg_db, test_app
+    ):
+        del pg_db
         artist_payload = {
             "id": 52,
             "slug": "poison-the-well",
@@ -603,7 +609,8 @@ class TestArtistDetailAPI:
         assert resp.json()["artist"]["name"] == "Poison The Well"
         mock_artist_name_from_ref.assert_called_once_with(52, "poison-the-well")
 
-    def test_get_artist_page_uses_cached_shows_helper(self, test_app):
+    def test_get_artist_page_uses_cached_shows_helper(self, pg_db, test_app):
+        del pg_db
         artist_payload = {
             "id": 52,
             "slug": "poison-the-well",
@@ -690,7 +697,8 @@ class TestArtistDetailAPI:
         assert payload["events"][0]["id"] == "99"
         assert payload["events"][0]["user_attending"] is True
 
-    def test_get_album_by_artist_and_album_slug(self, test_app):
+    def test_get_album_by_artist_and_album_slug(self, pg_db, test_app):
+        del pg_db
         artist = {"id": 5, "slug": "quicksand", "name": "Quicksand"}
         albums = [
             {"id": 14, "slug": "quicksand-slip", "artist": "Quicksand", "name": "Slip"},
@@ -916,7 +924,10 @@ class TestSearchAPI:
         )
 
         with (
-            patch("crate.api.browse_media.has_library_data", return_value=True),
+            patch("crate.local_search.has_library_data", return_value=True),
+            patch("crate.local_search.get_cache", return_value=None),
+            patch("crate.local_search.set_cache"),
+            patch("crate.local_search.record_later"),
             patch("crate.db.queries.browse_media_search.read_scope", mock_scope),
         ):
             resp = test_app.get("/api/search?q=radio")
@@ -1988,7 +1999,7 @@ class TestHomeEndpointCaching:
         }
 
         with (
-            patch("crate.api.me.get_cache", return_value=cached_mix),
+            patch("crate.api.me.get_cache", return_value=cached_mix) as mock_get_cache,
             patch(
                 "crate.api.me.get_home_playlist",
                 side_effect=AssertionError("unexpected playlist rebuild"),
@@ -2000,6 +2011,7 @@ class TestHomeEndpointCaching:
         data = resp.json()
         assert data["id"] == "daily-discovery"
         assert data["name"] == "Daily Discovery"
+        assert mock_get_cache.call_args.args[0].startswith("home_mix:v3:global:")
 
     def test_home_section_detail_uses_cache(self, test_app):
         cached_section = {
@@ -2010,7 +2022,9 @@ class TestHomeEndpointCaching:
         }
 
         with (
-            patch("crate.api.me.get_cache", return_value=cached_section),
+            patch(
+                "crate.api.me.get_cache", return_value=cached_section
+            ) as mock_get_cache,
             patch(
                 "crate.api.me.get_home_section",
                 side_effect=AssertionError("unexpected section rebuild"),
@@ -2022,6 +2036,7 @@ class TestHomeEndpointCaching:
         data = resp.json()
         assert data["id"] == "custom-mixes"
         assert data["title"] == "Custom mixes"
+        assert mock_get_cache.call_args.args[0].startswith("home_section:v4:global:")
 
 
 class TestShowsAPI:
@@ -2258,6 +2273,7 @@ class TestHealthAPI:
         assert by_check["duplicate_tracks"]["risk"] == "destructive"
         assert by_check["duplicate_tracks"]["scope"] == "hybrid"
         assert by_check["duplicate_tracks"]["requires_confirmation"] is True
+        assert by_check["duplicate_tracks"]["supports_artist_scope"] is True
         assert by_check["duplicate_tracks"]["supports_global_scope"] is False
 
     def test_fix_type_rejects_non_global_repairs(self, test_app):
@@ -2523,6 +2539,147 @@ class TestHealthAPI:
             }
         ]
         mock_fix_preview.assert_called_once_with("Birds In Row")
+
+    def test_artist_repair_plan_refreshes_duplicate_tracks_from_local_catalog(
+        self, test_app
+    ):
+        preview = {
+            "items": [
+                {
+                    "issue_id": None,
+                    "check_type": "duplicate_tracks",
+                    "severity": "medium",
+                    "description": "Duplicate tracks",
+                    "support": "automatic",
+                    "auto_fixable": True,
+                    "executable": True,
+                    "action": "quarantine_duplicate_tracks",
+                    "target": "Birds In Row/Gris Klein/0151",
+                    "message": "Would quarantine 1 duplicate track copy",
+                    "fs_write": True,
+                    "supports_artist_scope": True,
+                    "supports_global_scope": False,
+                    "issue": {
+                        "check": "duplicate_tracks",
+                        "details": {"artist": "Birds In Row"},
+                    },
+                }
+            ],
+            "total": 1,
+            "executable": 1,
+            "manual_only": 0,
+        }
+        stale_issue = {
+            "id": 41,
+            "check_type": "duplicate_tracks",
+            "details_json": {
+                "artist": "Birds In Row",
+                "album": "Old Album",
+                "title": "Old Duplicate",
+                "paths": ["/music/stale-a.flac", "/music/stale-b.flac"],
+            },
+        }
+        duplicate_row = {
+            "album_id": 7,
+            "artist": "Birds In Row",
+            "album": "Gris Klein",
+            "title": "0151",
+            "track_number": 1,
+            "disc_number": 1,
+            "cnt": 2,
+            "paths": [
+                "/music/birds-in-row/gris-klein/01-0151.flac",
+                "/music/birds-in-row/gris-klein/01-0151-copy.flac",
+            ],
+            "track_ids": [100, 101],
+            "tracks": [
+                {
+                    "id": 100,
+                    "path": "/music/birds-in-row/gris-klein/01-0151.flac",
+                    "filename": "01-0151.flac",
+                    "format": "flac",
+                    "duration": 131.0,
+                    "size": 1024,
+                    "has_audio_fingerprint": True,
+                    "audio_fingerprint_source": "fpcalc",
+                },
+                {
+                    "id": 101,
+                    "path": "/music/birds-in-row/gris-klein/01-0151-copy.flac",
+                    "filename": "01-0151-copy.flac",
+                    "format": "flac",
+                    "duration": 131.0,
+                    "size": 1000,
+                    "has_audio_fingerprint": True,
+                    "audio_fingerprint_source": "fpcalc",
+                },
+            ],
+            "fingerprinted_count": 2,
+            "missing_fingerprint_count": 0,
+        }
+        fix_preview = {
+            "status": "already_canonical",
+            "applicable": False,
+            "artist": "Birds In Row",
+            "message": "Birds In Row already uses canonical entity_uid layout",
+            "target_artist_dir": "/music/695179a0-3863-50c2-9302-61f5cf144daa",
+            "candidate_dirs": [],
+            "album_moves": [],
+            "artist_files": [],
+            "folder_name_mismatch": False,
+            "skipped_existing": 0,
+            "skipped_foreign": 0,
+            "preview_errors": [],
+        }
+
+        with (
+            patch(
+                "crate.api.management.artist_name_from_entity_uid",
+                return_value="Birds In Row",
+            ),
+            patch(
+                "crate.db.queries.health.get_duplicate_tracks",
+                return_value=[duplicate_row],
+            ) as mock_duplicate_tracks,
+            patch(
+                "crate.api.management._build_repair_preview", return_value=preview
+            ) as mock_preview,
+            patch(
+                "crate.api.management._build_artist_fix_preview",
+                return_value=fix_preview,
+            ),
+            patch("crate.api.management.get_artist_issues", return_value=[stale_issue]),
+        ):
+            resp = test_app.get(
+                "/api/manage/artists/by-entity/695179a0-3863-50c2-9302-61f5cf144daa/repair-plan"
+            )
+
+        assert resp.status_code == 200
+        mock_duplicate_tracks.assert_called_once_with(artist_name="Birds In Row")
+        preview_issues = mock_preview.call_args.args[0]
+        assert preview_issues == [
+            {
+                "check": "duplicate_tracks",
+                "severity": "medium",
+                "details": {
+                    "album_id": 7,
+                    "artist": "Birds In Row",
+                    "album": "Gris Klein",
+                    "title": "0151",
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "count": 2,
+                    "paths": [
+                        "/music/birds-in-row/gris-klein/01-0151.flac",
+                        "/music/birds-in-row/gris-klein/01-0151-copy.flac",
+                    ],
+                    "track_ids": [100, 101],
+                    "tracks": duplicate_row["tracks"],
+                    "fingerprinted_count": 2,
+                    "missing_fingerprint_count": 0,
+                },
+            }
+        ]
 
     def test_artist_repair_plan_filters_stale_artist_layout_issue(self, test_app):
         preview = {

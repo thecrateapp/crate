@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner", () => ({
-  toast: vi.fn(),
+  toast: Object.assign(vi.fn(), { success: vi.fn() }),
 }));
 
 vi.mock("@/lib/radio", () => ({
@@ -47,5 +47,37 @@ describe("RadioFeedback", () => {
     expect(
       screen.getByRole("button", { name: "Menos como esto" }),
     ).toBeVisible();
+  });
+
+  it("sends a canonical global track reference when no local id exists", async () => {
+    const onDislike = vi.fn();
+    renderWithListenProviders(
+      <RadioFeedback
+        sessionId="sess-1"
+        trackId={undefined}
+        globalTrackUid="remote-track"
+        onDislike={onDislike}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTitle("More like this"));
+
+    expect(mockSendRadioFeedback).toHaveBeenCalledWith(
+      "sess-1",
+      undefined,
+      "like",
+      "remote-track",
+    );
+
+    await user.click(screen.getByTitle("Less like this"));
+
+    expect(mockSendRadioFeedback).toHaveBeenCalledWith(
+      "sess-1",
+      undefined,
+      "dislike",
+      "remote-track",
+    );
+    expect(onDislike).toHaveBeenCalledTimes(1);
   });
 });

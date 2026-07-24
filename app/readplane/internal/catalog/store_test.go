@@ -1,11 +1,68 @@
 package catalog
 
 import (
+	"context"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestArtistTopTracksBySlugPreservesLookupErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "artist missing", err: ErrNotFound},
+		{name: "database unavailable", err: errors.New("database unavailable")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &Store{
+				artistRowFn: func(context.Context, string, ...any) (map[string]any, error) {
+					return nil, tt.err
+				},
+			}
+
+			tracks, err := store.ArtistTopTracksBySlug(context.Background(), "remote-artist", 20)
+
+			assert.Nil(t, tracks)
+			assert.ErrorIs(t, err, tt.err)
+		})
+	}
+}
+
+func TestBuildLocalFTSQuery(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{name: "single token", query: "High", want: "high:*"},
+		{name: "multiple tokens", query: "High Vis", want: "high & vis:*"},
+		{name: "punctuation", query: "Björk & París!", want: "björk & parís:*"},
+		{name: "empty", query: "---", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, buildLocalFTSQuery(tt.query))
+		})
+	}
+}
+
+func TestLocalSearchQueriesBoundCandidatesBeforeRanking(t *testing.T) {
+	queries := []string{localArtistSearchSQL, localAlbumSearchSQL, localTrackSearchSQL}
+	for _, query := range queries {
+		assert.Contains(t, query, "fts_candidates AS")
+		assert.Contains(t, query, "substring_candidates AS")
+		assert.Equal(t, 2, strings.Count(query, "LIMIT $4"))
+		assert.NotContains(t, query, "SELECT *")
+	}
+	assert.Contains(t, localTrackSearchSQL, "t.album ILIKE $2")
+	assert.NotContains(t, localTrackSearchSQL, "a.name ILIKE $2")
+}
 
 func TestMain(m *testing.M) {
 	LoadDefaultTaxonomy()
@@ -18,8 +75,19 @@ func TestPublicAlbumSlug(t *testing.T) {
 }
 
 func TestSlugify(t *testing.T) {
-	got := slugify("  Live in Orlando, FL 3/14/2022  ")
-	assert.Equal(t, "live-in-orlando-fl-3-14-2022", got)
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "punctuation", value: "  Live in Orlando, FL 3/14/2022  ", want: "live-in-orlando-fl-3-14-2022"},
+		{name: "unicode accents", value: "Björk à París", want: "bjork-a-paris"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, slugify(tt.value))
+		})
+	}
 }
 
 func TestLooksLikeUUID(t *testing.T) {
@@ -66,6 +134,34 @@ func TestEmptyTrackGenrePayload(t *testing.T) {
 	}
 }
 
+func TestUserLibraryCountsQueryKeepsCanonicalAndUnresolvedLegacyRefs(t *testing.T) {
+	tests := []struct {
+		name  string
+		table string
+	}{
+		{name: "followed artists", table: "user_global_artist_follows"},
+		{name: "saved albums", table: "user_global_album_saves"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Contains(t, userLibraryCountsQuery, tt.table)
+		})
+	}
+	for _, table := range []string{"user_follows", "user_saved_albums"} {
+		assert.Contains(t, userLibraryCountsQuery, table)
+	}
+	assert.Contains(t, userLibraryCountsQuery, "projected.user_id IS NULL")
+}
+
+func TestReadplaneUserLibraryQueriesUseCanonicalRefs(t *testing.T) {
+	queries := []string{followedArtistsQuery, savedAlbumsQuery, followingArtistNameQuery}
+	for _, query := range queries {
+		assert.Contains(t, query, "user_global_")
+		assert.Contains(t, query, "global_catalog_")
+	}
+}
+
 func TestAnnotateGenreSummary(t *testing.T) {
 	t.Run("mapped genre", func(t *testing.T) {
 		row := map[string]any{
@@ -90,6 +186,7 @@ func TestAnnotateGenreSummary(t *testing.T) {
 
 		assert.Equal(t, true, row["mapped"])
 		assert.Equal(t, "hardcore expanded into dynamics.", row["description"])
+		assert.Equal(t, 0, row["track_count"])
 		_, ok := row["canonical_eq_gains"]
 		assert.False(t, ok, "leaked canonical_eq_gains")
 		preset, ok := row["eq_preset_resolved"].(map[string]any)

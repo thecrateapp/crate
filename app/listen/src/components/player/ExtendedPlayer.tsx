@@ -189,13 +189,20 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   }
 
   function goToArtist() {
-    if (!resolvedArtist?.id) return;
+    if (!resolvedArtist?.id && !resolvedArtist?.globalArtistUid) return;
     navigate(
-      artistPagePath({
-        artistId: resolvedArtist.id,
-        artistSlug: resolvedArtist.slug,
-        artistName: resolvedArtist.name,
-      }),
+      resolvedArtist.globalArtistUid
+        ? artistPagePath({
+            artistId: resolvedArtist.id,
+            globalArtistUid: resolvedArtist.globalArtistUid,
+            artistSlug: resolvedArtist.slug,
+            artistName: resolvedArtist.name,
+          })
+        : artistPagePath({
+            artistId: resolvedArtist.id,
+            artistSlug: resolvedArtist.slug,
+            artistName: resolvedArtist.name,
+          }),
     );
   }
 

@@ -3,7 +3,9 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   EssentialsSection,
+  FavoriteArtistsSection,
   HomeTasteHero,
+  openRecentItemPath,
   RadioStationCard,
   RadioStationsSection,
   RecentEntityRow,
@@ -15,7 +17,16 @@ import type {
   HomeRadioStation,
   HomeRecentItem,
 } from "@/components/home/home-model";
+import { artistPhotoApiUrl } from "@/lib/library-routes";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
+
+vi.mock("@/lib/library-routes", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/library-routes")>();
+  return {
+    ...actual,
+    artistPhotoApiUrl: vi.fn(actual.artistPhotoApiUrl),
+  };
+});
 
 vi.mock("@/contexts/SavedAlbumsContext", () => ({
   useSavedAlbums: () => ({
@@ -318,6 +329,30 @@ describe("RecentEntityRow", () => {
     expect(within(playlistRow).queryByText("playlist")).toBeNull();
   });
 
+  it("renders remote favorite artists with global catalog routes and artwork", () => {
+    renderWithListenProviders(
+      <FavoriteArtistsSection
+        artists={[
+          {
+            global_artist_uid: "artist-global-1",
+            artist_name: "High Vis",
+            play_count: 9,
+            minutes_listened: 31,
+          },
+        ]}
+        onViewAll={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("High Vis").closest('[role="button"]'),
+    ).not.toBeNull();
+    expect(screen.getByAltText("High Vis")).toHaveAttribute(
+      "src",
+      "/api/catalog/artists/artist-global-1/photo?size=320&format=webp",
+    );
+  });
+
   it("opens the normalized album context menu from a recent album card", async () => {
     const item: HomeRecentItem = {
       type: "album",
@@ -345,6 +380,26 @@ describe("RecentEntityRow", () => {
     expect(
       within(menu).getByRole("menuitem", { name: "Share album" }),
     ).toBeInTheDocument();
+  });
+
+  it("uses global album identity for recent album artwork and navigation", () => {
+    const item: HomeRecentItem = {
+      type: "album",
+      global_album_uid: "album-global-1",
+      global_artist_uid: "artist-global-1",
+      album_name: "Blending",
+      artist_name: "High Vis",
+      subtitle: "Album",
+    };
+
+    const { container } = renderWithListenProviders(
+      <RecentEntityRow item={item} onClick={vi.fn()} />,
+    );
+
+    expect(openRecentItemPath(item)).toBe("/artists/high-vis/blending");
+    expect(container.innerHTML).toContain(
+      "/api/catalog/albums/album-global-1/cover",
+    );
   });
 
   it("opens the normalized artist context menu from the more button", async () => {
@@ -419,6 +474,32 @@ describe("RadioStationCard", () => {
     expect(screen.getByText("Artist Radio")).toBeInTheDocument();
     expect(screen.getByText("Converge")).toBeInTheDocument();
     expect(screen.queryByText("Based on your heavy rotation")).toBeNull();
+  });
+
+  it("uses global artist artwork for remote radio stations", () => {
+    const station: HomeRadioStation = {
+      type: "artist",
+      title: "High Vis Radio",
+      seed_type: "artist",
+      seed_value: "global-high-vis",
+      seed_label: "High Vis",
+      subtitle: "",
+      play_count: 24,
+      artist_name: "High Vis",
+      global_artist_uid: "global-high-vis",
+    };
+
+    renderWithListenProviders(
+      <RadioStationCard station={station} onPlay={vi.fn()} />,
+    );
+
+    expect(artistPhotoApiUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        globalArtistUid: "global-high-vis",
+        artistName: "High Vis",
+      }),
+      { size: 256 },
+    );
   });
 });
 

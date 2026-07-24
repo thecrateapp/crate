@@ -1,3 +1,14 @@
+---
+title: Enrichment, acquisition and integrations
+summary: Background enrichment and acquisition ownership.
+section: architecture
+audience: [developer]
+status: canonical
+order: 90
+verified: 2026-07-21
+sources: [app/crate/enrichment.py, app/crate/worker_handlers]
+---
+
 # Enrichment, Acquisition, and External Integrations
 
 ## Why this layer exists

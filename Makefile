@@ -218,6 +218,166 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
+# ===========================================================================
+# FEDERATION DEV (two-node local harness)
+# ===========================================================================
+
+DC_FED := COMPOSE_PROJECT_NAME=crate-federation-dev $(DC) -f docker-compose.federation-dev.yaml
+FED_CONTAINERS := fed-a-api fed-a-readplane fed-a-worker fed-a-admin fed-a-listen fed-a-postgres fed-a-redis fed-b-api fed-b-readplane fed-b-worker fed-b-postgres fed-b-redis
+FED_API_A := http://localhost:18585
+FED_API_B := http://localhost:28585
+FED_ADMIN_A := http://localhost:15173
+FED_LISTEN_A := http://localhost:15174
+FED_READPLANE_A := http://localhost:18686
+FED_READPLANE_B := http://localhost:28686
+FED_NODE_A_SERVICES := node-a-postgres node-a-redis node-a-api node-a-readplane node-a-worker node-a-admin node-a-listen
+
+.PHONY: federation-dev-up-singleton
+federation-dev-up-singleton: ## Start a real one-node federation harness
+	@echo "$(YELLOW)Checking singleton port availability...$(NC)"
+	@for port in 18585 18686 15173 15174 15433 16380; do \
+		if lsof -ti :$$port >/dev/null 2>&1; then \
+			echo "$(RED)Port $$port is already in use. Stop conflicting services first.$(NC)"; \
+			exit 1; \
+		fi; \
+	done
+	@bash scripts/federation-fixture-seed.sh
+	@$(DC_FED) up -d --build $(FED_NODE_A_SERVICES)
+	@ok=0; \
+	for _ in $$(seq 1 60); do \
+		if curl -fsS "$(FED_API_A)/api/status" >/dev/null 2>&1; then ok=1; break; fi; \
+		sleep 2; \
+	done; \
+	if [ "$$ok" != "1" ]; then \
+		echo "$(RED)Singleton API did not become ready: $(FED_API_A)$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Singleton harness running: $(FED_API_A)$(NC)"
+
+.PHONY: federation-dev-up
+federation-dev-up: ## Start the two-node federation dev harness with Node A Admin and Listen
+	@echo "$(YELLOW)Checking port availability...$(NC)"
+	@for port in 18585 18686 28585 28686 15173 15174 15433 25433 16380 26380; do \
+		if lsof -ti :$$port >/dev/null 2>&1; then \
+			echo "$(RED)Port $$port is already in use. Stop conflicting services first.$(NC)"; \
+			exit 1; \
+		fi; \
+	done
+	@echo "$(YELLOW)Seeding fixtures...$(NC)"
+	@bash scripts/federation-fixture-seed.sh
+	@echo "$(YELLOW)Starting federation stack...$(NC)"
+	@$(DC_FED) up -d --build
+	@echo "$(YELLOW)Waiting for federation services...$(NC)"
+	@for url in "$(FED_API_A)/api/status" "$(FED_API_B)/api/status" "$(FED_READPLANE_A)/readyz" "$(FED_READPLANE_B)/readyz"; do \
+		ok=0; \
+		for _ in $$(seq 1 60); do \
+			if curl -fsS "$$url" >/dev/null 2>&1; then ok=1; break; fi; \
+			sleep 2; \
+		done; \
+		if [ "$$ok" != "1" ]; then \
+			echo "$(RED)Service did not become ready: $$url$(NC)"; \
+			exit 1; \
+		fi; \
+	done
+	@ok=0; \
+	for _ in $$(seq 1 60); do \
+		if curl -fsS "$(FED_ADMIN_A)" 2>/dev/null | grep -q '<div id="root"'; then ok=1; break; fi; \
+		sleep 2; \
+	done; \
+	if [ "$$ok" != "1" ]; then \
+		echo "$(RED)Admin did not become ready: $(FED_ADMIN_A)$(NC)"; \
+		exit 1; \
+	fi
+	@ok=0; \
+	for _ in $$(seq 1 60); do \
+		if curl -fsS "$(FED_LISTEN_A)" 2>/dev/null | grep -q '<div id="root"'; then ok=1; break; fi; \
+		sleep 2; \
+	done; \
+	if [ "$$ok" != "1" ]; then \
+		echo "$(RED)Listen did not become ready: $(FED_LISTEN_A)$(NC)"; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "$(GREEN)Federation dev harness running:$(NC)"
+	@echo "  Node A API: $(FED_API_A)"
+	@echo "  Node A Readplane: $(FED_READPLANE_A)"
+	@echo "  Node A Admin: $(FED_ADMIN_A)"
+	@echo "  Node A Listen: $(FED_LISTEN_A)"
+	@echo "  Node B API: $(FED_API_B)"
+	@echo "  Node B Readplane: $(FED_READPLANE_B)"
+	@echo ""
+	@echo "  Next: make federation-dev-smoke && make federation-dev-e2e"
+
+.PHONY: federation-dev-down
+federation-dev-down: ## Stop the federation dev harness (preserves data volumes)
+	@$(DC_FED) down
+	@docker rm -f $(FED_CONTAINERS) >/dev/null 2>&1 || true
+	@echo "$(GREEN)Federation stack stopped (data preserved)$(NC)"
+
+.PHONY: federation-dev-reset
+federation-dev-reset: ## Reset the federation dev harness (wipes data volumes)
+	@$(DC_FED) down -v
+	@docker rm -f $(FED_CONTAINERS) >/dev/null 2>&1 || true
+	@rm -rf test-music-federation
+	@echo "$(GREEN)Federation stack reset (volumes + fixtures removed)$(NC)"
+
+.PHONY: federation-dev-seed
+federation-dev-seed: ## Re-seed federation fixture directories only
+	@rm -rf test-music-federation
+	@bash scripts/federation-fixture-seed.sh
+	@echo "$(GREEN)Fixtures re-seeded$(NC)"
+
+.PHONY: federation-dev-logs
+federation-dev-logs: ## Tail federation harness logs (usage: make federation-dev-logs s=fed-a-api)
+	@if [ -n "$(s)" ]; then \
+		$(DC_FED) logs -f $(s); \
+	else \
+		$(DC_FED) logs -f; \
+	fi
+
+.PHONY: federation-dev-smoke
+federation-dev-smoke: ## Run federation smoke check
+	@bash scripts/federation-smoke.sh
+
+.PHONY: federation-dev-e2e
+federation-dev-e2e: ## Pair nodes, sync fixtures, and verify cross-node search + playback
+	@python3 scripts/federation-dev-e2e.py e2e
+
+.PHONY: federation-dev-global-catalog-e2e
+federation-dev-global-catalog-e2e: ## Verify Listen-ready global catalog search, artwork, and playback
+	@python3 scripts/federation-dev-e2e.py global-catalog
+
+.PHONY: federation-dev-playback-prepare-e2e
+federation-dev-playback-prepare-e2e: ## Verify remote playback prepare, fallback, and ready variant flow
+	@python3 scripts/federation-dev-e2e.py playback-prepare
+
+.PHONY: federation-dev-import-e2e
+federation-dev-import-e2e: ## Verify signed remote import, local identity, hashes, playback, and cleanup
+	@CRATE_RUN_FEDERATION_E2E=1 PYTHONPATH=app uv run pytest app/tests/test_federation_import_e2e.py -q
+
+.PHONY: federation-dev-singleton-e2e
+federation-dev-singleton-e2e: ## Verify bootstrap, catalog, taxonomy, and playback with exactly one node
+	@python3 scripts/federation-dev-e2e.py singleton
+
+.PHONY: federation-dev-zero-downtime-e2e
+federation-dev-zero-downtime-e2e: ## Probe catalog availability during singleton sync and reconciliation
+	@python3 scripts/federation-dev-e2e.py zero-downtime
+
+.PHONY: federation-dev-ps
+federation-dev-ps: ## Show federation service status
+	@$(DC_FED) ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+
+# ── Federation dev helpers ────────────────────────────────────────────────
+
+.PHONY: federation-dev-pair
+federation-dev-pair: ## Pair node A and B bidirectionally and grant Listen access
+	@python3 scripts/federation-dev-e2e.py pair
+
+.PHONY: federation-dev-shell
+federation-dev-shell: ## Open a shell in a federation service (usage: make federation-dev-shell s=fed-a-api)
+	@if [ -z "$(s)" ]; then echo "$(RED)Specify a service: make federation-dev-shell s=fed-a-api$(NC)"; exit 1; fi
+	@$(DC_FED) exec $(s) sh
+
 .PHONY: dev-test
 dev-test: dev-test-backend dev-test-readplane dev-test-rust dev-test-frontend ## Run backend, frontend, Go, and Rust checks
 	@echo "$(GREEN)All dev checks passed$(NC)"
@@ -251,7 +411,8 @@ dev-test-backend: ## Run Python backend static checks and pytest
 	@$(DC_TEST) down -v --remove-orphans 2>/dev/null || true
 	@$(DC_TEST) up -d --wait
 	@docker run --rm --network crate-test_default \
-		-v "$(CURDIR)/app:/app" -w /app \
+		-v "$(CURDIR):/workspace" -w /workspace \
+		-e PYTHONPATH=/workspace/app \
 		-e CRATE_POSTGRES_HOST=crate-test-postgres \
 		-e CRATE_POSTGRES_PORT=5432 \
 		-e CRATE_POSTGRES_USER=crate \
@@ -260,9 +421,9 @@ dev-test-backend: ## Run Python backend static checks and pytest
 		-e REDIS_URL=redis://crate-test-redis:6379/0 \
 		--entrypoint python \
 		musicdock-worker \
-		-m pytest tests/ -q --durations=20 \
-		--ignore=tests/test_stats_integration.py \
-		--ignore=tests/test_user_stats_aggregates.py; \
+		-m pytest app/tests/ -q --durations=20 \
+		--ignore=app/tests/test_stats_integration.py \
+		--ignore=app/tests/test_user_stats_aggregates.py; \
 	EXIT=$$?; \
 	$(DC_TEST) down -v --remove-orphans 2>/dev/null || true; \
 	exit $$EXIT
@@ -271,6 +432,44 @@ dev-test-backend: ## Run Python backend static checks and pytest
 dev-test-readplane: ## Run Go readplane tests and vet
 	@$(MAKE) readplane-test
 	@$(MAKE) readplane-vet
+
+.PHONY: dev-federation-capacity-test
+dev-federation-capacity-test: ## Profile a 900/4.4K/48K federated catalog in the isolated test DB
+	@$(DC_TEST) down -v --remove-orphans >/dev/null 2>&1 || true
+	@$(DC_TEST) up -d --wait postgres redis
+	@mkdir -p .artifacts
+	@CRATE_POSTGRES_HOST=127.0.0.1 \
+		CRATE_POSTGRES_PORT=5434 \
+		CRATE_POSTGRES_USER=crate \
+		CRATE_POSTGRES_PASSWORD=crate_test \
+		CRATE_POSTGRES_DB=crate_test \
+		REDIS_URL=redis://127.0.0.1:6381/0 \
+		PYTHONPATH=app \
+		uv run python app/tests/load/federation_catalog_profile.py \
+			--enforce-slo \
+			--output .artifacts/federation-capacity.json; \
+	EXIT=$$?; \
+	$(DC_TEST) down -v --remove-orphans >/dev/null 2>&1 || true; \
+	exit $$EXIT
+
+.PHONY: dev-catalog-search-capacity-test
+dev-catalog-search-capacity-test: ## Gate local search fallback with a 100K-track fixture
+	@$(DC_TEST) down -v --remove-orphans >/dev/null 2>&1 || true
+	@$(DC_TEST) up -d --wait postgres redis
+	@mkdir -p .artifacts
+	@CRATE_POSTGRES_HOST=127.0.0.1 \
+		CRATE_POSTGRES_PORT=5434 \
+		CRATE_POSTGRES_USER=crate \
+		CRATE_POSTGRES_PASSWORD=crate_test \
+		CRATE_POSTGRES_DB=crate_test \
+		REDIS_URL=redis://127.0.0.1:6381/0 \
+		PYTHONPATH=app \
+		uv run python app/tests/load/catalog_search_fallback_profile.py \
+			--enforce-slo \
+			--output .artifacts/catalog-search-fallback-capacity.json; \
+	EXIT=$$?; \
+	$(DC_TEST) down -v --remove-orphans >/dev/null 2>&1 || true; \
+	exit $$EXIT
 
 .PHONY: dev-test-rust
 dev-test-rust: ## Run Rust tests for native services/tools
@@ -385,6 +584,7 @@ readplane-contract-smoke: ## Compare readplane P0/P1/P2 responses against local 
 		-e READPLANE_BASE="$(READPLANE_BASE)" \
 		-e READPLANE_CONTRACT_CHECK_P1="$(READPLANE_CONTRACT_CHECK_P1)" \
 		-e READPLANE_CONTRACT_P1_QUERY="$(READPLANE_CONTRACT_P1_QUERY)" \
+		-e READPLANE_CONTRACT_MEDIA_PATHS="$(READPLANE_CONTRACT_MEDIA_PATHS)" \
 		-e CRATE_AUTH_EMAIL="$(READPLANE_AUTH_EMAIL)" \
 		-e CRATE_AUTH_PASSWORD="$(READPLANE_AUTH_PASSWORD)" \
 		$(READPLANE_GO_IMAGE) \
@@ -404,6 +604,33 @@ readplane-benchmark: ## Compare FastAPI vs readplane latency for a P0 route
 		-e READPLANE_BENCH_WARMUP="$(READPLANE_BENCH_WARMUP)" \
 		$(READPLANE_GO_IMAGE) \
 		$(READPLANE_GO) run ./cmd/readplane-benchmark
+
+.PHONY: dev-federation-stream-benchmark
+dev-federation-stream-benchmark: ## Benchmark the selected Go federated stream data plane
+	@mkdir -p .artifacts/benchmarks
+	@mkdir -p .artifacts/bin
+	@cd app/readplane && go build -o ../../.artifacts/bin/federation-benchmark-proxy ./cmd/federation-benchmark-proxy
+	@PYTHONPATH=app .venv/bin/python app/tests/load/federation_stream_benchmark.py \
+		--file-mib "$${CRATE_BENCHMARK_FILE_MIB:-8}" \
+		--concurrency "$${CRATE_BENCHMARK_CONCURRENCY:-1,10,25,50}" \
+		--measurement-rounds "$${CRATE_BENCHMARK_ROUNDS:-3}" \
+		--go-proxy-binary .artifacts/bin/federation-benchmark-proxy \
+		--output .artifacts/benchmarks/federation-stream.json
+
+.PHONY: dev-artwork-delivery-benchmark
+dev-artwork-delivery-benchmark: ## Profile materialized artwork delivery
+	@PYTHONPATH=app .venv/bin/python app/tests/load/artwork_delivery_profile.py \
+		--url "$${CRATE_ARTWORK_BENCHMARK_URL:?set CRATE_ARTWORK_BENCHMARK_URL}" \
+		--token "$${CRATE_BENCHMARK_TOKEN:-}" \
+		--output .artifacts/benchmarks/artwork-delivery.json $${CRATE_BENCHMARK_SLO:+--enforce-slo}
+
+.PHONY: dev-local-stream-benchmark
+dev-local-stream-benchmark: ## Compare FastAPI and native readplane local stream delivery
+	@PYTHONPATH=app .venv/bin/python app/tests/load/local_stream_delivery_profile.py \
+		--fastapi-url "$${CRATE_FASTAPI_STREAM_BENCHMARK_URL:?set CRATE_FASTAPI_STREAM_BENCHMARK_URL}" \
+		--readplane-url "$${CRATE_READPLANE_STREAM_BENCHMARK_URL:?set CRATE_READPLANE_STREAM_BENCHMARK_URL}" \
+		--token "$${CRATE_BENCHMARK_TOKEN:-}" \
+		--output .artifacts/benchmarks/local-stream-delivery.json $${CRATE_BENCHMARK_SLO:+--enforce-slo}
 
 # ===========================================================================
 # LOCAL (full stack with Traefik)
@@ -504,15 +731,35 @@ _create-dirs:
 # ===========================================================================
 
 # Defaults to the short SHA tag published by GitHub Actions for origin/main.
-# Overrides: DEPLOY_IMAGE_TAG=<tag>, DEPLOY_REF=<git-ref>, DEPLOY_IMAGE_OWNER=<owner>, DEPLOY_PUBLIC_CHECKS=0.
+# VERSION=<full-main-sha> pins compose and every application image to one release.
+# Lower-level overrides remain available for development and incident recovery:
+# DEPLOY_IMAGE_TAG=<tag>, DEPLOY_REF=<git-ref>, DEPLOY_IMAGE_OWNER=<owner>, DEPLOY_PUBLIC_CHECKS=0.
 .PHONY: deploy
-deploy: ## Deploy origin/main GHCR images by SHA, verify health, rollback on failure
-	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh
+deploy: ## Deploy a release (usage: make deploy VERSION=<full-main-sha>)
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_VERSION='$(strip $(VERSION))' DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_ID="$(DEPLOY_ID)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh deploy
+
+.PHONY: deploy-preflight
+deploy-preflight: ## Validate a release and production readiness without changing the stack
+	@test -n "$(strip $(VERSION))" || { echo "$(RED)VERSION=<full-main-sha> is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_VERSION='$(strip $(VERSION))' DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_ID="$(DEPLOY_ID)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh preflight
+
+.PHONY: deploy-recovery-snapshot
+deploy-recovery-snapshot: ## Quiesce production and capture DB, durable Redis, config and images
+	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<release-id> is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh recovery-snapshot
+
+.PHONY: deploy-rollback
+deploy-rollback: ## Restore a recovery set (requires CONFIRM=restore-production)
+	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<release-id> is required$(NC)"; exit 1; }
+	@test "$(CONFIRM)" = "restore-production" || { echo "$(RED)CONFIRM=restore-production is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh rollback
 
 .PHONY: deploy-build
 deploy-build: ## Deploy by building on the server (GHCR fallback)
 	@echo "$(YELLOW)Syncing files...$(NC)"
 	@scp docker-compose.yaml docker-compose.project.yaml .env $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/
+	@$(SSH) "mkdir -p $(SERVER_PATH)/deploy/traefik"
+	@scp deploy/traefik/federation-readplane.yml $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/deploy/traefik/
 	@rsync -az --delete \
 		--exclude='node_modules' --exclude='dist' --exclude='__pycache__' \
 		--exclude='.vite' --exclude='*.tsbuildinfo' \
@@ -535,6 +782,8 @@ deploy-build: ## Deploy by building on the server (GHCR fallback)
 .PHONY: deploy-sync
 deploy-sync: ## Sync files to the server without restarting services
 	@scp docker-compose.yaml docker-compose.project.yaml .env $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/
+	@$(SSH) "mkdir -p $(SERVER_PATH)/deploy/traefik"
+	@scp deploy/traefik/federation-readplane.yml $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/deploy/traefik/
 	@rsync -az --delete \
 		--exclude='node_modules' --exclude='dist' --exclude='__pycache__' \
 		--exclude='.vite' --exclude='*.tsbuildinfo' \

@@ -1,176 +1,107 @@
-# Development Setup
+---
+title: Development setup
+summary: Run the complete local Crate stack and its four web workspaces.
+section: start
+audience: [developer]
+status: canonical
+order: 20
+verified: 2026-07-21
+sources: [Makefile, docker-compose.dev.yaml, docker-compose.readplane.dev.yaml]
+---
 
-Set up a local development environment for contributing to Crate.
+# Development setup
 
 ## Prerequisites
 
-- Node.js 20+ and npm
-- Docker and Docker Compose v2
-- Git
-- A small music collection for testing (or use the bundled `test-music/`)
-
-## 1. Clone and install
+- Node.js 20+ and npm.
+- Docker Engine and Docker Compose v2.
+- Python/uv and Go/Rust only when working directly on those services.
+- The repository checkout and its `test-music/` fixture library.
 
 ```bash
 git clone https://github.com/thecrateapp/crate.git
 cd crate
-npm install    # Installs all workspace dependencies (shared/ui, admin, listen)
-```
-
-Crate uses npm workspaces. The root `package.json` orchestrates three packages:
-
-| Package        | Path            | What                                                                 |
-| -------------- | --------------- | -------------------------------------------------------------------- |
-| `@crate/ui`    | `app/shared/ui` | Shared design system — tokens, primitives, shadcn, domain components |
-| `ui`           | `app/ui`        | Admin web app                                                        |
-| `crate-listen` | `app/listen`    | Listening app                                                        |
-
-## 2. Start the dev stack
-
-```bash
+npm install
 make dev
 ```
 
-This does everything:
+`make dev` is the supported local entry point. It combines
+`docker-compose.dev.yaml` and `docker-compose.readplane.dev.yaml`, builds the
+backend stack and starts the Vite applications. Do not start only the base dev
+compose if the change involves readplane-routed endpoints or SSE.
 
-1. Kills any leftover Vite processes
-2. Starts Docker containers (PostgreSQL with pgvector, Redis, API, Worker, Caddy)
-3. Installs npm dependencies
-4. Launches four Vite dev servers with hot reload
+## Local services
 
-| Service        | URL                                 | Port |
-| -------------- | ----------------------------------- | ---- |
-| Admin UI       | `https://admin.dev.lespedants.org`  | 5173 |
-| Listen app     | `https://listen.dev.lespedants.org` | 5174 |
-| Docs           | `https://docs.dev.cratemusic.app`   | 5175 |
-| Marketing site | `https://www.dev.cratemusic.app`    | 5176 |
-| API            | `https://api.dev.lespedants.org`    | 8585 |
+| Surface   | Local port | Normal development hostname         |
+| --------- | ---------: | ----------------------------------- |
+| Admin     |       5173 | `https://admin.dev.lespedants.org`  |
+| Listen    |       5174 | `https://listen.dev.lespedants.org` |
+| Docs      |       5175 | `https://docs.dev.cratemusic.app`   |
+| Site      |       5176 | `https://www.dev.cratemusic.app`    |
+| API       |       8585 | `https://api.dev.lespedants.org`    |
+| Readplane |       8686 | `http://localhost:8686`             |
 
-Local HTTPS is handled by Caddy with auto-generated certificates. Run `make trust-local-ca` once to trust the local CA in your browser.
+The local backend includes PostgreSQL, cache Redis, durable Redis, `slskd`, API,
+readplane, workers for normal/maintenance/analysis/playback work, projector,
+media worker and Caddy. The dev fixture has three artists and 122 tracks.
 
-### DNS setup
-
-For the `.dev.lespedants.org` domains to resolve locally:
-
-```bash
-make dns-setup    # Configures /etc/hosts or local DNS
-```
-
-### Test library
-
-Crate ships with `test-music/` containing 3 artists (Birds In Row, High Vis, Rival Schools) with 122 tracks. The dev stack mounts this automatically.
-
-**Login:** `admin@cratemusic.app` / `admin`
-
-## 3. Individual dev servers
-
-If you only need one frontend:
+For local TLS and hostnames:
 
 ```bash
-make dev-back           # Backend only (Docker containers)
-make dev-admin          # Admin UI on :5173
-make dev-listen         # Listen app on :5174
-make dev-site           # Marketing site on :5176
-
-# Or via npm workspaces
-npm run --workspace=app/ui dev -- --port 5173 --host
-npm run --workspace=app/listen dev -- --port 5174 --host
+make dns-setup       # *.crate.local -> 127.0.0.1; requires sudo
+make trust-local-ca  # imports Caddy's local CA; macOS helper
 ```
 
-### Against production API
+Those targets are convenience helpers, not portable prerequisites. `make dev`
+also advertises project development domains through Caddy; verify the active
+Caddyfile and local resolver when cookies or TLS are relevant to your change.
 
-Useful for testing frontend changes with real data:
+The seeded development account is `admin@cratemusic.app` / `admin`.
+
+## Focused workflows
 
 ```bash
-cd app/ui && API_URL=https://admin.your-domain.com npm run dev
-cd app/listen && API_URL=https://listen.your-domain.com npm run dev
+make dev-back     # backend, including readplane overlay
+make dev-admin    # Admin Vite on 5173
+make dev-listen   # Listen Vite on 5174
+make dev-docs     # Docs Vite on 5175
+make dev-site     # marketing Site Vite on 5176
+make dev-logs s=worker
+make dev-down
 ```
 
-## 4. Project structure
+The npm workspace includes four web packages: `app/shared/ui`, `app/ui`,
+`app/listen` and `app/listen-desktop`. Docs and Site are standalone Vite apps;
+their dependencies are installed by `make dev`.
 
-```
-crate/
-  package.json              # Root workspace config
-  Makefile                  # Dev, deploy, build commands
-  docker-compose.yaml       # Production stack
-  docker-compose.dev.yaml   # Dev stack
-  app/
-    crate/                  # Python backend (API + Worker)
-      api/                  # FastAPI routers
-      db/                   # Database layer (SQLAlchemy + Alembic)
-      worker_handlers/      # Background task handlers
-    readplane/              # Go read plane
-    media-worker/           # Rust media worker
-    shared/
-      ui/                   # @crate/ui design system
-        tokens/             # CSS design tokens
-        primitives/         # UI primitives (AppModal, ActionIconButton, etc.)
-        composites/         # Shared composed UI blocks
-        shadcn/             # Curated shadcn/Radix components
-        domain/             # Shared domain components
-        lib/                # Shared hooks and utilities
-      web/                  # Shared API client, hooks, formatters
-      fonts/                # Poppins font files
-    ui/                     # Admin frontend (React 19 + Vite)
-    listen/                 # Listen frontend (React 19 + Vite + Capacitor)
-    site/                   # Marketing landing page
-    docs/                   # Documentation site
-    tests/                  # Python backend tests
-  docs/
-    technical/              # Technical documentation (rendered by docs app)
-    plans/                  # Design documents and plans
-  tools/
-    crate-cli/       # Rust CLI for audio similarity
-```
+## Federation harness
 
-## 5. Common tasks
-
-### Type-checking
+Federation uses a separate two-node stack so it never shares the normal dev
+database or fixture media:
 
 ```bash
-# Check all workspace packages
-npm run --workspace=app/shared/ui typecheck
-cd app/ui && npx tsc --noEmit
-cd app/listen && npx tsc --noEmit
+make federation-dev-up
+make federation-dev-smoke
+make federation-dev-e2e
+make federation-dev-down
 ```
 
-### Building @crate/ui
+Node A exposes API/readplane/Admin/Listen on 18585/18686/15173/15174; Node B
+uses 28585/28686. There are focused acceptance targets for global catalog,
+playback prepare, imports, singleton parity and zero-downtime catalog reads.
+Read [Federation overview](federation-overview.md) before changing those flows.
 
-```bash
-npm run --workspace=app/shared/ui build    # → dist/*.js + dist/*.d.ts
-```
+## Tests and migrations
 
-### Running backend tests
+`make dev-test` runs backend checks plus Python, Go, Rust and frontend checks;
+it is not a worker-only pytest shortcut. For a narrow Python test use the
+project virtual environment or `uv run pytest`; for a full isolated backend run
+use `make dev-test-backend`.
 
-```bash
-make dev-test           # Runs pytest inside the worker container
-```
+Alembic is the authoritative schema path. API/worker startup serializes
+`alembic upgrade head` with an advisory lock. Add migrations under
+`app/crate/db/migrations/versions/`; do not bootstrap schema changes from a
+frontend or an ad-hoc script.
 
-### Database migrations
-
-Crate uses Alembic. Migrations run automatically on API startup. To create a new migration:
-
-```bash
-cd app && alembic revision -m "description"
-# Edit the generated file in crate/db/migrations/versions/
-```
-
-### Building the Android APK
-
-```bash
-cd app/listen
-npm run build:cap       # Build + sync with Capacitor
-npx cap open android    # Open in Android Studio
-```
-
-## 6. Useful Make targets
-
-| Command                  | What                        |
-| ------------------------ | --------------------------- |
-| `make dev`               | Start everything            |
-| `make dev-down`          | Stop everything             |
-| `make dev-rebuild`       | Force rebuild + restart     |
-| `make dev-logs`          | Tail backend logs           |
-| `make dev-logs s=worker` | Tail specific service       |
-| `make ps`                | Status of all services      |
-| `make deploy`            | Deploy to production server |
+See [Developer guide](developer-guide.md) for ownership boundaries and the
+complete repository map.

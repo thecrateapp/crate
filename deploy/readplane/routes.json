@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "name": "auth-profile",
+      "path": "/api/auth/me",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "my-library",
+      "path": "/api/me",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "home",
+      "path_prefix": "/api/me/home/",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "stats-dashboard",
+      "path": "/api/me/stats/dashboard",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "my-albums",
+      "path_prefix": "/api/me/albums",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "my-follows",
+      "path_prefix": "/api/me/follows",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "my-history",
+      "path": "/api/me/history",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "my-likes",
+      "path": "/api/me/likes",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "catalog",
+      "path_prefix": "/api/catalog/",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "search",
+      "path": "/api/search",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "genres",
+      "path_prefix": "/api/genres",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "favorites",
+      "path": "/api/favorites",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "artists",
+      "path_prefix": "/api/artists/",
+      "methods": ["GET", "HEAD"],
+      "class": "interactive"
+    },
+    {
+      "name": "artist-slugs",
+      "path_prefix": "/api/artist-slugs/",
+      "methods": ["GET"],
+      "class": "interactive"
+    },
+    {
+      "name": "albums",
+      "path_prefix": "/api/albums/",
+      "methods": ["GET", "HEAD"],
+      "class": "interactive"
+    },
+    {
+      "name": "cache-events",
+      "path": "/api/cache/events",
+      "methods": ["GET"],
+      "class": "sse"
+    },
+    {
+      "name": "home-stream",
+      "path": "/api/me/home/discovery-stream",
+      "methods": ["GET"],
+      "class": "sse"
+    },
+    {
+      "name": "federated-stream",
+      "path_prefix": "/api/federation/remote/streams/",
+      "methods": ["GET"],
+      "class": "stream"
+    },
+    {
+      "name": "tracks",
+      "path_prefix": "/api/tracks/",
+      "methods": ["GET", "HEAD"],
+      "class": "stream"
+    }
+  ]
+}

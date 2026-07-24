@@ -35,7 +35,7 @@ from crate.api.schemas.utility import (
     CacheInvalidationRequest,
     CacheInvalidationResponse,
 )
-from crate.config import get_redis_url
+from crate.config import get_cache_redis_url
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["events"])
@@ -76,6 +76,8 @@ _LIVE_CHANNEL = "crate:sse:cache-invalidation"
 _MAX_EVENTS = 500
 
 _redis: Any | None = None
+_invalidation_dispatcher = None
+_invalidation_subscriber = None
 
 _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
     {
@@ -94,7 +96,7 @@ def _get_redis() -> Any:
     if _redis is None:
         import redis as _redis_lib
 
-        _redis = _redis_lib.from_url(get_redis_url(), decode_responses=True)
+        _redis = _redis_lib.from_url(get_cache_redis_url(), decode_responses=True)
     return _redis
 
 
@@ -107,40 +109,90 @@ def _should_append_invalidation_domain_event(scope: str) -> bool:
 
 
 def broadcast_invalidation(*scopes: str):
-    """Broadcast cache invalidation in a background thread.
+    """Queue cache invalidation on the process-wide bounded dispatcher.
 
-    Non-blocking: the HTTP response returns immediately. Redis writes
-    and backend cache clearing happen asynchronously. Failures are
-    logged but never propagate.
+    Projector-relevant invalidations are committed to the PostgreSQL outbox
+    before the volatile dispatcher receives them. Redis writes and backend
+    cache clearing then happen asynchronously.
     """
-    import threading
+    normalized = tuple(dict.fromkeys(scope for scope in scopes if scope))
+    if not normalized:
+        return
+    try:
+        _persist_invalidation_events(normalized)
+    except Exception:
+        log.warning("Failed to persist cache invalidations", exc_info=True)
+    _get_invalidation_dispatcher().submit(normalized)
 
-    threading.Thread(target=_do_broadcast, args=(scopes,), daemon=True).start()
+
+def _persist_invalidation_events(scopes: tuple[str, ...]) -> None:
+    from crate.db.cache_invalidation import persist_invalidation_events
+
+    relevant = tuple(
+        scope for scope in scopes if _should_append_invalidation_domain_event(scope)
+    )
+    persist_invalidation_events(relevant)
+
+
+def _get_invalidation_dispatcher():
+    global _invalidation_dispatcher
+    if _invalidation_dispatcher is None:
+        from crate.db.cache_invalidation import BoundedInvalidationDispatcher
+
+        _invalidation_dispatcher = BoundedInvalidationDispatcher(_do_broadcast)
+        _invalidation_dispatcher.start()
+    return _invalidation_dispatcher
+
+
+def start_cache_invalidation_runtime() -> None:
+    global _invalidation_subscriber
+    _get_invalidation_dispatcher()
+    if _invalidation_subscriber is None:
+        from crate.db.cache_invalidation import CacheInvalidationSubscriber
+
+        _invalidation_subscriber = CacheInvalidationSubscriber(
+            _get_redis,
+            _LIVE_CHANNEL,
+        )
+        _invalidation_subscriber.start()
+
+
+def stop_cache_invalidation_runtime() -> None:
+    global _invalidation_dispatcher, _invalidation_subscriber
+    if _invalidation_subscriber is not None:
+        _invalidation_subscriber.stop()
+        _invalidation_subscriber = None
+    if _invalidation_dispatcher is not None:
+        _invalidation_dispatcher.stop()
+        _invalidation_dispatcher = None
 
 
 def _do_broadcast(scopes: tuple[str, ...] | list[str]):
     try:
         r = _get_redis()
-        from crate.db.domain_events import append_domain_event
+    except Exception:
+        r = None
+        log.warning("Cache Redis is unavailable during invalidation", exc_info=True)
 
+    try:
         _clear_backend_cache_for_scopes(scopes)
+    except Exception:
+        log.warning("Failed to clear local cache for %s", scopes, exc_info=True)
 
-        for scope in scopes:
-            event_id = r.incr(_EVENT_ID_KEY)
-            event = json.dumps({"id": event_id, "scope": scope, "ts": time()})
-            r.lpush(_EVENTS_KEY, event)
-            r.ltrim(_EVENTS_KEY, 0, _MAX_EVENTS - 1)
-            r.publish(_LIVE_CHANNEL, event)
-            if _should_append_invalidation_domain_event(scope):
-                append_domain_event(
-                    "ui.invalidate",
-                    {"scope": scope, "redis_event_id": event_id},
-                    scope="ui.invalidate",
-                    subject_key=scope,
+    for scope in scopes:
+        event_id = None
+        if r is not None:
+            try:
+                event_id = r.incr(_EVENT_ID_KEY)
+                event = json.dumps({"id": event_id, "scope": scope, "ts": time()})
+                r.lpush(_EVENTS_KEY, event)
+                r.ltrim(_EVENTS_KEY, 0, _MAX_EVENTS - 1)
+                r.publish(_LIVE_CHANNEL, event)
+                log.debug("cache invalidation: %s (event %d)", scope, event_id)
+            except Exception:
+                log.warning(
+                    "Failed to publish cache invalidation for %s", scope, exc_info=True
                 )
-            log.debug("cache invalidation: %s (event %d)", scope, event_id)
-    except Exception as exc:
-        log.warning("Failed to broadcast cache invalidation for %s: %s", scopes, exc)
 
 
 def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
@@ -148,31 +200,16 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
     from crate.db.cache_store import delete_cache_prefix
     from crate.db.ui_snapshot_store import mark_ui_snapshots_stale
 
-    # Mapping from scope → backend cache key prefixes to clear.
-    # Not every scope has a backend cache (many are frontend-only).
-    _SCOPE_CACHE_PREFIXES = {
-        "home": ["home:", "home_playlist:", "home_section:"],
-        "follows": [],
-        "likes": [],
-        "saved_albums": [],
-        "history": ["stats:"],
-        "library": ["discover:", "listen:artist_page:"],
-        "shows": ["shows:"],
-        "upcoming": ["upcoming:"],
-        "playlists": ["playlist:"],
-        "curation": ["curation:"],
-    }
+    from crate.db.cache_invalidation import cache_prefixes_for_scopes
+    from crate.db.cache_runtime import _mem_clear
 
-    prefixes_to_clear = set()
-    for scope in scopes:
-        # Direct scope match
-        if scope in _SCOPE_CACHE_PREFIXES:
-            prefixes_to_clear.update(_SCOPE_CACHE_PREFIXES[scope])
-        # Parameterised scopes like "playlist:42" → clear "playlist:42"
-        if ":" in scope:
-            prefixes_to_clear.add(scope)
-        if scope.startswith("artist:"):
-            prefixes_to_clear.add("listen:artist_page:")
+    if "*" in scopes:
+        _mem_clear()
+        delete_cache_prefix("")
+        mark_ui_snapshots_stale(scope_prefix="")
+        return
+
+    prefixes_to_clear = cache_prefixes_for_scopes(scopes)
 
     for prefix in prefixes_to_clear:
         try:
@@ -263,6 +300,24 @@ async def _close_live_invalidation_pubsub(pubsub) -> None:
 _HEARTBEAT_INTERVAL = 30  # seconds
 
 
+def _cache_event_resume_id(request: Request) -> int:
+    """Resolve a valid SSE cursor without replaying history to new clients."""
+    values = (
+        request.headers.get("Last-Event-ID"),
+        request.query_params.get("last_event_id"),
+    )
+    for value in values:
+        if value is None or not value.strip():
+            continue
+        try:
+            event_id = int(value)
+        except (ValueError, TypeError):
+            continue
+        if event_id >= 0:
+            return event_id
+    return get_latest_invalidation_event_id()
+
+
 async def _invalidation_stream(last_event_id: int) -> AsyncIterator[str]:
     """Yield SSE events for cache invalidation.
 
@@ -340,16 +395,12 @@ async def cache_events(request: Request):
     """SSE stream of cache invalidation events.
 
     On reconnect, the browser sends ``Last-Event-ID`` automatically.
-    The server replays any events the client missed during downtime.
+    Full page reloads resume through the persisted ``last_event_id`` query
+    parameter. The server replays any events the client missed during downtime.
     """
     _require_auth(request)
 
-    # Last-Event-ID is sent by the browser on SSE reconnect
-    last_event_id_str = request.headers.get("Last-Event-ID", "0")
-    try:
-        last_event_id = int(last_event_id_str)
-    except (ValueError, TypeError):
-        last_event_id = get_latest_invalidation_event_id()
+    last_event_id = _cache_event_resume_id(request)
 
     return StreamingResponse(
         _invalidation_stream(last_event_id),
@@ -387,6 +438,8 @@ async def cache_invalidate_endpoint(request: Request, body: CacheInvalidationReq
 
 # Map mutation routes to cache scopes they invalidate.
 _INVALIDATION_RULES: list[tuple[re.Pattern[str], list[str]]] = [
+    (re.compile(r"^/api/auth/(?:logout|sessions|profile)"), ["auth"]),
+    (re.compile(r"^/api/admin/(?:auth/)?users/\d+(?:/|$)"), ["auth"]),
     (re.compile(r"^/api/me/likes"), ["likes"]),
     (re.compile(r"^/api/me/follows"), ["follows", "home", "upcoming"]),
     (re.compile(r"^/api/me/albums"), ["saved_albums", "home"]),

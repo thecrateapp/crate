@@ -4,6 +4,7 @@ Covers: track_lookup, artist_tracks, track_genres, favorites, artist_refs,
         search, and mood query functions.
 """
 
+import json
 import time
 import uuid
 
@@ -77,6 +78,119 @@ def _setup_artist_album_track(
         row["entity_uid"],
         row["storage_id"],
     )
+
+
+def _insert_remote_global_mood_track(pg_db) -> str:
+    from crate.db.tx import transaction_scope
+
+    artist_uid = str(uuid.uuid4())
+    track_uid = str(uuid.uuid4())
+    node_uid = str(uuid.uuid4())
+    payload = {
+        "canonical_title": "Remote Mood Track",
+        "artist_name": "Remote Mood Artist",
+        "album_name": "Remote Mood Album",
+        "duration_seconds": 180,
+        "bpm": 142,
+        "energy": 0.86,
+        "danceability": 0.62,
+        "valence": 0.48,
+        "acousticness": 0.12,
+        "instrumentalness": 0.02,
+    }
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_artists
+                    (
+                        global_artist_uid,
+                        canonical_name,
+                        sort_name,
+                        normalized_name,
+                        source_count,
+                        has_remote
+                    )
+                VALUES
+                    (
+                        :artist_uid,
+                        'Remote Mood Artist',
+                        'Remote Mood Artist',
+                        'remote mood artist',
+                        1,
+                        true
+                    )
+                """
+            ),
+            {"artist_uid": artist_uid},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_tracks
+                    (
+                        global_track_uid,
+                        global_artist_uid,
+                        canonical_title,
+                        normalized_title,
+                        artist_name,
+                        album_name,
+                        duration_seconds,
+                        availability_json,
+                        source_count,
+                        has_remote
+                    )
+                VALUES
+                    (
+                        :track_uid,
+                        :artist_uid,
+                        'Remote Mood Track',
+                        'remote mood track',
+                        'Remote Mood Artist',
+                        'Remote Mood Album',
+                        180,
+                        '{"remote": true}'::jsonb,
+                        1,
+                        true
+                    )
+                """
+            ),
+            {"track_uid": track_uid, "artist_uid": artist_uid},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_sources
+                    (
+                        entity_type,
+                        global_entity_uid,
+                        source_kind,
+                        node_uid,
+                        remote_entity_uid,
+                        source_payload_json,
+                        match_key,
+                        match_confidence
+                    )
+                VALUES
+                    (
+                        'track',
+                        :track_uid,
+                        'federated',
+                        :node_uid,
+                        'remote-mood-track',
+                        CAST(:payload AS jsonb),
+                        'track:remote-mood-track',
+                        0.9
+                    )
+                """
+            ),
+            {
+                "track_uid": track_uid,
+                "node_uid": node_uid,
+                "payload": json.dumps(payload),
+            },
+        )
+    return track_uid
 
 
 def test_browse_filter_genres_include_editorial_metadata(pg_db):
@@ -208,6 +322,116 @@ def test_browse_filter_genres_prefers_manual_taxonomy_cover(pg_db):
 
     assert screamo["slug"] == "screamo"
     assert screamo["cover_url"] == "/api/genres/screamo/cover?size=640&format=webp"
+
+
+def test_browse_filter_decades_falls_back_to_album_years(pg_db):
+    from crate.db.queries.browse_artist_filters import get_browse_filter_decades
+
+    pg_db.upsert_artist({"name": "Birds In Row"})
+    pg_db.upsert_album(
+        {
+            "artist": "Birds In Row",
+            "name": "Personal War",
+            "path": "/music/birds-in-row/personal-war",
+            "year": "2015",
+            "track_count": 7,
+            "total_size": 1024,
+            "total_duration": 900,
+            "formats": ["flac"],
+        }
+    )
+    pg_db.upsert_album(
+        {
+            "artist": "Birds In Row",
+            "name": "Gris Klein",
+            "path": "/music/birds-in-row/gris-klein",
+            "year": "2022",
+            "track_count": 11,
+            "total_size": 2048,
+            "total_duration": 1800,
+            "formats": ["flac"],
+        }
+    )
+
+    assert get_browse_filter_decades() == ["2010s", "2020s"]
+
+
+def test_browse_filter_genres_include_remote_global_genres(pg_db, monkeypatch):
+    from crate.db.queries.browse_artist_filters import get_browse_filter_genres
+    from crate.db.tx import transaction_scope
+
+    artist_uid = str(uuid.uuid4())
+    node_uid = str(uuid.uuid4())
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_artists
+                    (
+                        global_artist_uid,
+                        canonical_name,
+                        sort_name,
+                        normalized_name,
+                        source_count,
+                        has_remote,
+                        has_photo
+                    )
+                VALUES
+                    (
+                        :artist_uid,
+                        'High Vis',
+                        'High Vis',
+                        'high vis',
+                        1,
+                        true,
+                        true
+                    )
+                """
+            ),
+            {"artist_uid": artist_uid},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_sources
+                    (
+                        entity_type,
+                        global_entity_uid,
+                        source_kind,
+                        node_uid,
+                        remote_entity_uid,
+                        source_payload_json,
+                        match_key,
+                        match_confidence
+                    )
+                VALUES
+                    (
+                        'artist',
+                        :artist_uid,
+                        'federated',
+                        :node_uid,
+                        'remote-high-vis',
+                        CAST(:payload AS jsonb),
+                        'artist:high-vis',
+                        0.9
+                    )
+                """
+            ),
+            {
+                "artist_uid": artist_uid,
+                "node_uid": node_uid,
+                "payload": json.dumps({"genres": ["post-punk"]}),
+            },
+        )
+
+    rows = get_browse_filter_genres()
+    post_punk = next(row for row in rows if row["name"] == "post-punk")
+
+    assert post_punk["count"] == 1
+    assert post_punk["top_artists"] == ["High Vis"]
+    assert post_punk["cover_url"] == (
+        f"/api/catalog/artists/{artist_uid}/background?size=640&format=webp"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -764,7 +988,8 @@ def _get_album_id_for_track(pg_db, track_id):
 
 class TestFavorites:
     def test_add_and_list_favorites(self, pg_db):
-        from crate.db.queries.browse_media_favorites import add_favorite, list_favorites
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import add_favorite
 
         add_favorite("track", "42", "2025-01-01T00:00:00Z")
         add_favorite("album", "7", "2025-01-02T00:00:00Z")
@@ -775,7 +1000,8 @@ class TestFavorites:
         assert favs[0]["item_id"] == "7"
 
     def test_add_favorite_idempotent_on_conflict(self, pg_db):
-        from crate.db.queries.browse_media_favorites import add_favorite, list_favorites
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import add_favorite
 
         add_favorite("artist", "99", "2025-01-01T00:00:00Z")
         add_favorite("artist", "99", "2025-01-01T00:00:00Z")
@@ -789,9 +1015,9 @@ class TestFavorites:
         assert list_favorites() == []
 
     def test_remove_favorite_deletes_by_type_and_id(self, pg_db):
-        from crate.db.queries.browse_media_favorites import (
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import (
             add_favorite,
-            list_favorites,
             remove_favorite,
         )
 
@@ -804,10 +1030,8 @@ class TestFavorites:
         assert favs[0]["item_id"] == "2"
 
     def test_remove_favorite_noop_when_not_found(self, pg_db):
-        from crate.db.queries.browse_media_favorites import (
-            remove_favorite,
-            list_favorites,
-        )
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import remove_favorite
 
         remove_favorite("track", "nonexistent")
         assert list_favorites() == []
@@ -1158,6 +1382,9 @@ class TestMood:
     def test_count_mood_tracks_counts_filtered_rows(self, pg_db):
         from crate.db.queries.browse_media_mood import count_mood_tracks
         from crate.db.tx import transaction_scope
+        from crate.federation.global_reconciliation import (
+            reconcile_dirty_catalog_sources,
+        )
 
         artist = "Mood Count Artist"
         album = "Mood Count Album"
@@ -1202,6 +1429,10 @@ class TestMood:
                     },
                 )
 
+        projection = reconcile_dirty_catalog_sources(limit=100)
+        assert projection["failed"] == 0
+        assert projection["remaining"] == 0
+
         count = count_mood_tracks(["energy >= %s", "bpm >= %s"], [0.7, 120])
         assert count == 1
 
@@ -1214,6 +1445,9 @@ class TestMood:
     def test_get_mood_tracks_returns_limited_results(self, pg_db):
         from crate.db.queries.browse_media_mood import get_mood_tracks
         from crate.db.tx import transaction_scope
+        from crate.federation.global_reconciliation import (
+            reconcile_dirty_catalog_sources,
+        )
 
         artist = "Mood Tracks Artist"
         album = "Mood Tracks Album"
@@ -1245,6 +1479,10 @@ class TestMood:
                     {"b": 120, "p": f"/music/{artist}/{album}/{i:02d}-mood.flac"},
                 )
 
+        projection = reconcile_dirty_catalog_sources(limit=100)
+        assert projection["failed"] == 0
+        assert projection["remaining"] == 0
+
         tracks = get_mood_tracks(["bpm >= %s"], [80], 3)
         assert len(tracks) == 3
         for t in tracks:
@@ -1258,3 +1496,27 @@ class TestMood:
         from crate.db.queries.browse_media_mood import get_mood_tracks
 
         assert get_mood_tracks(["energy >= %s"], [0.999], 10) == []
+
+    def test_count_mood_presets_include_remote_global_tracks(self, pg_db, monkeypatch):
+        from crate.db.queries.browse_media_mood import count_mood_presets
+
+        _insert_remote_global_mood_track(pg_db)
+        counts = count_mood_presets(
+            {"energetic": {"energy_min": 0.7, "danceability_min": 0.5}}
+        )
+
+        assert counts == {"energetic": 1}
+
+    def test_get_mood_tracks_include_remote_global_tracks(self, pg_db, monkeypatch):
+        from crate.db.queries.browse_media_mood import get_mood_tracks
+
+        track_uid = _insert_remote_global_mood_track(pg_db)
+        tracks = get_mood_tracks(["energy >= %s", "danceability >= %s"], [0.7, 0.5], 5)
+
+        assert len(tracks) == 1
+        assert tracks[0]["global_track_uid"] == track_uid
+        assert tracks[0]["entity_uid"] == track_uid
+        assert tracks[0]["origin"] == "remote"
+        assert tracks[0]["node_uid"]
+        assert tracks[0]["remote_entity_uid"] == "remote-mood-track"
+        assert tracks[0]["title"] == "Remote Mood Track"

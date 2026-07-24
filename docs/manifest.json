@@ -1,0 +1,317 @@
+[
+  {
+    "sourcePath": "docs/technical/00-quickstart.md",
+    "route": "/start/quickstart",
+    "section": "start",
+    "title": "Home quickstart",
+    "summary": "Install a single Crate instance with the supported home Docker Compose profile.",
+    "keywords": ["home", "installer", "self-hosted", "docker"],
+    "order": 10
+  },
+  {
+    "sourcePath": "docs/technical/00b-development-setup.md",
+    "route": "/start/development-setup",
+    "section": "start",
+    "title": "Development setup",
+    "summary": "Run the complete local Crate stack and its four web workspaces.",
+    "keywords": ["development", "make dev", "vite", "readplane"],
+    "order": 20
+  },
+  {
+    "sourcePath": "docs/technical/01-system-overview.md",
+    "route": "/architecture/system-overview",
+    "section": "architecture",
+    "title": "System overview",
+    "summary": "Crate services, data flow and read/write ownership.",
+    "keywords": ["architecture", "services", "readplane", "workers"],
+    "order": 50
+  },
+  {
+    "sourcePath": "docs/technical/02-backend-api-and-data.md",
+    "route": "/architecture/backend-api-and-data",
+    "section": "architecture",
+    "title": "Backend API and data layer",
+    "summary": "FastAPI, PostgreSQL and projection contracts.",
+    "keywords": ["fastapi", "postgresql", "api", "projector"],
+    "order": 60
+  },
+  {
+    "sourcePath": "docs/technical/03-worker-tasks-and-background-services.md",
+    "route": "/architecture/workers-and-background-services",
+    "section": "architecture",
+    "title": "Workers, tasks and background services",
+    "summary": "Dramatiq ownership, queues and daemon responsibilities.",
+    "keywords": ["dramatiq", "queues", "workers", "tasks"],
+    "order": 70
+  },
+  {
+    "sourcePath": "docs/technical/04-library-storage-sync-and-imports.md",
+    "route": "/architecture/library-storage-and-imports",
+    "section": "architecture",
+    "title": "Library, storage, sync and imports",
+    "summary": "Media ownership and worker-controlled publication paths.",
+    "keywords": ["music", "storage", "sync", "imports"],
+    "order": 80
+  },
+  {
+    "sourcePath": "docs/technical/05-enrichment-acquisition-and-integrations.md",
+    "route": "/architecture/enrichment-and-acquisition",
+    "section": "architecture",
+    "title": "Enrichment, acquisition and integrations",
+    "summary": "Background enrichment and acquisition ownership.",
+    "keywords": ["enrichment", "acquisition", "musicbrainz", "bandcamp"],
+    "order": 90
+  },
+  {
+    "sourcePath": "docs/technical/06-audio-analysis-similarity-and-discovery.md",
+    "route": "/architecture/audio-analysis-and-discovery",
+    "section": "architecture",
+    "title": "Audio analysis, similarity and discovery",
+    "summary": "Analysis, Bliss vectors and discovery read models.",
+    "keywords": ["audio", "bliss", "similarity", "analysis"],
+    "order": 95
+  },
+  {
+    "sourcePath": "docs/technical/07-auth-users-social-and-sessions.md",
+    "route": "/architecture/auth-and-sessions",
+    "section": "architecture",
+    "title": "Auth, sessions, users and social layer",
+    "summary": "Authentication and user-scoped state across Admin and Listen.",
+    "keywords": ["auth", "sessions", "oauth", "users"],
+    "order": 96
+  },
+  {
+    "sourcePath": "docs/technical/08-frontends-admin-and-listen.md",
+    "route": "/architecture/frontends-admin-and-listen",
+    "section": "architecture",
+    "title": "Frontend architecture: Admin and Listen",
+    "summary": "Separate application responsibilities and shared UI boundaries.",
+    "keywords": ["react", "admin", "listen", "ui"],
+    "order": 97
+  },
+  {
+    "sourcePath": "docs/technical/09-playback-realtime-and-subsonic.md",
+    "route": "/architecture/playback-realtime-and-subsonic",
+    "section": "architecture",
+    "title": "Playback, realtime and Subsonic",
+    "summary": "Playback surfaces, resilience gates, realtime and compatibility contracts.",
+    "keywords": ["playback", "sse", "subsonic", "streaming"],
+    "order": 98
+  },
+  {
+    "sourcePath": "docs/technical/developer-guide.md",
+    "route": "/developer/developer-guide",
+    "section": "developer",
+    "title": "Developer guide",
+    "summary": "Service boundaries, repository map and contribution rules for Crate.",
+    "keywords": ["contributing", "repository", "testing", "boundaries"],
+    "order": 40
+  },
+  {
+    "sourcePath": "docs/technical/10-development-deployment-and-operations.md",
+    "route": "/operations/runtime-model",
+    "section": "operations",
+    "title": "Development, deployment and operations model",
+    "summary": "The shared runtime model behind local development, self-hosting and project deployment.",
+    "keywords": ["runtime", "deployment", "operations", "read-only"],
+    "order": 100
+  },
+  {
+    "sourcePath": "docs/technical/deployment-profiles.md",
+    "route": "/operations/deployment-profiles",
+    "section": "operations",
+    "title": "Deployment profiles",
+    "summary": "Choose and operate the correct Crate deployment model without mixing their commands.",
+    "keywords": ["deploy", "home", "image-first", "compose"],
+    "order": 110
+  },
+  {
+    "sourcePath": "docs/technical/operations.md",
+    "route": "/operations/operations",
+    "section": "operations",
+    "title": "Operations",
+    "summary": "Runtime ownership, observability and recovery checks for a running Crate instance.",
+    "keywords": ["health", "redis", "projector", "incident"],
+    "order": 120
+  },
+  {
+    "sourcePath": "docs/technical/ops-runbook.md",
+    "route": "/operations/backup-and-recovery",
+    "section": "operations",
+    "title": "Backup and recovery",
+    "summary": "Quiesce, back up, restore and verify a Crate deployment without corrupting runtime state.",
+    "keywords": ["backup", "restore", "postgresql", "recovery"],
+    "order": 130
+  },
+  {
+    "sourcePath": "docs/technical/artwork-delivery.md",
+    "route": "/operations/artwork-delivery",
+    "section": "operations",
+    "title": "Artwork delivery",
+    "summary": "Operate worker-owned persistent artwork variants and their non-blocking read path.",
+    "keywords": ["artwork", "variants", "backfill", "workers"],
+    "order": 140
+  },
+  {
+    "sourcePath": "docs/technical/local-media-delivery-slos.md",
+    "route": "/operations/local-media-delivery-slos",
+    "section": "operations",
+    "title": "Local media delivery SLOs",
+    "summary": "Gate native readplane delivery of local audio and artwork with measurable safety and rollback criteria.",
+    "keywords": ["media", "readplane", "streaming", "slos"],
+    "order": 150
+  },
+  {
+    "sourcePath": "docs/technical/storage-retention.md",
+    "route": "/operations/storage-retention",
+    "section": "operations",
+    "title": "Storage retention and disk pressure",
+    "summary": "Bound regenerable caches, container logs and image retention, and recover safely from disk pressure.",
+    "keywords": ["storage", "cache", "retention", "disk"],
+    "order": 160
+  },
+  {
+    "sourcePath": "docs/technical/federation-overview.md",
+    "route": "/federation/federation-overview",
+    "section": "federation",
+    "title": "Federation overview",
+    "summary": "The node-first catalog, trust and media-delivery model, with explicit safety and rollout boundaries.",
+    "keywords": ["federation", "nodes", "catalog", "peering"],
+    "order": 200
+  },
+  {
+    "sourcePath": "docs/technical/federation-protocol.md",
+    "route": "/federation/federation-protocol",
+    "section": "federation",
+    "title": "Federation protocol",
+    "summary": "Signed node identity, typed authorization, catalog synchronization and opaque relay contracts.",
+    "keywords": ["protocol", "descriptor", "grants", "relay"],
+    "order": 210
+  },
+  {
+    "sourcePath": "docs/technical/federation-key-management.md",
+    "route": "/federation/federation-key-management",
+    "section": "federation",
+    "title": "Federation key management",
+    "summary": "Protect node signing identity and recover it without replacing node trust accidentally.",
+    "keywords": ["keys", "ed25519", "recovery", "rotation"],
+    "order": 220
+  },
+  {
+    "sourcePath": "docs/technical/federation-imports.md",
+    "route": "/federation/federation-imports",
+    "section": "federation",
+    "title": "Federated imports",
+    "summary": "Explicit, worker-owned publication of approved remote media into a local library.",
+    "keywords": ["import", "staging", "worker", "manifest"],
+    "order": 230
+  },
+  {
+    "sourcePath": "docs/technical/federation-operations-runbook.md",
+    "route": "/federation/federation-operations",
+    "section": "federation",
+    "title": "Federation operations",
+    "summary": "Contain peer incidents, diagnose synchronization and prove a federation release locally.",
+    "keywords": ["runbook", "peer", "grant", "incident"],
+    "order": 240
+  },
+  {
+    "sourcePath": "docs/technical/federation-slos.md",
+    "route": "/federation/federation-slos",
+    "section": "federation",
+    "title": "Federation SLOs and observability",
+    "summary": "Measure catalog, authorization, relay and import behavior without leaking peer or user secrets.",
+    "keywords": ["slos", "metrics", "observability", "alerts"],
+    "order": 250
+  },
+  {
+    "sourcePath": "docs/technical/federation-streaming-benchmark.md",
+    "route": "/federation/federated-streaming-and-playback",
+    "section": "federation",
+    "title": "Federated streaming and playback",
+    "summary": "Opaque relay behavior, Range safety and performance evaluation for remote playback.",
+    "keywords": ["streaming", "range", "readplane", "playback"],
+    "order": 260
+  },
+  {
+    "sourcePath": "docs/technical/federation-threat-model.md",
+    "route": "/federation/federation-threat-model",
+    "section": "federation",
+    "title": "Federation threat model",
+    "summary": "Security invariants and release checks for node identity, transport, grants and media relay.",
+    "keywords": ["security", "ssrf", "trust", "threat model"],
+    "order": 270
+  },
+  {
+    "sourcePath": "docs/technical/federation-capacity.md",
+    "route": "/federation/federation-capacity",
+    "section": "federation",
+    "title": "Federation capacity and catalog resilience",
+    "summary": "Capacity assumptions, serving modes and reconciliation safety for the global catalog.",
+    "keywords": ["capacity", "catalog", "fallback", "reconciliation"],
+    "order": 280
+  },
+  {
+    "sourcePath": "docs/technical/federation-production-acceptance.md",
+    "route": "/federation/federation-production-acceptance",
+    "section": "federation",
+    "title": "Federation production acceptance",
+    "summary": "Mandatory gates before a federation feature is exposed beyond a controlled two-node environment.",
+    "keywords": ["acceptance", "release", "two-node", "production"],
+    "order": 290
+  },
+  {
+    "sourcePath": "docs/technical/federation-upgrade-and-rollback.md",
+    "route": "/federation/federation-upgrade-and-rollback",
+    "section": "federation",
+    "title": "Federation upgrade and rollback",
+    "summary": "Expand-compatible rollout and recovery rules for federated state and protocol changes.",
+    "keywords": ["upgrade", "rollback", "migration", "canary"],
+    "order": 300
+  },
+  {
+    "sourcePath": "docs/README.md",
+    "route": "/reference/documentation-contract",
+    "section": "reference",
+    "title": "Documentation contract",
+    "summary": "Canonical reading paths and the source-of-truth policy for Crate documentation.",
+    "keywords": ["documentation", "canonical", "sources", "archive"],
+    "order": 0
+  },
+  {
+    "sourcePath": "docs/architecture.md",
+    "route": "/reference/architecture-summary",
+    "section": "reference",
+    "title": "Architecture summary",
+    "summary": "A concise reference to the Crate service topology.",
+    "keywords": ["architecture", "services", "overview"],
+    "order": 20
+  },
+  {
+    "sourcePath": "docs/api.md",
+    "route": "/reference/api-reference",
+    "section": "reference",
+    "title": "API reference",
+    "summary": "Focused API reference and compatibility guidance.",
+    "keywords": ["api", "openapi", "subsonic", "http"],
+    "order": 30
+  },
+  {
+    "sourcePath": "docs/audio-analysis.md",
+    "route": "/reference/audio-analysis",
+    "section": "reference",
+    "title": "Audio analysis reference",
+    "summary": "Reference notes for Crate audio-analysis capabilities.",
+    "keywords": ["audio", "bpm", "essentia", "bliss"],
+    "order": 40
+  },
+  {
+    "sourcePath": "docs/enrichment.md",
+    "route": "/reference/enrichment",
+    "section": "reference",
+    "title": "Enrichment reference",
+    "summary": "Reference notes for Crate enrichment sources and flow.",
+    "keywords": ["enrichment", "metadata", "providers"],
+    "order": 50
+  }
+]

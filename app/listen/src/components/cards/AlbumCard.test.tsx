@@ -40,6 +40,21 @@ beforeEach(() => {
 });
 
 describe("AlbumCard", () => {
+  it("renders responsive WebP candidates for generated covers", () => {
+    renderWithListenProviders(
+      <AlbumCard artist="Hum" album="Inlet" albumId={42} layout="grid" />,
+    );
+
+    const image = screen.getByAltText("Inlet");
+    expect(image).toHaveAttribute("sizes");
+    expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);
+    expect(image.getAttribute("srcset")).toMatch(/size=320[^,]* 320w/);
+    expect(image.getAttribute("srcset")).toMatch(/format=webp/);
+    expect(image.closest('[role="button"]')).toHaveClass(
+      "listen-deferred-grid-item",
+    );
+  });
+
   it("opens the desktop action menu when the album only has stable route identifiers", async () => {
     renderWithListenProviders(
       <AlbumCard

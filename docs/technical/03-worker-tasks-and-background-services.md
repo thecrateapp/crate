@@ -1,3 +1,14 @@
+---
+title: Workers, tasks and background services
+summary: Dramatiq ownership, queues and daemon responsibilities.
+section: architecture
+audience: [developer, operator]
+status: canonical
+order: 70
+verified: 2026-07-21
+sources: [app/crate/actors.py, app/crate/worker_handlers, docker-compose.yaml]
+---
+
 # Worker, Tasks, and Background Services
 
 ## Why the worker exists

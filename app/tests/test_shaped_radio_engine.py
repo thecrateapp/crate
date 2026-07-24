@@ -64,17 +64,10 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     assert context["discovery_excluded_artist_keys"] == ["artist 0"]
 
 
-def test_start_radio_reuses_single_read_session(monkeypatch):
-    from contextlib import contextmanager
-
+def test_start_radio_releases_database_sessions_before_scoring(monkeypatch):
     from crate import radio_engine
 
-    sentinel_session = object()
     seen_sessions = []
-
-    @contextmanager
-    def fake_read_scope():
-        yield sentinel_session
 
     def fake_resolve_seed(_user_id, _seed_type, _seed_value, *, session=None):
         seen_sessions.append(session)
@@ -94,7 +87,6 @@ def test_start_radio_reuses_single_read_session(monkeypatch):
         seen_sessions.append(db_session)
         return []
 
-    monkeypatch.setattr(radio_engine, "read_scope", fake_read_scope)
     monkeypatch.setattr(radio_engine, "_resolve_seed", fake_resolve_seed)
     monkeypatch.setattr(
         radio_engine, "load_feedback_history", fake_load_feedback_history
@@ -105,7 +97,245 @@ def test_start_radio_reuses_single_read_session(monkeypatch):
     result = radio_engine.start_radio(7, seed_type="track", seed_value="1")
 
     assert result is not None
-    assert seen_sessions == [sentinel_session, sentinel_session, sentinel_session]
+    assert seen_sessions == [None, None, None]
+
+
+def test_start_radio_falls_back_to_global_catalog_seed_queue(monkeypatch):
+    from crate import radio_engine
+
+    saved_sessions = []
+    monkeypatch.setattr(radio_engine, "_resolve_seed", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        radio_engine,
+        "_resolve_global_seed_tracks",
+        lambda seed_type, seed_value, *, session=None, limit=120: {
+            "seed_label": "High Vis",
+            "tracks": [
+                {
+                    "global_track_uid": "global-track-1",
+                    "global_artist_uid": "global-high-vis",
+                    "global_album_uid": "global-blending",
+                    "title": "0151",
+                    "artist": "High Vis",
+                    "album": "Blending",
+                    "duration": 181,
+                }
+            ],
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(radio_engine, "_save_session", saved_sessions.append)
+
+    result = radio_engine.start_radio(
+        7,
+        mode="seeded",
+        seed_type="artist",
+        seed_value="global-high-vis",
+    )
+
+    assert result is not None
+    assert result["seed_label"] == "High Vis"
+    assert result["tracks"] == [
+        {
+            "track_id": None,
+            "global_track_uid": "global-track-1",
+            "global_artist_uid": "global-high-vis",
+            "global_album_uid": "global-blending",
+            "entity_uid": None,
+            "title": "0151",
+            "artist": "High Vis",
+            "artist_id": None,
+            "artist_entity_uid": None,
+            "album": "Blending",
+            "album_id": None,
+            "album_entity_uid": None,
+            "bpm": None,
+            "audio_key": None,
+            "audio_scale": None,
+            "energy": None,
+            "danceability": None,
+            "valence": None,
+            "duration": 181,
+            "year": None,
+            "bliss_vector": None,
+            "distance": 0,
+        }
+    ]
+    assert saved_sessions[0]["radio_profile"] == "global_catalog"
+    assert saved_sessions[0]["global_cursor"] == 1
+
+
+def test_global_radio_batch_reloads_when_initial_queue_is_exhausted(monkeypatch):
+    from crate import radio_engine
+
+    first_track = {
+        "global_track_uid": "global-track-1",
+        "global_artist_uid": "global-high-vis",
+        "global_album_uid": "global-blending",
+        "title": "0151",
+        "artist": "High Vis",
+        "album": "Blending",
+    }
+    second_track = {
+        "global_track_uid": "global-track-2",
+        "global_artist_uid": "global-high-vis",
+        "global_album_uid": "global-blending",
+        "title": "Talk For Hours",
+        "artist": "High Vis",
+        "album": "Blending",
+    }
+    requested_limits: list[int] = []
+
+    def fake_resolve(seed_type, seed_value, *, session=None, limit=120):
+        del seed_type, seed_value, session
+        requested_limits.append(limit)
+        return {"seed_label": "High Vis", "tracks": [first_track, second_track]}
+
+    monkeypatch.setattr(radio_engine, "_resolve_global_seed_tracks", fake_resolve)
+
+    session = {
+        "seed_type": "artist",
+        "seed_value": "global-high-vis",
+        "seed_label": "High Vis",
+        "global_tracks": [first_track],
+        "global_cursor": 1,
+        "global_exhausted": True,
+        "global_source_exhausted": False,
+    }
+
+    tracks = radio_engine._generate_global_batch(session, count=1)
+
+    assert [track["global_track_uid"] for track in tracks] == ["global-track-2"]
+    assert requested_limits and requested_limits[0] > 1
+    assert session["global_cursor"] == 2
+    assert session["global_tracks"] == [first_track, second_track]
+
+
+def test_global_radio_like_uses_the_canonical_track_vector(monkeypatch):
+    from crate import radio_engine
+
+    vector = _vector(0.7)
+    session = {
+        "id": "global-session",
+        "user_id": 1,
+        "radio_profile": "global_catalog",
+        "initial_target": _vector(0.1),
+        "current_target": _vector(0.1),
+        "liked_vectors": [],
+        "disliked_vectors": [],
+        "global_tracks": [
+            {
+                "global_track_uid": "remote-track",
+                "title": "Remote track",
+                "bliss_vector": vector,
+            }
+        ],
+    }
+    saved: list[dict] = []
+    monkeypatch.setattr(radio_engine, "_load_session", lambda _: session)
+    monkeypatch.setattr(
+        radio_engine, "_save_session", lambda value: saved.append(value)
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "persist_radio_feedback",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("global feedback must not write a local track FK")
+        ),
+    )
+
+    result = radio_engine.radio_feedback(
+        "global-session",
+        None,
+        "like",
+        global_track_uid="remote-track",
+    )
+
+    assert result == {
+        "status": "ok",
+        "effect": "target_shifted",
+        "liked_count": 1,
+        "disliked_count": 0,
+    }
+    assert session["liked_vectors"] == [vector]
+    assert saved
+
+
+def test_global_radio_dislike_excludes_a_remote_track_without_local_vector(monkeypatch):
+    from crate import radio_engine
+
+    session = {
+        "id": "global-session",
+        "user_id": 1,
+        "radio_profile": "global_catalog",
+        "global_tracks": [
+            {"global_track_uid": "remote-track", "title": "Remote track"},
+            {"global_track_uid": "next-track", "title": "Next track"},
+        ],
+        "global_cursor": 0,
+    }
+    monkeypatch.setattr(radio_engine, "_load_session", lambda _: session)
+    monkeypatch.setattr(radio_engine, "_save_session", lambda _: None)
+
+    result = radio_engine.radio_feedback(
+        "global-session",
+        None,
+        "dislike",
+        global_track_uid="remote-track",
+    )
+
+    assert result == {"status": "ok", "effect": "exclusion_added"}
+    assert session["excluded_global_track_uids"] == ["remote-track"]
+    assert [
+        track["global_track_uid"]
+        for track in radio_engine._generate_global_batch(session, 2)
+    ] == ["next-track"]
+
+
+def test_next_tracks_marks_global_radio_session_exhausted(monkeypatch):
+    from crate import radio_engine
+
+    session = {
+        "id": "session",
+        "radio_profile": "global_catalog",
+        "track_count": 1,
+        "seed_type": "artist",
+        "seed_value": "global-high-vis",
+        "seed_label": "High Vis",
+        "global_tracks": [
+            {
+                "global_track_uid": "global-track-1",
+                "global_artist_uid": "global-high-vis",
+                "global_album_uid": "global-blending",
+                "title": "0151",
+                "artist": "High Vis",
+                "album": "Blending",
+            }
+        ],
+        "global_cursor": 1,
+    }
+    saved: list[dict] = []
+
+    monkeypatch.setattr(radio_engine, "_load_session", lambda _session_id: session)
+    monkeypatch.setattr(
+        radio_engine,
+        "_resolve_global_seed_tracks",
+        lambda *args, **kwargs: {
+            "seed_label": "High Vis",
+            "tracks": list(session["global_tracks"]),
+        },
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "_save_session",
+        lambda value: saved.append(dict(value)),
+    )
+
+    result = radio_engine.next_tracks("session", count=1)
+
+    assert result == {"session_id": "session", "tracks": [], "exhausted": True}
+    assert saved
+    assert saved[0]["global_exhausted"] is True
 
 
 def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(
@@ -874,6 +1104,11 @@ def test_daily_discovery_uses_cold_start_genres_when_profile_is_empty(monkeypatc
 
     monkeypatch.setattr(
         home_builder_mix_generation, "_query_discovery_tracks", fake_query
+    )
+    monkeypatch.setattr(
+        home_builder_mix_generation,
+        "_fallback_recent_interest_tracks",
+        lambda *_args, **_kwargs: [],
     )
 
     home_builder_mix_generation._build_mix_rows(

@@ -18,6 +18,7 @@ def run_projector_loop(
     interval_seconds: float = 5.0,
     limit: int = 200,
     home_warm_interval_seconds: float = 600.0,
+    outbox_cleanup_interval_seconds: float = 3600.0,
 ) -> None:
     """Consume domain events and warm UI snapshots until stopped."""
     from crate.projector import (
@@ -28,9 +29,25 @@ def run_projector_loop(
     interval = max(0.5, float(interval_seconds))
     batch_limit = max(1, min(int(limit), 1000))
     home_warm_interval = max(0.0, float(home_warm_interval_seconds))
+    outbox_cleanup_interval = max(60.0, float(outbox_cleanup_interval_seconds))
     last_home_warm = 0.0
+    last_outbox_cleanup: float | None = None
     while not stop_event.is_set():
         try:
+            from crate.domain_event_relay import relay_domain_events
+
+            relay_domain_events(limit=batch_limit)
+            now = time.monotonic()
+            if (
+                last_outbox_cleanup is None
+                or now - last_outbox_cleanup >= outbox_cleanup_interval
+            ):
+                last_outbox_cleanup = now
+                from crate.db.domain_event_outbox import cleanup_delivered_outbox
+
+                cleaned = cleanup_delivered_outbox()
+                if cleaned:
+                    log.info("Pruned %d delivered domain outbox event(s)", cleaned)
             result = process_domain_events(limit=batch_limit)
             if result.get("processed"):
                 log.info(

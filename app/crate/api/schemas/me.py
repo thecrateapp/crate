@@ -32,6 +32,7 @@ class SaveAlbumRequest(BaseModel):
 
 class LikeTrackRequest(IdentityFieldsMixin):
     track_id: int | None = None
+    global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
 
@@ -99,6 +100,7 @@ class RecommendationExposureResponse(BaseModel):
 class RecordPlayEventRequest(IdentityFieldsMixin):
     client_event_id: str | None = None
     track_id: int | None = None
+    global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
     title: str = ""
@@ -119,6 +121,7 @@ class RecordPlayEventRequest(IdentityFieldsMixin):
     context_playlist_id: int | None = None
     device_type: str | None = None
     app_platform: str | None = None
+    playback_session: str | None = Field(default=None, max_length=4096)
 
     @field_validator("played_seconds")
     @classmethod
@@ -298,7 +301,7 @@ class SavedAlbumResponse(IdentityFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     saved_at: datetime | str | None = None
-    id: int
+    id: int | None = None
     album_entity_uid: str | None = None
     slug: str | None = None
     artist: str | None = None
@@ -384,6 +387,7 @@ class PlayStatsResponse(BaseModel):
 
 class StatsOverviewTopArtistResponse(BaseModel):
     artist_name: str
+    global_artist_uid: str | None = None
     play_count: int
     minutes_listened: float | int
     artist_id: int | None = None
@@ -418,11 +422,14 @@ class StatsTrackResponse(IdentityFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None
+    global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
     title: str | None = None
     artist: str | None = None
     album: str | None = None
+    global_artist_uid: str | None = None
+    global_album_uid: str | None = None
     artist_id: int | None = None
     artist_slug: str | None = None
     album_id: int | None = None
@@ -443,6 +450,7 @@ class StatsTrackResponse(IdentityFieldsMixin):
 
 class StatsArtistResponse(BaseModel):
     artist_name: str
+    global_artist_uid: str | None = None
     artist_id: int | None = None
     artist_slug: str | None = None
     play_count: int
@@ -454,9 +462,11 @@ class StatsArtistResponse(BaseModel):
 
 class StatsAlbumResponse(BaseModel):
     artist: str
+    global_artist_uid: str | None = None
     artist_id: int | None = None
     artist_slug: str | None = None
     album: str
+    global_album_uid: str | None = None
     album_id: int | None = None
     album_slug: str | None = None
     play_count: int

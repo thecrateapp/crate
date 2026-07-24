@@ -1,3 +1,14 @@
+---
+title: Architecture summary
+summary: A concise reference to the Crate service topology.
+section: reference
+audience: [developer, operator]
+status: canonical
+order: 20
+verified: 2026-07-21
+sources: [docker-compose.yaml, app/crate, app/readplane]
+---
+
 # Architecture
 
 A short orientation. For the current detailed picture, read the

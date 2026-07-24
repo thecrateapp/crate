@@ -23,11 +23,14 @@ import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 
 /** Hidden img that preloads the artist background into the browser cache */
 function PreloadBackground({ item }: { item: UpcomingItem }) {
-  const url = artistBackgroundApiUrl({
-    artistId: item.artist_id,
-    artistSlug: item.artist_slug,
-    artistName: item.artist,
-  });
+  const url = artistBackgroundApiUrl(
+    {
+      artistId: item.artist_id,
+      artistSlug: item.artist_slug,
+      artistName: item.artist,
+    },
+    { size: 1280 },
+  );
   if (!url) return null;
   return <img src={url} alt="" className="hidden" />;
 }
@@ -155,11 +158,14 @@ export function UpcomingShowCollapsedView({
 }: CollapsedViewProps) {
   const { t, i18n } = useTranslation();
   const artistImageUrl =
-    artistPhotoApiUrl({
-      artistId: item.artist_id,
-      artistSlug: item.artist_slug,
-      artistName: item.artist,
-    }) ||
+    artistPhotoApiUrl(
+      {
+        artistId: item.artist_id,
+        artistSlug: item.artist_slug,
+        artistName: item.artist,
+      },
+      { size: 320 },
+    ) ||
     resolveMaybeApiAssetUrl(item.cover_url) ||
     undefined;
 
@@ -283,17 +289,23 @@ export function UpcomingShowExpandedView({
   showClose = true,
 }: ExpandedViewProps) {
   const { t, i18n } = useTranslation();
-  const backgroundUrl = artistBackgroundApiUrl({
-    artistId: item.artist_id,
-    artistSlug: item.artist_slug,
-    artistName: item.artist,
-  });
-  const artistPhotoUrl =
-    artistPhotoApiUrl({
+  const backgroundUrl = artistBackgroundApiUrl(
+    {
       artistId: item.artist_id,
       artistSlug: item.artist_slug,
       artistName: item.artist,
-    }) ||
+    },
+    { size: 1280 },
+  );
+  const artistPhotoUrl =
+    artistPhotoApiUrl(
+      {
+        artistId: item.artist_id,
+        artistSlug: item.artist_slug,
+        artistName: item.artist,
+      },
+      { size: 640 },
+    ) ||
     resolveMaybeApiAssetUrl(item.cover_url) ||
     undefined;
 

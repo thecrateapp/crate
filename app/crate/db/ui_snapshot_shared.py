@@ -9,11 +9,11 @@ from crate.db.read_model_shared import coerce_datetime, coerce_json, utc_now
 
 def snapshot_age_ok(row: dict[str, Any], max_age_seconds: int | None) -> bool:
     stale_after = coerce_datetime(row.get("stale_after"))
-    if stale_after is not None and stale_after <= utc_now():
+    built_at = coerce_datetime(row.get("built_at"))
+    if stale_after is not None and built_at is not None and stale_after <= built_at:
         return False
     if max_age_seconds is None:
-        return True
-    built_at = coerce_datetime(row.get("built_at"))
+        return stale_after is None or stale_after > utc_now()
     if built_at is None:
         return False
     return (utc_now() - built_at).total_seconds() <= max_age_seconds

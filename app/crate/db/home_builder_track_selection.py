@@ -30,7 +30,7 @@ def _select_diverse_tracks(
     album_counts: dict[tuple[str, str], int] = {}
 
     for row in rows:
-        track_key = row.get("track_id") or row.get("track_path")
+        track_key = _track_key(row)
         if not track_key or track_key in seen_tracks:
             continue
         artist_name = (row.get("artist") or "").strip().lower()
@@ -58,7 +58,7 @@ def _merge_track_rows(*collections: list[dict]) -> list[dict]:
 
     for rows in collections:
         for row in rows:
-            track_key = row.get("track_id") or row.get("track_path")
+            track_key = _track_key(row)
             if not track_key or track_key in seen_tracks:
                 continue
             seen_tracks.add(track_key)
@@ -121,7 +121,7 @@ def _select_diverse_tracks_with_backfill(
 
     for artist_limit, album_limit in passes:
         for row in rows:
-            track_key = row.get("track_id") or row.get("track_path")
+            track_key = _track_key(row)
             if not track_key or track_key in seen_tracks:
                 continue
             artist_name = (row.get("artist") or "").strip().lower()
@@ -141,6 +141,15 @@ def _select_diverse_tracks_with_backfill(
                 return selected
 
     return selected
+
+
+def _track_key(row: dict) -> object | None:
+    return (
+        row.get("global_track_uid")
+        or row.get("track_id")
+        or row.get("track_entity_uid")
+        or row.get("track_path")
+    )
 
 
 def _select_home_mix_tracks(

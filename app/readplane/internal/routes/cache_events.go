@@ -22,6 +22,77 @@ const (
 	cacheHeartbeatEvery = 30 * time.Second
 )
 
+// RunAuthInvalidation keeps revocable identity caches coherent across processes.
+func (s *Server) RunAuthInvalidation(ctx context.Context) {
+	if s.redis == nil || s.auth == nil {
+		return
+	}
+	var lastEventID int64
+	initialized := false
+	for ctx.Err() == nil {
+		pubsub := s.redis.Subscribe(ctx, cacheLiveChannel)
+		if _, err := pubsub.Receive(ctx); err != nil {
+			_ = pubsub.Close()
+			if !waitForRetry(ctx, time.Second) {
+				return
+			}
+			continue
+		}
+		if initialized {
+			events, err := s.cacheEventsSince(ctx, lastEventID)
+			if err != nil {
+				s.auth.InvalidateScope("auth")
+				if latest, latestErr := s.latestCacheEventID(ctx); latestErr == nil {
+					lastEventID = latest
+				}
+			} else {
+				for _, event := range events {
+					s.auth.InvalidateScope(event.Scope)
+					lastEventID = event.ID
+				}
+			}
+		} else {
+			if latest, err := s.latestCacheEventID(ctx); err == nil {
+				lastEventID = latest
+			}
+			initialized = true
+		}
+		messages := pubsub.Channel()
+		reconnect := false
+		for !reconnect {
+			select {
+			case <-ctx.Done():
+				_ = pubsub.Close()
+				return
+			case message, ok := <-messages:
+				if !ok {
+					reconnect = true
+					continue
+				}
+				if event, valid := parseCacheInvalidationEvent(message.Payload); valid && event.ID > lastEventID {
+					s.auth.InvalidateScope(event.Scope)
+					lastEventID = event.ID
+				}
+			}
+		}
+		_ = pubsub.Close()
+		if !waitForRetry(ctx, time.Second) {
+			return
+		}
+	}
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
 type cacheInvalidationEvent struct {
 	ID    int64   `json:"id"`
 	Scope string  `json:"scope"`
@@ -30,7 +101,7 @@ type cacheInvalidationEvent struct {
 
 func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 	if s.redis == nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -53,11 +124,11 @@ func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lastEventID, ok := parseLastEventID(r.Header.Get("Last-Event-ID"))
+	lastEventID, ok := cacheEventResumeID(r)
 	if !ok {
 		latest, err := s.latestCacheEventID(r.Context())
 		if err != nil {
-			if s.fallback.ServeHTTP(w, r) {
+			if s.tryFallback(w, r) {
 				return
 			}
 			httpx.MarkReadplane(w, "miss")
@@ -70,7 +141,7 @@ func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 	pubsub := s.redis.Subscribe(r.Context(), cacheLiveChannel)
 	defer pubsub.Close()
 	if _, err := pubsub.Receive(r.Context()); err != nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -80,7 +151,7 @@ func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 
 	missed, err := s.cacheEventsSince(r.Context(), lastEventID)
 	if err != nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -135,14 +206,24 @@ func (s *Server) cacheEventsSince(ctx context.Context, lastID int64) ([]cacheInv
 	if err != nil {
 		return nil, err
 	}
+	events, _ := filterCacheInvalidationEvents(rawEvents, lastID)
+	return events, nil
+}
+
+func filterCacheInvalidationEvents(rawEvents []string, lastID int64) ([]cacheInvalidationEvent, int64) {
 	events := make([]cacheInvalidationEvent, 0, len(rawEvents))
+	latest := lastID
 	for index := len(rawEvents) - 1; index >= 0; index-- {
 		event, ok := parseCacheInvalidationEvent(rawEvents[index])
-		if ok && event.ID > lastID {
-			events = append(events, event)
+		if !ok || event.ID <= lastID {
+			continue
+		}
+		events = append(events, event)
+		if event.ID > latest {
+			latest = event.ID
 		}
 	}
-	return events, nil
+	return events, latest
 }
 
 func (s *Server) latestCacheEventID(ctx context.Context) (int64, error) {
@@ -192,4 +273,16 @@ func parseLastEventID(value string) (int64, bool) {
 		return 0, false
 	}
 	return parsed, true
+}
+
+func cacheEventResumeID(r *http.Request) (int64, bool) {
+	if value := strings.TrimSpace(r.Header.Get("Last-Event-ID")); value != "" {
+		if eventID, ok := parseLastEventID(value); ok {
+			return eventID, true
+		}
+	}
+	if value := strings.TrimSpace(r.URL.Query().Get("last_event_id")); value != "" {
+		return parseLastEventID(value)
+	}
+	return 0, false
 }

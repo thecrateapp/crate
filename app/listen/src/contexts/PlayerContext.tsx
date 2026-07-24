@@ -23,8 +23,14 @@ import { getTrackCacheKey, getStreamUrl } from "@/contexts/player-utils";
 import {
   addTrack as gpAddTrack,
   destroyPlayer as gpDestroyPlayer,
+  getTrackIndex as gpGetTrackIndex,
+  getTracks as gpGetTracks,
   gotoTrack as gpGotoTrack,
   insertTrack as gpInsertTrack,
+  loadQueue as gpLoadQueue,
+  play as gpPlay,
+  replaceTrack as gpReplaceTrack,
+  seekTo as gpSeekTo,
   setLoop as gpSetLoop,
   setSingleMode as gpSetSingleMode,
   setVolume as gpSetVolume,
@@ -32,6 +38,7 @@ import {
 import {
   toFreshEngineTrack,
   toFreshEngineTracks,
+  toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
@@ -52,6 +59,10 @@ import {
   useDesktopTrayNowPlaying,
 } from "@/contexts/use-desktop-tray-commands";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
+import {
+  canApplyNextTrackResolution,
+  getNextTrackIndex,
+} from "@/contexts/player-next-track-resolution";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
 import {
@@ -74,14 +85,26 @@ import type {
 import { createQueueRevision } from "@/lib/playback-engine";
 import {
   getInfinitePlaybackPreference,
+  getEffectivePlaybackDeliveryPolicy,
   getPlaybackDeliveryPolicyPreference,
+  subscribeToPlaybackDeliveryNetworkChanges,
   getSmartCrossfadePreference,
   getSmartPlaylistSuggestionsCadencePreference,
   getSmartPlaylistSuggestionsPreference,
   PLAYER_PLAYBACK_PREFS_EVENT,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 import { preparePlaybackDelivery } from "@/lib/playback-delivery";
+import {
+  recordPlaybackStall,
+  recordStablePlayback,
+} from "@/lib/playback-network-quality";
+import { getPlaybackDeliveryProvenance } from "@/lib/playback-provenance";
+import {
+  installPlaybackQoeFlush,
+  recordPlaybackQoe,
+  type PlaybackQoeEventName,
+} from "@/lib/playback-qoe";
 import {
   CRATE_CONNECT_V2_TRANSPORT_ENABLED,
   connectPlayerStateToRemotePlaybackState,
@@ -398,6 +421,38 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     markSeekPosition,
     recordProgress,
   } = usePlayEventTracker(getPlaybackSnapshot);
+  const recordPlaybackQualityProgress = useCallback((seconds: number) => {
+    recordStablePlayback(seconds);
+  }, []);
+  const recordCurrentPlaybackQoe = useCallback(
+    (
+      event: PlaybackQoeEventName,
+      details: {
+        durationMs?: number;
+        bufferedAheadSeconds?: number;
+        attempt?: number;
+      } = {},
+    ) => {
+      const track = currentTrackRef.current;
+      if (!track) return;
+      const policy = getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy);
+      const provenance = getPlaybackDeliveryProvenance(track);
+      recordPlaybackQoe({
+        event,
+        origin:
+          provenance?.origin ??
+          (track.origin === "remote" ? "remote" : "local"),
+        requestedPolicy: provenance?.requestedPolicy ?? policy,
+        effectivePolicy: provenance?.effectivePolicy ?? policy,
+        ...details,
+      });
+    },
+    [currentTrackRef, playbackDeliveryPolicy],
+  );
+  const recoverActiveTrackRef = useRef<() => Promise<boolean>>(
+    async () => false,
+  );
+  const nextTrackResolutionKeyRef = useRef<string | null>(null);
 
   const {
     beginSoftInterruption,
@@ -413,6 +468,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     bufferingIntentRef,
     commitIsPlaying,
     commitIsBuffering,
+    onPlaybackStall: () => {
+      recordPlaybackStall();
+      recordCurrentPlaybackQoe("stall_start");
+    },
+    onPlaybackStallEnded: (durationMs, bufferedAheadSeconds) => {
+      recordCurrentPlaybackQoe("stall_end", {
+        durationMs,
+        bufferedAheadSeconds,
+      });
+    },
+    onPlaybackRecovered: (attempt) => {
+      recordCurrentPlaybackQoe("recovery", { attempt });
+    },
+    recoverCurrentTrack: () => recoverActiveTrackRef.current(),
   });
   const connectTransferPlaybackGuardRef = useRef<number | null>(null);
   const clearConnectTransferPlaybackGuard = useCallback(() => {
@@ -435,6 +504,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     isPlayingRef,
     requireUserGestureToResume,
   ]);
+
+  useEffect(() => {
+    return subscribeToPlaybackDeliveryNetworkChanges(() => {
+      setPlaybackDeliveryPolicy(getPlaybackDeliveryPolicyPreference());
+    });
+  }, [setPlaybackDeliveryPolicy]);
+  useEffect(() => installPlaybackQoeFlush(), []);
   const {
     syncEffectiveCrossfade,
     rememberActiveTrack,
@@ -466,6 +542,114 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     clearPrevRestartLatch,
     markSeekPosition,
   });
+
+  recoverActiveTrackRef.current = async () => {
+    const recoveryQueue = queueRef.current;
+    if (recoveryQueue.length === 0) return false;
+    const recoveryIndex = clampIndex(
+      currentIndexRef.current,
+      recoveryQueue.length,
+    );
+    const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+    const engineTracks = await toStartupEngineTracks(
+      recoveryQueue,
+      recoveryIndex,
+    );
+
+    if (shouldUseAndroidNativePlayer()) {
+      await androidNativeEngine.loadQueue({
+        revision: createQueueRevision(),
+        tracks: engineTracks,
+        currentIndex: recoveryIndex,
+        positionMs,
+        autoplay: true,
+        repeat: repeatRef.current,
+        crossfadeMs: effectiveCrossfadeMsRef.current,
+        volume: lastNonZeroVolumeRef.current,
+      });
+      return true;
+    }
+
+    gpLoadQueue(
+      buildEngineUrls(
+        recoveryQueue,
+        engineTracks.map((track) => track.url),
+      ),
+      recoveryIndex,
+      { restartIfSameIndex: true },
+    );
+    if (positionMs > 0) {
+      gpSeekTo(positionMs);
+    }
+    await gpPlay();
+    return true;
+  };
+
+  const preResolveNextTrack = useCallback(() => {
+    if (shouldUseAndroidNativePlayer()) return;
+
+    const queueSnapshot = queueRef.current;
+    const currentIndex = currentIndexRef.current;
+    const nextIndex = getNextTrackIndex(
+      queueSnapshot.length,
+      currentIndex,
+      repeatRef.current,
+    );
+    if (nextIndex === null) return;
+
+    const currentTrack = queueSnapshot[currentIndex];
+    const nextTrack = queueSnapshot[nextIndex];
+    if (!currentTrack || !nextTrack?.globalTrackUid) return;
+
+    const expectedUrl = gpGetTracks()[nextIndex];
+    if (!expectedUrl) return;
+
+    const resolutionKey = [
+      getTrackCacheKey(currentTrack),
+      getTrackCacheKey(nextTrack),
+      currentIndex,
+      nextIndex,
+      expectedUrl,
+    ].join(":");
+    if (nextTrackResolutionKeyRef.current === resolutionKey) return;
+    nextTrackResolutionKeyRef.current = resolutionKey;
+
+    void toFreshEngineTrack(nextTrack)
+      .then((resolvedTrack) => {
+        if (resolvedTrack.url === expectedUrl) return;
+
+        const engineUrls = gpGetTracks();
+        if (
+          !canApplyNextTrackResolution(
+            {
+              queue: queueSnapshot,
+              currentIndex,
+              nextIndex,
+              expectedUrl,
+            },
+            {
+              queue: queueRef.current,
+              currentIndex: currentIndexRef.current,
+              engineIndex: gpGetTrackIndex(),
+              engineUrl: engineUrls[nextIndex],
+            },
+          )
+        ) {
+          return;
+        }
+
+        gpReplaceTrack(nextIndex, resolvedTrack.url);
+        const resolvedUrls = [...engineUrls];
+        resolvedUrls[nextIndex] = resolvedTrack.url;
+        buildEngineUrls(queueSnapshot, resolvedUrls);
+      })
+      .catch((error) => {
+        if (nextTrackResolutionKeyRef.current === resolutionKey) {
+          nextTrackResolutionKeyRef.current = null;
+        }
+        console.warn("[gapless] failed to resolve next track:", error);
+      });
+  }, [buildEngineUrls, currentIndexRef, queueRef, repeatRef]);
 
   // Domain-level actions for usePlaybackIntelligence. Verb-oriented
   // instead of raw state setters — the hook no longer needs to reason
@@ -677,7 +861,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const engineTracks = await toFreshEngineTracks(queueSnapshot);
+      const engineTracks = await toStartupEngineTracks(queueSnapshot, index);
       await androidNativeEngine.loadQueue({
         revision: createQueueRevision(),
         tracks: engineTracks,
@@ -838,7 +1022,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (!(await refreshAuthToken())) {
           throw new Error("Could not refresh the native playback token");
         }
-        const engineTracks = await toFreshEngineTracks(queueSnapshot);
+        const engineTracks = await toStartupEngineTracks(queueSnapshot, index);
         await androidNativeEngine.loadQueue({
           revision: createQueueRevision(),
           tracks: engineTracks,
@@ -1188,7 +1372,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           crossfadeSeconds?: number;
           smartCrossfadeEnabled?: boolean;
           infinitePlaybackEnabled?: boolean;
-          playbackDeliveryPolicy?: PlaybackDeliveryPolicy;
+          playbackDeliveryPolicy?: PlaybackDeliveryPreference;
           smartPlaylistSuggestionsEnabled?: boolean;
           smartPlaylistSuggestionsCadence?: number;
         }>
@@ -1378,7 +1562,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   ]);
 
   useEffect(() => {
-    preparePlaybackDelivery(queue, currentIndex, playbackDeliveryPolicy);
+    preparePlaybackDelivery(
+      queue,
+      currentIndex,
+      getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy),
+    );
   }, [currentIndex, playbackDeliveryPolicy, queue]);
 
   const {
@@ -1430,6 +1618,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     rotateTrackerSession,
     markSeekPosition,
     recordProgress,
+    recordPlaybackQualityProgress,
+    recordPlaybackStarted: (durationMs) => {
+      recordCurrentPlaybackQoe("startup", { durationMs });
+    },
+    onActivePlaybackStarted: preResolveNextTrack,
     pullFromEngine,
     setAnalyserVersion,
     setCrossfadeTransition,
@@ -1513,7 +1706,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     pushToEngine,
     advanceCursorTo,
     publishConnectState,
-    playbackDeliveryPolicy,
+    playbackDeliveryPolicy: getEffectivePlaybackDeliveryPolicy(
+      playbackDeliveryPolicy,
+    ),
   });
 
   const clearQueueRef = useRef(clearQueue);

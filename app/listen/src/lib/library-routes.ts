@@ -1,16 +1,21 @@
 import {
   artistPagePath as _artistPagePath,
+  globalArtistPagePath as _globalArtistPagePath,
+  globalArtistUidFromRouteRef as _globalArtistUidFromRouteRef,
   artistSharePath as _artistSharePath,
   artistTopTracksPath as _artistTopTracksPath,
   artistApiPath as _artistApiPath,
   artistPhotoApiUrl as _artistPhotoApiUrl,
   artistBackgroundApiUrl as _artistBackgroundApiUrl,
   albumPagePath as _albumPagePath,
+  globalAlbumPagePath as _globalAlbumPagePath,
+  globalAlbumUidFromRouteRef as _globalAlbumUidFromRouteRef,
   albumSharePath as _albumSharePath,
   albumApiPath as _albumApiPath,
   albumDownloadApiPath as _albumDownloadApiPath,
   albumRelatedApiPath as _albumRelatedApiPath,
   albumCoverApiUrl as _albumCoverApiUrl,
+  genreCoverApiUrl as _genreCoverApiUrl,
   trackDownloadApiPath as _trackDownloadApiPath,
   trackEffectiveEqApiPath as _trackEffectiveEqApiPath,
   trackEqFeaturesApiPath as _trackEqFeaturesApiPath,
@@ -34,9 +39,13 @@ import { getApiBase, getAuthToken } from "@/lib/api";
 
 // Page routes — no prefix needed (local navigation)
 export const artistPagePath = _artistPagePath;
+export const globalArtistPagePath = _globalArtistPagePath;
+export const globalArtistUidFromRouteRef = _globalArtistUidFromRouteRef;
 export const artistSharePath = _artistSharePath;
 export const artistTopTracksPath = _artistTopTracksPath;
 export const albumPagePath = _albumPagePath;
+export const globalAlbumPagePath = _globalAlbumPagePath;
+export const globalAlbumUidFromRouteRef = _globalAlbumUidFromRouteRef;
 export const albumSharePath = _albumSharePath;
 export const isReservedArtistChildSlug = _isReservedArtistChildSlug;
 
@@ -73,6 +82,21 @@ function preferModernImageFormat(options?: ImageOptions): ImageOptions {
   return { ...options, format: "webp" };
 }
 
+export function responsiveImageSrcSet(
+  widths: readonly number[],
+  buildUrl: (size: number) => string,
+): string | undefined {
+  const candidates = [...new Set(widths)]
+    .filter((width) => Number.isFinite(width) && width > 0)
+    .sort((left, right) => left - right)
+    .map((width) => [Math.round(width), buildUrl(Math.round(width))] as const)
+    .filter(([, url]) => Boolean(url));
+
+  return candidates.length
+    ? candidates.map(([width, url]) => `${url} ${width}w`).join(", ")
+    : undefined;
+}
+
 // These are passed to useApi/api() which already prepends the active API base.
 export const artistApiPath = _artistApiPath;
 export const albumApiPath = _albumApiPath;
@@ -101,6 +125,12 @@ export const albumCoverApiUrl = authedUrl(((input, options) =>
     input,
     preferModernImageFormat(options),
   )) as typeof _albumCoverApiUrl);
+export const genreCoverApiUrl = authedUrl(((slug, options) =>
+  _genreCoverApiUrl(
+    slug,
+    preferModernImageFormat(options),
+  )) as typeof _genreCoverApiUrl);
+
 export const trackStreamApiPath = _trackStreamApiPath;
 export const trackDownloadApiPath = _trackDownloadApiPath;
 export const trackSharePath = _trackSharePath;

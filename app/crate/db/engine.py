@@ -59,19 +59,41 @@ def get_engine():
         max_overflow = _get_pool_setting(
             "CRATE_SQLALCHEMY_MAX_OVERFLOW", default_overflow
         )
+        pool_timeout = _get_positive_setting("CRATE_SQLALCHEMY_POOL_TIMEOUT_SECONDS", 5)
+        connect_timeout = _get_positive_setting(
+            "CRATE_POSTGRES_CONNECT_TIMEOUT_SECONDS", 3
+        )
+        statement_timeout = _get_positive_setting(
+            "CRATE_POSTGRES_STATEMENT_TIMEOUT_MS", _default_statement_timeout_ms()
+        )
+        lock_timeout = _get_positive_setting("CRATE_POSTGRES_LOCK_TIMEOUT_MS", 3_000)
         _engine = create_engine(
             _build_dsn(),
             pool_size=pool_size,
             max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
             pool_pre_ping=True,
             pool_recycle=3600,
+            connect_args={
+                "connect_timeout": connect_timeout,
+                "options": (
+                    f"-c statement_timeout={statement_timeout} "
+                    f"-c lock_timeout={lock_timeout}"
+                ),
+            },
             echo=False,
         )
         log.info(
-            "SQLAlchemy engine created: %s (pool_size=%s, max_overflow=%s)",
+            "SQLAlchemy engine created: %s "
+            "(pool_size=%s, max_overflow=%s, pool_timeout=%ss, "
+            "connect_timeout=%ss, statement_timeout=%sms, lock_timeout=%sms)",
             _engine.url.render_as_string(hide_password=True),
             pool_size,
             max_overflow,
+            pool_timeout,
+            connect_timeout,
+            statement_timeout,
+            lock_timeout,
         )
     return _engine
 
@@ -85,6 +107,37 @@ def get_session_factory():
             expire_on_commit=False,
         )
     return _session_factory
+
+
+def get_pool_runtime() -> dict[str, int | float | bool]:
+    """Return queue-pool saturation without creating an engine as a side effect."""
+    pool = getattr(_engine, "pool", None)
+    if pool is None:
+        return _empty_pool_runtime()
+    size = int(pool.size())
+    checked_in = int(pool.checkedin())
+    checked_out = int(pool.checkedout())
+    overflow = int(pool.overflow())
+    capacity = max(1, size)
+    return {
+        "configured": True,
+        "size": size,
+        "checked_in": checked_in,
+        "checked_out": checked_out,
+        "overflow": overflow,
+        "saturation_ratio": round(checked_out / capacity, 3),
+    }
+
+
+def _empty_pool_runtime() -> dict[str, int | float | bool]:
+    return {
+        "configured": False,
+        "size": 0,
+        "checked_in": 0,
+        "checked_out": 0,
+        "overflow": 0,
+        "saturation_ratio": 0.0,
+    }
 
 
 class Base(DeclarativeBase):
@@ -108,6 +161,30 @@ def _get_pool_setting(env_var: str, default: int) -> int:
         log.warning("Invalid %s=%r; falling back to %d", env_var, raw, default)
         return default
     return max(0, value)
+
+
+def _default_statement_timeout_ms() -> int:
+    runtime = os.environ.get("CRATE_RUNTIME", "").lower()
+    if runtime == "worker":
+        return 900_000
+    if runtime == "projector":
+        return 30_000
+    return 15_000
+
+
+def _get_positive_setting(env_var: str, default: int) -> int:
+    raw = os.environ.get(env_var)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        log.warning("Invalid %s=%r; falling back to %d", env_var, raw, default)
+        return default
+    if value <= 0:
+        log.warning("Non-positive %s=%r; falling back to %d", env_var, raw, default)
+        return default
+    return value
 
 
 def reset_engine():

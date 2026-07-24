@@ -10,6 +10,25 @@ export interface UseApiState<T> {
 
 type ApiFn = ReturnType<typeof createApiClient>;
 
+type RetryableApiError = Error & {
+  status?: number;
+  retryAfterMs?: number;
+};
+
+export function catalogWarmingRetryDelayMs(error: unknown): number | null {
+  const apiError = error as RetryableApiError;
+  if (apiError?.status !== 503) return null;
+  let detail = "";
+  try {
+    const payload = JSON.parse(apiError.message) as { detail?: unknown };
+    detail = String(payload.detail || "");
+  } catch {
+    detail = apiError.message || "";
+  }
+  if (detail !== "catalog_warming") return null;
+  return Math.min(30_000, Math.max(500, apiError.retryAfterMs ?? 3_000));
+}
+
 interface ReactHookDeps {
   useState: <T>(
     initial: T | (() => T),
@@ -46,34 +65,47 @@ export function createUseApi(reactHooks: ReactHookDeps, apiFn: ApiFn) {
       if (!url) return;
       const controller = new AbortController();
       let cancelled = false;
+      let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
       if (!hasFetched.current) {
         setLoading(true);
       }
       setError(null);
 
-      apiFn<T>(url, method, body, { signal: controller.signal })
-        .then((nextData) => {
-          if (!cancelled) {
-            setData(nextData);
-            hasFetched.current = true;
-          }
-        })
-        .catch((e: Error) => {
-          const wasAborted =
-            controller.signal.aborted === true || e.name === "AbortError";
-          if (!cancelled && !wasAborted) {
-            setError(e.message);
-          }
-        })
-        .finally(() => {
-          if (!cancelled) {
-            setLoading(false);
-          }
-        });
+      const runRequest = () => {
+        retryTimer = null;
+        apiFn<T>(url, method, body, { signal: controller.signal })
+          .then((nextData) => {
+            if (!cancelled) {
+              setData(nextData);
+              hasFetched.current = true;
+            }
+          })
+          .catch((error: Error) => {
+            const wasAborted =
+              controller.signal.aborted === true || error.name === "AbortError";
+            const retryDelay =
+              method === "GET" ? catalogWarmingRetryDelayMs(error) : null;
+            if (!cancelled && !wasAborted && retryDelay != null) {
+              retryTimer = setTimeout(runRequest, retryDelay);
+              return;
+            }
+            if (!cancelled && !wasAborted) {
+              setError(error.message);
+            }
+          })
+          .finally(() => {
+            if (!cancelled && retryTimer == null) {
+              setLoading(false);
+            }
+          });
+      };
+
+      runRequest();
 
       return () => {
         cancelled = true;
+        if (retryTimer != null) clearTimeout(retryTimer);
         controller.abort();
       };
     }, [apiFn, bodyKey, method, trigger, url]);

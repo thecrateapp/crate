@@ -5,7 +5,7 @@ import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { trackStreamApiPath } from "@/lib/library-routes";
 import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
 import { getOfflineNativePlaybackUrl } from "@/lib/offline";
-import { getPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
+import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 
 export const STORAGE_KEY = "listen-player-state";
 export const RECENTLY_PLAYED_KEY = "listen-recently-played";
@@ -108,9 +108,19 @@ export function getStoredQueue(): StoredQueue {
 
 function normalizeStoredTrack(track: Track): Track {
   const albumCover = resolveMaybeApiAssetUrl(track.albumCover);
-  return albumCover && albumCover !== track.albumCover
-    ? { ...track, albumCover }
-    : track;
+  const normalized =
+    albumCover && albumCover !== track.albumCover
+      ? { ...track, albumCover }
+      : { ...track };
+  // Strip remote stream URL on restore — always request fresh playback resolution
+  if (normalized.remote) {
+    normalized.remote = {
+      ...normalized.remote,
+      streamUrl: undefined,
+      streamUrlExpiresAt: undefined,
+    };
+  }
+  return normalized;
 }
 
 export interface SaveQueueOptions {
@@ -126,21 +136,38 @@ export function saveQueue(
   options: SaveQueueOptions = {},
 ) {
   try {
+    const safeQueue = queue.map(sanitizeTrackForPersistence);
+    const safeUnshuffled = options.unshuffledQueue
+      ? options.unshuffledQueue.map(sanitizeTrackForPersistence)
+      : null;
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        queue,
+        queue: safeQueue,
         currentIndex,
         currentTime: options.currentTime ?? 0,
         wasPlaying: options.wasPlaying ?? false,
         shuffle: options.shuffle ?? false,
-        unshuffledQueue: options.unshuffledQueue ?? null,
+        unshuffledQueue: safeUnshuffled,
         savedAt: new Date().toISOString(),
       }),
     );
   } catch {
     /* ignore */
   }
+}
+
+function sanitizeTrackForPersistence(track: Track): Track {
+  if (!track.remote) return track;
+  return {
+    ...track,
+    path: undefined,
+    remote: {
+      ...track.remote,
+      streamUrl: undefined,
+      streamUrlExpiresAt: undefined,
+    },
+  };
 }
 
 export function getStoredRecentlyPlayed(): Track[] {
@@ -162,6 +189,15 @@ export function saveRecentlyPlayed(tracks: Track[]) {
 }
 
 export function getStreamUrl(track: Track): string {
+  if (track.origin === "remote" && track.remote?.streamUrl) {
+    const expired = track.remote.streamUrlExpiresAt
+      ? new Date(track.remote.streamUrlExpiresAt).getTime() < Date.now()
+      : false;
+    if (!expired) {
+      return `${_apiBase()}${track.remote.streamUrl}`;
+    }
+  }
+
   if (track.entityUid || track.path) {
     const localOfflineUrl = getOfflineNativePlaybackUrl(
       track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,
@@ -179,7 +215,7 @@ export function getStreamUrl(track: Track): string {
     {
       track: track.title,
       artist: track.artist,
-      policy: getPlaybackDeliveryPolicyPreference(),
+      policy: getEffectivePlaybackDeliveryPolicy(),
       url: redactUrl(url),
     },
     "debug",
@@ -191,7 +227,7 @@ export function getStreamUrl(track: Track): string {
  *  playback uses the httpOnly session cookie instead of tokenized URLs. */
 function withStreamQuery(url: string): string {
   const params = new URLSearchParams();
-  const delivery = getPlaybackDeliveryPolicyPreference();
+  const delivery = getEffectivePlaybackDeliveryPolicy();
   if (delivery !== "original") {
     params.set("delivery", delivery);
   }

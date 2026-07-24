@@ -14,6 +14,7 @@ function tilePhoto(artist: HomeArtworkArtist): string | null {
     artistPhotoApiUrl(
       {
         artistId: artist.artist_id,
+        globalArtistUid: artist.global_artist_uid,
         artistSlug: artist.artist_slug,
         artistName: artist.artist_name,
       },

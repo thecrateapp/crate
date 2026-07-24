@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 
 import type { RepeatMode, Track } from "@/contexts/player-types";
+import { toStartupEngineTracks } from "@/contexts/player-engine-adapter";
 import { getStoredQueue } from "@/contexts/player-utils";
 import {
   fadeInAndPlay as gpFadeInAndPlay,
@@ -29,7 +30,7 @@ interface UseRestoreOnMountOptions {
    * stopped". Cleared when the attempt succeeds or times out.
    */
   bufferingIntentRef: MutableRefObject<boolean>;
-  buildEngineUrls: (tracks: Track[]) => string[];
+  buildEngineUrls: (tracks: Track[], resolvedUrls?: string[]) => string[];
   pullFromEngine: (sourceQueue?: Track[]) => unknown;
   pushToEngine: (
     queue: Track[],
@@ -174,23 +175,34 @@ export function useRestoreOnMount({
       return;
     }
 
-    gpLoadQueue(buildEngineUrls(restoredQueue), restoredIndex);
-    gpSetLoop(repeatRef.current === "all");
-    gpSetSingleMode(repeatRef.current === "one");
+    void (async () => {
+      const engineTracks = await toStartupEngineTracks(
+        restoredQueue,
+        restoredIndex,
+      );
+      const engineUrls = engineTracks.map((track) => track.url);
+      gpLoadQueue(buildEngineUrls(restoredQueue, engineUrls), restoredIndex);
+      gpSetLoop(repeatRef.current === "all");
+      gpSetSingleMode(repeatRef.current === "one");
 
-    // pullFromEngine commits queue/index/duration internally.
-    pullFromEngine(restoredQueue);
+      // pullFromEngine commits queue/index/duration internally.
+      pullFromEngine(restoredQueue);
 
-    // If we have a saved position, seek to it right away so the UI
-    // reflects it before any onLoad fires. The engine seeks properly
-    // once the track is loaded (via pendingRestoreTimeRef in onLoad).
-    if (pendingRestoreTimeRef.current > 0) {
-      gpSeekTo(pendingRestoreTimeRef.current * 1000);
-      commitCurrentTime(pendingRestoreTimeRef.current);
-      markSeekPosition(pendingRestoreTimeRef.current);
-    }
+      // If we have a saved position, seek to it right away so the UI
+      // reflects it before any onLoad fires. The engine seeks properly
+      // once the track is loaded (via pendingRestoreTimeRef in onLoad).
+      if (pendingRestoreTimeRef.current > 0) {
+        gpSeekTo(pendingRestoreTimeRef.current * 1000);
+        commitCurrentTime(pendingRestoreTimeRef.current);
+        markSeekPosition(pendingRestoreTimeRef.current);
+      }
+    })().catch((error) => {
+      console.error("[gapless] failed to restore queue playback:", error);
+      commitIsBuffering(false);
+    });
   }, [
     buildEngineUrls,
+    commitIsBuffering,
     commitCurrentTime,
     markSeekPosition,
     pullFromEngine,

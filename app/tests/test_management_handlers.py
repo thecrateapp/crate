@@ -1,7 +1,40 @@
 from crate.worker_handlers.management import (
+    _handle_move_artist,
     _handle_repair,
     _handle_repair_duplicate_tracks,
 )
+
+
+def test_handle_index_genres_broadcasts_library_cache_invalidation(monkeypatch):
+    from crate.worker_handlers.analysis import _handle_index_genres
+
+    emitted_events: list[tuple[str, str, dict]] = []
+    broadcasted_scopes: list[tuple[str, ...]] = []
+
+    monkeypatch.setattr(
+        "crate.genre_indexer.index_all_genres",
+        lambda progress_callback=None: {"total_genres": 2},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.analysis.emit_task_event",
+        lambda task_id, level, payload: emitted_events.append(
+            (task_id, level, payload)
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: broadcasted_scopes.append(scopes),
+    )
+
+    result = _handle_index_genres("index-genres-1", {}, {"library_path": "/music"})
+
+    assert result == {"total_genres": 2}
+    assert emitted_events[-1] == (
+        "index-genres-1",
+        "info",
+        {"message": "Genres indexed: 2 genres"},
+    )
+    assert broadcasted_scopes == [("library", "home")]
 
 
 def test_handle_repair_duplicate_tracks_delegates_high_confidence_rows(monkeypatch):
@@ -73,6 +106,42 @@ def test_handle_repair_duplicate_tracks_delegates_high_confidence_rows(monkeypat
             ],
         },
     }
+
+
+def test_move_artist_restores_directory_when_database_rename_fails(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "old-folder"
+    target = tmp_path / "Renamed Artist"
+    source.mkdir()
+    (source / "song.flac").write_bytes(b"audio")
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist",
+        lambda _name: {"name": "Old Artist", "folder_name": "old-folder"},
+    )
+
+    def fail_rename(*_args):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.rename_artist_in_db", fail_rename
+    )
+
+    try:
+        _handle_move_artist(
+            "move-artist-1",
+            {"name": "Old Artist", "new_name": "Renamed Artist"},
+            {"library_path": str(tmp_path)},
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "database unavailable"
+    else:
+        raise AssertionError("database failure must be propagated")
+
+    assert source.is_dir()
+    assert (source / "song.flac").read_bytes() == b"audio"
+    assert not target.exists()
 
 
 def test_handle_repair_revalidates_applied_checks(monkeypatch):

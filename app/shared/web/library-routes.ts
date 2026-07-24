@@ -14,6 +14,8 @@ function resolveAssetUrl(path: string) {
 export interface ArtistRouteInput {
   artistId?: number | null;
   artistEntityUid?: string | null;
+  globalArtistUid?: string | null;
+  global_artist_uid?: string | null;
   artistSlug?: string | null;
   artistName?: string | null;
 }
@@ -21,6 +23,8 @@ export interface ArtistRouteInput {
 export interface AlbumRouteInput {
   albumId?: number | null;
   albumEntityUid?: string | null;
+  globalAlbumUid?: string | null;
+  global_album_uid?: string | null;
   artistEntityUid?: string | null;
   albumSlug?: string | null;
   artistSlug?: string | null;
@@ -28,10 +32,28 @@ export interface AlbumRouteInput {
   albumName?: string | null;
 }
 
+export interface GlobalArtistRouteInput {
+  globalArtistUid?: string | null;
+  global_artist_uid?: string | null;
+  artistSlug?: string | null;
+  artistName?: string | null;
+}
+
+export interface GlobalAlbumRouteInput {
+  globalAlbumUid?: string | null;
+  global_album_uid?: string | null;
+  albumSlug?: string | null;
+  albumName?: string | null;
+  artistSlug?: string | null;
+  artistName?: string | null;
+}
+
 export interface TrackRouteInput {
   id?: string | number | null;
   trackId?: number | null;
   libraryTrackId?: number | null;
+  globalTrackUid?: string | null;
+  global_track_uid?: string | null;
   entityUid?: string | null;
   trackEntityUid?: string | null;
   trackSlug?: string | null;
@@ -50,6 +72,7 @@ export interface ImageAssetOptions {
 
 const artistAssetVersions = new Map<number, string>();
 const albumAssetVersions = new Map<number, string>();
+const genreAssetVersions = new Map<string, string>();
 let globalArtistAssetVersion: string | null = null;
 let globalAlbumAssetVersion: string | null = null;
 
@@ -74,6 +97,19 @@ function encodeEntityUid(value: string | null | undefined) {
   return value ? encodeURIComponent(value) : "";
 }
 
+function uidFromRouteRef(value: string | null | undefined) {
+  if (!value) return null;
+  let decoded = value;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    decoded = value;
+  }
+  const separatorIndex = decoded.lastIndexOf("--");
+  const uid = separatorIndex >= 0 ? decoded.slice(separatorIndex + 2) : decoded;
+  return uid.trim() || null;
+}
+
 function isUuidLike(value: string | null | undefined) {
   return Boolean(
     value &&
@@ -84,6 +120,9 @@ function isUuidLike(value: string | null | undefined) {
 }
 
 function resolveTrackEntityUid(input: TrackRouteInput) {
+  if (resolveGlobalTrackUid(input)) {
+    return input.entityUid || input.trackEntityUid || null;
+  }
   if (input.entityUid || input.trackEntityUid) {
     return input.entityUid || input.trackEntityUid || null;
   }
@@ -91,6 +130,10 @@ function resolveTrackEntityUid(input: TrackRouteInput) {
     return input.id as string;
   }
   return null;
+}
+
+function resolveGlobalTrackUid(input: TrackRouteInput) {
+  return input.globalTrackUid || input.global_track_uid || null;
 }
 
 function resolveTrackLibraryId(input: TrackRouteInput) {
@@ -214,12 +257,17 @@ export function recordAssetInvalidationScope(
     if (Number.isFinite(albumId)) {
       albumAssetVersions.set(albumId, String(version));
     }
+    return;
+  }
+  if (scope.startsWith("genre:")) {
+    const genreSlug = slugifySegment(scope.slice("genre:".length), "");
+    if (genreSlug) genreAssetVersions.set(genreSlug, String(version));
   }
 }
 
 export function artistPagePath(input: ArtistRouteInput) {
   const slug = publicArtistSlug(input);
-  if (slug) {
+  if (input.artistId != null && slug) {
     return `/artists/${encPath(slug)}`;
   }
   if (input.artistId != null) {
@@ -228,7 +276,21 @@ export function artistPagePath(input: ArtistRouteInput) {
       input.artistName || "artist",
     )}`;
   }
+  const globalPath = globalArtistPagePath(input);
+  if (globalPath) return globalPath;
+  if (slug) {
+    return `/artists/${encPath(slug)}`;
+  }
   return "/artists";
+}
+
+export function globalArtistPagePath(input: GlobalArtistRouteInput) {
+  const slug = publicArtistSlug(input);
+  return slug ? `/artists/${encPath(slug)}` : "";
+}
+
+export function globalArtistUidFromRouteRef(value: string | null | undefined) {
+  return uidFromRouteRef(value);
 }
 
 export function artistTopTracksPath(input: ArtistRouteInput) {
@@ -246,13 +308,15 @@ export function artistTopTracksPath(input: ArtistRouteInput) {
 }
 
 export function artistSharePath(input: ArtistRouteInput) {
-  const ref =
-    input.artistEntityUid || input.artistId || publicArtistSlug(input);
-  const slug = safeSlug(input.artistSlug, input.artistName || "artist");
-  return ref ? `/share/artist/${encodeURIComponent(ref)}/${slug}` : "/share";
+  const slug = publicArtistSlug(input);
+  return slug ? `/share/artist/${encPath(slug)}` : "/share";
 }
 
 export function artistApiPath(input: ArtistRouteInput) {
+  const globalArtistUid = input.globalArtistUid || input.global_artist_uid;
+  if (globalArtistUid) {
+    return `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/page`;
+  }
   const slug = publicArtistSlug(input);
   if (slug) {
     return `/api/artist-slugs/${encPath(slug)}`;
@@ -277,6 +341,22 @@ export function artistPhotoApiUrl(
   input: ArtistRouteInput,
   options?: ImageAssetOptions,
 ) {
+  const globalArtistUid = input.globalArtistUid || input.global_artist_uid;
+  if (globalArtistUid) {
+    const runtimeVersion =
+      input.artistId != null
+        ? artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion
+        : globalArtistAssetVersion;
+    return resolveAssetUrl(
+      withAssetOptions(
+        `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/photo`,
+        {
+          ...options,
+          version: resolveAssetVersion(options?.version, runtimeVersion),
+        },
+      ),
+    );
+  }
   if (input.artistId != null) {
     const runtimeVersion =
       artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
@@ -310,6 +390,22 @@ export function artistBackgroundApiUrl(
   input: ArtistRouteInput,
   options?: ImageAssetOptions,
 ) {
+  const globalArtistUid = input.globalArtistUid || input.global_artist_uid;
+  if (globalArtistUid) {
+    const runtimeVersion =
+      input.artistId != null
+        ? artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion
+        : globalArtistAssetVersion;
+    return resolveAssetUrl(
+      withAssetOptions(
+        `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/background`,
+        {
+          ...options,
+          version: resolveAssetVersion(options?.version, runtimeVersion),
+        },
+      ),
+    );
+  }
   if (input.artistId != null) {
     const runtimeVersion =
       artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
@@ -346,8 +442,17 @@ export function albumPagePath(input: AlbumRouteInput) {
     artistName: input.artistName,
   });
   const albumSlug = publicAlbumSlug(input);
-  if (artistSlug && albumSlug && !isReservedArtistChildSlug(albumSlug)) {
-    return `/artists/${encPath(artistSlug)}/${encPath(albumSlug)}`;
+  const hasGlobalAlbumUid = Boolean(
+    input.globalAlbumUid || input.global_album_uid,
+  );
+  const localAlbumPath =
+    artistSlug && albumSlug
+      ? isReservedArtistChildSlug(albumSlug)
+        ? `/artists/${encPath(artistSlug)}/albums/${encPath(albumSlug)}`
+        : `/artists/${encPath(artistSlug)}/${encPath(albumSlug)}`
+      : "";
+  if (localAlbumPath && (input.albumId != null || !hasGlobalAlbumUid)) {
+    return localAlbumPath;
   }
   if (input.albumId != null) {
     return `/albums/${input.albumId}/${safeSlug(
@@ -355,10 +460,32 @@ export function albumPagePath(input: AlbumRouteInput) {
       input.albumName || "album",
     )}`;
   }
+  const globalPath = globalAlbumPagePath(input);
+  if (globalPath) return globalPath;
+  if (localAlbumPath) {
+    return localAlbumPath;
+  }
   return "/albums";
 }
 
+export function globalAlbumPagePath(input: GlobalAlbumRouteInput) {
+  const artistSlug = publicArtistSlug(input);
+  const albumSlug = publicAlbumSlug(input);
+  if (!artistSlug || !albumSlug) return "";
+  return isReservedArtistChildSlug(albumSlug)
+    ? `/artists/${encPath(artistSlug)}/albums/${encPath(albumSlug)}`
+    : `/artists/${encPath(artistSlug)}/${encPath(albumSlug)}`;
+}
+
+export function globalAlbumUidFromRouteRef(value: string | null | undefined) {
+  return uidFromRouteRef(value);
+}
+
 export function albumApiPath(input: AlbumRouteInput) {
+  const globalAlbumUid = input.globalAlbumUid || input.global_album_uid;
+  if (globalAlbumUid) {
+    return `/api/catalog/albums/${encodeEntityUid(globalAlbumUid)}`;
+  }
   const artistSlug = publicArtistSlug({
     artistId: null,
     artistEntityUid: input.artistEntityUid,
@@ -381,12 +508,11 @@ export function albumApiPath(input: AlbumRouteInput) {
 }
 
 export function albumSharePath(input: AlbumRouteInput) {
-  const ref = input.albumEntityUid || input.albumId;
-  const publicSlug = publicAlbumSlug(input);
-  const slug = publicSlug
-    ? encPath(publicSlug)
-    : safeSlug(input.albumSlug, input.albumName || "album");
-  return ref ? `/share/album/${encodeURIComponent(ref)}/${slug}` : "/share";
+  const artistSlug = publicArtistSlug(input);
+  const albumSlug = publicAlbumSlug(input);
+  return artistSlug && albumSlug
+    ? `/share/album/${encPath(artistSlug)}/${encPath(albumSlug)}`
+    : "/share";
 }
 
 export function albumRelatedApiPath(input: AlbumRouteInput) {
@@ -402,6 +528,10 @@ export function albumRelatedApiPath(input: AlbumRouteInput) {
 }
 
 export function trackInfoApiPath(input: TrackRouteInput) {
+  const globalTrackUid = resolveGlobalTrackUid(input);
+  if (globalTrackUid)
+    return `/api/catalog/tracks/${encodeEntityUid(globalTrackUid)}/info`;
+
   const entityUid = resolveTrackEntityUid(input);
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/info`;
@@ -416,6 +546,10 @@ export function trackInfoApiPath(input: TrackRouteInput) {
 }
 
 export function trackPlaybackApiPath(input: TrackRouteInput) {
+  const globalTrackUid = resolveGlobalTrackUid(input);
+  if (globalTrackUid)
+    return `/api/catalog/tracks/${encodeEntityUid(globalTrackUid)}/playback`;
+
   const entityUid = resolveTrackEntityUid(input);
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/playback`;
@@ -427,6 +561,10 @@ export function trackPlaybackApiPath(input: TrackRouteInput) {
 }
 
 export function trackEqFeaturesApiPath(input: TrackRouteInput) {
+  const globalTrackUid = resolveGlobalTrackUid(input);
+  if (globalTrackUid)
+    return `/api/catalog/tracks/${encodeEntityUid(globalTrackUid)}/eq-features`;
+
   const entityUid = resolveTrackEntityUid(input);
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/eq-features`;
@@ -438,6 +576,10 @@ export function trackEqFeaturesApiPath(input: TrackRouteInput) {
 }
 
 export function trackEffectiveEqApiPath(input: TrackRouteInput) {
+  const globalTrackUid = resolveGlobalTrackUid(input);
+  if (globalTrackUid)
+    return `/api/catalog/tracks/${encodeEntityUid(globalTrackUid)}/eq`;
+
   const entityUid = resolveTrackEntityUid(input);
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/eq`;
@@ -455,6 +597,10 @@ export function trackEqPresetApiPath(input: TrackRouteInput) {
 }
 
 export function trackGenreApiPath(input: TrackRouteInput) {
+  const globalTrackUid = resolveGlobalTrackUid(input);
+  if (globalTrackUid)
+    return `/api/catalog/tracks/${encodeEntityUid(globalTrackUid)}/genre`;
+
   const entityUid = resolveTrackEntityUid(input);
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/genre`;
@@ -466,6 +612,10 @@ export function trackGenreApiPath(input: TrackRouteInput) {
 }
 
 export function trackStreamApiPath(input: TrackRouteInput) {
+  const globalTrackUid = resolveGlobalTrackUid(input);
+  if (globalTrackUid)
+    return `/api/catalog/tracks/${encodeEntityUid(globalTrackUid)}/stream`;
+
   const entityUid = resolveTrackEntityUid(input);
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/stream`;
@@ -524,7 +674,8 @@ export function trackOfflineManifestApiPath(input: TrackRouteInput) {
 export function trackSharePath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
   const libraryId = resolveTrackLibraryId(input);
-  const ref = entityUid || libraryId;
+  const globalTrackUid = resolveGlobalTrackUid(input);
+  const ref = entityUid || libraryId || globalTrackUid;
   const slug = safeSlug(
     input.trackSlug,
     input.title || input.artistName || "track",
@@ -536,6 +687,22 @@ export function albumCoverApiUrl(
   input: AlbumRouteInput,
   options?: ImageAssetOptions,
 ) {
+  const globalAlbumUid = input.globalAlbumUid || input.global_album_uid;
+  if (globalAlbumUid) {
+    const runtimeVersion =
+      input.albumId != null
+        ? albumAssetVersions.get(input.albumId) ?? globalAlbumAssetVersion
+        : globalAlbumAssetVersion;
+    return resolveAssetUrl(
+      withAssetOptions(
+        `/api/catalog/albums/${encodeEntityUid(globalAlbumUid)}/cover`,
+        {
+          ...options,
+          version: resolveAssetVersion(options?.version, runtimeVersion),
+        },
+      ),
+    );
+  }
   if (input.albumId != null) {
     const runtimeVersion =
       albumAssetVersions.get(input.albumId) ?? globalAlbumAssetVersion;
@@ -561,4 +728,18 @@ export function albumCoverApiUrl(
     );
   }
   return "";
+}
+
+export function genreCoverApiUrl(slug: string, options?: ImageAssetOptions) {
+  const normalizedSlug = slugifySegment(slug, "");
+  if (!normalizedSlug) return "";
+  return resolveAssetUrl(
+    withAssetOptions(`/api/genres/${encPath(normalizedSlug)}/cover`, {
+      ...options,
+      version: resolveAssetVersion(
+        options?.version,
+        genreAssetVersions.get(normalizedSlug),
+      ),
+    }),
+  );
 }

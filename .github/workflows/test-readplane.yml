@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "app/readplane/**"
+      - "app/tests/load/*media*"
       - ".github/workflows/test-readplane.yml"
   pull_request:
     paths:
       - "app/readplane/**"
+      - "app/tests/load/*media*"
       - ".github/workflows/test-readplane.yml"
 
 jobs:
@@ -36,6 +38,15 @@ jobs:
             -w /src \
             golang:1.23-alpine \
             go vet ./...
+
+      - name: Native media race tests
+        run: |
+          docker run --rm \
+            -e CGO_ENABLED=1 \
+            -v "${{ github.workspace }}/app/readplane:/src" \
+            -w /src \
+            golang:1.23 \
+            go test -race ./internal/media ./internal/observability ./internal/routes
 
       - name: Build readplane image
         uses: docker/build-push-action@v7

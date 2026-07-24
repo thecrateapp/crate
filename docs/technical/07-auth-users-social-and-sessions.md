@@ -1,3 +1,14 @@
+---
+title: Auth, sessions, users and social layer
+summary: Authentication and user-scoped state across Admin and Listen.
+section: architecture
+audience: [developer]
+status: canonical
+order: 96
+verified: 2026-07-21
+sources: [app/crate/api, app/crate/db/orm]
+---
+
 # Auth, Sessions, Users, and Social Layer
 
 ## Identity model

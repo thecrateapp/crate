@@ -195,6 +195,85 @@ describe("useApi", () => {
     expect(result.current.data).toEqual({ ok: 2 });
   });
 
+  it("keeps catalog views loading while the mandatory catalog warms", async () => {
+    vi.useFakeTimers();
+    const apiMock = vi.mocked(api);
+    apiMock
+      .mockRejectedValueOnce(
+        Object.assign(
+          new Error(JSON.stringify({ detail: "catalog_warming" })),
+          {
+            status: 503,
+            retryAfterMs: 3_000,
+          },
+        ),
+      )
+      .mockResolvedValueOnce({ items: [1] });
+
+    const { result } = renderHook(() =>
+      useApi<{ items: number[] }>("/api/catalog/search"),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    expect(result.current.data).toEqual({ items: [1] });
+    expect(result.current.loading).toBe(false);
+  });
+
+  it.each([502, 503, 504])(
+    "retries a transient GET failure with status %i",
+    async (status) => {
+      vi.useFakeTimers();
+      const apiMock = vi.mocked(api);
+      apiMock
+        .mockRejectedValueOnce(
+          Object.assign(new Error("Transient upstream failure"), { status }),
+        )
+        .mockResolvedValueOnce({ ok: 2 });
+
+      const { result } = renderHook(() =>
+        useApi<{ ok: number }>("/api/artist-slugs/high-vis/page"),
+      );
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      expect(apiMock).toHaveBeenCalledTimes(2);
+      expect(result.current.data).toEqual({ ok: 2 });
+      expect(result.current.error).toBeNull();
+    },
+  );
+
+  it("exposes the HTTP status after a terminal request failure", async () => {
+    const apiMock = vi.mocked(api);
+    apiMock.mockRejectedValueOnce(
+      Object.assign(new Error("Artist not found"), { status: 404 }),
+    );
+
+    const { result } = renderHook(() =>
+      useApi("/api/artist-slugs/fictitious-artist/page"),
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.status).toBe(404);
+  });
+
   it("defers initial revalidation when cached data is good enough for first paint", async () => {
     vi.useFakeTimers();
     const apiMock = vi.mocked(api);
@@ -240,5 +319,30 @@ describe("useApi", () => {
     });
 
     expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps cached data usable when background revalidation fails", async () => {
+    vi.useFakeTimers();
+    const apiMock = vi.mocked(api);
+    const cacheGetMock = vi.mocked(cacheGet);
+    const cachedArtist = { artist: { id: 7, name: "High Vis" } };
+    cacheGetMock.mockImplementation((url) =>
+      url === "/api/artist-slugs/high-vis/page" ? cachedArtist : null,
+    );
+    apiMock.mockRejectedValue(
+      Object.assign(new Error("Readplane fallback failed"), { status: 502 }),
+    );
+
+    const { result } = renderHook(() =>
+      useApi<typeof cachedArtist>("/api/artist-slugs/high-vis/page"),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await vi.runAllTimersAsync();
+    });
+
+    expect(result.current.data).toEqual(cachedArtist);
+    expect(result.current.error).toBeNull();
   });
 });

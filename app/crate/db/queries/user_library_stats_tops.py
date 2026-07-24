@@ -9,8 +9,13 @@ from crate.db.queries.user_library_shared import normalize_stats_window
 from crate.db.tx import read_scope
 
 
+def _global_stats_refs_enabled() -> bool:
+    return True
+
+
 def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
     normalized = normalize_stats_window(window)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
             session.execute(
@@ -18,11 +23,24 @@ def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[d
                     """
                 SELECT
                     uts.track_id,
+                    CASE
+                        WHEN :allow_global_catalog
+                        THEN COALESCE(uts.global_track_uid::text, gct.global_track_uid::text)
+                        ELSE NULL
+                    END AS global_track_uid,
+                    CASE
+                        WHEN :allow_global_catalog THEN gct.global_artist_uid::text
+                        ELSE NULL
+                    END AS global_artist_uid,
+                    CASE
+                        WHEN :allow_global_catalog THEN gct.global_album_uid::text
+                        ELSE NULL
+                    END AS global_album_uid,
                     COALESCE(lt.entity_uid::text, uts.track_entity_uid::text) AS track_entity_uid,
                     COALESCE(lt.path, uts.track_path) AS track_path,
-                    COALESCE(lt.title, uts.title) AS title,
-                    COALESCE(lt.artist, uts.artist) AS artist,
-                    COALESCE(lt.album, uts.album) AS album,
+                    COALESCE(lt.title, gct.canonical_title, uts.title) AS title,
+                    COALESCE(lt.artist, gct.artist_name, uts.artist) AS artist,
+                    COALESCE(lt.album, gct.album_name, uts.album) AS album,
                     art.id AS artist_id,
                     art.slug AS artist_slug,
                     COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
@@ -43,18 +61,45 @@ def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[d
                 LEFT JOIN library_tracks lt
                   ON lt.id = uts.track_id
                   OR (uts.track_id IS NULL AND uts.track_entity_uid IS NOT NULL AND lt.entity_uid = uts.track_entity_uid)
+                LEFT JOIN global_catalog_tracks gct
+                  ON :allow_global_catalog
+                  AND (
+                    gct.global_track_uid = uts.global_track_uid
+                    OR (
+                      uts.global_track_uid IS NULL
+                      AND lt.entity_uid IS NOT NULL
+                      AND gct.local_track_entity_uid = lt.entity_uid
+                    )
+                    OR (
+                      uts.global_track_uid IS NULL
+                      AND lt.id IS NULL
+                      AND COALESCE(NULLIF(TRIM(uts.artist), ''), '') <> ''
+                      AND COALESCE(NULLIF(TRIM(uts.title), ''), '') <> ''
+                      AND LOWER(gct.artist_name) = LOWER(uts.artist)
+                      AND LOWER(gct.canonical_title) = LOWER(uts.title)
+                      AND (
+                        COALESCE(NULLIF(TRIM(uts.album), ''), '') = ''
+                        OR LOWER(COALESCE(gct.album_name, '')) = LOWER(uts.album)
+                      )
+                    )
+                  )
                 LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
                 LEFT JOIN library_albums alb_by_name
                   ON alb_by_id.id IS NULL
-                 AND alb_by_name.artist = COALESCE(lt.artist, uts.artist)
-                 AND alb_by_name.name = COALESCE(lt.album, uts.album)
-                LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, uts.artist)
+                 AND alb_by_name.artist = COALESCE(lt.artist, gct.artist_name, uts.artist)
+                 AND alb_by_name.name = COALESCE(lt.album, gct.album_name, uts.album)
+                LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, gct.artist_name, uts.artist)
                 WHERE uts.user_id = :user_id AND uts.stat_window = :window
                 ORDER BY uts.play_count DESC, uts.minutes_listened DESC, uts.last_played_at DESC
                 LIMIT :lim
                 """
                 ),
-                {"user_id": user_id, "window": normalized, "lim": limit},
+                {
+                    "user_id": user_id,
+                    "window": normalized,
+                    "lim": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .all()
@@ -68,6 +113,7 @@ def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[d
 
 def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
     normalized = normalize_stats_window(window)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
             session.execute(
@@ -75,6 +121,10 @@ def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[
                     """
                 SELECT
                     uas.artist_name,
+                    CASE
+                        WHEN :allow_global_catalog THEN gca.global_artist_uid::text
+                        ELSE NULL
+                    END AS global_artist_uid,
                     la.id AS artist_id,
                     la.slug AS artist_slug,
                     play_count,
@@ -84,12 +134,28 @@ def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[
                     last_played_at
                 FROM user_artist_stats uas
                 LEFT JOIN library_artists la ON la.name = uas.artist_name
+                LEFT JOIN LATERAL (
+                    SELECT global_artist_uid
+                    FROM global_catalog_artists gca
+                    WHERE (
+                        la.entity_uid IS NOT NULL
+                        AND gca.local_artist_entity_uid = la.entity_uid
+                    )
+                    OR LOWER(gca.canonical_name) = LOWER(uas.artist_name)
+                    ORDER BY gca.has_local DESC, gca.has_remote DESC, gca.source_count DESC
+                    LIMIT 1
+                ) gca ON :allow_global_catalog
                 WHERE uas.user_id = :user_id AND uas.stat_window = :window
                 ORDER BY play_count DESC, minutes_listened DESC, last_played_at DESC
                 LIMIT :lim
                 """
                 ),
-                {"user_id": user_id, "window": normalized, "lim": limit},
+                {
+                    "user_id": user_id,
+                    "window": normalized,
+                    "lim": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .all()
@@ -99,6 +165,7 @@ def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[
 
 def get_top_albums(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
     normalized = normalize_stats_window(window)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
             session.execute(
@@ -106,9 +173,18 @@ def get_top_albums(user_id: int, window: str = "30d", limit: int = 20) -> list[d
                     """
                 SELECT
                     uas.artist,
+                    CASE
+                        WHEN :allow_global_catalog
+                        THEN COALESCE(galb.global_artist_uid::text, gca.global_artist_uid::text)
+                        ELSE NULL
+                    END AS global_artist_uid,
                     art.id AS artist_id,
                     art.slug AS artist_slug,
                     uas.album,
+                    CASE
+                        WHEN :allow_global_catalog THEN galb.global_album_uid::text
+                        ELSE NULL
+                    END AS global_album_uid,
                     alb.id AS album_id,
                     alb.slug AS album_slug,
                     uas.play_count,
@@ -119,12 +195,42 @@ def get_top_albums(user_id: int, window: str = "30d", limit: int = 20) -> list[d
                 FROM user_album_stats uas
                 LEFT JOIN library_albums alb ON alb.artist = uas.artist AND alb.name = uas.album
                 LEFT JOIN library_artists art ON art.name = uas.artist
+                LEFT JOIN LATERAL (
+                    SELECT global_artist_uid
+                    FROM global_catalog_artists gca
+                    WHERE (
+                        art.entity_uid IS NOT NULL
+                        AND gca.local_artist_entity_uid = art.entity_uid
+                    )
+                    OR LOWER(gca.canonical_name) = LOWER(uas.artist)
+                    ORDER BY gca.has_local DESC, gca.has_remote DESC, gca.source_count DESC
+                    LIMIT 1
+                ) gca ON :allow_global_catalog
+                LEFT JOIN LATERAL (
+                    SELECT global_album_uid, global_artist_uid
+                    FROM global_catalog_albums galb
+                    WHERE (
+                        alb.entity_uid IS NOT NULL
+                        AND galb.local_album_entity_uid = alb.entity_uid
+                    )
+                    OR (
+                        LOWER(galb.artist_name) = LOWER(uas.artist)
+                        AND LOWER(galb.canonical_name) = LOWER(uas.album)
+                    )
+                    ORDER BY galb.has_local DESC, galb.has_remote DESC, galb.source_count DESC
+                    LIMIT 1
+                ) galb ON :allow_global_catalog
                 WHERE uas.user_id = :user_id AND uas.stat_window = :window
                 ORDER BY uas.play_count DESC, uas.minutes_listened DESC, uas.last_played_at DESC
                 LIMIT :lim
                 """
                 ),
-                {"user_id": user_id, "window": normalized, "lim": limit},
+                {
+                    "user_id": user_id,
+                    "window": normalized,
+                    "lim": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .all()
@@ -162,6 +268,7 @@ def get_top_genres(user_id: int, window: str = "30d", limit: int = 20) -> list[d
 
 def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
     normalized = normalize_stats_window(window)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
             session.execute(
@@ -170,11 +277,24 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
                 WITH ranked AS (
                     SELECT
                         uts.track_id,
+                        CASE
+                            WHEN :allow_global_catalog
+                            THEN COALESCE(uts.global_track_uid::text, gct.global_track_uid::text)
+                            ELSE NULL
+                        END AS global_track_uid,
+                        CASE
+                            WHEN :allow_global_catalog THEN gct.global_artist_uid::text
+                            ELSE NULL
+                        END AS global_artist_uid,
+                        CASE
+                            WHEN :allow_global_catalog THEN gct.global_album_uid::text
+                            ELSE NULL
+                        END AS global_album_uid,
                         COALESCE(lt.entity_uid::text, uts.track_entity_uid::text) AS track_entity_uid,
                         COALESCE(lt.path, uts.track_path) AS track_path,
-                        COALESCE(lt.title, uts.title) AS title,
-                        COALESCE(lt.artist, uts.artist) AS artist,
-                        COALESCE(lt.album, uts.album) AS album,
+                        COALESCE(lt.title, gct.canonical_title, uts.title) AS title,
+                        COALESCE(lt.artist, gct.artist_name, uts.artist) AS artist,
+                        COALESCE(lt.album, gct.album_name, uts.album) AS album,
                         art.id AS artist_id,
                         art.slug AS artist_slug,
                         COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
@@ -192,19 +312,41 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
                         uts.first_played_at,
                         uts.last_played_at,
                         ROW_NUMBER() OVER (
-                            PARTITION BY COALESCE(lt.artist, uts.artist)
+                            PARTITION BY COALESCE(lt.artist, gct.artist_name, uts.artist)
                             ORDER BY uts.play_count DESC, uts.minutes_listened DESC, uts.last_played_at DESC
                         ) AS artist_rank
                     FROM user_track_stats uts
                     LEFT JOIN library_tracks lt
                       ON lt.id = uts.track_id
                       OR (uts.track_id IS NULL AND uts.track_entity_uid IS NOT NULL AND lt.entity_uid = uts.track_entity_uid)
+                    LEFT JOIN global_catalog_tracks gct
+                      ON :allow_global_catalog
+                      AND (
+                        gct.global_track_uid = uts.global_track_uid
+                        OR (
+                          uts.global_track_uid IS NULL
+                          AND lt.entity_uid IS NOT NULL
+                          AND gct.local_track_entity_uid = lt.entity_uid
+                        )
+                        OR (
+                          uts.global_track_uid IS NULL
+                          AND lt.id IS NULL
+                          AND COALESCE(NULLIF(TRIM(uts.artist), ''), '') <> ''
+                          AND COALESCE(NULLIF(TRIM(uts.title), ''), '') <> ''
+                          AND LOWER(gct.artist_name) = LOWER(uts.artist)
+                          AND LOWER(gct.canonical_title) = LOWER(uts.title)
+                          AND (
+                            COALESCE(NULLIF(TRIM(uts.album), ''), '') = ''
+                            OR LOWER(COALESCE(gct.album_name, '')) = LOWER(uts.album)
+                          )
+                        )
+                      )
                     LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
                     LEFT JOIN library_albums alb_by_name
                       ON alb_by_id.id IS NULL
-                     AND alb_by_name.artist = COALESCE(lt.artist, uts.artist)
-                     AND alb_by_name.name = COALESCE(lt.album, uts.album)
-                    LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, uts.artist)
+                     AND alb_by_name.artist = COALESCE(lt.artist, gct.artist_name, uts.artist)
+                     AND alb_by_name.name = COALESCE(lt.album, gct.album_name, uts.album)
+                    LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, gct.artist_name, uts.artist)
                     WHERE uts.user_id = :user_id AND uts.stat_window = :window
                 )
                 SELECT *
@@ -214,7 +356,12 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
                 LIMIT :lim
                 """
                 ),
-                {"user_id": user_id, "window": normalized, "lim": limit},
+                {
+                    "user_id": user_id,
+                    "window": normalized,
+                    "lim": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .all()

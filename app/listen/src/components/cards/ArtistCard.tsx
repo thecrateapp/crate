@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import {
@@ -19,14 +19,35 @@ import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  artistPagePath,
+  artistPhotoApiUrl,
+  responsiveImageSrcSet,
+} from "@/lib/library-routes";
+
+const ARTIST_CARD_IMAGE_WIDTHS = [160, 256, 320] as const;
+
+const EXTERNAL_ARTWORK_RETRY_DELAYS_MS = [
+  2_000, 4_000, 8_000, 15_000, 30_000, 30_000, 30_000, 60_000, 60_000, 60_000,
+];
+
+function artistMonogram(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "?";
+  const firstWord = words[0] ?? "";
+  if (words.length === 1) return Array.from(firstWord).slice(0, 2).join("");
+  const lastWord = words[words.length - 1] ?? "";
+  return `${firstWord[0] ?? ""}${lastWord[0] ?? ""}`;
+}
 
 interface ArtistCardProps {
   name: string;
   artistId?: number;
   artistEntityUid?: string;
+  globalArtistUid?: string;
   artistSlug?: string;
   photo?: string;
+  hasPhoto?: boolean | null;
   subtitle?: string;
   compact?: boolean;
   href?: string;
@@ -41,8 +62,10 @@ export function ArtistCard({
   name,
   artistId,
   artistEntityUid,
+  globalArtistUid,
   artistSlug,
   photo,
+  hasPhoto,
   subtitle,
   compact,
   href,
@@ -59,20 +82,80 @@ export function ArtistCard({
   const canUseInlineHoverActions = useHoverCapability();
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
+  const [externalArtworkRetry, setExternalArtworkRetry] = useState(0);
+  const [loadedPhotoUrl, setLoadedPhotoUrl] = useState<string | null>(null);
+  const externalArtworkRetryTimer = useRef<number | null>(null);
   const resolvedPhotoUrl = resolveMaybeApiAssetUrl(photo);
+  const shouldResolvePhoto = hasPhoto !== false;
   const photoUrl =
     resolvedPhotoUrl ||
-    artistPhotoApiUrl(
-      { artistId, artistEntityUid, artistSlug, artistName: name },
-      { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
-    ) ||
+    (shouldResolvePhoto
+      ? artistPhotoApiUrl(
+          {
+            artistId,
+            artistEntityUid,
+            globalArtistUid,
+            artistSlug,
+            artistName: name,
+          },
+          { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
+        )
+      : "") ||
     undefined;
+  const photoSrcSet = resolvedPhotoUrl
+    ? undefined
+    : responsiveImageSrcSet(ARTIST_CARD_IMAGE_WIDTHS, (size) =>
+        artistPhotoApiUrl(
+          {
+            artistId,
+            artistEntityUid,
+            globalArtistUid,
+            artistSlug,
+            artistName: name,
+          },
+          { size },
+        ),
+      );
+  const isPendingExternalArtwork =
+    external &&
+    Boolean(photoUrl?.includes("/api/network/external-artist/photo"));
+  const renderedPhotoUrl = useMemo(() => {
+    if (!photoUrl || !externalArtworkRetry) return photoUrl;
+    const separator = photoUrl.includes("?") ? "&" : "?";
+    return `${photoUrl}${separator}retry=${externalArtworkRetry}`;
+  }, [externalArtworkRetry, photoUrl]);
+  const photoReady = Boolean(
+    renderedPhotoUrl && loadedPhotoUrl === renderedPhotoUrl,
+  );
+
+  useEffect(() => {
+    if (externalArtworkRetryTimer.current !== null) {
+      window.clearTimeout(externalArtworkRetryTimer.current);
+      externalArtworkRetryTimer.current = null;
+    }
+    setExternalArtworkRetry(0);
+    return () => {
+      if (externalArtworkRetryTimer.current !== null) {
+        window.clearTimeout(externalArtworkRetryTimer.current);
+        externalArtworkRetryTimer.current = null;
+      }
+    };
+  }, [photoUrl]);
   const targetHref =
-    href || artistPagePath({ artistId, artistSlug, artistName: name });
-  const following = isFollowing(artistId);
+    href ||
+    artistPagePath({
+      artistId,
+      artistEntityUid,
+      globalArtistUid,
+      artistSlug,
+      artistName: name,
+    });
+  const following = isFollowing(artistId, globalArtistUid);
+  const hasPlayableArtist = artistId != null || Boolean(globalArtistUid);
   const actions = useArtistActionEntries({
     artistId,
     artistEntityUid,
+    globalArtistUid,
     artistSlug,
     imageUrl: photoUrl,
     name,
@@ -81,10 +164,11 @@ export function ArtistCard({
     disabled: external,
   });
   const imageSize = compact ? 100 : large ? 156 : 140;
+  const monogram = artistMonogram(name).toUpperCase();
   const wrapperClassName = cn(
     "group snap-start cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
     layout === "grid"
-      ? "w-full min-w-0"
+      ? "listen-deferred-grid-item w-full min-w-0"
       : `flex-shrink-0 ${
           compact ? "w-[100px]" : large ? "w-[156px]" : "w-[140px]"
         }`,
@@ -99,22 +183,50 @@ export function ArtistCard({
           height: layout === "grid" ? "auto" : imageSize,
         }}
       >
-        {photoUrl ? (
+        <div
+          aria-hidden="true"
+          data-testid="artist-artwork-placeholder"
+          data-placeholder-style="flat-disc"
+          className="absolute inset-0 grid place-items-center rounded-full bg-[#171922]"
+        >
+          <span className="text-sm font-semibold text-white/75">
+            {monogram}
+          </span>
+        </div>
+        {renderedPhotoUrl ? (
           <img
-            src={photoUrl}
+            src={renderedPhotoUrl}
+            srcSet={photoSrcSet}
+            sizes={photoSrcSet ? `${imageSize}px` : undefined}
             alt={name}
             loading="lazy"
+            decoding="async"
             className={cn(
-              "h-full w-full object-cover",
+              "relative z-10 h-full w-full object-cover",
+              photoReady ? "visible" : "invisible",
               imageTone === "muted" &&
                 "grayscale saturate-0 brightness-[0.52] contrast-125 transition duration-300 group-hover:brightness-[0.72]",
             )}
+            onLoad={() => setLoadedPhotoUrl(renderedPhotoUrl ?? null)}
             onError={(e) => {
+              setLoadedPhotoUrl(null);
+              if (
+                isPendingExternalArtwork &&
+                externalArtworkRetry < EXTERNAL_ARTWORK_RETRY_DELAYS_MS.length
+              ) {
+                if (externalArtworkRetryTimer.current === null) {
+                  externalArtworkRetryTimer.current = window.setTimeout(() => {
+                    externalArtworkRetryTimer.current = null;
+                    setExternalArtworkRetry((retry) => retry + 1);
+                  }, EXTERNAL_ARTWORK_RETRY_DELAYS_MS[externalArtworkRetry] ?? 60_000);
+                }
+                return;
+              }
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         ) : null}
-        {!external && artistId != null && canUseInlineHoverActions ? (
+        {!external && hasPlayableArtist && canUseInlineHoverActions ? (
           <>
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/42">
               <div className="pointer-events-none flex translate-y-2 items-center justify-center gap-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
@@ -123,11 +235,13 @@ export function ArtistCard({
                   className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
                   onClick={async (event) => {
                     event.stopPropagation();
-                    if (artistId == null) return;
+                    if (!hasPlayableArtist) return;
                     setPlayingTopTracks(true);
                     try {
                       const tracks = await fetchArtistTopTracks({
                         artistId,
+                        artistEntityUid,
+                        globalArtistUid,
                         artistSlug,
                         name,
                       });
@@ -171,7 +285,7 @@ export function ArtistCard({
                     event.stopPropagation();
                     setTogglingFollow(true);
                     try {
-                      await toggleArtistFollow(artistId);
+                      await toggleArtistFollow(artistId, globalArtistUid, name);
                       toast.success(
                         following
                           ? t("actions.artist.toasts.unfollowed", { name })

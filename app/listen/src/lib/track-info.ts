@@ -34,7 +34,10 @@ export interface TrackInfo {
 }
 
 export function resolveTrackInfoUrl(
-  track: Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path">,
+  track: Pick<
+    Track,
+    "id" | "globalTrackUid" | "entityUid" | "libraryTrackId" | "path"
+  >,
 ): string | null {
   const path = trackInfoApiPath(track);
   return path || null;

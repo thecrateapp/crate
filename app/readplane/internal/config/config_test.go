@@ -12,6 +12,8 @@ func TestLoad(t *testing.T) {
 		t.Setenv("READPLANE_ADDR", "")
 		t.Setenv("DATABASE_URL", "")
 		t.Setenv("REDIS_URL", "")
+		t.Setenv("REDIS_CACHE_URL", "")
+		t.Setenv("REDIS_DURABLE_URL", "")
 		t.Setenv("JWT_SECRET", "")
 
 		cfg := Load("test")
@@ -21,6 +23,10 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, defaultQueryTimeoutMS*time.Millisecond, cfg.QueryTimeout)
 		assert.True(t, cfg.Enabled, "Enabled should default to true")
 		assert.True(t, cfg.FallbackEnabled, "FallbackEnabled should default to true")
+		assert.True(t, cfg.FederationProxyEnabled, "federation proxy should default to true")
+		assert.False(t, cfg.LocalMediaEnabled)
+		assert.Equal(t, "/music", cfg.MusicRoot)
+		assert.Equal(t, "/cache", cfg.CacheRoot)
 	})
 
 	t.Run("parses overrides", func(t *testing.T) {
@@ -30,6 +36,22 @@ func TestLoad(t *testing.T) {
 		t.Setenv("READPLANE_QUERY_TIMEOUT_MS", "1500")
 		t.Setenv("READPLANE_ENABLE_SSE", "0")
 		t.Setenv("READPLANE_FALLBACK_ENABLED", "yes")
+		t.Setenv("READPLANE_FALLBACK_TIMEOUT_MS", "2500")
+		t.Setenv("READPLANE_FALLBACK_FAILURE_THRESHOLD", "4")
+		t.Setenv("READPLANE_FALLBACK_OPEN_SECONDS", "12")
+		t.Setenv("READPLANE_FEDERATION_PROXY_ENABLED", "false")
+		t.Setenv("CRATE_READPLANE_SERVICE_TOKEN", "service-token")
+		t.Setenv("CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS", "true")
+		t.Setenv("READPLANE_AUTH_CACHE_TTL_SECONDS", "20")
+		t.Setenv("READPLANE_AUTH_CACHE_MAX_ENTRIES", "321")
+		t.Setenv("READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS", "90")
+		t.Setenv("READPLANE_STATS_STALE_MAX_AGE_SECONDS", "7200")
+		t.Setenv("READPLANE_SESSION_TOUCH_INTERVAL_SECONDS", "45")
+		t.Setenv("REDIS_CACHE_URL", "redis://cache:6379/0")
+		t.Setenv("REDIS_DURABLE_URL", "redis://durable:6379/0")
+		t.Setenv("READPLANE_LOCAL_MEDIA_ENABLED", "true")
+		t.Setenv("READPLANE_MUSIC_ROOT", "/srv/music")
+		t.Setenv("READPLANE_CACHE_ROOT", "/srv/cache")
 
 		cfg := Load("test")
 
@@ -39,6 +61,32 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, 1500*time.Millisecond, cfg.QueryTimeout)
 		assert.False(t, cfg.EnableSSE, "EnableSSE should parse false")
 		assert.True(t, cfg.FallbackEnabled, "FallbackEnabled should parse yes")
+		assert.Equal(t, 2500*time.Millisecond, cfg.FallbackTimeout)
+		assert.Equal(t, 4, cfg.FallbackFailureThreshold)
+		assert.Equal(t, 12*time.Second, cfg.FallbackOpenDuration)
+		assert.False(t, cfg.FederationProxyEnabled)
+		assert.Equal(t, "service-token", cfg.ServiceToken)
+		assert.True(t, cfg.FederationAllowPrivateNetworks)
+		assert.Equal(t, 20*time.Second, cfg.AuthCacheTTL)
+		assert.Equal(t, 321, cfg.AuthCacheMaxEntries)
+		assert.Equal(t, 90*time.Second, cfg.StatsSnapshotMaxAge)
+		assert.Equal(t, 2*time.Hour, cfg.StatsStaleMaxAge)
+		assert.Equal(t, 45*time.Second, cfg.SessionTouchInterval)
+		assert.Equal(t, "redis://cache:6379/0", cfg.RedisURL)
+		assert.Equal(t, "redis://durable:6379/0", cfg.DurableRedisURL)
+		assert.True(t, cfg.LocalMediaEnabled)
+		assert.Equal(t, "/srv/music", cfg.MusicRoot)
+		assert.Equal(t, "/srv/cache", cfg.CacheRoot)
+	})
+
+	t.Run("rejects relative media roots", func(t *testing.T) {
+		t.Setenv("READPLANE_MUSIC_ROOT", "relative/music")
+		t.Setenv("READPLANE_CACHE_ROOT", "../cache")
+
+		cfg := Load("test")
+
+		assert.Equal(t, "/music", cfg.MusicRoot)
+		assert.Equal(t, "/cache", cfg.CacheRoot)
 	})
 
 	t.Run("builds database URL from Crate Postgres env vars", func(t *testing.T) {

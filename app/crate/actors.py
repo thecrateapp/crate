@@ -95,14 +95,25 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "apply_cover": TaskPoolConfig("fast", 0, 60, 0),
     "fetch_album_cover": TaskPoolConfig("fast", 0, 120, 1),
     "upload_image": TaskPoolConfig("fast", 0, 60, 0),
+    "resolve_external_artist_artwork": TaskPoolConfig("fast", 0, 30, 1),
+    "materialize_artwork_variants": TaskPoolConfig("default", 1, 300, 1),
     "library_upload": TaskPoolConfig("default", 0, 7200, 1),
     "library_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
     "library_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
     "import_queue_item": TaskPoolConfig("default", 0, 3600, 0),
     "import_queue_all": TaskPoolConfig("default", 0, 14400, 0),
     "import_queue_remove": TaskPoolConfig("default", 0, 300, 0),
+    "federation_import_album": TaskPoolConfig("default", 0, 14400, 0),
+    "federation_sync_catalog": TaskPoolConfig("maintenance", 2, 7200, 1),
+    "federation_health_poll": TaskPoolConfig("maintenance", 1, 300, 0),
+    "federation_directory_refresh": TaskPoolConfig("maintenance", 2, 600, 1),
+    "global_catalog_reconcile_incremental": TaskPoolConfig("maintenance", 2, 7200, 0),
+    "global_catalog_reconcile_full": TaskPoolConfig("maintenance", 3, 14400, 0),
     "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),
     "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
+    "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
+    "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
+    "refresh_probable_setlist": TaskPoolConfig("fast", 1, 180, 3),
     # New content processing (priority 1)
     "process_new_content": TaskPoolConfig("default", 1, 14400, 0),
     "enrich_artist": TaskPoolConfig("fast", 1, 180, 2),
@@ -152,6 +163,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "remux_m4a_dash": TaskPoolConfig("maintenance", 3, 7200, 0),
     "scan_missing_covers": TaskPoolConfig("maintenance", 3, 3600, 0),
     "fetch_artwork_all": TaskPoolConfig("maintenance", 3, 3600, 0),
+    "backfill_artwork_variants": TaskPoolConfig("maintenance", 3, 900, 1),
+    "cleanup_artwork_variants": TaskPoolConfig("maintenance", 3, 1800, 0),
+    "repair_artwork_variants": TaskPoolConfig("maintenance", 3, 3600, 1),
     "backfill_similarities": TaskPoolConfig("maintenance", 3, 3600, 0),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
     "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),
@@ -174,6 +188,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_completeness": TaskPoolConfig("maintenance", 3, 3600, 0),
     # Playback delivery
     "prepare_stream_variant": TaskPoolConfig("playback", 0, 1200, 1),
+    "warmup_stream_variants": TaskPoolConfig("maintenance", 3, 900, 0),
+    "cleanup_stream_variants": TaskPoolConfig("maintenance", 3, 1800, 0),
     # Playlist generation
     "generate_system_playlist": TaskPoolConfig("fast", 1, 600, 0),
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),
@@ -951,22 +967,10 @@ _register_actors()
     min_backoff=5_000,
     max_backoff=60_000,
 )
-def scrobble_play_event_actor(
-    user_id: int,
-    artist: str,
-    track: str,
-    album: str = "",
-    timestamp: int | None = None,
-):
-    from crate.scrobble import scrobble_play_event
+def scrobble_play_event_actor(event_id: int):
+    from crate.scrobble import dispatch_scrobble_play_event
 
-    scrobble_play_event(
-        user_id,
-        artist=artist,
-        track=track,
-        album=album,
-        timestamp=timestamp,
-    )
+    dispatch_scrobble_play_event(event_id)
 
 
 def get_actor(task_type: str) -> dramatiq.Actor | None:

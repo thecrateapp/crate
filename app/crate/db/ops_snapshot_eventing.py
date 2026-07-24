@@ -10,7 +10,9 @@ from crate.db.admin_stack_surface import STACK_SNAPSHOT_SCOPE
 from crate.db.admin_tasks_surface import TASKS_SURFACE_STREAM_CHANNEL
 from crate.db.cache_runtime import get_redis
 from crate.db.domain_events import get_domain_event_runtime
+from crate.db.domain_event_outbox import get_outbox_runtime
 from crate.db.snapshot_events import SNAPSHOT_CHANNEL_ALL, snapshot_channel
+from crate.runtime_saturation import get_runtime_saturation
 
 _CACHE_INVALIDATION_EVENTS_KEY = "cache:invalidation:events"
 _CACHE_INVALIDATION_EVENT_ID_KEY = "cache:invalidation:next_id"
@@ -114,9 +116,21 @@ def build_eventing_payload() -> dict[str, Any]:
             cache_invalidation["retained_events"] = 0
 
     domain_events = get_domain_event_runtime(limit=8)
+    try:
+        outbox = get_outbox_runtime()
+    except Exception:
+        outbox = {
+            "pending": 0,
+            "leased": 0,
+            "dead_letter": 0,
+            "oldest_pending_seconds": 0,
+            "unavailable": True,
+        }
     return {
         "redis_connected": bool(redis),
         "domain_events": domain_events,
+        "outbox": outbox,
+        "runtime_saturation": get_runtime_saturation(),
         "cache_invalidation": cache_invalidation,
         "sse_surfaces": _build_sse_surface_catalog(),
     }

@@ -79,11 +79,11 @@ def duplicate_playlist(
                 text(
                     """
                     INSERT INTO playlist_tracks (
-                        playlist_id, track_id, track_entity_uid, track_path, track_storage_id,
+                        playlist_id, global_track_uid, track_id, track_entity_uid, track_path, track_storage_id,
                         title, artist, album, duration, position, added_at
                     )
                     SELECT
-                        :new_id, track_id, track_entity_uid, track_path, track_storage_id,
+                        :new_id, global_track_uid, track_id, track_entity_uid, track_path, track_storage_id,
                         title, artist, album, duration, position, :added_at
                     FROM playlist_tracks
                     WHERE playlist_id = :old_id

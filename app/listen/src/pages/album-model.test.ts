@@ -91,6 +91,39 @@ describe("album model", () => {
     );
   });
 
+  it("prefers the canonical album cover route for global albums", () => {
+    const tracks = buildAlbumPlayerTracks({
+      ...BASE_ALBUM,
+      id: null,
+      global_album_uid: "40919666-af53-5810-a574-9cfeb5cec68b",
+      cover_url:
+        "/api/catalog/albums/40919666-af53-5810-a574-9cfeb5cec68b/cover",
+      tracks: [
+        {
+          id: "3776db13-c0ea-51f1-9e73-125497aeb4d7",
+          globalTrackUid: "3776db13-c0ea-51f1-9e73-125497aeb4d7",
+          filename: "01-guided-tour.flac",
+          format: "flac",
+          bitrate: 949,
+          sample_rate: 44100,
+          bit_depth: 16,
+          path: null,
+          is_available: true,
+          tags: { title: "Guided Tour" },
+        },
+      ],
+    });
+
+    const track = tracks[0];
+    expect(track).toBeDefined();
+    if (!track) throw new Error("expected a playable track");
+    expect(track.albumCover).toContain(
+      "/api/catalog/albums/40919666-af53-5810-a574-9cfeb5cec68b/cover",
+    );
+    expect(track.albumCover).toContain("size=512");
+    expect(track.albumCover).toContain("format=webp");
+  });
+
   it("builds one quality badge per format using the highest-quality exemplar", () => {
     const badges = buildAlbumQualityBadges([
       {

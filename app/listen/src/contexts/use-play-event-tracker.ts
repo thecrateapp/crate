@@ -5,6 +5,7 @@ import { getTrackCacheKey } from "@/contexts/player-utils";
 import { getListenAppPlatform, getListenDeviceType } from "@/lib/listen-device";
 import { postWithRetry } from "@/lib/play-event-queue";
 import { toTrackReferencePayload } from "@/lib/track-reference";
+import { getPlaybackSession } from "@/lib/playback-provenance";
 
 interface PlayEventSession {
   trackKey: string;
@@ -77,6 +78,7 @@ function dispatchPlayEvent(session: PlayEventSession, reason: FlushReason) {
   void postWithRetry("/api/me/play-events", {
     client_event_id: generateClientEventId(),
     track_id: ref.track_id ?? null,
+    global_track_uid: ref.global_track_uid ?? null,
     track_entity_uid: ref.entity_uid ?? null,
     track_path: ref.path || session.track.id,
     title: session.track.title,
@@ -102,6 +104,7 @@ function dispatchPlayEvent(session: PlayEventSession, reason: FlushReason) {
         : null,
     device_type: getListenDeviceType(),
     app_platform: getListenAppPlatform(),
+    playback_session: getPlaybackSession(session.track),
   });
 }
 

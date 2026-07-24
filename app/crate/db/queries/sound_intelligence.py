@@ -31,13 +31,13 @@ def get_sound_intelligence_health(*, session=None) -> dict:
                                 SELECT 1 FROM equalizer_presets ep
                                 WHERE ep.scope = 'user'
                                   AND ep.target_type = 'track'
-                                  AND ep.target_entity_uid = t.entity_uid::text
+                                  AND ep.target_entity_uid = t.entity_uid
                             ) THEN 'user_track_preset'
                             WHEN EXISTS (
                                 SELECT 1 FROM equalizer_presets ep
                                 WHERE ep.scope = 'instance'
                                   AND ep.target_type = 'track'
-                                  AND ep.target_entity_uid = t.entity_uid::text
+                                  AND ep.target_entity_uid = t.entity_uid
                             ) THEN 'instance_track_preset'
                             WHEN EXISTS (
                                 SELECT 1
@@ -45,7 +45,7 @@ def get_sound_intelligence_health(*, session=None) -> dict:
                                 JOIN equalizer_presets ep
                                   ON ep.scope = 'instance'
                                  AND ep.target_type = 'album'
-                                 AND ep.target_entity_uid = a.entity_uid::text
+                                 AND ep.target_entity_uid = a.entity_uid
                                 WHERE a.id = t.album_id
                             ) THEN 'instance_album_preset'
                             WHEN EXISTS (

@@ -17,8 +17,9 @@ function coreArtistPhoto(item: CoreTracksLike): string | null {
     artistPhotoApiUrl(
       {
         artistId: firstTrack?.artist_id,
+        globalArtistUid: firstTrack?.global_artist_uid,
         artistSlug: firstTrack?.artist_slug,
-        artistName: item.name,
+        artistName: firstTrack?.artist || item.name,
       },
       { size: 384 },
     ) || null

@@ -19,6 +19,11 @@ with PANNs + Essentia + bliss-rs, and exposes separate apps on top of a single
 FastAPI backend: an **admin** web app for library management and a **Listen**
 app (web/PWA/native shells) for playback and discovery. Underneath that, the
 backend maintains a snapshot/read-model plane for admin and Listen surfaces.
+Every installation is also a federation node: with no peers it is a one-node
+network; approved peers extend the same global catalog, taxonomy, human URLs,
+playback, imports, user references, and Open Subsonic surface without a mode
+switch. Pairing is bilateral, authorization and quotas are owner-side, and the
+Go readplane relays remote media without receiving private signing keys.
 
 ## Features
 
@@ -57,6 +62,17 @@ backend maintains a snapshot/read-model plane for admin and Listen surfaces.
 - 60+ curated genre graph with parent / related / influenced-by / fusion-of edges
 - Mix seeding from a single genre expands to musically adjacent genres via BFS traversal
 - Alias matching across library tags
+- Signed global taxonomy releases with source-provenanced memberships and local overlays
+
+**Federation**
+
+- Node-first global artist, album, track, genre, and user-reference model
+- Bilateral signed pairing, typed least-privilege grants, key rotation, replay protection, and strict HTTPS/SSRF policy
+- Snapshot plus durable delta catalog synchronization with resumable checkpoints and tombstones
+- Stable human routes across local and remote sources (`/artists/high-vis`)
+- Owner-side stream tickets, atomic quotas, revocation, Range support, and a benchmark-gated Go byte relay
+- Explicit approved imports with signed manifests, disk reservations, hash verification, provenance, and worker-only publication
+- Signed opt-in directories, global likes/playlists/radio, opt-in remote scrobbling, and global Open Subsonic IDs
 
 **Acquisition**
 
@@ -147,8 +163,8 @@ backend maintains a snapshot/read-model plane for admin and Listen surfaces.
 
 | Service                      | Tech                                     | Role                                                                              |
 | ---------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
-| **crate-api**                | FastAPI + Uvicorn                        | REST API, audio streaming, SSE events, snapshot-driven surfaces                   |
-| **crate-readplane**          | Go                                       | Low-latency read plane for snapshot-backed Listen/Admin routes                    |
+| **crate-api**                | FastAPI + Uvicorn                        | REST/control plane, signing, local audio, SSE, federation policy and snapshots    |
+| **crate-readplane**          | Go                                       | Low-latency read models and bounded remote federation stream relay                |
 | **crate-worker**             | Python + Dramatiq (Redis broker)         | Fast/default background tasks, filesystem writes, imports, scheduler/service loop |
 | **crate-projector**          | Python                                   | Redis/domain events → warmed PostgreSQL snapshots/read models                     |
 | **crate-maintenance-worker** | Python + Dramatiq                        | Repair, enrichment, sync and maintenance queues                                   |

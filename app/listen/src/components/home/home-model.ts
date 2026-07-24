@@ -66,6 +66,7 @@ export interface CuratedPlaylist {
 export interface GlobalArtist {
   id?: number;
   entity_uid?: string;
+  global_artist_uid?: string;
   slug?: string;
   name: string;
   albums?: number;
@@ -73,6 +74,7 @@ export interface GlobalArtist {
   album_count?: number;
   track_count?: number;
   has_photo: boolean;
+  photo_url?: string | null;
 }
 
 export interface PaginatedArtistsResponse {
@@ -134,15 +136,18 @@ export interface HomeUpcomingResponse {
 
 export interface ReplayTrack {
   track_id: number | null;
+  global_track_uid?: string | null;
   track_entity_uid?: string | null;
   track_path: string | null;
   title: string;
   artist: string;
   artist_id?: number | null;
+  global_artist_uid?: string | null;
   artist_entity_uid?: string | null;
   artist_slug?: string | null;
   album: string;
   album_id?: number | null;
+  global_album_uid?: string | null;
   album_entity_uid?: string | null;
   album_slug?: string | null;
   bpm?: number | null;
@@ -229,6 +234,7 @@ export interface HomeRecentArtistItem {
   type: "artist";
   artist_id?: number;
   artist_entity_uid?: string;
+  global_artist_uid?: string;
   artist_slug?: string;
   artist_name: string;
   subtitle?: string;
@@ -239,11 +245,13 @@ export interface HomeRecentAlbumItem {
   type: "album";
   album_id?: number;
   album_entity_uid?: string;
+  global_album_uid?: string;
   album_slug?: string;
   album_name: string;
   artist_name: string;
   artist_id?: number;
   artist_entity_uid?: string;
+  global_artist_uid?: string;
   artist_slug?: string;
   subtitle?: string;
   played_at?: string;
@@ -284,12 +292,14 @@ export interface HomeListeningHistoryCard {
 export interface HomeArtworkArtist {
   artist_name: string;
   artist_id?: number;
+  global_artist_uid?: string;
   artist_entity_uid?: string;
   artist_slug?: string;
 }
 
 export interface HomeSuggestedAlbum {
   album_id?: number;
+  global_album_uid?: string;
   album_entity_uid?: string;
   album_slug?: string;
   artist_name: string;
@@ -300,19 +310,23 @@ export interface HomeSuggestedAlbum {
   year?: string;
   release_date?: string;
   release_type?: string;
+  cover_url?: string | null;
 }
 
 export interface HomeRecommendedTrack {
   track_id?: number | null;
+  global_track_uid?: string | null;
   track_entity_uid?: string | null;
   track_path?: string | null;
   title: string;
   artist: string;
   artist_id?: number | null;
+  global_artist_uid?: string | null;
   artist_entity_uid?: string | null;
   artist_slug?: string | null;
   album?: string | null;
   album_id?: number | null;
+  global_album_uid?: string | null;
   album_entity_uid?: string | null;
   album_slug?: string | null;
   duration?: number | null;
@@ -338,15 +352,18 @@ export interface HomeRadioStation {
   title: string;
   subtitle: string;
   seed_type?: "artist" | "album" | "track" | "genre";
+  seed_value?: string;
   seed_label?: string;
   seed_subtitle?: string;
   play_count: number;
   artist_name?: string;
   artist_id?: number;
+  global_artist_uid?: string;
   artist_entity_uid?: string;
   artist_slug?: string;
   album_name?: string;
   album_id?: number;
+  global_album_uid?: string;
   album_entity_uid?: string;
   album_slug?: string;
   track_title?: string;
@@ -357,6 +374,7 @@ export interface HomeRadioStation {
 
 export interface HomeFavoriteArtist {
   artist_id?: number;
+  global_artist_uid?: string;
   artist_entity_uid?: string;
   artist_slug?: string;
   artist_name: string;

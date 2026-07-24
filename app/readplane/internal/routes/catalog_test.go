@@ -1,16 +1,29 @@
 package routes
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
-	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 	"github.com/stretchr/testify/assert"
+	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
+	"github.com/thecrateapp/crate/app/readplane/internal/config"
+	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 )
+
+type stubArtistTopTracksCatalog struct {
+	calls   int
+	payload []map[string]any
+	err     error
+}
+
+func (s *stubArtistTopTracksCatalog) ArtistTopTracksBySlug(context.Context, string, int) ([]map[string]any, error) {
+	s.calls++
+	return s.payload, s.err
+}
 
 func TestRouteParts(t *testing.T) {
 	t.Run("decodes URL segments", func(t *testing.T) {
@@ -57,6 +70,36 @@ func TestIsReservedGenreRoute(t *testing.T) {
 	assert.False(t, isReservedGenreRoute("punk"), "treated a normal genre slug as reserved")
 }
 
+func TestTryFallback(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer backend.Close()
+
+	enabled, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+	disabled, err := httpx.NewFallbackProxy(false, "", "test")
+	assert.NoError(t, err)
+
+	for _, test := range []struct {
+		name     string
+		fallback *httpx.FallbackProxy
+		want     bool
+	}{
+		{name: "missing", fallback: nil, want: false},
+		{name: "disabled", fallback: disabled, want: false},
+		{name: "enabled", fallback: enabled, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := &Server{fallback: test.fallback}
+			req := httptest.NewRequest(http.MethodGet, "/api/catalog/search", nil)
+			rec := httptest.NewRecorder()
+
+			assert.Equal(t, test.want, server.tryFallback(rec, req))
+		})
+	}
+}
+
 func TestCatalogPayloadFallbacksOnNotFoundWhenConfigured(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Crate-Readplane-Fallback") != "1" {
@@ -92,5 +135,119 @@ func TestCatalogPayloadFallbacksOnNotFoundWhenConfigured(t *testing.T) {
 	}
 	if got := rec.Header().Get("X-Crate-Readplane"); got != "fallback" {
 		t.Fatalf("X-Crate-Readplane = %q, want fallback", got)
+	}
+}
+
+func TestArtistPageSlugFallsBackToFastAPIForGlobalResolution(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/artist-slugs/high-vis/page", r.URL.Path)
+		assert.Equal(t, "1", r.Header.Get("X-Crate-Readplane-Fallback"))
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"artist": map[string]any{"name": "High Vis"}})
+	}))
+	defer backend.Close()
+
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	if err != nil {
+		t.Fatalf("fallback setup failed: %v", err)
+	}
+	server := &Server{
+		fallback: fallback,
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/artist-slugs/high-vis/page", nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+}
+
+func TestArtistTopTracksSlugFallsBackToFastAPIForGlobalResolution(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/artist-slugs/high-vis/top-tracks", r.URL.Path)
+		assert.Equal(t, "50", r.URL.Query().Get("count"))
+		httpx.WriteJSON(w, http.StatusOK, []map[string]any{{"title": "Choose To Lose"}})
+	}))
+	defer backend.Close()
+
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	if err != nil {
+		t.Fatalf("fallback setup failed: %v", err)
+	}
+	server := &Server{
+		fallback: fallback,
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/artist-slugs/high-vis/top-tracks?count=50", nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+}
+
+func TestArtistTopTracksSlugConsultsCatalogBeforeFallback(t *testing.T) {
+	fallbackCalls := 0
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fallbackCalls++
+		httpx.WriteJSON(w, http.StatusOK, []map[string]any{{"title": "Fallback track"}})
+	}))
+	defer backend.Close()
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+	store := &stubArtistTopTracksCatalog{
+		payload: []map[string]any{{"title": "Catalog track"}},
+	}
+	server := &Server{
+		artistTopTracks: store,
+		fallback:        fallback,
+		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/artist-slugs/high-vis/top-tracks?count=50", nil)
+	rec := httptest.NewRecorder()
+
+	server.writeArtistTopTracksBySlug(rec, req, "high-vis", 50)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "hit", rec.Header().Get("X-Crate-Readplane"))
+	assert.Equal(t, 1, store.calls)
+	assert.Equal(t, 0, fallbackCalls)
+}
+
+func TestCanonicalCatalogCatchAllFallsBackToFastAPI(t *testing.T) {
+	paths := []string{
+		"/api/catalog/artists/artist-global-1/page",
+		"/api/catalog/albums/album-global-1",
+		"/api/catalog/tracks/track-global-1/playback",
+		"/api/catalog/genres/hardcore-punk",
+	}
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "1", r.Header.Get("X-Crate-Readplane-Fallback"))
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"path": r.URL.Path})
+	}))
+	defer backend.Close()
+
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	if err != nil {
+		t.Fatalf("fallback setup failed: %v", err)
+	}
+	server := &Server{
+		cfg:      config.Config{Version: "test"},
+		fallback: fallback,
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			server.Handler().ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+		})
 	}
 }

@@ -94,3 +94,12 @@ def test_trace_log_record_factory_is_idempotent_and_sets_default_trace_id(monkey
         assert record.trace_id == "-"
     finally:
         logging.setLogRecordFactory(previous_factory)
+
+
+def test_production_app_registers_trace_middleware_outermost():
+    from crate.api import create_app
+
+    app = create_app()
+    middleware = [entry.cls for entry in app.user_middleware]
+
+    assert middleware[0] is TraceMiddleware

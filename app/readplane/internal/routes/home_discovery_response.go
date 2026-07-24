@@ -12,6 +12,7 @@ var homeDiscoveryListDefaults = []string{
 	"radio_stations",
 	"favorite_artists",
 	"essentials",
+	"listening_history",
 }
 
 var homeCardNilDefaults = []string{

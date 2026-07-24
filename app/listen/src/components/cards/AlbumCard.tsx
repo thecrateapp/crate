@@ -24,13 +24,17 @@ import {
   albumApiPath,
   albumCoverApiUrl,
   albumPagePath,
+  responsiveImageSrcSet,
 } from "@/lib/library-routes";
+
+const ALBUM_CARD_IMAGE_WIDTHS = [160, 256, 320, 480] as const;
 
 interface AlbumCardProps {
   artist: string;
   album: string;
   albumId?: number;
   albumEntityUid?: string;
+  globalAlbumUid?: string;
   artistEntityUid?: string;
   albumSlug?: string;
   year?: string;
@@ -45,11 +49,16 @@ interface AlbumData {
   artist: string;
   name: string;
   display_name: string;
+  global_album_uid?: string;
+  global_artist_uid?: string;
   tracks: Array<{
-    id: number;
+    id: string | number;
     entity_uid?: string;
+    globalTrackUid?: string;
+    global_track_uid?: string;
+    global_uid?: string;
     filename: string;
-    path: string;
+    path?: string | null;
     is_available?: boolean;
     length_sec: number;
     tags: {
@@ -63,6 +72,7 @@ export const AlbumCard = memo(function AlbumCard({
   album,
   albumId,
   albumEntityUid,
+  globalAlbumUid,
   artistEntityUid,
   albumSlug,
   year,
@@ -77,20 +87,32 @@ export const AlbumCard = memo(function AlbumCard({
   const { isSaved, toggleAlbumSaved } = useSavedAlbums();
   const { getAlbumState, getAlbumRecord } = useOffline();
   const [playing, setPlaying] = useState(false);
+  const albumRouteInput = {
+    albumId,
+    albumEntityUid,
+    globalAlbumUid,
+    artistEntityUid,
+    albumSlug,
+    artistName: artist,
+    albumName: album,
+  };
   const coverUrl =
     cover ||
-    albumCoverApiUrl(
-      {
-        albumId,
-        albumEntityUid,
-        artistEntityUid,
-        albumSlug,
-        artistName: artist,
-        albumName: album,
-      },
-      { size: layout === "grid" ? 320 : compact ? 192 : 256 },
-    );
-  const saved = isSaved(albumId);
+    albumCoverApiUrl(albumRouteInput, {
+      size: layout === "grid" ? 320 : compact ? 192 : 256,
+    });
+  const coverSrcSet = cover
+    ? undefined
+    : responsiveImageSrcSet(ALBUM_CARD_IMAGE_WIDTHS, (size) =>
+        albumCoverApiUrl(albumRouteInput, { size }),
+      );
+  const coverSizes =
+    layout === "grid"
+      ? "(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 17vw"
+      : compact
+        ? "120px"
+        : "160px";
+  const saved = isSaved(albumId, globalAlbumUid);
   const offlineState = getAlbumState(albumId);
   const offlineRecord = getAlbumRecord(albumId);
   const offlineMeta =
@@ -109,6 +131,7 @@ export const AlbumCard = memo(function AlbumCard({
     album,
     albumId,
     albumEntityUid,
+    globalAlbumUid,
     artistEntityUid,
     albumSlug,
     cover: coverUrl,
@@ -119,14 +142,7 @@ export const AlbumCard = memo(function AlbumCard({
     event.stopPropagation();
     setPlaying(true);
     try {
-      const data = await api<AlbumData>(
-        albumApiPath({
-          albumId,
-          albumSlug,
-          artistName: artist,
-          albumName: album,
-        }),
-      );
+      const data = await api<AlbumData>(albumApiPath(albumRouteInput));
       const playerTracks: Track[] = (data.tracks || [])
         .filter((track) => track.is_available !== false)
         .map((track) =>
@@ -134,11 +150,21 @@ export const AlbumCard = memo(function AlbumCard({
             {
               id: track.id,
               entity_uid: track.entity_uid,
+              globalTrackUid:
+                track.globalTrackUid ??
+                track.global_track_uid ??
+                track.global_uid,
+              global_artist_uid: data.global_artist_uid,
+              global_album_uid:
+                data.global_album_uid ?? globalAlbumUid ?? undefined,
               title: track.tags?.title || track.filename || "Unknown",
               artist: data.artist,
               album: data.display_name || data.name,
               path: track.path,
-              library_track_id: track.id > 0 ? track.id : undefined,
+              library_track_id:
+                typeof track.id === "number" && track.id > 0
+                  ? track.id
+                  : undefined,
             },
             { cover: coverUrl },
           ),
@@ -148,10 +174,7 @@ export const AlbumCard = memo(function AlbumCard({
           type: "album",
           name: `${artist} - ${album}`,
           href: albumPagePath({
-            albumId,
-            albumSlug,
-            artistName: artist,
-            albumName: album,
+            ...albumRouteInput,
           }),
           radio:
             albumId != null
@@ -171,7 +194,7 @@ export const AlbumCard = memo(function AlbumCard({
       className={cn(
         "group snap-start cursor-pointer rounded-xl p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid"
-          ? "w-full min-w-0"
+          ? "listen-deferred-grid-item w-full min-w-0"
           : `flex-shrink-0 ${compact ? "w-[120px]" : "w-[160px]"}`,
         offlineState === "ready"
           ? "bg-cyan-400/[0.04]"
@@ -183,42 +206,29 @@ export const AlbumCard = memo(function AlbumCard({
       )}
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
-      onClick={() =>
-        navigate(
-          albumPagePath({
-            albumId,
-            albumSlug,
-            artistName: artist,
-            albumName: album,
-          }),
-        )
-      }
+      onClick={() => navigate(albumPagePath(albumRouteInput))}
       onKeyDown={(event) => {
         actionMenu.handleKeyboardTrigger(event);
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          navigate(
-            albumPagePath({
-              albumId,
-              albumSlug,
-              artistName: artist,
-              albumName: album,
-            }),
-          );
+          navigate(albumPagePath(albumRouteInput));
         }
       }}
     >
       <div className="relative aspect-square rounded-lg overflow-hidden bg-white/5 mb-2">
         <img
           src={coverUrl}
+          srcSet={coverSrcSet}
+          sizes={coverSrcSet ? coverSizes : undefined}
           alt={album}
           loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />
-        {albumId != null && (
+        {(albumId != null || globalAlbumUid) && (
           <ActionIconButton
             variant="card"
             active={saved}
@@ -228,7 +238,7 @@ export const AlbumCard = memo(function AlbumCard({
             onClick={async (event) => {
               event.stopPropagation();
               try {
-                await toggleAlbumSaved(albumId);
+                await toggleAlbumSaved(albumId, globalAlbumUid);
               } catch {
                 // no-op; page-level toasts can be added later
               }

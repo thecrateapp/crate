@@ -51,7 +51,7 @@ def get_discovery_track_rows(
             t.bliss_vector,
             COALESCE(t.lastfm_playcount, 0) AS popularity,
             COALESCE(uts.play_count, 0) AS user_play_count,
-            (ult.track_id IS NOT NULL) AS is_liked
+            (ult.track_id IS NOT NULL OR global_like.global_track_uid IS NOT NULL) AS is_liked
         FROM matching_artists ma
         JOIN library_tracks t ON t.artist = ma.artist_name
         JOIN library_albums alb ON alb.id = t.album_id
@@ -63,6 +63,11 @@ def get_discovery_track_rows(
         LEFT JOIN user_liked_tracks ult
           ON ult.user_id = :user_id
          AND ult.track_id = t.id
+        LEFT JOIN global_catalog_tracks global_track
+          ON global_track.local_track_id = t.id
+        LEFT JOIN user_global_track_likes global_like
+          ON global_like.user_id = :user_id
+         AND global_like.global_track_uid = global_track.global_track_uid
         ORDER BY
             COALESCE(t.lastfm_playcount, 0) DESC,
             t.title ASC

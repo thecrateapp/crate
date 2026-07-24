@@ -100,6 +100,9 @@ def test_prepare_playback_queues_variant_without_reading_source_quality(
     monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
     monkeypatch.setattr("crate.streaming.service.read_audio_quality", fail_quality)
     monkeypatch.setattr(
+        "crate.streaming.service.get_variant_by_cache_key", lambda _key: None
+    )
+    monkeypatch.setattr(
         "crate.streaming.service.ensure_variant_record", fake_ensure_variant_record
     )
     monkeypatch.setattr(
@@ -131,6 +134,43 @@ def test_prepare_playback_queues_variant_without_reading_source_quality(
     assert len(marked) == 1
     assert marked[0][1] == "task-1"
     assert len(marked[0][0]) == 64
+
+
+def test_inspect_playback_preparation_reads_pending_variant_without_writing(
+    monkeypatch, tmp_path
+):
+    from crate.streaming.service import inspect_playback_preparation
+
+    library = tmp_path / "music"
+    track_path = library / "Artist" / "Album" / "track.flac"
+    track_path.parent.mkdir(parents=True)
+    track_path.write_bytes(b"fake flac")
+
+    monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
+    monkeypatch.setattr(
+        "crate.streaming.service.get_variant_by_cache_key",
+        lambda _key: {"status": "pending", "task_id": None},
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.ensure_variant_record",
+        lambda _payload: (_ for _ in ()).throw(AssertionError("must not write")),
+    )
+
+    inspection = inspect_playback_preparation(
+        {
+            "id": 1,
+            "path": str(track_path),
+            "format": "flac",
+            "bitrate": 900000,
+            "sample_rate": 44100,
+            "bit_depth": 16,
+        },
+        "balanced",
+    )
+
+    assert inspection is not None
+    assert inspection.cache_key
+    assert inspection.ready is False
 
 
 def test_resolve_playback_uses_db_quality_without_probing_request_path(
@@ -205,3 +245,69 @@ def test_resolve_playback_falls_back_to_original_when_variant_metadata_fails(
     assert resolution.transcoded is False
     assert resolution.preparing is False
     assert resolution.delivery["reason"] == "variant_metadata_unavailable"
+
+
+def test_data_saver_uses_ready_balanced_variant_while_requested_variant_warms(
+    monkeypatch, tmp_path
+):
+    library = tmp_path / "music"
+    track_path = library / "Artist" / "Album" / "track.flac"
+    track_path.parent.mkdir(parents=True)
+    track_path.write_bytes(b"fake flac")
+    balanced_path = tmp_path / "balanced.m4a"
+    balanced_path.write_bytes(b"aac")
+    enqueued: list[tuple[str, dict]] = []
+
+    def fake_ensure_variant_record(payload: dict) -> dict:
+        status = "ready" if payload["preset"] == "balanced" else "pending"
+        return {
+            **payload,
+            "status": status,
+            "task_id": None,
+            "bytes": balanced_path.stat().st_size if status == "ready" else None,
+            "error": None,
+        }
+
+    monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
+    monkeypatch.setattr(
+        "crate.streaming.service.get_variant_by_cache_key", lambda _key: None
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.ensure_variant_record", fake_ensure_variant_record
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.resolve_data_file",
+        lambda relative_path: (
+            balanced_path if "/balanced/" in str(relative_path) else None
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.create_task_dedup",
+        lambda *_args, **kwargs: (
+            enqueued.append(("prepare_stream_variant", kwargs)) or "task-data-saver"
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.mark_variant_task", lambda *_args: None
+    )
+
+    resolution = resolve_playback(
+        {
+            "id": 1,
+            "entity_uid": None,
+            "path": str(track_path),
+            "format": "flac",
+            "bitrate": 900000,
+            "sample_rate": 44100,
+            "bit_depth": 16,
+        },
+        "data_saver",
+    )
+
+    assert resolution is not None
+    assert resolution.requested_policy == "data_saver"
+    assert resolution.effective_policy == "balanced"
+    assert resolution.file_path == balanced_path
+    assert resolution.transcoded is True
+    assert resolution.preparing is True
+    assert enqueued[0][1]["priority"] == 0

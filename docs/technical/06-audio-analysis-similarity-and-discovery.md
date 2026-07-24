@@ -1,3 +1,19 @@
+---
+title: Audio analysis, similarity and discovery
+summary: Analysis, Bliss vectors and discovery read models.
+section: architecture
+audience: [developer]
+status: canonical
+order: 95
+verified: 2026-07-21
+sources:
+  [
+    app/crate/audio_analysis.py,
+    app/crate/bliss.py,
+    app/crate/analysis_daemon.py,
+  ]
+---
+
 # Audio Analysis, Similarity, and Discovery Intelligence
 
 ## Why this subsystem matters

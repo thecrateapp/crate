@@ -16,7 +16,6 @@ from crate.api._deps import (
 )
 from crate.api.auth import _require_auth
 from crate.api.permissions import require_permission
-from crate.api.browse_shared import fs_search, has_library_data
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -56,8 +55,8 @@ from crate.equalizer import (
 )
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.repositories.library import set_track_rating
+from crate.db.repositories.browse_media_favorites import add_favorite, remove_favorite
 from crate.db.queries.browse_media import (
-    add_favorite,
     count_mood_presets,
     find_track_id_by_path,
     get_mood_tracks,
@@ -71,12 +70,17 @@ from crate.db.queries.browse_media import (
     get_track_path,
     get_track_path_by_entity_uid,
     list_favorites,
-    remove_favorite,
-    search_all_hybrid,
 )
+from crate.local_search import search_local_library
 from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
 from crate.db.repositories.tasks import create_task_dedup
+from crate.federation.global_playback import (
+    GlobalTrackNotFound,
+    NoPlayableGlobalTrack,
+    resolve_global_track_playback,
+)
+from crate.federation.playback_prepare import prepare_remote_playback_variants
 from crate.audio import read_audio_quality
 from crate.streaming.paths import resolve_data_file
 from crate.db.repositories.streaming import (
@@ -144,32 +148,73 @@ _DOWNLOAD_RESPONSES = merge_responses(
 @router.get(
     "/api/search",
     response_model=SearchResponse,
+    response_model_exclude_none=True,
     responses=AUTH_ERROR_RESPONSES,
     summary="Search artists, albums, and tracks",
 )
-def api_search(request: Request, q: str = "", limit: int = 20):
-    _require_auth(request)
+def api_search(
+    request: Request,
+    q: str = "",
+    limit: int = 20,
+    scope: str = "local",
+):
+    user = _require_auth(request)
     q_stripped = q.strip()
     capped_limit = max(1, min(limit, 50))
     if len(q_stripped) < 2:
         return {"artists": [], "albums": [], "tracks": []}
 
-    cache_key = f"listen:search:v2:{q_stripped.lower()}:{capped_limit}"
+    scope = scope if scope in ("local", "auto", "federated") else "local"
+    if scope == "local":
+        return search_local_library(q_stripped, capped_limit)
+
+    use_global_catalog = scope == "auto"
+    global_catalog_revision = ""
+    if scope == "auto":
+        from crate.db.queries.global_catalog import get_global_catalog_revision
+
+        global_catalog_revision = get_global_catalog_revision()
+
+    user_cache_part = f":u:{user.get('id')}" if scope != "local" else ""
+    global_cache_part = (
+        f":global:{global_catalog_revision}" if use_global_catalog else ""
+    )
+    cache_key = (
+        f"listen:search:v2:{q_stripped.lower()}:{capped_limit}:{scope}"
+        f"{user_cache_part}{global_cache_part}"
+    )
     cached = get_cache(cache_key, max_age_seconds=30)
     if cached is not None:
         return cached
 
-    if not has_library_data():
-        result = fs_search(q_stripped)
-        result["tracks"] = []
-        set_cache(cache_key, result, ttl=45)
-        return result
+    if use_global_catalog:
+        from crate.db.queries.global_catalog import search_global_catalog
 
-    payload = search_all_hybrid(q_stripped, capped_limit)
-    record_later("search.hybrid.results.artists", len(payload["artists"]))
-    record_later("search.hybrid.results.albums", len(payload["albums"]))
-    record_later("search.hybrid.results.tracks", len(payload["tracks"]))
-    set_cache(cache_key, payload, ttl=45)
+        payload = search_global_catalog(q_stripped, capped_limit)
+        record_later("search.global.results.artists", len(payload["artists"]))
+        record_later("search.global.results.albums", len(payload["albums"]))
+        record_later("search.global.results.tracks", len(payload["tracks"]))
+        set_cache(cache_key, payload, ttl=45)
+        return payload
+
+    from crate.db.repositories import federation as fed_repo
+    from crate.federation.search_fanout import federated_search
+
+    local_node = fed_repo.get_local_node()
+
+    payload = federated_search(
+        query=q_stripped,
+        limit=capped_limit,
+        scope=scope,
+        local_node=local_node,
+        user=user,
+    )
+    record_later("search.federated.results.artists", len(payload["artists"]))
+    record_later("search.federated.results.albums", len(payload["albums"]))
+    record_later("search.federated.results.tracks", len(payload["tracks"]))
+    federation_status = payload.get("federation") or {}
+    if federation_status.get("complete", True):
+        set_cache(cache_key, payload, ttl=45)
     return payload
 
 
@@ -995,13 +1040,27 @@ def _stream_url_for_track(track: dict, policy: str) -> str:
     return f"/api/stream/{encoded_path}{query}"
 
 
-def _playback_payload_for_track(track: dict, delivery: str) -> dict:
+def _playback_payload_for_track(track: dict, delivery: str, *, user_id: int) -> dict:
     resolution = resolve_playback(track, delivery, enqueue=True)
     if resolution is None:
         raise HTTPException(status_code=404, detail="Track not found")
-    return resolution_to_payload(
+    payload = resolution_to_payload(
         resolution, _stream_url_for_track(track, resolution.requested_policy)
     )
+    from crate.playback_provenance import (
+        issue_playback_session,
+        resolve_local_content_provenance,
+    )
+
+    content_origin, source_node_uid = resolve_local_content_provenance(track.get("id"))
+    payload["playback_session"] = issue_playback_session(
+        user_id=int(user_id),
+        content_origin=content_origin,
+        source_node_uid=source_node_uid,
+    )
+    payload["content_origin"] = content_origin
+    payload["_source_node_uid"] = source_node_uid
+    return payload
 
 
 @router.get(
@@ -1028,11 +1087,11 @@ def api_stream_by_id(
 def api_playback_by_id(
     request: Request, track_id: int, delivery: str = Query("original")
 ):
-    _require_auth(request)
+    user = _require_auth(request)
     track = get_track_delivery_row_by_id(track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _playback_payload_for_track(track, delivery)
+    return _playback_payload_for_track(track, delivery, user_id=user["id"])
 
 
 @router.get(
@@ -1059,11 +1118,11 @@ def api_stream_by_entity_uid(
 def api_playback_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
-    _require_auth(request)
+    user = _require_auth(request)
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _playback_payload_for_track(track, delivery)
+    return _playback_payload_for_track(track, delivery, user_id=user["id"])
 
 
 @router.get(
@@ -1145,6 +1204,22 @@ def api_stream_playback_variant(request: Request, variant_id: str):
 
 
 def _resolve_playback_prepare_track(ref) -> dict | None:
+    if ref.global_track_uid:
+        try:
+            selection = resolve_global_track_playback(ref.global_track_uid)
+        except (GlobalTrackNotFound, NoPlayableGlobalTrack):
+            return None
+        if selection["kind"] != "local":
+            return None
+        entity_uid = selection.get("local_track_entity_uid")
+        if entity_uid:
+            track = get_track_delivery_row_by_entity_uid(entity_uid)
+            if track:
+                return track
+        track_id = selection.get("local_track_id")
+        if track_id is not None:
+            return get_track_delivery_row_by_id(track_id)
+        return None
     if ref.entity_uid:
         return get_track_delivery_row_by_entity_uid(ref.entity_uid)
     if ref.track_id:
@@ -1154,6 +1229,53 @@ def _resolve_playback_prepare_track(ref) -> dict | None:
     return None
 
 
+def _resolve_remote_playback_prepare_target(ref) -> tuple[str, str] | None:
+    if not ref.global_track_uid:
+        return None
+    try:
+        selection = resolve_global_track_playback(ref.global_track_uid)
+    except (GlobalTrackNotFound, NoPlayableGlobalTrack):
+        return None
+    if selection.get("kind") != "remote":
+        return None
+    node_uid = str(selection.get("node_uid") or "")
+    remote_entity_uid = str(selection.get("remote_entity_uid") or "")
+    if not node_uid or not remote_entity_uid:
+        return None
+    return node_uid, remote_entity_uid
+
+
+def _remote_prepare_item(entity_uid: str, status: str) -> dict:
+    if status == "ready":
+        return {
+            "entity_uid": entity_uid,
+            "ok": True,
+            "preparing": False,
+            "cache_hit": True,
+            "transcoded": True,
+        }
+    if status == "preparing":
+        return {
+            "entity_uid": entity_uid,
+            "ok": True,
+            "preparing": True,
+            "cache_hit": False,
+            "transcoded": False,
+        }
+    return {
+        "entity_uid": entity_uid,
+        "ok": False,
+        "preparing": False,
+        "cache_hit": False,
+        "transcoded": False,
+        "error": (
+            "Remote owner rate limited"
+            if status == "rate_limited"
+            else "Remote owner unavailable"
+        ),
+    }
+
+
 @router.post(
     "/api/playback/prepare",
     response_model=PlaybackPrepareResponse,
@@ -1161,13 +1283,20 @@ def _resolve_playback_prepare_track(ref) -> dict | None:
     summary="Queue cached playback variants for upcoming tracks",
 )
 def api_playback_prepare(request: Request, body: PlaybackPrepareRequest):
-    _require_auth(request)
+    user = _require_auth(request)
     policy = normalize_policy(body.policy)
-    items = []
+    items: list[dict | None] = []
+    remote_targets: list[tuple[int, str, str]] = []
     for ref in body.tracks[:12]:
         track = _resolve_playback_prepare_track(ref)
         if not track:
-            items.append({"ok": False, "error": "Track not found"})
+            remote_target = _resolve_remote_playback_prepare_target(ref)
+            if remote_target is None:
+                items.append({"ok": False, "error": "Track not found"})
+                continue
+            node_uid, remote_entity_uid = remote_target
+            remote_targets.append((len(items), node_uid, remote_entity_uid))
+            items.append(None)
             continue
         try:
             resolution = prepare_playback(track, policy)
@@ -1198,7 +1327,39 @@ def api_playback_prepare(request: Request, body: PlaybackPrepareRequest):
                     "error": str(exc),
                 }
             )
-    return {"policy": policy, "items": items}
+
+    if remote_targets:
+        selected_node_uid = remote_targets[0][1]
+        selected_targets = [
+            target for target in remote_targets if target[1] == selected_node_uid
+        ][:2]
+        try:
+            statuses = prepare_remote_playback_variants(
+                user=user,
+                node_uid=selected_node_uid,
+                remote_entity_uids=[target[2] for target in selected_targets],
+                delivery_policy=policy,
+            )
+        except Exception:
+            log.debug("Failed to relay remote playback preparation", exc_info=True)
+            statuses = {}
+        selected_indexes = {target[0] for target in selected_targets}
+        for index, _node_uid, remote_entity_uid in remote_targets:
+            if index not in selected_indexes:
+                items[index] = {
+                    "entity_uid": remote_entity_uid,
+                    "ok": False,
+                    "preparing": False,
+                    "cache_hit": False,
+                    "transcoded": False,
+                    "error": "Remote peer preparation deferred",
+                }
+                continue
+            items[index] = _remote_prepare_item(
+                remote_entity_uid,
+                statuses.get(remote_entity_uid, "unavailable"),
+            )
+    return {"policy": policy, "items": [item for item in items if item is not None]}
 
 
 @router.get(
@@ -1488,7 +1649,8 @@ def _mood_conditions(filters: dict) -> tuple[list[str], list]:
 def api_browse_moods(request: Request):
     """Return available mood presets with track counts."""
     _require_auth(request)
-    cached = get_cache("listen:browse_moods:v1", max_age_seconds=600)
+    cache_key = "listen:browse_moods:v2"
+    cached = get_cache(cache_key, max_age_seconds=600)
     if cached is not None:
         return cached
 
@@ -1497,7 +1659,7 @@ def api_browse_moods(request: Request):
         {"name": name, "track_count": counts.get(name, 0), "filters": filters}
         for name, filters in MOOD_PRESETS.items()
     ]
-    set_cache("listen:browse_moods:v1", results, ttl=600)
+    set_cache(cache_key, results, ttl=600)
     return results
 
 

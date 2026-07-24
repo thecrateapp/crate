@@ -211,13 +211,87 @@ describe("TopBarSearch", () => {
     vi.useRealTimers();
 
     await waitFor(() => {
-      expect(api).toHaveBeenCalledWith("/api/search?q=high&limit=10");
+      expect(api).toHaveBeenCalledWith("/api/catalog/search?q=high&limit=10");
       expect(screen.getByText("High Vis")).toBeTruthy();
     });
 
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
       "listen-glass-panel",
       "rounded-2xl",
+    );
+  });
+
+  it("labels canonical results that are only available remotely", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockResolvedValue({
+      artists: [
+        {
+          global_artist_uid: "artist-global-1",
+          name: "High Vis",
+          availability: {
+            catalog: true,
+            stream: true,
+            import: false,
+            local: false,
+            remote: true,
+          },
+        },
+      ],
+      albums: [],
+      tracks: [],
+    });
+    mockSearchBoxRect();
+
+    renderWithListenProviders(<TopBarSearch />);
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "high" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    vi.useRealTimers();
+
+    expect(await screen.findByText("Remote")).toBeInTheDocument();
+  });
+
+  it("opens local albums through local human routes when search returns global uids", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockResolvedValue({
+      artists: [],
+      albums: [
+        {
+          id: 3,
+          name: "Gris Klein",
+          artist: "Birds In Row",
+          global_album_uid: "785621b5-738e-5922-b6e3-108984976091",
+          entity_uid: "904e7879-9549-5f49-81c0-59843a562968",
+          has_cover: true,
+        },
+      ],
+      tracks: [],
+    });
+    mockSearchBoxRect();
+
+    renderWithListenProviders(<TopBarSearch />);
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "gris" } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    vi.useRealTimers();
+
+    fireEvent.click(await screen.findByText("Gris Klein"));
+
+    expect(navigateMock).toHaveBeenCalledWith(
+      "/artists/birds-in-row/gris-klein",
     );
   });
 

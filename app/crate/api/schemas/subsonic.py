@@ -100,6 +100,7 @@ class SubsonicSong(_SubsonicModel):
     path: str | None = None
     cover_art: str | None = Field(default=None, alias="coverArt")
     type: str | None = None
+    starred: str | None = None
 
 
 class SubsonicArtistDetail(_SubsonicModel):

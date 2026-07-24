@@ -47,6 +47,72 @@ func TestSnapshotFreshness(t *testing.T) {
 	})
 }
 
+func TestStoreFreshnessPolicyByScope(t *testing.T) {
+	store := NewStore(nil, time.Second, 10*time.Minute, time.Hour)
+	store.SetScopeFreshness("stats:", 5*time.Minute, 24*time.Hour)
+
+	tests := []struct {
+		name      string
+		scope     string
+		wantMax   time.Duration
+		wantStale time.Duration
+	}{
+		{name: "home uses defaults", scope: "home:discovery", wantMax: 10 * time.Minute, wantStale: time.Hour},
+		{name: "stats uses long stale window", scope: "stats:dashboard", wantMax: 5 * time.Minute, wantStale: 24 * time.Hour},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			maxAge, staleMaxAge := store.freshnessForScope(tt.scope)
+			assert.Equal(t, tt.wantMax, maxAge)
+			assert.Equal(t, tt.wantStale, staleMaxAge)
+		})
+	}
+}
+
+func TestRequireMatchingTaxonomy(t *testing.T) {
+	matchingTaxonomy := &Row{Payload: map[string]any{
+		"taxonomy": map[string]any{
+			"id": "crate-core", "version": "1.0.0", "digest": "sha256:one",
+		},
+	}}
+
+	tests := []struct {
+		name        string
+		memberships *Row
+		wantErr     bool
+	}{
+		{
+			name: "matching release",
+			memberships: &Row{Payload: map[string]any{
+				"taxonomy": map[string]any{
+					"id": "crate-core", "version": "1.0.0", "digest": "sha256:one",
+				},
+			}},
+		},
+		{
+			name: "digest mismatch",
+			memberships: &Row{Payload: map[string]any{
+				"taxonomy": map[string]any{
+					"id": "crate-core", "version": "1.0.0", "digest": "sha256:two",
+				},
+			}},
+			wantErr: true,
+		},
+		{name: "missing membership snapshot", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RequireMatchingTaxonomy(matchingTaxonomy, tt.memberships)
+			if tt.wantErr {
+				assert.ErrorIs(t, err, ErrTaxonomyMismatch)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestSnapshotCache(t *testing.T) {
 	t.Run("expires and returns copy", func(t *testing.T) {
 		now := time.Unix(1_700_000_000, 0)

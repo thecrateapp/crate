@@ -6,6 +6,9 @@ import { getPlaySourceLabel } from "@/components/player/player-source";
 
 export interface RadioTrackPayload {
   track_id?: number | null;
+  global_track_uid?: string | null;
+  global_artist_uid?: string | null;
+  global_album_uid?: string | null;
   track_entity_uid?: string | null;
   track_slug?: string | null;
   track_path?: string | null;
@@ -171,7 +174,7 @@ async function startSeededRadioSession(
 }
 
 export async function fetchArtistRadio(
-  artistId: number,
+  artistId: number | string,
   artistName: string,
   limit = 50,
   options: RadioRequestOptions = {},
@@ -191,6 +194,7 @@ export async function fetchArtistRadio(
 export async function fetchTrackRadio(
   seed: {
     libraryTrackId?: number | null;
+    globalTrackUid?: string | null;
     entityUid?: string | null;
     path?: string | null;
     title: string;
@@ -203,16 +207,18 @@ export async function fetchTrackRadio(
   const seedValue =
     seed.libraryTrackId != null
       ? String(seed.libraryTrackId)
-      : seed.entityUid || seed.path;
+      : seed.globalTrackUid || seed.entityUid || seed.path;
   if (!seedValue) {
-    throw new Error("track radio requires libraryTrackId, entityUid or path");
+    throw new Error(
+      "track radio requires libraryTrackId, globalTrackUid, entityUid or path",
+    );
   }
   return startSeededRadioSession("track", seedValue, seed.title, options);
 }
 
 export async function fetchAlbumRadio(
   seed: {
-    albumId: number;
+    albumId: number | string;
     artistName: string;
     albumName: string;
   },
@@ -382,7 +388,10 @@ export async function fetchInfiniteContinuation(
 // ── Shaped Radio (v2) — sessions with like/dislike feedback ────────
 
 export interface ShapedRadioTrack {
-  track_id: number;
+  track_id?: number | null;
+  global_track_uid?: string | null;
+  global_artist_uid?: string | null;
+  global_album_uid?: string | null;
   entity_uid?: string | null;
   title: string;
   artist: string;
@@ -413,7 +422,10 @@ interface ShapedRadioNextResponse {
 function shapedToTrack(t: ShapedRadioTrack): Track {
   return toPlayableTrack(
     {
-      id: t.track_id,
+      id: t.global_track_uid ?? t.track_id,
+      global_track_uid: t.global_track_uid,
+      global_artist_uid: t.global_artist_uid,
+      global_album_uid: t.global_album_uid,
       entity_uid: t.entity_uid,
       title: t.title,
       artist: t.artist,
@@ -430,8 +442,13 @@ function shapedToTrack(t: ShapedRadioTrack): Track {
     },
     {
       cover: t.album_id
-        ? albumCoverApiUrl({ albumId: t.album_id }) || undefined
-        : undefined,
+        ? albumCoverApiUrl({ albumId: t.album_id }, { size: 512 }) || undefined
+        : t.global_album_uid
+          ? albumCoverApiUrl(
+              { globalAlbumUid: t.global_album_uid },
+              { size: 512 },
+            ) || undefined
+          : undefined,
     },
   );
 }
@@ -516,13 +533,15 @@ export async function fetchShapedRadioNext(
 
 export async function sendRadioFeedback(
   sessionId: string,
-  trackId: number,
+  trackId: number | undefined,
   action: "like" | "dislike",
+  globalTrackUid?: string,
 ): Promise<void> {
   try {
     await api("/api/radio/feedback", "POST", {
       session_id: sessionId,
-      track_id: trackId,
+      ...(trackId !== undefined ? { track_id: trackId } : {}),
+      ...(globalTrackUid ? { global_track_uid: globalTrackUid } : {}),
       action,
     });
   } catch {

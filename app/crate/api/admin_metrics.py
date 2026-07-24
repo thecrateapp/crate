@@ -31,6 +31,10 @@ _DASHBOARD_TIMESERIES = {
     "stream.transcode.duration": "stream.transcode.duration",
     "stream.transcode.completed": "stream.transcode.completed",
     "stream.transcode.failed": "stream.transcode.failed",
+    "stream.cache.bytes": "stream.cache.bytes",
+    "stream.cache.bytes_removed": "stream.cache.bytes_removed",
+    "playback.startup.ms": "playback.startup.ms",
+    "playback.stall.ms": "playback.stall.ms",
     "home.compute.ms": "home.compute.ms",
     "home.endpoint_compute.ms": "home.endpoint_compute.ms",
     "worker.queue.depth": "worker.queue.depth",
@@ -54,6 +58,15 @@ _SUMMARY_METRICS = {
     "stream_transcode_duration": ("stream.transcode.duration", 60),
     "stream_transcode_completed": ("stream.transcode.completed", 60),
     "stream_transcode_failed": ("stream.transcode.failed", 60),
+    "stream_cache_bytes": ("stream.cache.bytes", 120),
+    "stream_cache_files": ("stream.cache.files", 120),
+    "stream_cache_bytes_removed": ("stream.cache.bytes_removed", 120),
+    "stream_cache_files_removed": ("stream.cache.files_removed", 120),
+    "stream_cache_orphan_files": ("stream.cache.orphan_files", 120),
+    "playback_startup_ms": ("playback.startup.ms", 15),
+    "playback_stalls": ("playback.stall.count", 15),
+    "playback_stall_ms": ("playback.stall.ms", 15),
+    "playback_recoveries": ("playback.recovery.count", 15),
     "home_cache_hit": ("home.cache.hit", 15),
     "home_cache_miss": ("home.cache.miss", 15),
     "home_cache_waited": ("home.cache.waited", 15),
@@ -110,36 +123,26 @@ def _build_metrics_summary() -> dict:
 
 
 def _build_metrics_system() -> dict:
-    import shutil
+    try:
+        from crate.storage_health import collect_storage_health
 
-    disk = {}
-    for label, path in [("music", "/music"), ("data", "/data")]:
-        try:
-            usage = shutil.disk_usage(path)
-            disk[label] = {
-                "total_gb": round(usage.total / (1024**3), 1),
-                "used_gb": round(usage.used / (1024**3), 1),
-                "free_gb": round(usage.free / (1024**3), 1),
-                "percent": round(usage.used / usage.total * 100, 1)
-                if usage.total
-                else 0,
-            }
-        except Exception:
-            disk[label] = None
+        disk = collect_storage_health()
+    except Exception:
+        disk = {}
 
     db_pool = {}
     db_pools = {"combined": {}, "sqlalchemy": {}, "legacy": {}}
     try:
-        from crate.db.engine import _engine
+        from crate.db.engine import get_pool_runtime
 
-        if _engine:
-            pool = _engine.pool
+        pool_runtime = get_pool_runtime()
+        if pool_runtime["configured"]:
             sqlalchemy_pool = {
-                "size": pool.size(),
-                "checked_in": pool.checkedin(),
-                "checked_out": pool.checkedout(),
-                "overflow": pool.overflow(),
-                "total": pool.checkedin() + pool.checkedout(),
+                "size": pool_runtime["size"],
+                "checked_in": pool_runtime["checked_in"],
+                "checked_out": pool_runtime["checked_out"],
+                "overflow": pool_runtime["overflow"],
+                "total": pool_runtime["checked_in"] + pool_runtime["checked_out"],
             }
             db_pools["sqlalchemy"] = sqlalchemy_pool
     except Exception:
@@ -223,6 +226,14 @@ def _build_metrics_system() -> dict:
     except Exception:
         media_worker = {}
 
+    artwork_variants = {}
+    try:
+        from crate.health_check import artwork_variant_health_sample
+
+        artwork_variants = artwork_variant_health_sample()
+    except Exception:
+        artwork_variants = {}
+
     return {
         "disk": disk,
         "db_pool": db_pool,
@@ -231,6 +242,7 @@ def _build_metrics_system() -> dict:
         "load": load,
         "resource_pressure": resource_pressure,
         "media_worker": media_worker,
+        "artwork_variants": artwork_variants,
     }
 
 

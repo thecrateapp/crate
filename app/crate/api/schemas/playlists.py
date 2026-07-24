@@ -14,6 +14,8 @@ class PlaylistTrackInput(IdentityFieldsMixin):
     entity_uid: str | None = None
     path: str | None = None
     title: str | None = None
+    global_track_uid: str | None = None
+    globalTrackUid: str | None = None
     artist: str | None = None
     album: str | None = None
     duration: float | int | None = None
@@ -84,6 +86,7 @@ class PlaylistTrackResponse(IdentityFieldsMixin):
     id: int | None = None
     playlist_id: int | None = None
     track_id: int | None = None
+    global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
     title: str | None = None

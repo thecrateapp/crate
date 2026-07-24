@@ -22,42 +22,86 @@ const (
 
 // Config holds all runtime configuration for the readplane service.
 type Config struct {
-	Addr            string
-	DatabaseURL     string
-	RedisURL        string
-	JWTSecret       string
-	Enabled         bool
-	MaxDBConns      int32
-	MinDBConns      int32
-	QueryTimeout    time.Duration
-	SnapshotMaxAge  time.Duration
-	StaleMaxAge     time.Duration
-	EnableSSE       bool
-	RouteMode       string
-	APIBase         string
-	FallbackEnabled bool
-	Version         string
+	Addr                           string
+	DatabaseURL                    string
+	RedisURL                       string
+	DurableRedisURL                string
+	JWTSecret                      string
+	Enabled                        bool
+	MaxDBConns                     int32
+	MinDBConns                     int32
+	QueryTimeout                   time.Duration
+	SnapshotMaxAge                 time.Duration
+	StaleMaxAge                    time.Duration
+	StatsSnapshotMaxAge            time.Duration
+	StatsStaleMaxAge               time.Duration
+	AuthCacheTTL                   time.Duration
+	AuthCacheMaxEntries            int
+	SessionTouchInterval           time.Duration
+	EnableSSE                      bool
+	RouteMode                      string
+	APIBase                        string
+	FallbackEnabled                bool
+	FallbackTimeout                time.Duration
+	FallbackFailureThreshold       int
+	FallbackOpenDuration           time.Duration
+	FederationProxyEnabled         bool
+	FederationAllowPrivateNetworks bool
+	ServiceToken                   string
+	FederationControlTimeout       time.Duration
+	FederationConnectTimeout       time.Duration
+	FederationHeaderTimeout        time.Duration
+	Version                        string
+	LocalMediaEnabled              bool
+	MusicRoot                      string
+	CacheRoot                      string
 }
 
 // Load reads environment variables and returns a populated Config.
 func Load(version string) Config {
 	return Config{
-		Addr:            stringEnv("READPLANE_ADDR", defaultAddr),
-		DatabaseURL:     databaseURL(),
-		RedisURL:        stringEnv("REDIS_URL", defaultRedisURL),
-		JWTSecret:       stringEnv("JWT_SECRET", ""),
-		Enabled:         boolEnv("READPLANE_ENABLED", true),
-		MaxDBConns:      int32Env("READPLANE_MAX_DB_CONNS", defaultMaxDBConns),
-		MinDBConns:      int32Env("READPLANE_MIN_DB_CONNS", defaultMinDBConns),
-		QueryTimeout:    msEnv("READPLANE_QUERY_TIMEOUT_MS", defaultQueryTimeoutMS),
-		SnapshotMaxAge:  secondsEnv("READPLANE_SNAPSHOT_MAX_AGE_SECONDS", defaultSnapshotMaxAgeSeconds),
-		StaleMaxAge:     secondsEnv("READPLANE_STALE_MAX_AGE_SECONDS", defaultStaleMaxAgeSeconds),
-		EnableSSE:       boolEnv("READPLANE_ENABLE_SSE", true),
-		RouteMode:       stringEnv("READPLANE_ROUTE_MODE", defaultRouteMode),
-		APIBase:         strings.TrimRight(stringEnv("API_FALLBACK_BASE", defaultFallbackBase), "/"),
-		FallbackEnabled: boolEnv("READPLANE_FALLBACK_ENABLED", true),
-		Version:         version,
+		Addr:                           stringEnv("READPLANE_ADDR", defaultAddr),
+		DatabaseURL:                    databaseURL(),
+		RedisURL:                       stringEnv("REDIS_CACHE_URL", stringEnv("REDIS_URL", defaultRedisURL)),
+		DurableRedisURL:                stringEnv("REDIS_DURABLE_URL", stringEnv("REDIS_URL", defaultRedisURL)),
+		JWTSecret:                      stringEnv("JWT_SECRET", ""),
+		Enabled:                        boolEnv("READPLANE_ENABLED", true),
+		MaxDBConns:                     int32Env("READPLANE_MAX_DB_CONNS", defaultMaxDBConns),
+		MinDBConns:                     int32Env("READPLANE_MIN_DB_CONNS", defaultMinDBConns),
+		QueryTimeout:                   msEnv("READPLANE_QUERY_TIMEOUT_MS", defaultQueryTimeoutMS),
+		SnapshotMaxAge:                 secondsEnv("READPLANE_SNAPSHOT_MAX_AGE_SECONDS", defaultSnapshotMaxAgeSeconds),
+		StaleMaxAge:                    secondsEnv("READPLANE_STALE_MAX_AGE_SECONDS", defaultStaleMaxAgeSeconds),
+		StatsSnapshotMaxAge:            secondsEnv("READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS", 300),
+		StatsStaleMaxAge:               secondsEnv("READPLANE_STATS_STALE_MAX_AGE_SECONDS", 86400),
+		AuthCacheTTL:                   secondsEnv("READPLANE_AUTH_CACHE_TTL_SECONDS", 15),
+		AuthCacheMaxEntries:            positiveIntEnv("READPLANE_AUTH_CACHE_MAX_ENTRIES", 2048),
+		SessionTouchInterval:           secondsEnv("READPLANE_SESSION_TOUCH_INTERVAL_SECONDS", 60),
+		EnableSSE:                      boolEnv("READPLANE_ENABLE_SSE", true),
+		RouteMode:                      stringEnv("READPLANE_ROUTE_MODE", defaultRouteMode),
+		APIBase:                        strings.TrimRight(stringEnv("API_FALLBACK_BASE", defaultFallbackBase), "/"),
+		FallbackEnabled:                boolEnv("READPLANE_FALLBACK_ENABLED", true),
+		FallbackTimeout:                msEnv("READPLANE_FALLBACK_TIMEOUT_MS", 3000),
+		FallbackFailureThreshold:       positiveIntEnv("READPLANE_FALLBACK_FAILURE_THRESHOLD", 5),
+		FallbackOpenDuration:           secondsEnv("READPLANE_FALLBACK_OPEN_SECONDS", 10),
+		FederationProxyEnabled:         boolEnv("READPLANE_FEDERATION_PROXY_ENABLED", true),
+		FederationAllowPrivateNetworks: boolEnv("CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS", false),
+		ServiceToken:                   stringEnv("CRATE_READPLANE_SERVICE_TOKEN", ""),
+		FederationControlTimeout:       msEnv("READPLANE_FEDERATION_CONTROL_TIMEOUT_MS", 2000),
+		FederationConnectTimeout:       msEnv("READPLANE_FEDERATION_CONNECT_TIMEOUT_MS", 5000),
+		FederationHeaderTimeout:        msEnv("READPLANE_FEDERATION_HEADER_TIMEOUT_MS", 10000),
+		Version:                        version,
+		LocalMediaEnabled:              boolEnv("READPLANE_LOCAL_MEDIA_ENABLED", false),
+		MusicRoot:                      absolutePathEnv("READPLANE_MUSIC_ROOT", "/music"),
+		CacheRoot:                      absolutePathEnv("READPLANE_CACHE_ROOT", "/cache"),
 	}
+}
+
+func absolutePathEnv(key string, fallback string) string {
+	value := stringEnv(key, fallback)
+	if !strings.HasPrefix(value, "/") {
+		return fallback
+	}
+	return strings.TrimRight(value, "/")
 }
 
 func databaseURL() string {
@@ -146,4 +190,12 @@ func intEnv(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func positiveIntEnv(key string, fallback int) int {
+	value := intEnv(key, fallback)
+	if value <= 0 {
+		return fallback
+	}
+	return value
 }

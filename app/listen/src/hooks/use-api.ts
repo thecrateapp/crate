@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { api } from "@/lib/api";
+import { catalogWarmingRetryDelayMs } from "../../../shared/web/use-api";
 import {
   cacheGet,
   cacheSet,
@@ -19,7 +20,21 @@ export interface UseApiState<T> {
   data: T | null;
   loading: boolean;
   error: string | null;
+  status?: number | null;
   refetch: () => void;
+}
+
+type HttpError = Error & { status?: number };
+
+const TRANSIENT_READ_RETRY_DELAYS_MS = [250, 750] as const;
+
+function transientReadRetryDelayMs(
+  error: unknown,
+  attempt: number,
+): number | null {
+  const status = (error as HttpError)?.status;
+  if (![502, 503, 504].includes(status ?? 0)) return null;
+  return TRANSIENT_READ_RETRY_DELAYS_MS[attempt] ?? null;
 }
 
 interface UseApiOptions {
@@ -87,6 +102,7 @@ export function useApi<T>(
   const [data, setData] = useState<T | null>(initialStateRef.current.data);
   const [loading, setLoading] = useState(initialStateRef.current.loading);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<number | null>(null);
   const [trigger, setTrigger] = useState(0);
   const urlRef = useRef(url);
   const dataUrlRef = useRef(url);
@@ -102,6 +118,7 @@ export function useApi<T>(
       setData(freshCache);
       setLoading(!freshCache && !!url);
       setError(null);
+      setStatus(null);
     }
   }, [url]);
 
@@ -112,17 +129,22 @@ export function useApi<T>(
     const controller = new AbortController();
     let cancelled = false;
     let cancelScheduledFetch: (() => void) | null = null;
+    let warmingRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    let transientRetryAttempt = 0;
     const hasCachedPayload =
       method === "GET" ? cacheGet<T>(requestUrl) !== null : false;
 
     // Only show loading if no cached data
     if (!data) setLoading(true);
     setError(null);
+    setStatus(null);
 
     const runFetch = () => {
       if (cancelled || controller.signal.aborted) return;
+      warmingRetryTimer = null;
       api<T>(requestUrl, method, body, { signal: controller.signal })
         .then((freshData) => {
+          transientRetryAttempt = 0;
           cacheSet(requestUrl, freshData);
           if (cancelled) return;
           if (urlRef.current !== requestUrl) return;
@@ -131,13 +153,28 @@ export function useApi<T>(
             setData(freshData);
           });
         })
-        .catch((e: Error) => {
+        .catch((e: HttpError) => {
+          const warmingRetryDelay =
+            method === "GET" ? catalogWarmingRetryDelayMs(e) : null;
+          const transientRetryDelay =
+            method === "GET" && warmingRetryDelay == null
+              ? transientReadRetryDelayMs(e, transientRetryAttempt)
+              : null;
+          const retryDelay = warmingRetryDelay ?? transientRetryDelay;
+          if (!cancelled && !controller.signal.aborted && retryDelay != null) {
+            if (transientRetryDelay != null) transientRetryAttempt += 1;
+            warmingRetryTimer = setTimeout(runFetch, retryDelay);
+            return;
+          }
           if (!cancelled && !controller.signal.aborted) {
-            setError(e.message);
+            const canServeCachedData =
+              method === "GET" && cacheGet<T>(requestUrl) !== null;
+            setError(canServeCachedData ? null : e.message);
+            setStatus(canServeCachedData ? null : e.status ?? null);
           }
         })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          if (!cancelled && warmingRetryTimer == null) setLoading(false);
         });
     };
 
@@ -155,6 +192,7 @@ export function useApi<T>(
     return () => {
       cancelled = true;
       cancelScheduledFetch?.();
+      if (warmingRetryTimer != null) clearTimeout(warmingRetryTimer);
       controller.abort();
     };
   }, [url, method, trigger, revalidateIfCached, idleRevalidateMs]);
@@ -219,6 +257,7 @@ export function useApi<T>(
     data: stateMatchesCurrentUrl ? data : cachedForCurrentUrl,
     loading: stateMatchesCurrentUrl ? loading : !cachedForCurrentUrl && !!url,
     error: stateMatchesCurrentUrl ? error : null,
+    status: stateMatchesCurrentUrl ? status : null,
     refetch,
   };
 }

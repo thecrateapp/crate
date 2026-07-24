@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import {
   getCrossfadeDurationPreference,
   setCrossfadeDurationPreference,
@@ -11,6 +11,7 @@ import {
   getSmartPlaylistSuggestionsCadencePreference,
   setSmartPlaylistSuggestionsCadencePreference,
   getPlaybackDeliveryPolicyPreference,
+  getEffectivePlaybackDeliveryPolicy,
   setPlaybackDeliveryPolicyPreference,
   getMobileEnhancedAudioPreference,
   setMobileEnhancedAudioPreference,
@@ -19,6 +20,13 @@ import {
 
 beforeEach(() => {
   localStorage.clear();
+});
+
+afterEach(() => {
+  Object.defineProperty(navigator, "connection", {
+    configurable: true,
+    value: undefined,
+  });
 });
 
 describe("crossfade", () => {
@@ -123,8 +131,9 @@ describe("smart playlist cadence", () => {
 });
 
 describe("playback delivery policy", () => {
-  it("defaults to original on desktop", () => {
-    expect(getPlaybackDeliveryPolicyPreference()).toBe("original");
+  it("defaults to auto while retaining the desktop original policy", () => {
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("auto");
+    expect(getEffectivePlaybackDeliveryPolicy()).toBe("original");
   });
 
   it("round-trips balanced", () => {
@@ -134,6 +143,26 @@ describe("playback delivery policy", () => {
 
   it("ignores invalid values", () => {
     localStorage.setItem("listen-player-delivery-policy", "invalid");
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("auto");
+  });
+
+  it("uses data saver automatically on a constrained connection", () => {
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      value: { effectiveType: "slow-2g", downlink: 0.5, rtt: 800 },
+    });
+
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("auto");
+    expect(getEffectivePlaybackDeliveryPolicy()).toBe("data_saver");
+  });
+
+  it("preserves an explicit quality preference over connection hints", () => {
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      value: { effectiveType: "slow-2g", downlink: 0.5, rtt: 800 },
+    });
+    setPlaybackDeliveryPolicyPreference("original");
+
     expect(getPlaybackDeliveryPolicyPreference()).toBe("original");
   });
 });

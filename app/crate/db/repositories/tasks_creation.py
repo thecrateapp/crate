@@ -95,7 +95,10 @@ def create_task_dedup(
     params: dict | None = None,
     dedup_key: str = "",
     dispatch: bool = True,
+    session=None,
     *,
+    priority: int | None = None,
+    pool: str | None = None,
     dispatch_task_fn: Callable[[str, str], None],
     dumps_fn: Callable[..., str],
     register_tasks_surface_signal_fn: Callable[[object], None],
@@ -108,15 +111,20 @@ def create_task_dedup(
     task_id = new_task_id()
     now = utc_now_iso()
 
-    priority, pool, max_duration, max_retries = task_runtime_config(task_type)
+    requested_priority = priority
+    default_priority, default_pool, max_duration, max_retries = task_runtime_config(
+        task_type
+    )
+    priority = default_priority if priority is None else priority
+    pool = default_pool if pool is None else pool
 
-    with transaction_scope() as session:
-        register_tasks_surface_signal_fn(session)
-        session.execute(
+    with optional_scope(session) as current:
+        register_tasks_surface_signal_fn(current)
+        current.execute(
             text("SELECT pg_advisory_xact_lock(hashtext(:dedup_lock_key))"),
             {"dedup_lock_key": dedup_lock_key},
         )
-        result = session.execute(
+        result = current.execute(
             text(
                 """
                 INSERT INTO tasks (
@@ -170,10 +178,32 @@ def create_task_dedup(
             },
         )
         if int(getattr(result, "rowcount", 0) or 0) == 0:
+            if requested_priority is not None:
+                current.execute(
+                    text(
+                        """
+                        UPDATE tasks
+                        SET priority = LEAST(priority, :priority), updated_at = :updated_at
+                        WHERE type = :type
+                          AND status = 'pending'
+                          AND (
+                              (:dedup_key <> '' AND dedup_key = :dedup_key)
+                              OR (:dedup_key = '' AND params_json = CAST(:params_json AS jsonb))
+                          )
+                        """
+                    ),
+                    {
+                        "type": task_type,
+                        "dedup_key": explicit_dedup_key,
+                        "params_json": params_json,
+                        "priority": requested_priority,
+                        "updated_at": now,
+                    },
+                )
             return None
 
         if dispatch:
-            register_after_commit(session, lambda: dispatch_task_fn(task_type, task_id))
+            register_after_commit(current, lambda: dispatch_task_fn(task_type, task_id))
 
     return task_id
 

@@ -37,6 +37,7 @@ interface PersonalizedRadioStation {
   play_count?: number;
   minutes_listened?: number;
   artist_id?: number | null;
+  global_artist_uid?: string | null;
   artist_entity_uid?: string | null;
   artist_slug?: string | null;
   artist_name?: string | null;
@@ -76,10 +77,13 @@ function stationArtwork(station: PersonalizedRadioStation): string | null {
   if (station.type === "genre") {
     return resolveMaybeApiAssetUrl(station.cover_url) || null;
   }
+  const explicitCover = resolveMaybeApiAssetUrl(station.cover_url);
+  if (explicitCover) return explicitCover;
   return (
     artistPhotoApiUrl(
       {
         artistId: station.artist_id,
+        globalArtistUid: station.global_artist_uid,
         artistEntityUid: station.artist_entity_uid,
         artistSlug: station.artist_slug,
         artistName: station.artist_name || station.seed_label,
@@ -244,7 +248,7 @@ export function RadioPage() {
             artist_entity_uid?: string;
             slug?: string;
           }[];
-        }>(`/api/search?q=${encodeURIComponent(q)}&limit=5`),
+        }>(`/api/catalog/search?q=${encodeURIComponent(q)}&limit=5`),
         api<{ slug: string; name: string }[]>("/api/genres"),
       ]);
       const items: SearchResult[] = [];
@@ -259,12 +263,15 @@ export function RadioPage() {
           type: "artist",
           value: a.entity_uid || String(a.id),
           label: a.name,
-          imageUrl: artistPhotoApiUrl({
-            artistId: a.id,
-            artistEntityUid: a.entity_uid,
-            artistSlug: a.slug,
-            artistName: a.name,
-          }),
+          imageUrl: artistPhotoApiUrl(
+            {
+              artistId: a.id,
+              artistEntityUid: a.entity_uid,
+              artistSlug: a.slug,
+              artistName: a.name,
+            },
+            { size: 128 },
+          ),
         });
       }
       for (const a of searchData.albums?.slice(0, 3) ?? []) {
@@ -272,14 +279,17 @@ export function RadioPage() {
           type: "album",
           value: a.entity_uid || String(a.id ?? 0),
           label: `${a.name} — ${a.artist}`,
-          imageUrl: albumCoverApiUrl({
-            albumId: a.id,
-            albumEntityUid: a.entity_uid,
-            artistEntityUid: a.artist_entity_uid,
-            albumSlug: a.slug,
-            albumName: a.name,
-            artistName: a.artist,
-          }),
+          imageUrl: albumCoverApiUrl(
+            {
+              albumId: a.id,
+              albumEntityUid: a.entity_uid,
+              artistEntityUid: a.artist_entity_uid,
+              albumSlug: a.slug,
+              albumName: a.name,
+              artistName: a.artist,
+            },
+            { size: 128 },
+          ),
         });
       }
       setResults(items);

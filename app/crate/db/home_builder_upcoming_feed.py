@@ -42,7 +42,10 @@ def _build_release_items(releases: list[dict], *, today) -> list[dict]:
 def _load_probable_setlists(
     artist_names: list[str], *, live_fetch_limit: int = 8
 ) -> dict[str, list[dict]]:
-    from crate.setlistfm import get_cached_probable_setlist, get_probable_setlist
+    from crate.setlistfm import (
+        get_cached_probable_setlist,
+        queue_probable_setlist_refreshes,
+    )
 
     probable_setlists: dict[str, list[dict]] = {}
     missing: list[str] = []
@@ -53,18 +56,8 @@ def _load_probable_setlists(
         else:
             missing.append(artist_name)
 
-    for artist_name in missing[:live_fetch_limit]:
-        try:
-            songs = get_probable_setlist(artist_name)
-        except Exception:
-            log.debug(
-                "Failed to load probable setlist for upcoming feed artist=%s",
-                artist_name,
-                exc_info=True,
-            )
-            continue
-        if songs:
-            probable_setlists[artist_name] = songs
+    if missing:
+        queue_probable_setlist_refreshes(missing[:live_fetch_limit])
     return probable_setlists
 
 

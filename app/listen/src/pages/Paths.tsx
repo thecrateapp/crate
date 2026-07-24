@@ -127,7 +127,7 @@ function EndpointPanel({
             artist_entity_uid?: string;
             artist_slug?: string;
           }[];
-        }>(`/api/search?q=${encodeURIComponent(q)}&limit=5`),
+        }>(`/api/catalog/search?q=${encodeURIComponent(q)}&limit=5`),
         api<{ slug: string; name: string }[]>("/api/genres"),
       ]);
 
@@ -146,12 +146,15 @@ function EndpointPanel({
           artistId: a.id,
           artistEntityUid: a.entity_uid,
           artistSlug: a.slug,
-          imageUrl: artistPhotoApiUrl({
-            artistId: a.id,
-            artistEntityUid: a.entity_uid,
-            artistSlug: a.slug,
-            artistName: a.name,
-          }),
+          imageUrl: artistPhotoApiUrl(
+            {
+              artistId: a.id,
+              artistEntityUid: a.entity_uid,
+              artistSlug: a.slug,
+              artistName: a.name,
+            },
+            { size: 128 },
+          ),
         });
       }
       for (const a of searchData.albums?.slice(0, 3) ?? []) {
@@ -162,13 +165,16 @@ function EndpointPanel({
           albumId: a.album_id ?? a.id,
           albumEntityUid: a.entity_uid,
           artistEntityUid: a.artist_entity_uid,
-          imageUrl: albumCoverApiUrl({
-            albumId: a.album_id ?? a.id,
-            albumEntityUid: a.entity_uid,
-            artistEntityUid: a.artist_entity_uid,
-            albumName: a.name,
-            artistName: a.artist,
-          }),
+          imageUrl: albumCoverApiUrl(
+            {
+              albumId: a.album_id ?? a.id,
+              albumEntityUid: a.entity_uid,
+              artistEntityUid: a.artist_entity_uid,
+              albumName: a.name,
+              artistName: a.artist,
+            },
+            { size: 128 },
+          ),
         });
       }
       for (const t of searchData.tracks?.slice(0, 2) ?? []) {
@@ -182,10 +188,13 @@ function EndpointPanel({
           artistEntityUid: t.artist_entity_uid,
           imageUrl:
             t.album_id || t.album_entity_uid
-              ? albumCoverApiUrl({
-                  albumId: t.album_id,
-                  albumEntityUid: t.album_entity_uid,
-                })
+              ? albumCoverApiUrl(
+                  {
+                    albumId: t.album_id,
+                    albumEntityUid: t.album_entity_uid,
+                  },
+                  { size: 128 },
+                )
               : undefined,
         });
       }
@@ -404,11 +413,14 @@ export function Paths() {
         toPlayableTrack(t, {
           cover:
             t.album_id || t.album_entity_uid
-              ? albumCoverApiUrl({
-                  albumId: t.album_id,
-                  albumEntityUid: t.album_entity_uid,
-                  artistEntityUid: t.artist_entity_uid,
-                })
+              ? albumCoverApiUrl(
+                  {
+                    albumId: t.album_id,
+                    albumEntityUid: t.album_entity_uid,
+                    artistEntityUid: t.artist_entity_uid,
+                  },
+                  { size: 512 },
+                )
               : undefined,
         }),
       );

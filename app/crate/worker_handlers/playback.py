@@ -2,21 +2,33 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import time
 
 from crate.db.cache_runtime import get_redis
 from crate.db.cache_settings import get_setting
 from crate.db.events import emit_task_event
-from crate.db.repositories.streaming import mark_variant_running
+from crate.db.repositories.streaming import (
+    list_recent_local_delivery_tracks,
+    mark_variant_running,
+)
+from crate.streaming.service import prepare_playback
+from crate.streaming.maintenance import cleanup_stream_variants
 from crate.streaming.transcode import transcode_variant
 from crate.task_progress import TaskProgress, emit_progress
-from crate.worker_handlers import TaskHandler
+from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
 
 _TRANSCODE_SLOT_KEY = "crate:stream_transcode_slots"
 _TRANSCODE_SLOT_TTL_SECONDS = 1200
 _TRANSCODE_SLOT_WAIT_SECONDS = 600
+_WARMUP_DEFAULT_LIMIT = 25
+_WARMUP_MAX_LIMIT = 100
+_WARMUP_DEFAULT_MAX_SOURCE_BYTES = 1024 * 1024 * 1024
+_WARMUP_MAX_SOURCE_BYTES = 5 * 1024 * 1024 * 1024
+_WARMUP_DEFAULT_MAX_SECONDS = 60
+_WARMUP_MAX_SECONDS = 600
 
 
 def _max_concurrent_transcodes(config: dict) -> int:
@@ -30,6 +42,33 @@ def _max_concurrent_transcodes(config: dict) -> int:
         return max(1, min(int(raw or 1), 4))
     except (TypeError, ValueError):
         return 1
+
+
+def _playback_warmup_enabled() -> bool:
+    return os.environ.get("CRATE_PLAYBACK_WARMUP_ENABLED", "false").lower() == "true"
+
+
+def _has_warmup_disk_headroom() -> bool:
+    raw_minimum_gb = os.environ.get("CRATE_PLAYBACK_WARMUP_MIN_FREE_GB", "20")
+    try:
+        minimum_bytes = max(0, float(raw_minimum_gb)) * 1024**3
+    except ValueError:
+        minimum_bytes = 20 * 1024**3
+    try:
+        return shutil.disk_usage("/music").free >= minimum_bytes
+    except OSError:
+        log.warning("Unable to inspect free disk before playback warmup")
+        return False
+
+
+def _bounded_int(
+    params: dict, key: str, default: int, maximum: int, *, minimum: int = 1
+) -> int:
+    try:
+        value = int(params.get(key, default))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(value, maximum))
 
 
 def prune_stream_transcode_slots() -> None:
@@ -201,6 +240,66 @@ def _handle_prepare_stream_variant(task_id: str, params: dict, config: dict) -> 
         _release_slot(task_id)
 
 
+def _handle_warmup_stream_variants(task_id: str, params: dict, config: dict) -> dict:
+    """Queue a small, explicitly enabled set of local playback variants."""
+    if not _playback_warmup_enabled():
+        return {"status": "disabled", "enqueued": 0, "skipped": 0}
+    if not _has_warmup_disk_headroom():
+        return {"status": "insufficient_disk", "enqueued": 0, "skipped": 0}
+
+    limit = _bounded_int(params, "limit", _WARMUP_DEFAULT_LIMIT, _WARMUP_MAX_LIMIT)
+    max_source_bytes = _bounded_int(
+        params,
+        "max_source_bytes",
+        _WARMUP_DEFAULT_MAX_SOURCE_BYTES,
+        _WARMUP_MAX_SOURCE_BYTES,
+    )
+    max_seconds = _bounded_int(
+        params,
+        "max_seconds",
+        _WARMUP_DEFAULT_MAX_SECONDS,
+        _WARMUP_MAX_SECONDS,
+    )
+    include_data_saver = bool(params.get("include_data_saver", False))
+    started_at = time.monotonic()
+    consumed_source_bytes = 0
+    enqueued = 0
+    skipped = 0
+
+    def warm(policy: str) -> None:
+        nonlocal consumed_source_bytes, enqueued, skipped
+        for track in list_recent_local_delivery_tracks(limit):
+            if is_cancelled(task_id) or time.monotonic() - started_at >= max_seconds:
+                return
+            try:
+                source_size = max(0, int(track.get("size") or 0))
+            except (TypeError, ValueError):
+                source_size = 0
+            if consumed_source_bytes + source_size > max_source_bytes:
+                skipped += 1
+                continue
+            resolution = prepare_playback(track, policy, reason="lookahead")
+            if resolution is None or not resolution.preparing:
+                skipped += 1
+                continue
+            consumed_source_bytes += source_size
+            enqueued += 1
+
+    warm("balanced")
+    if include_data_saver and not is_cancelled(task_id):
+        warm("data_saver")
+
+    status = "cancelled" if is_cancelled(task_id) else "completed"
+    return {"status": status, "enqueued": enqueued, "skipped": skipped}
+
+
+def _handle_cleanup_stream_variants(task_id: str, params: dict, config: dict) -> dict:
+    del task_id, params, config
+    return cleanup_stream_variants()
+
+
 PLAYBACK_TASK_HANDLERS: dict[str, TaskHandler] = {
     "prepare_stream_variant": _handle_prepare_stream_variant,
+    "warmup_stream_variants": _handle_warmup_stream_variants,
+    "cleanup_stream_variants": _handle_cleanup_stream_variants,
 }

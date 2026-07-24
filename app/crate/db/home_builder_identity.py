@@ -2,6 +2,9 @@ from __future__ import annotations
 
 
 def _artist_identity(row: dict) -> object | None:
+    global_artist_uid = (row.get("global_artist_uid") or "").strip().lower()
+    if global_artist_uid:
+        return ("global", global_artist_uid)
     artist_slug = (row.get("artist_slug") or "").strip().lower()
     if artist_slug:
         return ("slug", artist_slug)
@@ -16,6 +19,9 @@ def _artist_identity(row: dict) -> object | None:
 
 def _album_identity(row: dict) -> object | None:
     artist_identity = _artist_identity(row)
+    global_album_uid = (row.get("global_album_uid") or "").strip().lower()
+    if global_album_uid:
+        return ("global", global_album_uid)
     album_slug = (row.get("album_slug") or "").strip().lower()
     if album_slug:
         return ("slug", artist_identity, album_slug)

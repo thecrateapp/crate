@@ -1,3 +1,14 @@
+---
+title: Frontend architecture: Admin and Listen
+summary: Separate application responsibilities and shared UI boundaries.
+section: architecture
+audience: [developer]
+status: canonical
+order: 97
+verified: 2026-07-21
+sources: [app/ui, app/listen, app/shared/ui, app/shared/web]
+---
+
 # Frontend Architecture: Admin and Listen
 
 ## Two products, one backend

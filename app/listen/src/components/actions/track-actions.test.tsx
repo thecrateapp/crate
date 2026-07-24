@@ -42,6 +42,7 @@ vi.mock("@/lib/radio", () => ({
 
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";
+import { fetchTrackRadio } from "@/lib/radio";
 import { SHARE_REQUEST_EVENT, type SharePayload } from "@/lib/social-share";
 
 function i18nWrapper(locale: ListenLocale = "es") {
@@ -53,6 +54,7 @@ function i18nWrapper(locale: ListenLocale = "es") {
 describe("useTrackActionEntries", () => {
   beforeEach(() => {
     navigateMock.mockReset();
+    vi.mocked(fetchTrackRadio).mockReset();
   });
 
   it("shares tracks through Crate's share sheet with the public preview URL", async () => {
@@ -136,6 +138,54 @@ describe("useTrackActionEntries", () => {
       }
       expect(action.disabled).toBe(false);
     }
+  });
+
+  it("enables global actions for remote tracks without enabling local-only actions", async () => {
+    vi.mocked(fetchTrackRadio).mockResolvedValue({
+      tracks: [],
+      source: { type: "radio", name: "Remote Radio" },
+    });
+    const { result } = renderHook(() =>
+      useTrackActionEntries({
+        track: {
+          id: "11111111-1111-4111-8111-111111111111",
+          global_track_uid: "11111111-1111-4111-8111-111111111111",
+          title: "Talk for Hours",
+          artist: "High Vis",
+        },
+      }),
+    );
+
+    const byKey = (key: string) => {
+      const entry = result.current.find((item) => item.key === key);
+      if (
+        !entry ||
+        entry.type === "divider" ||
+        entry.type === "label" ||
+        entry.type === "disclosure"
+      ) {
+        throw new Error(`${key} action missing`);
+      }
+      return entry;
+    };
+
+    expect(byKey("like").disabled).toBe(false);
+    expect(byKey("offline").disabled).toBe(true);
+    expect(byKey("download").disabled).toBe(true);
+    expect(byKey("radio").disabled).toBe(false);
+    expect(byKey("share").disabled).toBe(false);
+
+    await act(async () => {
+      await byKey("radio").onSelect();
+    });
+
+    expect(fetchTrackRadio).toHaveBeenCalledWith({
+      libraryTrackId: null,
+      globalTrackUid: "11111111-1111-4111-8111-111111111111",
+      entityUid: null,
+      path: undefined,
+      title: "Talk for Hours",
+    });
   });
 
   it("localizes track action labels", () => {

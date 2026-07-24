@@ -496,10 +496,10 @@ class TestBlissStorage:
         vec2 = make_vec(0.2)
 
         with patch(
-            "crate.db.queries.bliss_storage.refresh_artist_bliss_centroids_for_track_ids",
+            "crate.db.jobs.bliss_storage.refresh_artist_bliss_centroids_for_track_ids",
             return_value=2,
         ) as mock_refresh:
-            from crate.db.queries.bliss_storage import store_bliss_vectors
+            from crate.db.jobs.bliss_storage import store_bliss_vectors
 
             store_bliss_vectors({t1_path: vec1, t2_path: vec2})
 
@@ -544,10 +544,10 @@ class TestBlissStorage:
         new_vec = make_vec(0.9)
 
         with patch(
-            "crate.db.queries.bliss_storage.refresh_artist_bliss_centroids_for_track_ids",
+            "crate.db.jobs.bliss_storage.refresh_artist_bliss_centroids_for_track_ids",
             return_value=0,
         ) as mock_refresh:
-            from crate.db.queries.bliss_storage import store_bliss_vectors
+            from crate.db.jobs.bliss_storage import store_bliss_vectors
 
             store_bliss_vectors({t_path: new_vec})
 
@@ -562,9 +562,9 @@ class TestBlissStorage:
 
     def test_store_bliss_vectors_empty(self, pg_db):
         with patch(
-            "crate.db.queries.bliss_storage.refresh_artist_bliss_centroids_for_track_ids",
+            "crate.db.jobs.bliss_storage.refresh_artist_bliss_centroids_for_track_ids",
         ) as mock_refresh:
-            from crate.db.queries.bliss_storage import store_bliss_vectors
+            from crate.db.jobs.bliss_storage import store_bliss_vectors
 
             store_bliss_vectors({})
 
@@ -1307,6 +1307,7 @@ class TestBlissSimilarityCandidates:
         _set_bliss_embedding(seed_id, make_vec(0.0))
         _set_bliss_embedding(keep_id, make_vec(0.1))
 
+        _insert_artist(pg_db, ".crate-trash")
         hidden_album_id = _insert_album(
             pg_db,
             ".crate-trash",
@@ -1324,6 +1325,7 @@ class TestBlissSimilarityCandidates:
         )
         _set_bliss_embedding(hidden_id, make_vec_near(0.0))
 
+        _insert_artist(pg_db, "Multi Quarantine")
         quarantine_album_id = _insert_album(
             pg_db,
             "Multi Quarantine",

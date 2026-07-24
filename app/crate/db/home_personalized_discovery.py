@@ -22,6 +22,13 @@ from crate.db.home_context import (
     merged_artists_from_context,
     recent_releases_from_context,
 )
+from crate.db.home_builder_global_recommendations import (
+    global_artist_uids_from_context,
+    global_recommended_track_rows,
+    global_suggested_albums,
+    merge_global_track_rows,
+    merge_suggested_albums,
+)
 from crate.db.home_personalized_collections import (
     get_home_favorite_artists,
     get_home_recently_played,
@@ -36,6 +43,8 @@ def _build_home_recommended_tracks(
     interest_artists_lower: list[str],
     top_genres_lower: list[str],
     limit: int,
+    global_artist_uids: list[str] | None = None,
+    global_track_rows: list[dict] | None = None,
 ) -> list[dict]:
     discovery_fallback = _query_discovery_tracks(
         user_id,
@@ -49,12 +58,28 @@ def _build_home_recommended_tracks(
             interest_artists_lower=interest_artists_lower,
             limit=max(limit * 4, 80),
         )
-    return _build_recommended_tracks(
+    local_rows = _build_recommended_tracks(
         user_id,
         recent_releases=recent_releases,
         interest_artists_lower=interest_artists_lower,
         limit=limit,
         fallback_tracks=discovery_fallback,
+    )
+    if len(local_rows) >= limit:
+        return local_rows
+    return merge_global_track_rows(
+        local_rows,
+        global_track_rows
+        if global_track_rows is not None
+        else global_recommended_track_rows(global_artist_uids or [], limit=limit),
+        limit=limit,
+    )
+
+
+def _global_home_track_rows(context: dict, *, limit: int) -> list[dict]:
+    return global_recommended_track_rows(
+        global_artist_uids_from_context(context),
+        limit=limit,
     )
 
 
@@ -92,6 +117,9 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
                 top_genres_lower=top_genres_lower,
                 mix_count=limit,
                 recent_releases=recent_releases,
+                global_track_rows=_global_home_track_rows(
+                    context, limit=max(limit * 8, 64)
+                ),
             ),
         }
 
@@ -110,6 +138,7 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
             interest_artists_lower=interest_artists_lower,
             top_genres_lower=top_genres_lower,
             limit=limit,
+            global_artist_uids=global_artist_uids_from_context(context),
         )
         return {
             "id": section_id,
@@ -185,13 +214,15 @@ def build_home_discovery_payload(user_id: int) -> dict:
     if my_new_arrivals_mix[0] and my_new_arrivals_mix[2]:
         precomputed_mixes["my-new-arrivals"] = my_new_arrivals_mix
 
-    suggested_albums = _build_suggested_albums(recent_releases, 14)
+    suggested_albums = _build_home_suggested_albums(recent_releases, 14)
+    global_track_rows = _global_home_track_rows(context, limit=64)
     recommended_tracks = _build_home_recommended_tracks(
         user_id,
         recent_releases=recent_releases,
         interest_artists_lower=interest_artists_lower,
         top_genres_lower=top_genres_lower,
         limit=18,
+        global_track_rows=global_track_rows,
     )
     custom_mixes = _build_custom_mix_summaries(
         user_id,
@@ -201,6 +232,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
         mix_count=8,
         recent_releases=recent_releases,
         precomputed_mixes=precomputed_mixes,
+        global_track_rows=global_track_rows,
     )
     merged_artists = merged_artists_from_context(context)
     discovery_artists = _build_core_discovery_artists(
@@ -228,6 +260,15 @@ def build_home_discovery_payload(user_id: int) -> dict:
             user_id, lookup_limit=120, item_limit=12, followed=followed
         ),
     }
+
+
+def _build_home_suggested_albums(recent_releases: list[dict], limit: int) -> list[dict]:
+    local_albums = _build_suggested_albums(recent_releases, limit)
+    return merge_suggested_albums(
+        local_albums,
+        global_suggested_albums(limit),
+        limit=limit,
+    )
 
 
 __all__ = [
