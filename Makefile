@@ -731,10 +731,28 @@ _create-dirs:
 # ===========================================================================
 
 # Defaults to the short SHA tag published by GitHub Actions for origin/main.
-# Overrides: DEPLOY_IMAGE_TAG=<tag>, DEPLOY_REF=<git-ref>, DEPLOY_IMAGE_OWNER=<owner>, DEPLOY_PUBLIC_CHECKS=0.
+# VERSION=<full-main-sha> pins compose and every application image to one release.
+# Lower-level overrides remain available for development and incident recovery:
+# DEPLOY_IMAGE_TAG=<tag>, DEPLOY_REF=<git-ref>, DEPLOY_IMAGE_OWNER=<owner>, DEPLOY_PUBLIC_CHECKS=0.
 .PHONY: deploy
-deploy: ## Deploy origin/main GHCR images by SHA, verify health, rollback on failure
-	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh
+deploy: ## Deploy a release (usage: make deploy VERSION=<full-main-sha>)
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_VERSION='$(strip $(VERSION))' DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_ID="$(DEPLOY_ID)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh deploy
+
+.PHONY: deploy-preflight
+deploy-preflight: ## Validate a release and production readiness without changing the stack
+	@test -n "$(strip $(VERSION))" || { echo "$(RED)VERSION=<full-main-sha> is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_VERSION='$(strip $(VERSION))' DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_ID="$(DEPLOY_ID)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh preflight
+
+.PHONY: deploy-recovery-snapshot
+deploy-recovery-snapshot: ## Quiesce production and capture DB, durable Redis, config and images
+	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<release-id> is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh recovery-snapshot
+
+.PHONY: deploy-rollback
+deploy-rollback: ## Restore a recovery set (requires CONFIRM=restore-production)
+	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<release-id> is required$(NC)"; exit 1; }
+	@test "$(CONFIRM)" = "restore-production" || { echo "$(RED)CONFIRM=restore-production is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh rollback
 
 .PHONY: deploy-build
 deploy-build: ## Deploy by building on the server (GHCR fallback)

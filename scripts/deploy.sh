@@ -2,12 +2,15 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ACTION="${1:-deploy}"
 SERVER_USER="${SERVER_USER:-crate}"
 SERVER_HOST="${SERVER_HOST:-95.216.3.27}"
 SERVER_PATH="${SERVER_PATH:-/home/crate/crate}"
 REMOTE="${SERVER_USER}@${SERVER_HOST}"
-DEPLOY_ID="${DEPLOY_ID:-$(date -u +%Y%m%d-%H%M%S)}"
+DEPLOY_ID="${DEPLOY_ID:-}"
+DEPLOY_VERSION="${DEPLOY_VERSION:-}"
 DEPLOY_REF="${DEPLOY_REF:-origin/main}"
+DEPLOY_CONFIRM="${DEPLOY_CONFIRM:-}"
 DEPLOY_IMAGE_OWNER="${DEPLOY_IMAGE_OWNER:-}"
 DEPLOY_IMAGE_REGISTRY="${DEPLOY_IMAGE_REGISTRY:-}"
 DEPLOY_PUBLIC_CHECKS="${DEPLOY_PUBLIC_CHECKS:-1}"
@@ -15,6 +18,7 @@ DEPLOY_SKIP_IMAGE_CHECK="${DEPLOY_SKIP_IMAGE_CHECK:-0}"
 DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
 DEPLOY_IMAGE_WAIT_INTERVAL="${DEPLOY_IMAGE_WAIT_INTERVAL:-20}"
 REMOTE_SCRIPT_PATH="${SERVER_PATH}/.deploy/deploy-remote.sh"
+DEPLOY_CANDIDATE_DIR=""
 TMP_DIR=""
 ROLLBACK_ENABLED=1
 REQUIRED_IMAGE_NAMES=(
@@ -57,7 +61,7 @@ ssh_remote() {
 
 remote_deploy() {
   ssh_remote \
-    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' DEPLOY_HEALTH_WAIT_SECONDS='${DEPLOY_HEALTH_WAIT_SECONDS:-420}' '$REMOTE_SCRIPT_PATH' '$1'"
+    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_CANDIDATE_DIR='$DEPLOY_CANDIDATE_DIR' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_CONFIRM='$DEPLOY_CONFIRM' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' DEPLOY_HEALTH_WAIT_SECONDS='${DEPLOY_HEALTH_WAIT_SECONDS:-420}' '$REMOTE_SCRIPT_PATH' '$1'"
 }
 
 env_file_value() {
@@ -102,8 +106,30 @@ resolve_repo_owner_from_remote() {
 }
 
 resolve_image_tag() {
+  local resolved_version
+  local version_tag
+
   if [[ "${DEPLOY_SKIP_GIT_FETCH:-0}" != "1" ]]; then
     git -C "$ROOT_DIR" fetch --quiet origin main
+  fi
+
+  if [[ -n "$DEPLOY_VERSION" ]]; then
+    if [[ ! "$DEPLOY_VERSION" =~ ^[0-9a-f]{40}$ ]]; then
+      fail "VERSION must be a full 40-character lowercase Git commit SHA"
+    fi
+    resolved_version="$(git -C "$ROOT_DIR" rev-parse "${DEPLOY_VERSION}^{commit}" 2>/dev/null || true)"
+    if [[ "$resolved_version" != "$DEPLOY_VERSION" ]]; then
+      fail "VERSION does not resolve to the requested commit: ${DEPLOY_VERSION}"
+    fi
+    if ! git -C "$ROOT_DIR" merge-base --is-ancestor "$resolved_version" origin/main; then
+      fail "VERSION must be reachable from origin/main: ${DEPLOY_VERSION}"
+    fi
+    DEPLOY_REF="$resolved_version"
+    version_tag="$(git -C "$ROOT_DIR" rev-parse --short=7 "$resolved_version")"
+    if [[ -n "${DEPLOY_IMAGE_TAG:-}" && "$DEPLOY_IMAGE_TAG" != "$version_tag" ]]; then
+      fail "DEPLOY_IMAGE_TAG=${DEPLOY_IMAGE_TAG} does not match VERSION tag ${version_tag}"
+    fi
+    DEPLOY_IMAGE_TAG="$version_tag"
   fi
 
   if [[ -z "${DEPLOY_IMAGE_TAG:-}" ]]; then
@@ -125,6 +151,48 @@ resolve_image_tag() {
   DEPLOY_IMAGE_REGISTRY="${DEPLOY_IMAGE_REGISTRY:-ghcr.io}"
 
   export DEPLOY_IMAGE_TAG DEPLOY_IMAGE_SHA DEPLOY_IMAGE_OWNER DEPLOY_IMAGE_REGISTRY
+}
+
+require_deploy_id() {
+  if [[ -z "$DEPLOY_ID" ]]; then
+    fail "DEPLOY_ID is required for ${ACTION}"
+  fi
+  if [[ ! "$DEPLOY_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$ ]]; then
+    fail "DEPLOY_ID must use only letters, digits, dot, underscore or dash"
+  fi
+}
+
+prepare_remote_script() {
+  log "Checking remote host"
+  ssh_remote "mkdir -p '$SERVER_PATH' '$SERVER_PATH/.deploy' && command -v docker >/dev/null && docker compose version >/dev/null"
+  scp "$ROOT_DIR/scripts/deploy-remote.sh" "$REMOTE:$REMOTE_SCRIPT_PATH"
+  ssh_remote "chmod +x '$REMOTE_SCRIPT_PATH'"
+}
+
+stage_remote_preflight_payload() {
+  DEPLOY_CANDIDATE_DIR="${SERVER_PATH}/.deploy/preflight-${DEPLOY_ID}"
+  ssh_remote "rm -rf '$DEPLOY_CANDIDATE_DIR' && mkdir -p '$DEPLOY_CANDIDATE_DIR'"
+  scp \
+    "$TMP_DIR/docker-compose.yaml" \
+    "$TMP_DIR/docker-compose.project.yaml" \
+    "$REMOTE:$DEPLOY_CANDIDATE_DIR/"
+}
+
+resolve_remote_release_settings() {
+  local remote_tag
+  local remote_owner
+  local remote_registry
+
+  remote_tag="$(ssh_remote "grep -E '^CRATE_IMAGE_TAG=' '$SERVER_PATH/.env' 2>/dev/null | tail -n 1 | cut -d= -f2-" || true)"
+  remote_owner="$(ssh_remote "grep -E '^CRATE_IMAGE_OWNER=' '$SERVER_PATH/.env' 2>/dev/null | tail -n 1 | cut -d= -f2-" || true)"
+  remote_registry="$(ssh_remote "grep -E '^CRATE_IMAGE_REGISTRY=' '$SERVER_PATH/.env' 2>/dev/null | tail -n 1 | cut -d= -f2-" || true)"
+  DEPLOY_IMAGE_TAG="${DEPLOY_IMAGE_TAG:-$remote_tag}"
+  DEPLOY_IMAGE_OWNER="${DEPLOY_IMAGE_OWNER:-${remote_owner:-thecrateapp}}"
+  DEPLOY_IMAGE_REGISTRY="${DEPLOY_IMAGE_REGISTRY:-${remote_registry:-ghcr.io}}"
+  if [[ -z "$DEPLOY_IMAGE_TAG" ]]; then
+    fail "CRATE_IMAGE_TAG is missing from the production .env"
+  fi
+  export DEPLOY_IMAGE_TAG DEPLOY_IMAGE_OWNER DEPLOY_IMAGE_REGISTRY
 }
 
 prepare_payload() {
@@ -248,14 +316,26 @@ rollback_on_error() {
   exit "$exit_code"
 }
 
-main() {
+run_preflight() {
+  local_preflight
+  DEPLOY_ID="${DEPLOY_ID:-preflight-$(date -u +%Y%m%d-%H%M%S)}"
+  require_deploy_id
+  prepare_remote_script
+  stage_remote_preflight_payload
+  remote_deploy release-preflight
+  ssh_remote "rm -rf '$DEPLOY_CANDIDATE_DIR'"
+  log "Deploy preflight completed successfully"
+}
+
+run_deploy() {
+  DEPLOY_ID="${DEPLOY_ID:-$(date -u +%Y%m%d-%H%M%S)}"
+  require_deploy_id
   local_preflight
 
-  log "Checking remote host"
-  ssh_remote "mkdir -p '$SERVER_PATH' '$SERVER_PATH/.deploy' && command -v docker >/dev/null && docker compose version >/dev/null"
-
-  scp "$ROOT_DIR/scripts/deploy-remote.sh" "$REMOTE:$REMOTE_SCRIPT_PATH"
-  ssh_remote "chmod +x '$REMOTE_SCRIPT_PATH'"
+  prepare_remote_script
+  stage_remote_preflight_payload
+  remote_deploy release-preflight
+  ssh_remote "rm -rf '$DEPLOY_CANDIDATE_DIR'"
 
   remote_deploy backup
   trap rollback_on_error EXIT
@@ -275,4 +355,31 @@ main() {
   remote_deploy ps
 }
 
-main "$@"
+run_recovery_snapshot() {
+  require_deploy_id
+  prepare_remote_script
+  resolve_remote_release_settings
+  remote_deploy recovery-snapshot
+  log "Recovery snapshot ${DEPLOY_ID} completed; production remains quiesced for deploy"
+}
+
+run_rollback() {
+  require_deploy_id
+  if [[ "$DEPLOY_CONFIRM" != "restore-production" ]]; then
+    fail "rollback requires DEPLOY_CONFIRM=restore-production"
+  fi
+  prepare_remote_script
+  resolve_remote_release_settings
+  remote_deploy state-rollback
+  log "Production rollback ${DEPLOY_ID} completed"
+}
+
+case "$ACTION" in
+  deploy) run_deploy ;;
+  preflight) run_preflight ;;
+  recovery-snapshot) run_recovery_snapshot ;;
+  rollback) run_rollback ;;
+  *)
+    fail "unknown action '${ACTION}' (expected deploy, preflight, recovery-snapshot or rollback)"
+    ;;
+esac
