@@ -24,9 +24,7 @@ def test_deploy_version_forwards_one_commit_to_the_release_script() -> None:
         "VERSION=0123456789abcdef0123456789abcdef01234567",
     )
 
-    assert (
-        "DEPLOY_VERSION='0123456789abcdef0123456789abcdef01234567'" in output
-    )
+    assert "DEPLOY_VERSION='0123456789abcdef0123456789abcdef01234567'" in output
     assert "scripts/deploy.sh deploy" in output
 
 
@@ -36,9 +34,7 @@ def test_deploy_preflight_uses_the_same_versioned_release_contract() -> None:
         "VERSION=0123456789abcdef0123456789abcdef01234567",
     )
 
-    assert (
-        "DEPLOY_VERSION='0123456789abcdef0123456789abcdef01234567'" in output
-    )
+    assert "DEPLOY_VERSION='0123456789abcdef0123456789abcdef01234567'" in output
     assert "scripts/deploy.sh preflight" in output
 
 
@@ -54,9 +50,9 @@ def test_preflight_validates_candidate_compose_with_production_environment() -> 
 
 def test_deploy_cannot_bypass_remote_release_preflight() -> None:
     script = (ROOT / "scripts/deploy.sh").read_text()
-    deploy_body = script[script.index("run_deploy() {") : script.index(
-        "run_recovery_snapshot() {"
-    )]
+    deploy_body = script[
+        script.index("run_deploy() {") : script.index("run_recovery_snapshot() {")
+    ]
 
     assert "stage_remote_preflight_payload" in deploy_body
     assert "remote_deploy release-preflight" in deploy_body
@@ -83,9 +79,9 @@ def test_production_rollback_requires_destructive_confirmation() -> None:
 
 def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
-    snapshot_body = script[script.index("cmd_recovery_snapshot() {") : script.index(
-        "cmd_config() {"
-    )]
+    snapshot_body = script[
+        script.index("cmd_recovery_snapshot() {") : script.index("cmd_config() {")
+    ]
 
     assert "cmd_recovery_snapshot" in script
     assert "pg_dump" in script
@@ -99,9 +95,9 @@ def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
 
 def test_remote_state_rollback_restores_database_before_old_images() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
-    rollback_body = script[script.index("cmd_state_rollback() {") : script.index(
-        "cmd_cleanup() {"
-    )]
+    rollback_body = script[
+        script.index("cmd_state_rollback() {") : script.index("cmd_cleanup() {")
+    ]
 
     assert "cmd_state_rollback" in script
     assert "pg_restore" in script
