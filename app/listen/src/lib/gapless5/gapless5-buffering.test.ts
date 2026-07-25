@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  Gapless5,
   getBufferedAheadSeconds,
   getLoadableTrackIndices,
 } from "@/lib/gapless5/gapless5";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function ranges(values: Array<[number, number]>): TimeRanges {
   return {
@@ -57,5 +62,30 @@ describe("getLoadableTrackIndices", () => {
 
   it("keeps the unlimited mode bounded to real source indices", () => {
     expect(getLoadableTrackIndices(0, 3, -1)).toEqual([0, 1, 2]);
+  });
+});
+
+describe("Gapless5.replaceTrack", () => {
+  it("preserves the active cursor when refreshing the next source", () => {
+    vi.useFakeTimers();
+    const player = new Gapless5({
+      tracks: ["one", "two", "three", "four", "five"],
+      startingTrack: 3,
+      useHTML5Audio: false,
+      useWebAudio: false,
+      loadLimit: 2,
+    });
+
+    player.replaceTrack(4, "five-refreshed");
+
+    expect(player.getIndex()).toBe(3);
+    expect(player.getTracks()).toEqual([
+      "one",
+      "two",
+      "three",
+      "four",
+      "five-refreshed",
+    ]);
+    player.removeAllTracks();
   });
 });

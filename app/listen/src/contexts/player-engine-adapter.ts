@@ -1,5 +1,9 @@
 import type { Track } from "@/contexts/player-types";
-import { getStreamUrl } from "@/contexts/player-utils";
+import {
+  getOfflineStreamUrl,
+  getStreamUrl,
+  type StreamUrlOptions,
+} from "@/contexts/player-utils";
 import { ensureFreshAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { fetchTrackPlayback } from "@/lib/track-playback";
 import type { EngineTrack } from "@/lib/playback-engine";
@@ -13,12 +17,13 @@ export function toEngineTrack(
   track: Track,
   eqGains?: number[],
   streamUrl?: string,
+  options: StreamUrlOptions = {},
 ): EngineTrack {
   const artwork = resolveMaybeApiAssetUrl(track.albumCover) || undefined;
 
   return {
     id: track.id,
-    url: streamUrl ?? getStreamUrl(track),
+    url: streamUrl ?? getStreamUrl(track, options),
     title: track.title || "Unknown",
     artist: track.artist || "",
     album: track.album || undefined,
@@ -37,27 +42,31 @@ export function toEngineTrack(
 export function toEngineTracks(
   tracks: Track[],
   eqGainsByTrackId?: Map<string, number[]>,
+  options: StreamUrlOptions = {},
 ): EngineTrack[] {
   return tracks.map((track) =>
-    toEngineTrack(track, eqGainsByTrackId?.get(track.id)),
+    toEngineTrack(track, eqGainsByTrackId?.get(track.id), undefined, options),
   );
 }
 
 export async function toFreshEngineTrack(
   track: Track,
   eqGains?: number[],
+  options: StreamUrlOptions = {},
 ): Promise<EngineTrack> {
   await ensureFreshAuthToken();
   return toEngineTrack(
     track,
     eqGains,
-    await resolveFreshEngineStreamUrl(track),
+    await resolveFreshEngineStreamUrl(track, options),
+    options,
   );
 }
 
 export async function toFreshEngineTracks(
   tracks: Track[],
   eqGainsByTrackId?: Map<string, number[]>,
+  options: StreamUrlOptions = {},
 ): Promise<EngineTrack[]> {
   await ensureFreshAuthToken();
   return Promise.all(
@@ -65,7 +74,8 @@ export async function toFreshEngineTracks(
       toEngineTrack(
         track,
         eqGainsByTrackId?.get(track.id),
-        await resolveFreshEngineStreamUrl(track),
+        await resolveFreshEngineStreamUrl(track, options),
+        options,
       ),
     ),
   );
@@ -75,9 +85,10 @@ export async function toStartupEngineTracks(
   tracks: Track[],
   activeIndex: number,
   eqGainsByTrackId?: Map<string, number[]>,
+  options: StreamUrlOptions = {},
 ): Promise<EngineTrack[]> {
   await ensureFreshAuthToken();
-  const engineTracks = toEngineTracks(tracks, eqGainsByTrackId);
+  const engineTracks = toEngineTracks(tracks, eqGainsByTrackId, options);
   const normalizedIndex = Math.max(
     0,
     Math.min(Math.trunc(activeIndex), tracks.length - 1),
@@ -88,7 +99,8 @@ export async function toStartupEngineTracks(
   engineTracks[normalizedIndex] = toEngineTrack(
     activeTrack,
     eqGainsByTrackId?.get(activeTrack.id),
-    await resolveFreshEngineStreamUrl(activeTrack),
+    await resolveFreshEngineStreamUrl(activeTrack, options),
+    options,
   );
   return engineTracks;
 }
@@ -99,15 +111,20 @@ function hasFreshRemoteStream(track: Track): boolean {
   return new Date(track.remote.streamUrlExpiresAt).getTime() > Date.now();
 }
 
-async function resolveFreshEngineStreamUrl(track: Track): Promise<string> {
-  if (hasFreshRemoteStream(track)) return getStreamUrl(track);
-  if (!track.globalTrackUid) return getStreamUrl(track);
+async function resolveFreshEngineStreamUrl(
+  track: Track,
+  options: StreamUrlOptions,
+): Promise<string> {
+  const offlineUrl = getOfflineStreamUrl(track, options);
+  if (offlineUrl) return offlineUrl;
+  if (hasFreshRemoteStream(track)) return getStreamUrl(track, options);
+  if (!track.globalTrackUid) return getStreamUrl(track, options);
 
   const playback = await fetchTrackPlayback(
     track,
     getEffectivePlaybackDeliveryPolicy(),
   );
-  if (!playback) return getStreamUrl(track);
+  if (!playback) return getStreamUrl(track, options);
   setPlaybackSession(track, playback.playback_session);
   setPlaybackDeliveryProvenance(track, playback);
   return resolveMaybeApiAssetUrl(playback.stream_url) || playback.stream_url;

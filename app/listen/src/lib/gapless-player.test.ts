@@ -42,6 +42,7 @@ import {
   getCurrentTrackDuration,
   getCurrentBufferedAheadSeconds,
   getCurrentTrackUrl,
+  getPlaybackLoadLimit,
   getPlayer,
   getPosition,
   getTrackIndex,
@@ -177,6 +178,10 @@ describe("getCurrentBufferedAheadSeconds", () => {
 });
 
 describe("initPlayer", () => {
+  it("keeps the next HTML5 track preloaded for mobile auto-advance", () => {
+    expect(getPlaybackLoadLimit(true)).toBe(2);
+  });
+
   it("creates a Gapless5 instance with expected options", () => {
     const player = initPlayer();
 
@@ -555,13 +560,13 @@ describe("replaceTrack", () => {
     expect(mock.replaceTrack).toHaveBeenCalledWith(1, "/tracks/new/stream");
   });
 
-  it("restores sequential playlist indices after the underlying remove/insert", () => {
+  it("preserves shuffle order when refreshing a source in place", () => {
     initPlayer();
     mock.playlist.shuffledIndices = [2, 0, 1];
 
     replaceTrack(1, "/tracks/new/stream");
 
-    expect(mock.playlist.shuffledIndices).toEqual([0, 1, 2]);
+    expect(mock.playlist.shuffledIndices).toEqual([2, 0, 1]);
   });
 
   it("is a no-op when no instance exists", () => {

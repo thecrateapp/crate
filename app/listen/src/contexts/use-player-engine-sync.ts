@@ -276,6 +276,8 @@ export function usePlayerEngineSync({
           const engineTracks = await toStartupEngineTracks(
             nextQueue,
             nextIndex,
+            undefined,
+            { target: "android-native" },
           );
           return androidNativeEngine.loadQueue({
             revision: createQueueRevision(),

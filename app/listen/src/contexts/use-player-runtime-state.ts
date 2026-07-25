@@ -118,7 +118,7 @@ export function usePlayerRuntimeState() {
 
   const buildEngineUrls = useCallback(
     (tracks: Track[], resolvedUrls?: string[]): string[] => {
-      const urls = resolvedUrls ?? tracks.map(getStreamUrl);
+      const urls = resolvedUrls ?? tracks.map((track) => getStreamUrl(track));
 
       const nextMap = new Map<string, Track[]>();
       tracks.forEach((track, index) => {

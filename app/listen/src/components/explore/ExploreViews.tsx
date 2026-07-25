@@ -853,17 +853,11 @@ function buildGenreHeroArtistBackgroundFallback(
   artists?: GenreDetail["artists"],
 ) {
   if (!artists?.length) return null;
-  const topArtist = artists
-    .filter(
-      (artist) =>
-        (artist.artist_id != null || artist.global_artist_uid) &&
-        artist.has_photo,
-    )
-    .sort((a, b) => {
-      const aListeners = a.listeners ?? -1;
-      const bListeners = b.listeners ?? -1;
-      return bListeners - aListeners;
-    })[0];
+  const topArtist = artists.find(
+    (artist) =>
+      (artist.artist_id != null || artist.global_artist_uid) &&
+      artist.has_photo,
+  );
 
   if (!topArtist?.artist_id && !topArtist?.global_artist_uid) return null;
 

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, authState, ensureFreshAuthTokenMock } = vi.hoisted(() => ({
-  apiMock: vi.fn(),
-  authState: { token: "listen-token" },
-  ensureFreshAuthTokenMock: vi.fn(),
-}));
+const { apiMock, authState, ensureFreshAuthTokenMock, offlineUrlState } =
+  vi.hoisted(() => ({
+    apiMock: vi.fn(),
+    authState: { token: "listen-token" },
+    ensureFreshAuthTokenMock: vi.fn(),
+    offlineUrlState: { url: null as string | null },
+  }));
 
 vi.mock("@/lib/api", () => ({
   api: apiMock,
@@ -24,7 +26,7 @@ vi.mock("@/lib/capacitor-runtime", () => ({
 }));
 
 vi.mock("@/lib/offline", () => ({
-  getOfflineNativePlaybackUrl: () => null,
+  getOfflineNativePlaybackUrl: () => offlineUrlState.url,
 }));
 
 import {
@@ -40,6 +42,7 @@ describe("player engine adapter", () => {
     apiMock.mockReset();
     ensureFreshAuthTokenMock.mockReset();
     ensureFreshAuthTokenMock.mockResolvedValue(true);
+    offlineUrlState.url = null;
   });
 
   it("sends absolute authenticated artwork URLs to the native player", () => {
@@ -122,6 +125,27 @@ describe("player engine adapter", () => {
       "/api/catalog/tracks/global-track-1/stream",
     );
     expect(getPlaybackSession(sourceTrack)).toBe("signed-global-playback");
+  });
+
+  it("keeps an offline file URI instead of resolving global playback", async () => {
+    offlineUrlState.url =
+      "file:///data/user/0/app.cratemusic.crate/files/offline/song.m4a";
+    const sourceTrack = {
+      id: "global-track-offline",
+      globalTrackUid: "global-track-offline",
+      entityUid: "entity-track-offline",
+      title: "Offline Song",
+      artist: "Offline Band",
+    };
+
+    const track = await toFreshEngineTrack(sourceTrack, undefined, {
+      target: "android-native",
+    });
+
+    expect(apiMock).not.toHaveBeenCalled();
+    expect(track.url).toBe(
+      "file:///data/user/0/app.cratemusic.crate/files/offline/song.m4a",
+    );
   });
 
   it("reuses fresh remote stream tickets before resolving global catalog playback again", async () => {

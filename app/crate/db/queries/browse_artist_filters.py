@@ -5,7 +5,7 @@ from sqlalchemy import text
 from crate.db.tx import read_scope
 from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
 
-MIN_GENRE_MEMBERSHIP_SCORE = 0.45
+MIN_GENRE_MEMBERSHIP_SCORE = 0.70
 
 
 def artist_decade_filter_sql(artist_alias: str) -> str:

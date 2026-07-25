@@ -81,5 +81,10 @@ describe("native offline playback bootstrap", () => {
     expect(getOfflineNativePlaybackUrl({ entityUid: "track-entity-1" })).toBe(
       "capacitor://localhost/_capacitor_file_/offline-media/profile/song.m4a",
     );
+    expect(
+      getOfflineNativePlaybackUrl({ entityUid: "track-entity-1" }, undefined, {
+        target: "android-native",
+      }),
+    ).toBe("file:///offline-media/profile/song.m4a");
   });
 });

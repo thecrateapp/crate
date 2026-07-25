@@ -551,12 +551,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       recoveryQueue.length,
     );
     const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+    const nativePlayerActive = shouldUseAndroidNativePlayer();
     const engineTracks = await toStartupEngineTracks(
       recoveryQueue,
       recoveryIndex,
+      undefined,
+      nativePlayerActive ? { target: "android-native" } : undefined,
     );
 
-    if (shouldUseAndroidNativePlayer()) {
+    if (nativePlayerActive) {
       await androidNativeEngine.loadQueue({
         revision: createQueueRevision(),
         tracks: engineTracks,
@@ -673,7 +676,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nativePlayerActive = shouldUseAndroidNativePlayer();
       if (nativePlayerActive) {
         void (async () => {
-          const engineTracks = await toFreshEngineTracks(unique);
+          const engineTracks = await toFreshEngineTracks(unique, undefined, {
+            target: "android-native",
+          });
           return androidNativeEngine.appendTracks(engineTracks);
         })().catch((error) => {
           console.error(
@@ -724,7 +729,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       nextQueue.splice(insertionIndex, 0, marked);
       if (shouldUseAndroidNativePlayer()) {
         void (async () => {
-          const engineTrack = await toFreshEngineTrack(marked);
+          const engineTrack = await toFreshEngineTrack(marked, undefined, {
+            target: "android-native",
+          });
           return androidNativeEngine.insertTrack(insertionIndex, engineTrack);
         })().catch((error) => {
           console.error(
@@ -769,7 +776,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nativePlayerActive = shouldUseAndroidNativePlayer();
       if (nativePlayerActive) {
         void (async () => {
-          const engineTracks = await toFreshEngineTracks(unique);
+          const engineTracks = await toFreshEngineTracks(unique, undefined, {
+            target: "android-native",
+          });
           await androidNativeEngine.appendTracks(engineTracks);
           return androidNativeEngine.jumpTo(queue.length, true);
         })().catch((error) => {
@@ -861,7 +870,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const engineTracks = await toStartupEngineTracks(queueSnapshot, index);
+      const engineTracks = await toStartupEngineTracks(
+        queueSnapshot,
+        index,
+        undefined,
+        { target: "android-native" },
+      );
       await androidNativeEngine.loadQueue({
         revision: createQueueRevision(),
         tracks: engineTracks,
@@ -1022,7 +1036,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (!(await refreshAuthToken())) {
           throw new Error("Could not refresh the native playback token");
         }
-        const engineTracks = await toStartupEngineTracks(queueSnapshot, index);
+        const engineTracks = await toStartupEngineTracks(
+          queueSnapshot,
+          index,
+          undefined,
+          { target: "android-native" },
+        );
         await androidNativeEngine.loadQueue({
           revision: createQueueRevision(),
           tracks: engineTracks,

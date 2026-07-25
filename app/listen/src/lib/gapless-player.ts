@@ -45,6 +45,8 @@ type WindowWithGaplessContext = Window & {
 // LogLevel.Warning = 3, CrossfadeShape.EqualPower = 3.
 const GAPLESS_LOG_LEVEL_WARNING = 3;
 const GAPLESS_CROSSFADE_EQUAL_POWER = 3;
+const DESKTOP_DECODE_TRACK_LIMIT = 2;
+const MOBILE_HTML5_TRACK_LIMIT = 2;
 
 export interface GaplessPlayerCallbacks {
   onTimeUpdate?: (positionMs: number, trackIndex: number) => void;
@@ -88,6 +90,12 @@ let currentTrackFullyBuffered = false;
 let fadeSettle: (() => void) | null = null;
 // Active equalizer chain (null = direct output, no processing).
 let eqChain: EqChain | null = null;
+
+export function getPlaybackLoadLimit(preferHtml5Audio: boolean): number {
+  return preferHtml5Audio
+    ? MOBILE_HTML5_TRACK_LIMIT
+    : DESKTOP_DECODE_TRACK_LIMIT;
+}
 let eqEnabled = false;
 let lastEqGains: EqGains = [];
 let lastPlaybackRate = 1.0;
@@ -232,11 +240,9 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
     volume: lastVolume,
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
-    // Keep the live HTML5 pipeline conservative on mobile. The vendored
-    // loader treats loadLimit=1 as the active source only; higher values
-    // create parallel <audio> loads and Android WebView/emulators can
-    // start dropping audio frames.
-    loadLimit: preferHtml5Audio ? 1 : 2,
+    // Keep the next mobile <audio> source ready before the active element
+    // reaches ended, preserving uninterrupted media-session/Bluetooth state.
+    loadLimit: getPlaybackLoadLimit(preferHtml5Audio),
   });
   appliedVolume = lastVolume;
 
@@ -440,9 +446,6 @@ export function removeTrack(indexOrUrl: number | string): void {
 
 export function replaceTrack(index: number, url: string): void {
   instance?.replaceTrack(index, url);
-  // Gapless-5 replaces by removing then inserting, and insertion mutates
-  // shuffledIndices. React owns the queue order, so restore identity order.
-  normalizeShuffledIndices();
 }
 
 function getAudioContext(): AudioContext | null {

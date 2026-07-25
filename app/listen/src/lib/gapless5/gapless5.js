@@ -1194,6 +1194,17 @@ function Gapless5FileList(
     this.updateLoading();
   };
 
+  this.replace = (playlistIndex, audioPath) => {
+    const { index, source } = this.getSourceIndexed(playlistIndex);
+    if (!source) {
+      return false;
+    }
+    source.unload();
+    this.sources[index] = new Gapless5Source(player, log, audioPath);
+    this.updateLoading();
+    return true;
+  };
+
   // process inputs from constructor
   if (inTracks.length > 0) {
     for (let i = 0; i < inTracks.length; i++) {
@@ -1810,8 +1821,13 @@ function Gapless5(options = {}, deprecated = {}) {
    * @param {string} audioPath - path to audio file(s) or blob URL(s)
    */
   this.replaceTrack = (point, audioPath) => {
-    this.removeTrack(point);
-    this.insertTrack(point, audioPath);
+    const playlistIndex = this.playlist.indexFromTrack(point);
+    if (!isValidIndex(playlistIndex)) {
+      log.warn(`Cannot replace missing track: ${point}`);
+      return;
+    }
+    this.playlist.replace(playlistIndex, audioPath);
+    this.uiDirty = true;
   };
 
   this.removeAllTracks = (flushPlaylist = true) => {

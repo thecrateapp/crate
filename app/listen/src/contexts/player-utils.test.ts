@@ -232,6 +232,60 @@ describe("getStreamUrl", () => {
       "capacitor://localhost/_capacitor_file_/offline/song.flac",
     );
   });
+
+  it("requests a file URI for the Android native playback engine", () => {
+    vi.mocked(getOfflineNativePlaybackUrl).mockReturnValueOnce(
+      "file:///data/user/0/app.cratemusic.crate/files/offline/song.flac",
+    );
+
+    const url = getStreamUrl(
+      {
+        id: "t1",
+        entityUid: "entity-1",
+        title: "Song",
+        artist: "Band",
+      },
+      { target: "android-native" },
+    );
+
+    expect(getOfflineNativePlaybackUrl).toHaveBeenCalledWith(
+      { entityUid: "entity-1" },
+      undefined,
+      { target: "android-native" },
+    );
+    expect(url).toBe(
+      "file:///data/user/0/app.cratemusic.crate/files/offline/song.flac",
+    );
+  });
+
+  it("prefers an offline copy over an unexpired remote stream ticket", () => {
+    vi.mocked(getOfflineNativePlaybackUrl).mockReturnValueOnce(
+      "file:///data/user/0/app.cratemusic.crate/files/offline/remote.m4a",
+    );
+
+    const url = getStreamUrl(
+      {
+        id: "remote-track",
+        entityUid: "remote-entity",
+        title: "Remote Song",
+        artist: "Remote Band",
+        origin: "remote",
+        remote: {
+          nodeUid: "node-b",
+          nodeName: "Node B",
+          remoteEntityUid: "remote-track",
+          streamUrl: "/api/federation/remote/streams/ticket-live",
+          streamUrlExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+          availability: { catalog: true, stream: true, import: false },
+        },
+      },
+      { target: "android-native" },
+    );
+
+    expect(url).toBe(
+      "file:///data/user/0/app.cratemusic.crate/files/offline/remote.m4a",
+    );
+  });
 });
 
 describe("getEffectiveCrossfadeSeconds", () => {
