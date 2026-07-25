@@ -89,7 +89,7 @@ def _queue_global_catalog_bootstrap() -> None:
 
     state = get_catalog_state()
     if (
-        state["status"] not in {"cold", "failed"}
+        state["status"] == "ready"
         and state.get("user_refs_backfilled_at") is not None
         and state.get("user_refs_backfill_version", 0)
         >= USER_LIBRARY_REFS_BACKFILL_VERSION
