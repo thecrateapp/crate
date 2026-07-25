@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -61,6 +63,47 @@ def test_deploy_cannot_bypass_remote_release_preflight() -> None:
     )
 
 
+def test_production_compose_propagates_federation_identity_and_secrets() -> None:
+    compose = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())
+
+    environments = {
+        service_name: {
+            entry.split("=", 1)[0]: entry.split("=", 1)[1]
+            for entry in compose["services"][service_name]["environment"]
+        }
+        for service_name in ("crate-api", "crate-worker", "crate-playback-worker")
+    }
+
+    assert environments["crate-api"]["CRATE_INSTANCE_NAME"] == (
+        "${CRATE_INSTANCE_NAME:?CRATE_INSTANCE_NAME must be set}"
+    )
+    assert environments["crate-api"]["CRATE_PUBLIC_API_BASE_URL"] == (
+        "${CRATE_PUBLIC_API_BASE_URL:?CRATE_PUBLIC_API_BASE_URL must be set}"
+    )
+    assert environments["crate-api"]["CRATE_FEDERATION_CURSOR_SECRET"] == (
+        "${CRATE_FEDERATION_CURSOR_SECRET:?CRATE_FEDERATION_CURSOR_SECRET must be set}"
+    )
+    assert environments["crate-api"]["CRATE_FEDERATION_CATALOG_PAGE_MAX_BYTES"] == (
+        "${CRATE_FEDERATION_CATALOG_PAGE_MAX_BYTES:-2097152}"
+    )
+    assert environments["crate-worker"]["CRATE_FEDERATION_DELTA_RETENTION_DAYS"] == (
+        "${CRATE_FEDERATION_DELTA_RETENTION_DAYS:-90}"
+    )
+    for environment in environments.values():
+        assert environment["CRATE_FEDERATION_SUBJECT_SECRET"] == (
+            "${CRATE_FEDERATION_SUBJECT_SECRET:"
+            "?CRATE_FEDERATION_SUBJECT_SECRET must be set}"
+        )
+
+
+def test_example_environment_documents_required_federation_identity() -> None:
+    example = (ROOT / ".env.example").read_text()
+
+    assert "CRATE_INSTANCE_NAME=" in example
+    assert "CRATE_PUBLIC_API_BASE_URL=" in example
+    assert "CRATE_FEDERATION_SUBJECT_SECRET=" in example
+
+
 def test_recovery_snapshot_requires_an_explicit_deploy_id() -> None:
     makefile = (ROOT / "Makefile").read_text()
 
@@ -91,6 +134,20 @@ def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
     assert "recovery.env" in snapshot_body
     assert 'sha256sum "${checksum_files[@]}"' in snapshot_body
     assert "recovery_complete" in script
+
+
+def test_remote_backup_preserves_a_sealed_recovery_set() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    backup_body = script[
+        script.index("cmd_backup() {") : script.index("recovery_redis_service() {")
+    ]
+
+    sealed_guard = 'if [[ -f "$BACKUP_DIR/recovery_complete" ]]; then'
+    assert sealed_guard in backup_body
+    assert backup_body.index(sealed_guard) < backup_body.index(
+        'cp -a "$file" "$BACKUP_DIR/$file"'
+    )
+    assert "return 0" in backup_body[backup_body.index(sealed_guard) :]
 
 
 def test_remote_state_rollback_restores_database_before_old_images() -> None:
