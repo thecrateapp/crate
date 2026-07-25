@@ -441,6 +441,17 @@ cmd_recovery_snapshot() {
     dc stop --timeout 45 "${running_services[@]}"
   fi
 
+  log "Stopping any quiesce service missed by Compose"
+  for service in "${QUIESCE_SERVICES[@]}"; do
+    if [[ "$(docker inspect -f '{{.State.Running}}' "$service" 2>/dev/null || true)" != "true" ]]; then
+      continue
+    fi
+    if ! grep -Fxq "$service" "$BACKUP_DIR/recovery_running_services"; then
+      printf '%s\n' "$service" >> "$BACKUP_DIR/recovery_running_services"
+    fi
+    docker stop --time 45 "$service" >/dev/null
+  done
+
   pg_user="$(env_value CRATE_POSTGRES_USER)"
   pg_password="$(env_value CRATE_POSTGRES_PASSWORD)"
   pg_db="$(env_value CRATE_POSTGRES_DB)"
@@ -472,10 +483,16 @@ cmd_recovery_snapshot() {
     >/dev/null
   dc stop --timeout 30 "$redis_service"
   docker run --rm \
+    -e BACKUP_UID="$(id -u)" \
+    -e BACKUP_GID="$(id -g)" \
     --volumes-from "$redis_service" \
     -v "$BACKUP_DIR:/backup" \
     redis:7-alpine \
-    sh -ec 'tar -C /data -czf /backup/redis-durable.tar.gz .'
+    sh -ec '
+      tar -C /data -czf /backup/redis-durable.tar.gz .
+      chown "$BACKUP_UID:$BACKUP_GID" /backup/redis-durable.tar.gz
+      chmod 600 /backup/redis-durable.tar.gz
+    '
 
   {
     printf 'deploy_id=%s\n' "$DEPLOY_ID"

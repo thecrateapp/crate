@@ -130,10 +130,18 @@ def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
     assert "pg_dump" in script
     assert "redis-durable.tar.gz" in script
     assert "sha256sum" in script
+    assert 'BACKUP_UID="$(id -u)"' in snapshot_body
+    assert 'BACKUP_GID="$(id -g)"' in snapshot_body
+    assert 'chown "$BACKUP_UID:$BACKUP_GID" /backup/redis-durable.tar.gz' in (
+        snapshot_body
+    )
+    assert "chmod 600 /backup/redis-durable.tar.gz" in snapshot_body
     assert "docker-compose.yaml" in snapshot_body
     assert "recovery.env" in snapshot_body
     assert 'sha256sum "${checksum_files[@]}"' in snapshot_body
     assert "recovery_complete" in script
+    assert 'log "Stopping any quiesce service missed by Compose"' in snapshot_body
+    assert 'docker stop --time 45 "$service"' in snapshot_body
 
 
 def test_remote_backup_preserves_a_sealed_recovery_set() -> None:
