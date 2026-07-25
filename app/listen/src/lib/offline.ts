@@ -1233,6 +1233,7 @@ export function getOfflineActionLabel(state: OfflineItemState): string {
 export function getOfflineNativePlaybackUrl(
   track: OfflineTrackIdentityInput,
   storageId?: string | null,
+  options: { target?: "webview" | "android-native" } = {},
 ): string | null {
   if (!isNative) return null;
   const profileKey = getActiveOfflineProfileKey();
@@ -1241,7 +1242,10 @@ export function getOfflineNativePlaybackUrl(
   const entry = getOfflineTrackAssetAliases(track, storageId)
     .map((alias) => assets[alias])
     .find(Boolean);
-  return entry?.playbackUrl || null;
+  if (!entry) return null;
+  return options.target === "android-native"
+    ? entry.uri || null
+    : entry.playbackUrl || null;
 }
 
 export async function syncOfflineProfileToServiceWorker(

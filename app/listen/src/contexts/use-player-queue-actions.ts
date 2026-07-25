@@ -263,6 +263,8 @@ export function usePlayerQueueActions({
           const engineTracks = await toStartupEngineTracks(
             tracks,
             normalizedIndex,
+            undefined,
+            { target: "android-native" },
           );
           return nativeEngine.loadQueue({
             revision: createQueueRevision(),
@@ -890,7 +892,9 @@ export function usePlayerQueueActions({
 
       if (shouldUseAndroidNativePlayer()) {
         void (async () => {
-          const engineTrack = await toFreshEngineTrack(track);
+          const engineTrack = await toFreshEngineTrack(track, undefined, {
+            target: "android-native",
+          });
           return nativeEngine.insertTrack(insertAt, engineTrack);
         })().catch((error) => {
           console.error("[native-player] failed to insert track:", error);
@@ -918,7 +922,9 @@ export function usePlayerQueueActions({
       const nextQueue = [...queueRef.current, track];
       if (shouldUseAndroidNativePlayer()) {
         void (async () => {
-          const engineTrack = await toFreshEngineTrack(track);
+          const engineTrack = await toFreshEngineTrack(track, undefined, {
+            target: "android-native",
+          });
           return nativeEngine.appendTracks([engineTrack]);
         })().catch((error) => {
           console.error("[native-player] failed to append track:", error);

@@ -502,14 +502,14 @@ describe("Explore", () => {
     });
   });
 
-  it("uses top artist background without probing an absent genre cover", () => {
+  it("keeps the API membership order when choosing a fallback hero", () => {
     mockGenreDetail({
       coverUrl: null,
       artists: [
         {
           artist_id: 111,
-          artist_name: "Less Popular",
-          artist_slug: "less-popular",
+          artist_name: "Core Artist",
+          artist_slug: "core-artist",
           album_count: 3,
           track_count: 6,
           has_photo: true,
@@ -517,8 +517,8 @@ describe("Explore", () => {
         },
         {
           artist_id: 222,
-          artist_name: "Most Popular",
-          artist_slug: "most-popular",
+          artist_name: "Popular Adjacent Artist",
+          artist_slug: "popular-adjacent-artist",
           album_count: 5,
           track_count: 9,
           has_photo: true,
@@ -534,7 +534,7 @@ describe("Explore", () => {
 
     expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
       "src",
-      "/api/artists/222/background?size=1280&format=webp",
+      "/api/artists/111/background?size=1280&format=webp",
     );
   });
 

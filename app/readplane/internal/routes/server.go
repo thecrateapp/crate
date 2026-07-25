@@ -113,6 +113,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/me/home/essentials", s.route(http.MethodGet, s.homeSlice))
 	mux.HandleFunc("/api/me/home/discovery", s.route(http.MethodGet, s.homeDiscovery))
 	mux.HandleFunc("/api/me/home/discovery-stream", s.route(http.MethodGet, s.homeDiscoveryStream))
+	mux.HandleFunc("/api/me/home/", s.route(http.MethodGet, s.fallbackOnly))
 	mux.HandleFunc("/api/me/stats/dashboard", s.route(http.MethodGet, s.statsDashboard))
 	mux.HandleFunc("/api/me/albums", s.route(http.MethodGet, s.myAlbumsRoute))
 	mux.HandleFunc("/api/me/follows", s.route(http.MethodGet, s.myFollowsRoute))
@@ -137,6 +138,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/artists/", s.routeGetHead(s.artistRoute))
 	mux.HandleFunc("/api/tracks/", s.routeGetHead(s.trackRoute))
 	return s.withCommonHeaders(s.withTraceID(s.withAccessLog(mux)))
+}
+
+func (s *Server) fallbackOnly(w http.ResponseWriter, r *http.Request) {
+	s.fallbackOrRouteMiss(w, r)
 }
 
 func (s *Server) routeGetHead(handler handlerFunc) http.HandlerFunc {

@@ -639,6 +639,35 @@ func TestFallbackOrAuthError_Unauthorized(t *testing.T) {
 	assert.Equal(t, "Not authenticated", body["detail"])
 }
 
+func TestHomeSectionDetailFallsBackToFastAPI(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/me/home/sections/suggested-albums", r.URL.Path)
+		assert.Equal(t, "42", r.URL.Query().Get("limit"))
+		assert.Equal(t, "1", r.Header.Get("X-Crate-Readplane-Fallback"))
+		_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{
+			"id":    "suggested-albums",
+			"items": []any{},
+		})
+	}))
+	defer backend.Close()
+
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+	server := newTestServerNoAuth()
+	server.fallback = fallback
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/me/home/sections/suggested-albums?limit=42",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+}
+
 func TestCatalogUnavailable_WithoutFallback(t *testing.T) {
 	// catalog=nil, auth=nil, no fallback → requireCatalogUser returns catalogUnavailable → 503.
 	server := newTestServerNoAuth()

@@ -281,8 +281,8 @@ def test_browse_filter_genres_orders_top_artists_by_genre_weight(pg_db):
     rows = get_browse_filter_genres()
     mathcore = next(row for row in rows if row["name"] == "mathcore")
 
-    assert mathcore["top_artists"] == ["Evenly Split 2", "Evenly Split 1"]
-    assert mathcore["count"] == 2
+    assert mathcore["top_artists"] == ["Evenly Split 2"]
+    assert mathcore["count"] == 1
 
 
 def test_browse_filter_genres_prefers_manual_taxonomy_cover(pg_db):

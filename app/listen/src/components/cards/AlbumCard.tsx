@@ -16,7 +16,7 @@ import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { api } from "@/lib/api";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { cn } from "@/lib/utils";
@@ -97,7 +97,7 @@ export const AlbumCard = memo(function AlbumCard({
     albumName: album,
   };
   const coverUrl =
-    cover ||
+    resolveMaybeApiAssetUrl(cover) ||
     albumCoverApiUrl(albumRouteInput, {
       size: layout === "grid" ? 320 : compact ? 192 : 256,
     });

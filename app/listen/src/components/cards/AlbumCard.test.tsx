@@ -5,6 +5,19 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { AlbumCard } from "./AlbumCard";
 
+const apiMocks = vi.hoisted(() => ({
+  resolveMaybeApiAssetUrl: vi.fn((url: string | null | undefined) =>
+    url?.startsWith("/api/")
+      ? `https://api.example.test${url}&token=native-token`
+      : url ?? null,
+  ),
+}));
+
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  resolveMaybeApiAssetUrl: apiMocks.resolveMaybeApiAssetUrl,
+}));
+
 vi.mock("@/contexts/SavedAlbumsContext", () => ({
   useSavedAlbums: () => ({
     isSaved: () => false,
@@ -40,6 +53,25 @@ beforeEach(() => {
 });
 
 describe("AlbumCard", () => {
+  it("resolves API cover paths for configurable native servers", () => {
+    renderWithListenProviders(
+      <AlbumCard
+        artist="Hum"
+        album="Inlet"
+        globalAlbumUid="album-global-1"
+        cover="/api/catalog/albums/album-global-1/cover?size=256"
+      />,
+    );
+
+    expect(apiMocks.resolveMaybeApiAssetUrl).toHaveBeenCalledWith(
+      "/api/catalog/albums/album-global-1/cover?size=256",
+    );
+    expect(screen.getByAltText("Inlet")).toHaveAttribute(
+      "src",
+      "https://api.example.test/api/catalog/albums/album-global-1/cover?size=256&token=native-token",
+    );
+  });
+
   it("renders responsive WebP candidates for generated covers", () => {
     renderWithListenProviders(
       <AlbumCard artist="Hum" album="Inlet" albumId={42} layout="grid" />,

@@ -188,7 +188,29 @@ export function saveRecentlyPlayed(tracks: Track[]) {
   }
 }
 
-export function getStreamUrl(track: Track): string {
+export interface StreamUrlOptions {
+  target?: "webview" | "android-native";
+}
+
+export function getOfflineStreamUrl(
+  track: Track,
+  options: StreamUrlOptions = {},
+): string | null {
+  if (!track.entityUid && !track.path) return null;
+  return getOfflineNativePlaybackUrl(
+    track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,
+    undefined,
+    options,
+  );
+}
+
+export function getStreamUrl(
+  track: Track,
+  options: StreamUrlOptions = {},
+): string {
+  const localOfflineUrl = getOfflineStreamUrl(track, options);
+  if (localOfflineUrl) return localOfflineUrl;
+
   if (track.origin === "remote" && track.remote?.streamUrl) {
     const expired = track.remote.streamUrlExpiresAt
       ? new Date(track.remote.streamUrlExpiresAt).getTime() < Date.now()
@@ -196,13 +218,6 @@ export function getStreamUrl(track: Track): string {
     if (!expired) {
       return `${_apiBase()}${track.remote.streamUrl}`;
     }
-  }
-
-  if (track.entityUid || track.path) {
-    const localOfflineUrl = getOfflineNativePlaybackUrl(
-      track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,
-    );
-    if (localOfflineUrl) return localOfflineUrl;
   }
 
   const base = _apiBase();
