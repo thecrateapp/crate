@@ -28,6 +28,7 @@ def create_task(
     priority: int | None = None,
     pool: str | None = None,
     parent_task_id: str | None = None,
+    dedup_key: str | None = None,
     dispatch: bool = True,
     session=None,
 ) -> str:
@@ -37,6 +38,7 @@ def create_task(
         priority=priority,
         pool=pool,
         parent_task_id=parent_task_id,
+        dedup_key=dedup_key,
         dispatch=dispatch,
         session=session,
         dispatch_task_fn=dispatch_task,

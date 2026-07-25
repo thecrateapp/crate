@@ -14,6 +14,7 @@ from crate.db.queries.admin_global_catalog import (
     list_global_catalog_runs,
 )
 from crate.db.repositories.tasks import create_task_dedup
+from crate.task_dedup_keys import GLOBAL_CATALOG_FULL_DEDUP_KEY
 from crate.federation.global_decisions import record_match_decision
 
 router = APIRouter(prefix="/api/admin/global-catalog", tags=["admin"])
@@ -61,7 +62,11 @@ def global_catalog_reconcile(request: Request, body: ReconcileRequest):
     task_id = create_task_dedup(
         task_type,
         {"triggered_by": "admin"},
-        dedup_key=f"manual:{task_type}",
+        dedup_key=(
+            GLOBAL_CATALOG_FULL_DEDUP_KEY
+            if task_type == "global_catalog_reconcile_full"
+            else f"manual:{task_type}"
+        ),
     )
     return {"task_id": task_id, "status": "queued"}
 

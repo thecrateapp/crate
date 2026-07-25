@@ -27,6 +27,7 @@ from crate.federation.global_reconciliation import (
     reconcile_local_catalog_batch,
     reconcile_remote_catalog_batch,
 )
+from crate.task_dedup_keys import GLOBAL_CATALOG_FULL_DEDUP_KEY
 from crate.worker_handlers import TaskHandler
 
 DEFAULT_BATCH_SIZE = 500
@@ -256,6 +257,7 @@ def _queue_full_reconciliation_continuation(
         "global_catalog_reconcile_full",
         continuation_params,
         parent_task_id=task_id,
+        dedup_key=GLOBAL_CATALOG_FULL_DEDUP_KEY,
     )
 
 

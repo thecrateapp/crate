@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+
 def test_global_catalog_scheduler_defaults_are_registered():
     from crate.scheduler import DEFAULT_SCHEDULES
 
@@ -87,3 +90,34 @@ def test_scheduler_uses_stable_jitter_for_global_catalog_tasks(monkeypatch):
 
     assert first == second
     assert 0 <= first <= 3600
+
+
+def test_scheduler_reuses_the_full_catalog_chain_dedup_key(monkeypatch):
+    from crate import resource_governor, scheduler
+
+    queued: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        scheduler,
+        "get_schedules",
+        lambda: {"global_catalog_reconcile_full": 43200},
+    )
+    monkeypatch.setattr(scheduler, "should_run", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        scheduler,
+        "create_task_dedup",
+        lambda task_type, *, dedup_key: (
+            queued.append((task_type, dedup_key)) or "task-global"
+        ),
+    )
+    monkeypatch.setattr(scheduler, "mark_run", lambda _task_type: None)
+    monkeypatch.setattr(
+        resource_governor,
+        "should_defer_task",
+        lambda _task_type: SimpleNamespace(allowed=True),
+    )
+
+    scheduler.check_and_create_scheduled_tasks()
+
+    assert queued == [
+        ("global_catalog_reconcile_full", "global-catalog:full"),
+    ]

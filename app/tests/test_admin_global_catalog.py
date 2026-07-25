@@ -97,7 +97,7 @@ def test_admin_global_catalog_reconcile_enqueues_task(test_app):
     mocked.assert_called_once_with(
         "global_catalog_reconcile_full",
         {"triggered_by": "admin"},
-        dedup_key="manual:global_catalog_reconcile_full",
+        dedup_key="global-catalog:full",
     )
 
 

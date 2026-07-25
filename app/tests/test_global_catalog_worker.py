@@ -133,6 +133,7 @@ def test_full_worker_processes_one_bounded_batch_then_enqueues_continuation(
             "task_type": "global_catalog_reconcile_full",
             "params": {"batch_size": 25, "triggered_by": "continuation"},
             "parent_task_id": "task-1",
+            "dedup_key": "global-catalog:full",
         }
     ]
     assert transitions[-1] == (
