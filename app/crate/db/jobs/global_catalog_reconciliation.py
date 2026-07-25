@@ -310,6 +310,7 @@ def _reconcile_local_source(session, source: dict[str, Any]) -> None:
             session,
             artist_name=payload["artist_name"],
             album_name=payload.get("album_name"),
+            local_album_id=payload.get("local_album_id"),
         )
         global_uid, score = _resolve_track_target(session, source, artist_uid)
         source = _with_match(source, score)
@@ -900,6 +901,7 @@ def _reconcile_local_batch_sources(
                     session,
                     artist_name=payload["artist_name"],
                     album_name=payload.get("album_name"),
+                    local_album_id=payload.get("local_album_id"),
                 )
                 global_uid, score = _resolve_track_target(session, source, artist_uid)
                 source = _with_match(source, score)
@@ -1472,20 +1474,70 @@ def _upsert_artist(session, source: dict[str, Any], global_uid: str) -> None:
                     NOW()
                 )
             ON CONFLICT (global_artist_uid) DO UPDATE SET
-                canonical_name = EXCLUDED.canonical_name,
-                public_slug = EXCLUDED.public_slug,
-                sort_name = EXCLUDED.sort_name,
-                normalized_name = EXCLUDED.normalized_name,
-                musicbrainz_artist_mbid = EXCLUDED.musicbrainz_artist_mbid,
-                local_artist_id = EXCLUDED.local_artist_id,
-                local_artist_entity_uid = EXCLUDED.local_artist_entity_uid,
-                display_source_json = EXCLUDED.display_source_json,
+                canonical_name = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.canonical_name
+                    ELSE global_catalog_artists.canonical_name
+                END,
+                public_slug = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.public_slug
+                    ELSE global_catalog_artists.public_slug
+                END,
+                sort_name = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.sort_name
+                    ELSE global_catalog_artists.sort_name
+                END,
+                normalized_name = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.normalized_name
+                    ELSE global_catalog_artists.normalized_name
+                END,
+                musicbrainz_artist_mbid = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.musicbrainz_artist_mbid
+                    ELSE global_catalog_artists.musicbrainz_artist_mbid
+                END,
+                local_artist_id = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.local_artist_id
+                    ELSE global_catalog_artists.local_artist_id
+                END,
+                local_artist_entity_uid = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.local_artist_entity_uid
+                    ELSE global_catalog_artists.local_artist_entity_uid
+                END,
+                display_source_json = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.display_source_json
+                    ELSE global_catalog_artists.display_source_json
+                END,
                 availability_json = EXCLUDED.availability_json,
-                match_json = EXCLUDED.match_json,
+                match_json = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.match_json
+                    ELSE global_catalog_artists.match_json
+                END,
                 source_count = EXCLUDED.source_count,
                 has_local = true,
-                has_photo = EXCLUDED.has_photo,
-                search_vector = EXCLUDED.search_vector,
+                has_photo = global_catalog_artists.has_photo OR EXCLUDED.has_photo,
+                search_vector = CASE
+                    WHEN global_catalog_artists.local_artist_id IS NULL
+                      OR EXCLUDED.local_artist_id <= global_catalog_artists.local_artist_id
+                    THEN EXCLUDED.search_vector
+                    ELSE global_catalog_artists.search_vector
+                END,
                 updated_at = NOW()
             """
         ),
@@ -1505,11 +1557,17 @@ def _upsert_artist(session, source: dict[str, Any], global_uid: str) -> None:
             "search_text": payload["canonical_name"],
         },
     )
-    claim_artist_public_slug(
-        session,
-        global_uid,
-        build_artist_slug(payload["canonical_name"]),
-    )
+    canonical_name = session.execute(
+        text(
+            """
+            SELECT canonical_name
+            FROM global_catalog_artists
+            WHERE global_artist_uid = CAST(:global_uid AS uuid)
+            """
+        ),
+        {"global_uid": global_uid},
+    ).scalar_one()
+    claim_artist_public_slug(session, global_uid, build_artist_slug(canonical_name))
 
 
 def _upsert_album(
@@ -2333,6 +2391,31 @@ def _project_source_genres(
 
 
 def _find_artist_uid(session, artist_name: str) -> str | None:
+    local_source = (
+        session.execute(
+            text(
+                """
+                SELECT source.global_entity_uid::text AS global_artist_uid
+                FROM library_artists artist
+                JOIN global_catalog_sources source
+                  ON source.source_kind = 'local'
+                 AND source.entity_type = 'artist'
+                 AND source.local_id = artist.id
+                 AND source.source_deleted_at IS NULL
+                 AND NOT source.source_stale
+                WHERE artist.name = :artist_name
+                ORDER BY source.local_id
+                LIMIT 1
+                """
+            ),
+            {"artist_name": artist_name},
+        )
+        .mappings()
+        .first()
+    )
+    if local_source:
+        return local_source["global_artist_uid"]
+
     normalized_name = normalize_name(artist_name)
     row = (
         session.execute(
@@ -2353,7 +2436,36 @@ def _find_artist_uid(session, artist_name: str) -> str | None:
     return row["global_artist_uid"] if row else None
 
 
-def _find_album_uid(session, *, artist_name: str, album_name: str | None) -> str | None:
+def _find_album_uid(
+    session,
+    *,
+    artist_name: str,
+    album_name: str | None,
+    local_album_id: int | None = None,
+) -> str | None:
+    if local_album_id is not None:
+        local_source = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_entity_uid::text AS global_album_uid
+                    FROM global_catalog_sources
+                    WHERE source_kind = 'local'
+                      AND entity_type = 'album'
+                      AND local_id = :local_album_id
+                      AND source_deleted_at IS NULL
+                      AND NOT source_stale
+                    LIMIT 1
+                    """
+                ),
+                {"local_album_id": local_album_id},
+            )
+            .mappings()
+            .first()
+        )
+        if local_source:
+            return local_source["global_album_uid"]
+
     if not album_name:
         return None
     normalized_name = normalize_name(album_name, strip_edition=True)
