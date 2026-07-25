@@ -216,7 +216,7 @@ def merge_duplicate_library_genres() -> list[dict]:
         return merge_duplicate_library_genres_in_session(session)
 
 
-def seed_genre_taxonomy_definitions(session, definitions) -> None:
+def seed_genre_taxonomy_definitions(session, definitions) -> bool:
     # Keep the seed idempotent, but always apply it so upgrades from the
     # pre-global taxonomy schema receive the stable core identity as well.
     from crate.genre_taxonomy import CORE_TAXONOMY_ID, core_genre_uid
@@ -321,7 +321,9 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
                 },
             )
 
-    session.execute(text("DELETE FROM genre_taxonomy_aliases WHERE origin = 'legacy'"))
+    removed_legacy_aliases = session.execute(
+        text("DELETE FROM genre_taxonomy_aliases WHERE origin = 'legacy'")
+    ).rowcount
 
     for definition in definitions:
         source_id = node_ids.get(definition.slug)
@@ -379,3 +381,5 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
                 ),
                 {"source_id": source_id, "target_id": target_id},
             )
+
+    return bool(removed_legacy_aliases)
