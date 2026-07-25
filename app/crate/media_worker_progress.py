@@ -6,7 +6,7 @@ import os
 import socket
 from typing import Any
 
-from crate.db.cache_runtime import get_redis
+from crate.config import get_durable_redis_url
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +20,27 @@ DEFAULT_SLOT_TTL_SECONDS = 1_200
 DEFAULT_MAX_ACTIVE = 1
 
 _group_created = False
+_redis_client: Any | None = None
+
+
+def get_redis() -> Any | None:
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    try:
+        import redis
+
+        _redis_client = redis.from_url(
+            get_durable_redis_url(),
+            decode_responses=True,
+            socket_timeout=2,
+            socket_connect_timeout=2,
+        )
+        _redis_client.ping()
+    except Exception:
+        log.warning("Durable Redis is not available for media-worker progress")
+        _redis_client = None
+    return _redis_client
 
 
 def media_worker_events_stream() -> str:
