@@ -158,13 +158,20 @@ def test_remote_backup_preserves_a_sealed_recovery_set() -> None:
     assert "return 0" in backup_body[backup_body.index(sealed_guard) :]
 
 
-def test_remote_verify_executes_inline_python_inside_the_api_container() -> None:
+def test_remote_verify_checks_internal_urls_inside_the_api_container() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
     verify_body = script[
         script.index("cmd_verify() {") : script.index("cmd_rollback() {")
     ]
 
-    assert verify_body.count("docker exec -i crate-api python - <<'PY'") == 2
+    assert (
+        'wait_for_container_http_url crate-api "http://127.0.0.1:8585/api/status"'
+        in verify_body
+    )
+    assert (
+        'wait_for_container_http_url crate-api "http://crate-readplane:8686/readyz"'
+        in verify_body
+    )
 
 
 def test_remote_verify_waits_for_public_routes_to_become_ready() -> None:
@@ -188,6 +195,17 @@ def test_health_wait_does_not_treat_running_before_health_init_as_ready() -> Non
 
     assert ".State.Health.Status" in wait_body
     assert "{{else}}{{.State.Running}}" not in wait_body
+
+
+def test_internal_api_checks_retry_with_exponential_backoff() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    verify_body = script[
+        script.index("cmd_verify() {") : script.index("cmd_rollback() {")
+    ]
+
+    assert "wait_for_container_http_url" in verify_body
+    assert "retry_delay=$((retry_delay * 2))" in script
+    assert "DEPLOY_API_RETRY_MAX_SECONDS" in script
 
 
 def test_remote_state_rollback_restores_database_before_old_images() -> None:
