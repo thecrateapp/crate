@@ -107,6 +107,133 @@ class TestExploreFiltersContract:
             assert data["playlists"][0]["name"] == "Playlist 1"
             assert data["moods"][0]["name"] == "energetic"
 
+    def test_explore_page_uses_global_genre_ranking_and_artwork_when_ready(
+        self,
+        test_app,
+        monkeypatch,
+    ):
+        from crate.api import browse
+
+        monkeypatch.setattr(
+            browse,
+            "get_catalog_state",
+            lambda: {"status": "ready", "last_full_reconcile_at": object()},
+            raising=False,
+        )
+        monkeypatch.setattr(
+            browse,
+            "catalog_serves_global",
+            lambda state: state["status"] == "ready",
+            raising=False,
+        )
+        monkeypatch.setattr(
+            browse,
+            "list_global_catalog_genres",
+            lambda: [
+                {
+                    "canonical_name": "Death Metal",
+                    "canonical_slug": "death-metal",
+                    "artist_count": 2,
+                    "description": "Extreme metal rooted in speed and precision.",
+                    "top_artists": ["Death", "BLOCKHEADS"],
+                    "cover_url": (
+                        "/api/catalog/artists/death-global/background"
+                        "?size=640&format=webp"
+                    ),
+                }
+            ],
+            raising=False,
+        )
+
+        with (
+            patch(
+                "crate.api.browse.api_browse_filters",
+                return_value={
+                    "genres": [{"name": "Legacy Genre", "count": 99}],
+                    "countries": [],
+                    "decades": [],
+                    "formats": [],
+                },
+            ),
+            patch("crate.api.browse.curated_playlists", return_value=[]),
+            patch("crate.api.browse.api_browse_moods", return_value=[]),
+            patch("crate.api.browse.get_cache", return_value=None),
+            patch("crate.api.browse.set_cache"),
+        ):
+            response = test_app.get("/api/browse/explore-page")
+
+        assert response.status_code == 200
+        assert response.json()["filters"]["genres"] == [
+            {
+                "name": "Death Metal",
+                "slug": "death-metal",
+                "cnt": 2,
+                "count": 2,
+                "description": "Extreme metal rooted in speed and precision.",
+                "top_artists": ["Death", "BLOCKHEADS"],
+                "cover_url": (
+                    "/api/catalog/artists/death-global/background?size=640&format=webp"
+                ),
+            }
+        ]
+
+    def test_explore_page_keeps_local_genres_during_catalog_warming(
+        self,
+        test_app,
+        monkeypatch,
+    ):
+        from crate.api import browse
+
+        monkeypatch.setattr(
+            browse,
+            "get_catalog_state",
+            lambda: {"status": "backfilling", "last_full_reconcile_at": None},
+            raising=False,
+        )
+        monkeypatch.setattr(
+            browse,
+            "catalog_serves_global",
+            lambda state: False,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            browse,
+            "list_global_catalog_genres",
+            MagicMock(side_effect=AssertionError("global genres must not be read")),
+            raising=False,
+        )
+        local_genres = [{"name": "Local Genre", "count": 4}]
+
+        with (
+            patch(
+                "crate.api.browse.api_browse_filters",
+                return_value={
+                    "genres": local_genres,
+                    "countries": [],
+                    "decades": [],
+                    "formats": [],
+                },
+            ),
+            patch("crate.api.browse.curated_playlists", return_value=[]),
+            patch("crate.api.browse.api_browse_moods", return_value=[]),
+            patch("crate.api.browse.get_cache", return_value=None),
+            patch("crate.api.browse.set_cache"),
+        ):
+            response = test_app.get("/api/browse/explore-page")
+
+        assert response.status_code == 200
+        assert response.json()["filters"]["genres"] == [
+            {
+                "name": "Local Genre",
+                "slug": None,
+                "cnt": None,
+                "count": 4,
+                "description": None,
+                "top_artists": [],
+                "cover_url": None,
+            }
+        ]
+
 
 class TestExploreSearchContract:
     def test_search_short_query_still_returns_tracks_key(self, test_app):

@@ -292,7 +292,11 @@ def list_global_catalog_genres() -> list[dict]:
                             membership.entity_type,
                             membership.global_entity_uid,
                             membership.global_genre_uid,
-                            membership.global_genre_uid AS direct_genre_uid
+                            membership.global_genre_uid AS direct_genre_uid,
+                            membership.direct_score,
+                            membership.aggregate_score,
+                            membership.supporting_source_count,
+                            membership.supporting_node_count
                         FROM global_catalog_entity_genres membership
                         WHERE membership.aggregate_score >= 0.700
                         UNION
@@ -300,7 +304,11 @@ def list_global_catalog_genres() -> list[dict]:
                             inherited.entity_type,
                             inherited.global_entity_uid,
                             parent.global_genre_uid,
-                            inherited.direct_genre_uid
+                            inherited.direct_genre_uid,
+                            inherited.direct_score,
+                            inherited.aggregate_score,
+                            inherited.supporting_source_count,
+                            inherited.supporting_node_count
                         FROM inherited
                         JOIN genre_taxonomy_nodes child
                           ON child.taxonomy_id = 'crate-core'
@@ -310,11 +318,87 @@ def list_global_catalog_genres() -> list[dict]:
                          AND edge.relation_type = 'parent'
                          AND edge.locked
                         JOIN genre_taxonomy_nodes parent ON parent.id = edge.target_genre_id
+                    ),
+                    artist_paths AS (
+                        SELECT
+                            inherited.global_genre_uid,
+                            artist.global_artist_uid,
+                            artist.canonical_name AS artist_name,
+                            artist.local_artist_id,
+                            artist.has_photo,
+                            (
+                                inherited.direct_genre_uid
+                                = inherited.global_genre_uid
+                            ) AS direct_membership,
+                            inherited.direct_score,
+                            inherited.aggregate_score,
+                            inherited.supporting_source_count,
+                            inherited.supporting_node_count,
+                            local_artist.listeners,
+                            local_artist.spotify_popularity,
+                            COALESCE(album_counts.album_count, 0)::integer
+                                AS album_count,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY
+                                    inherited.global_genre_uid,
+                                    artist.global_artist_uid
+                                ORDER BY
+                                    (
+                                        inherited.direct_genre_uid
+                                        = inherited.global_genre_uid
+                                    ) DESC,
+                                    inherited.aggregate_score DESC,
+                                    inherited.direct_score DESC,
+                                    inherited.supporting_source_count DESC,
+                                    inherited.supporting_node_count DESC
+                            ) AS path_rank
+                        FROM inherited
+                        JOIN global_catalog_artists artist
+                          ON artist.global_artist_uid
+                           = inherited.global_entity_uid
+                        LEFT JOIN library_artists local_artist
+                          ON local_artist.id = artist.local_artist_id
+                        LEFT JOIN (
+                            SELECT
+                                global_artist_uid,
+                                COUNT(*)::integer AS album_count
+                            FROM global_catalog_albums
+                            GROUP BY global_artist_uid
+                        ) album_counts
+                          ON album_counts.global_artist_uid
+                           = artist.global_artist_uid
+                        WHERE inherited.entity_type = 'artist'
+                    ),
+                    ranked_artists AS (
+                        SELECT
+                            artist_paths.*,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY global_genre_uid
+                                ORDER BY
+                                    direct_membership DESC,
+                                    aggregate_score DESC,
+                                    direct_score DESC,
+                                    supporting_source_count DESC,
+                                    supporting_node_count DESC,
+                                    listeners DESC NULLS LAST,
+                                    spotify_popularity DESC NULLS LAST,
+                                    album_count DESC,
+                                    artist_name ASC,
+                                    global_artist_uid ASC
+                            ) AS genre_rank
+                        FROM artist_paths
+                        WHERE path_rank = 1
+                          AND direct_membership
                     )
                     SELECT
                         taxonomy.global_genre_uid::text AS global_genre_uid,
                         taxonomy.slug AS canonical_slug,
                         taxonomy.name AS canonical_name,
+                        COALESCE(
+                            NULLIF(taxonomy.description, ''),
+                            NULLIF(taxonomy.external_description, '')
+                        ) AS description,
+                        taxonomy.cover_path,
                         COUNT(DISTINCT (
                             inherited.entity_type::text || ':' || inherited.global_entity_uid::text
                         ))::integer AS entity_count,
@@ -326,13 +410,56 @@ def list_global_catalog_genres() -> list[dict]:
                             AS album_count,
                         COUNT(DISTINCT inherited.global_entity_uid)
                             FILTER (WHERE inherited.entity_type = 'track')::integer
-                            AS track_count
+                            AS track_count,
+                        top_artists.top_artists,
+                        top_artists.top_artist_global_uid,
+                        top_artists.top_artist_id,
+                        top_artists.top_artist_has_photo
                     FROM genre_taxonomy_nodes taxonomy
                     LEFT JOIN inherited
                       ON inherited.global_genre_uid = taxonomy.global_genre_uid
+                    LEFT JOIN LATERAL (
+                        SELECT
+                            ARRAY_AGG(
+                                ranked.artist_name
+                                ORDER BY ranked.genre_rank
+                            ) AS top_artists,
+                            (
+                                ARRAY_AGG(
+                                    ranked.global_artist_uid::text
+                                    ORDER BY ranked.genre_rank
+                                )
+                            )[1] AS top_artist_global_uid,
+                            (
+                                ARRAY_AGG(
+                                    ranked.local_artist_id
+                                    ORDER BY ranked.genre_rank
+                                )
+                            )[1] AS top_artist_id,
+                            (
+                                ARRAY_AGG(
+                                    ranked.has_photo
+                                    ORDER BY ranked.genre_rank
+                                )
+                            )[1] AS top_artist_has_photo
+                        FROM ranked_artists ranked
+                        WHERE ranked.global_genre_uid
+                            = taxonomy.global_genre_uid
+                          AND ranked.genre_rank <= 3
+                    ) top_artists ON TRUE
                     WHERE taxonomy.taxonomy_id = 'crate-core'
                       AND taxonomy.origin = 'core'
-                    GROUP BY taxonomy.global_genre_uid, taxonomy.slug, taxonomy.name
+                    GROUP BY
+                        taxonomy.global_genre_uid,
+                        taxonomy.slug,
+                        taxonomy.name,
+                        taxonomy.description,
+                        taxonomy.external_description,
+                        taxonomy.cover_path,
+                        top_artists.top_artists,
+                        top_artists.top_artist_global_uid,
+                        top_artists.top_artist_id,
+                        top_artists.top_artist_has_photo
                     ORDER BY entity_count DESC, taxonomy.name ASC
                     """
                 )
@@ -340,7 +467,26 @@ def list_global_catalog_genres() -> list[dict]:
             .mappings()
             .all()
         )
-    return [dict(row) for row in rows]
+    payloads = []
+    for row in rows:
+        payload = dict(row)
+        payload["top_artists"] = list(payload.get("top_artists") or [])
+        cover_path = str(payload.pop("cover_path", "") or "").strip()
+        top_artist_has_photo = bool(payload.pop("top_artist_has_photo", False))
+        if cover_path:
+            payload["cover_url"] = genre_cover_public_url(
+                str(payload["canonical_slug"]),
+                size=640,
+            )
+        elif payload.get("top_artist_global_uid") and top_artist_has_photo:
+            payload["cover_url"] = (
+                f"/api/catalog/artists/{payload['top_artist_global_uid']}"
+                "/background?size=640&format=webp"
+            )
+        else:
+            payload["cover_url"] = None
+        payloads.append(payload)
+    return payloads
 
 
 def get_global_genre_detail(slug: str) -> dict | None:
@@ -446,7 +592,10 @@ _GLOBAL_GENRE_ARTISTS_SQL = text(
             membership.global_entity_uid,
             membership.global_genre_uid,
             membership.global_genre_uid AS direct_genre_uid,
-            membership.supporting_source_count
+            membership.direct_score,
+            membership.aggregate_score,
+            membership.supporting_source_count,
+            membership.supporting_node_count
         FROM global_catalog_entity_genres membership
         WHERE membership.entity_type = 'artist'
           AND membership.aggregate_score >= 0.700
@@ -456,7 +605,10 @@ _GLOBAL_GENRE_ARTISTS_SQL = text(
             inherited.global_entity_uid,
             parent.global_genre_uid,
             inherited.direct_genre_uid,
-            inherited.supporting_source_count
+            inherited.direct_score,
+            inherited.aggregate_score,
+            inherited.supporting_source_count,
+            inherited.supporting_node_count
         FROM inherited
         JOIN genre_taxonomy_nodes child
           ON child.taxonomy_id = 'crate-core'
@@ -466,45 +618,97 @@ _GLOBAL_GENRE_ARTISTS_SQL = text(
          AND edge.relation_type = 'parent'
          AND edge.locked
         JOIN genre_taxonomy_nodes parent ON parent.id = edge.target_genre_id
+    ),
+    ranked AS (
+        SELECT
+            artist.global_artist_uid::text AS global_artist_uid,
+            artist.canonical_name AS artist_name,
+            artist.local_artist_id AS artist_id,
+            artist.local_artist_entity_uid::text AS artist_entity_uid,
+            local_artist.slug AS artist_slug,
+            COALESCE(album_counts.album_count, 0)::integer AS album_count,
+            COALESCE(track_counts.track_count, 0)::integer AS track_count,
+            artist.has_photo,
+            CASE WHEN artist.has_photo
+                THEN '/api/catalog/artists/' || artist.global_artist_uid::text || '/photo'
+                ELSE NULL
+            END AS photo_url,
+            local_artist.listeners,
+            local_artist.spotify_popularity,
+            (
+                inherited.direct_genre_uid
+                = inherited.global_genre_uid
+            ) AS direct_membership,
+            inherited.direct_score::double precision AS direct_score,
+            inherited.aggregate_score::double precision AS aggregate_score,
+            inherited.supporting_source_count,
+            inherited.supporting_node_count,
+            ROW_NUMBER() OVER (
+                PARTITION BY artist.global_artist_uid
+                ORDER BY
+                    (
+                        inherited.direct_genre_uid
+                        = inherited.global_genre_uid
+                    ) DESC,
+                    inherited.aggregate_score DESC,
+                    inherited.direct_score DESC,
+                    inherited.supporting_source_count DESC,
+                    inherited.supporting_node_count DESC
+            ) AS path_rank
+        FROM inherited
+        JOIN global_catalog_artists artist
+          ON artist.global_artist_uid = inherited.global_entity_uid
+        LEFT JOIN library_artists local_artist
+          ON local_artist.id = artist.local_artist_id
+        LEFT JOIN (
+            SELECT global_artist_uid, COUNT(*)::integer AS album_count
+            FROM global_catalog_albums
+            GROUP BY global_artist_uid
+        ) album_counts
+          ON album_counts.global_artist_uid = artist.global_artist_uid
+        LEFT JOIN (
+            SELECT global_artist_uid, COUNT(*)::integer AS track_count
+            FROM global_catalog_tracks
+            GROUP BY global_artist_uid
+        ) track_counts
+          ON track_counts.global_artist_uid = artist.global_artist_uid
+        WHERE inherited.global_genre_uid
+            = CAST(:global_genre_uid AS uuid)
     )
-    SELECT DISTINCT ON (artist.global_artist_uid)
-        artist.global_artist_uid::text AS global_artist_uid,
-        artist.canonical_name AS artist_name,
-        artist.local_artist_id AS artist_id,
-        artist.local_artist_entity_uid::text AS artist_entity_uid,
-        local_artist.slug AS artist_slug,
-        COALESCE(album_counts.album_count, 0)::integer AS album_count,
-        COALESCE(track_counts.track_count, 0)::integer AS track_count,
-        artist.has_photo,
-        CASE WHEN artist.has_photo
-            THEN '/api/catalog/artists/' || artist.global_artist_uid::text || '/photo'
-            ELSE NULL
-        END AS photo_url,
-        local_artist.listeners,
+    SELECT
+        global_artist_uid,
+        artist_name,
+        artist_id,
+        artist_entity_uid,
+        artist_slug,
+        album_count,
+        track_count,
+        has_photo,
+        photo_url,
+        listeners,
+        spotify_popularity,
         CASE
-            WHEN inherited.direct_genre_uid = CAST(:global_genre_uid AS uuid)
-            THEN 'direct'
+            WHEN direct_membership THEN 'direct'
             ELSE 'inherited'
         END AS membership,
-        inherited.supporting_source_count
-    FROM inherited
-    JOIN global_catalog_artists artist
-      ON artist.global_artist_uid = inherited.global_entity_uid
-    LEFT JOIN library_artists local_artist ON local_artist.id = artist.local_artist_id
-    LEFT JOIN (
-        SELECT global_artist_uid, COUNT(*)::integer AS album_count
-        FROM global_catalog_albums
-        GROUP BY global_artist_uid
-    ) album_counts ON album_counts.global_artist_uid = artist.global_artist_uid
-    LEFT JOIN (
-        SELECT global_artist_uid, COUNT(*)::integer AS track_count
-        FROM global_catalog_tracks
-        GROUP BY global_artist_uid
-    ) track_counts ON track_counts.global_artist_uid = artist.global_artist_uid
-    WHERE inherited.global_genre_uid = CAST(:global_genre_uid AS uuid)
-    ORDER BY artist.global_artist_uid,
-             (inherited.direct_genre_uid = CAST(:global_genre_uid AS uuid)) DESC,
-             inherited.supporting_source_count DESC
+        direct_score,
+        aggregate_score,
+        aggregate_score AS membership_score,
+        supporting_source_count,
+        supporting_node_count
+    FROM ranked
+    WHERE path_rank = 1
+    ORDER BY
+        direct_membership DESC,
+        aggregate_score DESC,
+        direct_score DESC,
+        supporting_source_count DESC,
+        supporting_node_count DESC,
+        listeners DESC NULLS LAST,
+        spotify_popularity DESC NULLS LAST,
+        album_count DESC,
+        artist_name ASC,
+        global_artist_uid ASC
     """
 )
 
@@ -517,7 +721,10 @@ _GLOBAL_GENRE_ALBUMS_SQL = text(
             membership.global_entity_uid,
             membership.global_genre_uid,
             membership.global_genre_uid AS direct_genre_uid,
-            membership.supporting_source_count
+            membership.direct_score,
+            membership.aggregate_score,
+            membership.supporting_source_count,
+            membership.supporting_node_count
         FROM global_catalog_entity_genres membership
         WHERE membership.entity_type = 'album'
           AND membership.aggregate_score >= 0.700
@@ -527,7 +734,10 @@ _GLOBAL_GENRE_ALBUMS_SQL = text(
             inherited.global_entity_uid,
             parent.global_genre_uid,
             inherited.direct_genre_uid,
-            inherited.supporting_source_count
+            inherited.direct_score,
+            inherited.aggregate_score,
+            inherited.supporting_source_count,
+            inherited.supporting_node_count
         FROM inherited
         JOIN genre_taxonomy_nodes child
           ON child.taxonomy_id = 'crate-core'
@@ -537,40 +747,95 @@ _GLOBAL_GENRE_ALBUMS_SQL = text(
          AND edge.relation_type = 'parent'
          AND edge.locked
         JOIN genre_taxonomy_nodes parent ON parent.id = edge.target_genre_id
+    ),
+    ranked AS (
+        SELECT
+            album.global_album_uid::text AS global_album_uid,
+            album.local_album_id AS album_id,
+            album.local_album_entity_uid::text AS album_entity_uid,
+            local_album.slug AS album_slug,
+            album.artist_name AS artist,
+            artist.local_artist_id AS artist_id,
+            artist.local_artist_entity_uid::text AS artist_entity_uid,
+            local_artist.slug AS artist_slug,
+            album.canonical_name AS name,
+            COALESCE(album.year, '') AS year,
+            COALESCE(album.track_count, 0)::integer AS track_count,
+            album.has_cover,
+            CASE WHEN album.has_cover
+                THEN '/api/catalog/albums/' || album.global_album_uid::text || '/cover'
+                ELSE NULL
+            END AS cover_url,
+            (
+                inherited.direct_genre_uid
+                = inherited.global_genre_uid
+            ) AS direct_membership,
+            inherited.direct_score::double precision AS direct_score,
+            inherited.aggregate_score::double precision AS aggregate_score,
+            inherited.supporting_source_count,
+            inherited.supporting_node_count,
+            local_album.popularity,
+            local_album.lastfm_playcount,
+            ROW_NUMBER() OVER (
+                PARTITION BY album.global_album_uid
+                ORDER BY
+                    (
+                        inherited.direct_genre_uid
+                        = inherited.global_genre_uid
+                    ) DESC,
+                    inherited.aggregate_score DESC,
+                    inherited.direct_score DESC,
+                    inherited.supporting_source_count DESC,
+                    inherited.supporting_node_count DESC
+            ) AS path_rank
+        FROM inherited
+        JOIN global_catalog_albums album
+          ON album.global_album_uid = inherited.global_entity_uid
+        JOIN global_catalog_artists artist
+          ON artist.global_artist_uid = album.global_artist_uid
+        LEFT JOIN library_albums local_album
+          ON local_album.id = album.local_album_id
+        LEFT JOIN library_artists local_artist
+          ON local_artist.id = artist.local_artist_id
+        WHERE inherited.global_genre_uid
+            = CAST(:global_genre_uid AS uuid)
     )
-    SELECT DISTINCT ON (album.global_album_uid)
-        album.global_album_uid::text AS global_album_uid,
-        album.local_album_id AS album_id,
-        album.local_album_entity_uid::text AS album_entity_uid,
-        local_album.slug AS album_slug,
-        album.artist_name AS artist,
-        artist.local_artist_id AS artist_id,
-        artist.local_artist_entity_uid::text AS artist_entity_uid,
-        local_artist.slug AS artist_slug,
-        album.canonical_name AS name,
-        COALESCE(album.year, '') AS year,
-        COALESCE(album.track_count, 0)::integer AS track_count,
-        album.has_cover,
-        CASE WHEN album.has_cover
-            THEN '/api/catalog/albums/' || album.global_album_uid::text || '/cover'
-            ELSE NULL
-        END AS cover_url,
+    SELECT
+        global_album_uid,
+        album_id,
+        album_entity_uid,
+        album_slug,
+        artist,
+        artist_id,
+        artist_entity_uid,
+        artist_slug,
+        name,
+        year,
+        track_count,
+        has_cover,
+        cover_url,
         CASE
-            WHEN inherited.direct_genre_uid = CAST(:global_genre_uid AS uuid)
-            THEN 'direct'
+            WHEN direct_membership THEN 'direct'
             ELSE 'inherited'
         END AS membership,
-        inherited.supporting_source_count
-    FROM inherited
-    JOIN global_catalog_albums album
-      ON album.global_album_uid = inherited.global_entity_uid
-    JOIN global_catalog_artists artist ON artist.global_artist_uid = album.global_artist_uid
-    LEFT JOIN library_albums local_album ON local_album.id = album.local_album_id
-    LEFT JOIN library_artists local_artist ON local_artist.id = artist.local_artist_id
-    WHERE inherited.global_genre_uid = CAST(:global_genre_uid AS uuid)
-    ORDER BY album.global_album_uid,
-             (inherited.direct_genre_uid = CAST(:global_genre_uid AS uuid)) DESC,
-             inherited.supporting_source_count DESC
+        direct_score,
+        aggregate_score,
+        aggregate_score AS membership_score,
+        supporting_source_count,
+        supporting_node_count
+    FROM ranked
+    WHERE path_rank = 1
+    ORDER BY
+        direct_membership DESC,
+        aggregate_score DESC,
+        direct_score DESC,
+        supporting_source_count DESC,
+        supporting_node_count DESC,
+        popularity DESC NULLS LAST,
+        lastfm_playcount DESC NULLS LAST,
+        year DESC,
+        name ASC,
+        global_album_uid ASC
     """
 )
 

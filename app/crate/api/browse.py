@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Request
 
 from crate.api.auth import _require_auth
@@ -8,6 +10,11 @@ from crate.api.curation import curated_playlists
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.schemas import BrowseExplorePageResponse
 from crate.db.cache_store import get_cache, set_cache
+from crate.db.queries.global_catalog import list_global_catalog_genres
+from crate.db.repositories.global_catalog_state import (
+    catalog_serves_global,
+    get_catalog_state,
+)
 
 router = APIRouter()
 router.include_router(artist_router)
@@ -15,6 +22,35 @@ router.include_router(album_router)
 router.include_router(media_router)
 
 _EXPLORE_PAGE_CACHE_TTL_SECONDS = 60
+log = logging.getLogger(__name__)
+
+
+def _explore_genres(local_genres: list[dict]) -> list[dict]:
+    try:
+        if not catalog_serves_global(get_catalog_state()):
+            return local_genres
+        global_genres = list_global_catalog_genres()
+    except Exception:
+        log.warning(
+            "Global genre summaries unavailable; using local Explore genres",
+            exc_info=True,
+        )
+        return local_genres
+
+    payloads = [
+        {
+            "name": genre["canonical_name"],
+            "slug": genre["canonical_slug"],
+            "cnt": int(genre.get("artist_count") or 0),
+            "count": int(genre.get("artist_count") or 0),
+            "description": genre.get("description"),
+            "top_artists": list(genre.get("top_artists") or []),
+            "cover_url": genre.get("cover_url"),
+        }
+        for genre in global_genres
+        if int(genre.get("artist_count") or 0) > 0
+    ]
+    return payloads or local_genres
 
 
 @router.get(
@@ -30,8 +66,10 @@ def api_browse_explore_page(request: Request):
     if cached is not None:
         return cached
 
+    filters = dict(api_browse_filters(request))
+    filters["genres"] = _explore_genres(list(filters.get("genres") or []))
     payload = {
-        "filters": api_browse_filters(request),
+        "filters": filters,
         "playlists": curated_playlists(request)[:8],
         "moods": api_browse_moods(request),
     }
