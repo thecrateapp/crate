@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -59,6 +61,47 @@ def test_deploy_cannot_bypass_remote_release_preflight() -> None:
     assert deploy_body.index("remote_deploy release-preflight") < deploy_body.index(
         "remote_deploy backup"
     )
+
+
+def test_production_compose_propagates_federation_identity_and_secrets() -> None:
+    compose = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())
+
+    environments = {
+        service_name: {
+            entry.split("=", 1)[0]: entry.split("=", 1)[1]
+            for entry in compose["services"][service_name]["environment"]
+        }
+        for service_name in ("crate-api", "crate-worker", "crate-playback-worker")
+    }
+
+    assert environments["crate-api"]["CRATE_INSTANCE_NAME"] == (
+        "${CRATE_INSTANCE_NAME:?CRATE_INSTANCE_NAME must be set}"
+    )
+    assert environments["crate-api"]["CRATE_PUBLIC_API_BASE_URL"] == (
+        "${CRATE_PUBLIC_API_BASE_URL:?CRATE_PUBLIC_API_BASE_URL must be set}"
+    )
+    assert environments["crate-api"]["CRATE_FEDERATION_CURSOR_SECRET"] == (
+        "${CRATE_FEDERATION_CURSOR_SECRET:?CRATE_FEDERATION_CURSOR_SECRET must be set}"
+    )
+    assert environments["crate-api"]["CRATE_FEDERATION_CATALOG_PAGE_MAX_BYTES"] == (
+        "${CRATE_FEDERATION_CATALOG_PAGE_MAX_BYTES:-2097152}"
+    )
+    assert environments["crate-worker"]["CRATE_FEDERATION_DELTA_RETENTION_DAYS"] == (
+        "${CRATE_FEDERATION_DELTA_RETENTION_DAYS:-90}"
+    )
+    for environment in environments.values():
+        assert environment["CRATE_FEDERATION_SUBJECT_SECRET"] == (
+            "${CRATE_FEDERATION_SUBJECT_SECRET:"
+            "?CRATE_FEDERATION_SUBJECT_SECRET must be set}"
+        )
+
+
+def test_example_environment_documents_required_federation_identity() -> None:
+    example = (ROOT / ".env.example").read_text()
+
+    assert "CRATE_INSTANCE_NAME=" in example
+    assert "CRATE_PUBLIC_API_BASE_URL=" in example
+    assert "CRATE_FEDERATION_SUBJECT_SECRET=" in example
 
 
 def test_recovery_snapshot_requires_an_explicit_deploy_id() -> None:
