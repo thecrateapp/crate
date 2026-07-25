@@ -292,6 +292,84 @@ def test_local_track_resolves_album_through_merged_local_source(pg_db):
     assert row["track_album_uid"] == row["source_album_uid"]
 
 
+@pytest.mark.parametrize("reconciliation_mode", ["full", "incremental"])
+def test_local_track_uses_album_artist_when_track_credit_is_not_canonical(
+    pg_db, reconciliation_mode
+):
+    from crate.db.tx import read_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_dirty_catalog_sources,
+        reconcile_local_catalog,
+    )
+
+    pg_db.upsert_artist(
+        {
+            "name": "The Who",
+            "entity_uid": str(uuid.uuid4()),
+        }
+    )
+    album_id = pg_db.upsert_album(
+        {
+            "artist": "The Who",
+            "name": "Who Came First",
+            "path": "/music/The Who/Who Came First",
+            "entity_uid": str(uuid.uuid4()),
+            "track_count": 1,
+        }
+    )
+    track_uid = str(uuid.uuid4())
+    pg_db.upsert_track(
+        {
+            "album_id": album_id,
+            "artist": "Pete Townshend",
+            "album": "Who Came First",
+            "filename": "01 - Pure And Easy.flac",
+            "title": "Pure And Easy",
+            "path": "/music/The Who/Who Came First/01 - Pure And Easy.flac",
+            "entity_uid": track_uid,
+            "duration": 333.0,
+            "disc_number": 1,
+            "track_number": 1,
+            "format": "flac",
+            "size": 1024,
+        }
+    )
+
+    if reconciliation_mode == "full":
+        reconcile_local_catalog()
+    else:
+        result = reconcile_dirty_catalog_sources(limit=10)
+        assert result["failed"] == 0
+        assert result["remaining"] == 0
+
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        track.global_artist_uid::text AS track_artist_uid,
+                        album.global_artist_uid::text AS album_artist_uid
+                    FROM global_catalog_sources source
+                    JOIN global_catalog_tracks track
+                      ON track.global_track_uid = source.global_entity_uid
+                    JOIN global_catalog_albums album
+                      ON album.global_album_uid = track.global_album_uid
+                    WHERE source.source_kind = 'local'
+                      AND source.entity_type = 'track'
+                      AND source.local_entity_uid = CAST(:track_uid AS uuid)
+                    """
+                ),
+                {"track_uid": track_uid},
+            )
+            .mappings()
+            .one_or_none()
+        )
+
+    assert row is not None
+    assert row["track_artist_uid"] == row["album_artist_uid"]
+
+
 def test_full_local_reconciliation_prunes_a_source_missing_from_write_model(pg_db):
     from sqlalchemy import text
 

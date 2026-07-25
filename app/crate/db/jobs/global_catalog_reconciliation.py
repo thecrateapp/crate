@@ -303,15 +303,19 @@ def _reconcile_local_source(session, source: dict[str, Any]) -> None:
         _upsert_album(session, source, global_uid, artist_uid)
     elif entity_type == "track":
         payload = source["source_payload"]
-        artist_uid = _find_artist_uid(session, payload["artist_name"])
-        if artist_uid is None:
-            raise RuntimeError("Track source is waiting for its canonical artist")
         album_uid = _find_album_uid(
             session,
             artist_name=payload["artist_name"],
             album_name=payload.get("album_name"),
             local_album_id=payload.get("local_album_id"),
         )
+        artist_uid = _find_local_track_artist_uid(
+            session,
+            album_uid=album_uid,
+            track_artist_name=payload["artist_name"],
+        )
+        if artist_uid is None:
+            raise RuntimeError("Track source is waiting for its canonical artist")
         global_uid, score = _resolve_track_target(session, source, artist_uid)
         source = _with_match(source, score)
         _upsert_track(session, source, global_uid, artist_uid, album_uid)
@@ -894,15 +898,19 @@ def _reconcile_local_batch_sources(
                 _upsert_album(session, source, global_uid, artist_uid)
             else:
                 payload = source["source_payload"]
-                artist_uid = _find_artist_uid(session, payload["artist_name"])
-                if artist_uid is None:
-                    continue
                 album_uid = _find_album_uid(
                     session,
                     artist_name=payload["artist_name"],
                     album_name=payload.get("album_name"),
                     local_album_id=payload.get("local_album_id"),
                 )
+                artist_uid = _find_local_track_artist_uid(
+                    session,
+                    album_uid=album_uid,
+                    track_artist_name=payload["artist_name"],
+                )
+                if artist_uid is None:
+                    continue
                 global_uid, score = _resolve_track_target(session, source, artist_uid)
                 source = _with_match(source, score)
                 existed = _canonical_exists(
@@ -2487,6 +2495,28 @@ def _find_album_uid(
         .first()
     )
     return row["global_album_uid"] if row else None
+
+
+def _find_local_track_artist_uid(
+    session,
+    *,
+    album_uid: str | None,
+    track_artist_name: str,
+) -> str | None:
+    if album_uid is not None:
+        artist_uid = session.execute(
+            text(
+                """
+                SELECT global_artist_uid::text
+                FROM global_catalog_albums
+                WHERE global_album_uid = CAST(:album_uid AS uuid)
+                """
+            ),
+            {"album_uid": album_uid},
+        ).scalar_one_or_none()
+        if artist_uid is not None:
+            return str(artist_uid)
+    return _find_artist_uid(session, track_artist_name)
 
 
 def _source_conflict_target(source: dict[str, Any]) -> str:
