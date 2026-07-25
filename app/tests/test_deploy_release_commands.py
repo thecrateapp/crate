@@ -136,6 +136,20 @@ def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
     assert "recovery_complete" in script
 
 
+def test_remote_backup_preserves_a_sealed_recovery_set() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    backup_body = script[
+        script.index("cmd_backup() {") : script.index("recovery_redis_service() {")
+    ]
+
+    sealed_guard = 'if [[ -f "$BACKUP_DIR/recovery_complete" ]]; then'
+    assert sealed_guard in backup_body
+    assert backup_body.index(sealed_guard) < backup_body.index(
+        'cp -a "$file" "$BACKUP_DIR/$file"'
+    )
+    assert "return 0" in backup_body[backup_body.index(sealed_guard) :]
+
+
 def test_remote_state_rollback_restores_database_before_old_images() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
     rollback_body = script[

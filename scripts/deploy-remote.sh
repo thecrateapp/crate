@@ -350,6 +350,11 @@ cmd_backup() {
   log "Creating rollback snapshot ${DEPLOY_ID}"
   mkdir -p "$BACKUP_DIR"
 
+  if [[ -f "$BACKUP_DIR/recovery_complete" ]]; then
+    log "Reusing sealed recovery set ${DEPLOY_ID}"
+    return 0
+  fi
+
   for file in docker-compose.yaml docker-compose.project.yaml .env; do
     if [[ -f "$file" ]]; then
       cp -a "$file" "$BACKUP_DIR/$file"
