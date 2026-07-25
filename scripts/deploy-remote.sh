@@ -11,6 +11,7 @@ DEPLOY_PUBLIC_CHECKS="${DEPLOY_PUBLIC_CHECKS:-1}"
 DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
 DEPLOY_IMAGE_WAIT_INTERVAL="${DEPLOY_IMAGE_WAIT_INTERVAL:-20}"
 DEPLOY_HEALTH_WAIT_SECONDS="${DEPLOY_HEALTH_WAIT_SECONDS:-420}"
+DEPLOY_PUBLIC_WAIT_SECONDS="${DEPLOY_PUBLIC_WAIT_SECONDS:-120}"
 DEPLOY_CONFIRM="${DEPLOY_CONFIRM:-}"
 CRATE_DEPLOY_PRUNE_UNUSED_IMAGES="${CRATE_DEPLOY_PRUNE_UNUSED_IMAGES:-1}"
 BACKUP_ROOT="${SERVER_PATH}/.deploy-backups"
@@ -284,20 +285,40 @@ wait_for_container_healthy() {
   done
 }
 
-check_public_url() {
+wait_for_public_url() {
   local url="$1"
   local host
+  local deadline
+
   host="${url#https://}"
   host="${host%%/*}"
-  curl -fsSIL --max-time 10 --retry 3 --retry-delay 2 --resolve "${host}:443:127.0.0.1" "$url" >/dev/null
+  deadline=$((SECONDS + DEPLOY_PUBLIC_WAIT_SECONDS))
+
+  until curl -fsSIL --max-time 10 --resolve "${host}:443:127.0.0.1" "$url" >/dev/null; do
+    if (( SECONDS >= deadline )); then
+      log "Public route did not become ready: ${url}"
+      return 1
+    fi
+    sleep 2
+  done
 }
 
-check_public_get_url() {
+wait_for_public_get_url() {
   local url="$1"
   local host
+  local deadline
+
   host="${url#https://}"
   host="${host%%/*}"
-  curl -fsSL --max-time 10 --retry 3 --retry-delay 2 --resolve "${host}:443:127.0.0.1" "$url" >/dev/null
+  deadline=$((SECONDS + DEPLOY_PUBLIC_WAIT_SECONDS))
+
+  until curl -fsSL --max-time 10 --resolve "${host}:443:127.0.0.1" "$url" >/dev/null; do
+    if (( SECONDS >= deadline )); then
+      log "Public route did not become ready: ${url}"
+      return 1
+    fi
+    sleep 2
+  done
 }
 
 cmd_preflight() {
@@ -615,7 +636,7 @@ cmd_verify() {
   done
 
   log "Checking API from inside the backend container"
-  docker exec crate-api python - <<'PY'
+  docker exec -i crate-api python - <<'PY'
 import urllib.request
 
 with urllib.request.urlopen("http://127.0.0.1:8585/api/status", timeout=5) as response:
@@ -625,7 +646,7 @@ PY
 
   if compose_has_service crate-readplane; then
     log "Checking readplane readiness from inside the backend container"
-    docker exec crate-api python - <<'PY'
+    docker exec -i crate-api python - <<'PY'
 import urllib.request
 
 with urllib.request.urlopen("http://crate-readplane:8686/readyz", timeout=5) as response:
@@ -637,11 +658,11 @@ PY
   if [[ "$DEPLOY_PUBLIC_CHECKS" != "0" && -n "$domain" ]]; then
     command -v curl >/dev/null
     log "Checking public routes through Traefik"
-    check_public_get_url "https://api.${domain}/api/status"
-    check_public_url "https://admin.${domain}"
-    check_public_url "https://listen.${domain}"
-    check_public_url "https://cratemusic.app"
-    check_public_url "https://docs.cratemusic.app"
+    wait_for_public_get_url "https://api.${domain}/api/status"
+    wait_for_public_url "https://admin.${domain}"
+    wait_for_public_url "https://listen.${domain}"
+    wait_for_public_url "https://cratemusic.app"
+    wait_for_public_url "https://docs.cratemusic.app"
   fi
 }
 

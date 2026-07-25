@@ -158,6 +158,26 @@ def test_remote_backup_preserves_a_sealed_recovery_set() -> None:
     assert "return 0" in backup_body[backup_body.index(sealed_guard) :]
 
 
+def test_remote_verify_executes_inline_python_inside_the_api_container() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    verify_body = script[
+        script.index("cmd_verify() {") : script.index("cmd_rollback() {")
+    ]
+
+    assert verify_body.count("docker exec -i crate-api python - <<'PY'") == 2
+
+
+def test_remote_verify_waits_for_public_routes_to_become_ready() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    verify_body = script[
+        script.index("cmd_verify() {") : script.index("cmd_rollback() {")
+    ]
+
+    assert "DEPLOY_PUBLIC_WAIT_SECONDS" in script
+    assert "wait_for_public_get_url" in verify_body
+    assert verify_body.count("wait_for_public_url") == 4
+
+
 def test_remote_state_rollback_restores_database_before_old_images() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
     rollback_body = script[
