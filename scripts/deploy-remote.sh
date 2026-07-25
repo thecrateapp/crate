@@ -441,6 +441,17 @@ cmd_recovery_snapshot() {
     dc stop --timeout 45 "${running_services[@]}"
   fi
 
+  log "Stopping any quiesce service missed by Compose"
+  for service in "${QUIESCE_SERVICES[@]}"; do
+    if [[ "$(docker inspect -f '{{.State.Running}}' "$service" 2>/dev/null || true)" != "true" ]]; then
+      continue
+    fi
+    if ! grep -Fxq "$service" "$BACKUP_DIR/recovery_running_services"; then
+      printf '%s\n' "$service" >> "$BACKUP_DIR/recovery_running_services"
+    fi
+    docker stop --time 45 "$service" >/dev/null
+  done
+
   pg_user="$(env_value CRATE_POSTGRES_USER)"
   pg_password="$(env_value CRATE_POSTGRES_PASSWORD)"
   pg_db="$(env_value CRATE_POSTGRES_DB)"

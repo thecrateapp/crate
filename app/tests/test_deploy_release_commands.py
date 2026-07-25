@@ -140,6 +140,8 @@ def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
     assert "recovery.env" in snapshot_body
     assert 'sha256sum "${checksum_files[@]}"' in snapshot_body
     assert "recovery_complete" in script
+    assert 'log "Stopping any quiesce service missed by Compose"' in snapshot_body
+    assert 'docker stop --time 45 "$service"' in snapshot_body
 
 
 def test_remote_backup_preserves_a_sealed_recovery_set() -> None:
