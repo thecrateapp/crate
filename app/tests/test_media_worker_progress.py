@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import crate.media_worker_progress as media_progress
 
@@ -49,6 +50,27 @@ class FakeRedis:
 
     def hgetall(self, key):
         return self.hash_data.get(key, {})
+
+
+def test_media_worker_progress_uses_durable_redis(monkeypatch):
+    import redis
+
+    client = SimpleNamespace(ping=lambda: True)
+    urls: list[str] = []
+
+    monkeypatch.setenv("REDIS_URL", "redis://legacy:6379/0")
+    monkeypatch.setenv("REDIS_CACHE_URL", "redis://cache:6379/0")
+    monkeypatch.setenv("REDIS_DURABLE_URL", "redis://durable:6379/0")
+    monkeypatch.setattr(media_progress, "_redis_client", None, raising=False)
+    monkeypatch.setattr("crate.db.cache_runtime._redis_client", None)
+    monkeypatch.setattr(
+        redis,
+        "from_url",
+        lambda url, **_kwargs: urls.append(url) or client,
+    )
+
+    assert media_progress.get_redis() is client
+    assert urls == ["redis://durable:6379/0"]
 
 
 def test_bridge_media_worker_events_to_task_progress(monkeypatch):
