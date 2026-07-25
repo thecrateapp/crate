@@ -22,6 +22,9 @@ def get_artist_all_tracks(artist_name: str, limit: int | None = None) -> list[di
                     t.track_number, t.format,
                     t.bpm, t.audio_key, t.audio_scale, t.energy,
                     t.danceability, t.valence, t.bliss_vector,
+                    t.lastfm_top_rank, t.lastfm_listeners, t.lastfm_playcount,
+                    t.spotify_top_rank, t.spotify_track_popularity,
+                    t.popularity_score, t.popularity_confidence,
                     t.entity_uid::text AS track_entity_uid,
                     a.id as album_id, a.entity_uid::text AS album_entity_uid, a.slug as album_slug, a.year,
                     ar.id as artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug as artist_slug
@@ -29,7 +32,13 @@ def get_artist_all_tracks(artist_name: str, limit: int | None = None) -> list[di
                 LEFT JOIN library_albums a ON a.id = t.album_id
                 LEFT JOIN library_artists ar ON ar.name = t.artist
                 WHERE t.artist = :artist_name
-                ORDER BY COALESCE(t.lastfm_playcount, 0) DESC,
+                ORDER BY t.lastfm_top_rank ASC NULLS LAST,
+                    t.spotify_top_rank ASC NULLS LAST,
+                    COALESCE(t.lastfm_playcount, 0) DESC,
+                    COALESCE(t.lastfm_listeners, 0) DESC,
+                    COALESCE(t.spotify_track_popularity, 0) DESC,
+                    COALESCE(t.popularity_score, 0) DESC,
+                    COALESCE(t.popularity_confidence, 0) DESC,
                     a.year DESC NULLS LAST,
                     t.track_number ASC NULLS LAST,
                     t.title ASC

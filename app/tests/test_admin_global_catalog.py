@@ -65,6 +65,90 @@ def test_admin_global_catalog_status_reports_serving_mode(monkeypatch):
     assert status["serving_mode"] == "local-fallback"
 
 
+def test_admin_status_counts_only_non_merged_matches_as_ambiguous(monkeypatch):
+    from crate.db.queries import admin_global_catalog
+
+    executed_sql: list[str] = []
+
+    class _Session:
+        def __init__(self):
+            self.results = iter(
+                [
+                    _QueryResult(row=None),
+                    _QueryResult(scalar_value=0),
+                    _QueryResult(scalar_value=7),
+                    _QueryResult(
+                        row={
+                            "active_assertions": 0,
+                            "unmapped_assertions": 0,
+                            "memberships": 0,
+                        }
+                    ),
+                ]
+            )
+
+        def execute(self, statement, *_args, **_kwargs):
+            executed_sql.append(str(statement))
+            return next(self.results)
+
+    @contextmanager
+    def fake_read_scope():
+        yield _Session()
+
+    monkeypatch.setattr(admin_global_catalog, "get_global_catalog_counts", lambda: {})
+    monkeypatch.setattr(
+        admin_global_catalog.global_catalog_state,
+        "get_catalog_state",
+        lambda: {"status": "ready", "last_full_reconcile_at": "2026-07-25"},
+    )
+    monkeypatch.setattr(
+        admin_global_catalog,
+        "get_core_taxonomy_descriptor",
+        lambda: {"taxonomy_id": "crate-core", "version": "1", "digest": "x"},
+    )
+    monkeypatch.setattr(admin_global_catalog, "read_scope", fake_read_scope)
+
+    status = admin_global_catalog.get_global_catalog_admin_status()
+
+    ambiguity_query = next(
+        query for query in executed_sql if "match_confidence" in query
+    )
+    assert "match_confidence < 0.900" in ambiguity_query
+    assert "source_deleted_at IS NULL" in ambiguity_query
+    assert "NOT source_stale" in ambiguity_query
+    assert status["ambiguous_candidate_count"] == 7
+
+
+def test_duplicate_candidates_exclude_sources_already_on_same_canonical(monkeypatch):
+    from crate.db.queries import admin_global_catalog
+
+    executed_sql: list[str] = []
+
+    class _Rows:
+        def mappings(self):
+            return self
+
+        def all(self):
+            return []
+
+    class _Session:
+        def execute(self, statement, *_args, **_kwargs):
+            executed_sql.append(str(statement))
+            return _Rows()
+
+    @contextmanager
+    def fake_read_scope():
+        yield _Session()
+
+    monkeypatch.setattr(admin_global_catalog, "read_scope", fake_read_scope)
+
+    assert admin_global_catalog.list_global_catalog_duplicate_candidates() == []
+    query = executed_sql[0]
+    assert "COUNT(DISTINCT global_entity_uid) > 1" in query
+    assert "source_deleted_at IS NULL" in query
+    assert "NOT source_stale" in query
+
+
 def test_admin_global_catalog_status_endpoint(test_app):
     with patch(
         "crate.api.admin_global_catalog.get_global_catalog_admin_status",

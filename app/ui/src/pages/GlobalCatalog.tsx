@@ -219,7 +219,10 @@ export function GlobalCatalog() {
             <MetricCard label="Artists" value={formatNumber(counts?.artists)} />
             <MetricCard label="Albums" value={formatNumber(counts?.albums)} />
             <MetricCard label="Tracks" value={formatNumber(counts?.tracks)} />
-            <MetricCard label="Sources" value={formatNumber(counts?.sources)} />
+            <MetricCard
+              label="Entity sources"
+              value={formatNumber(counts?.sources)}
+            />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
@@ -254,8 +257,12 @@ export function GlobalCatalog() {
                   Stale peers: {formatNumber(status?.stale_peer_count)}
                 </p>
                 <p className="text-muted-foreground">
-                  Ambiguous candidates:{" "}
+                  Unresolved match candidates:{" "}
                   {formatNumber(status?.ambiguous_candidate_count)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Similar sources below the automatic merge threshold; they
+                  remain separate until reviewed.
                 </p>
               </CardContent>
             </Card>

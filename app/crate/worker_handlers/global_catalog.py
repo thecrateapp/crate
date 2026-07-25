@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from crate.db.repositories.global_catalog_state import (
@@ -21,14 +22,20 @@ from crate.db.repositories.global_user_library import (
 )
 from crate.federation.global_genres import refresh_global_catalog_genre_snapshots
 from crate.federation.global_reconciliation import (
+    begin_global_catalog_reconciliation_run,
+    complete_global_catalog_reconciliation_run,
+    fail_global_catalog_reconciliation_run,
     prune_local_catalog_sources_batch,
     prune_remote_catalog_sources_batch,
+    record_global_catalog_reconciliation_batch,
     reconcile_dirty_catalog_sources,
     reconcile_local_catalog_batch,
     reconcile_remote_catalog_batch,
 )
 from crate.task_dedup_keys import GLOBAL_CATALOG_FULL_DEDUP_KEY
 from crate.worker_handlers import TaskHandler
+
+log = logging.getLogger(__name__)
 
 DEFAULT_BATCH_SIZE = 500
 MAX_BATCH_SIZE = 5000
@@ -58,18 +65,23 @@ def _handle_reconcile_incremental(task_id: str, params: dict, config: dict) -> d
 def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
     batch_size = _batch_size(params)
     state = get_catalog_state()
-    if state["status"] != "backfilling":
-        transition_catalog_state("backfilling")
     bootstrap = state.get("bootstrap_cursor_json")
     bootstrap = bootstrap if isinstance(bootstrap, dict) else {}
+    run_id = str(bootstrap.get("run_id") or "")
     phase = str(bootstrap.get("phase") or "local")
     cursor = bootstrap.get("cursor")
     try:
+        if state["status"] != "backfilling":
+            transition_catalog_state("backfilling")
+        if not run_id:
+            run_id = begin_global_catalog_reconciliation_run(mode="full")
         if phase == "local":
             batch = reconcile_local_catalog_batch(
                 batch_size=batch_size,
                 cursor=cursor if isinstance(cursor, dict) else None,
+                recompute_matches=True,
             )
+            record_global_catalog_reconciliation_batch(run_id, batch)
             return _continue_full_reconciliation(
                 task_id,
                 params,
@@ -77,6 +89,7 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
                 next_phase="local_prune" if batch["completed"] else "local",
                 result=batch,
                 batch_size=batch_size,
+                run_id=run_id,
             )
         if phase == "local_prune":
             batch = prune_local_catalog_sources_batch(
@@ -90,12 +103,15 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
                 next_phase="remote" if batch["completed"] else "local_prune",
                 result=batch,
                 batch_size=batch_size,
+                run_id=run_id,
             )
         if phase == "remote":
             batch = reconcile_remote_catalog_batch(
                 batch_size=batch_size,
                 cursor=cursor if isinstance(cursor, dict) else None,
+                recompute_matches=True,
             )
+            record_global_catalog_reconciliation_batch(run_id, batch)
             return _continue_full_reconciliation(
                 task_id,
                 params,
@@ -103,6 +119,7 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
                 next_phase="remote_prune" if batch["completed"] else "remote",
                 result=batch,
                 batch_size=batch_size,
+                run_id=run_id,
             )
         if phase == "remote_prune":
             batch = prune_remote_catalog_sources_batch(
@@ -113,9 +130,38 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
                 task_id,
                 params,
                 current_phase="remote_prune",
-                next_phase="user_refs" if batch["completed"] else "remote_prune",
+                next_phase="local_refresh" if batch["completed"] else "remote_prune",
                 result=batch,
                 batch_size=batch_size,
+                run_id=run_id,
+            )
+        if phase == "local_refresh":
+            batch = reconcile_local_catalog_batch(
+                batch_size=batch_size,
+                cursor=cursor if isinstance(cursor, dict) else None,
+            )
+            return _continue_full_reconciliation(
+                task_id,
+                params,
+                current_phase="local_refresh",
+                next_phase="remote_refresh" if batch["completed"] else "local_refresh",
+                result=batch,
+                batch_size=batch_size,
+                run_id=run_id,
+            )
+        if phase == "remote_refresh":
+            batch = reconcile_remote_catalog_batch(
+                batch_size=batch_size,
+                cursor=cursor if isinstance(cursor, dict) else None,
+            )
+            return _continue_full_reconciliation(
+                task_id,
+                params,
+                current_phase="remote_refresh",
+                next_phase="user_refs" if batch["completed"] else "remote_refresh",
+                result=batch,
+                batch_size=batch_size,
+                run_id=run_id,
             )
         if phase == "user_refs":
             report = bootstrap.get("user_refs_report")
@@ -138,12 +184,14 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
                     "phase": "search_documents",
                     "cursor": None,
                     "user_refs_report": finalized_report,
+                    "run_id": run_id,
                 }
             else:
                 next_cursor_json = {
                     "phase": "user_refs",
                     "cursor": user_refs["next_cursor"],
                     "user_refs_report": report,
+                    "run_id": run_id,
                 }
             transition_catalog_state(
                 "backfilling",
@@ -178,6 +226,7 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
                 bootstrap_cursor_json={
                     "phase": next_phase,
                     "cursor": search_documents.get("next_cursor"),
+                    "run_id": run_id,
                 },
             )
             continuation_task_id = _queue_full_reconciliation_continuation(
@@ -195,9 +244,18 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
             raise ValueError(f"Unsupported catalog reconciliation phase: {phase}")
         refresh_global_catalog_genre_snapshots()
     except Exception as exc:
+        if run_id:
+            try:
+                fail_global_catalog_reconciliation_run(run_id, str(exc))
+            except Exception:
+                log.exception(
+                    "Failed to persist full catalog reconciliation failure",
+                    extra={"run_id": run_id},
+                )
         transition_catalog_state("failed", last_error=str(exc)[:4000])
         raise
 
+    complete_global_catalog_reconciliation_run(run_id)
     completed_at = datetime.now(timezone.utc).isoformat()
     transition_catalog_state(
         "ready",
@@ -227,11 +285,16 @@ def _continue_full_reconciliation(
     next_phase: str,
     result: dict,
     batch_size: int,
+    run_id: str,
 ) -> dict:
     next_cursor = result.get("next_cursor") if next_phase == current_phase else None
     transition_catalog_state(
         "backfilling",
-        bootstrap_cursor_json={"phase": next_phase, "cursor": next_cursor},
+        bootstrap_cursor_json={
+            "phase": next_phase,
+            "cursor": next_cursor,
+            "run_id": run_id,
+        },
     )
     continuation_task_id = _queue_full_reconciliation_continuation(
         task_id, params, batch_size

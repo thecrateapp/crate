@@ -15,7 +15,7 @@ func TestGenreMembershipTier(t *testing.T) {
 	}{
 		{name: "core", score: 0.90, tier: "core", visible: true},
 		{name: "strong", score: 0.70, tier: "strong", visible: true},
-		{name: "adjacent", score: 0.45, tier: "adjacent", visible: true},
+		{name: "adjacent", score: 0.45, tier: "adjacent", visible: false},
 		{name: "weak", score: 0.44, tier: "weak", visible: false},
 	}
 

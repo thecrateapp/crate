@@ -61,7 +61,9 @@ def get_global_catalog_admin_status() -> dict[str, Any]:
                     SELECT COUNT(*)
                     FROM global_catalog_sources
                     WHERE match_confidence >= 0.850
-                      AND match_confidence < 0.950
+                      AND match_confidence < 0.900
+                      AND source_deleted_at IS NULL
+                      AND NOT source_stale
                     """
                 )
             ).scalar()
@@ -165,8 +167,10 @@ def list_global_catalog_duplicate_candidates(
                         ) AS sources
                     FROM global_catalog_sources
                     WHERE match_confidence >= 0.850
+                      AND source_deleted_at IS NULL
+                      AND NOT source_stale
                     GROUP BY entity_type, match_key
-                    HAVING COUNT(*) > 1
+                    HAVING COUNT(DISTINCT global_entity_uid) > 1
                     ORDER BY source_count DESC, entity_type ASC, match_key ASC
                     LIMIT :limit
                     """

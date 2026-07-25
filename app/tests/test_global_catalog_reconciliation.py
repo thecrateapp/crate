@@ -124,6 +124,208 @@ def test_reconcile_local_catalog_is_idempotent(pg_db):
     }
 
 
+def test_full_match_recompute_splits_sources_that_no_longer_match(pg_db):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_local_catalog_batch,
+    )
+
+    pg_db.upsert_artist(
+        {
+            "name": "Underworld",
+            "entity_uid": str(uuid.uuid4()),
+        }
+    )
+    album_ids = [
+        pg_db.upsert_album(
+            {
+                "artist": "Underworld",
+                "name": title,
+                "path": f"/music/Underworld/{title}",
+                "entity_uid": str(uuid.uuid4()),
+                "year": "2019",
+                "track_count": 5,
+            }
+        )
+        for title in ('DRIFT Episode 1 "DUST"', 'DRIFT Episode 2 "ATOM"')
+    ]
+    reconcile_local_catalog()
+
+    with read_scope() as session:
+        source_rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT id, local_id, global_entity_uid::text AS global_entity_uid
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'album'
+                      AND local_id = ANY(:album_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"album_ids": album_ids},
+            )
+            .mappings()
+            .all()
+        )
+    assert len({row["global_entity_uid"] for row in source_rows}) == 2
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET global_entity_uid = CAST(:wrong_uid AS uuid)
+                WHERE id = :source_id
+                """
+            ),
+            {
+                "wrong_uid": source_rows[0]["global_entity_uid"],
+                "source_id": source_rows[1]["id"],
+            },
+        )
+
+    cursor = None
+    while True:
+        batch = reconcile_local_catalog_batch(
+            batch_size=1,
+            cursor=cursor,
+            recompute_matches=True,
+        )
+        if batch["completed"]:
+            break
+        cursor = batch["next_cursor"]
+
+    with read_scope() as session:
+        repaired = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        global_entity_uid::text AS global_entity_uid,
+                        match_key
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'album'
+                      AND local_id = ANY(:album_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"album_ids": album_ids},
+            )
+            .mappings()
+            .all()
+        )
+
+    assert len({row["global_entity_uid"] for row in repaired}) == 2
+    assert [row["match_key"] for row in repaired] == [
+        "album:underworld|drift episode 1 dust|2019",
+        "album:underworld|drift episode 2 atom|2019",
+    ]
+
+
+def test_full_match_recompute_splits_mixed_clusters_into_valid_subgroups(pg_db):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_local_catalog_batch,
+    )
+
+    pg_db.upsert_artist(
+        {
+            "name": "Dead Can Dance",
+            "entity_uid": str(uuid.uuid4()),
+        }
+    )
+    titles = [
+        "Live at the Acropolis",
+        "Live at the Acropolis (Deluxe Edition)",
+        "Live in Paris",
+        "Live in Paris (Deluxe Edition)",
+    ]
+    album_ids = [
+        pg_db.upsert_album(
+            {
+                "artist": "Dead Can Dance",
+                "name": title,
+                "path": f"/music/Dead Can Dance/{title}",
+                "entity_uid": str(uuid.uuid4()),
+                "year": "2021",
+                "track_count": 10,
+            }
+        )
+        for title in titles
+    ]
+    reconcile_local_catalog()
+
+    with read_scope() as session:
+        sources = (
+            session.execute(
+                text(
+                    """
+                    SELECT id, local_id, global_entity_uid::text AS global_entity_uid
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'album'
+                      AND local_id = ANY(:album_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"album_ids": album_ids},
+            )
+            .mappings()
+            .all()
+        )
+    wrong_uid = sources[0]["global_entity_uid"]
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET global_entity_uid = CAST(:wrong_uid AS uuid)
+                WHERE id = ANY(:source_ids)
+                """
+            ),
+            {
+                "wrong_uid": wrong_uid,
+                "source_ids": [row["id"] for row in sources],
+            },
+        )
+
+    cursor = None
+    while True:
+        batch = reconcile_local_catalog_batch(
+            batch_size=1,
+            cursor=cursor,
+            recompute_matches=True,
+        )
+        if batch["completed"]:
+            break
+        cursor = batch["next_cursor"]
+
+    with read_scope() as session:
+        repaired = (
+            session.execute(
+                text(
+                    """
+                    SELECT local_id, global_entity_uid::text AS global_entity_uid
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'album'
+                      AND local_id = ANY(:album_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"album_ids": album_ids},
+            )
+            .mappings()
+            .all()
+        )
+
+    targets = {row["local_id"]: row["global_entity_uid"] for row in repaired}
+    assert targets[album_ids[0]] == targets[album_ids[1]]
+    assert targets[album_ids[2]] == targets[album_ids[3]]
+    assert targets[album_ids[0]] != targets[album_ids[2]]
+
+
 def test_local_album_resolves_artist_through_merged_local_source(pg_db):
     from crate.db.queries.global_catalog import get_global_catalog_counts
     from crate.db.tx import read_scope, transaction_scope
@@ -425,3 +627,90 @@ def test_reconcile_local_catalog_prefers_local_sources(pg_db):
         assert source["preferred_for_display"] is True
         assert source["preferred_for_artwork"] is True
         assert source["preferred_for_playback"] is True
+
+
+def test_full_reconciliation_run_lifecycle_persists_batch_totals(pg_db):
+    from crate.db.tx import read_scope
+    from crate.federation.global_reconciliation import (
+        begin_global_catalog_reconciliation_run,
+        complete_global_catalog_reconciliation_run,
+        record_global_catalog_reconciliation_batch,
+    )
+
+    run_id = begin_global_catalog_reconciliation_run(mode="full")
+    record_global_catalog_reconciliation_batch(
+        run_id,
+        {
+            "source_rows_seen": 500,
+            "sources_upserted": 498,
+            "canonical_created": 2,
+            "canonical_updated": 496,
+            "auto_merged": 7,
+            "ambiguous_candidates": 3,
+        },
+    )
+    complete_global_catalog_reconciliation_run(run_id)
+
+    with read_scope() as session:
+        run = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        status,
+                        source_rows_seen,
+                        sources_upserted,
+                        canonical_created,
+                        canonical_updated,
+                        auto_merged,
+                        ambiguous_candidates,
+                        completed_at
+                    FROM global_catalog_reconciliation_runs
+                    WHERE run_id = CAST(:run_id AS uuid)
+                    """
+                ),
+                {"run_id": run_id},
+            )
+            .mappings()
+            .one()
+        )
+
+    assert run["status"] == "completed"
+    assert run["source_rows_seen"] == 500
+    assert run["sources_upserted"] == 498
+    assert run["canonical_created"] == 2
+    assert run["canonical_updated"] == 496
+    assert run["auto_merged"] == 7
+    assert run["ambiguous_candidates"] == 3
+    assert run["completed_at"] is not None
+
+
+def test_full_reconciliation_run_failure_is_persisted(pg_db):
+    from crate.db.tx import read_scope
+    from crate.federation.global_reconciliation import (
+        begin_global_catalog_reconciliation_run,
+        fail_global_catalog_reconciliation_run,
+    )
+
+    run_id = begin_global_catalog_reconciliation_run(mode="full")
+    fail_global_catalog_reconciliation_run(run_id, "projection failed")
+
+    with read_scope() as session:
+        run = (
+            session.execute(
+                text(
+                    """
+                    SELECT status, error, completed_at
+                    FROM global_catalog_reconciliation_runs
+                    WHERE run_id = CAST(:run_id AS uuid)
+                    """
+                ),
+                {"run_id": run_id},
+            )
+            .mappings()
+            .one()
+        )
+
+    assert run["status"] == "failed"
+    assert run["error"] == "projection failed"
+    assert run["completed_at"] is not None

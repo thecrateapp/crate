@@ -909,7 +909,10 @@ class TestArtistEnrichment:
 
         worker_enrichment._invalidate_artist_top_tracks_cache(" Birds In Row ")
 
-        assert prefixes == ["listen:artist_top_tracks:v1:birds in row:"]
+        assert prefixes == [
+            "listen:artist_top_tracks:v1:birds in row:",
+            "listen:artist_top_tracks:v2:birds in row:",
+        ]
 
 
 def test_download_artist_photo_queues_persistent_variants(monkeypatch, tmp_path):

@@ -52,6 +52,12 @@ class GenreTaxonomyAlias(Base):
         ForeignKey("genre_taxonomy_nodes.id", ondelete="CASCADE"),
         nullable=False,
     )
+    origin: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default="legacy",
+    )
+    confidence: Mapped[float | None] = mapped_column(Float)
 
     genre: Mapped["GenreTaxonomyNode"] = relationship(back_populates="aliases")
 

@@ -424,15 +424,23 @@ def _build_artist_top_tracks_payload(
     *,
     count: int,
     lastfm_top: list[dict] | None,
+    local_tracks: list[dict] | None = None,
 ) -> list[dict]:
     all_tracks: dict[str, dict] = {}
-    for row in get_artist_all_tracks(artist_name, limit=max(count * 8, 200)):
-        all_tracks.setdefault(row["title"].lower(), row)
+    rows = (
+        local_tracks
+        if local_tracks is not None
+        else get_artist_all_tracks(artist_name, limit=max(count * 8, 200))
+    )
+    for row in rows:
+        title = str(row.get("title") or "").strip()
+        if title:
+            all_tracks.setdefault(title.casefold(), row)
 
     ranked = []
     seen_ids: set[int] = set()
     for item in lastfm_top or []:
-        match = all_tracks.get(item["title"].lower())
+        match = all_tracks.get(str(item.get("title") or "").strip().casefold())
         if match and match["id"] not in seen_ids:
             seen_ids.add(match["id"])
             ranked.append(match)
@@ -441,22 +449,47 @@ def _build_artist_top_tracks_payload(
 
     if len(ranked) < count:
         remaining = [
-            track for track in all_tracks.values() if track["id"] not in seen_ids
+            track
+            for track in all_tracks.values()
+            if track["id"] not in seen_ids and _has_track_level_popularity_signal(track)
         ]
-        remaining.sort(
-            key=lambda track: (
-                track.get("year") or "0",
-                track.get("track_number") or 0,
-            ),
-            reverse=True,
-        )
+        remaining.sort(key=_persisted_top_track_sort_key)
         ranked.extend(remaining[: count - len(ranked)])
 
     return [_format_artist_top_track(row) for row in ranked]
 
 
+def _has_track_level_popularity_signal(track: dict) -> bool:
+    return any(
+        track.get(field) is not None
+        for field in (
+            "lastfm_top_rank",
+            "lastfm_listeners",
+            "lastfm_playcount",
+            "spotify_top_rank",
+            "spotify_track_popularity",
+            "popularity_score",
+        )
+    )
+
+
+def _persisted_top_track_sort_key(track: dict) -> tuple:
+    return (
+        track.get("lastfm_top_rank") is None,
+        int(track.get("lastfm_top_rank") or 1_000_000),
+        track.get("spotify_top_rank") is None,
+        int(track.get("spotify_top_rank") or 1_000_000),
+        -int(track.get("lastfm_playcount") or 0),
+        -int(track.get("lastfm_listeners") or 0),
+        -int(track.get("spotify_track_popularity") or 0),
+        -float(track.get("popularity_score") or 0.0),
+        -float(track.get("popularity_confidence") or 0.0),
+        str(track.get("title") or "").casefold(),
+    )
+
+
 def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict]:
-    cache_key = f"listen:artist_top_tracks:v1:{artist_name.strip().lower()}:{count}"
+    cache_key = f"listen:artist_top_tracks:v2:{artist_name.strip().lower()}:{count}"
     cached = get_cache(cache_key, max_age_seconds=300)
     if cached is not None:
         return cached

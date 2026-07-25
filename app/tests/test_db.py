@@ -1217,6 +1217,86 @@ class TestGenreTaxonomyCleanup:
         assert second is not None
         assert first["entity_uid"] == second["entity_uid"]
 
+    def test_overlay_genre_taxonomy_aliases_are_persisted_as_manual(self, pg_db):
+        from crate.db.tx import read_scope
+
+        pg_db.upsert_genre_taxonomy_node("crank-wave", name="Crank Wave")
+
+        with read_scope() as session:
+            aliases = (
+                session.execute(
+                    text(
+                        """
+                        SELECT alias_slug, origin, confidence
+                        FROM genre_taxonomy_aliases
+                        WHERE genre_id = (
+                            SELECT id
+                            FROM genre_taxonomy_nodes
+                            WHERE slug = 'crank-wave'
+                        )
+                        ORDER BY alias_slug
+                        """
+                    )
+                )
+                .mappings()
+                .all()
+            )
+
+        assert aliases
+        assert {row["origin"] for row in aliases} == {"manual"}
+        assert {float(row["confidence"]) for row in aliases} == {1.0}
+
+    def test_taxonomy_seed_removes_unclassified_legacy_aliases_only(self, pg_db):
+        from crate.db.tx import read_scope, transaction_scope
+        from crate.genre_taxonomy import seed_genre_taxonomy
+
+        with transaction_scope() as session:
+            punk_id = session.execute(
+                text("SELECT id FROM genre_taxonomy_nodes WHERE slug = 'hardcore-punk'")
+            ).scalar_one()
+            session.execute(
+                text(
+                    """
+                    INSERT INTO genre_taxonomy_aliases (
+                        alias_slug, alias_name, genre_id, origin, confidence
+                    )
+                    VALUES
+                        ('country-code-jp', 'country code jp', :genre_id, 'legacy', NULL),
+                        ('curated-scene', 'curated scene', :genre_id, 'manual', 1.0)
+                    ON CONFLICT (alias_slug) DO UPDATE
+                    SET genre_id = EXCLUDED.genre_id,
+                        origin = EXCLUDED.origin,
+                        confidence = EXCLUDED.confidence
+                    """
+                ),
+                {"genre_id": punk_id},
+            )
+            seed_genre_taxonomy(session)
+
+        with read_scope() as session:
+            aliases = {
+                row["alias_slug"]: row["origin"]
+                for row in session.execute(
+                    text(
+                        """
+                        SELECT alias_slug, origin
+                        FROM genre_taxonomy_aliases
+                        WHERE alias_slug IN (
+                            'country-code-jp',
+                            'curated-scene',
+                            'hardcore'
+                        )
+                        """
+                    )
+                )
+                .mappings()
+                .all()
+            }
+
+        assert "country-code-jp" not in aliases
+        assert aliases["curated-scene"] == "manual"
+        assert aliases["hardcore"] == "core"
+
     def test_assign_genre_alias_is_noop_when_alias_already_points_to_same_canonical(
         self, pg_db
     ):

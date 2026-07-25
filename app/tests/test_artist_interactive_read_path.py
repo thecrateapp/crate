@@ -51,8 +51,16 @@ def test_artist_top_tracks_use_persisted_local_ranking_when_cache_misses(
     from crate.api import browse_artist
 
     persisted_tracks = [
-        _local_track(track_id=1, title="Persisted Top Track"),
-        _local_track(track_id=2, title="Persisted Second Track"),
+        {
+            **_local_track(track_id=1, title="Persisted Top Track"),
+            "lastfm_top_rank": 2,
+            "lastfm_playcount": 100,
+        },
+        {
+            **_local_track(track_id=2, title="Persisted Second Track"),
+            "lastfm_top_rank": 1,
+            "lastfm_playcount": 200,
+        },
     ]
     monkeypatch.setattr(browse_artist, "get_cache", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(browse_artist, "set_cache", lambda *_args, **_kwargs: None)

@@ -192,11 +192,15 @@ def upsert_genre_taxonomy_node(
         session.execute(
             text(
                 """
-                INSERT INTO genre_taxonomy_aliases (alias_slug, alias_name, genre_id)
-                VALUES (:alias_slug, :alias_name, :genre_id)
+                INSERT INTO genre_taxonomy_aliases (
+                    alias_slug, alias_name, genre_id, origin, confidence
+                )
+                VALUES (:alias_slug, :alias_name, :genre_id, 'manual', 1.0)
                 ON CONFLICT (alias_slug) DO UPDATE
                 SET alias_name = EXCLUDED.alias_name,
-                    genre_id = EXCLUDED.genre_id
+                    genre_id = EXCLUDED.genre_id,
+                    origin = 'manual',
+                    confidence = 1.0
                 """
             ),
             {"alias_slug": alias_slug, "alias_name": alias_name, "genre_id": row["id"]},

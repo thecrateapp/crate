@@ -25,6 +25,7 @@ from crate.genre_taxonomy import (
 log = logging.getLogger(__name__)
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+_AUTO_APPLY_ALIAS_CONFIDENCE = 0.90
 
 
 @dataclass
@@ -259,6 +260,18 @@ def infer_canonical_genre(
                 }
 
     return None
+
+
+def _should_auto_apply_alias(proposal: dict | None) -> bool:
+    if not proposal or not proposal.get("canonical_slug"):
+        return False
+    try:
+        confidence = float(proposal.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    return confidence >= _AUTO_APPLY_ALIAS_CONFIDENCE and str(
+        proposal.get("mode") or ""
+    ) in {"direct", "specific"}
 
 
 def _list_unmapped_genres(limit: int, focus_slug: str | None = None) -> list[dict]:
@@ -524,7 +537,13 @@ def infer_genre_taxonomy_batch(
             confidence = proposal.get("confidence")
             mode = proposal.get("mode")
             reason = proposal.get("reason")
-            applied = assign_genre_alias_value(genre_name, canonical_slug)
+            if _should_auto_apply_alias(proposal):
+                applied = assign_genre_alias_value(
+                    genre_name,
+                    canonical_slug,
+                    origin="inferred",
+                    confidence=float(confidence or 0.0),
+                )
 
         if applied:
             mapped += 1

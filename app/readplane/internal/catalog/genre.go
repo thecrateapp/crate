@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	minGenreMembershipScore  = 0.45
-	artistAlbumFallbackScore = 0.70
-	relatedGenreLimit        = 24
+	minGenreMembershipScore      = 0.45
+	minArtistRoomMembershipScore = 0.70
+	artistAlbumFallbackScore     = 0.70
+	relatedGenreLimit            = 24
 )
 
 var genreRelationLabels = map[string]string{
@@ -49,7 +50,7 @@ func genreMembershipTier(score float64) string {
 }
 
 func visibleGenreMembership(score float64) bool {
-	return score >= minGenreMembershipScore
+	return score >= minArtistRoomMembershipScore
 }
 
 func annotateGenreMembershipRows(rows []map[string]any) {

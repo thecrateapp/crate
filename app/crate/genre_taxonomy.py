@@ -1489,9 +1489,9 @@ def seed_genre_taxonomy(session) -> None:
     """Upsert the static genre definitions into the taxonomy tables.
 
     Tables must already exist (created by _create_schema / migrations).
-    This is safe to run on every boot — it only inserts or updates rows
-    that diverge from the Python definitions and never touches
-    user-created or externally-enriched data.
+    This is safe to run on every boot: it refreshes core definitions and
+    removes only pre-provenance aliases that cannot be trusted. Classified
+    manual and inferred aliases are preserved.
     """
     from crate.db.jobs.genre_taxonomy import seed_genre_taxonomy_definitions
 

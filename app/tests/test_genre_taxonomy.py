@@ -11,7 +11,10 @@ from crate.genre_taxonomy import (
     resolve_genre_eq_preset,
     summarize_taste_genres,
 )
-from crate.genre_taxonomy_inference import infer_canonical_genre
+from crate.genre_taxonomy_inference import (
+    _should_auto_apply_alias,
+    infer_canonical_genre,
+)
 
 
 def test_summarize_taste_genres_normalizes_aliases() -> None:
@@ -216,6 +219,29 @@ def test_infer_canonical_genre_falls_back_to_family_when_needed() -> None:
 
     assert proposal is not None
     assert proposal["canonical_slug"] in {"techno", "house", "electronic"}
+
+
+def test_taxonomy_inference_does_not_persist_weak_contextual_aliases() -> None:
+    assert (
+        _should_auto_apply_alias(
+            {
+                "canonical_slug": "punk",
+                "confidence": 0.82,
+                "mode": "family_fallback",
+            }
+        )
+        is False
+    )
+    assert (
+        _should_auto_apply_alias(
+            {
+                "canonical_slug": "doom-metal",
+                "confidence": 0.95,
+                "mode": "specific",
+            }
+        )
+        is True
+    )
 
 
 def test_infer_canonical_genre_prefers_specific_runtime_child_over_generic_family() -> (

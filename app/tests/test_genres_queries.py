@@ -243,9 +243,7 @@ class TestGenresLibraryDetail:
         assert len(result["artists"]) >= 1
         assert result["artists"][0]["artist_name"] == "Detail Artist"
 
-    def test_get_genre_detail_includes_all_genre_artists_by_weight_then_popularity(
-        self, pg_db
-    ):
+    def test_get_genre_detail_excludes_weak_contextual_artist_tags(self, pg_db):
         from crate.db.queries.genres_library_detail import get_genre_detail
 
         self._setup_genre_library_data(pg_db)
@@ -253,7 +251,7 @@ class TestGenresLibraryDetail:
         pg_db.upsert_artist({"name": "Weak Detail Artist", "listeners": 9999999})
         pg_db.set_artist_genres(
             "Secondary Detail Artist",
-            [("experimental", 1.0, "test"), ("post-punk", 0.5, "test")],
+            [("experimental", 1.0, "test"), ("post-punk", 0.72, "test")],
         )
         pg_db.set_artist_genres(
             "Weak Detail Artist",
@@ -295,9 +293,9 @@ class TestGenresLibraryDetail:
             > result["artists"][1]["membership_score"]
         )
         assert result["artists"][0]["membership_tier"] == "core"
-        assert result["artists"][1]["membership_tier"] == "adjacent"
+        assert result["artists"][1]["membership_tier"] == "strong"
         album_names = [album["name"] for album in result["albums"]]
-        assert "Secondary Detail Album" not in album_names
+        assert "Secondary Detail Album" in album_names
         assert "Weak Detail Album" not in album_names
         assert result["artist_count"] == len(result["artists"])
         assert result["album_count"] == len(result["albums"])
