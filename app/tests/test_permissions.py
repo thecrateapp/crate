@@ -2492,11 +2492,15 @@ def test_album_enrich_rejects_regular_user():
 
 
 def test_artist_enrich_allows_metadata_editor_without_admin_access(monkeypatch):
+    import importlib
+
     from crate.api.browse_artist import api_artist_enrich
 
     queued: list[tuple[str, bool, str]] = []
+    content = importlib.import_module("crate.content")
     monkeypatch.setattr(
-        "crate.content.queue_process_new_content_if_needed",
+        content,
+        "queue_process_new_content_if_needed",
         lambda name, force, triggered_by: (
             queued.append((name, force, triggered_by)) or "task-artist"
         ),
