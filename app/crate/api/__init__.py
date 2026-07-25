@@ -85,6 +85,7 @@ def _queue_global_catalog_bootstrap() -> None:
         USER_LIBRARY_REFS_BACKFILL_VERSION,
     )
     from crate.db.repositories.tasks import create_task_dedup
+    from crate.task_dedup_keys import GLOBAL_CATALOG_FULL_DEDUP_KEY
 
     state = get_catalog_state()
     if (
@@ -98,7 +99,7 @@ def _queue_global_catalog_bootstrap() -> None:
     create_task_dedup(
         "global_catalog_reconcile_full",
         {"triggered_by": "api_startup"},
-        dedup_key="bootstrap:global-catalog",
+        dedup_key=GLOBAL_CATALOG_FULL_DEDUP_KEY,
     )
 
 

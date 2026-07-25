@@ -164,3 +164,21 @@ class TestCreateTaskDedup:
             dedup_key="tidal:album:https://tidal.com/album/123:max:terror:one-with-the-underdogs",
         )
         assert second is None
+
+    def test_explicit_key_on_a_continuation_suppresses_new_root_tasks(self, pg_db):
+        dedup_key = "global-catalog:full"
+        continuation_id = pg_db.create_task(
+            "global_catalog_reconcile_full",
+            {"triggered_by": "continuation"},
+            parent_task_id="completed-parent",
+            dedup_key=dedup_key,
+        )
+
+        duplicate_root = pg_db.create_task_dedup(
+            "global_catalog_reconcile_full",
+            {"triggered_by": "api_startup"},
+            dedup_key=dedup_key,
+        )
+
+        assert continuation_id is not None
+        assert duplicate_root is None

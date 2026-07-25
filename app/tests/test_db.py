@@ -2249,6 +2249,14 @@ class TestHomeCaching:
         assert task["status"] == "pending"
         assert task["params"] == {}
 
+    def test_create_task_persists_chain_dedup_key(self, pg_db):
+        task_id = pg_db.create_task("scan", dedup_key="global-catalog:full")
+
+        task = pg_db.get_task(task_id)
+
+        assert task is not None
+        assert task["dedup_key"] == "global-catalog:full"
+
     def test_get_task_not_found(self, pg_db):
         assert pg_db.get_task("nonexistent") is None
 

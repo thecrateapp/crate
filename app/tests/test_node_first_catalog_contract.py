@@ -83,7 +83,7 @@ def test_cold_single_node_queues_a_catalog_backfill_on_startup(monkeypatch):
         "global_catalog_reconcile_full",
         {"triggered_by": "api_startup"},
     )
-    assert queued["kwargs"] == {"dedup_key": "bootstrap:global-catalog"}
+    assert queued["kwargs"] == {"dedup_key": "global-catalog:full"}
 
 
 def test_ready_node_without_user_ref_projection_queues_a_catalog_backfill(monkeypatch):
@@ -108,7 +108,7 @@ def test_ready_node_without_user_ref_projection_queues_a_catalog_backfill(monkey
         "global_catalog_reconcile_full",
         {"triggered_by": "api_startup"},
     )
-    assert queued["kwargs"] == {"dedup_key": "bootstrap:global-catalog"}
+    assert queued["kwargs"] == {"dedup_key": "global-catalog:full"}
 
 
 def test_ready_node_with_an_older_user_ref_backfill_queues_a_catalog_backfill(
@@ -142,7 +142,7 @@ def test_ready_node_with_an_older_user_ref_backfill_queues_a_catalog_backfill(
         "global_catalog_reconcile_full",
         {"triggered_by": "api_startup"},
     )
-    assert queued["kwargs"] == {"dedup_key": "bootstrap:global-catalog"}
+    assert queued["kwargs"] == {"dedup_key": "global-catalog:full"}
 
 
 def test_ready_node_without_search_projection_queues_a_catalog_backfill(monkeypatch):
