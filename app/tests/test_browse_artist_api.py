@@ -4,6 +4,116 @@ from fastapi import Response
 from fastapi.responses import JSONResponse
 
 
+def _top_track_row(**overrides):
+    row = {
+        "id": 1,
+        "title": "Track",
+        "artist": "Example Artist",
+        "artist_id": 10,
+        "artist_slug": "example-artist",
+        "album": "Album",
+        "album_id": 20,
+        "album_slug": "album",
+        "duration": 180,
+        "track_number": 1,
+        "format": "FLAC",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_top_tracks_fall_back_to_persisted_rank_signals_not_recent_album_order():
+    from crate.api.browse_artist import _build_artist_top_tracks_payload
+
+    rows = [
+        _top_track_row(
+            id=1,
+            title="Current Single",
+            year="2025",
+            track_number=1,
+            lastfm_top_rank=45,
+            lastfm_playcount=3_800_000,
+        ),
+        _top_track_row(
+            id=2,
+            title="Catalog Favorite",
+            year="2010",
+            track_number=8,
+            lastfm_top_rank=4,
+            lastfm_playcount=29_000_000,
+        ),
+        _top_track_row(
+            id=3,
+            title="Unranked Album Closer",
+            year="2025",
+            track_number=11,
+            lastfm_top_rank=None,
+            lastfm_playcount=None,
+        ),
+    ]
+
+    payload = _build_artist_top_tracks_payload(
+        "Example Artist",
+        count=10,
+        lastfm_top=None,
+        local_tracks=rows,
+    )
+
+    assert [track["title"] for track in payload] == [
+        "Catalog Favorite",
+        "Current Single",
+    ]
+
+
+def test_top_tracks_do_not_invent_rankings_without_track_level_signals():
+    from crate.api.browse_artist import _build_artist_top_tracks_payload
+
+    payload = _build_artist_top_tracks_payload(
+        "Example Artist",
+        count=10,
+        lastfm_top=None,
+        local_tracks=[
+            _top_track_row(
+                id=1,
+                title="Album Track",
+                year="2025",
+                track_number=1,
+            )
+        ],
+    )
+
+    assert payload == []
+
+
+def test_top_tracks_use_persisted_composite_popularity_when_source_ranks_are_missing():
+    from crate.api.browse_artist import _build_artist_top_tracks_payload
+
+    payload = _build_artist_top_tracks_payload(
+        "Example Artist",
+        count=10,
+        lastfm_top=None,
+        local_tracks=[
+            _top_track_row(
+                id=1,
+                title="Lower Composite Score",
+                popularity_score=0.41,
+                popularity_confidence=0.8,
+            ),
+            _top_track_row(
+                id=2,
+                title="Higher Composite Score",
+                popularity_score=0.93,
+                popularity_confidence=0.9,
+            ),
+        ],
+    )
+
+    assert [track["title"] for track in payload] == [
+        "Higher Composite Score",
+        "Lower Composite Score",
+    ]
+
+
 def test_artist_page_by_slug_falls_back_to_remote_global_catalog(monkeypatch):
     from crate.api import catalog_artist_compat
 

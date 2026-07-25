@@ -77,6 +77,15 @@ describe("GlobalCatalog", () => {
       screen.getByRole("heading", { name: "Global Catalog" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Artists")).toBeInTheDocument();
+    expect(screen.getByText("Entity sources")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Unresolved match candidates:/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Similar sources below the automatic merge threshold; they remain separate until reviewed.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("Local fallback")).toBeInTheDocument();
     expect(

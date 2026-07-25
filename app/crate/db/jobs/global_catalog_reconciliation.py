@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from itertools import islice
+from collections.abc import Mapping
 from datetime import datetime, timezone
+from itertools import islice
 from typing import Any
 
 from sqlalchemy import text
@@ -554,14 +555,21 @@ def reconcile_remote_catalog(
 
 
 def reconcile_local_catalog_batch(
-    *, batch_size: int = 500, cursor: dict[str, Any] | None = None
+    *,
+    batch_size: int = 500,
+    cursor: dict[str, Any] | None = None,
+    recompute_matches: bool = False,
 ) -> dict[str, Any]:
     """Project one durable, dependency-ordered batch of local sources."""
     entity_type, after_id = _reconciliation_cursor(cursor)
     sources = _local_batch_sources(entity_type, after_id, batch_size)
     result = _new_batch_result("local", len(sources))
     if sources:
-        _reconcile_local_batch_sources(sources, result)
+        _reconcile_local_batch_sources(
+            sources,
+            result,
+            recompute_matches=recompute_matches,
+        )
     return _complete_batch_result(result, entity_type, after_id, sources, batch_size)
 
 
@@ -570,6 +578,7 @@ def reconcile_remote_catalog_batch(
     batch_size: int = 500,
     cursor: dict[str, Any] | None = None,
     node_uid: str | None = None,
+    recompute_matches: bool = False,
 ) -> dict[str, Any]:
     """Project one durable, dependency-ordered batch of federated sources."""
     entity_type, after_id = _reconciliation_cursor(cursor)
@@ -586,7 +595,11 @@ def reconcile_remote_catalog_batch(
     )
     result = _new_batch_result("peer" if node_uid else "incremental", len(sources))
     if sources:
-        _reconcile_remote_batch_sources(sources, result)
+        _reconcile_remote_batch_sources(
+            sources,
+            result,
+            recompute_matches=recompute_matches,
+        )
     return _complete_batch_result(result, entity_type, after_id, sources, batch_size)
 
 
@@ -866,13 +879,20 @@ def _merge_batch_result(result: dict[str, Any], batch: dict[str, Any]) -> None:
 
 
 def _reconcile_local_batch_sources(
-    sources: list[dict[str, Any]], result: dict[str, Any]
+    sources: list[dict[str, Any]],
+    result: dict[str, Any],
+    *,
+    recompute_matches: bool = False,
 ) -> None:
     with transaction_scope() as session:
         for source in sources:
             entity_type = source["entity_type"]
             if entity_type == "artist":
-                global_uid, score = _resolve_artist_target(session, source)
+                global_uid, score = _resolve_artist_target(
+                    session,
+                    source,
+                    recompute_matches=recompute_matches,
+                )
                 source = _with_match(source, score)
                 existed = _canonical_exists(
                     session,
@@ -887,7 +907,12 @@ def _reconcile_local_batch_sources(
                 )
                 if artist_uid is None:
                     continue
-                global_uid, score = _resolve_album_target(session, source, artist_uid)
+                global_uid, score = _resolve_album_target(
+                    session,
+                    source,
+                    artist_uid,
+                    recompute_matches=recompute_matches,
+                )
                 source = _with_match(source, score)
                 existed = _canonical_exists(
                     session,
@@ -911,7 +936,12 @@ def _reconcile_local_batch_sources(
                 )
                 if artist_uid is None:
                     continue
-                global_uid, score = _resolve_track_target(session, source, artist_uid)
+                global_uid, score = _resolve_track_target(
+                    session,
+                    source,
+                    artist_uid,
+                    recompute_matches=recompute_matches,
+                )
                 source = _with_match(source, score)
                 existed = _canonical_exists(
                     session,
@@ -927,13 +957,20 @@ def _reconcile_local_batch_sources(
 
 
 def _reconcile_remote_batch_sources(
-    sources: list[dict[str, Any]], result: dict[str, Any]
+    sources: list[dict[str, Any]],
+    result: dict[str, Any],
+    *,
+    recompute_matches: bool = False,
 ) -> None:
     with transaction_scope() as session:
         for source in sources:
             entity_type = source["entity_type"]
             if entity_type == "artist":
-                target_uid, score = _resolve_artist_target(session, source)
+                target_uid, score = _resolve_artist_target(
+                    session,
+                    source,
+                    recompute_matches=recompute_matches,
+                )
                 source = _with_match(source, score)
                 existed = _canonical_exists(
                     session, "global_catalog_artists", "global_artist_uid", target_uid
@@ -947,7 +984,12 @@ def _reconcile_remote_batch_sources(
                 )
                 if artist_uid is None:
                     continue
-                target_uid, score = _resolve_album_target(session, source, artist_uid)
+                target_uid, score = _resolve_album_target(
+                    session,
+                    source,
+                    artist_uid,
+                    recompute_matches=recompute_matches,
+                )
                 source = _with_match(source, score)
                 existed = _canonical_exists(
                     session, "global_catalog_albums", "global_album_uid", target_uid
@@ -965,7 +1007,12 @@ def _reconcile_remote_batch_sources(
                     artist_name=payload["artist_name"],
                     album_name=payload.get("album_name"),
                 )
-                target_uid, score = _resolve_track_target(session, source, artist_uid)
+                target_uid, score = _resolve_track_target(
+                    session,
+                    source,
+                    artist_uid,
+                    recompute_matches=recompute_matches,
+                )
                 source = _with_match(source, score)
                 existed = _canonical_exists(
                     session, "global_catalog_tracks", "global_track_uid", target_uid
@@ -993,6 +1040,85 @@ def _insert_run(session, *, run_id: str, mode: str, started_at: datetime) -> Non
         ),
         {"run_id": run_id, "mode": mode, "started_at": started_at},
     )
+
+
+def begin_global_catalog_reconciliation_run(*, mode: str) -> str:
+    run_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc)
+    with transaction_scope() as session:
+        _insert_run(session, run_id=run_id, mode=mode, started_at=started_at)
+    _emit_reconcile_event("started", run_id=run_id, mode=mode)
+    return run_id
+
+
+def record_global_catalog_reconciliation_batch(
+    run_id: str, result: Mapping[str, Any]
+) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_reconciliation_runs
+                SET
+                    source_rows_seen = source_rows_seen + :source_rows_seen,
+                    sources_upserted = sources_upserted + :sources_upserted,
+                    canonical_created = canonical_created + :canonical_created,
+                    canonical_updated = canonical_updated + :canonical_updated,
+                    auto_merged = auto_merged + :auto_merged,
+                    ambiguous_candidates =
+                        ambiguous_candidates + :ambiguous_candidates
+                WHERE run_id = :run_id
+                  AND status = 'running'
+                """
+            ),
+            {
+                "run_id": run_id,
+                "source_rows_seen": int(result.get("source_rows_seen") or 0),
+                "sources_upserted": int(result.get("sources_upserted") or 0),
+                "canonical_created": int(result.get("canonical_created") or 0),
+                "canonical_updated": int(result.get("canonical_updated") or 0),
+                "auto_merged": int(result.get("auto_merged") or 0),
+                "ambiguous_candidates": int(result.get("ambiguous_candidates") or 0),
+            },
+        )
+
+
+def complete_global_catalog_reconciliation_run(run_id: str) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_reconciliation_runs
+                SET
+                    status = 'completed',
+                    completed_at = :completed_at
+                WHERE run_id = :run_id
+                  AND status = 'running'
+                """
+            ),
+            {
+                "run_id": run_id,
+                "completed_at": datetime.now(timezone.utc),
+            },
+        )
+        _emit_reconcile_event(
+            "completed",
+            run_id=run_id,
+            mode="full",
+            session=session,
+        )
+
+
+def fail_global_catalog_reconciliation_run(run_id: str, error: str) -> None:
+    with transaction_scope() as session:
+        _fail_run(session, run_id=run_id, error=error)
+        _emit_reconcile_event(
+            "failed",
+            run_id=run_id,
+            mode="full",
+            error=error,
+            session=session,
+        )
 
 
 def _complete_run(session, *, run_id: str, result: dict[str, Any]) -> None:
@@ -1100,7 +1226,12 @@ def _count_result(result: dict[str, Any], existed: bool) -> None:
         result["canonical_created"] += 1
 
 
-def _resolve_artist_target(session, source: dict[str, Any]) -> tuple[str, MatchScore]:
+def _resolve_artist_target(
+    session,
+    source: dict[str, Any],
+    *,
+    recompute_matches: bool = False,
+) -> tuple[str, MatchScore]:
     forced_target = force_merge_target_for_source(session, source)
     if forced_target:
         return forced_target, MatchScore(1.0, "manual_force_merge", auto_merge=True)
@@ -1109,10 +1240,21 @@ def _resolve_artist_target(session, source: dict[str, Any]) -> tuple[str, MatchS
     if existing_target and not merge_blocked_for_source(
         session, source, existing_target
     ):
-        return existing_target, _existing_source_score(source)
+        if not recompute_matches:
+            return existing_target, _existing_source_score(source)
+        revalidated = _revalidate_existing_target(
+            session,
+            source,
+            existing_target,
+            score_artist_match,
+        )
+        if revalidated is not None:
+            return revalidated
 
     payload = source["source_payload"]
     rows = _candidate_artists(session, payload)
+    if recompute_matches and existing_target:
+        rows = [row for row in rows if row["global_artist_uid"] != existing_target]
     best_uid, best_score = _best_match(
         rows,
         payload,
@@ -1134,6 +1276,8 @@ def _resolve_album_target(
     session,
     source: dict[str, Any],
     artist_uid: str,
+    *,
+    recompute_matches: bool = False,
 ) -> tuple[str, MatchScore]:
     forced_target = force_merge_target_for_source(session, source)
     if forced_target:
@@ -1157,10 +1301,21 @@ def _resolve_album_target(
     if existing_target and not merge_blocked_for_source(
         session, source, existing_target
     ):
-        return existing_target, _existing_source_score(source)
+        if not recompute_matches:
+            return existing_target, _existing_source_score(source)
+        revalidated = _revalidate_existing_target(
+            session,
+            source,
+            existing_target,
+            score_album_match,
+        )
+        if revalidated is not None:
+            return revalidated
 
     payload = source["source_payload"]
     rows = _candidate_albums(session, payload, artist_uid)
+    if recompute_matches and existing_target:
+        rows = [row for row in rows if row["global_album_uid"] != existing_target]
     best_uid, best_score = _best_match(
         rows,
         payload,
@@ -1182,6 +1337,8 @@ def _resolve_track_target(
     session,
     source: dict[str, Any],
     artist_uid: str,
+    *,
+    recompute_matches: bool = False,
 ) -> tuple[str, MatchScore]:
     forced_target = force_merge_target_for_source(session, source)
     if forced_target:
@@ -1191,10 +1348,21 @@ def _resolve_track_target(
     if existing_target and not merge_blocked_for_source(
         session, source, existing_target
     ):
-        return existing_target, _existing_source_score(source)
+        if not recompute_matches:
+            return existing_target, _existing_source_score(source)
+        revalidated = _revalidate_existing_target(
+            session,
+            source,
+            existing_target,
+            score_track_match,
+        )
+        if revalidated is not None:
+            return revalidated
 
     payload = source["source_payload"]
     rows = _candidate_tracks(session, payload, artist_uid)
+    if recompute_matches and existing_target:
+        rows = [row for row in rows if row["global_track_uid"] != existing_target]
     best_uid, best_score = _best_match(
         rows,
         payload,
@@ -1210,6 +1378,74 @@ def _resolve_track_target(
             )
         return best_uid, best_score
     return _global_uid(source), best_score or MatchScore(0.0, "new_remote_track")
+
+
+def _revalidate_existing_target(
+    session,
+    source: dict[str, Any],
+    existing_target: str,
+    scorer,
+) -> tuple[str, MatchScore] | None:
+    if _global_uid(source) == existing_target:
+        return existing_target, MatchScore(
+            1.0,
+            "existing_source_identity",
+            auto_merge=True,
+        )
+
+    rows = (
+        session.execute(
+            text(
+                """
+                SELECT
+                    source_kind,
+                    node_uid::text AS node_uid,
+                    remote_entity_uid,
+                    local_id,
+                    local_entity_uid::text AS local_entity_uid,
+                    source_payload_json
+                FROM global_catalog_sources
+                WHERE entity_type = :entity_type
+                  AND global_entity_uid = CAST(:global_entity_uid AS uuid)
+                  AND source_deleted_at IS NULL
+                  AND NOT source_stale
+                """
+            ),
+            {
+                "entity_type": source["entity_type"],
+                "global_entity_uid": existing_target,
+            },
+        )
+        .mappings()
+        .all()
+    )
+    anchor = next(
+        (
+            row
+            for row in rows
+            if _global_uid(
+                {
+                    "entity_type": source["entity_type"],
+                    "source_kind": row["source_kind"],
+                    "local_id": row["local_id"],
+                    "local_entity_uid": row["local_entity_uid"],
+                    "remote_entity_uid": row["remote_entity_uid"],
+                }
+            )
+            == existing_target
+        ),
+        None,
+    )
+    if anchor is None:
+        return None
+    payload = anchor.get("source_payload_json")
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    if isinstance(payload, dict):
+        score = scorer(source["source_payload"], payload)
+        if score.auto_merge:
+            return existing_target, score
+    return None
 
 
 def _best_match(

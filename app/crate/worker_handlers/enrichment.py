@@ -65,6 +65,7 @@ def _unmark_processing(artist_name: str):
 
 def _invalidate_artist_top_tracks_cache(artist_name: str) -> None:
     delete_cache_prefix(f"listen:artist_top_tracks:v1:{artist_name.strip().lower()}:")
+    delete_cache_prefix(f"listen:artist_top_tracks:v2:{artist_name.strip().lower()}:")
 
 
 def _clean_album_lookup_name(album_name: str) -> str:

@@ -743,7 +743,7 @@ func (s *Store) GenreDetail(ctx context.Context, slug string, userID int64) (map
 			la.spotify_popularity DESC NULLS LAST,
 			la.album_count DESC NULLS LAST,
 			ag.artist_name ASC
-	`, genreID, minGenreMembershipScore))
+	`, genreID, minArtistRoomMembershipScore))
 	if err != nil {
 		return nil, err
 	}

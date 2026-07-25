@@ -12,6 +12,7 @@ DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
 DEPLOY_IMAGE_WAIT_INTERVAL="${DEPLOY_IMAGE_WAIT_INTERVAL:-20}"
 DEPLOY_HEALTH_WAIT_SECONDS="${DEPLOY_HEALTH_WAIT_SECONDS:-420}"
 DEPLOY_PUBLIC_WAIT_SECONDS="${DEPLOY_PUBLIC_WAIT_SECONDS:-120}"
+DEPLOY_API_RETRY_MAX_SECONDS="${DEPLOY_API_RETRY_MAX_SECONDS:-15}"
 DEPLOY_CONFIRM="${DEPLOY_CONFIRM:-}"
 CRATE_DEPLOY_PRUNE_UNUSED_IMAGES="${CRATE_DEPLOY_PRUNE_UNUSED_IMAGES:-1}"
 BACKUP_ROOT="${SERVER_PATH}/.deploy-backups"
@@ -282,6 +283,28 @@ wait_for_container_healthy() {
       return 1
     fi
     sleep 3
+  done
+}
+
+wait_for_container_http_url() {
+  local container="$1"
+  local url="$2"
+  local deadline=$((SECONDS + DEPLOY_HEALTH_WAIT_SECONDS))
+  local retry_delay=1
+
+  until docker exec "$container" python -c \
+    'import sys, urllib.request; response = urllib.request.urlopen(sys.argv[1], timeout=5); raise SystemExit(0 if response.status < 400 else 1)' \
+    "$url" >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      log "Container URL did not become ready: ${container} ${url}"
+      docker logs --tail=120 "$container" 2>/dev/null || true
+      return 1
+    fi
+    sleep "$retry_delay"
+    retry_delay=$((retry_delay * 2))
+    if (( retry_delay > DEPLOY_API_RETRY_MAX_SECONDS )); then
+      retry_delay="$DEPLOY_API_RETRY_MAX_SECONDS"
+    fi
   done
 }
 
@@ -636,23 +659,11 @@ cmd_verify() {
   done
 
   log "Checking API from inside the backend container"
-  docker exec -i crate-api python - <<'PY'
-import urllib.request
-
-with urllib.request.urlopen("http://127.0.0.1:8585/api/status", timeout=5) as response:
-    if response.status >= 400:
-        raise SystemExit(f"unexpected status {response.status}")
-PY
+  wait_for_container_http_url crate-api "http://127.0.0.1:8585/api/status"
 
   if compose_has_service crate-readplane; then
     log "Checking readplane readiness from inside the backend container"
-    docker exec -i crate-api python - <<'PY'
-import urllib.request
-
-with urllib.request.urlopen("http://crate-readplane:8686/readyz", timeout=5) as response:
-    if response.status >= 400:
-        raise SystemExit(f"unexpected status {response.status}")
-PY
+    wait_for_container_http_url crate-api "http://crate-readplane:8686/readyz"
   fi
 
   if [[ "$DEPLOY_PUBLIC_CHECKS" != "0" && -n "$domain" ]]; then

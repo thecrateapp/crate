@@ -294,6 +294,7 @@ def list_global_catalog_genres() -> list[dict]:
                             membership.global_genre_uid,
                             membership.global_genre_uid AS direct_genre_uid
                         FROM global_catalog_entity_genres membership
+                        WHERE membership.aggregate_score >= 0.700
                         UNION
                         SELECT
                             inherited.entity_type,
@@ -448,6 +449,7 @@ _GLOBAL_GENRE_ARTISTS_SQL = text(
             membership.supporting_source_count
         FROM global_catalog_entity_genres membership
         WHERE membership.entity_type = 'artist'
+          AND membership.aggregate_score >= 0.700
         UNION
         SELECT
             inherited.entity_type,
@@ -518,6 +520,7 @@ _GLOBAL_GENRE_ALBUMS_SQL = text(
             membership.supporting_source_count
         FROM global_catalog_entity_genres membership
         WHERE membership.entity_type = 'album'
+          AND membership.aggregate_score >= 0.700
         UNION
         SELECT
             inherited.entity_type,
@@ -581,6 +584,7 @@ _GLOBAL_GENRE_RELATED_SQL = text(
             membership.global_genre_uid
         FROM global_catalog_entity_genres membership
         WHERE membership.entity_type IN ('artist', 'album')
+          AND membership.aggregate_score >= 0.700
         UNION
         SELECT
             inherited.entity_type,

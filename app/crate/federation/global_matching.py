@@ -11,11 +11,15 @@ AUTO_MERGE_THRESHOLD = 0.90
 CANDIDATE_THRESHOLD = 0.85
 
 _FEAT_SUFFIX_RE = re.compile(
-    r"\s*[\(\[]?\s*(?:feat|ft|featuring)\.?\s+.+?[\)\]]?\s*$",
+    r"(?:\s+|\s*[\(\[]\s*)(?:feat|ft|featuring)\.?\s+.+?[\)\]]?\s*$",
     re.IGNORECASE,
 )
-_EDITION_SUFFIX_RE = re.compile(
-    r"\s*[\(\[]?\s*(?:deluxe|expanded|remaster(?:ed)?|anniversary|special|bonus|limited|live)(?:\s+(?:edition|version|remaster))?.*?[\)\]]?\s*$",
+_BRACKETED_EDITION_SUFFIX_RE = re.compile(
+    r"\s*[\(\[]\s*(?:deluxe|expanded|remaster(?:ed)?|anniversary|special|bonus|limited)\b[^\)\]]*[\)\]]\s*$",
+    re.IGNORECASE,
+)
+_UNBRACKETED_EDITION_SUFFIX_RE = re.compile(
+    r"\s+(?:deluxe|expanded|remaster(?:ed)?|anniversary|special|bonus|limited)(?:\s+(?:edition|version|remaster))?\s*$",
     re.IGNORECASE,
 )
 _PUNCT_RE = re.compile(r"[^a-z0-9]+")
@@ -36,7 +40,8 @@ def normalize_name(value: Any, *, strip_edition: bool = False) -> str:
 
     text = _FEAT_SUFFIX_RE.sub("", text)
     if strip_edition:
-        text = _EDITION_SUFFIX_RE.sub("", text)
+        text = _BRACKETED_EDITION_SUFFIX_RE.sub("", text)
+        text = _UNBRACKETED_EDITION_SUFFIX_RE.sub("", text)
     text = text.replace("&", " and ")
     text = unicodedata.normalize("NFKD", text)
     text = text.encode("ascii", "ignore").decode("ascii")

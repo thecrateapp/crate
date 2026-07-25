@@ -16,6 +16,7 @@ from crate.genre_taxonomy import (
 )
 
 MIN_GENRE_MEMBERSHIP_SCORE = 0.45
+MIN_ARTIST_ROOM_MEMBERSHIP_SCORE = 0.70
 ARTIST_ALBUM_FALLBACK_FACTOR = 0.70
 RELATED_GENRE_LIMIT = 24
 
@@ -210,7 +211,7 @@ def get_genre_detail(slug: str, *, include_global_entities: bool = True) -> dict
                 ),
                 {
                     "genre_id": genre["id"],
-                    "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
+                    "min_membership_score": MIN_ARTIST_ROOM_MEMBERSHIP_SCORE,
                 },
             )
             .mappings()

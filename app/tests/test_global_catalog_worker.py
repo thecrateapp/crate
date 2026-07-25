@@ -1,3 +1,26 @@
+def _stub_full_run_tracking(monkeypatch, global_catalog, *, run_id="run-1"):
+    monkeypatch.setattr(
+        global_catalog,
+        "begin_global_catalog_reconciliation_run",
+        lambda **_kwargs: run_id,
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "record_global_catalog_reconciliation_batch",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "complete_global_catalog_reconciliation_run",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "fail_global_catalog_reconciliation_run",
+        lambda *_args, **_kwargs: None,
+    )
+
+
 def test_incremental_worker_claims_only_dirty_catalog_sources(monkeypatch):
     from crate.worker_handlers import global_catalog
 
@@ -56,6 +79,7 @@ def test_incremental_worker_has_no_global_catalog_feature_gate(monkeypatch):
 def test_full_worker_advances_from_local_to_prune_without_scanning_remote(monkeypatch):
     from crate.worker_handlers import global_catalog
 
+    _stub_full_run_tracking(monkeypatch, global_catalog)
     calls: list[str] = []
     monkeypatch.setattr(
         global_catalog,
@@ -68,8 +92,9 @@ def test_full_worker_advances_from_local_to_prune_without_scanning_remote(monkey
     monkeypatch.setattr(
         global_catalog,
         "reconcile_local_catalog_batch",
-        lambda *, batch_size, cursor: (
+        lambda *, batch_size, cursor, recompute_matches: (
             calls.append(f"local:{batch_size}")
+            or calls.append(f"recompute:{recompute_matches}")
             or {"completed": True, "source_rows_seen": batch_size}
         ),
     )
@@ -77,7 +102,7 @@ def test_full_worker_advances_from_local_to_prune_without_scanning_remote(monkey
 
     result = global_catalog._handle_reconcile_full("task-1", {}, {})
 
-    assert calls == ["local:500"]
+    assert calls == ["local:500", "recompute:True"]
     assert result["status"] == "continued"
     assert result["phase"] == "local"
 
@@ -87,6 +112,7 @@ def test_full_worker_processes_one_bounded_batch_then_enqueues_continuation(
 ):
     from crate.worker_handlers import global_catalog
 
+    _stub_full_run_tracking(monkeypatch, global_catalog)
     transitions: list[tuple[str, dict]] = []
     continuations: list[dict] = []
     local_calls: list[dict | None] = []
@@ -103,8 +129,9 @@ def test_full_worker_processes_one_bounded_batch_then_enqueues_continuation(
     monkeypatch.setattr(
         global_catalog,
         "reconcile_local_catalog_batch",
-        lambda *, batch_size, cursor: (
+        lambda *, batch_size, cursor, recompute_matches: (
             local_calls.append(cursor)
+            or local_calls.append(recompute_matches)
             or {
                 "completed": False,
                 "next_cursor": {"entity_type": "artist", "after_id": batch_size},
@@ -124,7 +151,7 @@ def test_full_worker_processes_one_bounded_batch_then_enqueues_continuation(
 
     result = global_catalog._handle_reconcile_full("task-1", {"batch_size": 25}, {})
 
-    assert local_calls == [None]
+    assert local_calls == [None, True]
     assert result["status"] == "continued"
     assert result["completed"] is False
     assert result["phase"] == "local"
@@ -142,6 +169,7 @@ def test_full_worker_processes_one_bounded_batch_then_enqueues_continuation(
             "bootstrap_cursor_json": {
                 "phase": "local",
                 "cursor": {"entity_type": "artist", "after_id": 25},
+                "run_id": "run-1",
             }
         },
     )
@@ -150,6 +178,7 @@ def test_full_worker_processes_one_bounded_batch_then_enqueues_continuation(
 def test_full_worker_resumes_persisted_batches_before_marking_ready(monkeypatch):
     from crate.worker_handlers import global_catalog
 
+    _stub_full_run_tracking(monkeypatch, global_catalog)
     transitions: list[tuple[str, dict]] = []
     local_cursors: list[dict | None] = []
     monkeypatch.setattr(
@@ -160,6 +189,7 @@ def test_full_worker_resumes_persisted_batches_before_marking_ready(monkeypatch)
             "bootstrap_cursor_json": {
                 "phase": "local",
                 "cursor": {"entity_type": "artist", "after_id": 500},
+                "run_id": "run-1",
             },
         },
     )
@@ -171,8 +201,9 @@ def test_full_worker_resumes_persisted_batches_before_marking_ready(monkeypatch)
     monkeypatch.setattr(
         global_catalog,
         "reconcile_local_catalog_batch",
-        lambda *, batch_size, cursor: (
+        lambda *, batch_size, cursor, recompute_matches: (
             local_cursors.append(cursor)
+            or local_cursors.append(recompute_matches)
             or {"completed": True, "next_cursor": None, "source_rows_seen": 1}
         ),
     )
@@ -181,13 +212,17 @@ def test_full_worker_resumes_persisted_batches_before_marking_ready(monkeypatch)
     result = global_catalog._handle_reconcile_full("task-1", {}, {})
 
     assert result["status"] == "continued"
-    assert local_cursors == [{"entity_type": "artist", "after_id": 500}]
+    assert local_cursors == [
+        {"entity_type": "artist", "after_id": 500},
+        True,
+    ]
     assert transitions[-1] == (
         "backfilling",
         {
             "bootstrap_cursor_json": {
                 "phase": "local_prune",
                 "cursor": None,
+                "run_id": "run-1",
             }
         },
     )
@@ -196,6 +231,7 @@ def test_full_worker_resumes_persisted_batches_before_marking_ready(monkeypatch)
 def test_full_worker_resumes_a_checkpoint_after_a_previous_task_stops(monkeypatch):
     from crate.worker_handlers import global_catalog
 
+    _stub_full_run_tracking(monkeypatch, global_catalog)
     remote_cursors: list[dict | None] = []
     monkeypatch.setattr(
         global_catalog,
@@ -205,6 +241,7 @@ def test_full_worker_resumes_a_checkpoint_after_a_previous_task_stops(monkeypatc
             "bootstrap_cursor_json": {
                 "phase": "remote",
                 "cursor": {"entity_type": "artist", "after_id": 500},
+                "run_id": "run-1",
             },
         },
     )
@@ -218,8 +255,10 @@ def test_full_worker_resumes_a_checkpoint_after_a_previous_task_stops(monkeypatc
     monkeypatch.setattr(
         global_catalog,
         "reconcile_remote_catalog_batch",
-        lambda *, batch_size, cursor: (
-            remote_cursors.append(cursor) or {"completed": True, "source_rows_seen": 1}
+        lambda *, batch_size, cursor, recompute_matches: (
+            remote_cursors.append(cursor)
+            or remote_cursors.append(recompute_matches)
+            or {"completed": True, "source_rows_seen": 1}
         ),
     )
     monkeypatch.setattr(
@@ -231,12 +270,66 @@ def test_full_worker_resumes_a_checkpoint_after_a_previous_task_stops(monkeypatc
 
     assert result["status"] == "continued"
     assert result["phase"] == "remote"
-    assert remote_cursors == [{"entity_type": "artist", "after_id": 500}]
+    assert remote_cursors == [
+        {"entity_type": "artist", "after_id": 500},
+        True,
+    ]
+
+
+def test_full_worker_refreshes_canonical_payloads_after_match_recompute(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    _stub_full_run_tracking(monkeypatch, global_catalog)
+    transitions: list[dict] = []
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        global_catalog,
+        "get_catalog_state",
+        lambda: {
+            "status": "backfilling",
+            "bootstrap_cursor_json": {
+                "phase": "local_refresh",
+                "cursor": None,
+                "run_id": "run-1",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_local_catalog_batch",
+        lambda **kwargs: (
+            calls.append(kwargs)
+            or {
+                "completed": True,
+                "next_cursor": None,
+                "source_rows_seen": 5,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "transition_catalog_state",
+        lambda _status, **kwargs: transitions.append(
+            dict(kwargs["bootstrap_cursor_json"])
+        ),
+    )
+    monkeypatch.setattr(global_catalog, "create_task", lambda *_args, **_kwargs: "next")
+
+    result = global_catalog._handle_reconcile_full("task-refresh", {}, {})
+
+    assert calls == [{"batch_size": 500, "cursor": None}]
+    assert result["phase"] == "local_refresh"
+    assert transitions[-1] == {
+        "phase": "remote_refresh",
+        "cursor": None,
+        "run_id": "run-1",
+    }
 
 
 def test_full_worker_backfills_legacy_user_refs_before_catalog_is_ready(monkeypatch):
     from crate.worker_handlers import global_catalog
 
+    _stub_full_run_tracking(monkeypatch, global_catalog)
     calls: list[str] = []
     transitions: list[str] = []
     monkeypatch.setattr(
@@ -244,7 +337,11 @@ def test_full_worker_backfills_legacy_user_refs_before_catalog_is_ready(monkeypa
         "get_catalog_state",
         lambda: {
             "status": "backfilling",
-            "bootstrap_cursor_json": {"phase": "user_refs", "cursor": None},
+            "bootstrap_cursor_json": {
+                "phase": "user_refs",
+                "cursor": None,
+                "run_id": "run-1",
+            },
         },
     )
     monkeypatch.setattr(
@@ -289,6 +386,7 @@ def test_full_worker_backfills_legacy_user_refs_before_catalog_is_ready(monkeypa
 def test_full_worker_checkpoints_one_user_reference_batch(monkeypatch):
     from crate.worker_handlers import global_catalog
 
+    _stub_full_run_tracking(monkeypatch, global_catalog)
     transitions: list[tuple[str, dict]] = []
     monkeypatch.setattr(
         global_catalog,
@@ -300,6 +398,7 @@ def test_full_worker_checkpoints_one_user_reference_batch(monkeypatch):
                 "phase": "user_refs",
                 "cursor": 10,
                 "user_refs_report": {"artist_follows": 2},
+                "run_id": "run-1",
             },
         },
     )
@@ -356,6 +455,7 @@ def test_full_worker_checkpoints_one_user_reference_batch(monkeypatch):
                         "play_events": 0,
                         "listening_stats_users": 0,
                     },
+                    "run_id": "run-1",
                 }
             },
         )
@@ -365,13 +465,24 @@ def test_full_worker_checkpoints_one_user_reference_batch(monkeypatch):
 def test_full_worker_marks_catalog_ready_only_after_both_sources_finish(monkeypatch):
     from crate.worker_handlers import global_catalog
 
+    completed_runs: list[str] = []
+    _stub_full_run_tracking(monkeypatch, global_catalog)
+    monkeypatch.setattr(
+        global_catalog,
+        "complete_global_catalog_reconciliation_run",
+        lambda run_id: completed_runs.append(run_id),
+    )
     transitions: list[tuple[str, dict]] = []
     monkeypatch.setattr(
         global_catalog,
         "get_catalog_state",
         lambda: {
             "status": "backfilling",
-            "bootstrap_cursor_json": {"phase": "snapshots", "cursor": None},
+            "bootstrap_cursor_json": {
+                "phase": "snapshots",
+                "cursor": None,
+                "run_id": "run-1",
+            },
         },
     )
     monkeypatch.setattr(
@@ -387,6 +498,141 @@ def test_full_worker_marks_catalog_ready_only_after_both_sources_finish(monkeypa
     assert result["status"] == "completed"
     assert [status for status, _ in transitions] == ["ready"]
     assert "last_full_reconcile_at" in transitions[-1][1]
+    assert completed_runs == ["run-1"]
+
+
+def test_full_worker_starts_and_checkpoints_a_persisted_run(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    started: list[str] = []
+    recorded: list[tuple[str, int]] = []
+    transitions: list[dict] = []
+    monkeypatch.setattr(
+        global_catalog,
+        "get_catalog_state",
+        lambda: {"status": "ready", "bootstrap_cursor_json": {}},
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "begin_global_catalog_reconciliation_run",
+        lambda **_kwargs: started.append("full") or "persisted-run",
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "record_global_catalog_reconciliation_batch",
+        lambda run_id, result: recorded.append(
+            (run_id, int(result["source_rows_seen"]))
+        ),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "fail_global_catalog_reconciliation_run",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "transition_catalog_state",
+        lambda _status, **kwargs: transitions.append(
+            dict(kwargs.get("bootstrap_cursor_json") or {})
+        ),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_local_catalog_batch",
+        lambda **_kwargs: {
+            "completed": False,
+            "next_cursor": {"entity_type": "track", "after_id": 500},
+            "source_rows_seen": 500,
+        },
+    )
+    monkeypatch.setattr(global_catalog, "create_task", lambda *_args, **_kwargs: "next")
+
+    global_catalog._handle_reconcile_full("task-1", {}, {})
+
+    assert started == ["full"]
+    assert recorded == [("persisted-run", 500)]
+    assert transitions[-1] == {
+        "phase": "local",
+        "cursor": {"entity_type": "track", "after_id": 500},
+        "run_id": "persisted-run",
+    }
+
+
+def test_full_worker_marks_catalog_failed_when_run_tracking_cannot_start(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    transitions: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        global_catalog,
+        "get_catalog_state",
+        lambda: {"status": "ready", "bootstrap_cursor_json": {}},
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "begin_global_catalog_reconciliation_run",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("run table unavailable")),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "transition_catalog_state",
+        lambda status, **kwargs: transitions.append((status, kwargs)),
+    )
+
+    try:
+        global_catalog._handle_reconcile_full("task-1", {}, {})
+    except RuntimeError as exc:
+        assert str(exc) == "run table unavailable"
+    else:
+        raise AssertionError("run creation failure must abort reconciliation")
+
+    assert transitions[-1] == (
+        "failed",
+        {"last_error": "run table unavailable"},
+    )
+
+
+def test_full_worker_preserves_original_error_if_failure_tracking_also_fails(
+    monkeypatch,
+):
+    from crate.worker_handlers import global_catalog
+
+    _stub_full_run_tracking(monkeypatch, global_catalog)
+    monkeypatch.setattr(
+        global_catalog,
+        "get_catalog_state",
+        lambda: {
+            "status": "backfilling",
+            "bootstrap_cursor_json": {
+                "phase": "local",
+                "cursor": None,
+                "run_id": "run-1",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_local_catalog_batch",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("source failure")),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "fail_global_catalog_reconciliation_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("run table failure")
+        ),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "transition_catalog_state",
+        lambda *_args, **_kwargs: None,
+    )
+
+    try:
+        global_catalog._handle_reconcile_full("task-1", {}, {})
+    except RuntimeError as exc:
+        assert str(exc) == "source failure"
+    else:
+        raise AssertionError("source reconciliation failure must be preserved")
 
 
 def test_global_catalog_tasks_are_registered_in_worker():

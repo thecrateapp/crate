@@ -14,6 +14,24 @@ def test_normalize_name_is_case_punctuation_whitespace_and_feat_safe():
     assert normalize_name("Artist feat. Guest") == "artist"
     assert normalize_name("Artist (feat. Guest)") == "artist"
     assert normalize_name("Björk & The Sugarcubes") == "bjork and the sugarcubes"
+    assert normalize_name("DRIFT Episode 2 “ATOM”") == "drift episode 2 atom"
+
+
+def test_normalize_name_only_strips_explicit_edition_suffixes():
+    assert (
+        normalize_name(
+            "Live from Teatro Dal Verme, Milan, Italy. March 24th, 2005",
+            strip_edition=True,
+        )
+        == "live from teatro dal verme milan italy march 24th 2005"
+    )
+    assert normalize_name("Songs of Faith and Devotion Live", strip_edition=True) == (
+        "songs of faith and devotion live"
+    )
+    assert normalize_name("Toward the Within (Live)", strip_edition=True) == (
+        "toward the within live"
+    )
+    assert normalize_name("Pedals (Deluxe Edition)", strip_edition=True) == "pedals"
 
 
 def test_match_keys_are_deterministic_and_conservative():

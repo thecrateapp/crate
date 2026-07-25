@@ -12,13 +12,22 @@ def _slugify_genre(value: str) -> str:
 
 
 def assign_genre_alias_in_session(
-    session, alias_value: str, canonical_slug: str
+    session,
+    alias_value: str,
+    canonical_slug: str,
+    *,
+    origin: str = "manual",
+    confidence: float | None = None,
 ) -> bool:
     alias_name = (alias_value or "").strip().lower()
     alias_slug = _slugify_genre(alias_name)
     canonical_slug = (canonical_slug or "").strip().lower()
     if not alias_name or not alias_slug or not canonical_slug:
         return False
+    normalized_origin = origin if origin in {"core", "manual", "inferred"} else "manual"
+    normalized_confidence = (
+        max(0.0, min(1.0, float(confidence))) if confidence is not None else None
+    )
 
     session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
@@ -40,7 +49,7 @@ def assign_genre_alias_in_session(
         session.execute(
             text(
                 """
-            SELECT alias_slug, genre_id
+            SELECT alias_slug, genre_id, origin, confidence
             FROM genre_taxonomy_aliases
             WHERE alias_name = :alias_name
             """
@@ -54,6 +63,15 @@ def assign_genre_alias_in_session(
         existing
         and existing["alias_slug"] == alias_slug
         and int(existing["genre_id"]) == int(node_row["id"])
+        and existing["origin"] == normalized_origin
+        and (
+            existing["confidence"] == normalized_confidence
+            or (
+                existing["confidence"] is not None
+                and normalized_confidence is not None
+                and float(existing["confidence"]) == normalized_confidence
+            )
+        )
     ):
         return True
 
@@ -66,25 +84,45 @@ def assign_genre_alias_in_session(
     session.execute(
         text(
             """
-            INSERT INTO genre_taxonomy_aliases (alias_slug, alias_name, genre_id)
-            VALUES (:alias_slug, :alias_name, :genre_id)
+            INSERT INTO genre_taxonomy_aliases (
+                alias_slug, alias_name, genre_id, origin, confidence
+            )
+            VALUES (
+                :alias_slug, :alias_name, :genre_id, :origin, :confidence
+            )
             ON CONFLICT (alias_slug) DO UPDATE
             SET alias_name = EXCLUDED.alias_name,
-                genre_id = EXCLUDED.genre_id
+                genre_id = EXCLUDED.genre_id,
+                origin = EXCLUDED.origin,
+                confidence = EXCLUDED.confidence
             """
         ),
         {
             "alias_slug": alias_slug,
             "alias_name": alias_name,
             "genre_id": node_row["id"],
+            "origin": normalized_origin,
+            "confidence": normalized_confidence,
         },
     )
     return True
 
 
-def assign_genre_alias_value(alias_value: str, canonical_slug: str) -> bool:
+def assign_genre_alias_value(
+    alias_value: str,
+    canonical_slug: str,
+    *,
+    origin: str = "manual",
+    confidence: float | None = None,
+) -> bool:
     with transaction_scope() as session:
-        return assign_genre_alias_in_session(session, alias_value, canonical_slug)
+        return assign_genre_alias_in_session(
+            session,
+            alias_value,
+            canonical_slug,
+            origin=origin,
+            confidence=confidence,
+        )
 
 
 def merge_duplicate_library_genres_in_session(session) -> list[dict]:
@@ -265,11 +303,15 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
             session.execute(
                 text(
                     """
-                    INSERT INTO genre_taxonomy_aliases (alias_slug, alias_name, genre_id)
-                    VALUES (:alias_slug, :alias_name, :genre_id)
+                    INSERT INTO genre_taxonomy_aliases (
+                        alias_slug, alias_name, genre_id, origin, confidence
+                    )
+                    VALUES (:alias_slug, :alias_name, :genre_id, 'core', 1.0)
                     ON CONFLICT (alias_slug) DO UPDATE
                     SET alias_name = EXCLUDED.alias_name,
-                        genre_id = EXCLUDED.genre_id
+                        genre_id = EXCLUDED.genre_id,
+                        origin = 'core',
+                        confidence = 1.0
                     """
                 ),
                 {
@@ -278,6 +320,8 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
                     "genre_id": genre_id,
                 },
             )
+
+    session.execute(text("DELETE FROM genre_taxonomy_aliases WHERE origin = 'legacy'"))
 
     for definition in definitions:
         source_id = node_ids.get(definition.slug)

@@ -67,8 +67,22 @@ def create_library_genres_schema(cur) -> None:
         CREATE TABLE IF NOT EXISTS genre_taxonomy_aliases (
             alias_slug TEXT PRIMARY KEY,
             alias_name TEXT UNIQUE NOT NULL,
-            genre_id INTEGER NOT NULL REFERENCES genre_taxonomy_nodes(id) ON DELETE CASCADE
+            genre_id INTEGER NOT NULL REFERENCES genre_taxonomy_nodes(id) ON DELETE CASCADE,
+            origin TEXT NOT NULL DEFAULT 'legacy',
+            confidence DOUBLE PRECISION,
+            CONSTRAINT genre_taxonomy_aliases_origin_check
+                CHECK (origin IN ('core', 'manual', 'inferred', 'legacy')),
+            CONSTRAINT genre_taxonomy_aliases_confidence_check
+                CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1))
         )
+    """)
+    cur.execute("""
+        ALTER TABLE genre_taxonomy_aliases
+        ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT 'legacy'
+    """)
+    cur.execute("""
+        ALTER TABLE genre_taxonomy_aliases
+        ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS genre_taxonomy_edges (
@@ -105,6 +119,9 @@ def create_library_genres_schema(cur) -> None:
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_alias_genre_id ON genre_taxonomy_aliases(genre_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_aliases_origin ON genre_taxonomy_aliases(origin)"
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_edges_source ON genre_taxonomy_edges(source_genre_id)"
