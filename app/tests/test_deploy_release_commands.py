@@ -178,6 +178,18 @@ def test_remote_verify_waits_for_public_routes_to_become_ready() -> None:
     assert verify_body.count("wait_for_public_url") == 4
 
 
+def test_health_wait_does_not_treat_running_before_health_init_as_ready() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    wait_body = script[
+        script.index("wait_for_container_healthy() {") : script.index(
+            "wait_for_public_url() {"
+        )
+    ]
+
+    assert ".State.Health.Status" in wait_body
+    assert "{{else}}{{.State.Running}}" not in wait_body
+
+
 def test_remote_state_rollback_restores_database_before_old_images() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
     rollback_body = script[

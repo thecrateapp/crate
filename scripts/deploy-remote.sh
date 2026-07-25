@@ -266,8 +266,8 @@ wait_for_container_healthy() {
   local reported_unhealthy=0
 
   while true; do
-    status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Running}}{{end}}' "$container" 2>/dev/null || true)"
-    if [[ "$status" == "healthy" || "$status" == "true" ]]; then
+    status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$container" 2>/dev/null || true)"
+    if [[ "$status" == "healthy" ]]; then
       return 0
     fi
     if [[ "$status" == "unhealthy" ]]; then
