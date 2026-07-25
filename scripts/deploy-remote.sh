@@ -472,10 +472,16 @@ cmd_recovery_snapshot() {
     >/dev/null
   dc stop --timeout 30 "$redis_service"
   docker run --rm \
+    -e BACKUP_UID="$(id -u)" \
+    -e BACKUP_GID="$(id -g)" \
     --volumes-from "$redis_service" \
     -v "$BACKUP_DIR:/backup" \
     redis:7-alpine \
-    sh -ec 'tar -C /data -czf /backup/redis-durable.tar.gz .'
+    sh -ec '
+      tar -C /data -czf /backup/redis-durable.tar.gz .
+      chown "$BACKUP_UID:$BACKUP_GID" /backup/redis-durable.tar.gz
+      chmod 600 /backup/redis-durable.tar.gz
+    '
 
   {
     printf 'deploy_id=%s\n' "$DEPLOY_ID"
