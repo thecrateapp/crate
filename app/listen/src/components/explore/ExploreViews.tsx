@@ -836,7 +836,7 @@ function buildGenreHeroCoverCandidates(
   const fallbackArtistBackground =
     buildGenreHeroArtistBackgroundFallback(artists);
   const fallback =
-    !generatedArtistCover && fallbackSlug && (url || !fallbackArtistBackground)
+    !generatedArtistCover && url && fallbackSlug
       ? upscaleGenreCoverUrl(undefined, fallbackSlug)
       : null;
 
@@ -853,13 +853,14 @@ function buildGenreHeroArtistBackgroundFallback(
   artists?: GenreDetail["artists"],
 ) {
   if (!artists?.length) return null;
-  const topArtist = artists.find(
-    (artist) =>
-      (artist.artist_id != null || artist.global_artist_uid) &&
-      artist.has_photo,
-  );
+  const topArtist = artists[0];
 
-  if (!topArtist?.artist_id && !topArtist?.global_artist_uid) return null;
+  if (
+    !topArtist?.has_photo ||
+    (!topArtist.artist_id && !topArtist.global_artist_uid)
+  ) {
+    return null;
+  }
 
   const resolved = artistBackgroundApiUrl(
     {

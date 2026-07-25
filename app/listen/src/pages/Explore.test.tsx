@@ -463,8 +463,21 @@ describe("Explore", () => {
     }
   });
 
-  it("falls back to the canonical genre cover when cached detail has no cover url", () => {
-    mockGenreDetail({ coverUrl: null });
+  it("uses the first ranked artist when the genre has no curated cover", () => {
+    mockGenreDetail({
+      coverUrl: null,
+      artists: [
+        {
+          artist_id: 111,
+          artist_name: "Top Ranked Artist",
+          artist_slug: "top-ranked-artist",
+          album_count: 3,
+          track_count: 6,
+          has_photo: true,
+          listeners: 120,
+        },
+      ],
+    });
 
     renderWithListenProviders(<Explore />, {
       route: "/explore?genre=hardcore",
@@ -473,7 +486,7 @@ describe("Explore", () => {
 
     expect(screen.getByAltText("hardcore genre cover")).toHaveAttribute(
       "src",
-      "/api/genres/hardcore-punk/cover?size=1280&format=webp",
+      "/api/artists/111/background?size=1280&format=webp",
     );
   });
 
@@ -538,6 +551,39 @@ describe("Explore", () => {
     );
   });
 
+  it("does not skip the first ranked artist when selecting fallback artwork", () => {
+    mockGenreDetail({
+      coverUrl: null,
+      artists: [
+        {
+          artist_id: 111,
+          artist_name: "Top Artist Without Artwork",
+          artist_slug: "top-artist-without-artwork",
+          album_count: 3,
+          track_count: 6,
+          has_photo: false,
+          listeners: 120,
+        },
+        {
+          artist_id: 222,
+          artist_name: "Second Artist With Artwork",
+          artist_slug: "second-artist-with-artwork",
+          album_count: 5,
+          track_count: 9,
+          has_photo: true,
+          listeners: 999,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore?genre=hardcore",
+      path: "/explore",
+    });
+
+    expect(screen.queryByAltText("hardcore genre cover")).toBeNull();
+  });
+
   it("rebuilds cached generated hero URLs through the invalidation-aware helper", () => {
     recordAssetInvalidationScope("artist:222", "artist-artwork-222");
     mockGenreDetail({
@@ -568,15 +614,13 @@ describe("Explore", () => {
     );
   });
 
-  it("unmounts the genre hero after every artwork candidate fails", () => {
+  it("does not probe an absent canonical cover without a ranked artist", () => {
     mockGenreDetail({ coverUrl: null, artists: [] });
 
     renderWithListenProviders(<Explore />, {
       route: "/explore?genre=hardcore",
       path: "/explore",
     });
-
-    fireEvent.error(screen.getByAltText("hardcore genre cover"));
 
     expect(screen.queryByAltText("hardcore genre cover")).toBeNull();
   });
