@@ -73,6 +73,309 @@ def test_local_genre_assignment_projects_attributed_global_membership(pg_db):
     }
 
 
+def test_legacy_alias_does_not_project_global_membership(pg_db):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
+
+    artist_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "Legacy Alias Artist", "entity_uid": artist_uid})
+    with transaction_scope() as session:
+        rock_id = session.execute(
+            text(
+                """
+                SELECT id
+                FROM genre_taxonomy_nodes
+                WHERE taxonomy_id = 'crate-core' AND slug = 'rock'
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_aliases (
+                    alias_slug, alias_name, genre_id, origin, confidence
+                )
+                VALUES ('scene-country', 'scene country', :genre_id, 'legacy', NULL)
+                """
+            ),
+            {"genre_id": rock_id},
+        )
+    pg_db.set_artist_genres(
+        "Legacy Alias Artist",
+        [("scene country", 1.0, "test")],
+    )
+
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
+
+    with read_scope() as session:
+        assertion = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        assertion.global_genre_uid,
+                        assertion.mapping_method
+                    FROM global_catalog_genre_assertions assertion
+                    JOIN global_catalog_sources source ON source.id = assertion.source_id
+                    WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                      AND assertion.invalidated_at IS NULL
+                    """
+                ),
+                {"artist_uid": artist_uid},
+            )
+            .mappings()
+            .one()
+        )
+        memberships = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_entity_genres membership
+                JOIN global_catalog_sources source
+                  ON source.entity_type = membership.entity_type
+                 AND source.global_entity_uid = membership.global_entity_uid
+                WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                """
+            ),
+            {"artist_uid": artist_uid},
+        ).scalar_one()
+
+    assert assertion == {
+        "global_genre_uid": None,
+        "mapping_method": "unmapped",
+    }
+    assert memberships == 0
+
+
+def test_repair_stale_alias_assertions_recomputes_affected_entity(pg_db):
+    from crate.db.jobs.global_catalog_genres import repair_stale_alias_assertions
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
+
+    artist_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "Removed Alias Artist", "entity_uid": artist_uid})
+    with transaction_scope() as session:
+        rock_id = session.execute(
+            text(
+                """
+                SELECT id
+                FROM genre_taxonomy_nodes
+                WHERE taxonomy_id = 'crate-core' AND slug = 'rock'
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_aliases (
+                    alias_slug, alias_name, genre_id, origin, confidence
+                )
+                VALUES ('temporary-scene', 'temporary scene', :genre_id, 'manual', 1.0)
+                """
+            ),
+            {"genre_id": rock_id},
+        )
+    pg_db.set_artist_genres(
+        "Removed Alias Artist",
+        [("temporary scene", 1.0, "test")],
+    )
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "DELETE FROM genre_taxonomy_aliases WHERE alias_slug = 'temporary-scene'"
+            )
+        )
+        repaired = repair_stale_alias_assertions(session)
+
+    assert repaired == {"assertions": 1, "entities": 1}
+    with read_scope() as session:
+        active_assertions = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_genre_assertions assertion
+                JOIN global_catalog_sources source ON source.id = assertion.source_id
+                WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                  AND assertion.invalidated_at IS NULL
+                """
+            ),
+            {"artist_uid": artist_uid},
+        ).scalar_one()
+        memberships = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_entity_genres membership
+                JOIN global_catalog_sources source
+                  ON source.entity_type = membership.entity_type
+                 AND source.global_entity_uid = membership.global_entity_uid
+                WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                """
+            ),
+            {"artist_uid": artist_uid},
+        ).scalar_one()
+
+    assert active_assertions == 0
+    assert memberships == 0
+
+
+def test_repair_waits_until_a_legacy_alias_is_removed(pg_db):
+    from crate.db.jobs.global_catalog_genres import repair_stale_alias_assertions
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
+
+    artist_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "Pending Seed Artist", "entity_uid": artist_uid})
+    with transaction_scope() as session:
+        rock_id = session.execute(
+            text(
+                """
+                SELECT id
+                FROM genre_taxonomy_nodes
+                WHERE taxonomy_id = 'crate-core' AND slug = 'rock'
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_aliases (
+                    alias_slug, alias_name, genre_id, origin, confidence
+                )
+                VALUES ('pending-seed', 'pending seed', :genre_id, 'manual', 1.0)
+                """
+            ),
+            {"genre_id": rock_id},
+        )
+    pg_db.set_artist_genres(
+        "Pending Seed Artist",
+        [("pending seed", 1.0, "test")],
+    )
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE genre_taxonomy_aliases
+                SET origin = 'legacy', confidence = NULL
+                WHERE alias_slug = 'pending-seed'
+                """
+            )
+        )
+        repaired = repair_stale_alias_assertions(session)
+
+    assert repaired == {"assertions": 0, "entities": 0}
+    with read_scope() as session:
+        active_assertions = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_genre_assertions assertion
+                JOIN global_catalog_sources source ON source.id = assertion.source_id
+                WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                  AND assertion.invalidated_at IS NULL
+                """
+            ),
+            {"artist_uid": artist_uid},
+        ).scalar_one()
+        memberships = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_entity_genres membership
+                JOIN global_catalog_sources source
+                  ON source.entity_type = membership.entity_type
+                 AND source.global_entity_uid = membership.global_entity_uid
+                WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                """
+            ),
+            {"artist_uid": artist_uid},
+        ).scalar_one()
+
+    assert active_assertions == 1
+    assert memberships == 1
+
+
+def test_taxonomy_seed_repairs_assertions_for_removed_legacy_aliases(pg_db):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
+    from crate.genre_taxonomy import seed_genre_taxonomy
+
+    artist_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "Seed Repair Artist", "entity_uid": artist_uid})
+    with transaction_scope() as session:
+        rock_id = session.execute(
+            text(
+                """
+                SELECT id
+                FROM genre_taxonomy_nodes
+                WHERE taxonomy_id = 'crate-core' AND slug = 'rock'
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_aliases (
+                    alias_slug, alias_name, genre_id, origin, confidence
+                )
+                VALUES ('removed-by-seed', 'removed by seed', :genre_id, 'manual', 1.0)
+                """
+            ),
+            {"genre_id": rock_id},
+        )
+    pg_db.set_artist_genres(
+        "Seed Repair Artist",
+        [("removed by seed", 1.0, "test")],
+    )
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE genre_taxonomy_aliases
+                SET origin = 'legacy', confidence = NULL
+                WHERE alias_slug = 'removed-by-seed'
+                """
+            )
+        )
+        seed_genre_taxonomy(session)
+
+    with read_scope() as session:
+        active_assertions = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_genre_assertions assertion
+                JOIN global_catalog_sources source ON source.id = assertion.source_id
+                WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                  AND assertion.invalidated_at IS NULL
+                """
+            ),
+            {"artist_uid": artist_uid},
+        ).scalar_one()
+        memberships = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_entity_genres membership
+                JOIN global_catalog_sources source
+                  ON source.entity_type = membership.entity_type
+                 AND source.global_entity_uid = membership.global_entity_uid
+                WHERE source.local_entity_uid = CAST(:artist_uid AS uuid)
+                """
+            ),
+            {"artist_uid": artist_uid},
+        ).scalar_one()
+
+    assert active_assertions == 0
+    assert memberships == 0
+
+
 def test_changing_local_genres_requeues_only_that_catalog_source(pg_db):
     from crate.db.repositories.genres_assignments import set_artist_genres
     from crate.db.tx import read_scope

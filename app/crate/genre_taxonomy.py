@@ -1494,6 +1494,12 @@ def seed_genre_taxonomy(session) -> None:
     manual and inferred aliases are preserved.
     """
     from crate.db.jobs.genre_taxonomy import seed_genre_taxonomy_definitions
+    from crate.db.jobs.global_catalog_genres import repair_stale_alias_assertions
 
-    seed_genre_taxonomy_definitions(session, _GENRE_DEFINITIONS)
+    removed_legacy_aliases = seed_genre_taxonomy_definitions(
+        session,
+        _GENRE_DEFINITIONS,
+    )
+    if removed_legacy_aliases:
+        repair_stale_alias_assertions(session)
     invalidate_runtime_taxonomy_cache_after_commit(session)
