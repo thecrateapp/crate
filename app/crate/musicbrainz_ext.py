@@ -3,6 +3,7 @@ import logging
 import musicbrainzngs
 
 from crate.db.cache_store import get_cache, set_cache
+from crate.provider_rate_limits import wait_for_provider_slot
 
 log = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ def get_artist_details(name: str) -> dict | None:
 def get_artist_releases(mbid: str) -> list[dict]:
     """Get all release groups (albums, EPs, singles) for an artist by MBID.
     Returns list sorted by date descending."""
-    cache_key = f"mb:releases:{mbid}"
+    cache_key = f"mb:releases:v2:{mbid}"
     cached = get_cache(cache_key)
     if cached:
         return cached
@@ -108,9 +109,9 @@ def get_artist_releases(mbid: str) -> list[dict]:
         while page < max_pages:
             page += 1
             try:
+                wait_for_provider_slot("musicbrainz", 1.1)
                 result = musicbrainzngs.browse_release_groups(
                     artist=mbid,
-                    release_type=["album", "ep"],
                     limit=100,
                     offset=offset,
                 )
@@ -131,6 +132,7 @@ def get_artist_releases(mbid: str) -> list[dict]:
                         "title": title,
                         "year": year,
                         "type": rg_type,
+                        "secondary_types": list(rg.get("secondary-type-list") or []),
                         "mbid": rg.get("id", ""),
                         "first_release_date": first_release,
                     }

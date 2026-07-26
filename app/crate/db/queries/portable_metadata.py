@@ -72,6 +72,8 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                     alb.has_cover,
                     alb.musicbrainz_albumid,
                     alb.musicbrainz_releasegroupid,
+                    alb.release_group_primary_type,
+                    alb.release_group_secondary_types,
                     alb.discogs_master_id,
                     alb.lastfm_listeners,
                     alb.lastfm_playcount,

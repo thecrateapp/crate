@@ -88,6 +88,8 @@ class LibraryAlbumRow(TypedDict):
     has_cover: int
     musicbrainz_albumid: str | None
     musicbrainz_releasegroupid: str | None
+    release_group_primary_type: str | None
+    release_group_secondary_types: list[str]
     tag_album: str | None
     dir_mtime: float | None
     updated_at: Any | None
@@ -236,6 +238,10 @@ def album_to_dict(album) -> LibraryAlbumRow | None:
         "has_cover": album.has_cover or 0,
         "musicbrainz_albumid": album.musicbrainz_albumid,
         "musicbrainz_releasegroupid": album.musicbrainz_releasegroupid,
+        "release_group_primary_type": album.release_group_primary_type,
+        "release_group_secondary_types": list(
+            album.release_group_secondary_types or []
+        ),
         "tag_album": album.tag_album,
         "dir_mtime": album.dir_mtime,
         "updated_at": album.updated_at,

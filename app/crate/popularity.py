@@ -34,6 +34,12 @@ from crate.db.jobs.popularity_writes import (
 from crate.db.repositories.library import get_library_artists
 from crate.lastfm import get_top_tracks as get_lastfm_top_tracks
 from crate.spotify import get_top_tracks as get_spotify_top_tracks
+from crate.track_versions import (
+    canonical_track_title_key,
+    normalized_track_title_key,
+    select_preferred_track_variant,
+    track_variant_rank,
+)
 
 log = logging.getLogger(__name__)
 
@@ -74,15 +80,29 @@ def _parse_int(val) -> int:
 
 
 def _normalize_track_title(value: str) -> str:
-    title = unicodedata.normalize("NFKC", (value or "").lower())
+    title = unicodedata.normalize("NFKC", value or "")
     title = title.replace("&", " and ")
     title = title.replace("’", "'").replace("`", "'")
-    title = re.sub(r"\bfeat(?:uring)?\.?\s+[^-()\[\]]+", " ", title)
-    title = re.sub(r"\((.*?)\)|\[(.*?)\]", " ", title)
-    title = re.sub(r"[-_/]", " ", title)
-    title = re.sub(r"[^a-z0-9\s']", " ", title)
-    title = re.sub(r"\s+", " ", title).strip()
-    return title
+    title = re.sub(
+        r"\bfeat(?:uring)?\.?\s+[^-()\[\]]+",
+        " ",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return normalized_track_title_key(title)
+
+
+def _canonical_track_match_key(value: str) -> str:
+    title = unicodedata.normalize("NFKC", value or "")
+    title = title.replace("&", " and ")
+    title = title.replace("’", "'").replace("`", "'")
+    title = re.sub(
+        r"\bfeat(?:uring)?\.?\s+[^-()\[\]]+",
+        " ",
+        title,
+        flags=re.IGNORECASE,
+    )
+    return canonical_track_title_key(title)
 
 
 def _rank_signal(rank: int | None, rank_max: int) -> float:
@@ -126,7 +146,7 @@ def _artist_signal(row: dict, scales: dict) -> float:
 def _build_title_index(tracks: list[dict]) -> dict[str, list[dict]]:
     title_index: dict[str, list[dict]] = defaultdict(list)
     for track in tracks:
-        normalized = _normalize_track_title(track.get("title") or "")
+        normalized = _canonical_track_match_key(track.get("title") or "")
         if normalized:
             title_index[normalized].append(track)
     return title_index
@@ -135,30 +155,21 @@ def _build_title_index(tracks: list[dict]) -> dict[str, list[dict]]:
 def _match_remote_track_ids(
     title_index: dict[str, list[dict]], remote_title: str
 ) -> list[int]:
-    normalized = _normalize_track_title(remote_title)
-    if not normalized:
+    canonical = _canonical_track_match_key(remote_title)
+    if not canonical:
         return []
 
-    exact = title_index.get(normalized)
-    if exact:
-        return [int(track["id"]) for track in exact]
+    candidates = title_index.get(canonical, [])
+    if track_variant_rank(remote_title) > 0:
+        requested_exact = _normalize_track_title(remote_title)
+        candidates = [
+            track
+            for track in candidates
+            if _normalize_track_title(str(track.get("title") or "")) == requested_exact
+        ]
 
-    partial_ids: list[int] = []
-    for candidate_title, tracks in title_index.items():
-        if (
-            candidate_title.startswith(normalized)
-            or normalized.startswith(candidate_title)
-            or normalized in candidate_title
-        ):
-            partial_ids.extend(int(track["id"]) for track in tracks)
-
-    seen: set[int] = set()
-    deduped: list[int] = []
-    for track_id in partial_ids:
-        if track_id not in seen:
-            seen.add(track_id)
-            deduped.append(track_id)
-    return deduped
+    match = select_preferred_track_variant(candidates)
+    return [int(match["id"])] if match else []
 
 
 def refresh_artist_track_popularity_signals(artist_name: str) -> dict:
@@ -175,10 +186,8 @@ def refresh_artist_track_popularity_signals(artist_name: str) -> dict:
     title_index = _build_title_index(tracks)
     reset_track_popularity_signals(artist_name)
 
-    lastfm_updates: list[dict] = []
-    spotify_updates: list[dict] = []
-    seen_lastfm_ids: set[int] = set()
-    seen_spotify_ids: set[int] = set()
+    lastfm_updates_by_id: dict[int, dict] = {}
+    spotify_updates_by_id: dict[int, dict] = {}
 
     lastfm_top_tracks = (
         get_lastfm_top_tracks(artist_name, limit=LASTFM_TOP_TRACK_LIMIT) or []
@@ -190,16 +199,16 @@ def refresh_artist_track_popularity_signals(artist_name: str) -> dict:
         listeners = _parse_int(item.get("listeners", 0))
         playcount = _parse_int(item.get("playcount", 0))
         for track_id in matched_ids:
-            lastfm_updates.append(
-                {
+            current = lastfm_updates_by_id.get(track_id)
+            if current is None or rank < current["lastfm_top_rank"]:
+                lastfm_updates_by_id[track_id] = {
                     "id": track_id,
                     "lastfm_top_rank": rank,
                     "lastfm_listeners": listeners or None,
                     "lastfm_playcount": playcount or None,
                 }
-            )
-            seen_lastfm_ids.add(track_id)
 
+    lastfm_updates = list(lastfm_updates_by_id.values())
     if lastfm_updates:
         bulk_update_lastfm_top_track_signals(lastfm_updates)
 
@@ -212,21 +221,21 @@ def refresh_artist_track_popularity_signals(artist_name: str) -> dict:
                 continue
             popularity = _parse_int(item.get("popularity", 0))
             for track_id in matched_ids:
-                spotify_updates.append(
-                    {
+                current = spotify_updates_by_id.get(track_id)
+                if current is None or rank < current["spotify_top_rank"]:
+                    spotify_updates_by_id[track_id] = {
                         "id": track_id,
                         "spotify_track_popularity": popularity or None,
                         "spotify_top_rank": rank,
                     }
-                )
-                seen_spotify_ids.add(track_id)
 
+    spotify_updates = list(spotify_updates_by_id.values())
     if spotify_updates:
         bulk_update_spotify_track_signals(spotify_updates)
 
     return {
-        "lastfm_matches": len(seen_lastfm_ids),
-        "spotify_matches": len(seen_spotify_ids),
+        "lastfm_matches": len(lastfm_updates_by_id),
+        "spotify_matches": len(spotify_updates_by_id),
     }
 
 

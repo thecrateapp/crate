@@ -2236,6 +2236,27 @@ def test_library_health_check_rejects_metadata_editor():
     assert exc.value.status_code == 403
 
 
+def test_release_type_backfill_queues_metadata_only_enrichment(monkeypatch):
+    from crate.api.management import enrich_mbids
+    from crate.api.schemas.management import EnrichMbidsRequest
+
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-1",
+    )
+
+    response = enrich_mbids(  # type: ignore[arg-type]
+        _request_for("editor"),
+        EnrichMbidsRequest(release_types_only=True),
+    )
+
+    assert response == {"task_id": "task-1"}
+    assert created == [
+        ("enrich_mbids", {"release_types_only": True}),
+    ]
+
+
 def test_full_album_delete_requires_librarian_file_delete_capability(monkeypatch):
     from crate.api.management import delete_album_by_id
     from crate.api.schemas.management import DeleteRequest

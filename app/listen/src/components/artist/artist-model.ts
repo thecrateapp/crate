@@ -28,6 +28,14 @@ export interface ArtistAlbum {
   release_date?: string | null;
   release_status?: string | null;
   release_type?: string | null;
+  release_secondary_types?: string[];
+  release_category?:
+    | "album"
+    | "ep_single"
+    | "compilation"
+    | "live"
+    | "other"
+    | null;
   source_url?: string | null;
 }
 

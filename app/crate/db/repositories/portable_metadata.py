@@ -469,6 +469,11 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 "has_cover": album.get("has_cover") or 0,
                 "musicbrainz_albumid": album.get("musicbrainz_albumid"),
                 "musicbrainz_releasegroupid": album.get("musicbrainz_releasegroupid"),
+                "release_group_primary_type": album.get("release_group_primary_type"),
+                "release_group_secondary_types": album.get(
+                    "release_group_secondary_types"
+                )
+                or [],
                 "tag_album": album.get("tag_album"),
             },
             session=session,

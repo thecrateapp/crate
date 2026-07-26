@@ -106,6 +106,8 @@ export const COMPLETED_ENGLISH_FALLBACK_ALLOWLIST = new Set<string>([
   "share.instagramStory",
   "actions.track.playlists",
   "artist.sections.albums",
+  "artist.sections.epsAndSingles",
+  "artist.sections.compilations",
   "common.off",
   "common.offline",
   "common.album",

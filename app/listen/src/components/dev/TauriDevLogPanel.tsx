@@ -34,8 +34,12 @@ export function TauriDevLogPanel() {
         <div className="w-[min(46rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-cyan-400/25 bg-[#05070b]/95 shadow-2xl shadow-black/60">
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <div>
-              <div className="font-sans text-sm font-semibold text-white">Tauri playback logs</div>
-              <div className="text-[0.65rem] uppercase tracking-[0.18em] text-cyan-300/80">{logs.length} events</div>
+              <div className="font-sans text-sm font-semibold text-white">
+                Tauri playback logs
+              </div>
+              <div className="text-[0.65rem] uppercase tracking-[0.18em] text-cyan-300/80">
+                {logs.length} events
+              </div>
             </div>
             <div className="flex gap-2 font-sans">
               <button
@@ -56,32 +60,44 @@ export function TauriDevLogPanel() {
           </div>
           <div className="max-h-[42vh] overflow-auto px-3 py-2">
             {logs.length === 0 ? (
-              <div className="py-6 text-center font-sans text-slate-500">No playback events yet.</div>
+              <div className="py-6 text-center font-sans text-slate-500">
+                No playback events yet.
+              </div>
             ) : (
-              logs.slice().reverse().map((entry) => (
-                <div key={entry.id} className="border-b border-white/5 py-2 last:border-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-slate-500">{timeLabel(entry.timestamp)}</span>
-                    <span className="rounded bg-cyan-400/10 px-1.5 py-0.5 uppercase tracking-wide text-cyan-200">
-                      {entry.scope}
-                    </span>
-                    <span className={
-                      entry.level === "error"
-                        ? "text-red-300"
-                        : entry.level === "warn"
-                          ? "text-amber-300"
-                          : "text-slate-100"
-                    }>
-                      {entry.message}
-                    </span>
+              logs
+                .slice()
+                .reverse()
+                .map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="border-b border-white/5 py-2 last:border-0"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-slate-500">
+                        {timeLabel(entry.timestamp)}
+                      </span>
+                      <span className="rounded bg-cyan-400/10 px-1.5 py-0.5 uppercase tracking-wide text-cyan-200">
+                        {entry.scope}
+                      </span>
+                      <span
+                        className={
+                          entry.level === "error"
+                            ? "text-red-300"
+                            : entry.level === "warn"
+                              ? "text-amber-300"
+                              : "text-slate-100"
+                        }
+                      >
+                        {entry.message}
+                      </span>
+                    </div>
+                    {entry.detail ? (
+                      <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words text-[0.68rem] leading-relaxed text-slate-400">
+                        {entry.detail}
+                      </pre>
+                    ) : null}
                   </div>
-                  {entry.detail ? (
-                    <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words text-[0.68rem] leading-relaxed text-slate-400">
-                      {entry.detail}
-                    </pre>
-                  ) : null}
-                </div>
-              ))
+                ))
             )}
           </div>
         </div>

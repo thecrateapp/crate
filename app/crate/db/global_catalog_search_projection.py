@@ -343,6 +343,8 @@ _UPSERT_ALBUM_DOCUMENT_SQL = text(
                'display_name', canonical_name,
                'year', year,
                'tracks', COALESCE(track_count, 0),
+               'release_type', release_group_primary_type,
+               'release_secondary_types', release_group_secondary_types,
                'formats', '[]'::jsonb,
                'size_mb', 0,
                'has_cover', has_cover,

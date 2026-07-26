@@ -9,6 +9,13 @@ from tests.conftest import PG_AVAILABLE
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
 
+def test_remote_track_title_normalization_ignores_capitalized_feature_credit():
+    from crate.popularity import _canonical_track_match_key, _normalize_track_title
+
+    assert _normalize_track_title("Big Song Feat. Guest") == "big song"
+    assert _canonical_track_match_key("Big Song Featuring Guest") == "big song"
+
+
 def _seed_artist_album_and_tracks(pg_db, artist_name: str):
     pg_db.upsert_artist(
         {
@@ -135,6 +142,71 @@ def test_refresh_artist_track_popularity_signals_matches_lastfm_and_spotify(pg_d
     assert big_song["spotify_top_rank"] == 1
     assert deep_cut["lastfm_top_rank"] is None
     assert deep_cut["spotify_track_popularity"] is None
+
+
+def test_refresh_track_popularity_does_not_spread_or_overwrite_version_ranks(pg_db):
+    from crate.popularity import refresh_artist_track_popularity_signals
+
+    seeded = _seed_artist_album_and_tracks(pg_db, "Versioned Artist")
+    remaster_path = "/music/versioned-artist/beta/02-big-song-remaster.flac"
+    live_path = "/music/versioned-artist/beta/03-big-song-live.flac"
+    pg_db.upsert_track(
+        {
+            "album_id": seeded["album_two_id"],
+            "artist": "Versioned Artist",
+            "album": "Beta (Deluxe Edition)",
+            "filename": "02-big-song-remaster.flac",
+            "title": "Big Song (2010 Remaster)",
+            "track_number": 2,
+            "format": "flac",
+            "duration": 181,
+            "size": 123,
+            "path": remaster_path,
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": seeded["album_two_id"],
+            "artist": "Versioned Artist",
+            "album": "Live at Somewhere",
+            "filename": "03-big-song-live.flac",
+            "title": "Big Song (Live at Somewhere)",
+            "track_number": 3,
+            "format": "flac",
+            "duration": 240,
+            "size": 123,
+            "path": live_path,
+        }
+    )
+
+    with (
+        patch(
+            "crate.popularity.get_lastfm_top_tracks",
+            return_value=[
+                {"title": "Big Song", "listeners": 9000, "playcount": 50000},
+                {"title": "Deep Cut", "listeners": 8000, "playcount": 40000},
+                {
+                    "title": "Big Song (2010 Remaster)",
+                    "listeners": 7000,
+                    "playcount": 30000,
+                },
+                {"title": "Big Song", "listeners": 100, "playcount": 200},
+            ],
+        ),
+        patch("crate.popularity.get_spotify_top_tracks", return_value=[]),
+    ):
+        result = refresh_artist_track_popularity_signals("Versioned Artist")
+
+    original = pg_db.get_library_track_by_path(seeded["big_song_path"])
+    remaster = pg_db.get_library_track_by_path(remaster_path)
+    live = pg_db.get_library_track_by_path(live_path)
+
+    assert result["lastfm_matches"] == 3
+    assert original["lastfm_top_rank"] == 1
+    assert original["lastfm_listeners"] == 9000
+    assert original["lastfm_playcount"] == 50000
+    assert remaster["lastfm_top_rank"] == 3
+    assert live["lastfm_top_rank"] is None
 
 
 def test_recompute_track_popularity_scores_backfills_all_tracks(pg_db):

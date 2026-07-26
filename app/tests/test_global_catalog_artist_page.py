@@ -19,6 +19,8 @@ def _seed_local_artist_album_track(pg_db):
             "year": "2011",
             "track_count": 1,
             "has_cover": 1,
+            "release_group_primary_type": "Album",
+            "release_group_secondary_types": ["Live"],
         }
     )
     pg_db.upsert_track(
@@ -142,6 +144,7 @@ def test_global_artist_page_returns_local_artist_payload(pg_db):
 
     assert payload["artist"]["name"] == "Rival Schools"
     assert payload["artist"]["albums"][0]["name"] == "Pedals"
+    assert payload["artist"]["albums"][0]["release_category"] == "live"
     assert payload["top_tracks"][0]["title"] == "Wring It Out"
     assert payload["artist"]["availability"]["local"] is True
 

@@ -88,6 +88,10 @@ class LibraryAlbum(Base):
     slug: Mapped[str | None] = mapped_column(Text)
     tag_album: Mapped[str | None] = mapped_column(Text)
     musicbrainz_releasegroupid: Mapped[str | None] = mapped_column(Text)
+    release_group_primary_type: Mapped[str | None] = mapped_column(Text)
+    release_group_secondary_types: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default="[]"
+    )
     discogs_master_id: Mapped[str | None] = mapped_column(Text)
     lastfm_listeners: Mapped[int | None] = mapped_column(Integer)
     lastfm_playcount: Mapped[int | None] = mapped_column(BIGINT)

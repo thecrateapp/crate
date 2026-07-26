@@ -75,6 +75,8 @@ def _lookup_release(mbid: str) -> dict:
             "mb_artist": release.get("artist-credit-phrase"),
             "mb_track_count": track_count,
             "mb_release_group_id": rg.get("id"),
+            "release_group_primary_type": rg.get("primary-type"),
+            "release_group_secondary_types": list(rg.get("secondary-type-list") or []),
         }
         _mb_cache[mbid] = info
         set_mb_cache(cache_key, info)
@@ -134,6 +136,8 @@ def _empty_result() -> dict:
         "mb_artist": None,
         "mb_track_count": None,
         "mb_release_group_id": None,
+        "release_group_primary_type": None,
+        "release_group_secondary_types": [],
     }
 
 

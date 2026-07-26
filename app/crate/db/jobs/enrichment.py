@@ -1,10 +1,14 @@
 """DB functions for enrichment worker handlers."""
 
 from collections.abc import Mapping, Sequence
+import json
 from typing import Any
 
 from sqlalchemy import text
 
+from crate.db.repositories.global_catalog_dirty_sources import (
+    enqueue_local_dirty_source,
+)
 from crate.db.tx import transaction_scope
 
 
@@ -14,6 +18,30 @@ def get_albums_without_mbid() -> list[dict]:
             session.execute(
                 text(
                     "SELECT * FROM library_albums WHERE musicbrainz_albumid IS NULL OR musicbrainz_albumid = ''"
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(row) for row in rows]
+
+
+def get_albums_needing_release_metadata() -> list[dict]:
+    with transaction_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT album.*, artist.mbid AS artist_mbid
+                    FROM library_albums album
+                    LEFT JOIN library_artists artist
+                      ON LOWER(artist.name) = LOWER(album.artist)
+                    WHERE album.musicbrainz_albumid IS NULL
+                       OR album.musicbrainz_albumid = ''
+                       OR album.release_group_primary_type IS NULL
+                       OR album.release_group_primary_type = ''
+                    ORDER BY album.artist, album.year NULLS LAST, album.name
+                    """
                 )
             )
             .mappings()
@@ -58,14 +86,36 @@ def persist_album_release_mbids(
 ) -> None:
     release_mbid = release["mbid"]
     release_group_id = release.get("release_group_id", "")
+    release_group_primary_type = release.get("release_group_primary_type")
+    release_group_secondary_types = list(
+        release.get("release_group_secondary_types") or []
+    )
     mb_tracks = release.get("tracks", [])
 
     with transaction_scope() as session:
         session.execute(
             text(
-                "UPDATE library_albums SET musicbrainz_albumid = :mbid WHERE id = :id"
+                """
+                UPDATE library_albums
+                SET musicbrainz_albumid = :mbid,
+                    release_group_primary_type = COALESCE(
+                        :release_group_primary_type,
+                        release_group_primary_type
+                    ),
+                    release_group_secondary_types =
+                        CAST(:release_group_secondary_types AS jsonb),
+                    updated_at = NOW()
+                WHERE id = :id
+                """
             ),
-            {"mbid": release_mbid, "id": album_id},
+            {
+                "mbid": release_mbid,
+                "release_group_primary_type": release_group_primary_type,
+                "release_group_secondary_types": json.dumps(
+                    release_group_secondary_types
+                ),
+                "id": album_id,
+            },
         )
         if release_group_id:
             session.execute(
@@ -73,6 +123,14 @@ def persist_album_release_mbids(
                     "UPDATE library_albums SET musicbrainz_releasegroupid = :rgid WHERE id = :id"
                 ),
                 {"rgid": release_group_id, "id": album_id},
+            )
+        entity_uid = session.execute(
+            text("SELECT entity_uid::text FROM library_albums WHERE id = :id"),
+            {"id": album_id},
+        ).scalar_one_or_none()
+        if entity_uid:
+            enqueue_local_dirty_source(
+                "album", str(entity_uid), "upsert", session=session
             )
         for index, db_track in enumerate(tracks_db):
             if index >= len(mb_tracks):
@@ -90,6 +148,60 @@ def persist_album_release_mbids(
                         "id": db_track["id"],
                     },
                 )
+
+
+def persist_album_release_group_types(updates: list[dict]) -> int:
+    if not updates:
+        return 0
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE library_albums
+                SET musicbrainz_releasegroupid = COALESCE(
+                        NULLIF(:musicbrainz_releasegroupid, ''),
+                        musicbrainz_releasegroupid
+                    ),
+                    release_group_primary_type = :release_group_primary_type,
+                    release_group_secondary_types =
+                        CAST(:release_group_secondary_types AS jsonb),
+                    updated_at = NOW()
+                WHERE id = :id
+                """
+            ),
+            [
+                {
+                    **update,
+                    "musicbrainz_releasegroupid": str(
+                        update.get("musicbrainz_releasegroupid") or ""
+                    ),
+                    "release_group_secondary_types": json.dumps(
+                        update.get("release_group_secondary_types") or []
+                    ),
+                }
+                for update in updates
+            ],
+        )
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT id, entity_uid::text AS entity_uid
+                    FROM library_albums
+                    WHERE id = ANY(CAST(:ids AS bigint[]))
+                    """
+                ),
+                {"ids": [int(update["id"]) for update in updates]},
+            )
+            .mappings()
+            .all()
+        )
+        for row in rows:
+            if row["entity_uid"]:
+                enqueue_local_dirty_source(
+                    "album", str(row["entity_uid"]), "upsert", session=session
+                )
+    return len(updates)
 
 
 def update_album_mbid_and_propagate(album_id: int, mbid: str) -> None:

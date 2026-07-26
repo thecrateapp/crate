@@ -15,12 +15,12 @@ from crate.db.events import emit_task_event
 from crate.db.genres import set_album_genres
 from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url
 from crate.db.jobs.enrichment import (
-    get_albums_without_mbid,
+    get_albums_needing_release_metadata,
     get_album_names_for_artist,
     get_artists_with_mbid,
+    persist_album_release_group_types,
     persist_album_release_mbids as _db_persist_album_release_mbids,
     update_album_has_cover,
-    update_album_mbid_and_propagate,
     update_album_path_after_reorganize,
     update_album_popularity,
     update_artist_content_hash,
@@ -66,6 +66,7 @@ def _unmark_processing(artist_name: str):
 def _invalidate_artist_top_tracks_cache(artist_name: str) -> None:
     delete_cache_prefix(f"listen:artist_top_tracks:v1:{artist_name.strip().lower()}:")
     delete_cache_prefix(f"listen:artist_top_tracks:v2:{artist_name.strip().lower()}:")
+    delete_cache_prefix(f"listen:artist_top_tracks:v3:{artist_name.strip().lower()}:")
 
 
 def _clean_album_lookup_name(album_name: str) -> str:
@@ -182,6 +183,65 @@ def _persist_album_release_mbids(
     album_id: int, tracks_db: Sequence[Mapping[str, Any]], release: dict
 ) -> None:
     _db_persist_album_release_mbids(album_id, tracks_db, release)
+
+
+def _backfill_known_release_group_types(
+    albums: Sequence[Mapping[str, Any]],
+) -> set[int]:
+    from crate.musicbrainz_ext import get_artist_releases
+
+    by_artist_mbid: dict[str, list[Mapping[str, Any]]] = {}
+    for album in albums:
+        artist_mbid = str(album.get("artist_mbid") or "").strip()
+        release_group_id = str(album.get("musicbrainz_releasegroupid") or "").strip()
+        if artist_mbid and release_group_id:
+            by_artist_mbid.setdefault(artist_mbid, []).append(album)
+
+    updates: list[dict] = []
+    for artist_mbid, artist_albums in by_artist_mbid.items():
+        release_groups = {
+            str(release.get("mbid") or ""): release
+            for release in get_artist_releases(artist_mbid)
+            if release.get("mbid")
+        }
+        for album in artist_albums:
+            release = release_groups.get(
+                str(album.get("musicbrainz_releasegroupid") or "")
+            )
+            if not release or not release.get("type"):
+                continue
+            updates.append(
+                {
+                    "id": int(album["id"]),
+                    "release_group_primary_type": release["type"],
+                    "release_group_secondary_types": list(
+                        release.get("secondary_types") or []
+                    ),
+                }
+            )
+
+    persist_album_release_group_types(updates)
+    return {int(update["id"]) for update in updates}
+
+
+def _persist_existing_release_group_types(album_id: int, release: dict) -> bool:
+    primary_type = release.get("release_group_primary_type")
+    secondary_types = list(release.get("release_group_secondary_types") or [])
+    release_group_id = str(release.get("release_group_id") or "").strip()
+    if not primary_type and not secondary_types:
+        return False
+
+    persist_album_release_group_types(
+        [
+            {
+                "id": int(album_id),
+                "musicbrainz_releasegroupid": release_group_id,
+                "release_group_primary_type": primary_type,
+                "release_group_secondary_types": secondary_types,
+            }
+        ]
+    )
+    return True
 
 
 def _write_album_release_tags(
@@ -475,16 +535,25 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
     exts = DEFAULT_AUDIO_EXTENSIONS
     artist_filter = params.get("artist")
     min_score = params.get("min_score", 70)
+    release_types_only = bool(params.get("release_types_only"))
 
     if artist_filter:
         albums = get_library_albums(artist_filter)
     else:
-        albums = get_albums_without_mbid()
+        albums = get_albums_needing_release_metadata()
+    if release_types_only:
+        albums = [
+            album
+            for album in albums
+            if album.get("musicbrainz_albumid")
+            or album.get("musicbrainz_releasegroupid")
+        ]
 
     total = len(albums)
     enriched = 0
     skipped = 0
     failed = 0
+    type_backfilled_ids = _backfill_known_release_group_types(albums)
 
     p = TaskProgress(phase="matching_mbids", phase_count=1, total=total)
 
@@ -497,13 +566,33 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
         album_path = album.get("path", "")
 
         existing_mbid = album.get("musicbrainz_albumid")
-        if existing_mbid and existing_mbid.strip():
+        existing_primary_type = album.get("release_group_primary_type")
+        if album["id"] in type_backfilled_ids or (
+            existing_mbid and existing_mbid.strip() and existing_primary_type
+        ):
             skipped += 1
+            continue
+
+        if release_types_only and not existing_mbid:
+            failed += 1
             continue
 
         p.done = index
         p.item = entity_label(artist=artist_name, album=album_name)
         emit_progress(task_id, p)
+
+        if existing_mbid and existing_mbid.strip():
+            from crate.matcher import _get_release_detail
+
+            wait_for_provider_slot("musicbrainz", 1.1)
+            existing_release = _get_release_detail(existing_mbid.strip())
+            if existing_release and _persist_existing_release_group_types(
+                int(album["id"]), existing_release
+            ):
+                enriched += 1
+            else:
+                failed += 1
+            continue
 
         clean_album = _clean_album_lookup_name(album_name)
         tracks_db = get_library_tracks(album["id"]) if "id" in album else []
@@ -775,7 +864,22 @@ def _process_new_content_album_mbids(
             if album_folder and album["name"] != album_folder:
                 continue
             existing_mbid = album.get("musicbrainz_albumid")
+            if (
+                existing_mbid
+                and existing_mbid.strip()
+                and album.get("release_group_primary_type")
+            ):
+                continue
+
             if existing_mbid and existing_mbid.strip():
+                from crate.matcher import _get_release_detail
+
+                wait_for_provider_slot("musicbrainz", 1.1)
+                existing_release = _get_release_detail(existing_mbid.strip())
+                if existing_release and _persist_existing_release_group_types(
+                    int(album["id"]), existing_release
+                ):
+                    mbid_count += 1
                 continue
 
             clean_name = _clean_album_lookup_name(
@@ -799,8 +903,11 @@ def _process_new_content_album_mbids(
             )
 
             if best_release and best_score >= 70:
-                mbid = best_release["mbid"]
-                update_album_mbid_and_propagate(album["id"], mbid)
+                _persist_album_release_mbids(
+                    int(album["id"]),
+                    tracks_db,
+                    best_release,
+                )
                 mbid_count += 1
 
         result["steps"]["album_mbid"] = mbid_count

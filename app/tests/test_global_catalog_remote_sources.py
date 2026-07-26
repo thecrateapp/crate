@@ -296,6 +296,8 @@ def test_catalog_manifest_items_expose_content_facets(pg_db):
             "path": "/music/Birds In Row/We Already Lost the World",
             "has_cover": 1,
             "track_count": 1,
+            "release_group_primary_type": "Album",
+            "release_group_secondary_types": ["Compilation"],
         }
     )
     pg_db.upsert_track(
@@ -354,6 +356,9 @@ def test_catalog_manifest_items_expose_content_facets(pg_db):
             },
         }
     ]
+    assert by_type["album"]["release_group_primary_type"] == "Album"
+    assert by_type["album"]["release_group_secondary_types"] == ["Compilation"]
+    assert by_type["album"]["release_category"] == "compilation"
     assert by_type["album"]["facets"]["album_detail"]["available"] is True
     assert by_type["album"]["facets"]["album_artwork"]["available"] is True
     assert by_type["track"]["facets"]["track_info"]["available"] is True
