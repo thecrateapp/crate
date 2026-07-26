@@ -4,10 +4,7 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 
-from sqlalchemy import text
-
 from crate.config import load_config
-from crate.db.tx import read_scope
 
 _STATS_WINDOWS: dict[str, int | None] = {
     "7d": 7,
@@ -48,27 +45,6 @@ def relative_track_path(track_path: str) -> str:
     return ""
 
 
-@lru_cache(maxsize=1)
-def has_legacy_stream_id_column() -> bool:
-    with read_scope() as session:
-        row = (
-            session.execute(
-                text(
-                    """
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_name = 'library_tracks'
-                  AND column_name = 'navidrome_id'
-                LIMIT 1
-                """
-                )
-            )
-            .mappings()
-            .first()
-        )
-    return row is not None
-
-
 def window_day_cutoff(window: str) -> str | None:
     normalized = normalize_stats_window(window)
     days = _STATS_WINDOWS[normalized]
@@ -79,7 +55,6 @@ def window_day_cutoff(window: str) -> str | None:
 
 __all__ = [
     "_STATS_WINDOWS",
-    "has_legacy_stream_id_column",
     "library_root",
     "normalize_stats_window",
     "relative_track_path",

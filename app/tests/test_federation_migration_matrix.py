@@ -306,7 +306,7 @@ def _seed_063_legacy_state() -> dict[str, str]:
 
 
 def _assert_hardened_state(ids: dict[str, str]) -> None:
-    assert _scalar("SELECT version_num FROM alembic_version") == "080"
+    assert _scalar("SELECT version_num FROM alembic_version") == "081"
     assert (
         _scalar(
             "SELECT status FROM federation_local_keys WHERE node_uid = %s",
@@ -356,7 +356,7 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "080"
+    assert _scalar("SELECT version_num FROM alembic_version") == "081"
     for table in (
         "federation_local_keys",
         "federation_catalog_changes",
@@ -371,6 +371,54 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
         assert _scalar("SELECT to_regclass(%s) IS NOT NULL", (f"public.{table}",))
 
 
+def test_080_upgrade_removes_deprecated_navidrome_column(pg_db):
+    del pg_db
+    _reset_schema()
+    _migrate("080")
+    connection = _connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE library_tracks ADD COLUMN navidrome_id TEXT")
+        connection.commit()
+    finally:
+        connection.close()
+
+    _migrate("head")
+
+    assert _scalar("SELECT version_num FROM alembic_version") == "081"
+    assert (
+        _scalar(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'library_tracks'
+                  AND column_name = 'navidrome_id'
+            )
+            """
+        )
+        is False
+    )
+
+    _migrate("080", downgrade=True)
+
+    assert (
+        _scalar(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'library_tracks'
+                  AND column_name = 'navidrome_id'
+            )
+            """
+        )
+        is True
+    )
+
+
 def test_real_main_049_snapshot_upgrades_without_user_data_loss(pg_db):
     del pg_db
     _restore_049_schema_fixture()
@@ -378,7 +426,7 @@ def test_real_main_049_snapshot_upgrades_without_user_data_loss(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "080"
+    assert _scalar("SELECT version_num FROM alembic_version") == "081"
     assert _scalar("SELECT email FROM users WHERE id = %s", (ids["user_id"],)) == (
         "legacy@example.test"
     )

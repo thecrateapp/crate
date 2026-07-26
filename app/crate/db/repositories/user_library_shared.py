@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from crate.config import load_config
 from crate.db.domain_events import append_domain_event
-from crate.db.tx import read_scope, transaction_scope
+from crate.db.tx import read_scope
 
 _STATS_WINDOWS: dict[str, int | None] = {
     "7d": 7,
@@ -40,27 +40,6 @@ def relative_track_path(track_path: str) -> str:
     if not normalized.startswith("/"):
         return normalized
     return ""
-
-
-@lru_cache(maxsize=1)
-def has_legacy_stream_id_column() -> bool:
-    with transaction_scope() as session:
-        row = (
-            session.execute(
-                text(
-                    """
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_name = 'library_tracks'
-                  AND column_name = 'navidrome_id'
-                LIMIT 1
-                """
-                )
-            )
-            .mappings()
-            .first()
-        )
-    return row is not None
 
 
 def resolve_track_id(
@@ -101,71 +80,36 @@ def resolve_track_id(
     absolute_candidate = f"{root}/{rel_path}" if root and rel_path else track_path
     music_candidate = f"/music/{rel_path}" if rel_path else track_path
 
-    should_match_external_id = "/" not in track_path and "\\" not in track_path
-    if should_match_external_id and has_legacy_stream_id_column():
-        row = (
-            session.execute(
-                text(
-                    """
-                SELECT id
-                FROM library_tracks
-                WHERE path = :track_path
-                   OR path = :absolute_candidate
-                   OR path = :music_candidate
-                   OR navidrome_id = :navidrome_id
-                ORDER BY CASE
-                    WHEN path = :track_path2 THEN 0
-                    WHEN path = :absolute_candidate2 THEN 1
-                    WHEN path = :music_candidate2 THEN 2
-                    ELSE 3
-                END
-                LIMIT 1
+    row = (
+        session.execute(
+            text(
                 """
-                ),
-                {
-                    "track_path": track_path,
-                    "absolute_candidate": absolute_candidate,
-                    "music_candidate": music_candidate,
-                    "navidrome_id": track_path,
-                    "track_path2": track_path,
-                    "absolute_candidate2": absolute_candidate,
-                    "music_candidate2": music_candidate,
-                },
-            )
-            .mappings()
-            .first()
+            SELECT id
+            FROM library_tracks
+            WHERE path = :track_path
+               OR path = :absolute_candidate
+               OR path = :music_candidate
+            ORDER BY CASE
+                WHEN path = :track_path2 THEN 0
+                WHEN path = :absolute_candidate2 THEN 1
+                WHEN path = :music_candidate2 THEN 2
+                ELSE 3
+            END
+            LIMIT 1
+            """
+            ),
+            {
+                "track_path": track_path,
+                "absolute_candidate": absolute_candidate,
+                "music_candidate": music_candidate,
+                "track_path2": track_path,
+                "absolute_candidate2": absolute_candidate,
+                "music_candidate2": music_candidate,
+            },
         )
-    else:
-        row = (
-            session.execute(
-                text(
-                    """
-                SELECT id
-                FROM library_tracks
-                WHERE path = :track_path
-                   OR path = :absolute_candidate
-                   OR path = :music_candidate
-                ORDER BY CASE
-                    WHEN path = :track_path2 THEN 0
-                    WHEN path = :absolute_candidate2 THEN 1
-                    WHEN path = :music_candidate2 THEN 2
-                    ELSE 3
-                END
-                LIMIT 1
-                """
-                ),
-                {
-                    "track_path": track_path,
-                    "absolute_candidate": absolute_candidate,
-                    "music_candidate": music_candidate,
-                    "track_path2": track_path,
-                    "absolute_candidate2": absolute_candidate,
-                    "music_candidate2": music_candidate,
-                },
-            )
-            .mappings()
-            .first()
-        )
+        .mappings()
+        .first()
+    )
     return row["id"] if row else None
 
 
@@ -245,7 +189,6 @@ def utc_now_iso() -> str:
 __all__ = [
     "_STATS_WINDOWS",
     "emit_user_domain_event",
-    "has_legacy_stream_id_column",
     "library_root",
     "relative_track_path",
     "resolve_track_reference",

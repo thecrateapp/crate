@@ -809,9 +809,7 @@ class TestPlayHistory:
 
         from crate.db.queries.user_library_history import get_play_history_rows
 
-        rows = get_play_history_rows(
-            TEST_USER_ID, limit=10, has_legacy_stream_id_column=False
-        )
+        rows = get_play_history_rows(TEST_USER_ID, limit=10)
         assert len(rows) == 1
         assert rows[0]["title"] == "Concubine"
         assert rows[0]["artist"] == "Converge"
@@ -940,7 +938,6 @@ class TestPlayHistory:
         history = get_play_history_rows(
             TEST_USER_ID,
             limit=10,
-            has_legacy_stream_id_column=False,
         )
 
         matching = [item for item in history if item["title"] == title]
