@@ -34,7 +34,6 @@ type Server struct {
 	redis           *redis.Client
 	auth            *auth.Authenticator
 	catalog         *catalog.Store
-	artistTopTracks artistTopTracksCatalog
 	localMedia      localMediaCatalog
 	artworkCatalog  artworkCatalog
 	artworkResolver *media.ArtworkResolver
@@ -43,10 +42,6 @@ type Server struct {
 	fallback        *httpx.FallbackProxy
 	federationProxy *readplanefederation.Proxy
 	logger          *slog.Logger
-}
-
-type artistTopTracksCatalog interface {
-	ArtistTopTracksBySlug(context.Context, string, int) ([]map[string]any, error)
 }
 
 type localMediaCatalog interface {
@@ -87,7 +82,6 @@ func NewServer(
 		logger:          logger,
 	}
 	if catalogStore != nil {
-		server.artistTopTracks = catalogStore
 		server.localMedia = catalogStore
 		server.artworkCatalog = catalogStore
 	}

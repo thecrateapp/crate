@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,17 +12,6 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 )
-
-type stubArtistTopTracksCatalog struct {
-	calls   int
-	payload []map[string]any
-	err     error
-}
-
-func (s *stubArtistTopTracksCatalog) ArtistTopTracksBySlug(context.Context, string, int) ([]map[string]any, error) {
-	s.calls++
-	return s.payload, s.err
-}
 
 func TestRouteParts(t *testing.T) {
 	t.Run("decodes URL segments", func(t *testing.T) {
@@ -188,7 +176,53 @@ func TestArtistTopTracksSlugFallsBackToFastAPIForGlobalResolution(t *testing.T) 
 	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
 }
 
-func TestArtistTopTracksSlugConsultsCatalogBeforeFallback(t *testing.T) {
+func TestArtistTopTracksIdentityRoutesUseAuthoritativeFastAPIRanking(t *testing.T) {
+	const artistEntityUID = "123e4567-e89b-12d3-a456-426614174000"
+	tests := []struct {
+		path  string
+		write func(*Server, http.ResponseWriter, *http.Request)
+	}{
+		{
+			path: "/api/artists/7/top-tracks?count=50",
+			write: func(server *Server, w http.ResponseWriter, r *http.Request) {
+				server.writeArtistTopTracks(w, r)
+			},
+		},
+		{
+			path: "/api/artists/by-entity/" + artistEntityUID + "/top-tracks?count=50",
+			write: func(server *Server, w http.ResponseWriter, r *http.Request) {
+				server.writeArtistTopTracks(w, r)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, tt.path, r.URL.RequestURI())
+				assert.Equal(t, "1", r.Header.Get("X-Crate-Readplane-Fallback"))
+				httpx.WriteJSON(w, http.StatusOK, []map[string]any{{"title": "Choose To Lose"}})
+			}))
+			defer backend.Close()
+
+			fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+			assert.NoError(t, err)
+			server := &Server{
+				fallback: fallback,
+				logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			rec := httptest.NewRecorder()
+			tt.write(server, rec, req)
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+		})
+	}
+}
+
+func TestArtistTopTracksSlugUsesAuthoritativeFastAPIRanking(t *testing.T) {
 	fallbackCalls := 0
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fallbackCalls++
@@ -197,23 +231,18 @@ func TestArtistTopTracksSlugConsultsCatalogBeforeFallback(t *testing.T) {
 	defer backend.Close()
 	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
 	assert.NoError(t, err)
-	store := &stubArtistTopTracksCatalog{
-		payload: []map[string]any{{"title": "Catalog track"}},
-	}
 	server := &Server{
-		artistTopTracks: store,
-		fallback:        fallback,
-		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		fallback: fallback,
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 	req := httptest.NewRequest(http.MethodGet, "/api/artist-slugs/high-vis/top-tracks?count=50", nil)
 	rec := httptest.NewRecorder()
 
-	server.writeArtistTopTracksBySlug(rec, req, "high-vis", 50)
+	server.writeArtistTopTracks(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "hit", rec.Header().Get("X-Crate-Readplane"))
-	assert.Equal(t, 1, store.calls)
-	assert.Equal(t, 0, fallbackCalls)
+	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+	assert.Equal(t, 1, fallbackCalls)
 }
 
 func TestCanonicalCatalogCatchAllFallsBackToFastAPI(t *testing.T) {

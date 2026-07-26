@@ -124,6 +124,188 @@ def test_reconcile_local_catalog_is_idempotent(pg_db):
     }
 
 
+def test_full_match_recompute_rebinds_recording_mbid_without_unique_violation(
+    pg_db,
+):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_local_catalog_batch,
+    )
+
+    pg_db.upsert_artist(
+        {
+            "name": "Pulp",
+            "entity_uid": str(uuid.uuid4()),
+        }
+    )
+    original_album_id = pg_db.upsert_album(
+        {
+            "artist": "Pulp",
+            "name": "Different Class",
+            "path": "/music/Pulp/Different Class",
+            "entity_uid": str(uuid.uuid4()),
+            "year": "1995",
+            "track_count": 1,
+        }
+    )
+    deluxe_album_id = pg_db.upsert_album(
+        {
+            "artist": "Pulp",
+            "name": "Different Class (Deluxe Edition)",
+            "path": "/music/Pulp/Different Class (Deluxe Edition)",
+            "entity_uid": str(uuid.uuid4()),
+            "year": "1995",
+            "track_count": 1,
+        }
+    )
+    original_track_path = "/music/Pulp/Different Class/01 - Mis-Shapes.flac"
+    pg_db.upsert_track(
+        {
+            "album_id": original_album_id,
+            "artist": "Pulp",
+            "album": "Different Class",
+            "filename": "01 - Mis-Shapes.flac",
+            "title": "Mis-Shapes",
+            "path": original_track_path,
+            "entity_uid": str(uuid.uuid4()),
+            "duration": 227.0,
+            "disc_number": 1,
+            "track_number": 1,
+        }
+    )
+    deluxe_track_path = (
+        "/music/Pulp/Different Class (Deluxe Edition)/01 - Mis-Shapes.flac"
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": deluxe_album_id,
+            "artist": "Pulp",
+            "album": "Different Class (Deluxe Edition)",
+            "filename": "01 - Mis-Shapes.flac",
+            "title": "Mis-Shapes",
+            "path": deluxe_track_path,
+            "entity_uid": str(uuid.uuid4()),
+            "musicbrainz_trackid": "recording-mbid",
+            "duration": 235.0,
+            "disc_number": 1,
+            "track_number": 1,
+        }
+    )
+    with read_scope() as session:
+        track_ids = (
+            session.execute(
+                text(
+                    """
+                    SELECT id
+                    FROM library_tracks
+                    WHERE path = ANY(:paths)
+                    ORDER BY path
+                    """
+                ),
+                {"paths": [original_track_path, deluxe_track_path]},
+            )
+            .scalars()
+            .all()
+        )
+    original_track_id, deluxe_track_id = sorted(track_ids)
+    reconcile_local_catalog()
+
+    with read_scope() as session:
+        initial_sources = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        local_id,
+                        global_entity_uid::text AS global_entity_uid
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'track'
+                      AND local_id = ANY(:track_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"track_ids": [original_track_id, deluxe_track_id]},
+            )
+            .mappings()
+            .all()
+        )
+    assert len({row["global_entity_uid"] for row in initial_sources}) == 2
+
+    replacement_entity_uid = str(uuid.uuid4())
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE library_tracks
+                SET duration = 227,
+                    entity_uid = CAST(:entity_uid AS uuid)
+                WHERE id = :track_id
+                """
+            ),
+            {
+                "entity_uid": replacement_entity_uid,
+                "track_id": deluxe_track_id,
+            },
+        )
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET local_entity_uid = CAST(:entity_uid AS uuid)
+                WHERE entity_type = 'track'
+                  AND local_id = :track_id
+                """
+            ),
+            {
+                "entity_uid": replacement_entity_uid,
+                "track_id": deluxe_track_id,
+            },
+        )
+
+    cursor = None
+    while True:
+        batch = reconcile_local_catalog_batch(
+            batch_size=1,
+            cursor=cursor,
+            recompute_matches=True,
+        )
+        if batch["completed"]:
+            break
+        cursor = batch["next_cursor"]
+
+    with read_scope() as session:
+        reconciled_sources = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_entity_uid::text AS global_entity_uid
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'track'
+                      AND local_id = ANY(:track_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"track_ids": [original_track_id, deluxe_track_id]},
+            )
+            .scalars()
+            .all()
+        )
+        recording_mbid = session.execute(
+            text(
+                """
+                SELECT musicbrainz_recording_mbid
+                FROM global_catalog_tracks
+                WHERE global_track_uid = CAST(:global_uid AS uuid)
+                """
+            ),
+            {"global_uid": reconciled_sources[0]},
+        ).scalar_one()
+
+    assert len(set(reconciled_sources)) == 1
+    assert recording_mbid == "recording-mbid"
+
+
 def test_full_match_recompute_splits_sources_that_no_longer_match(pg_db):
     from crate.db.tx import read_scope, transaction_scope
     from crate.federation.global_reconciliation import (

@@ -1,7 +1,7 @@
 def _stats_snapshot(payload: dict) -> dict:
     return {
         "scope": "stats:dashboard",
-        "subject_key": "user:7:30d:default:10:8:8:8:30",
+        "subject_key": "user:7:30d:default:12:10:12:10:36",
         "payload_json": payload,
         "version": 2,
         "built_at": "2026-07-18T10:00:00+00:00",
@@ -59,11 +59,11 @@ def test_cold_stats_dashboard_returns_minimal_payload_and_queues_projection(
             "user_id": 7,
             "window": "30d",
             "month": None,
-            "tracks_limit": 10,
-            "artists_limit": 8,
-            "albums_limit": 8,
-            "genres_limit": 8,
-            "replay_limit": 30,
+            "tracks_limit": 12,
+            "artists_limit": 10,
+            "albums_limit": 12,
+            "genres_limit": 10,
+            "replay_limit": 36,
         }
     ]
 
@@ -113,3 +113,44 @@ def test_stats_refresh_worker_builds_default_dashboard(monkeypatch):
     assert result == {"ok": True, "user_id": 7, "window": "30d"}
     assert calls == [(7, "30d")]
     assert invalidations == [("history",)]
+
+
+def test_stats_bootstrap_queues_only_missing_canonical_snapshots(monkeypatch):
+    from crate.db import user_stats_dashboard_surface as surface
+
+    queued: list[tuple[int, str]] = []
+    monkeypatch.setattr(surface, "_list_stats_dashboard_user_ids", lambda: [7, 8])
+    monkeypatch.setattr(
+        surface,
+        "get_ui_snapshot",
+        lambda _scope, subject_key, **_kwargs: (
+            {"subject_key": subject_key} if subject_key.startswith("user:8:") else None
+        ),
+    )
+    monkeypatch.setattr(
+        surface,
+        "_schedule_projection",
+        lambda params, subject_key: queued.append((params["user_id"], subject_key)),
+    )
+
+    count = surface.queue_missing_stats_dashboard_snapshots()
+
+    assert count == 1
+    assert queued == [(7, "user:7:30d:default:12:10:12:10:36")]
+
+
+def test_api_startup_queues_stats_snapshot_bootstrap(monkeypatch):
+    from crate import api
+    from crate.db import user_stats_dashboard_surface as surface
+
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        surface,
+        "queue_missing_stats_dashboard_snapshots",
+        lambda: calls.append(True) or 2,
+        raising=False,
+    )
+
+    api._queue_stats_dashboard_backfill()
+
+    assert calls == [True]

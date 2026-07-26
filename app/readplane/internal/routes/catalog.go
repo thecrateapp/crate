@@ -210,7 +210,7 @@ func (s *Server) artistSlugRoute(w http.ResponseWriter, r *http.Request) {
 		if !s.requireCatalogAuth(w, r) {
 			return
 		}
-		s.writeArtistTopTracksBySlug(w, r, parts[0], boundedQueryInt(r, "count", 20, 1, 50))
+		s.writeArtistTopTracks(w, r)
 		return
 	}
 	if len(parts) == 3 && parts[1] == "albums" {
@@ -227,17 +227,11 @@ func (s *Server) artistSlugRoute(w http.ResponseWriter, r *http.Request) {
 	s.fallbackOrRouteMiss(w, r)
 }
 
-func (s *Server) writeArtistTopTracksBySlug(w http.ResponseWriter, r *http.Request, slug string, count int) {
-	store := s.artistTopTracks
-	if store == nil {
-		store = s.catalog
-	}
-	if store == nil {
-		s.catalogUnavailable(w, r, "Readplane catalog unavailable")
+func (s *Server) writeArtistTopTracks(w http.ResponseWriter, r *http.Request) {
+	if s.tryFallback(w, r) {
 		return
 	}
-	payload, err := store.ArtistTopTracksBySlug(r.Context(), slug, count)
-	s.writeCatalogPayloadOrFallbackNotFound(w, r, payload, err, "Artist top tracks unavailable", "Not found")
+	s.catalogUnavailable(w, r, "Artist top tracks unavailable")
 }
 
 func (s *Server) artistRoute(w http.ResponseWriter, r *http.Request) {
@@ -279,7 +273,7 @@ func (s *Server) artistRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 2 && parts[1] == "top-tracks" {
-		artistID, ok := parsePositiveInt64(parts[0])
+		_, ok := parsePositiveInt64(parts[0])
 		if !ok {
 			s.fallbackOrRouteMiss(w, r)
 			return
@@ -287,8 +281,7 @@ func (s *Server) artistRoute(w http.ResponseWriter, r *http.Request) {
 		if !s.requireCatalogAuth(w, r) {
 			return
 		}
-		payload, err := s.catalog.ArtistTopTracksByID(r.Context(), artistID, boundedQueryInt(r, "count", 20, 1, 50))
-		s.writeCatalogPayload(w, r, payload, err, "Artist top tracks unavailable", "Not found")
+		s.writeArtistTopTracks(w, r)
 		return
 	}
 	if len(parts) == 2 && parts[0] == "by-entity" && isRouteUUID(parts[1]) {
@@ -303,8 +296,7 @@ func (s *Server) artistRoute(w http.ResponseWriter, r *http.Request) {
 		if !s.requireCatalogAuth(w, r) {
 			return
 		}
-		payload, err := s.catalog.ArtistTopTracksByEntityUID(r.Context(), parts[1], boundedQueryInt(r, "count", 20, 1, 50))
-		s.writeCatalogPayload(w, r, payload, err, "Artist top tracks unavailable", "Not found")
+		s.writeArtistTopTracks(w, r)
 		return
 	}
 	s.fallbackOrRouteMiss(w, r)

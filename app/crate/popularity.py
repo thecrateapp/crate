@@ -47,6 +47,7 @@ LASTFM_BASE = "http://ws.audioscrobbler.com/2.0/"
 LASTFM_TOP_TRACK_LIMIT = 250
 LASTFM_RANK_MAX = 250
 SPOTIFY_RANK_MAX = 10
+ARTIST_TOP_TRACK_RANKING_VERSION = "2"
 
 
 def _api_key() -> str | None:

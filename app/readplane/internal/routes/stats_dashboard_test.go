@@ -20,7 +20,7 @@ func TestStatsDashboardSubjectKey(t *testing.T) {
 			name:   "defaults",
 			userID: 17,
 			query:  url.Values{},
-			want:   "user:17:30d:default:10:8:8:8:30",
+			want:   "user:17:30d:default:12:10:12:10:36",
 		},
 		{
 			name:   "custom window and limits",
@@ -39,7 +39,7 @@ func TestStatsDashboardSubjectKey(t *testing.T) {
 			name:   "month overrides period",
 			userID: 9,
 			query:  url.Values{"month": {"2026-04"}},
-			want:   "user:9:month:2026-04:2026-04:10:8:8:8:30",
+			want:   "user:9:month:2026-04:2026-04:12:10:12:10:36",
 		},
 		{
 			name:    "invalid month",

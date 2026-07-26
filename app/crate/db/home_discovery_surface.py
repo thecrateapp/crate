@@ -38,7 +38,7 @@ def _merge_recently_played(user_id: int, payload: dict) -> dict:
 def _cold_home_payload(user_id: int) -> dict:
     return {
         "hero": None,
-        "recently_played": get_home_recently_played(user_id),
+        "recently_played": [],
         "custom_mixes": [],
         "suggested_albums": [],
         "recommended_tracks": [],

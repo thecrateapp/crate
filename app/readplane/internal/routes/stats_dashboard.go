@@ -17,11 +17,11 @@ var statsDashboardLimits = []struct {
 	name         string
 	defaultValue int
 }{
-	{name: "tracks_limit", defaultValue: 10},
-	{name: "artists_limit", defaultValue: 8},
-	{name: "albums_limit", defaultValue: 8},
-	{name: "genres_limit", defaultValue: 8},
-	{name: "replay_limit", defaultValue: 30},
+	{name: "tracks_limit", defaultValue: 12},
+	{name: "artists_limit", defaultValue: 10},
+	{name: "albums_limit", defaultValue: 12},
+	{name: "genres_limit", defaultValue: 10},
+	{name: "replay_limit", defaultValue: 36},
 }
 
 func statsDashboardSubjectKey(userID int64, query url.Values) (string, error) {

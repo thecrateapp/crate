@@ -900,6 +900,13 @@ def _reconcile_local_batch_sources(
                     "global_artist_uid",
                     global_uid,
                 )
+                source_id = _rebind_source_before_canonical_upsert(
+                    session,
+                    source,
+                    global_uid,
+                    preferred=True,
+                    target_exists=existed,
+                )
                 _upsert_artist(session, source, global_uid)
             elif entity_type == "album":
                 artist_uid = _find_artist_uid(
@@ -919,6 +926,13 @@ def _reconcile_local_batch_sources(
                     "global_catalog_albums",
                     "global_album_uid",
                     global_uid,
+                )
+                source_id = _rebind_source_before_canonical_upsert(
+                    session,
+                    source,
+                    global_uid,
+                    preferred=True,
+                    target_exists=existed,
                 )
                 _upsert_album(session, source, global_uid, artist_uid)
             else:
@@ -949,8 +963,21 @@ def _reconcile_local_batch_sources(
                     "global_track_uid",
                     global_uid,
                 )
+                source_id = _rebind_source_before_canonical_upsert(
+                    session,
+                    source,
+                    global_uid,
+                    preferred=True,
+                    target_exists=existed,
+                )
                 _upsert_track(session, source, global_uid, artist_uid, album_uid)
-            source_id = _upsert_source(session, source, global_uid, preferred=True)
+            if source_id is None:
+                source_id = _upsert_source(
+                    session,
+                    source,
+                    global_uid,
+                    preferred=True,
+                )
             _project_source_genres(session, source, global_uid, source_id)
             _refresh_source_count(session, entity_type, global_uid)
             _count_result(result, existed)
@@ -975,8 +1002,15 @@ def _reconcile_remote_batch_sources(
                 existed = _canonical_exists(
                     session, "global_catalog_artists", "global_artist_uid", target_uid
                 )
-                _upsert_remote_artist(session, source, target_uid)
                 preferred = not _canonical_has_local(session, "artist", target_uid)
+                source_id = _rebind_source_before_canonical_upsert(
+                    session,
+                    source,
+                    target_uid,
+                    preferred=preferred,
+                    target_exists=existed,
+                )
+                _upsert_remote_artist(session, source, target_uid)
                 refresh_artist_photo = True
             elif entity_type == "album":
                 artist_uid = _find_artist_uid(
@@ -994,8 +1028,15 @@ def _reconcile_remote_batch_sources(
                 existed = _canonical_exists(
                     session, "global_catalog_albums", "global_album_uid", target_uid
                 )
-                _upsert_remote_album(session, source, target_uid, artist_uid)
                 preferred = not _canonical_has_local(session, "album", target_uid)
+                source_id = _rebind_source_before_canonical_upsert(
+                    session,
+                    source,
+                    target_uid,
+                    preferred=preferred,
+                    target_exists=existed,
+                )
+                _upsert_remote_album(session, source, target_uid, artist_uid)
                 refresh_artist_photo = False
             else:
                 payload = source["source_payload"]
@@ -1017,10 +1058,23 @@ def _reconcile_remote_batch_sources(
                 existed = _canonical_exists(
                     session, "global_catalog_tracks", "global_track_uid", target_uid
                 )
-                _upsert_remote_track(session, source, target_uid, artist_uid, album_uid)
                 preferred = not _canonical_has_local(session, "track", target_uid)
+                source_id = _rebind_source_before_canonical_upsert(
+                    session,
+                    source,
+                    target_uid,
+                    preferred=preferred,
+                    target_exists=existed,
+                )
+                _upsert_remote_track(session, source, target_uid, artist_uid, album_uid)
                 refresh_artist_photo = False
-            source_id = _upsert_source(session, source, target_uid, preferred=preferred)
+            if source_id is None:
+                source_id = _upsert_source(
+                    session,
+                    source,
+                    target_uid,
+                    preferred=preferred,
+                )
             _project_source_genres(session, source, target_uid, source_id)
             if refresh_artist_photo:
                 _refresh_artist_has_photo(session, target_uid)
@@ -2505,6 +2559,27 @@ def _upsert_source(
             target_global_uid=global_entity_uid,
         )
     return int(source_id)
+
+
+def _rebind_source_before_canonical_upsert(
+    session,
+    source: dict[str, Any],
+    global_entity_uid: str,
+    *,
+    preferred: bool,
+    target_exists: bool,
+) -> int | None:
+    if not target_exists:
+        return None
+    previous_global_uid = _existing_source_target(session, source)
+    if not previous_global_uid or previous_global_uid == global_entity_uid:
+        return None
+    return _upsert_source(
+        session,
+        source,
+        global_entity_uid,
+        preferred=preferred,
+    )
 
 
 def _cleanup_rebound_canonical(

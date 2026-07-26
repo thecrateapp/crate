@@ -316,31 +316,61 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
                             ORDER BY uts.play_count DESC, uts.minutes_listened DESC, uts.last_played_at DESC
                         ) AS artist_rank
                     FROM user_track_stats uts
-                    LEFT JOIN library_tracks lt
-                      ON lt.id = uts.track_id
-                      OR (uts.track_id IS NULL AND uts.track_entity_uid IS NOT NULL AND lt.entity_uid = uts.track_entity_uid)
-                    LEFT JOIN global_catalog_tracks gct
-                      ON :allow_global_catalog
-                      AND (
-                        gct.global_track_uid = uts.global_track_uid
-                        OR (
-                          uts.global_track_uid IS NULL
-                          AND lt.entity_uid IS NOT NULL
-                          AND gct.local_track_entity_uid = lt.entity_uid
-                        )
-                        OR (
-                          uts.global_track_uid IS NULL
-                          AND lt.id IS NULL
-                          AND COALESCE(NULLIF(TRIM(uts.artist), ''), '') <> ''
-                          AND COALESCE(NULLIF(TRIM(uts.title), ''), '') <> ''
-                          AND LOWER(gct.artist_name) = LOWER(uts.artist)
-                          AND LOWER(gct.canonical_title) = LOWER(uts.title)
-                          AND (
-                            COALESCE(NULLIF(TRIM(uts.album), ''), '') = ''
-                            OR LOWER(COALESCE(gct.album_name, '')) = LOWER(uts.album)
-                          )
-                        )
-                      )
+                    LEFT JOIN LATERAL (
+                        SELECT candidate.*
+                        FROM (
+                            SELECT track_by_id.*, 1 AS resolution_priority
+                            FROM library_tracks track_by_id
+                            WHERE uts.track_id IS NOT NULL
+                              AND track_by_id.id = uts.track_id
+                            UNION ALL
+                            SELECT track_by_entity.*, 2 AS resolution_priority
+                            FROM library_tracks track_by_entity
+                            WHERE uts.track_id IS NULL
+                              AND uts.track_entity_uid IS NOT NULL
+                              AND track_by_entity.entity_uid = uts.track_entity_uid
+                        ) candidate
+                        ORDER BY candidate.resolution_priority, candidate.id
+                        LIMIT 1
+                    ) lt ON TRUE
+                    LEFT JOIN LATERAL (
+                        SELECT candidate.*
+                        FROM (
+                            SELECT track_by_uid.*, 1 AS resolution_priority
+                            FROM global_catalog_tracks track_by_uid
+                            WHERE :allow_global_catalog
+                              AND uts.global_track_uid IS NOT NULL
+                              AND track_by_uid.global_track_uid = uts.global_track_uid
+                            UNION ALL
+                            SELECT track_by_entity.*, 2 AS resolution_priority
+                            FROM global_catalog_tracks track_by_entity
+                            WHERE :allow_global_catalog
+                              AND uts.global_track_uid IS NULL
+                              AND lt.entity_uid IS NOT NULL
+                              AND track_by_entity.local_track_entity_uid = lt.entity_uid
+                            UNION ALL
+                            SELECT track_by_metadata.*, 3 AS resolution_priority
+                            FROM global_catalog_tracks track_by_metadata
+                            WHERE :allow_global_catalog
+                              AND uts.global_track_uid IS NULL
+                              AND lt.id IS NULL
+                              AND COALESCE(NULLIF(TRIM(uts.artist), ''), '') <> ''
+                              AND COALESCE(NULLIF(TRIM(uts.title), ''), '') <> ''
+                              AND LOWER(track_by_metadata.artist_name) = LOWER(uts.artist)
+                              AND LOWER(track_by_metadata.canonical_title) = LOWER(uts.title)
+                              AND (
+                                COALESCE(NULLIF(TRIM(uts.album), ''), '') = ''
+                                OR LOWER(COALESCE(track_by_metadata.album_name, '')) = LOWER(uts.album)
+                              )
+                        ) candidate
+                        ORDER BY
+                            candidate.resolution_priority,
+                            candidate.has_local DESC,
+                            candidate.has_remote DESC,
+                            candidate.source_count DESC,
+                            candidate.global_track_uid
+                        LIMIT 1
+                    ) gct ON TRUE
                     LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
                     LEFT JOIN library_albums alb_by_name
                       ON alb_by_id.id IS NULL
