@@ -87,3 +87,27 @@ func TestListenCatalogQueriesBoundAggregationWork(t *testing.T) {
 		})
 	}
 }
+
+func TestPlayHistoryQueriesLimitEventsBeforeMetadataResolution(t *testing.T) {
+	tests := []struct {
+		name   string
+		legacy bool
+	}{
+		{name: "current schema", legacy: false},
+		{name: "legacy stream id", legacy: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query := playHistorySQL(tt.legacy)
+
+			assert.Contains(t, query, "recent_events AS MATERIALIZED")
+			assert.Contains(t, query, "FROM recent_events upe")
+			limitIndex := strings.Index(query, "LIMIT $2")
+			resolutionIndex := strings.Index(query, "LEFT JOIN LATERAL")
+			assert.NotEqual(t, -1, limitIndex)
+			assert.NotEqual(t, -1, resolutionIndex)
+			assert.Less(t, limitIndex, resolutionIndex)
+		})
+	}
+}

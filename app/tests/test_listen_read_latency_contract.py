@@ -162,3 +162,13 @@ def test_global_genre_augmentation_only_scans_remote_only_entities():
     source = inspect.getsource(genres_library_detail._augment_global_genre_entities)
 
     assert source.count("AND NOT a.has_local") >= 2
+
+
+def test_play_history_limits_recent_events_before_metadata_joins():
+    from crate.db.queries import user_library_history
+
+    source = inspect.getsource(user_library_history.get_play_history_rows)
+
+    assert "recent_events AS MATERIALIZED" in source
+    assert "FROM recent_events upe" in source
+    assert source.index("LIMIT :lim") < source.index("LEFT JOIN LATERAL")
