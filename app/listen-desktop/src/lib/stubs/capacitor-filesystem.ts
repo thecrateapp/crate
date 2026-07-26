@@ -34,8 +34,12 @@ function unsupported(): Promise<never> {
 }
 
 export const Filesystem = {
-  mkdir: (_options: FilesystemPathOptions & { recursive?: boolean }): Promise<void> => unsupported(),
-  readFile: (_options: FilesystemReadOptions): Promise<{ data: string | Blob }> => unsupported(),
+  mkdir: (
+    _options: FilesystemPathOptions & { recursive?: boolean },
+  ): Promise<void> => unsupported(),
+  readFile: (
+    _options: FilesystemReadOptions,
+  ): Promise<{ data: string | Blob }> => unsupported(),
   writeFile: (_options: FilesystemWriteOptions): Promise<void> => unsupported(),
   stat: (
     _options: FilesystemPathOptions,

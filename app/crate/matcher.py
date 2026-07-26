@@ -229,6 +229,7 @@ def _get_release_detail(mbid: str) -> dict | None:
         )
         release = result.get("release", {})
         media = release.get("medium-list", [])
+        release_group = release.get("release-group", {})
 
         tracks = []
         for medium in media:
@@ -253,7 +254,11 @@ def _get_release_detail(mbid: str) -> dict | None:
             "date": release.get("date", ""),
             "country": release.get("country", ""),
             "track_count": len(tracks),
-            "release_group_id": release.get("release-group", {}).get("id"),
+            "release_group_id": release_group.get("id"),
+            "release_group_primary_type": release_group.get("primary-type"),
+            "release_group_secondary_types": list(
+                release_group.get("secondary-type-list") or []
+            ),
             "tracks": tracks,
         }
     except Exception as e:

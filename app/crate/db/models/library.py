@@ -88,6 +88,8 @@ class AlbumRow(BaseModel):
     has_cover: int = 0
     musicbrainz_albumid: str | None = None
     musicbrainz_releasegroupid: str | None = None
+    release_group_primary_type: str | None = None
+    release_group_secondary_types: list[str] = []
     tag_album: str | None = None
     dir_mtime: float | None = None
     updated_at: datetime | None = None

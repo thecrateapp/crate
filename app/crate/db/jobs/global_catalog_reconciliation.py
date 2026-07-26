@@ -1838,6 +1838,8 @@ def _upsert_album(
                     total_duration_seconds,
                     musicbrainz_release_group_mbid,
                     musicbrainz_release_mbid,
+                    release_group_primary_type,
+                    release_group_secondary_types,
                     local_album_id,
                     local_album_entity_uid,
                     display_source_json,
@@ -1865,6 +1867,8 @@ def _upsert_album(
                     :total_duration_seconds,
                     :musicbrainz_release_group_mbid,
                     :musicbrainz_release_mbid,
+                    :release_group_primary_type,
+                    CAST(:release_group_secondary_types AS jsonb),
                     :local_id,
                     :local_entity_uid,
                     :display_source_json,
@@ -1890,6 +1894,15 @@ def _upsert_album(
                 total_duration_seconds = EXCLUDED.total_duration_seconds,
                 musicbrainz_release_group_mbid = EXCLUDED.musicbrainz_release_group_mbid,
                 musicbrainz_release_mbid = EXCLUDED.musicbrainz_release_mbid,
+                release_group_primary_type = COALESCE(
+                    EXCLUDED.release_group_primary_type,
+                    global_catalog_albums.release_group_primary_type
+                ),
+                release_group_secondary_types = CASE
+                    WHEN EXCLUDED.release_group_secondary_types <> '[]'::jsonb
+                    THEN EXCLUDED.release_group_secondary_types
+                    ELSE global_catalog_albums.release_group_secondary_types
+                END,
                 local_album_id = EXCLUDED.local_album_id,
                 local_album_entity_uid = EXCLUDED.local_album_entity_uid,
                 display_source_json = EXCLUDED.display_source_json,
@@ -1916,6 +1929,10 @@ def _upsert_album(
             "total_duration_seconds": payload["total_duration_seconds"],
             "musicbrainz_release_group_mbid": payload["musicbrainz_release_group_mbid"],
             "musicbrainz_release_mbid": payload["musicbrainz_release_mbid"],
+            "release_group_primary_type": payload.get("release_group_primary_type"),
+            "release_group_secondary_types": _json(
+                payload.get("release_group_secondary_types") or []
+            ),
             "local_id": source["local_id"],
             "local_entity_uid": source["local_entity_uid"],
             "display_source_json": _json(_source_ref(source)),
@@ -2152,6 +2169,15 @@ def _upsert_remote_album(
                 UPDATE global_catalog_albums
                 SET
                     has_remote = true,
+                    release_group_primary_type = COALESCE(
+                        release_group_primary_type,
+                        :release_group_primary_type
+                    ),
+                    release_group_secondary_types = CASE
+                        WHEN release_group_secondary_types = '[]'::jsonb
+                        THEN CAST(:release_group_secondary_types AS jsonb)
+                        ELSE release_group_secondary_types
+                    END,
                     has_cover = global_catalog_albums.has_cover OR :has_cover,
                     artwork_source_json = CASE
                         WHEN :has_cover THEN :artwork_source_json
@@ -2163,6 +2189,10 @@ def _upsert_remote_album(
             ),
             {
                 "global_uid": global_uid,
+                "release_group_primary_type": payload.get("release_group_primary_type"),
+                "release_group_secondary_types": _json(
+                    payload.get("release_group_secondary_types") or []
+                ),
                 "has_cover": payload["has_cover"],
                 "artwork_source_json": _json(_source_ref(source)),
             },
@@ -2187,6 +2217,8 @@ def _upsert_remote_album(
                     total_duration_seconds,
                     musicbrainz_release_group_mbid,
                     musicbrainz_release_mbid,
+                    release_group_primary_type,
+                    release_group_secondary_types,
                     upc,
                     display_source_json,
                     artwork_source_json,
@@ -2214,6 +2246,8 @@ def _upsert_remote_album(
                     :total_duration_seconds,
                     :musicbrainz_release_group_mbid,
                     :musicbrainz_release_mbid,
+                    :release_group_primary_type,
+                    CAST(:release_group_secondary_types AS jsonb),
                     :upc,
                     :display_source_json,
                     :artwork_source_json,
@@ -2242,6 +2276,10 @@ def _upsert_remote_album(
             "total_duration_seconds": payload["total_duration_seconds"],
             "musicbrainz_release_group_mbid": payload["musicbrainz_release_group_mbid"],
             "musicbrainz_release_mbid": payload["musicbrainz_release_mbid"],
+            "release_group_primary_type": payload.get("release_group_primary_type"),
+            "release_group_secondary_types": _json(
+                payload.get("release_group_secondary_types") or []
+            ),
             "upc": payload["upc"],
             "display_source_json": _json(_source_ref(source)),
             "artwork_source_json": _json(_source_ref(source)),

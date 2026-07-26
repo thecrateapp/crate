@@ -138,6 +138,8 @@ const completedActionEnglishFallbackAllowlist = new Set<string>([
 const fullyLocalizedArtistPrefixes = ["artist.sections."] as const;
 const completedArtistEnglishFallbackAllowlist = new Set<string>([
   "artist.sections.albums",
+  "artist.sections.epsAndSingles",
+  "artist.sections.compilations",
 ]);
 const fullyLocalizedCommonPrefixes = ["common."] as const;
 const completedCommonEnglishFallbackAllowlist = new Set<string>([
@@ -175,6 +177,8 @@ const fullyLocalizedJamInvitePrefixes = ["jamInvite."] as const;
 const fullyLocalizedArtistAllPrefixes = ["artist."] as const;
 const completedArtistAllFallbackAllowlist = new Set<string>([
   "artist.sections.albums",
+  "artist.sections.epsAndSingles",
+  "artist.sections.compilations",
   "artist.actions.setlist",
 ]);
 const fullyLocalizedExplorePrefixes = ["explore."] as const;

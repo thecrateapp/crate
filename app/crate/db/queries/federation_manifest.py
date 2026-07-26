@@ -25,6 +25,8 @@ _ENTITY_SELECTS = {
             NULL::integer AS disc_number,
             NULL::boolean AS has_photo,
             (COALESCE(has_cover, 0) <> 0) AS has_cover,
+            release_group_primary_type,
+            release_group_secondary_types,
             (
                 SELECT COALESCE(
                     jsonb_agg(
@@ -68,6 +70,8 @@ _ENTITY_SELECTS = {
             NULL::integer AS disc_number,
             (COALESCE(has_photo, 0) <> 0) AS has_photo,
             NULL::boolean AS has_cover,
+            NULL::text AS release_group_primary_type,
+            '[]'::jsonb AS release_group_secondary_types,
             (
                 SELECT COALESCE(
                     jsonb_agg(
@@ -112,6 +116,8 @@ _ENTITY_SELECTS = {
             lt.disc_number,
             NULL::boolean AS has_photo,
             NULL::boolean AS has_cover,
+            NULL::text AS release_group_primary_type,
+            '[]'::jsonb AS release_group_secondary_types,
             '[]'::jsonb AS genres_json,
             lt.genre::text AS genre,
             COALESCE(taf.bpm, lt.bpm)::double precision AS bpm,

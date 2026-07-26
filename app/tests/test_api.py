@@ -312,7 +312,7 @@ class TestArtistDetailAPI:
             patch("crate.api.browse_artist.set_cache"),
             patch(
                 "crate.api.browse_artist.get_artist_all_tracks", return_value=all_tracks
-            ),
+            ) as mock_get_artist_tracks,
             patch(
                 "crate.api.browse_artist.get_cached_top_tracks",
                 return_value=[{"title": "Track Two"}, {"title": "Track One"}],
@@ -321,7 +321,14 @@ class TestArtistDetailAPI:
             payload = browse_artist._get_artist_top_tracks_payload("Tool", count=5)
 
         assert [item["title"] for item in payload[:2]] == ["Track Two", "Track One"]
-        mock_cached_top_tracks.assert_called_once_with("Tool", limit=100)
+        mock_get_artist_tracks.assert_called_once_with(
+            "Tool",
+            limit=browse_artist.ARTIST_TOP_TRACK_CANDIDATE_LIMIT,
+        )
+        mock_cached_top_tracks.assert_called_once_with(
+            "Tool",
+            limit=browse_artist.ARTIST_TOP_TRACK_REMOTE_LIMIT,
+        )
 
     def test_get_artist_found(self, pg_db, test_app):
         del pg_db
@@ -342,6 +349,8 @@ class TestArtistDetailAPI:
                 "formats": ["flac"],
                 "year": "2001",
                 "has_cover": 1,
+                "release_group_primary_type": "Album",
+                "release_group_secondary_types": ["Live"],
             },
         ]
         mock_scope = _make_mock_session(
@@ -373,6 +382,9 @@ class TestArtistDetailAPI:
             data = resp.json()
             assert data["name"] == "Tool"
             assert len(data["albums"]) == 1
+            assert data["albums"][0]["release_type"] == "Album"
+            assert data["albums"][0]["release_secondary_types"] == ["Live"]
+            assert data["albums"][0]["release_category"] == "live"
 
     def test_get_artist_not_found(self, test_app):
         with patch("crate.api.browse_artist.artist_name_from_ref", return_value=None):

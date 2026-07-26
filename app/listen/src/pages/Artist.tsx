@@ -338,7 +338,11 @@ export function Artist() {
           tracks={previewTopTracks}
           coverFallback={coverFallback}
         />
-        <ArtistAlbumsSection artistName={data.name} albums={albumsSorted} />
+        <ArtistAlbumsSection
+          artistName={data.name}
+          artistSlug={data.slug}
+          albums={albumsSorted}
+        />
         <ArtistAppearsOnSection playlists={appearsOn} />
         <ArtistShowsSection
           shows={visibleShowItems}

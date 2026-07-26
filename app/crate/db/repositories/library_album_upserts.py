@@ -33,6 +33,14 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
         )
         requested_mbid = (data.get("musicbrainz_albumid") or "").strip()
         requested_rgid = (data.get("musicbrainz_releasegroupid") or "").strip()
+        requested_primary_type = (
+            str(data.get("release_group_primary_type") or "").strip() or None
+        )
+        requested_secondary_types = [
+            str(value).strip()
+            for value in (data.get("release_group_secondary_types") or [])
+            if str(value).strip()
+        ]
         existing = s.execute(
             select(
                 LibraryAlbum.id,
@@ -111,6 +119,13 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                     musicbrainz_albumid=requested_mbid or existing_album_mbid,
                     musicbrainz_releasegroupid=requested_rgid
                     or existing_releasegroupid,
+                    release_group_primary_type=requested_primary_type
+                    or LibraryAlbum.release_group_primary_type,
+                    release_group_secondary_types=(
+                        requested_secondary_types
+                        if "release_group_secondary_types" in data
+                        else LibraryAlbum.release_group_secondary_types
+                    ),
                     tag_album=requested_tag_album
                     if requested_tag_album is not None
                     else existing_tag_album,
@@ -167,6 +182,9 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             genre=data.get("genre"),
             has_cover=data.get("has_cover", 0),
             musicbrainz_albumid=data.get("musicbrainz_albumid"),
+            musicbrainz_releasegroupid=data.get("musicbrainz_releasegroupid"),
+            release_group_primary_type=requested_primary_type,
+            release_group_secondary_types=requested_secondary_types,
             tag_album=data.get("tag_album"),
             dir_mtime=data.get("dir_mtime"),
             updated_at=now,
@@ -194,6 +212,21 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                     "musicbrainz_albumid": func.coalesce(
                         func.nullif(insert_stmt.excluded.musicbrainz_albumid, ""),
                         LibraryAlbum.musicbrainz_albumid,
+                    ),
+                    "musicbrainz_releasegroupid": func.coalesce(
+                        func.nullif(
+                            insert_stmt.excluded.musicbrainz_releasegroupid, ""
+                        ),
+                        LibraryAlbum.musicbrainz_releasegroupid,
+                    ),
+                    "release_group_primary_type": func.coalesce(
+                        insert_stmt.excluded.release_group_primary_type,
+                        LibraryAlbum.release_group_primary_type,
+                    ),
+                    "release_group_secondary_types": (
+                        insert_stmt.excluded.release_group_secondary_types
+                        if "release_group_secondary_types" in data
+                        else LibraryAlbum.release_group_secondary_types
                     ),
                     "tag_album": func.coalesce(
                         insert_stmt.excluded.tag_album, LibraryAlbum.tag_album

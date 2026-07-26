@@ -1646,6 +1646,8 @@ def enrich_mbids(request: Request, body: EnrichMbidsRequest | None = None):
             params["artist"] = body.artist
         if body.min_score is not None:
             params["min_score"] = body.min_score
+        if body.release_types_only:
+            params["release_types_only"] = True
     task_id = create_task("enrich_mbids", params)
     return {"task_id": task_id}
 

@@ -23,7 +23,8 @@ _ALT_MARKER_RE = re.compile(
 )
 _STUDIOISH_MARKER_RE = re.compile(
     r"\b("
-    r"remaster(?:ed)?|mono|stereo|anniversary edition|deluxe edition|special edition"
+    r"remaster(?:ed)?|mono|stereo|anniversary edition|deluxe(?: edition)?|"
+    r"special edition"
     r")\b",
     re.IGNORECASE,
 )
@@ -38,7 +39,7 @@ def _normalize_text(value: str) -> str:
     return text
 
 
-def _normalized_track_title_key(title: str) -> str:
+def normalized_track_title_key(title: str) -> str:
     return _normalize_text(title or "")
 
 
@@ -94,7 +95,7 @@ def track_variant_rank(title: str) -> int:
 def _row_variant_rank(row: dict) -> int:
     return max(
         track_variant_rank(str(row.get("title") or "")),
-        _variant_marker_rank(str(row.get("album") or "")),
+        _variant_marker_rank(str(row.get("album") or row.get("album_name") or "")),
     )
 
 
@@ -133,6 +134,49 @@ def prefers_track_variant(candidate: dict, current: dict) -> bool:
     if candidate_rank != current_rank:
         return candidate_rank < current_rank
     return False
+
+
+def _release_year(row: dict) -> int:
+    match = re.search(r"\b(\d{4})\b", str(row.get("year") or ""))
+    if not match:
+        return 9999
+    return int(match.group(1))
+
+
+def select_preferred_track_variant(
+    rows: list[dict],
+    *,
+    requested_title: str | None = None,
+) -> dict | None:
+    candidates = list(rows)
+    if requested_title:
+        requested_identity = canonical_track_title_key(requested_title)
+        candidates = [
+            row
+            for row in candidates
+            if canonical_track_title_key(str(row.get("title") or ""))
+            == requested_identity
+        ]
+        if track_variant_rank(requested_title) > 0:
+            requested_exact = normalized_track_title_key(requested_title)
+            candidates = [
+                row
+                for row in candidates
+                if normalized_track_title_key(str(row.get("title") or ""))
+                == requested_exact
+            ]
+
+    if not candidates:
+        return None
+
+    return min(
+        enumerate(candidates),
+        key=lambda item: (
+            _row_variant_rank(item[1]),
+            _release_year(item[1]),
+            item[0],
+        ),
+    )[1]
 
 
 def _duration_value(row: dict) -> float | None:
@@ -176,7 +220,7 @@ def dedupe_track_variants(rows: list[dict]) -> list[dict]:
             continue
 
         raw_title_keys = {
-            _normalized_track_title_key(str(row.get("title") or ""))
+            normalized_track_title_key(str(row.get("title") or ""))
             for _index, row in entries
         }
         ranks = [_row_variant_rank(row) for _index, row in entries]
@@ -202,7 +246,9 @@ def dedupe_track_variants(rows: list[dict]) -> list[dict]:
 __all__ = [
     "canonical_track_title_key",
     "dedupe_track_variants",
+    "normalized_track_title_key",
     "prefers_track_variant",
+    "select_preferred_track_variant",
     "track_song_identity",
     "track_variant_rank",
 ]

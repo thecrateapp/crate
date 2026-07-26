@@ -237,6 +237,8 @@ def iter_local_album_sources(
             total_duration,
             musicbrainz_albumid AS musicbrainz_release_mbid,
             musicbrainz_releasegroupid AS musicbrainz_release_group_mbid,
+            release_group_primary_type,
+            release_group_secondary_types,
             has_cover,
             (
                 SELECT request.global_album_uid::text
@@ -275,6 +277,10 @@ def iter_local_album_sources(
             "total_duration_seconds": _duration_seconds(row["total_duration"]),
             "musicbrainz_release_mbid": row["musicbrainz_release_mbid"],
             "musicbrainz_release_group_mbid": row["musicbrainz_release_group_mbid"],
+            "release_group_primary_type": row["release_group_primary_type"],
+            "release_group_secondary_types": list(
+                row["release_group_secondary_types"] or []
+            ),
             "local_album_id": row["id"],
             "local_album_entity_uid": row["entity_uid"],
             "imported_global_album_uid": row["imported_global_album_uid"],
@@ -419,6 +425,8 @@ def get_local_source(entity_type: str, entity_uid: str) -> dict[str, Any] | None
                             total_duration,
                             musicbrainz_albumid AS musicbrainz_release_mbid,
                             musicbrainz_releasegroupid AS musicbrainz_release_group_mbid,
+                            release_group_primary_type,
+                            release_group_secondary_types,
                             has_cover,
                             (
                                 SELECT request.global_album_uid::text
@@ -461,6 +469,10 @@ def get_local_source(entity_type: str, entity_uid: str) -> dict[str, Any] | None
                 "total_duration_seconds": _duration_seconds(row["total_duration"]),
                 "musicbrainz_release_mbid": row["musicbrainz_release_mbid"],
                 "musicbrainz_release_group_mbid": row["musicbrainz_release_group_mbid"],
+                "release_group_primary_type": row["release_group_primary_type"],
+                "release_group_secondary_types": list(
+                    row["release_group_secondary_types"] or []
+                ),
                 "local_album_id": row["id"],
                 "local_album_entity_uid": row["entity_uid"],
                 "imported_global_album_uid": row["imported_global_album_uid"],
@@ -640,6 +652,9 @@ def _remote_artist_payload(row: dict[str, Any]) -> dict[str, Any]:
 def _remote_album_payload(row: dict[str, Any]) -> dict[str, Any]:
     raw = _raw_payload(row)
     facets = _facets(raw)
+    secondary_types = raw.get("release_group_secondary_types") or []
+    if not isinstance(secondary_types, list):
+        secondary_types = []
     return {
         "canonical_name": row["title"],
         "normalized_name": normalize_name(row["title"], strip_edition=True),
@@ -650,6 +665,10 @@ def _remote_album_payload(row: dict[str, Any]) -> dict[str, Any]:
         "total_duration_seconds": row["duration_seconds"],
         "musicbrainz_release_group_mbid": row["musicbrainz_release_group_mbid"],
         "musicbrainz_release_mbid": row["musicbrainz_release_mbid"],
+        "release_group_primary_type": raw.get("release_group_primary_type"),
+        "release_group_secondary_types": [
+            str(value) for value in secondary_types if value
+        ],
         "upc": row["upc"],
         "has_cover": _remote_asset_available(
             row,

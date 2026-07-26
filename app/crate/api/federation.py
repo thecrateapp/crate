@@ -69,6 +69,7 @@ from crate.federation.signing import (
     validate_timestamp,
     verify_signature,
 )
+from crate.release_types import classify_release
 from crate.streaming.service import inspect_playback_preparation, prepare_playback
 
 log = logging.getLogger(__name__)
@@ -1558,6 +1559,12 @@ def _catalog_manifest_items_after(
     for row in rows:
         item = dict(row)
         item["entity_uid"] = item["remote_entity_uid"]
+        if item["entity_type"] == "album":
+            item["release_category"] = classify_release(
+                primary_type=item.get("release_group_primary_type"),
+                secondary_types=list(item.get("release_group_secondary_types") or []),
+                title=str(item.get("title") or ""),
+            )
         if include_genres:
             item["genres"] = _manifest_genres(item)
             item["genre_assertions"] = _manifest_genre_assertions(item)

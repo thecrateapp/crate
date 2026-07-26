@@ -29,7 +29,9 @@ export function initLinuxDesktopTheme(): void {
 }
 
 function isLinuxWebView(): boolean {
-  return typeof navigator !== "undefined" && /\bLinux\b/i.test(navigator.userAgent);
+  return (
+    typeof navigator !== "undefined" && /\bLinux\b/i.test(navigator.userAgent)
+  );
 }
 
 async function refreshLinuxDesktopTheme(): Promise<void> {
@@ -97,10 +99,15 @@ function normalizeHexColor(value: string | null | undefined): string | null {
   return value.toLowerCase();
 }
 
-function fontFamilyFromGtkFont(value: string | null | undefined): string | null {
+function fontFamilyFromGtkFont(
+  value: string | null | undefined,
+): string | null {
   const family = value?.trim().replace(GTK_FONT_SIZE_SUFFIX_RE, "").trim();
   if (!family) return null;
-  return `"${family.replace(CSS_STRING_ESCAPE_RE, "\\$&")}", system-ui, sans-serif`;
+  return `"${family.replace(
+    CSS_STRING_ESCAPE_RE,
+    "\\$&",
+  )}", system-ui, sans-serif`;
 }
 
 function setCssProperty(

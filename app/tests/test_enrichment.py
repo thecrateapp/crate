@@ -912,6 +912,7 @@ class TestArtistEnrichment:
         assert prefixes == [
             "listen:artist_top_tracks:v1:birds in row:",
             "listen:artist_top_tracks:v2:birds in row:",
+            "listen:artist_top_tracks:v3:birds in row:",
         ]
 
 

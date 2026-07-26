@@ -92,6 +92,8 @@ def load_local_catalog_payload(
                 'album', name,
                 'year', year,
                 'duration_seconds', total_duration,
+                'release_group_primary_type', release_group_primary_type,
+                'release_group_secondary_types', release_group_secondary_types,
                 'has_cover', (COALESCE(has_cover, 0) <> 0),
                 'genres', COALESCE((
                     SELECT jsonb_agg(g.name ORDER BY ag.weight DESC, g.name)

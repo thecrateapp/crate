@@ -96,99 +96,198 @@ export function ArtistTopTracksSection({
 
 interface ArtistAlbumsSectionProps {
   artistName: string;
+  artistSlug?: string;
   albums: ArtistAlbum[];
+}
+
+type ArtistReleaseCategory = NonNullable<ArtistAlbum["release_category"]>;
+
+const RELEASE_GROUPS: {
+  category: ArtistReleaseCategory;
+  labelKey: string;
+}[] = [
+  { category: "album", labelKey: "artist.sections.albums" },
+  { category: "ep_single", labelKey: "artist.sections.epsAndSingles" },
+  { category: "compilation", labelKey: "artist.sections.compilations" },
+  { category: "live", labelKey: "artist.sections.liveAlbums" },
+  { category: "other", labelKey: "artist.sections.otherReleases" },
+];
+
+function releaseCategory(album: ArtistAlbum): ArtistReleaseCategory {
+  if (album.release_category) return album.release_category;
+
+  const primaryType = album.release_type?.trim().toLocaleLowerCase() ?? "";
+  const secondaryTypes = new Set(
+    (album.release_secondary_types ?? []).map((value) =>
+      value.trim().toLocaleLowerCase(),
+    ),
+  );
+
+  if (secondaryTypes.has("live")) return "live";
+  if (secondaryTypes.has("compilation")) return "compilation";
+  if (
+    [
+      "remix",
+      "soundtrack",
+      "spokenword",
+      "audiobook",
+      "interview",
+      "audio drama",
+      "dj-mix",
+      "mixtape/street",
+    ].some((value) => secondaryTypes.has(value))
+  ) {
+    return "other";
+  }
+  if (primaryType === "ep" || primaryType === "single") return "ep_single";
+  if (primaryType === "album") return "album";
+  if (primaryType) return "other";
+
+  const title = album.display_name || album.name;
+  if (/\blive\b/i.test(title)) {
+    return "live";
+  }
+  if (
+    /\b(?:best of|greatest hits|anthology|compilation|complete albums?|collected|collection)\b/i.test(
+      title,
+    )
+  ) {
+    return "compilation";
+  }
+  if (/\b(?:ep|single)\b/i.test(title) || album.tracks === 1) {
+    return "ep_single";
+  }
+  return "album";
+}
+
+function ArtistAlbumItem({
+  album,
+  artistName,
+  artistSlug,
+}: {
+  album: ArtistAlbum;
+  artistName: string;
+  artistSlug?: string;
+}) {
+  const globalAlbumUid =
+    album.global_album_uid ??
+    album.global_uid ??
+    (typeof album.id === "string" ? album.id : null);
+  const localAlbumId =
+    typeof album.id === "number" && !album.is_pre_release
+      ? album.id
+      : undefined;
+  const cover =
+    album.cover_url ||
+    buildArtistAlbumCover(
+      artistName,
+      album.name,
+      localAlbumId,
+      album.slug,
+      globalAlbumUid,
+    );
+
+  if (globalAlbumUid) {
+    return (
+      <Link
+        to={albumPagePath({
+          albumId: localAlbumId,
+          globalAlbumUid,
+          albumSlug: album.slug,
+          artistSlug,
+          artistName,
+          albumName: album.display_name || album.name,
+        })}
+        className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
+          {cover ? (
+            <img
+              src={cover}
+              alt={album.display_name || album.name}
+              loading="lazy"
+              className="h-full w-full object-cover"
+              onError={(event) => {
+                (event.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Disc3 size={32} className="text-white/25" />
+            </div>
+          )}
+        </div>
+        <p className="truncate text-sm font-medium text-foreground">
+          {album.display_name || album.name}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {album.year
+            ? `${album.year.slice(0, 4)} · ${artistName}`
+            : artistName}
+        </p>
+      </Link>
+    );
+  }
+
+  return (
+    <AlbumCard
+      artist={artistName}
+      album={album.display_name || album.name}
+      albumId={localAlbumId}
+      albumSlug={album.slug}
+      artistSlug={artistSlug}
+      year={album.year?.slice(0, 4)}
+      cover={cover}
+      isPreRelease={album.is_pre_release}
+      releaseDate={album.release_date}
+      layout="grid"
+    />
+  );
 }
 
 export function ArtistAlbumsSection({
   artistName,
+  artistSlug,
   albums,
 }: ArtistAlbumsSectionProps) {
   const { t } = useTranslation();
+  const groupedAlbums = useMemo(
+    () =>
+      RELEASE_GROUPS.map((group) => ({
+        ...group,
+        albums: albums.filter(
+          (album) => releaseCategory(album) === group.category,
+        ),
+      })).filter((group) => group.albums.length > 0),
+    [albums],
+  );
   if (!albums.length) return null;
 
   return (
-    <section>
-      <h2 className="mb-4 text-lg font-semibold text-foreground">
-        {t("artist.sections.albums")}
-      </h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {albums.map((album) => {
-          const globalAlbumUid =
-            album.global_album_uid ??
-            album.global_uid ??
-            (typeof album.id === "string" ? album.id : null);
-          const localAlbumId =
-            typeof album.id === "number" && !album.is_pre_release
-              ? album.id
-              : undefined;
-          const cover =
-            album.cover_url ||
-            buildArtistAlbumCover(
-              artistName,
-              album.name,
-              localAlbumId,
-              album.slug,
-              globalAlbumUid,
-            );
-          if (globalAlbumUid) {
-            return (
-              <Link
-                key={globalAlbumUid}
-                to={albumPagePath({
-                  albumId: localAlbumId,
-                  globalAlbumUid,
-                  albumSlug: album.slug,
-                  artistName,
-                  albumName: album.display_name || album.name,
-                })}
-                className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
-                  {cover ? (
-                    <img
-                      src={cover}
-                      alt={album.display_name || album.name}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                      onError={(event) => {
-                        (event.target as HTMLImageElement).style.display =
-                          "none";
-                      }}
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Disc3 size={32} className="text-white/25" />
-                    </div>
-                  )}
-                </div>
-                <p className="truncate text-sm font-medium text-foreground">
-                  {album.display_name || album.name}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {album.year
-                    ? `${album.year.slice(0, 4)} · ${artistName}`
-                    : artistName}
-                </p>
-              </Link>
-            );
-          }
-          return (
-            <AlbumCard
-              key={album.id}
-              artist={artistName}
-              album={album.display_name || album.name}
-              albumId={localAlbumId}
-              albumSlug={album.slug}
-              year={album.year?.slice(0, 4)}
-              cover={cover}
-              isPreRelease={album.is_pre_release}
-              releaseDate={album.release_date}
-              layout="grid"
-            />
-          );
-        })}
-      </div>
-    </section>
+    <div className="space-y-10">
+      {groupedAlbums.map((group) => (
+        <section key={group.category}>
+          <h2 className="mb-4 text-lg font-semibold text-foreground">
+            {t(group.labelKey)}
+          </h2>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {group.albums.map((album) => (
+              <ArtistAlbumItem
+                key={
+                  album.global_album_uid ??
+                  album.global_uid ??
+                  album.id ??
+                  `${album.name}-${album.year}`
+                }
+                album={album}
+                artistName={artistName}
+                artistSlug={artistSlug}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 

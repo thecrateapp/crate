@@ -6,6 +6,7 @@ from crate.db.home_builder_track_selection import _select_diverse_tracks_with_ba
 from crate.track_versions import (
     canonical_track_title_key,
     dedupe_track_variants,
+    select_preferred_track_variant,
     track_variant_rank,
 )
 
@@ -22,6 +23,48 @@ def test_track_variant_rank_does_not_penalize_live_forever_style_titles():
     assert track_variant_rank("Concubine (2024 Remaster)") == 1
     assert track_variant_rank("Concubine (Acoustic)") == 2
     assert track_variant_rank("Concubine (Live at CBGB)") == 3
+
+
+def test_select_preferred_track_variant_uses_original_album_unless_requested():
+    rows = [
+        {
+            "id": 1,
+            "title": "Walk (2010 Remaster)",
+            "album": "Vulgar Display of Power (Deluxe)",
+            "year": "2012",
+        },
+        {
+            "id": 2,
+            "title": "Walk",
+            "album": "Vulgar Display of Power",
+            "year": "1992",
+        },
+        {
+            "id": 3,
+            "title": "Walk (Live at Dynamo Open Air 1998)",
+            "album": "Live at Dynamo Open Air 1998",
+            "year": "1998",
+        },
+    ]
+
+    assert select_preferred_track_variant(rows, requested_title="Walk")["id"] == 2
+    assert (
+        select_preferred_track_variant(
+            rows,
+            requested_title="Walk (Live at Dynamo Open Air 1998)",
+        )["id"]
+        == 3
+    )
+
+
+def test_select_preferred_track_variant_rejects_missing_explicit_variant():
+    assert (
+        select_preferred_track_variant(
+            [{"id": 1, "title": "Walk", "album": "Album", "year": "1992"}],
+            requested_title="Walk (Demo)",
+        )
+        is None
+    )
 
 
 def test_select_diverse_tracks_prefers_studio_version_over_live_variant():

@@ -9,6 +9,7 @@ from sqlalchemy import text
 from crate.db.tx import optional_scope, read_scope
 from crate.federation.global_matching import normalize_name
 from crate.genre_covers import genre_cover_public_url
+from crate.release_types import classify_release
 from crate.slugs import build_artist_slug, build_public_album_slug
 
 
@@ -202,6 +203,8 @@ _SEARCH_ALBUMS_SQL = text(
         a.canonical_name,
         a.artist_name,
         a.year,
+        a.release_group_primary_type,
+        a.release_group_secondary_types,
         a.local_album_id,
         a.local_album_entity_uid::text AS local_album_entity_uid,
         a.availability_json,
@@ -1174,6 +1177,8 @@ def get_global_artist_page(
                         canonical_name,
                         artist_name,
                         year,
+                        release_group_primary_type,
+                        release_group_secondary_types,
                         (
                             SELECT COUNT(*)::integer
                             FROM global_catalog_tracks track
@@ -1283,6 +1288,8 @@ def get_global_album_detail(global_album_uid: str) -> dict | None:
                         canonical_name,
                         artist_name,
                         year,
+                        release_group_primary_type,
+                        release_group_secondary_types,
                         local_album_id,
                         local_album_entity_uid::text AS local_album_entity_uid,
                         availability_json,
@@ -1765,6 +1772,17 @@ def _artist_payload(row, *, include_sources: bool) -> dict:
 
 
 def _album_payload(row, *, include_sources: bool) -> dict:
+    primary_type = (
+        row["release_group_primary_type"]
+        if "release_group_primary_type" in row
+        else None
+    )
+    secondary_types = (
+        list(row["release_group_secondary_types"] or [])
+        if "release_group_secondary_types" in row
+        else []
+    )
+    track_count = int(row["track_count"] or 0) if "track_count" in row else 0
     payload = {
         "id": row["local_album_id"],
         "entity_uid": row["local_album_entity_uid"],
@@ -1779,10 +1797,18 @@ def _album_payload(row, *, include_sources: bool) -> dict:
         "name": row["canonical_name"],
         "display_name": row["canonical_name"],
         "year": row["year"],
-        "tracks": int(row["track_count"] or 0) if "track_count" in row else 0,
+        "tracks": track_count,
         "formats": [],
         "size_mb": 0,
         "has_cover": row["has_cover"],
+        "release_type": primary_type,
+        "release_secondary_types": secondary_types,
+        "release_category": classify_release(
+            primary_type=primary_type,
+            secondary_types=secondary_types,
+            title=row["canonical_name"],
+            track_count=track_count,
+        ),
         "availability": _availability(row),
     }
     return _with_debug_source(payload, row, include_sources=include_sources)

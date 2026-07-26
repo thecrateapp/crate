@@ -294,8 +294,15 @@ def test_portable_album_payload_contains_cached_lyrics_analysis_and_bliss(
         album_id = session.execute(
             text(
                 """
-                INSERT INTO library_albums (artist, name, path, entity_uid, updated_at)
-                VALUES ('High Vis', 'Blending', :path, CAST(:album_uid AS uuid), NOW())
+                INSERT INTO library_albums (
+                    artist, name, path, entity_uid,
+                    release_group_primary_type, release_group_secondary_types,
+                    updated_at
+                )
+                VALUES (
+                    'High Vis', 'Blending', :path, CAST(:album_uid AS uuid),
+                    'Album', '["Compilation"]'::jsonb, NOW()
+                )
                 RETURNING id
                 """
             ),
@@ -347,6 +354,8 @@ def test_portable_album_payload_contains_cached_lyrics_analysis_and_bliss(
     track = payload["tracks"][0]
     assert str(payload["artist"]["entity_uid"]) == artist_uid
     assert str(payload["album"]["entity_uid"]) == album_uid
+    assert payload["album"]["release_group_primary_type"] == "Album"
+    assert payload["album"]["release_group_secondary_types"] == ["Compilation"]
     assert str(track["entity_uid"]) == track_uid
     assert track["lyrics"]["plain"] == "Cached lyric"
     assert track["analysis"]["bpm"] == 132.0
@@ -373,6 +382,8 @@ def test_rehydrate_album_payload_restores_catalog_features_and_lyrics(pg_db, tmp
             "name": "United By Fate",
             "path": str(album_dir),
             "track_count": 1,
+            "release_group_primary_type": "EP",
+            "release_group_secondary_types": [],
         },
         "tracks": [
             {
@@ -413,8 +424,15 @@ def test_rehydrate_album_payload_restores_catalog_features_and_lyrics(pg_db, tmp
             session.execute(
                 text(
                     """
-                SELECT lt.title, lt.audio_fingerprint, taf.bpm, tbe.bliss_vector
+                SELECT
+                    lt.title,
+                    lt.audio_fingerprint,
+                    taf.bpm,
+                    tbe.bliss_vector,
+                    la.release_group_primary_type,
+                    la.release_group_secondary_types
                 FROM library_tracks lt
+                JOIN library_albums la ON la.id = lt.album_id
                 LEFT JOIN track_analysis_features taf ON taf.track_id = lt.id
                 LEFT JOIN track_bliss_embeddings tbe ON tbe.track_id = lt.id
                 WHERE lt.path = :path
@@ -428,6 +446,8 @@ def test_rehydrate_album_payload_restores_catalog_features_and_lyrics(pg_db, tmp
         lyrics = session.execute(
             text("SELECT plain_lyrics FROM track_lyrics LIMIT 1")
         ).scalar_one()
+        assert row["release_group_primary_type"] == "EP"
+        assert row["release_group_secondary_types"] == []
 
     assert row["title"] == "Travel By Telephone"
     assert row["audio_fingerprint"] == "fp-rival"

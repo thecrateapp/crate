@@ -98,13 +98,21 @@ from crate.lastfm import (
     get_cached_artist_info,
     get_cached_top_tracks,
 )
+from crate.release_types import classify_release
 from crate.storage_layout import resolve_artist_dir
 from crate.slugs import build_public_album_slug
-from crate.track_versions import canonical_track_title_key, track_variant_rank
+from crate.track_versions import (
+    canonical_track_title_key,
+    select_preferred_track_variant,
+    track_variant_rank,
+)
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["browse"])
+
+ARTIST_TOP_TRACK_CANDIDATE_LIMIT = 1000
+ARTIST_TOP_TRACK_REMOTE_LIMIT = 250
 
 _BROWSE_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -277,7 +285,7 @@ def _build_artist_page_payload(
     stats_limit: int,
 ) -> dict | JSONResponse:
     cache_key = (
-        f"listen:artist_page:v5:{user_id}:{artist_id}:"
+        f"listen:artist_page:v6:{user_id}:{artist_id}:"
         f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}"
     )
     cached = get_cache(cache_key, max_age_seconds=300)
@@ -426,33 +434,53 @@ def _build_artist_top_tracks_payload(
     lastfm_top: list[dict] | None,
     local_tracks: list[dict] | None = None,
 ) -> list[dict]:
-    all_tracks: dict[str, dict] = {}
     rows = (
         local_tracks
         if local_tracks is not None
-        else get_artist_all_tracks(artist_name, limit=max(count * 8, 200))
+        else get_artist_all_tracks(
+            artist_name,
+            limit=ARTIST_TOP_TRACK_CANDIDATE_LIMIT,
+        )
     )
+    tracks_by_song: dict[str, list[dict]] = {}
     for row in rows:
         title = str(row.get("title") or "").strip()
         if title:
-            all_tracks.setdefault(title.casefold(), row)
+            song_key = canonical_track_title_key(title) or f"track:{row.get('id')}"
+            tracks_by_song.setdefault(song_key, []).append(row)
 
-    ranked = []
+    ranked: list[dict] = []
     seen_ids: set[int] = set()
+    ranked_song_keys: set[str] = set()
     for item in lastfm_top or []:
-        match = all_tracks.get(str(item.get("title") or "").strip().casefold())
-        if match and match["id"] not in seen_ids:
-            seen_ids.add(match["id"])
-            ranked.append(match)
-            if len(ranked) >= count:
-                break
+        requested_title = str(item.get("title") or "").strip()
+        song_key = canonical_track_title_key(requested_title)
+        if not song_key:
+            continue
+        match = select_preferred_track_variant(
+            tracks_by_song.get(song_key, []),
+            requested_title=requested_title,
+        )
+        if not match or match["id"] in seen_ids:
+            continue
+        seen_ids.add(match["id"])
+        ranked_song_keys.add(song_key)
+        ranked.append(match)
+        if len(ranked) >= count:
+            break
 
     if len(ranked) < count:
-        remaining = [
-            track
-            for track in all_tracks.values()
-            if track["id"] not in seen_ids and _has_track_level_popularity_signal(track)
-        ]
+        remaining: list[dict] = []
+        for song_key, variants in tracks_by_song.items():
+            if song_key in ranked_song_keys:
+                continue
+            track = select_preferred_track_variant(variants)
+            if (
+                track
+                and track["id"] not in seen_ids
+                and _has_track_level_popularity_signal(track)
+            ):
+                remaining.append(track)
         remaining.sort(key=_persisted_top_track_sort_key)
         ranked.extend(remaining[: count - len(ranked)])
 
@@ -489,7 +517,7 @@ def _persisted_top_track_sort_key(track: dict) -> tuple:
 
 
 def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict]:
-    cache_key = f"listen:artist_top_tracks:v2:{artist_name.strip().lower()}:{count}"
+    cache_key = f"listen:artist_top_tracks:v3:{artist_name.strip().lower()}:{count}"
     cached = get_cache(cache_key, max_age_seconds=300)
     if cached is not None:
         return cached
@@ -499,7 +527,7 @@ def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict
         count=count,
         lastfm_top=get_cached_top_tracks(
             artist_name,
-            limit=max(count * 2, 100),
+            limit=ARTIST_TOP_TRACK_REMOTE_LIMIT,
         ),
     )
     set_cache(cache_key, payload, ttl=300)
@@ -1743,6 +1771,19 @@ def api_artist(request: Request, name: str):
         tracklist = release.get("tracklist_json") if release else None
         release_track_count = len(tracklist) if isinstance(tracklist, list) else 0
         release_declared_tracks = int(release.get("tracks") or 0) if release else 0
+        release_type = (
+            release.get("release_type")
+            if release
+            else album.get("release_group_primary_type")
+        )
+        release_secondary_types = (
+            list(release.get("release_secondary_types") or [])
+            if release
+            else list(album.get("release_group_secondary_types") or [])
+        )
+        effective_track_count = (
+            release_track_count or release_declared_tracks or album["track_count"]
+        )
         albums.append(
             {
                 "id": album["id"],
@@ -1750,9 +1791,7 @@ def api_artist(request: Request, name: str):
                 "slug": album_slug if release else album.get("slug"),
                 "name": album["name"],
                 "display_name": display_name(album["name"]),
-                "tracks": release_track_count
-                or release_declared_tracks
-                or album["track_count"],
+                "tracks": effective_track_count,
                 "formats": album.get("formats", []),
                 "bit_depth": album_quality.get(album["id"], {}).get("bit_depth"),
                 "sample_rate": album_quality.get(album["id"], {}).get("sample_rate"),
@@ -1775,9 +1814,14 @@ def api_artist(request: Request, name: str):
                 "is_pre_release": bool(release),
                 "release_date": release.get("release_date") if release else None,
                 "release_status": release.get("status") if release else None,
-                "release_type": (release.get("release_type") or "Album")
-                if release
-                else None,
+                "release_type": release_type,
+                "release_secondary_types": release_secondary_types,
+                "release_category": classify_release(
+                    primary_type=release_type,
+                    secondary_types=release_secondary_types,
+                    title=album["name"],
+                    track_count=effective_track_count,
+                ),
                 "source_url": (
                     release.get("source_url") or release.get("tidal_url") or ""
                 )
@@ -1815,6 +1859,15 @@ def api_artist(request: Request, name: str):
                 "release_date": release.get("release_date"),
                 "release_status": release.get("status"),
                 "release_type": release.get("release_type") or "Album",
+                "release_secondary_types": list(
+                    release.get("release_secondary_types") or []
+                ),
+                "release_category": classify_release(
+                    primary_type=release.get("release_type") or "Album",
+                    secondary_types=list(release.get("release_secondary_types") or []),
+                    title=release["album_title"],
+                    track_count=track_count or int(release.get("tracks") or 0),
+                ),
                 "source_url": release.get("source_url")
                 or release.get("tidal_url")
                 or "",

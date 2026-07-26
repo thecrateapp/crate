@@ -107,11 +107,14 @@ def test_local_delta_album_payload_preserves_artwork_facets(pg_db):
             text(
                 """
                 INSERT INTO library_albums (
-                    artist, name, path, entity_uid, has_cover, updated_at
+                    artist, name, path, entity_uid, has_cover,
+                    release_group_primary_type, release_group_secondary_types,
+                    updated_at
                 )
                 VALUES (
                     'High Vis', 'Blending', '/music/high-vis/blending',
-                    CAST(:album_uid AS uuid), 1, NOW()
+                    CAST(:album_uid AS uuid), 1,
+                    'Album', '["Compilation"]'::jsonb, NOW()
                 )
                 """
             ),
@@ -122,6 +125,8 @@ def test_local_delta_album_payload_preserves_artwork_facets(pg_db):
 
     assert payload is not None
     assert payload["has_cover"] is True
+    assert payload["release_group_primary_type"] == "Album"
+    assert payload["release_group_secondary_types"] == ["Compilation"]
     assert payload["facets"]["metadata"]["available"] is True
     assert payload["facets"]["album_detail"]["available"] is True
     assert payload["facets"]["album_artwork"]["available"] is True

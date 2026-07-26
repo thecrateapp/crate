@@ -114,6 +114,136 @@ def test_top_tracks_use_persisted_composite_popularity_when_source_ranks_are_mis
     ]
 
 
+def test_top_tracks_fallback_collapses_versions_and_prefers_studio_album_track():
+    from crate.api.browse_artist import _build_artist_top_tracks_payload
+
+    payload = _build_artist_top_tracks_payload(
+        "Pantera",
+        count=10,
+        lastfm_top=None,
+        local_tracks=[
+            _top_track_row(
+                id=1,
+                title="Shattered (2010 Remaster)",
+                artist="Pantera",
+                album="Cowboys from Hell (Deluxe)",
+                year="2010",
+                lastfm_top_rank=22,
+            ),
+            _top_track_row(
+                id=2,
+                title="Shattered (Demo)",
+                artist="Pantera",
+                album="Cowboys from Hell (Deluxe)",
+                year="2010",
+                lastfm_top_rank=22,
+            ),
+            _top_track_row(
+                id=3,
+                title="Shattered",
+                artist="Pantera",
+                album="Cowboys from Hell",
+                year="1990",
+                lastfm_top_rank=22,
+            ),
+            _top_track_row(
+                id=4,
+                title="The Art of Shredding",
+                artist="Pantera",
+                album="Cowboys from Hell",
+                year="1990",
+                lastfm_top_rank=23,
+            ),
+        ],
+    )
+
+    assert [track["title"] for track in payload] == [
+        "Shattered",
+        "The Art of Shredding",
+    ]
+
+
+def test_top_tracks_preserve_only_variants_explicitly_ranked_by_lastfm():
+    from crate.api.browse_artist import _build_artist_top_tracks_payload
+
+    payload = _build_artist_top_tracks_payload(
+        "Pantera",
+        count=10,
+        lastfm_top=[
+            {"title": "Walk"},
+            {"title": "Walk (Live at Dynamo Open Air 1998)"},
+        ],
+        local_tracks=[
+            _top_track_row(
+                id=1,
+                title="Walk (2010 Remaster)",
+                artist="Pantera",
+                album="Vulgar Display of Power (Deluxe)",
+                year="2012",
+                lastfm_top_rank=1,
+            ),
+            _top_track_row(
+                id=2,
+                title="Walk",
+                artist="Pantera",
+                album="Vulgar Display of Power",
+                year="1992",
+                lastfm_top_rank=1,
+            ),
+            _top_track_row(
+                id=3,
+                title="Walk (Live at Dynamo Open Air 1998)",
+                artist="Pantera",
+                album="Live at Dynamo Open Air 1998",
+                year="1998",
+                lastfm_top_rank=40,
+            ),
+            _top_track_row(
+                id=4,
+                title="Walk (Demo)",
+                artist="Pantera",
+                album="Vulgar Display of Power (Deluxe)",
+                year="2012",
+                lastfm_top_rank=1,
+            ),
+        ],
+    )
+
+    assert [track["title"] for track in payload] == [
+        "Walk",
+        "Walk (Live at Dynamo Open Air 1998)",
+    ]
+
+
+def test_top_tracks_preview_is_prefix_of_view_all_ranking():
+    from crate.api.browse_artist import _build_artist_top_tracks_payload
+
+    rows = [
+        _top_track_row(
+            id=index,
+            title=f"Track {index:02d}",
+            track_number=index,
+        )
+        for index in range(1, 61)
+    ]
+    lastfm_top = [{"title": f"Track {index:02d}"} for index in range(60, 0, -1)]
+
+    preview = _build_artist_top_tracks_payload(
+        "Example Artist",
+        count=5,
+        lastfm_top=lastfm_top,
+        local_tracks=rows,
+    )
+    view_all = _build_artist_top_tracks_payload(
+        "Example Artist",
+        count=50,
+        lastfm_top=lastfm_top,
+        local_tracks=rows,
+    )
+
+    assert preview == view_all[:5]
+
+
 def test_artist_page_by_slug_falls_back_to_remote_global_catalog(monkeypatch):
     from crate.api import catalog_artist_compat
 

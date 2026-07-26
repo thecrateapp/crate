@@ -121,6 +121,8 @@ class ArtistAlbumSummaryResponse(IdentityFieldsMixin):
     release_date: str | None = None
     release_status: str | None = None
     release_type: str | None = None
+    release_secondary_types: list[str] = Field(default_factory=list)
+    release_category: str | None = None
     source_url: str | None = None
 
 

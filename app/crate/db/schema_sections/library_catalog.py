@@ -104,6 +104,8 @@ def create_library_catalog_schema(cur) -> None:
             slug TEXT,
             tag_album TEXT,
             musicbrainz_releasegroupid TEXT,
+            release_group_primary_type TEXT,
+            release_group_secondary_types JSONB NOT NULL DEFAULT '[]'::jsonb,
             discogs_master_id TEXT,
             lastfm_listeners INTEGER,
             lastfm_playcount BIGINT,

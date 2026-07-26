@@ -15,7 +15,9 @@ export function initLinuxScrollBehavior(): void {
 }
 
 function isLinuxWebView(): boolean {
-  return typeof navigator !== "undefined" && /\bLinux\b/i.test(navigator.userAgent);
+  return (
+    typeof navigator !== "undefined" && /\bLinux\b/i.test(navigator.userAgent)
+  );
 }
 
 function handleWheel(event: WheelEvent): void {
@@ -72,7 +74,8 @@ function findScrollableTarget(
 
   while (element) {
     if (canScrollElement(element, axis, amount)) return element;
-    if (element === document.body || element === document.documentElement) break;
+    if (element === document.body || element === document.documentElement)
+      break;
     element = element.parentElement;
   }
 
