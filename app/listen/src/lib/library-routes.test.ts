@@ -267,6 +267,25 @@ describe("library route asset helpers", () => {
     ).toBe("/artists/high-vis/no-sense-no-feeling");
   });
 
+  it("matches backend slug normalization for non-ASCII punctuation and letters", () => {
+    expect(
+      albumPagePath({
+        albumId: 9,
+        artistName: "Derby Motoreta’s Burrito Kachimba",
+        albumName: "Bolsa Amarilla y Piedra Potente",
+      }),
+    ).toBe(
+      "/artists/derby-motoretas-burrito-kachimba/bolsa-amarilla-y-piedra-potente",
+    );
+    expect(
+      albumPagePath({
+        albumId: 10,
+        artistName: "Trentemøller",
+        albumName: "Late Night Tales: Trentemøller",
+      }),
+    ).toBe("/artists/trentemller/late-night-tales-trentemller");
+  });
+
   it("prefers local album paths when a local album also has a global uid", () => {
     expect(
       albumPagePath({

@@ -37,6 +37,7 @@ interface AlbumCardProps {
   globalAlbumUid?: string;
   artistEntityUid?: string;
   albumSlug?: string;
+  artistSlug?: string;
   year?: string;
   cover?: string;
   isPreRelease?: boolean;
@@ -75,6 +76,7 @@ export const AlbumCard = memo(function AlbumCard({
   globalAlbumUid,
   artistEntityUid,
   albumSlug,
+  artistSlug,
   year,
   cover,
   isPreRelease = false,
@@ -93,6 +95,7 @@ export const AlbumCard = memo(function AlbumCard({
     globalAlbumUid,
     artistEntityUid,
     albumSlug,
+    artistSlug,
     artistName: artist,
     albumName: album,
   };

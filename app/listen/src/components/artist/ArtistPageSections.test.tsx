@@ -23,6 +23,40 @@ vi.mock("@/components/playlists/PlaylistCard", () => ({
 }));
 
 describe("ArtistPageSections", () => {
+  it("uses the API-provided canonical artist slug for album links", () => {
+    render(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <ArtistAlbumsSection
+            artistName="Derby Motoreta’s Burrito Kachimba"
+            artistSlug="derby-motoretas-burrito-kachimba"
+            albums={[
+              {
+                id: "54561c2a-89ab-566d-a30d-3b9ad10ea576",
+                global_album_uid: "54561c2a-89ab-566d-a30d-3b9ad10ea576",
+                name: "Bolsa Amarilla y Piedra Potente",
+                display_name: "Bolsa Amarilla y Piedra Potente",
+                slug: "bolsa-amarilla-y-piedra-potente",
+                year: "2024",
+                tracks: 12,
+                formats: ["FLAC"],
+                size_mb: 420,
+                has_cover: true,
+              },
+            ]}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: /Bolsa Amarilla y Piedra Potente/i }),
+    ).toHaveAttribute(
+      "href",
+      "/artists/derby-motoretas-burrito-kachimba/bolsa-amarilla-y-piedra-potente",
+    );
+  });
+
   it("localizes artist rail headings", () => {
     render(
       <MemoryRouter>

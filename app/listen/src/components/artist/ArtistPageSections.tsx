@@ -96,11 +96,13 @@ export function ArtistTopTracksSection({
 
 interface ArtistAlbumsSectionProps {
   artistName: string;
+  artistSlug?: string;
   albums: ArtistAlbum[];
 }
 
 export function ArtistAlbumsSection({
   artistName,
+  artistSlug,
   albums,
 }: ArtistAlbumsSectionProps) {
   const { t } = useTranslation();
@@ -138,6 +140,7 @@ export function ArtistAlbumsSection({
                   albumId: localAlbumId,
                   globalAlbumUid,
                   albumSlug: album.slug,
+                  artistSlug,
                   artistName,
                   albumName: album.display_name || album.name,
                 })}
@@ -179,6 +182,7 @@ export function ArtistAlbumsSection({
               album={album.display_name || album.name}
               albumId={localAlbumId}
               albumSlug={album.slug}
+              artistSlug={artistSlug}
               year={album.year?.slice(0, 4)}
               cover={cover}
               isPreRelease={album.is_pre_release}

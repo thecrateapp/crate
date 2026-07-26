@@ -86,6 +86,7 @@ export const AlbumCard = React.memo(function AlbumCard({
     albumId,
     albumEntityUid,
     albumSlug,
+    artistSlug,
     artistName: artist,
     albumName: name,
   });
@@ -129,6 +130,7 @@ export const AlbumCard = React.memo(function AlbumCard({
             albumPagePath({
               albumId,
               albumSlug,
+              artistSlug,
               artistName: artist,
               albumName: name,
             }),
