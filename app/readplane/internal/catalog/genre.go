@@ -145,14 +145,7 @@ func nilIfZero(value int64) any {
 	return value
 }
 
-func (s *Store) relatedGenres(ctx context.Context, canonicalSlug string, limit int) ([]map[string]any, error) {
-	slug := strings.TrimSpace(canonicalSlug)
-	if slug == "" {
-		return []map[string]any{}, nil
-	}
-	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
-	defer cancel()
-	rows, err := rowsToMaps(s.pool.Query(queryCtx, `
+const relatedGenresSQL = `
 		WITH target AS (
 			SELECT id, slug
 			FROM genre_taxonomy_nodes
@@ -248,6 +241,78 @@ func (s *Store) relatedGenres(ctx context.Context, canonicalSlug string, limit i
 			SELECT slug, relation_type
 			FROM ranked_relations
 			WHERE relation_rank = 1
+		),
+		candidate_nodes AS (
+			SELECT
+				n.id,
+				n.slug,
+				n.name,
+				n.description,
+				n.external_description,
+				n.cover_path,
+				c.relation_type
+			FROM candidate_relations c
+			JOIN genre_taxonomy_nodes n ON n.slug = c.slug
+		),
+		taxonomy_artist_counts AS (
+			SELECT
+				gta.genre_id AS taxonomy_id,
+				COUNT(DISTINCT ag.artist_name)::BIGINT AS artist_count
+			FROM genre_taxonomy_aliases gta
+			JOIN candidate_nodes n ON n.id = gta.genre_id
+			JOIN genres g ON g.slug = gta.alias_slug
+			JOIN artist_genres ag ON ag.genre_id = g.id
+			GROUP BY gta.genre_id
+		),
+		taxonomy_album_counts AS (
+			SELECT
+				gta.genre_id AS taxonomy_id,
+				COUNT(DISTINCT alg.album_id)::BIGINT AS album_count
+			FROM genre_taxonomy_aliases gta
+			JOIN candidate_nodes n ON n.id = gta.genre_id
+			JOIN genres g ON g.slug = gta.alias_slug
+			JOIN album_genres alg ON alg.genre_id = g.id
+			GROUP BY gta.genre_id
+		),
+		genre_artist_counts AS (
+			SELECT
+				ag.genre_id,
+				COUNT(DISTINCT ag.artist_name)::BIGINT AS artist_count
+			FROM artist_genres ag
+			GROUP BY ag.genre_id
+		),
+		genre_album_counts AS (
+			SELECT
+				alg.genre_id,
+				COUNT(DISTINCT alg.album_id)::BIGINT AS album_count
+			FROM album_genres alg
+			GROUP BY alg.genre_id
+		),
+		alias_counts AS (
+			SELECT
+				n.id AS taxonomy_id,
+				g.slug AS page_slug,
+				g.name AS page_name,
+				COALESCE(ac.artist_count, 0) AS artist_count,
+				COALESCE(alc.album_count, 0) AS album_count
+			FROM candidate_nodes n
+			LEFT JOIN genre_taxonomy_aliases gta ON gta.genre_id = n.id
+			LEFT JOIN genres g ON g.slug = gta.alias_slug
+			LEFT JOIN genre_artist_counts ac ON ac.genre_id = g.id
+			LEFT JOIN genre_album_counts alc ON alc.genre_id = g.id
+		),
+		best_pages AS (
+			SELECT DISTINCT ON (taxonomy_id)
+				taxonomy_id,
+				page_slug,
+				page_name
+			FROM alias_counts
+			WHERE page_slug IS NOT NULL
+			ORDER BY
+				taxonomy_id,
+				artist_count DESC,
+				album_count DESC,
+				page_slug ASC
 		)
 		SELECT
 			n.slug,
@@ -255,36 +320,18 @@ func (s *Store) relatedGenres(ctx context.Context, canonicalSlug string, limit i
 			n.description,
 			n.external_description,
 			n.cover_path AS canonical_cover_path,
-			c.relation_type,
-			COUNT(DISTINCT ag.artist_name)::BIGINT AS artist_count,
-			COUNT(DISTINCT alg.album_id)::BIGINT AS album_count,
+			n.relation_type,
+			COALESCE(tac.artist_count, 0) AS artist_count,
+			COALESCE(talc.album_count, 0) AS album_count,
 			page.page_slug,
 			page.page_name,
 			top_artist.top_artist_id,
 			top_artist.top_artist_slug,
 			top_artist.top_artist_name
-		FROM candidate_relations c
-		JOIN genre_taxonomy_nodes n ON n.slug = c.slug
-		LEFT JOIN genre_taxonomy_aliases gta ON gta.genre_id = n.id
-		LEFT JOIN genres g ON g.slug = gta.alias_slug
-		LEFT JOIN artist_genres ag ON ag.genre_id = g.id
-		LEFT JOIN album_genres alg ON alg.genre_id = g.id
-		LEFT JOIN LATERAL (
-			SELECT
-				gp.slug AS page_slug,
-				gp.name AS page_name
-			FROM genre_taxonomy_aliases gta_page
-			JOIN genres gp ON gp.slug = gta_page.alias_slug
-			LEFT JOIN artist_genres ag_page ON ag_page.genre_id = gp.id
-			LEFT JOIN album_genres alg_page ON alg_page.genre_id = gp.id
-			WHERE gta_page.genre_id = n.id
-			GROUP BY gp.id, gp.slug, gp.name
-			ORDER BY
-				COUNT(DISTINCT ag_page.artist_name) DESC,
-				COUNT(DISTINCT alg_page.album_id) DESC,
-				gp.slug ASC
-			LIMIT 1
-		) page ON true
+		FROM candidate_nodes n
+		LEFT JOIN taxonomy_artist_counts tac ON tac.taxonomy_id = n.id
+		LEFT JOIN taxonomy_album_counts talc ON talc.taxonomy_id = n.id
+		LEFT JOIN best_pages page ON page.taxonomy_id = n.id
 		LEFT JOIN LATERAL (
 			SELECT
 				la.id AS top_artist_id,
@@ -303,20 +350,16 @@ func (s *Store) relatedGenres(ctx context.Context, canonicalSlug string, limit i
 				la.name ASC
 			LIMIT 1
 		) top_artist ON true
-		GROUP BY
-			n.id,
-			n.slug,
-			n.name,
-			n.description,
-			n.external_description,
-			n.cover_path,
-			c.relation_type,
-			page.page_slug,
-			page.page_name,
-			top_artist.top_artist_id,
-			top_artist.top_artist_slug,
-			top_artist.top_artist_name
-	`, slug))
+	`
+
+func (s *Store) relatedGenres(ctx context.Context, canonicalSlug string, limit int) ([]map[string]any, error) {
+	slug := strings.TrimSpace(canonicalSlug)
+	if slug == "" {
+		return []map[string]any{}, nil
+	}
+	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(queryCtx, relatedGenresSQL, slug))
 	if err != nil {
 		return nil, err
 	}

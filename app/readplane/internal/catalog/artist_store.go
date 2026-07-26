@@ -10,6 +10,57 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
 
+const artistAlbumsSQL = `
+		WITH artist_albums AS (
+			SELECT
+				id,
+				entity_uid,
+				slug,
+				name,
+				track_count,
+				formats_json,
+				total_size,
+				year,
+				has_cover,
+				musicbrainz_albumid,
+				popularity,
+				popularity_score,
+				popularity_confidence
+			FROM library_albums
+			WHERE lower(artist) = lower($1)
+			  AND quarantined_at IS NULL
+		),
+		album_quality AS (
+			SELECT
+				t.album_id,
+				MAX(t.bit_depth) AS bit_depth,
+				MAX(t.sample_rate) AS sample_rate
+			FROM library_tracks t
+			JOIN artist_albums aa ON aa.id = t.album_id
+			WHERE t.format IS NOT NULL
+			GROUP BY t.album_id
+		)
+		SELECT
+			a.id,
+			a.entity_uid::text AS entity_uid,
+			a.slug,
+			a.name,
+			a.track_count AS tracks,
+			a.formats_json AS formats,
+			q.bit_depth,
+			q.sample_rate,
+			a.total_size,
+			a.year,
+			a.has_cover,
+			a.musicbrainz_albumid,
+			a.popularity,
+			a.popularity_score,
+			a.popularity_confidence
+		FROM artist_albums a
+		LEFT JOIN album_quality q ON q.album_id = a.id
+		ORDER BY a.year, a.name
+	`
+
 func (s *Store) ArtistArtworkKeyByID(ctx context.Context, artistID int64) (string, error) {
 	return s.artistArtworkKey(ctx, "id = $1", artistID)
 }
@@ -128,21 +179,7 @@ func (s *Store) artistPayload(ctx context.Context, artist map[string]any) (map[s
 	name := stringValue(artist["name"])
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	albums, err := rowsToMaps(s.pool.Query(ctx, `
-		SELECT a.id, a.entity_uid::text AS entity_uid, a.slug, a.name, a.track_count AS tracks,
-		       a.formats_json AS formats, q.bit_depth, q.sample_rate, a.total_size,
-		       a.year, a.has_cover, a.musicbrainz_albumid, a.popularity,
-		       a.popularity_score, a.popularity_confidence
-		FROM library_albums a
-		LEFT JOIN (
-			SELECT album_id, MAX(bit_depth) AS bit_depth, MAX(sample_rate) AS sample_rate
-			FROM library_tracks
-			WHERE format IS NOT NULL
-			GROUP BY album_id
-		) q ON q.album_id = a.id
-		WHERE lower(a.artist) = lower($1) AND a.quarantined_at IS NULL
-		ORDER BY a.year, a.name
-	`, name))
+	albums, err := rowsToMaps(s.pool.Query(ctx, artistAlbumsSQL, name))
 	if err != nil {
 		return nil, err
 	}
