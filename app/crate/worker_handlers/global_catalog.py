@@ -71,7 +71,14 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
     phase = str(bootstrap.get("phase") or "local")
     cursor = bootstrap.get("cursor")
     try:
-        if state["status"] != "backfilling":
+        if state["status"] == "failed":
+            run_id = begin_global_catalog_reconciliation_run(mode="full")
+            bootstrap = {**bootstrap, "run_id": run_id}
+            transition_catalog_state(
+                "backfilling",
+                bootstrap_cursor_json=bootstrap,
+            )
+        elif state["status"] != "backfilling":
             transition_catalog_state("backfilling")
         if not run_id:
             run_id = begin_global_catalog_reconciliation_run(mode="full")
