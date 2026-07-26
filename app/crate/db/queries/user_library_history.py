@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.queries.user_library_shared import (
-    has_legacy_stream_id_column,
-    relative_track_path,
-)
+from crate.db.queries.user_library_shared import relative_track_path
 from crate.db.tx import read_scope
 
 
@@ -17,7 +14,6 @@ def get_play_history_rows(
     user_id: int,
     *,
     limit: int,
-    has_legacy_stream_id_column: bool,
     allow_global_catalog: bool | None = None,
 ) -> list[dict]:
     if allow_global_catalog is None:
@@ -88,32 +84,12 @@ def get_play_history_rows(
                 WHERE upe.track_id IS NULL
                   AND upe.track_entity_uid IS NOT NULL
                   AND matched.entity_uid = upe.track_entity_uid
-    """
-    if has_legacy_stream_id_column:
-        query_sql += """
-                UNION ALL
-                SELECT matched.id, 3
-                FROM library_tracks matched
-                WHERE upe.track_id IS NULL
-                  AND COALESCE(upe.track_path, '') <> ''
-                  AND matched.navidrome_id = upe.track_path
-                UNION ALL
-                SELECT matched.id, 4
-                FROM library_tracks matched
-                WHERE upe.track_id IS NULL
-                  AND COALESCE(upe.track_path, '') <> ''
-                  AND matched.path = upe.track_path
-        """
-    else:
-        query_sql += """
                 UNION ALL
                 SELECT matched.id, 3
                 FROM library_tracks matched
                 WHERE upe.track_id IS NULL
                   AND COALESCE(upe.track_path, '') <> ''
                   AND matched.path = upe.track_path
-        """
-    query_sql += """
             ) matches
             JOIN library_tracks candidate ON candidate.id = matches.track_id
             ORDER BY matches.match_priority
@@ -273,7 +249,6 @@ def get_play_history(user_id: int, limit: int = 50) -> list[dict]:
     rows_raw = get_play_history_rows(
         user_id,
         limit=limit,
-        has_legacy_stream_id_column=has_legacy_stream_id_column(),
     )
     rows: list[dict] = []
     needs_title_fallback: list[tuple[int, str, str]] = []

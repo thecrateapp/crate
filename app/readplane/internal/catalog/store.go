@@ -572,11 +572,7 @@ func (s *Store) IsFollowingArtistID(ctx context.Context, userID int64, artistID 
 
 // PlayHistory returns the user's recent play events with resolved track metadata.
 func (s *Store) PlayHistory(ctx context.Context, userID int64, limit int) ([]map[string]any, error) {
-	hasLegacyStreamID, err := s.hasLegacyStreamIDColumn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := s.playHistoryRows(ctx, userID, limit, hasLegacyStreamID)
+	rows, err := s.playHistoryRows(ctx, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1151,35 +1147,7 @@ func (s *Store) genreSummaryBySlug(ctx context.Context, slug string) (map[string
 	return row, nil
 }
 
-func (s *Store) hasLegacyStreamIDColumn(ctx context.Context) (bool, error) {
-	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
-	defer cancel()
-	rows, err := rowsToMaps(s.pool.Query(queryCtx, `
-		SELECT 1
-		FROM information_schema.columns
-		WHERE table_name = 'library_tracks'
-		  AND column_name = 'navidrome_id'
-		LIMIT 1
-	`))
-	if err != nil {
-		return false, err
-	}
-	return len(rows) > 0, nil
-}
-
-func playHistorySQL(hasLegacyStreamIDColumn bool) string {
-	legacyMatch := ""
-	if hasLegacyStreamIDColumn {
-		legacyMatch = `
-				UNION ALL
-				SELECT matched.id, 3
-				FROM library_tracks matched
-				WHERE upe.track_id IS NULL
-				  AND COALESCE(upe.track_path, '') <> ''
-				  AND matched.navidrome_id = upe.track_path
-		`
-	}
-
+func playHistorySQL() string {
 	return `
 		WITH recent_events AS MATERIALIZED (
 			SELECT *
@@ -1235,9 +1203,8 @@ func playHistorySQL(hasLegacyStreamIDColumn bool) string {
 				WHERE upe.track_id IS NULL
 				  AND upe.track_entity_uid IS NOT NULL
 				  AND matched.entity_uid = upe.track_entity_uid
-				` + legacyMatch + `
 				UNION ALL
-				SELECT matched.id, 4
+				SELECT matched.id, 3
 				FROM library_tracks matched
 				WHERE upe.track_id IS NULL
 				  AND COALESCE(upe.track_path, '') <> ''
@@ -1304,10 +1271,10 @@ func playHistorySQL(hasLegacyStreamIDColumn bool) string {
 	`
 }
 
-func (s *Store) playHistoryRows(ctx context.Context, userID int64, limit int, hasLegacyStreamIDColumn bool) ([]map[string]any, error) {
+func (s *Store) playHistoryRows(ctx context.Context, userID int64, limit int) ([]map[string]any, error) {
 	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	return rowsToMaps(s.pool.Query(queryCtx, playHistorySQL(hasLegacyStreamIDColumn), userID, limit))
+	return rowsToMaps(s.pool.Query(queryCtx, playHistorySQL(), userID, limit))
 }
 
 func (s *Store) resolvePlayHistoryAlbumFallback(ctx context.Context, refs []historyFallbackRef) (map[string]map[string]any, error) {
