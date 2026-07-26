@@ -209,6 +209,68 @@ def test_refresh_track_popularity_does_not_spread_or_overwrite_version_ranks(pg_
     assert live["lastfm_top_rank"] is None
 
 
+def test_refresh_track_popularity_preserves_signals_when_providers_are_unavailable(
+    pg_db,
+):
+    from crate.db.jobs.popularity import (
+        bulk_update_lastfm_top_track_signals,
+        bulk_update_spotify_track_signals,
+    )
+    from crate.popularity import refresh_artist_track_popularity_signals
+
+    seeded = _seed_artist_album_and_tracks(pg_db, "Unavailable Artist")
+    pg_db.update_artist_enrichment(
+        "Unavailable Artist",
+        {"spotify_id": "spotify-unavailable-artist"},
+    )
+    track = pg_db.get_library_track_by_path(seeded["big_song_path"])
+    bulk_update_lastfm_top_track_signals(
+        [
+            {
+                "id": track["id"],
+                "lastfm_top_rank": 3,
+                "lastfm_listeners": 9000,
+                "lastfm_playcount": 50000,
+            }
+        ]
+    )
+    bulk_update_spotify_track_signals(
+        [
+            {
+                "id": track["id"],
+                "spotify_track_popularity": 88,
+                "spotify_top_rank": 2,
+            }
+        ]
+    )
+
+    with (
+        patch("crate.popularity.get_lastfm_top_tracks", return_value=None),
+        patch("crate.popularity.get_spotify_top_tracks", return_value=None),
+    ):
+        result = refresh_artist_track_popularity_signals("Unavailable Artist")
+
+    refreshed = pg_db.get_library_track_by_path(seeded["big_song_path"])
+    assert result == {"lastfm_matches": 0, "spotify_matches": 0}
+    assert refreshed["lastfm_top_rank"] == 3
+    assert refreshed["spotify_track_popularity"] == 88
+    assert refreshed["spotify_top_rank"] == 2
+
+
+def test_scoped_popularity_normalization_avoids_global_legacy_rewrite():
+    from crate.popularity import _normalize_popularity
+
+    with (
+        patch("crate.popularity.normalize_popularity_scores") as normalize_legacy,
+        patch("crate.popularity.recompute_track_popularity_scores"),
+        patch("crate.popularity.recompute_album_popularity_scores"),
+        patch("crate.popularity.recompute_artist_popularity_scores"),
+    ):
+        _normalize_popularity(["Scoped Artist"])
+
+    normalize_legacy.assert_not_called()
+
+
 def test_recompute_track_popularity_scores_backfills_all_tracks(pg_db):
     from crate.db.jobs.popularity import (
         bulk_update_lastfm_top_track_signals,
