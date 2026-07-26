@@ -226,10 +226,7 @@ def test_top_tracks_preview_is_prefix_of_view_all_ranking():
         )
         for index in range(1, 61)
     ]
-    lastfm_top = [
-        {"title": f"Track {index:02d}"}
-        for index in range(60, 0, -1)
-    ]
+    lastfm_top = [{"title": f"Track {index:02d}"} for index in range(60, 0, -1)]
 
     preview = _build_artist_top_tracks_payload(
         "Example Artist",

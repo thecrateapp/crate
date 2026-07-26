@@ -12,18 +12,9 @@ def test_release_type_secondary_types_override_primary_type():
         classify_release(primary_type="Album", secondary_types=["Compilation"])
         == "compilation"
     )
-    assert (
-        classify_release(primary_type="Album", secondary_types=["Live"])
-        == "live"
-    )
-    assert (
-        classify_release(primary_type="Album", secondary_types=["Remix"])
-        == "other"
-    )
-    assert (
-        classify_release(primary_type="Album", secondary_types=["DJ-mix"])
-        == "other"
-    )
+    assert classify_release(primary_type="Album", secondary_types=["Live"]) == "live"
+    assert classify_release(primary_type="Album", secondary_types=["Remix"]) == "other"
+    assert classify_release(primary_type="Album", secondary_types=["DJ-mix"]) == "other"
 
 
 def test_release_type_uses_conservative_fallbacks_without_metadata():
@@ -155,9 +146,7 @@ def test_release_group_type_persistence_updates_existing_album_metadata(pg_db):
     assert album["release_group_secondary_types"] == ["Compilation"]
 
 
-def test_existing_mbid_backfill_never_runs_filesystem_auto_apply(
-    monkeypatch, tmp_path
-):
+def test_existing_mbid_backfill_never_runs_filesystem_auto_apply(monkeypatch, tmp_path):
     from crate.worker_handlers import enrichment
 
     monkeypatch.setattr(
@@ -181,7 +170,7 @@ def test_existing_mbid_backfill_never_runs_filesystem_auto_apply(
                 "musicbrainz_albumid": None,
                 "musicbrainz_releasegroupid": None,
                 "release_group_primary_type": None,
-            }
+            },
         ],
     )
     monkeypatch.setattr(
@@ -189,9 +178,7 @@ def test_existing_mbid_backfill_never_runs_filesystem_auto_apply(
     )
     monkeypatch.setattr(enrichment, "is_cancelled", lambda _task_id: False)
     monkeypatch.setattr(enrichment, "emit_progress", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        enrichment, "emit_task_event", lambda *_args, **_kwargs: None
-    )
+    monkeypatch.setattr(enrichment, "emit_task_event", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         enrichment, "wait_for_provider_slot", lambda *_args, **_kwargs: None
     )
@@ -216,9 +203,7 @@ def test_existing_mbid_backfill_never_runs_filesystem_auto_apply(
         ),
     )
 
-    result = enrichment._handle_enrich_mbids(
-        "task-1", {"release_types_only": True}, {}
-    )
+    result = enrichment._handle_enrich_mbids("task-1", {"release_types_only": True}, {})
 
     assert result == {"enriched": 1, "skipped": 0, "failed": 0, "total": 1}
 
