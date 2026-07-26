@@ -349,7 +349,7 @@ services:
     labels:
       traefik.enable: true
       traefik.docker.network: crate
-      traefik.http.routers.crate-readplane-interactive.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`, `HEAD`) && (PathPrefix(`/api/catalog/`) || PathPrefix(`/api/me/home/`) || PathPrefix(`/api/me/albums`) || PathPrefix(`/api/me/follows`) || PathPrefix(`/api/genres`) || PathPrefix(`/api/artists/`) || PathPrefix(`/api/artist-slugs/`) || PathPrefix(`/api/albums/`) || Path(`/api/auth/me`) || Path(`/api/me`) || Path(`/api/me/history`) || Path(`/api/me/likes`) || Path(`/api/me/stats/dashboard`) || Path(`/api/search`) || Path(`/api/favorites`))
+      traefik.http.routers.crate-readplane-interactive.rule: Host(`api.${DOMAIN:-localhost}`) && (Method(`GET`) || Method(`HEAD`)) && (PathPrefix(`/api/catalog/`) || PathPrefix(`/api/me/home/`) || PathPrefix(`/api/me/albums`) || PathPrefix(`/api/me/follows`) || PathPrefix(`/api/genres`) || PathPrefix(`/api/artists/`) || PathPrefix(`/api/artist-slugs/`) || PathPrefix(`/api/albums/`) || Path(`/api/auth/me`) || Path(`/api/me`) || Path(`/api/me/history`) || Path(`/api/me/likes`) || Path(`/api/me/stats/dashboard`) || Path(`/api/search`) || Path(`/api/favorites`))
       traefik.http.routers.crate-readplane-interactive.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
       traefik.http.routers.crate-readplane-interactive.middlewares: crate-api-compress@docker
       traefik.http.routers.crate-readplane-interactive.priority: 100
@@ -362,7 +362,7 @@ services:
       traefik.http.routers.crate-readplane-sse.service: crate-readplane-sse@file
       traefik.http.routers.crate-readplane-sse.tls: ${TRAEFIK_TLS_ENABLED:-true}
       traefik.http.routers.crate-readplane-sse.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
-      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`, `HEAD`) && (PathPrefix(`/api/federation/remote/streams/`) || PathPrefix(`/api/tracks/`))
+      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN:-localhost}`) && (Method(`GET`) || Method(`HEAD`)) && (PathPrefix(`/api/federation/remote/streams/`) || PathPrefix(`/api/tracks/`))
       traefik.http.routers.crate-readplane-stream.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
       traefik.http.routers.crate-readplane-stream.priority: 110
       traefik.http.routers.crate-readplane-stream.tls: ${TRAEFIK_TLS_ENABLED:-true}

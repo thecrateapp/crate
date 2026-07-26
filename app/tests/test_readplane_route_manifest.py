@@ -94,3 +94,14 @@ def test_api_domain_routes_readplane_classes_with_explicit_priority():
         "PathPrefix(`/api/federation/remote/streams/`)"
         in labels["traefik.http.routers.crate-readplane-stream.rule"]
     )
+
+
+def test_traefik_v3_method_matchers_keep_get_and_head_routers_enabled():
+    for compose_name in ("docker-compose.yaml", "docker-compose.home.yaml"):
+        compose = yaml.safe_load((ROOT / compose_name).read_text())
+        labels = compose["services"]["crate-readplane"]["labels"]
+
+        for router_name in ("interactive", "stream"):
+            rule = labels[f"traefik.http.routers.crate-readplane-{router_name}.rule"]
+            assert "Method(`GET`, `HEAD`)" not in rule
+            assert "(Method(`GET`) || Method(`HEAD`))" in rule
