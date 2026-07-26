@@ -605,6 +605,19 @@ readplane-benchmark: ## Compare FastAPI vs readplane latency for a P0 route
 		$(READPLANE_GO_IMAGE) \
 		$(READPLANE_GO) run ./cmd/readplane-benchmark
 
+.PHONY: test-response
+test-response: ## Benchmark Listen API routes (auth: CRATE_RESPONSE_TOKEN or EMAIL/PASSWORD)
+	@PYTHONPATH=app .venv/bin/python app/tests/load/listen_response_profile.py \
+		--base-url "$${CRATE_RESPONSE_BASE_URL:-http://localhost:8585}" \
+		--artist-slug "$${CRATE_RESPONSE_ARTIST_SLUG:-pantera}" \
+		--genre-slug "$${CRATE_RESPONSE_GENRE_SLUG:-death-metal}" \
+		--samples "$${CRATE_RESPONSE_SAMPLES:-5}" \
+		--warmups "$${CRATE_RESPONSE_WARMUPS:-1}" \
+		--timeout "$${CRATE_RESPONSE_TIMEOUT:-20}" \
+		--output "$${CRATE_RESPONSE_OUTPUT:-.artifacts/benchmarks/listen-response.json}" \
+		$${CRATE_RESPONSE_REPORT_ONLY:+--report-only} \
+		$${CRATE_RESPONSE_SKIP_TLS_VERIFY:+--skip-tls-verify}
+
 .PHONY: dev-federation-stream-benchmark
 dev-federation-stream-benchmark: ## Benchmark the selected Go federated stream data plane
 	@mkdir -p .artifacts/benchmarks
