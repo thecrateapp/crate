@@ -629,18 +629,28 @@ func (s *Store) PlayHistory(ctx context.Context, userID int64, limit int) ([]map
 	return rows, nil
 }
 
-// Genres returns all genres with artist/album counts and taxonomy metadata.
-func (s *Store) Genres(ctx context.Context) ([]map[string]any, error) {
-	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
-	defer cancel()
-	rows, err := rowsToMaps(s.pool.Query(ctx, `
+var genresSQL = `
+		WITH artist_counts AS (
+			SELECT
+				genre_id,
+				COUNT(DISTINCT artist_name)::INTEGER AS artist_count
+			FROM artist_genres
+			GROUP BY genre_id
+		),
+		album_counts AS (
+			SELECT
+				genre_id,
+				COUNT(DISTINCT album_id)::INTEGER AS album_count
+			FROM album_genres
+			GROUP BY genre_id
+		)
 		SELECT
 			g.id,
 			g.entity_uid::text AS entity_uid,
 			g.name,
 			g.slug,
-			COUNT(DISTINCT ag.artist_name)::INTEGER AS artist_count,
-			COUNT(DISTINCT alg.album_id)::INTEGER AS album_count,
+			COALESCE(ac.artist_count, 0) AS artist_count,
+			COALESCE(alc.album_count, 0) AS album_count,
 			tn.slug AS canonical_slug,
 			tn.name AS canonical_name,
 			tn.description AS canonical_description,
@@ -654,32 +664,22 @@ func (s *Store) Genres(ctx context.Context) ([]map[string]any, error) {
 			tl.name AS top_level_name,
 			tl.description AS top_level_description
 		FROM genres g
-		LEFT JOIN artist_genres ag ON g.id = ag.genre_id
-		LEFT JOIN album_genres alg ON g.id = alg.genre_id
+		LEFT JOIN artist_counts ac ON ac.genre_id = g.id
+		LEFT JOIN album_counts alc ON alc.genre_id = g.id
 		LEFT JOIN genre_taxonomy_aliases gta
 		  ON gta.alias_slug = g.slug OR lower(trim(gta.alias_name)) = lower(trim(g.name))
 		LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
-		LEFT JOIN LATERAL (`+genreTopLevelSQL("tn.slug")+`) tl ON tn.slug IS NOT NULL
-		GROUP BY
-			g.id,
-			g.entity_uid,
-			g.name,
-			g.slug,
-			tn.slug,
-			tn.name,
-			tn.description,
-			tn.external_description,
-			tn.external_description_source,
-			tn.cover_path,
-			tn.musicbrainz_mbid,
-			tn.wikidata_entity_id,
-			tn.wikidata_url,
-			tl.slug,
-			tl.name,
-			tl.description
-		HAVING COUNT(DISTINCT ag.artist_name) > 0 OR COUNT(DISTINCT alg.album_id) > 0
-		ORDER BY COUNT(DISTINCT ag.artist_name) DESC
-	`))
+		LEFT JOIN LATERAL (` + genreTopLevelSQL("tn.slug") + `) tl ON tn.slug IS NOT NULL
+		WHERE COALESCE(ac.artist_count, 0) > 0
+		   OR COALESCE(alc.album_count, 0) > 0
+		ORDER BY COALESCE(ac.artist_count, 0) DESC
+	`
+
+// Genres returns all genres with artist/album counts and taxonomy metadata.
+func (s *Store) Genres(ctx context.Context) ([]map[string]any, error) {
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(ctx, genresSQL))
 	if err != nil {
 		return nil, err
 	}
@@ -1065,28 +1065,63 @@ func nonEmptyStrings(values ...string) []string {
 	return items
 }
 
-func (s *Store) genreSummaryBySlug(ctx context.Context, slug string) (map[string]any, error) {
-	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
-	defer cancel()
-	rows, err := rowsToMaps(s.pool.Query(queryCtx, `
+var genreSummarySQL = `
+		WITH target_genre AS (
+			SELECT
+				g.id,
+				g.entity_uid,
+				g.name,
+				g.slug,
+				tn.slug AS canonical_slug,
+				tn.name AS canonical_name,
+				tn.description AS canonical_description,
+				tn.external_description,
+				tn.external_description_source,
+				tn.cover_path AS canonical_cover_path,
+				tn.musicbrainz_mbid,
+				tn.wikidata_entity_id,
+				tn.wikidata_url,
+				tn.eq_gains AS canonical_eq_gains,
+				tn.eq_reasoning
+			FROM genres g
+			LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
+			LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
+			WHERE g.slug = $1
+		),
+		artist_counts AS (
+			SELECT
+				ag.genre_id,
+				COUNT(DISTINCT ag.artist_name)::INTEGER AS artist_count
+			FROM artist_genres ag
+			JOIN target_genre tg ON tg.id = ag.genre_id
+			GROUP BY ag.genre_id
+		),
+		album_counts AS (
+			SELECT
+				alg.genre_id,
+				COUNT(DISTINCT alg.album_id)::INTEGER AS album_count
+			FROM album_genres alg
+			JOIN target_genre tg ON tg.id = alg.genre_id
+			GROUP BY alg.genre_id
+		)
 		SELECT
 			g.id,
 			g.entity_uid::text AS entity_uid,
 			g.name,
 			g.slug,
-			COUNT(DISTINCT ag.artist_name)::INTEGER AS artist_count,
-			COUNT(DISTINCT alg.album_id)::INTEGER AS album_count,
-			tn.slug AS canonical_slug,
-			tn.name AS canonical_name,
-			tn.description AS canonical_description,
-			tn.external_description,
-			tn.external_description_source,
-			tn.cover_path AS canonical_cover_path,
-			tn.musicbrainz_mbid,
-			tn.wikidata_entity_id,
-			tn.wikidata_url,
-			tn.eq_gains AS canonical_eq_gains,
-			tn.eq_reasoning,
+			COALESCE(ac.artist_count, 0) AS artist_count,
+			COALESCE(alc.album_count, 0) AS album_count,
+			g.canonical_slug,
+			g.canonical_name,
+			g.canonical_description,
+			g.external_description,
+			g.external_description_source,
+			g.canonical_cover_path,
+			g.musicbrainz_mbid,
+			g.wikidata_entity_id,
+			g.wikidata_url,
+			g.canonical_eq_gains,
+			g.eq_reasoning,
 			tl.slug AS top_level_slug,
 			tl.name AS top_level_name,
 			tl.description AS top_level_description,
@@ -1094,38 +1129,17 @@ func (s *Store) genreSummaryBySlug(ctx context.Context, slug string) (map[string
 			preset.source AS preset_source,
 			preset.slug AS preset_slug,
 			preset.name AS preset_name
-		FROM genres g
-		LEFT JOIN artist_genres ag ON g.id = ag.genre_id
-		LEFT JOIN album_genres alg ON g.id = alg.genre_id
-		LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
-		LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
-		LEFT JOIN LATERAL (`+genreTopLevelSQL("tn.slug")+`) tl ON tn.slug IS NOT NULL
-		LEFT JOIN LATERAL (`+genrePresetSQL("tn.slug")+`) preset ON tn.slug IS NOT NULL
-		WHERE g.slug = $1
-		GROUP BY
-			g.id,
-			g.entity_uid,
-			g.name,
-			g.slug,
-			tn.slug,
-			tn.name,
-			tn.description,
-			tn.external_description,
-			tn.external_description_source,
-			tn.cover_path,
-			tn.musicbrainz_mbid,
-			tn.wikidata_entity_id,
-			tn.wikidata_url,
-			tn.eq_gains,
-			tn.eq_reasoning,
-			tl.slug,
-			tl.name,
-			tl.description,
-			preset.gains,
-			preset.source,
-			preset.slug,
-			preset.name
-	`, slug))
+		FROM target_genre g
+		LEFT JOIN artist_counts ac ON ac.genre_id = g.id
+		LEFT JOIN album_counts alc ON alc.genre_id = g.id
+		LEFT JOIN LATERAL (` + genreTopLevelSQL("g.canonical_slug") + `) tl ON g.canonical_slug IS NOT NULL
+		LEFT JOIN LATERAL (` + genrePresetSQL("g.canonical_slug") + `) preset ON g.canonical_slug IS NOT NULL
+	`
+
+func (s *Store) genreSummaryBySlug(ctx context.Context, slug string) (map[string]any, error) {
+	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(queryCtx, genreSummarySQL, slug))
 	if err != nil {
 		return nil, err
 	}
