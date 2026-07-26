@@ -53,19 +53,37 @@ def update_track_lastfm(track_id: int, listeners: int, playcount: int) -> None:
         )
 
 
-def reset_track_popularity_signals(artist_name: str) -> None:
+def reset_track_popularity_signals(
+    artist_name: str,
+    *,
+    lastfm: bool = True,
+    spotify: bool = True,
+) -> None:
     with transaction_scope() as session:
         session.execute(
             text("""
                 UPDATE library_tracks
-                SET lastfm_top_rank = NULL,
-                    spotify_track_popularity = NULL,
-                    spotify_top_rank = NULL
+                SET lastfm_top_rank = CASE
+                        WHEN :reset_lastfm THEN NULL
+                        ELSE lastfm_top_rank
+                    END,
+                    spotify_track_popularity = CASE
+                        WHEN :reset_spotify THEN NULL
+                        ELSE spotify_track_popularity
+                    END,
+                    spotify_top_rank = CASE
+                        WHEN :reset_spotify THEN NULL
+                        ELSE spotify_top_rank
+                    END
                 WHERE album_id IN (
                     SELECT id FROM library_albums WHERE LOWER(artist) = LOWER(:artist_name)
                 )
             """),
-            {"artist_name": artist_name},
+            {
+                "artist_name": artist_name,
+                "reset_lastfm": lastfm,
+                "reset_spotify": spotify,
+            },
         )
 
 

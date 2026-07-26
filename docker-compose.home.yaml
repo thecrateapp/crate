@@ -45,6 +45,7 @@ x-crate-env: &crate-env
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  AUDIOMUSE_GEMINI_API_KEY: ${AUDIOMUSE_GEMINI_API_KEY:-}
   CRATE_READPLANE_SERVICE_TOKEN: ${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
   CRATE_FEDERATION_IMPORT_MAX_BYTES: ${CRATE_FEDERATION_IMPORT_MAX_BYTES:-100000000000}
   CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES: ${CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES:-100000000000}
@@ -489,7 +490,13 @@ services:
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
     environment:
-      <<: [*crate-env, *worker-resource-env, *worker-native-env]
+      <<:
+        [
+          *crate-env,
+          *crate-enrichment-env,
+          *worker-resource-env,
+          *worker-native-env,
+        ]
       CRATE_RUNTIME: worker
       CRATE_LEGACY_POOL_MAXCONN: ${MAINTENANCE_LEGACY_POOL_MAXCONN:-2}
       CRATE_SQLALCHEMY_POOL_SIZE: ${MAINTENANCE_SQLALCHEMY_POOL_SIZE:-1}

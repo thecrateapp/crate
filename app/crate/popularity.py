@@ -185,14 +185,24 @@ def refresh_artist_track_popularity_signals(artist_name: str) -> dict:
         return {"lastfm_matches": 0, "spotify_matches": 0}
 
     title_index = _build_title_index(tracks)
-    reset_track_popularity_signals(artist_name)
 
     lastfm_updates_by_id: dict[int, dict] = {}
     spotify_updates_by_id: dict[int, dict] = {}
 
-    lastfm_top_tracks = (
-        get_lastfm_top_tracks(artist_name, limit=LASTFM_TOP_TRACK_LIMIT) or []
+    lastfm_available = get_lastfm_top_tracks(
+        artist_name,
+        limit=LASTFM_TOP_TRACK_LIMIT,
     )
+    lastfm_top_tracks = lastfm_available or []
+    spotify_id = artist.get("spotify_id")
+    spotify_available = get_spotify_top_tracks(spotify_id) if spotify_id else None
+    spotify_top_tracks = spotify_available or []
+    reset_track_popularity_signals(
+        artist_name,
+        lastfm=lastfm_available is not None,
+        spotify=spotify_available is not None,
+    )
+
     for rank, item in enumerate(lastfm_top_tracks, start=1):
         matched_ids = _match_remote_track_ids(title_index, item.get("title", ""))
         if not matched_ids:
@@ -213,9 +223,7 @@ def refresh_artist_track_popularity_signals(artist_name: str) -> dict:
     if lastfm_updates:
         bulk_update_lastfm_top_track_signals(lastfm_updates)
 
-    spotify_id = artist.get("spotify_id")
     if spotify_id:
-        spotify_top_tracks = get_spotify_top_tracks(spotify_id) or []
         for rank, item in enumerate(spotify_top_tracks, start=1):
             matched_ids = _match_remote_track_ids(title_index, item.get("name", ""))
             if not matched_ids:
@@ -469,7 +477,8 @@ def compute_popularity(progress_callback=None) -> dict:
 
 def _normalize_popularity(artist_names: list[str] | None = None):
     """Recompute consolidated popularity for artists, albums, and tracks."""
-    normalize_popularity_scores()
+    if artist_names is None:
+        normalize_popularity_scores()
     recompute_track_popularity_scores(artist_names)
     recompute_album_popularity_scores(artist_names)
     recompute_artist_popularity_scores(artist_names)
