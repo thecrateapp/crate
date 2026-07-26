@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import text
+
 from crate.db.queries.user_library import (
     get_replay_mix,
     get_stats_overview,
@@ -25,6 +27,7 @@ from crate.db.queries.user_library_stats_month import (
     month_period_key,
 )
 from crate.db.repositories.tasks import create_task_dedup
+from crate.db.tx import read_scope
 from crate.db.ui_snapshot_reads import get_ui_snapshot
 from crate.db.ui_snapshot_shared import decorate_snapshot
 from crate.db.ui_snapshot_writes import upsert_ui_snapshot
@@ -32,11 +35,11 @@ from crate.db.ui_snapshot_writes import upsert_ui_snapshot
 _MAX_AGE_SECONDS = 300
 _STALE_MAX_AGE_SECONDS = 86_400
 _DEFAULT_LIMITS = {
-    "tracks_limit": 10,
-    "artists_limit": 8,
-    "albums_limit": 8,
-    "genres_limit": 8,
-    "replay_limit": 30,
+    "tracks_limit": 12,
+    "artists_limit": 10,
+    "albums_limit": 12,
+    "genres_limit": 10,
+    "replay_limit": 36,
 }
 
 
@@ -201,11 +204,11 @@ def get_user_stats_dashboard(
     *,
     window: str = "30d",
     month: str | None = None,
-    tracks_limit: int = 10,
-    artists_limit: int = 8,
-    albums_limit: int = 8,
-    genres_limit: int = 8,
-    replay_limit: int = 30,
+    tracks_limit: int = 12,
+    artists_limit: int = 10,
+    albums_limit: int = 12,
+    genres_limit: int = 10,
+    replay_limit: int = 36,
 ) -> dict[str, Any]:
     params = _projection_params(
         user_id,
@@ -237,11 +240,11 @@ def refresh_user_stats_dashboard_snapshot(
     *,
     window: str = "30d",
     month: str | None = None,
-    tracks_limit: int = 10,
-    artists_limit: int = 8,
-    albums_limit: int = 8,
-    genres_limit: int = 8,
-    replay_limit: int = 30,
+    tracks_limit: int = 12,
+    artists_limit: int = 10,
+    albums_limit: int = 12,
+    genres_limit: int = 10,
+    replay_limit: int = 36,
 ) -> dict[str, Any]:
     params = _projection_params(
         user_id,
@@ -269,9 +272,51 @@ def refresh_user_stats_dashboard_snapshots(user_id: int) -> int:
     return 1
 
 
+def _list_stats_dashboard_user_ids() -> list[int]:
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                SELECT id
+                FROM users
+                WHERE status = 'active'
+                  AND deleted_at IS NULL
+                ORDER BY id
+                """
+                )
+            )
+            .scalars()
+            .all()
+        )
+    return [int(user_id) for user_id in rows]
+
+
+def queue_missing_stats_dashboard_snapshots() -> int:
+    queued = 0
+    for user_id in _list_stats_dashboard_user_ids():
+        params = _projection_params(
+            user_id,
+            window="30d",
+            month=None,
+            **_DEFAULT_LIMITS,
+        )
+        subject_key = stats_dashboard_subject_key(**params)
+        if get_ui_snapshot(
+            "stats:dashboard",
+            subject_key,
+            max_age_seconds=_STALE_MAX_AGE_SECONDS,
+        ):
+            continue
+        _schedule_projection(params, subject_key)
+        queued += 1
+    return queued
+
+
 __all__ = [
     "build_user_stats_dashboard",
     "get_user_stats_dashboard",
+    "queue_missing_stats_dashboard_snapshots",
     "refresh_user_stats_dashboard_snapshot",
     "refresh_user_stats_dashboard_snapshots",
     "stats_dashboard_subject_key",

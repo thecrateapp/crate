@@ -145,12 +145,14 @@ def _handle_refresh_home_discovery_snapshot(
     task_id: str, params: dict, config: dict
 ) -> dict:
     del task_id, config
+    from crate.api.cache_events import broadcast_invalidation
     from crate.db.home import get_cached_home_discovery
 
     user_id = int(params.get("user_id") or 0)
     if user_id <= 0:
         return {"ok": False, "error": "Missing user_id"}
     get_cached_home_discovery(user_id, fresh=True)
+    broadcast_invalidation("home")
     return {"ok": True, "user_id": user_id}
 
 
@@ -171,11 +173,11 @@ def _handle_refresh_user_stats_dashboard_snapshot(
         user_id,
         window=window,
         month=params.get("month"),
-        tracks_limit=int(params.get("tracks_limit") or 10),
-        artists_limit=int(params.get("artists_limit") or 8),
-        albums_limit=int(params.get("albums_limit") or 8),
-        genres_limit=int(params.get("genres_limit") or 8),
-        replay_limit=int(params.get("replay_limit") or 30),
+        tracks_limit=int(params.get("tracks_limit") or 12),
+        artists_limit=int(params.get("artists_limit") or 10),
+        albums_limit=int(params.get("albums_limit") or 12),
+        genres_limit=int(params.get("genres_limit") or 10),
+        replay_limit=int(params.get("replay_limit") or 36),
     )
     broadcast_invalidation("history")
     return {"ok": True, "user_id": user_id, "window": window}
@@ -459,7 +461,7 @@ def _try_complete_parent(parent_task_id: str, child_task_type: str = "") -> None
     }
 
     finalize_fn = _PARENT_FINALIZERS.get(child_task_type)
-    if finalize_fn:
+    if finalize_fn and status["failed"] == 0:
         try:
             extra = finalize_fn()
             if extra:
@@ -469,6 +471,8 @@ def _try_complete_parent(parent_task_id: str, child_task_type: str = "") -> None
                 "Finalization failed for parent %s", parent_task_id, exc_info=True
             )
             result["finalization_error"] = True
+    elif finalize_fn:
+        result["finalization_skipped"] = True
 
     update_task(parent_task_id, status="completed", result=result)
     emit_task_event(
@@ -541,9 +545,27 @@ def _handle_bliss_chunk(task_id: str, params: dict, config: dict) -> dict:
 
 def _popularity_finalize() -> dict | None:
     """Post-processing after all popularity chunks complete."""
-    from crate.popularity import recompute_track_popularity_scores
+    from crate.api.cache_events import broadcast_invalidation
+    from crate.db.cache_settings import set_setting
+    from crate.db.cache_store import delete_cache_prefix
+    from crate.popularity import (
+        ARTIST_TOP_TRACK_RANKING_VERSION,
+        recompute_track_popularity_scores,
+    )
 
     scored = recompute_track_popularity_scores()
+    set_setting(
+        "artist_top_track_ranking_version",
+        ARTIST_TOP_TRACK_RANKING_VERSION,
+    )
+    for prefix in (
+        "listen:artist_top_tracks:v1:",
+        "listen:artist_top_tracks:v2:",
+        "listen:artist_top_tracks:v3:",
+        "listen:artist_page:v6:",
+    ):
+        delete_cache_prefix(prefix)
+    broadcast_invalidation("catalog", "home")
     return {"tracks_scored": scored.get("tracks_scored", 0)}
 
 
@@ -556,9 +578,12 @@ def _handle_compute_popularity(task_id: str, params: dict, config: dict) -> dict
     if params.get("artists"):
         return _handle_popularity_chunk(task_id, params, config)
 
-    return _chunk_coordinator(
+    result = _chunk_coordinator(
         task_id, params, config, "compute_popularity", _handle_popularity_chunk
     )
+    if result.get("chunks") == 0:
+        result.update(_popularity_finalize() or {})
+    return result
 
 
 def _handle_popularity_chunk(task_id: str, params: dict, config: dict) -> dict:

@@ -906,6 +906,47 @@ class TestPlayHistory:
         assert history[0]["artist_id"] is None
         assert history[0]["album_id"] is None
 
+    def test_get_play_history_dedupes_ambiguous_metadata_fallback(self, lib_db):
+        artist = "Ambiguous History Artist"
+        title = "Shared History Song"
+        first = _seed_global_catalog_track(
+            artist_uid="61111111-1111-4111-8111-111111111111",
+            album_uid="62222222-2222-4222-8222-222222222222",
+            track_uid="63333333-3333-4333-8333-333333333333",
+            artist=artist,
+            album="First History Album",
+            title=title,
+        )
+        _seed_global_catalog_track(
+            artist_uid=first["artist_uid"],
+            album_uid="62222222-2222-4222-8222-222222222223",
+            track_uid="63333333-3333-4333-8333-333333333334",
+            artist=artist,
+            album="Second History Album",
+            title=title,
+        )
+        now = datetime.now(timezone.utc)
+        _insert_play_event(
+            TEST_USER_ID,
+            title=title,
+            artist=artist,
+            album="",
+            track_path="",
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_history import get_play_history_rows
+
+        history = get_play_history_rows(
+            TEST_USER_ID,
+            limit=10,
+            has_legacy_stream_id_column=False,
+        )
+
+        matching = [item for item in history if item["title"] == title]
+        assert len(matching) == 1
+        assert matching[0]["global_track_uid"] == first["track_uid"]
+
     def test_get_play_history_backfills_legacy_remote_events_from_global_catalog(
         self, lib_db
     ):
@@ -1640,6 +1681,54 @@ class TestStatsTops:
         assert item["global_album_uid"] == catalog["album_uid"]
         assert item["album_id"] is None
 
+    def test_get_replay_mix_uses_one_deterministic_metadata_fallback(self, lib_db):
+        artist = "Ambiguous Replay Artist"
+        title = "Shared Song"
+        first = _seed_global_catalog_track(
+            artist_uid="41111111-1111-4111-8111-111111111111",
+            album_uid="42222222-2222-4222-8222-222222222222",
+            track_uid="43333333-3333-4333-8333-333333333333",
+            artist=artist,
+            album="First Album",
+            title=title,
+        )
+        _seed_global_catalog_track(
+            artist_uid=first["artist_uid"],
+            album_uid="42222222-2222-4222-8222-222222222223",
+            track_uid="43333333-3333-4333-8333-333333333334",
+            artist=artist,
+            album="Second Album",
+            title=title,
+        )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_stats (
+                        user_id, stat_window, entity_key, track_id,
+                        global_track_uid, track_entity_uid, track_path,
+                        title, artist, album,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '30d', 'legacy:shared-song', NULL,
+                        NULL, NULL, '',
+                        :title, :artist, '',
+                        4, 4, 12.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID, "artist": artist, "title": title},
+            )
+
+        from crate.db.queries.user_library_stats_tops import get_replay_mix
+
+        mix = get_replay_mix(TEST_USER_ID, window="30d", limit=10)
+
+        assert [item["title"] for item in mix["items"]] == [title]
+        assert mix["items"][0]["global_track_uid"] == first["track_uid"]
+
     def test_get_month_top_tracks_resolves_global_catalog_identity(self, lib_db):
         catalog = _seed_global_catalog_track()
         now = datetime.now(timezone.utc)
@@ -1663,6 +1752,43 @@ class TestStatsTops:
         assert top[0]["global_artist_uid"] == catalog["artist_uid"]
         assert top[0]["global_album_uid"] == catalog["album_uid"]
         assert top[0]["track_id"] is None
+
+    def test_get_month_top_tracks_dedupes_ambiguous_metadata_fallback(self, lib_db):
+        artist = "Ambiguous Monthly Artist"
+        title = "Shared Monthly Song"
+        first = _seed_global_catalog_track(
+            artist_uid="51111111-1111-4111-8111-111111111111",
+            album_uid="52222222-2222-4222-8222-222222222222",
+            track_uid="53333333-3333-4333-8333-333333333333",
+            artist=artist,
+            album="First Monthly Album",
+            title=title,
+        )
+        _seed_global_catalog_track(
+            artist_uid=first["artist_uid"],
+            album_uid="52222222-2222-4222-8222-222222222223",
+            track_uid="53333333-3333-4333-8333-333333333334",
+            artist=artist,
+            album="Second Monthly Album",
+            title=title,
+        )
+        now = datetime.now(timezone.utc)
+        _insert_play_event(
+            TEST_USER_ID,
+            title=title,
+            artist=artist,
+            album="",
+            track_path="",
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_stats_month import get_month_top_tracks
+
+        top = get_month_top_tracks(TEST_USER_ID, now.strftime("%Y-%m"), limit=10)
+
+        matching = [item for item in top if item["title"] == title]
+        assert len(matching) == 1
+        assert matching[0]["global_track_uid"] == first["track_uid"]
         assert top[0]["album_id"] is None
 
     def test_get_month_replay_mix_resolves_global_catalog_identity(self, lib_db):

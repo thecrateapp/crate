@@ -70,13 +70,15 @@ def test_cold_home_request_returns_schema_valid_minimal_payload(monkeypatch):
     monkeypatch.setattr(
         surface,
         "get_home_recently_played",
-        lambda _user_id: [{"title": "Song"}],
+        lambda _user_id: (_ for _ in ()).throw(
+            AssertionError("cold home must not run history queries")
+        ),
     )
 
     payload = surface.get_cached_home_discovery(7)
 
     assert payload["hero"] is None
-    assert payload["recently_played"] == [{"title": "Song"}]
+    assert payload["recently_played"] == []
     assert payload["custom_mixes"] == []
     assert payload["snapshot"]["pending"] is True
     assert queued == [7]
@@ -86,9 +88,14 @@ def test_home_refresh_worker_builds_full_snapshot(monkeypatch):
     from crate.worker_handlers import analysis
 
     calls: list[tuple[int, bool]] = []
+    invalidations: list[tuple[str, ...]] = []
     monkeypatch.setattr(
         "crate.db.home.get_cached_home_discovery",
         lambda user_id, fresh=False: calls.append((user_id, fresh)) or {"hero": {}},
+    )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
     )
 
     result = analysis._handle_refresh_home_discovery_snapshot(
@@ -97,6 +104,7 @@ def test_home_refresh_worker_builds_full_snapshot(monkeypatch):
 
     assert result == {"ok": True, "user_id": 7}
     assert calls == [(7, True)]
+    assert invalidations == [("home",)]
 
 
 def test_expired_stale_after_does_not_hide_snapshot_inside_requested_stale_window(

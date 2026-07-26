@@ -69,44 +69,88 @@ def get_play_history_rows(
             alb.slug AS album_slug,
             upe.ended_at AS played_at
         FROM user_play_events upe
-        LEFT JOIN library_tracks lt
-          ON lt.id = upe.track_id
-    """
-    query_sql += """
-          OR (upe.track_id IS NULL AND upe.track_entity_uid IS NOT NULL AND lt.entity_uid = upe.track_entity_uid)
+        LEFT JOIN LATERAL (
+            SELECT candidate.*
+            FROM (
+                SELECT matched.id AS track_id, 1 AS match_priority
+                FROM library_tracks matched
+                WHERE matched.id = upe.track_id
+                UNION ALL
+                SELECT matched.id, 2
+                FROM library_tracks matched
+                WHERE upe.track_id IS NULL
+                  AND upe.track_entity_uid IS NOT NULL
+                  AND matched.entity_uid = upe.track_entity_uid
     """
     if has_legacy_stream_id_column:
         query_sql += """
-          OR (upe.track_id IS NULL AND COALESCE(upe.track_path, '') <> '' AND lt.navidrome_id = upe.track_path)
-          OR (upe.track_id IS NULL AND COALESCE(upe.track_path, '') <> '' AND lt.path = upe.track_path)
+                UNION ALL
+                SELECT matched.id, 3
+                FROM library_tracks matched
+                WHERE upe.track_id IS NULL
+                  AND COALESCE(upe.track_path, '') <> ''
+                  AND matched.navidrome_id = upe.track_path
+                UNION ALL
+                SELECT matched.id, 4
+                FROM library_tracks matched
+                WHERE upe.track_id IS NULL
+                  AND COALESCE(upe.track_path, '') <> ''
+                  AND matched.path = upe.track_path
         """
     else:
         query_sql += """
-          OR (upe.track_id IS NULL AND COALESCE(upe.track_path, '') <> '' AND lt.path = upe.track_path)
+                UNION ALL
+                SELECT matched.id, 3
+                FROM library_tracks matched
+                WHERE upe.track_id IS NULL
+                  AND COALESCE(upe.track_path, '') <> ''
+                  AND matched.path = upe.track_path
         """
     query_sql += """
-        LEFT JOIN global_catalog_tracks gct
-          ON :allow_global_catalog
-          AND (
-            gct.global_track_uid = upe.global_track_uid
-            OR (
-              upe.global_track_uid IS NULL
-              AND lt.entity_uid IS NOT NULL
-              AND gct.local_track_entity_uid = lt.entity_uid
-            )
-            OR (
-              upe.global_track_uid IS NULL
-              AND lt.id IS NULL
-              AND COALESCE(NULLIF(TRIM(upe.artist), ''), '') <> ''
-              AND COALESCE(NULLIF(TRIM(upe.title), ''), '') <> ''
-              AND LOWER(gct.artist_name) = LOWER(upe.artist)
-              AND LOWER(gct.canonical_title) = LOWER(upe.title)
-              AND (
-                COALESCE(NULLIF(TRIM(upe.album), ''), '') = ''
-                OR LOWER(COALESCE(gct.album_name, '')) = LOWER(upe.album)
-              )
-            )
-          )
+            ) matches
+            JOIN library_tracks candidate ON candidate.id = matches.track_id
+            ORDER BY matches.match_priority
+            LIMIT 1
+        ) lt ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT candidate.*
+            FROM (
+                SELECT matched.global_track_uid, 1 AS match_priority
+                FROM global_catalog_tracks matched
+                WHERE :allow_global_catalog
+                  AND matched.global_track_uid = upe.global_track_uid
+                UNION ALL
+                SELECT matched.global_track_uid, 2
+                FROM global_catalog_tracks matched
+                WHERE :allow_global_catalog
+                  AND upe.global_track_uid IS NULL
+                  AND lt.entity_uid IS NOT NULL
+                  AND matched.local_track_entity_uid = lt.entity_uid
+                UNION ALL
+                SELECT matched.global_track_uid, 3
+                FROM global_catalog_tracks matched
+                WHERE :allow_global_catalog
+                  AND upe.global_track_uid IS NULL
+                  AND lt.id IS NULL
+                  AND COALESCE(NULLIF(TRIM(upe.artist), ''), '') <> ''
+                  AND COALESCE(NULLIF(TRIM(upe.title), ''), '') <> ''
+                  AND LOWER(matched.artist_name) = LOWER(upe.artist)
+                  AND LOWER(matched.canonical_title) = LOWER(upe.title)
+                  AND (
+                    COALESCE(NULLIF(TRIM(upe.album), ''), '') = ''
+                    OR LOWER(COALESCE(matched.album_name, '')) = LOWER(upe.album)
+                  )
+            ) matches
+            JOIN global_catalog_tracks candidate
+              ON candidate.global_track_uid = matches.global_track_uid
+            ORDER BY
+                matches.match_priority,
+                candidate.has_local DESC,
+                candidate.has_remote DESC,
+                candidate.source_count DESC,
+                candidate.global_track_uid
+            LIMIT 1
+        ) gct ON TRUE
         LEFT JOIN global_catalog_albums gca
           ON :allow_global_catalog
          AND gca.global_album_uid = gct.global_album_uid

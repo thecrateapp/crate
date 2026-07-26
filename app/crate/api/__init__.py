@@ -118,6 +118,38 @@ def _queue_artwork_variant_backfill() -> None:
     )
 
 
+def _queue_stats_dashboard_backfill() -> None:
+    """Prewarm the canonical dashboard projection for every active user."""
+    from crate.db.user_stats_dashboard_surface import (
+        queue_missing_stats_dashboard_snapshots,
+    )
+
+    queued = queue_missing_stats_dashboard_snapshots()
+    if queued:
+        log.info("Queued %s missing user stats dashboard snapshots", queued)
+
+
+def _queue_artist_top_track_ranking_backfill() -> None:
+    """Refresh persisted remote ranks after ranking semantics change."""
+    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.tasks import create_task_dedup
+    from crate.popularity import ARTIST_TOP_TRACK_RANKING_VERSION
+
+    if (
+        get_setting("artist_top_track_ranking_version")
+        == ARTIST_TOP_TRACK_RANKING_VERSION
+    ):
+        return
+    create_task_dedup(
+        "compute_popularity",
+        {
+            "triggered_by": "api_startup",
+            "ranking_version": ARTIST_TOP_TRACK_RANKING_VERSION,
+        },
+        dedup_key=(f"bootstrap:artist-top-tracks:v{ARTIST_TOP_TRACK_RANKING_VERSION}"),
+    )
+
+
 async def _repair_musicbrainz_cache_ttls() -> int:
     from crate.db.cache_musicbrainz import repair_mb_cache_ttls
 
@@ -133,6 +165,8 @@ async def lifespan(app: FastAPI):
     _bootstrap_federation_identity()
     _queue_global_catalog_bootstrap()
     _queue_artwork_variant_backfill()
+    _queue_stats_dashboard_backfill()
+    _queue_artist_top_track_ranking_backfill()
     from crate.utils import init_musicbrainz
 
     init_musicbrainz()

@@ -177,6 +177,67 @@ class TestExploreFiltersContract:
             }
         ]
 
+    def test_explore_page_reads_persisted_global_genre_snapshot(
+        self,
+        test_app,
+        monkeypatch,
+    ):
+        from crate.api import browse
+
+        monkeypatch.setattr(
+            browse,
+            "get_catalog_state",
+            lambda: {"status": "ready", "last_full_reconcile_at": object()},
+        )
+        monkeypatch.setattr(browse, "catalog_serves_global", lambda _state: True)
+        monkeypatch.setattr(
+            browse,
+            "get_ui_snapshot",
+            lambda scope, subject_key, **_kwargs: {
+                "scope": scope,
+                "subject_key": subject_key,
+                "payload_json": {
+                    "items": [
+                        {
+                            "canonical_name": "Death Metal",
+                            "canonical_slug": "death-metal",
+                            "artist_count": 2,
+                            "description": "Extreme metal.",
+                            "top_artists": ["Death"],
+                            "cover_url": "/api/genres/death-metal/cover",
+                        }
+                    ]
+                },
+                "version": 4,
+            },
+            raising=False,
+        )
+        monkeypatch.setattr(
+            browse,
+            "list_global_catalog_genres",
+            MagicMock(side_effect=AssertionError("live genre query must stay cold")),
+        )
+
+        with (
+            patch(
+                "crate.api.browse.api_browse_filters",
+                return_value={
+                    "genres": [{"name": "Legacy Genre", "count": 99}],
+                    "countries": [],
+                    "decades": [],
+                    "formats": [],
+                },
+            ),
+            patch("crate.api.browse.curated_playlists", return_value=[]),
+            patch("crate.api.browse.api_browse_moods", return_value=[]),
+            patch("crate.api.browse.get_cache", return_value=None),
+            patch("crate.api.browse.set_cache"),
+        ):
+            response = test_app.get("/api/browse/explore-page")
+
+        assert response.status_code == 200
+        assert response.json()["filters"]["genres"][0]["name"] == "Death Metal"
+
     def test_explore_page_keeps_local_genres_during_catalog_warming(
         self,
         test_app,

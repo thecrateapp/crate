@@ -15,21 +15,42 @@ from crate.db.repositories.global_catalog_state import (
     catalog_serves_global,
     get_catalog_state,
 )
+from crate.db.ui_snapshot_reads import get_ui_snapshot
+from crate.db.ui_snapshot_shared import decorate_snapshot
 
 router = APIRouter()
 router.include_router(artist_router)
 router.include_router(album_router)
 router.include_router(media_router)
 
-_EXPLORE_PAGE_CACHE_TTL_SECONDS = 60
+_EXPLORE_PAGE_CACHE_TTL_SECONDS = 600
+_GLOBAL_GENRES_SNAPSHOT_MAX_AGE_SECONDS = 86_400
 log = logging.getLogger(__name__)
+
+
+def _global_genres_snapshot_items() -> list[dict] | None:
+    try:
+        snapshot = get_ui_snapshot(
+            "global-catalog-genres",
+            "crate-core",
+            max_age_seconds=_GLOBAL_GENRES_SNAPSHOT_MAX_AGE_SECONDS,
+        )
+    except Exception:
+        log.debug("Global genre snapshot unavailable", exc_info=True)
+        return None
+    if not snapshot:
+        return None
+    items = decorate_snapshot(snapshot).get("items")
+    return list(items) if isinstance(items, list) else None
 
 
 def _explore_genres(local_genres: list[dict]) -> list[dict]:
     try:
         if not catalog_serves_global(get_catalog_state()):
             return local_genres
-        global_genres = list_global_catalog_genres()
+        global_genres = _global_genres_snapshot_items()
+        if global_genres is None:
+            global_genres = list_global_catalog_genres()
     except Exception:
         log.warning(
             "Global genre summaries unavailable; using local Explore genres",
