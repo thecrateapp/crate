@@ -1167,30 +1167,48 @@ func (s *Store) hasLegacyStreamIDColumn(ctx context.Context) (bool, error) {
 	return len(rows) > 0, nil
 }
 
-func (s *Store) playHistoryRows(ctx context.Context, userID int64, limit int, hasLegacyStreamIDColumn bool) ([]map[string]any, error) {
-	joinPredicate := `
-		ON lt.id = upe.track_id
-		OR (upe.track_id IS NULL AND upe.track_entity_uid IS NOT NULL AND lt.entity_uid = upe.track_entity_uid)
-		OR (upe.track_id IS NULL AND COALESCE(upe.track_path, '') <> '' AND lt.path = upe.track_path)
-	`
+func playHistorySQL(hasLegacyStreamIDColumn bool) string {
+	legacyMatch := ""
 	if hasLegacyStreamIDColumn {
-		joinPredicate = `
-			ON lt.id = upe.track_id
-			OR (upe.track_id IS NULL AND upe.track_entity_uid IS NOT NULL AND lt.entity_uid = upe.track_entity_uid)
-			OR (upe.track_id IS NULL AND COALESCE(upe.track_path, '') <> '' AND lt.navidrome_id = upe.track_path)
-			OR (upe.track_id IS NULL AND COALESCE(upe.track_path, '') <> '' AND lt.path = upe.track_path)
+		legacyMatch = `
+				UNION ALL
+				SELECT matched.id, 3
+				FROM library_tracks matched
+				WHERE upe.track_id IS NULL
+				  AND COALESCE(upe.track_path, '') <> ''
+				  AND matched.navidrome_id = upe.track_path
 		`
 	}
 
-	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
-	defer cancel()
-	return rowsToMaps(s.pool.Query(queryCtx, `
+	return `
+		WITH recent_events AS MATERIALIZED (
+			SELECT *
+			FROM user_play_events
+			WHERE user_id = $1
+			ORDER BY ended_at DESC
+			LIMIT $2
+		)
 		SELECT
 			COALESCE(lt.id, upe.track_id) AS track_id,
+			COALESCE(upe.global_track_uid::text, gct.global_track_uid::text) AS global_track_uid,
+			COALESCE(gct.global_artist_uid::text, gca.global_artist_uid::text) AS global_artist_uid,
+			gct.global_album_uid::text AS global_album_uid,
 			lt.entity_uid::text AS track_entity_uid,
 			COALESCE(lt.path, upe.track_path) AS track_path,
-			COALESCE(lt.title, upe.title) AS title,
-			COALESCE(ar_by_album.name, ar_by_albumartist.name, ar_by_track.name, ar_by_event.name, lt.albumartist, alb.artist, lt.artist, upe.artist) AS artist,
+			COALESCE(lt.title, gct.canonical_title, upe.title) AS title,
+			COALESCE(
+				ar_by_album.name,
+				ar_by_albumartist.name,
+				ar_by_track.name,
+				ar_by_event.name,
+				gca.artist_name,
+				gcartist.canonical_name,
+				gct.artist_name,
+				lt.albumartist,
+				alb.artist,
+				lt.artist,
+				upe.artist
+			) AS artist,
 			COALESCE(ar_by_album.id, ar_by_albumartist.id, ar_by_track.id, ar_by_event.id) AS artist_id,
 			COALESCE(
 				ar_by_album.entity_uid::text,
@@ -1199,14 +1217,76 @@ func (s *Store) playHistoryRows(ctx context.Context, userID int64, limit int, ha
 				ar_by_event.entity_uid::text
 			) AS artist_entity_uid,
 			COALESCE(ar_by_album.slug, ar_by_albumartist.slug, ar_by_track.slug, ar_by_event.slug) AS artist_slug,
-			COALESCE(lt.album, upe.album) AS album,
+			COALESCE(alb.name, lt.album, gca.canonical_name, gct.album_name, upe.album) AS album,
 			alb.id AS album_id,
 			alb.entity_uid::text AS album_entity_uid,
 			alb.slug AS album_slug,
 			upe.ended_at AS played_at
-		FROM user_play_events upe
-		LEFT JOIN library_tracks lt
-		`+joinPredicate+`
+		FROM recent_events upe
+		LEFT JOIN LATERAL (
+			SELECT candidate.*
+			FROM (
+				SELECT matched.id AS track_id, 1 AS match_priority
+				FROM library_tracks matched
+				WHERE matched.id = upe.track_id
+				UNION ALL
+				SELECT matched.id, 2
+				FROM library_tracks matched
+				WHERE upe.track_id IS NULL
+				  AND upe.track_entity_uid IS NOT NULL
+				  AND matched.entity_uid = upe.track_entity_uid
+				` + legacyMatch + `
+				UNION ALL
+				SELECT matched.id, 4
+				FROM library_tracks matched
+				WHERE upe.track_id IS NULL
+				  AND COALESCE(upe.track_path, '') <> ''
+				  AND matched.path = upe.track_path
+			) matches
+			JOIN library_tracks candidate ON candidate.id = matches.track_id
+			ORDER BY matches.match_priority
+			LIMIT 1
+		) lt ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT candidate.*
+			FROM (
+				SELECT matched.global_track_uid, 1 AS match_priority
+				FROM global_catalog_tracks matched
+				WHERE matched.global_track_uid = upe.global_track_uid
+				UNION ALL
+				SELECT matched.global_track_uid, 2
+				FROM global_catalog_tracks matched
+				WHERE upe.global_track_uid IS NULL
+				  AND lt.entity_uid IS NOT NULL
+				  AND matched.local_track_entity_uid = lt.entity_uid
+				UNION ALL
+				SELECT matched.global_track_uid, 3
+				FROM global_catalog_tracks matched
+				WHERE upe.global_track_uid IS NULL
+				  AND lt.id IS NULL
+				  AND COALESCE(NULLIF(TRIM(upe.artist), ''), '') <> ''
+				  AND COALESCE(NULLIF(TRIM(upe.title), ''), '') <> ''
+				  AND LOWER(matched.artist_name) = LOWER(upe.artist)
+				  AND LOWER(matched.canonical_title) = LOWER(upe.title)
+				  AND (
+					COALESCE(NULLIF(TRIM(upe.album), ''), '') = ''
+					OR LOWER(COALESCE(matched.album_name, '')) = LOWER(upe.album)
+				  )
+			) matches
+			JOIN global_catalog_tracks candidate
+			  ON candidate.global_track_uid = matches.global_track_uid
+			ORDER BY
+				matches.match_priority,
+				candidate.has_local DESC,
+				candidate.has_remote DESC,
+				candidate.source_count DESC,
+				candidate.global_track_uid
+			LIMIT 1
+		) gct ON TRUE
+		LEFT JOIN global_catalog_albums gca
+		  ON gca.global_album_uid = gct.global_album_uid
+		LEFT JOIN global_catalog_artists gcartist
+		  ON gcartist.global_artist_uid = gct.global_artist_uid
 		LEFT JOIN library_albums alb ON alb.id = lt.album_id
 		LEFT JOIN library_artists ar_by_album
 		  ON COALESCE(alb.artist, '') <> ''
@@ -1220,10 +1300,14 @@ func (s *Store) playHistoryRows(ctx context.Context, userID int64, limit int, ha
 		LEFT JOIN library_artists ar_by_event
 		  ON COALESCE(upe.artist, '') <> ''
 		 AND LOWER(ar_by_event.name) = LOWER(upe.artist)
-		WHERE upe.user_id = $1
 		ORDER BY upe.ended_at DESC
-		LIMIT $2
-	`, userID, limit))
+	`
+}
+
+func (s *Store) playHistoryRows(ctx context.Context, userID int64, limit int, hasLegacyStreamIDColumn bool) ([]map[string]any, error) {
+	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	return rowsToMaps(s.pool.Query(queryCtx, playHistorySQL(hasLegacyStreamIDColumn), userID, limit))
 }
 
 func (s *Store) resolvePlayHistoryAlbumFallback(ctx context.Context, refs []historyFallbackRef) (map[string]map[string]any, error) {

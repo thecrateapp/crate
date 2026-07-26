@@ -23,6 +23,13 @@ def get_play_history_rows(
     if allow_global_catalog is None:
         allow_global_catalog = _global_history_refs_enabled()
     query_sql = """
+        WITH recent_events AS MATERIALIZED (
+            SELECT *
+            FROM user_play_events
+            WHERE user_id = :user_id
+            ORDER BY ended_at DESC
+            LIMIT :lim
+        )
         SELECT
             COALESCE(lt.id, upe.track_id) AS track_id,
             CASE
@@ -68,7 +75,7 @@ def get_play_history_rows(
             alb.entity_uid::text AS album_entity_uid,
             alb.slug AS album_slug,
             upe.ended_at AS played_at
-        FROM user_play_events upe
+        FROM recent_events upe
         LEFT JOIN LATERAL (
             SELECT candidate.*
             FROM (
@@ -170,9 +177,7 @@ def get_play_history_rows(
         LEFT JOIN library_artists ar_by_event
           ON COALESCE(upe.artist, '') <> ''
          AND LOWER(ar_by_event.name) = LOWER(upe.artist)
-        WHERE upe.user_id = :user_id
         ORDER BY upe.ended_at DESC
-        LIMIT :lim
     """
 
     with read_scope() as session:
