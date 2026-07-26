@@ -147,11 +147,13 @@ def _handle_refresh_home_discovery_snapshot(
     del task_id, config
     from crate.api.cache_events import broadcast_invalidation
     from crate.db.home import get_cached_home_discovery
+    from crate.db.home_section_surface import warm_home_sections
 
     user_id = int(params.get("user_id") or 0)
     if user_id <= 0:
         return {"ok": False, "error": "Missing user_id"}
     get_cached_home_discovery(user_id, fresh=True)
+    warm_home_sections(user_id)
     broadcast_invalidation("home")
     return {"ok": True, "user_id": user_id}
 

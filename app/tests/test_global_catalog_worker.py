@@ -228,6 +228,66 @@ def test_full_worker_resumes_persisted_batches_before_marking_ready(monkeypatch)
     )
 
 
+def test_full_worker_starts_new_run_when_resuming_failed_checkpoint(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    transitions: list[tuple[str, dict]] = []
+    recorded_runs: list[str] = []
+    monkeypatch.setattr(
+        global_catalog,
+        "get_catalog_state",
+        lambda: {
+            "status": "failed",
+            "bootstrap_cursor_json": {
+                "phase": "local",
+                "cursor": {"entity_type": "track", "after_id": 250000},
+                "run_id": "failed-run",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "begin_global_catalog_reconciliation_run",
+        lambda **_kwargs: "retry-run",
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "transition_catalog_state",
+        lambda status, **kwargs: transitions.append((status, kwargs)),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "record_global_catalog_reconciliation_batch",
+        lambda run_id, _batch: recorded_runs.append(run_id),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_local_catalog_batch",
+        lambda **_kwargs: {
+            "completed": True,
+            "next_cursor": None,
+            "source_rows_seen": 1,
+        },
+    )
+    monkeypatch.setattr(global_catalog, "create_task", lambda *_args, **_kwargs: "next")
+
+    result = global_catalog._handle_reconcile_full("task-retry", {}, {})
+
+    assert result["status"] == "continued"
+    assert recorded_runs == ["retry-run"]
+    assert transitions[0] == (
+        "backfilling",
+        {
+            "bootstrap_cursor_json": {
+                "phase": "local",
+                "cursor": {"entity_type": "track", "after_id": 250000},
+                "run_id": "retry-run",
+            }
+        },
+    )
+    assert transitions[-1][1]["bootstrap_cursor_json"]["run_id"] == "retry-run"
+
+
 def test_full_worker_resumes_a_checkpoint_after_a_previous_task_stops(monkeypatch):
     from crate.worker_handlers import global_catalog
 

@@ -482,6 +482,7 @@ def _augment_global_genre_entities(session, genre: dict) -> None:
                 ) track_counts ON track_counts.global_artist_uid = a.global_artist_uid
                 WHERE src.source_deleted_at IS NULL
                   AND NOT src.source_stale
+                  AND NOT a.has_local
                   AND EXISTS (
                     SELECT 1
                     FROM jsonb_array_elements_text(
@@ -550,6 +551,7 @@ def _augment_global_genre_entities(session, genre: dict) -> None:
                 LEFT JOIN library_artists lar ON lar.id = art.local_artist_id
                 WHERE src.source_deleted_at IS NULL
                   AND NOT src.source_stale
+                  AND NOT a.has_local
                   AND EXISTS (
                     SELECT 1
                     FROM jsonb_array_elements_text(

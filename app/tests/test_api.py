@@ -2035,12 +2035,9 @@ class TestHomeEndpointCaching:
 
         with (
             patch(
-                "crate.api.me.get_cache", return_value=cached_section
-            ) as mock_get_cache,
-            patch(
-                "crate.api.me.get_home_section",
-                side_effect=AssertionError("unexpected section rebuild"),
-            ),
+                "crate.api.me.get_cached_home_section",
+                return_value=cached_section,
+            ) as mock_get_section,
         ):
             resp = test_app.get("/api/me/home/sections/custom-mixes")
 
@@ -2048,7 +2045,8 @@ class TestHomeEndpointCaching:
         data = resp.json()
         assert data["id"] == "custom-mixes"
         assert data["title"] == "Custom mixes"
-        assert mock_get_cache.call_args.args[0].startswith("home_section:v4:global:")
+        assert mock_get_section.call_args.args[:2] == (1, "custom-mixes")
+        assert mock_get_section.call_args.kwargs == {"limit": 42}
 
 
 class TestShowsAPI:

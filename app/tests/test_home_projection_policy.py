@@ -88,6 +88,7 @@ def test_home_refresh_worker_builds_full_snapshot(monkeypatch):
     from crate.worker_handlers import analysis
 
     calls: list[tuple[int, bool]] = []
+    section_calls: list[int] = []
     invalidations: list[tuple[str, ...]] = []
     monkeypatch.setattr(
         "crate.db.home.get_cached_home_discovery",
@@ -97,6 +98,10 @@ def test_home_refresh_worker_builds_full_snapshot(monkeypatch):
         "crate.api.cache_events.broadcast_invalidation",
         lambda *scopes: invalidations.append(scopes),
     )
+    monkeypatch.setattr(
+        "crate.db.home_section_surface.warm_home_sections",
+        lambda user_id: section_calls.append(user_id) or {},
+    )
 
     result = analysis._handle_refresh_home_discovery_snapshot(
         "task-1", {"user_id": 7}, {}
@@ -104,6 +109,7 @@ def test_home_refresh_worker_builds_full_snapshot(monkeypatch):
 
     assert result == {"ok": True, "user_id": 7}
     assert calls == [(7, True)]
+    assert section_calls == [7]
     assert invalidations == [("home",)]
 
 

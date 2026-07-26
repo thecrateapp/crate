@@ -12,13 +12,27 @@ def get_all_genres() -> list[dict]:
             session.execute(
                 text(
                     """
+                WITH artist_counts AS (
+                    SELECT
+                        genre_id,
+                        COUNT(DISTINCT artist_name)::INTEGER AS artist_count
+                    FROM artist_genres
+                    GROUP BY genre_id
+                ),
+                album_counts AS (
+                    SELECT
+                        genre_id,
+                        COUNT(DISTINCT album_id)::INTEGER AS album_count
+                    FROM album_genres
+                    GROUP BY genre_id
+                )
                 SELECT
                     g.id,
                     g.entity_uid::text AS entity_uid,
                     g.name,
                     g.slug,
-                    COUNT(DISTINCT ag.artist_name)::INTEGER AS artist_count,
-                    COUNT(DISTINCT alg.album_id)::INTEGER AS album_count,
+                    COALESCE(ac.artist_count, 0) AS artist_count,
+                    COALESCE(alc.album_count, 0) AS album_count,
                     tn.slug AS canonical_slug,
                     tn.name AS canonical_name,
                     tn.description AS canonical_description,
@@ -29,26 +43,13 @@ def get_all_genres() -> list[dict]:
                     tn.wikidata_entity_id,
                     tn.wikidata_url
                 FROM genres g
-                LEFT JOIN artist_genres ag ON g.id = ag.genre_id
-                LEFT JOIN album_genres alg ON g.id = alg.genre_id
+                LEFT JOIN artist_counts ac ON ac.genre_id = g.id
+                LEFT JOIN album_counts alc ON alc.genre_id = g.id
                 LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
                 LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
-                GROUP BY
-                    g.id,
-                    g.entity_uid,
-                    g.name,
-                    g.slug,
-                    tn.slug,
-                    tn.name,
-                    tn.description,
-                    tn.external_description,
-                    tn.external_description_source,
-                    tn.cover_path,
-                    tn.musicbrainz_mbid,
-                    tn.wikidata_entity_id,
-                    tn.wikidata_url
-                HAVING COUNT(DISTINCT ag.artist_name) > 0 OR COUNT(DISTINCT alg.album_id) > 0
-                ORDER BY COUNT(DISTINCT ag.artist_name) DESC
+                WHERE COALESCE(ac.artist_count, 0) > 0
+                   OR COALESCE(alc.album_count, 0) > 0
+                ORDER BY COALESCE(ac.artist_count, 0) DESC
                 """
                 )
             )

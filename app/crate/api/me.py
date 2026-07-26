@@ -95,8 +95,8 @@ from crate.db.home import (
     get_cached_home_discovery,
     get_home_discovery_debug,
     get_home_playlist,
-    get_home_section,
 )
+from crate.db.home_section_surface import get_cached_home_section
 from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
 from crate.db.queries.user import (
     get_artist_genres_for_names,
@@ -1301,12 +1301,10 @@ def home_section_detail(
     request: Request, section_id: str, limit: int = Query(42, ge=1, le=120)
 ):
     user = _require_auth(request)
-    cache_mode = _listen_global_cache_mode()
-    section = _get_cached_home_endpoint_response(
-        cache_key=f"home_section:v4:{cache_mode}:{user['id']}:{section_id}:{limit}",
-        max_age_seconds=300,
-        ttl=300,
-        compute=lambda: get_home_section(user["id"], section_id, limit=limit),
+    section = get_cached_home_section(
+        user["id"],
+        section_id,
+        limit=limit,
     )
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
