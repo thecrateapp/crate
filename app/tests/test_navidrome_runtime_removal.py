@@ -7,6 +7,7 @@ RUNTIME_FILES = (
     ROOT / "app/crate/db/queries/user_library_history.py",
     ROOT / "app/crate/db/repositories/user_library_shared.py",
     ROOT / "app/readplane/internal/catalog/store.go",
+    ROOT / "app/site/src/components/Comparison.tsx",
 )
 MIGRATION = (
     ROOT / "app/crate/db/migrations/versions/081_remove_navidrome_compatibility.py"

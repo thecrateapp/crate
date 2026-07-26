@@ -3,7 +3,6 @@ import { Check, Minus } from "lucide-react";
 interface Row {
   label: string;
   crate: boolean | "partial";
-  navidrome: boolean | "partial";
   plex: boolean | "partial";
   jellyfin: boolean | "partial";
 }
@@ -12,91 +11,78 @@ const ROWS: Row[] = [
   {
     label: "Multi-source enrichment (8+)",
     crate: true,
-    navidrome: false,
     plex: true,
     jellyfin: false,
   },
   {
     label: "Audio analysis (BPM, key, mood)",
     crate: true,
-    navidrome: false,
     plex: true,
     jellyfin: false,
   },
   {
     label: "Adaptive EQ per track",
     crate: true,
-    navidrome: false,
     plex: false,
     jellyfin: false,
   },
   {
     label: "Bliss-based similarity radio",
     crate: true,
-    navidrome: false,
     plex: false,
     jellyfin: false,
   },
   {
     label: "Genre taxonomy with inheritance",
     crate: true,
-    navidrome: false,
     plex: false,
     jellyfin: false,
   },
   {
     label: "Upcoming shows + setlists",
     crate: true,
-    navidrome: false,
     plex: false,
     jellyfin: false,
   },
   {
     label: "Subsonic API",
     crate: true,
-    navidrome: true,
     plex: false,
     jellyfin: false,
   },
   {
     label: "Native mobile app",
     crate: true,
-    navidrome: false,
     plex: true,
     jellyfin: true,
   },
   {
     label: "Synced lyrics with seek-by-line",
     crate: true,
-    navidrome: false,
     plex: true,
     jellyfin: false,
   },
   {
     label: "Offline downloads",
     crate: true,
-    navidrome: false,
     plex: true,
     jellyfin: true,
   },
   {
     label: "Low-resource footprint",
     crate: false,
-    navidrome: true,
     plex: "partial",
     jellyfin: "partial",
   },
   {
     label: "Comfortable on very small servers",
     crate: false,
-    navidrome: true,
     plex: "partial",
     jellyfin: "partial",
   },
   {
     label: "Open source",
     crate: true,
-    navidrome: true,
     plex: false,
     jellyfin: true,
   },
@@ -122,7 +108,6 @@ function Cell({ value }: { value: boolean | "partial" }) {
 
 const COLS = [
   { key: "crate" as const, label: "Crate", highlight: true },
-  { key: "navidrome" as const, label: "Navidrome", highlight: false },
   { key: "plex" as const, label: "Plex", highlight: false },
   { key: "jellyfin" as const, label: "Jellyfin", highlight: false },
 ];
@@ -141,11 +126,9 @@ export function Comparison() {
           Crate asks for more machine.
         </h2>
         <p className="mt-4 text-base leading-7 text-white/60 sm:text-lg">
-          If you want a small music server that mostly stays out of the way,
-          Navidrome may be a better fit. Crate does more background work:
-          enrichment, audio analysis, acquisition, cache generation, admin
-          views, and a separate listening app. That costs CPU, memory, and disk
-          I/O.
+          Crate does extensive background work: enrichment, audio analysis,
+          acquisition, cache generation, admin views, and a separate listening
+          app. That costs CPU, memory, and disk I/O.
         </p>
         <p className="mt-5 border-l border-cyan-300/35 pl-4 text-[14.5px] leading-7 text-white/52">
           Reducing that footprint is active work, especially around workers,
@@ -158,11 +141,10 @@ export function Comparison() {
       <div className="overflow-x-auto rounded-[20px] border border-white/8">
         <table className="w-full table-fixed text-left">
           <colgroup>
-            <col className="w-[40%]" />
-            <col className="w-[15%]" />
-            <col className="w-[15%]" />
-            <col className="w-[15%]" />
-            <col className="w-[15%]" />
+            <col className="w-[46%]" />
+            <col className="w-[18%]" />
+            <col className="w-[18%]" />
+            <col className="w-[18%]" />
           </colgroup>
           <thead>
             <tr className="border-b border-white/8">
