@@ -41,30 +41,37 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             for value in (data.get("release_group_secondary_types") or [])
             if str(value).strip()
         ]
+        existing_columns = (
+            LibraryAlbum.id,
+            LibraryAlbum.slug,
+            LibraryAlbum.storage_id,
+            LibraryAlbum.entity_uid,
+            LibraryAlbum.musicbrainz_albumid,
+            LibraryAlbum.musicbrainz_releasegroupid,
+            LibraryAlbum.tag_album,
+        )
         existing = s.execute(
-            select(
-                LibraryAlbum.id,
-                LibraryAlbum.slug,
-                LibraryAlbum.storage_id,
-                LibraryAlbum.entity_uid,
-                LibraryAlbum.musicbrainz_albumid,
-                LibraryAlbum.musicbrainz_releasegroupid,
-                LibraryAlbum.tag_album,
-            )
-            .where(
-                or_(
-                    path_match,
-                    entity_match,
-                    LibraryAlbum.musicbrainz_albumid == requested_mbid
-                    if requested_mbid
-                    else false(),
-                    LibraryAlbum.musicbrainz_releasegroupid == requested_rgid
-                    if requested_rgid
-                    else false(),
-                )
-            )
-            .limit(1)
+            select(*existing_columns).where(path_match).limit(1)
         ).first()
+        if existing is None and requested_entity_uid is not None:
+            existing = s.execute(
+                select(*existing_columns).where(entity_match).limit(1)
+            ).first()
+        if existing is None and (requested_mbid or requested_rgid):
+            existing = s.execute(
+                select(*existing_columns)
+                .where(
+                    or_(
+                        LibraryAlbum.musicbrainz_albumid == requested_mbid
+                        if requested_mbid
+                        else false(),
+                        LibraryAlbum.musicbrainz_releasegroupid == requested_rgid
+                        if requested_rgid
+                        else false(),
+                    )
+                )
+                .limit(1)
+            ).first()
         slug = (
             existing[1]
             if existing and existing[1]
