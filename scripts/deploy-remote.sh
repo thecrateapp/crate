@@ -24,10 +24,10 @@ IMAGE_PREFIX="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
 cd "$SERVER_PATH"
 
 COMPOSE=(docker compose -f docker-compose.yaml -f docker-compose.project.yaml)
-PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs)
+PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs)
 HEALTHY_SERVICES=(crate-redis crate-postgres crate-api)
-RUNNING_SERVICES=(crate-readplane crate-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs)
-QUIESCE_SERVICES=(crate-api crate-readplane crate-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker)
+RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs)
+QUIESCE_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker)
 RELEASE_ENV_KEYS=(
   CRATE_RELEASE_SHA
   CRATE_API_IMAGE
@@ -46,6 +46,7 @@ declare -A SERVICE_IMAGE_REPOS=(
   [crate-api]="${IMAGE_PREFIX}/crate-api"
   [crate-readplane]="${IMAGE_PREFIX}/crate-readplane"
   [crate-worker]="${IMAGE_PREFIX}/crate-worker"
+  [crate-fast-worker]="${IMAGE_PREFIX}/crate-worker"
   [crate-projector]="${IMAGE_PREFIX}/crate-worker"
   [crate-maintenance-worker]="${IMAGE_PREFIX}/crate-worker"
   [crate-analysis-worker]="${IMAGE_PREFIX}/crate-analysis-worker"
@@ -71,7 +72,7 @@ declare -A RELEASE_ENV_REPOS=(
 declare -A RELEASE_ENV_SERVICES=(
   [CRATE_API_IMAGE]="crate-api"
   [CRATE_READPLANE_IMAGE]="crate-readplane"
-  [CRATE_WORKER_IMAGE]="crate-worker crate-projector crate-maintenance-worker"
+  [CRATE_WORKER_IMAGE]="crate-worker crate-fast-worker crate-projector crate-maintenance-worker"
   [CRATE_ANALYSIS_WORKER_IMAGE]="crate-analysis-worker"
   [CRATE_PLAYBACK_WORKER_IMAGE]="crate-playback-worker"
   [CRATE_MEDIA_WORKER_IMAGE]="crate-media-worker"
@@ -1092,7 +1093,7 @@ cmd_ps() {
 
 cmd_diagnose() {
   dc ps || true
-  dc logs --tail=120 crate-api crate-readplane crate-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs || true
+  dc logs --tail=120 crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs || true
 }
 
 case "${1:-}" in

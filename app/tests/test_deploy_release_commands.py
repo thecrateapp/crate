@@ -196,6 +196,26 @@ def test_remote_deploy_only_pulls_and_restarts_changed_release_services() -> Non
     assert "--no-deps" in up_body
 
 
+def test_worker_release_manages_every_production_worker_role() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+
+    for array_name in (
+        "PROJECT_SERVICES",
+        "RUNNING_SERVICES",
+        "QUIESCE_SERVICES",
+    ):
+        assignment = next(
+            line for line in script.splitlines() if line.startswith(f"{array_name}=(")
+        )
+        assert "crate-fast-worker" in assignment
+
+    assert '[crate-fast-worker]="${IMAGE_PREFIX}/crate-worker"' in script
+    assert (
+        '[CRATE_WORKER_IMAGE]="crate-worker crate-fast-worker '
+        'crate-projector crate-maintenance-worker"'
+    ) in script
+
+
 def test_image_rollback_restores_only_the_services_changed_by_the_release() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
     rollback_body = script[
