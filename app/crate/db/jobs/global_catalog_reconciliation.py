@@ -1291,9 +1291,11 @@ def _resolve_artist_target(
         return forced_target, MatchScore(1.0, "manual_force_merge", auto_merge=True)
 
     existing_target = _existing_source_target(session, source)
-    if existing_target and not merge_blocked_for_source(
-        session, source, existing_target
-    ):
+    existing_target_allowed = bool(
+        existing_target
+        and not merge_blocked_for_source(session, source, existing_target)
+    )
+    if existing_target and existing_target_allowed:
         if not recompute_matches:
             return existing_target, _existing_source_score(source)
         revalidated = _revalidate_existing_target(
@@ -1307,6 +1309,16 @@ def _resolve_artist_target(
 
     payload = source["source_payload"]
     rows = _candidate_artists(session, payload)
+    existing_identity_match = (
+        recompute_matches
+        and existing_target is not None
+        and existing_target_allowed
+        and any(
+            row["global_artist_uid"] == existing_target
+            and _has_strong_identity_match("artist", payload, row)
+            for row in rows
+        )
+    )
     if recompute_matches and existing_target:
         rows = [row for row in rows if row["global_artist_uid"] != existing_target]
     best_uid, best_score = _best_match(
@@ -1323,6 +1335,12 @@ def _resolve_artist_target(
                 candidate=True,
             )
         return best_uid, best_score
+    if existing_identity_match and existing_target is not None:
+        return existing_target, MatchScore(
+            1.0,
+            "existing_strong_identity",
+            auto_merge=True,
+        )
     return _global_uid(source), MatchScore(0.0, "new_remote_artist")
 
 
@@ -1352,9 +1370,11 @@ def _resolve_album_target(
         )
 
     existing_target = _existing_source_target(session, source)
-    if existing_target and not merge_blocked_for_source(
-        session, source, existing_target
-    ):
+    existing_target_allowed = bool(
+        existing_target
+        and not merge_blocked_for_source(session, source, existing_target)
+    )
+    if existing_target and existing_target_allowed:
         if not recompute_matches:
             return existing_target, _existing_source_score(source)
         revalidated = _revalidate_existing_target(
@@ -1368,6 +1388,16 @@ def _resolve_album_target(
 
     payload = source["source_payload"]
     rows = _candidate_albums(session, payload, artist_uid)
+    existing_identity_match = (
+        recompute_matches
+        and existing_target is not None
+        and existing_target_allowed
+        and any(
+            row["global_album_uid"] == existing_target
+            and _has_strong_identity_match("album", payload, row)
+            for row in rows
+        )
+    )
     if recompute_matches and existing_target:
         rows = [row for row in rows if row["global_album_uid"] != existing_target]
     best_uid, best_score = _best_match(
@@ -1384,6 +1414,12 @@ def _resolve_album_target(
                 candidate=True,
             )
         return best_uid, best_score
+    if existing_identity_match and existing_target is not None:
+        return existing_target, MatchScore(
+            1.0,
+            "existing_strong_identity",
+            auto_merge=True,
+        )
     return _global_uid(source), best_score or MatchScore(0.0, "new_remote_album")
 
 
@@ -1399,9 +1435,11 @@ def _resolve_track_target(
         return forced_target, MatchScore(1.0, "manual_force_merge", auto_merge=True)
 
     existing_target = _existing_source_target(session, source)
-    if existing_target and not merge_blocked_for_source(
-        session, source, existing_target
-    ):
+    existing_target_allowed = bool(
+        existing_target
+        and not merge_blocked_for_source(session, source, existing_target)
+    )
+    if existing_target and existing_target_allowed:
         if not recompute_matches:
             return existing_target, _existing_source_score(source)
         revalidated = _revalidate_existing_target(
@@ -1415,6 +1453,16 @@ def _resolve_track_target(
 
     payload = source["source_payload"]
     rows = _candidate_tracks(session, payload, artist_uid)
+    existing_identity_match = (
+        recompute_matches
+        and existing_target is not None
+        and existing_target_allowed
+        and any(
+            row["global_track_uid"] == existing_target
+            and _has_strong_identity_match("track", payload, row)
+            for row in rows
+        )
+    )
     if recompute_matches and existing_target:
         rows = [row for row in rows if row["global_track_uid"] != existing_target]
     best_uid, best_score = _best_match(
@@ -1431,6 +1479,12 @@ def _resolve_track_target(
                 candidate=True,
             )
         return best_uid, best_score
+    if existing_identity_match and existing_target is not None:
+        return existing_target, MatchScore(
+            1.0,
+            "existing_strong_identity",
+            auto_merge=True,
+        )
     return _global_uid(source), best_score or MatchScore(0.0, "new_remote_track")
 
 
@@ -1517,6 +1571,26 @@ def _best_match(
             best_uid = row[uid_key]
             best_score = score
     return best_uid, best_score
+
+
+def _has_strong_identity_match(
+    entity_type: str,
+    payload: dict[str, Any],
+    candidate: dict[str, Any],
+) -> bool:
+    identifiers = {
+        "artist": ("musicbrainz_artist_mbid",),
+        "album": (
+            "musicbrainz_release_mbid",
+            "musicbrainz_release_group_mbid",
+            "upc",
+        ),
+        "track": ("musicbrainz_recording_mbid", "isrc"),
+    }[entity_type]
+    return any(
+        payload.get(identifier) and payload.get(identifier) == candidate.get(identifier)
+        for identifier in identifiers
+    )
 
 
 def _existing_source_target(session, source: dict[str, Any]) -> str | None:
