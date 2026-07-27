@@ -653,12 +653,13 @@ def test_full_match_recompute_keeps_recording_mbid_after_anchor_is_pruned(
             session.execute(
                 text(
                     """
-                    SELECT global_entity_uid::text
-                    FROM global_catalog_sources
-                    WHERE entity_type = 'track'
-                      AND local_id = ANY(:track_ids)
-                    ORDER BY local_id
-                    """
+                        SELECT global_entity_uid::text
+                        FROM global_catalog_sources
+                        WHERE entity_type = 'track'
+                          AND local_id = ANY(:track_ids)
+                          AND source_deleted_at IS NULL
+                        ORDER BY local_id
+                        """
                 ),
                 {"track_ids": [original_track_id, replacement_track_id]},
             )

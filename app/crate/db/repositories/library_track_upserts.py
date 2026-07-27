@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import false, func, or_, select, update
+from sqlalchemy import and_, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -28,34 +28,71 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
         requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
         path_match = LibraryTrack.path == data["path"]
         entity_match = (
-            LibraryTrack.entity_uid == requested_entity_uid
+            and_(
+                LibraryTrack.entity_uid == requested_entity_uid,
+                LibraryTrack.album_id == data.get("album_id"),
+                LibraryTrack.disc_number == int(data.get("disc_number") or 1),
+                LibraryTrack.track_number.is_not_distinct_from(
+                    data.get("track_number")
+                ),
+            )
             if requested_entity_uid is not None
             else false()
         )
         requested_track_mbid = (data.get("musicbrainz_trackid") or "").strip()
+        existing_columns = (
+            LibraryTrack.id,
+            LibraryTrack.slug,
+            LibraryTrack.storage_id,
+            LibraryTrack.entity_uid,
+            LibraryTrack.musicbrainz_albumid,
+            LibraryTrack.musicbrainz_trackid,
+            LibraryTrack.audio_fingerprint,
+            LibraryTrack.audio_fingerprint_source,
+            LibraryTrack.audio_fingerprint_computed_at,
+        )
         existing = s.execute(
-            select(
-                LibraryTrack.id,
-                LibraryTrack.slug,
-                LibraryTrack.storage_id,
-                LibraryTrack.entity_uid,
-                LibraryTrack.musicbrainz_albumid,
-                LibraryTrack.musicbrainz_trackid,
-                LibraryTrack.audio_fingerprint,
-                LibraryTrack.audio_fingerprint_source,
-                LibraryTrack.audio_fingerprint_computed_at,
-            )
+            select(*existing_columns)
             .where(
                 or_(
                     path_match,
                     entity_match,
-                    LibraryTrack.musicbrainz_trackid == requested_track_mbid
-                    if requested_track_mbid
-                    else false(),
                 )
             )
             .limit(1)
         ).first()
+        album_entity_uid = None
+        album_id = data.get("album_id")
+        if album_id is not None:
+            album_entity_uid = s.execute(
+                select(LibraryAlbum.entity_uid)
+                .where(LibraryAlbum.id == album_id)
+                .limit(1)
+            ).scalar_one_or_none()
+        if requested_entity_uid is not None and existing is None:
+            entity_uid_is_occupied = s.execute(
+                select(LibraryTrack.id)
+                .where(LibraryTrack.entity_uid == requested_entity_uid)
+                .limit(1)
+            ).scalar_one_or_none()
+            if entity_uid_is_occupied is not None:
+                requested_entity_uid = track_entity_uid(
+                    album_uid=album_entity_uid,
+                    artist_name=data["artist"],
+                    album_name=data["album"],
+                    title=data.get("title"),
+                    filename=data.get("filename"),
+                    disc_number=data.get("disc_number"),
+                    track_number=data.get("track_number"),
+                )
+                existing = s.execute(
+                    select(*existing_columns)
+                    .where(
+                        LibraryTrack.entity_uid == requested_entity_uid,
+                        LibraryTrack.album_id == album_id,
+                    )
+                    .limit(1)
+                ).first()
         slug = (
             existing[1]
             if existing and existing[1]
@@ -67,14 +104,6 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                 ),
             )
         )
-        album_entity_uid = None
-        album_id = data.get("album_id")
-        if album_id is not None:
-            album_entity_uid = s.execute(
-                select(LibraryAlbum.entity_uid)
-                .where(LibraryAlbum.id == album_id)
-                .limit(1)
-            ).scalar_one_or_none()
         entity_uid = (
             existing[3]
             if existing and existing[3]
