@@ -206,6 +206,20 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     if (request) {
       request.abort();
     }
+    if (audio) {
+      audio.removeEventListener("loadedmetadata", onLoadedHTML5Metadata, false);
+      audio.removeEventListener("loadeddata", onLoadedHTML5Audio, false);
+      audio.removeEventListener("canplay", onLoadedHTML5Audio, false);
+      audio.removeEventListener("canplaythrough", onLoadedHTML5Audio, false);
+      audio.removeEventListener("ended", onEnded, false);
+      try {
+        audio.removeAttribute?.("src");
+        audio.srcObject = null;
+        audio.load();
+      } catch {
+        // Releasing a detached media element is best-effort.
+      }
+    }
     audio = null;
     source = null;
     buffer = null;
@@ -269,7 +283,8 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     } else if (
       audio !== null &&
       queuedState === Gapless5State.None &&
-      this.inPlayState(true)
+      this.inPlayState(true) &&
+      player.switchToWebAudioDuringPlayback
     ) {
       log.debug(`Switching from HTML5 to WebAudio: ${this.audioPath}`);
       setState(Gapless5State.Stop);
@@ -455,7 +470,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             if (!webAudioSwitched) {
               player.onplay(this.audioPath);
             }
-            if (audio) {
+            if (audio && crossfadeOut > 0) {
               setEndedCallbackTime(audio.duration - offsetSec);
             }
           } else if (audio) {
@@ -849,6 +864,7 @@ function Gapless5FileList(
   inLoadLimit = -1,
   inTracks = [],
   inStartingTrack = 0,
+  inDeferAdjacentLoadsUntilBufferedSeconds = 0,
 ) {
   const player = parentPlayer;
   const log = parentLog;
@@ -866,6 +882,11 @@ function Gapless5FileList(
   this.shuffleRequest = null;
   this.preserveCurrent = true;
   this.loadLimit = inLoadLimit;
+  this.deferAdjacentLoadsUntilBufferedSeconds = Math.max(
+    0,
+    Number(inDeferAdjacentLoadsUntilBufferedSeconds) || 0,
+  );
+  this.adjacentLoadsReady = this.deferAdjacentLoadsUntilBufferedSeconds === 0;
 
   // PRIVATE METHODS
 
@@ -928,6 +949,7 @@ function Gapless5FileList(
     this.trackNumber = allowOverride
       ? updateShuffle(requestedIndex)
       : requestedIndex;
+    this.adjacentLoadsReady = this.deferAdjacentLoadsUntilBufferedSeconds === 0;
     log.debug(`Setting track number to ${this.trackNumber}`);
     this.updateLoading();
     player.scrub(0, true);
@@ -1099,11 +1121,12 @@ function Gapless5FileList(
 
   // returns set of actual indices (not shuffled)
   this.loadableTracks = () => {
+    const effectiveLoadLimit = this.adjacentLoadsReady ? this.loadLimit : 1;
     const loadableIndices = new Set(
       getLoadableTrackIndices(
         this.trackNumber,
         this.sources.length,
-        this.loadLimit,
+        effectiveLoadLimit,
       ),
     );
     if (player.queuedTrack !== null) {
@@ -1114,6 +1137,34 @@ function Gapless5FileList(
     }
     log.debug(`Loadable indices: ${JSON.stringify([...loadableIndices])}`);
     return loadableIndices;
+  };
+
+  this.maybeUnlockAdjacentLoading = () => {
+    if (this.adjacentLoadsReady || this.loadLimit === 1) {
+      return;
+    }
+    const source = this.currentSource();
+    if (!source) {
+      return;
+    }
+    const durationSeconds = source.getLength() / 1000;
+    const remainingSeconds = Math.max(
+      0,
+      durationSeconds - source.getPosition() / 1000,
+    );
+    const requiredBufferSeconds =
+      Number.isFinite(durationSeconds) && durationSeconds > 0
+        ? Math.min(
+            this.deferAdjacentLoadsUntilBufferedSeconds,
+            Math.max(1, durationSeconds / 2),
+            Math.max(3, remainingSeconds / 2),
+          )
+        : this.deferAdjacentLoadsUntilBufferedSeconds;
+    if (source.getBufferedAheadSeconds() < requiredBufferSeconds) {
+      return;
+    }
+    this.adjacentLoadsReady = true;
+    this.updateLoading();
   };
 
   this.updateLoading = () => {
@@ -1232,6 +1283,8 @@ function Gapless5FileList(
  *   useHTML5Audio (default = true)
  *   startingTrack (number or "random", default = 0)
  *   loadLimit (max number of tracks loaded at one time, default = -1, no limit)
+ *   deferAdjacentLoadsUntilBufferedSeconds (keep one live request until the
+ *     active HTML5 source has this much audio buffered, default = 0)
  *   logLevel (default = LogLevel.Info) minimum logging level
  *   shuffle (true or false): start the jukebox in shuffle mode
  *   shuffleButton (default = true): whether shuffle button appears or not in UI
@@ -1307,6 +1360,8 @@ function Gapless5(options = {}, deprecated = {}) {
   this.crossfade = options.crossfade || 0;
   this.crossfadeShape = options.crossfadeShape || CrossfadeShape.None;
   this.analyserPrecision = options.analyserPrecision || null;
+  this.switchToWebAudioDuringPlayback =
+    options.switchToWebAudioDuringPlayback !== false;
 
   // This is a hack to activate WebAudio on certain iOS versions
   const silenceWavData =
@@ -2174,6 +2229,7 @@ function Gapless5(options = {}, deprecated = {}) {
     const source = this.currentSource();
     if (source) {
       const loadedSpan = source.tick(true);
+      this.playlist.maybeUnlockAdjacentLoading();
       this.setLoadedSpan(loadedSpan);
       if (this.uiDirty) {
         this.uiDirty = false;
@@ -2353,6 +2409,7 @@ function Gapless5(options = {}, deprecated = {}) {
       options.loadLimit,
       items,
       startingTrack,
+      options.deferAdjacentLoadsUntilBufferedSeconds,
     );
   } else {
     this.playlist = new Gapless5FileList(
@@ -2360,6 +2417,9 @@ function Gapless5(options = {}, deprecated = {}) {
       log,
       options.shuffle,
       options.loadLimit,
+      [],
+      0,
+      options.deferAdjacentLoadsUntilBufferedSeconds,
     );
   }
 

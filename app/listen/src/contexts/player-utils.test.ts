@@ -9,6 +9,7 @@ import { getOfflineNativePlaybackUrl } from "@/lib/offline";
 import { setPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
 import {
   ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
+  ANDROID_MEDIA_SESSION_HANDOFF_SECONDS,
   getEffectiveCrossfadeSeconds,
   getStoredQueue,
   getStreamUrl,
@@ -355,6 +356,20 @@ describe("getEffectiveCrossfadeSeconds", () => {
         { html5OnlyPlayback: true },
       ),
     ).toBe(ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS);
+  });
+
+  it("keeps a minimal HTML5 handoff for non-album queues when crossfade is off", () => {
+    expect(
+      getEffectiveCrossfadeSeconds(
+        TRACK_A,
+        TRACK_B,
+        PLAYLIST_SOURCE,
+        false,
+        0,
+        true,
+        { html5OnlyPlayback: true },
+      ),
+    ).toBe(ANDROID_MEDIA_SESSION_HANDOFF_SECONDS);
   });
 
   it("keeps true gapless album playback when enhanced mobile audio is enabled", () => {

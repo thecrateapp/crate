@@ -9,6 +9,8 @@ declare module "@/lib/gapless5/gapless5" {
     useHTML5Audio?: boolean;
     useWebAudio?: boolean;
     loadLimit?: number | null;
+    deferAdjacentLoadsUntilBufferedSeconds?: number;
+    switchToWebAudioDuringPlayback?: boolean;
     volume?: number;
     crossfade?: number;
     // Runtime values: None=1, Linear=2, EqualPower=3
