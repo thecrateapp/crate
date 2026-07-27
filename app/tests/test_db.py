@@ -2953,6 +2953,182 @@ class TestLibraryCRUD:
             )
         assert count == 1
 
+    def test_upsert_track_keeps_release_copies_with_same_recording_mbid(self, pg_db):
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Joy Division"})
+        original_album_id = pg_db.upsert_album(
+            {
+                "artist": "Joy Division",
+                "name": "Closer",
+                "path": "/music/joy-division/closer",
+            }
+        )
+        collector_album_id = pg_db.upsert_album(
+            {
+                "artist": "Joy Division",
+                "name": "Closer (Collector's Edition)",
+                "path": "/music/joy-division/closer-collectors-edition",
+            }
+        )
+        recording_mbid = "4e44d50e-0c7b-4cca-816c-f2a78d085a72"
+
+        pg_db.upsert_track(
+            {
+                "album_id": original_album_id,
+                "artist": "Joy Division",
+                "album": "Closer",
+                "entity_uid": "123e4567-e89b-12d3-a456-426614174101",
+                "filename": "01-atmosphere.flac",
+                "title": "Atmosphere",
+                "track_number": 1,
+                "musicbrainz_trackid": recording_mbid,
+                "path": "/music/joy-division/closer/01-atmosphere.flac",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": collector_album_id,
+                "artist": "Joy Division",
+                "album": "Closer (Collector's Edition)",
+                "entity_uid": "123e4567-e89b-12d3-a456-426614174101",
+                "filename": "10-atmosphere.flac",
+                "title": "Atmosphere",
+                "track_number": 10,
+                "musicbrainz_trackid": recording_mbid,
+                "path": (
+                    "/music/joy-division/closer-collectors-edition/10-atmosphere.flac"
+                ),
+            }
+        )
+
+        original_tracks = pg_db.get_library_tracks(original_album_id)
+        collector_tracks = pg_db.get_library_tracks(collector_album_id)
+        assert len(original_tracks) == 1
+        assert len(collector_tracks) == 1
+        assert original_tracks[0]["entity_uid"] != collector_tracks[0]["entity_uid"]
+        assert original_tracks[0]["musicbrainz_trackid"] == recording_mbid
+        assert collector_tracks[0]["musicbrainz_trackid"] == recording_mbid
+
+        with transaction_scope() as session:
+            count = session.execute(
+                text(
+                    """
+                    SELECT COUNT(*)
+                    FROM library_tracks
+                    WHERE musicbrainz_trackid = :recording_mbid
+                    """
+                ),
+                {"recording_mbid": recording_mbid},
+            ).scalar_one()
+        assert count == 2
+
+    def test_upsert_track_relocates_release_copy_with_shared_recording_mbid(
+        self, pg_db
+    ):
+        pg_db.upsert_artist({"name": "Joy Division"})
+        original_album_id = pg_db.upsert_album(
+            {
+                "artist": "Joy Division",
+                "name": "Closer",
+                "path": "/music/joy-division/closer",
+            }
+        )
+        collector_album_id = pg_db.upsert_album(
+            {
+                "artist": "Joy Division",
+                "name": "Closer (Collector's Edition)",
+                "path": "/music/joy-division/closer-collectors-edition",
+            }
+        )
+        recording_mbid = "4e44d50e-0c7b-4cca-816c-f2a78d085a72"
+        shared_entity_uid = "123e4567-e89b-12d3-a456-426614174101"
+
+        pg_db.upsert_track(
+            {
+                "album_id": original_album_id,
+                "artist": "Joy Division",
+                "album": "Closer",
+                "entity_uid": shared_entity_uid,
+                "filename": "01-atmosphere.flac",
+                "title": "Atmosphere",
+                "track_number": 1,
+                "musicbrainz_trackid": recording_mbid,
+                "path": "/music/joy-division/closer/01-atmosphere.flac",
+            }
+        )
+        collector_track = {
+            "album_id": collector_album_id,
+            "artist": "Joy Division",
+            "album": "Closer (Collector's Edition)",
+            "entity_uid": shared_entity_uid,
+            "filename": "10-atmosphere.flac",
+            "title": "Atmosphere",
+            "track_number": 10,
+            "musicbrainz_trackid": recording_mbid,
+            "path": "/music/joy-division/closer-collectors-edition/10-atmosphere.flac",
+        }
+        pg_db.upsert_track(collector_track)
+
+        relocated_path = (
+            "/music/joy-division/closer-collectors-edition/disc-2/10-atmosphere.flac"
+        )
+        pg_db.upsert_track({**collector_track, "path": relocated_path})
+
+        collector_tracks = pg_db.get_library_tracks(collector_album_id)
+        assert len(collector_tracks) == 1
+        assert collector_tracks[0]["path"] == relocated_path
+
+    def test_upsert_track_keeps_repeated_recording_within_same_release(self, pg_db):
+        pg_db.upsert_artist({"name": "Joy Division"})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": "Joy Division",
+                "name": "Closer (Collector's Edition)",
+                "path": "/music/joy-division/closer-collectors-edition",
+            }
+        )
+        recording_mbid = "4e44d50e-0c7b-4cca-816c-f2a78d085a72"
+        shared_entity_uid = "123e4567-e89b-12d3-a456-426614174101"
+        base_track = {
+            "album_id": album_id,
+            "artist": "Joy Division",
+            "album": "Closer (Collector's Edition)",
+            "entity_uid": shared_entity_uid,
+            "title": "Atmosphere",
+            "musicbrainz_trackid": recording_mbid,
+        }
+
+        pg_db.upsert_track(
+            {
+                **base_track,
+                "filename": "01-atmosphere.flac",
+                "disc_number": 1,
+                "track_number": 1,
+                "path": (
+                    "/music/joy-division/closer-collectors-edition/"
+                    "disc-1/01-atmosphere.flac"
+                ),
+            }
+        )
+        pg_db.upsert_track(
+            {
+                **base_track,
+                "filename": "10-atmosphere.flac",
+                "disc_number": 2,
+                "track_number": 10,
+                "path": (
+                    "/music/joy-division/closer-collectors-edition/"
+                    "disc-2/10-atmosphere.flac"
+                ),
+            }
+        )
+
+        tracks = pg_db.get_library_tracks(album_id)
+        assert len(tracks) == 2
+        assert {track["disc_number"] for track in tracks} == {1, 2}
+        assert {track["musicbrainz_trackid"] for track in tracks} == {recording_mbid}
+
     def test_get_library_artists_pagination(self, pg_db):
         for i in range(5):
             pg_db.upsert_artist({"name": f"Artist {i:02d}"})
