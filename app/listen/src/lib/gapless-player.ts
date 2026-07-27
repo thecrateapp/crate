@@ -47,6 +47,8 @@ const GAPLESS_LOG_LEVEL_WARNING = 3;
 const GAPLESS_CROSSFADE_EQUAL_POWER = 3;
 const DESKTOP_DECODE_TRACK_LIMIT = 2;
 const MOBILE_HTML5_TRACK_LIMIT = 2;
+const ADJACENT_LOAD_BUFFER_SECONDS = 15;
+const RESUMED_AUDIO_CONTEXT_RAMP_MS = 24;
 
 export interface GaplessPlayerCallbacks {
   onTimeUpdate?: (positionMs: number, trackIndex: number) => void;
@@ -241,8 +243,14 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     volume: lastVolume,
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
     // Keep the next mobile <audio> source ready before the active element
-    // reaches ended, preserving uninterrupted media-session/Bluetooth state.
+    // reaches ended, but only after the current stream has a safe buffer.
+    // Starting both FLAC requests together can starve Android's active decoder.
     loadLimit: getPlaybackLoadLimit(preferHtml5Audio),
+    deferAdjacentLoadsUntilBufferedSeconds: ADJACENT_LOAD_BUFFER_SECONDS,
+    // Switching an audible source from HTML5 to WebAudio mid-track can click
+    // even when both clocks are aligned. Decoded buffers remain available for
+    // tracks that have not started yet.
+    switchToWebAudioDuringPlayback: false,
   });
   appliedVolume = lastVolume;
 
@@ -664,10 +672,18 @@ async function prepareAudioForPlaybackInner(
 
 export async function play(): Promise<void> {
   stopFade();
+  const shouldRampAfterResume =
+    !isTauriDesktopRuntime() && getAudioContext()?.state === "suspended";
   await prepareAudioForPlayback("play", {
     rebuildIfTauriOutputMayBeStale: true,
   });
   tauriPlaybackWasActive = true;
+  if (shouldRampAfterResume && instance) {
+    applyVolume(0);
+    instance.play();
+    animateVolume(0, lastVolume, RESUMED_AUDIO_CONTEXT_RAMP_MS);
+    return;
+  }
   instance?.play();
 }
 

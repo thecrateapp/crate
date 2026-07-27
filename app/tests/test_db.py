@@ -2851,6 +2851,63 @@ class TestLibraryCRUD:
         assert album["entity_uid"] is not None
         assert album["storage_id"] is None
 
+    def test_upsert_album_prefers_exact_path_over_shared_external_ids(self, pg_db):
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Amenra"})
+        original_id = pg_db.upsert_album(
+            {
+                "artist": "Amenra",
+                "name": "Mass I",
+                "path": "/music/Amenra/Mass I",
+                "track_count": 5,
+            }
+        )
+        remastered_id = pg_db.upsert_album(
+            {
+                "artist": "Amenra",
+                "name": "Mass I (Remastered)",
+                "path": "/music/Amenra/Mass I (Remastered)",
+                "track_count": 0,
+            }
+        )
+        shared_release_mbid = str(uuid4())
+        shared_release_group_mbid = str(uuid4())
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_albums
+                    SET musicbrainz_albumid = :release_mbid,
+                        musicbrainz_releasegroupid = :release_group_mbid
+                    WHERE id IN (:original_id, :remastered_id)
+                    """
+                ),
+                {
+                    "release_mbid": shared_release_mbid,
+                    "release_group_mbid": shared_release_group_mbid,
+                    "original_id": original_id,
+                    "remastered_id": remastered_id,
+                },
+            )
+
+        updated_id = pg_db.upsert_album(
+            {
+                "artist": "Amenra",
+                "name": "Mass I (Remastered)",
+                "path": "/music/Amenra/Mass I (Remastered)",
+                "track_count": 6,
+                "musicbrainz_albumid": shared_release_mbid,
+                "musicbrainz_releasegroupid": shared_release_group_mbid,
+            }
+        )
+
+        assert updated_id == remastered_id
+        assert pg_db.get_library_album("Amenra", "Mass I")["track_count"] == 5
+        assert (
+            pg_db.get_library_album("Amenra", "Mass I (Remastered)")["track_count"] == 6
+        )
+
     def test_upsert_track(self, pg_db):
         from crate.db.tx import transaction_scope
 

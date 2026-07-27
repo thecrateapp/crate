@@ -11,6 +11,7 @@ export const STORAGE_KEY = "listen-player-state";
 export const RECENTLY_PLAYED_KEY = "listen-recently-played";
 export const MAX_RECENT = 10;
 export const ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS = 1;
+export const ANDROID_MEDIA_SESSION_HANDOFF_SECONDS = 0.15;
 export const SMART_TRANSITION_SHORT_SECONDS = 2;
 export const SMART_TRANSITION_BALANCED_SECONDS = 4;
 export const SMART_TRANSITION_LONG_SECONDS = 6;
@@ -534,7 +535,14 @@ export function getEffectiveCrossfadeSeconds(
       );
     }
   }
-  if (clampedSeconds <= 0) return 0;
+  if (clampedSeconds <= 0) {
+    if (shouldMaskHtml5Gap && nextTrack) {
+      return continuousAlbumTransition
+        ? ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS
+        : ANDROID_MEDIA_SESSION_HANDOFF_SECONDS;
+    }
+    return 0;
+  }
   if (!smartCrossfadeEnabled) return clampedSeconds;
   if (continuousAlbumTransition) {
     return shouldMaskHtml5Gap

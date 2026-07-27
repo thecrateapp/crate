@@ -194,6 +194,8 @@ describe("initPlayer", () => {
     expect(options.crossfadeShape).toBe(3);
     expect(options.volume).toBe(1);
     expect(options.logLevel).toBe(3);
+    expect(options.deferAdjacentLoadsUntilBufferedSeconds).toBe(15);
+    expect(options.switchToWebAudioDuringPlayback).toBe(false);
     expect(player).toBeDefined();
   });
 

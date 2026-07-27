@@ -58,9 +58,11 @@ it with irreplaceable media or user data.
 ## Project-hosted image-first deployment
 
 `make deploy` delegates to `scripts/deploy.sh`. By default it resolves
-`origin/main`, verifies GHCR manifests for every required image, copies only
-the compose/Traefik deployment payload, creates a remote rollback snapshot,
-pulls images and starts the compose stack with `--no-build`.
+`origin/main`, downloads its complete signed release manifest, verifies every
+immutable GHCR digest and copies only the compose/Traefik deployment payload.
+The remote deploy snapshots the previous release, pulls only changed images
+and recreates only services whose digest or Compose configuration changed.
+Images not rebuilt for a commit remain pinned to their last promoted digest.
 
 The remote profile combines `docker-compose.yaml` and
 `docker-compose.project.yaml`; it includes API, readplane, worker families,
@@ -71,6 +73,11 @@ Migration safety changes rollback semantics: after the updated stack has been
 started, automatic rollback is intentionally disabled because the database may
 already have advanced. Treat a failed post-start verification as a forward-fix
 or restore decision, not as permission to retag older images blindly.
+For a release that did not advance state, use
+`make deploy-image-rollback DEPLOY_ID=<id> CONFIRM=rollback-images` to restore
+only the application services changed by that deployment. The destructive
+`make deploy-rollback ... CONFIRM=restore-production` command remains the
+database and durable-Redis recovery path.
 
 `make deploy-build` and `make deploy-sync` are exceptional/manual workflows.
 Do not replace the image-first flow with a repository-wide `rsync --delete`:
@@ -82,8 +89,8 @@ Before any non-development deployment:
 
 1. Back up PostgreSQL and the deployment `.env`.
 2. Check `docker compose config -q` with the exact compose/profile files.
-3. Confirm music mount ownership, free disk, required secrets and image tags.
-4. Record the previous image tag and migration state.
+3. Confirm music mount ownership, free disk, required secrets and release digests.
+4. Record the previous release manifest and migration state.
 
 After startup, check container health, API status, readplane readiness,
 projector progress, worker queues and an authenticated Admin/Listen request.

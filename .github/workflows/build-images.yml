@@ -13,15 +13,83 @@ env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
 
+concurrency:
+  group: build-images-main
+  cancel-in-progress: false
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      readplane: ${{ steps.filter.outputs.readplane }}
+      worker: ${{ steps.filter.outputs.worker }}
+      analysis_worker: ${{ steps.filter.outputs.analysis_worker }}
+      playback_worker: ${{ steps.filter.outputs.playback_worker }}
+      media_worker: ${{ steps.filter.outputs.media_worker }}
+      ui: ${{ steps.filter.outputs.ui }}
+      listen: ${{ steps.filter.outputs.listen }}
+      site: ${{ steps.filter.outputs.site }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve last promoted release
+        id: baseline
+        env:
+          MANIFEST_IMAGE: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-release-manifest:stable
+        run: |
+          set -Eeuo pipefail
+          baseline=""
+          if docker pull -q "$MANIFEST_IMAGE" >/dev/null 2>&1; then
+            container="$(docker create "$MANIFEST_IMAGE" true)"
+            trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+            docker cp "$container:/release-manifest.json" /tmp/previous-release.json
+            python scripts/release_manifest.py validate \
+              --manifest /tmp/previous-release.json \
+              --registry "$REGISTRY" \
+              --owner "$OWNER"
+            baseline="$(python scripts/release_manifest.py base-sha \
+              --manifest /tmp/previous-release.json)"
+          fi
+          echo "sha=$baseline" >> "$GITHUB_OUTPUT"
+
+      - name: Detect affected images
+        id: filter
+        env:
+          BASE_SHA: ${{ steps.baseline.outputs.sha }}
+          REQUESTED_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.images || '' }}
+        run: |
+          set -Eeuo pipefail
+          args=(detect --head "$GITHUB_SHA")
+          if [[ -n "$BASE_SHA" ]]; then
+            args+=(--base "$BASE_SHA")
+          fi
+          if [[ -n "$REQUESTED_IMAGES" ]]; then
+            args+=(--requested "$REQUESTED_IMAGES")
+          fi
+          python scripts/release_manifest.py "${args[@]}" >> "$GITHUB_OUTPUT"
+
   build-api:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'api') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -38,10 +106,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-api
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app
           file: ./app/Dockerfile
@@ -50,17 +118,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
 
   build-worker:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'worker') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -84,12 +153,12 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-worker
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       # Core worker image: no Torch, Essentia, librosa, or model checkpoints.
       # The heavy audio analysis stack is isolated in crate-analysis-worker.
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app
           file: ./app/Dockerfile
@@ -98,17 +167,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max
 
   build-analysis-worker:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'worker') || contains(github.event.inputs.images, 'analysis-worker') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.analysis_worker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -132,10 +202,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-analysis-worker
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app
           file: ./app/Dockerfile
@@ -144,17 +214,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
+          cache-from: type=gha,scope=analysis-worker
+          cache-to: type=gha,scope=analysis-worker,mode=max,ignore-error=true
 
   build-playback-worker:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'worker') || contains(github.event.inputs.images, 'playback-worker') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.playback_worker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -171,10 +242,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-playback-worker
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app
           file: ./app/Dockerfile
@@ -183,17 +254,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=playback-worker
+          cache-to: type=gha,scope=playback-worker,mode=max
 
   build-media-worker:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'media-worker') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.media_worker == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -210,10 +282,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-media-worker
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app
           file: ./app/Dockerfile
@@ -222,17 +294,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=media-worker
+          cache-to: type=gha,scope=media-worker,mode=max
 
   build-readplane:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'readplane') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.readplane == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -249,10 +322,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-readplane
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app/readplane
           file: ./app/readplane/Dockerfile
@@ -262,17 +335,18 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=readplane
+          cache-to: type=gha,scope=readplane,mode=max
 
   build-ui:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'ui') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -289,27 +363,28 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-ui
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app
           file: ./app/ui/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=ui
+          cache-to: type=gha,scope=ui,mode=max
 
   build-listen:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'listen') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.listen == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -326,27 +401,28 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-listen
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: ./app
           file: ./app/listen/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=listen
+          cache-to: type=gha,scope=listen,mode=max
 
   build-docs:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'docs') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -363,30 +439,31 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-docs
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       # NOTE: docs build context is the repo root (not ./app) because
       # the Dockerfile needs to COPY both app/docs/ (source) and docs/
       # (markdown files consumed by import.meta.glob at build time).
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: .
           file: ./app/docs/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=docs
+          cache-to: type=gha,scope=docs,mode=max
 
   build-site:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'site') || github.event.inputs.images == 'all'))
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -403,17 +480,214 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-site
           tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest
+            type=sha,prefix=,format=long
 
       # NOTE: site build context is the repo root (matches the docs job)
       # so the Dockerfile's COPY app/site/... resolves cleanly.
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: .
           file: ./app/site/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=site
+          cache-to: type=gha,scope=site,mode=max
+
+  promote-release:
+    needs:
+      - changes
+      - build-api
+      - build-readplane
+      - build-worker
+      - build-analysis-worker
+      - build-playback-worker
+      - build-media-worker
+      - build-ui
+      - build-listen
+      - build-site
+      - build-docs
+    if: always() && needs.changes.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      CHANGED_API: ${{ needs.changes.outputs.api }}
+      CHANGED_READPLANE: ${{ needs.changes.outputs.readplane }}
+      CHANGED_WORKER: ${{ needs.changes.outputs.worker }}
+      CHANGED_ANALYSIS_WORKER: ${{ needs.changes.outputs.analysis_worker }}
+      CHANGED_PLAYBACK_WORKER: ${{ needs.changes.outputs.playback_worker }}
+      CHANGED_MEDIA_WORKER: ${{ needs.changes.outputs.media_worker }}
+      CHANGED_UI: ${{ needs.changes.outputs.ui }}
+      CHANGED_LISTEN: ${{ needs.changes.outputs.listen }}
+      CHANGED_SITE: ${{ needs.changes.outputs.site }}
+      CHANGED_DOCS: ${{ needs.changes.outputs.docs }}
+      RESULT_API: ${{ needs['build-api'].result }}
+      RESULT_READPLANE: ${{ needs['build-readplane'].result }}
+      RESULT_WORKER: ${{ needs['build-worker'].result }}
+      RESULT_ANALYSIS_WORKER: ${{ needs['build-analysis-worker'].result }}
+      RESULT_PLAYBACK_WORKER: ${{ needs['build-playback-worker'].result }}
+      RESULT_MEDIA_WORKER: ${{ needs['build-media-worker'].result }}
+      RESULT_UI: ${{ needs['build-ui'].result }}
+      RESULT_LISTEN: ${{ needs['build-listen'].result }}
+      RESULT_SITE: ${{ needs['build-site'].result }}
+      RESULT_DOCS: ${{ needs['build-docs'].result }}
+      DIGEST_API: ${{ needs['build-api'].outputs.digest }}
+      DIGEST_READPLANE: ${{ needs['build-readplane'].outputs.digest }}
+      DIGEST_WORKER: ${{ needs['build-worker'].outputs.digest }}
+      DIGEST_ANALYSIS_WORKER: ${{ needs['build-analysis-worker'].outputs.digest }}
+      DIGEST_PLAYBACK_WORKER: ${{ needs['build-playback-worker'].outputs.digest }}
+      DIGEST_MEDIA_WORKER: ${{ needs['build-media-worker'].outputs.digest }}
+      DIGEST_UI: ${{ needs['build-ui'].outputs.digest }}
+      DIGEST_LISTEN: ${{ needs['build-listen'].outputs.digest }}
+      DIGEST_SITE: ${{ needs['build-site'].outputs.digest }}
+      DIGEST_DOCS: ${{ needs['build-docs'].outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reject incomplete selected builds
+        run: |
+          set -Eeuo pipefail
+          check_result() {
+            local name="$1"
+            local changed="$2"
+            local result="$3"
+            if [[ "$changed" == "true" && "$result" != "success" ]]; then
+              echo "Required image build failed: ${name} (${result})" >&2
+              return 1
+            fi
+          }
+          check_result api "$CHANGED_API" "$RESULT_API"
+          check_result readplane "$CHANGED_READPLANE" "$RESULT_READPLANE"
+          check_result worker "$CHANGED_WORKER" "$RESULT_WORKER"
+          check_result analysis-worker "$CHANGED_ANALYSIS_WORKER" "$RESULT_ANALYSIS_WORKER"
+          check_result playback-worker "$CHANGED_PLAYBACK_WORKER" "$RESULT_PLAYBACK_WORKER"
+          check_result media-worker "$CHANGED_MEDIA_WORKER" "$RESULT_MEDIA_WORKER"
+          check_result ui "$CHANGED_UI" "$RESULT_UI"
+          check_result listen "$CHANGED_LISTEN" "$RESULT_LISTEN"
+          check_result site "$CHANGED_SITE" "$RESULT_SITE"
+          check_result docs "$CHANGED_DOCS" "$RESULT_DOCS"
+
+      - name: Assemble complete release manifest
+        env:
+          STABLE_MANIFEST: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-release-manifest:stable
+        run: |
+          set -Eeuo pipefail
+          previous_args=()
+          if docker pull -q "$STABLE_MANIFEST" >/dev/null 2>&1; then
+            container="$(docker create "$STABLE_MANIFEST" true)"
+            trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+            docker cp "$container:/release-manifest.json" /tmp/previous-release.json
+            python scripts/release_manifest.py validate \
+              --manifest /tmp/previous-release.json \
+              --registry "$REGISTRY" \
+              --owner "$OWNER"
+            previous_args=(--previous /tmp/previous-release.json)
+          fi
+
+          digest_args=()
+          [[ "$CHANGED_API" == "true" ]] && digest_args+=(--digest "api=$DIGEST_API")
+          [[ "$CHANGED_READPLANE" == "true" ]] && digest_args+=(--digest "readplane=$DIGEST_READPLANE")
+          [[ "$CHANGED_WORKER" == "true" ]] && digest_args+=(--digest "worker=$DIGEST_WORKER")
+          [[ "$CHANGED_ANALYSIS_WORKER" == "true" ]] && digest_args+=(--digest "analysis-worker=$DIGEST_ANALYSIS_WORKER")
+          [[ "$CHANGED_PLAYBACK_WORKER" == "true" ]] && digest_args+=(--digest "playback-worker=$DIGEST_PLAYBACK_WORKER")
+          [[ "$CHANGED_MEDIA_WORKER" == "true" ]] && digest_args+=(--digest "media-worker=$DIGEST_MEDIA_WORKER")
+          [[ "$CHANGED_UI" == "true" ]] && digest_args+=(--digest "ui=$DIGEST_UI")
+          [[ "$CHANGED_LISTEN" == "true" ]] && digest_args+=(--digest "listen=$DIGEST_LISTEN")
+          [[ "$CHANGED_SITE" == "true" ]] && digest_args+=(--digest "site=$DIGEST_SITE")
+          [[ "$CHANGED_DOCS" == "true" ]] && digest_args+=(--digest "docs=$DIGEST_DOCS")
+
+          python scripts/release_manifest.py assemble \
+            --release-sha "$GITHUB_SHA" \
+            --registry "$REGISTRY" \
+            --owner "$OWNER" \
+            "${previous_args[@]}" \
+            "${digest_args[@]}" \
+            --output /tmp/release-manifest.json
+
+          while IFS= read -r reference; do
+            docker buildx imagetools inspect "$reference" >/dev/null
+          done < <(python scripts/release_manifest.py refs \
+            --manifest /tmp/release-manifest.json)
+
+      - name: Publish immutable release manifest
+        id: manifest
+        env:
+          MANIFEST_REPOSITORY: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-release-manifest
+        run: |
+          set -Eeuo pipefail
+          immutable_ref="${MANIFEST_REPOSITORY}:${GITHUB_SHA}"
+          mkdir -p /tmp/release-manifest-image
+          cp /tmp/release-manifest.json /tmp/release-manifest-image/release-manifest.json
+          printf 'FROM scratch\nCOPY release-manifest.json /release-manifest.json\n' \
+            > /tmp/release-manifest-image/Dockerfile
+
+          if docker pull -q "$immutable_ref" >/dev/null 2>&1; then
+            container="$(docker create "$immutable_ref" true)"
+            trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+            docker cp "$container:/release-manifest.json" /tmp/existing-release.json
+            cmp /tmp/existing-release.json /tmp/release-manifest.json
+          else
+            docker buildx build \
+              --provenance=true \
+              --push \
+              --tag "$immutable_ref" \
+              /tmp/release-manifest-image
+          fi
+
+          digest="$(docker buildx imagetools inspect "$immutable_ref" \
+            --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Promote changed images to latest
+        run: |
+          set -Eeuo pipefail
+          promote_latest() {
+            local changed="$1"
+            local repository="$2"
+            local digest="$3"
+            if [[ "$changed" == "true" ]]; then
+              docker buildx imagetools create \
+                --tag "${REGISTRY}/${OWNER}/${repository}:latest" \
+                "${REGISTRY}/${OWNER}/${repository}@${digest}"
+            fi
+          }
+          promote_latest "$CHANGED_API" crate-api "$DIGEST_API"
+          promote_latest "$CHANGED_READPLANE" crate-readplane "$DIGEST_READPLANE"
+          promote_latest "$CHANGED_WORKER" crate-worker "$DIGEST_WORKER"
+          promote_latest "$CHANGED_ANALYSIS_WORKER" crate-analysis-worker "$DIGEST_ANALYSIS_WORKER"
+          promote_latest "$CHANGED_PLAYBACK_WORKER" crate-playback-worker "$DIGEST_PLAYBACK_WORKER"
+          promote_latest "$CHANGED_MEDIA_WORKER" crate-media-worker "$DIGEST_MEDIA_WORKER"
+          promote_latest "$CHANGED_UI" crate-ui "$DIGEST_UI"
+          promote_latest "$CHANGED_LISTEN" crate-listen "$DIGEST_LISTEN"
+          promote_latest "$CHANGED_SITE" crate-site "$DIGEST_SITE"
+          promote_latest "$CHANGED_DOCS" crate-docs "$DIGEST_DOCS"
+
+      - name: Attest release manifest
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-release-manifest
+          subject-digest: ${{ steps.manifest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Promote release manifest to stable
+        env:
+          MANIFEST_REPOSITORY: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-release-manifest
+        run: |
+          set -Eeuo pipefail
+          docker buildx imagetools create \
+            --tag "${MANIFEST_REPOSITORY}:stable" \
+            "${MANIFEST_REPOSITORY}@${{ steps.manifest.outputs.digest }}"

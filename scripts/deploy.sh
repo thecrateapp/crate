@@ -21,18 +21,6 @@ REMOTE_SCRIPT_PATH="${SERVER_PATH}/.deploy/deploy-remote.sh"
 DEPLOY_CANDIDATE_DIR=""
 TMP_DIR=""
 ROLLBACK_ENABLED=1
-REQUIRED_IMAGE_NAMES=(
-  crate-api
-  crate-readplane
-  crate-worker
-  crate-analysis-worker
-  crate-playback-worker
-  crate-media-worker
-  crate-ui
-  crate-listen
-  crate-site
-  crate-docs
-)
 
 log() {
   printf '\n==> %s\n' "$*"
@@ -61,7 +49,7 @@ ssh_remote() {
 
 remote_deploy() {
   ssh_remote \
-    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_CANDIDATE_DIR='$DEPLOY_CANDIDATE_DIR' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_CONFIRM='$DEPLOY_CONFIRM' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' DEPLOY_HEALTH_WAIT_SECONDS='${DEPLOY_HEALTH_WAIT_SECONDS:-420}' '$REMOTE_SCRIPT_PATH' '$1'"
+    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_CANDIDATE_DIR='$DEPLOY_CANDIDATE_DIR' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_RELEASE_SHA='${DEPLOY_IMAGE_SHA:-}' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_CONFIRM='$DEPLOY_CONFIRM' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' DEPLOY_HEALTH_WAIT_SECONDS='${DEPLOY_HEALTH_WAIT_SECONDS:-420}' '$REMOTE_SCRIPT_PATH' '$1'"
 }
 
 env_file_value() {
@@ -175,6 +163,8 @@ stage_remote_preflight_payload() {
   scp \
     "$TMP_DIR/docker-compose.yaml" \
     "$TMP_DIR/docker-compose.project.yaml" \
+    "$TMP_DIR/release-manifest.json" \
+    "$TMP_DIR/release.env" \
     "$REMOTE:$DEPLOY_CANDIDATE_DIR/"
 }
 
@@ -211,16 +201,42 @@ prepare_payload() {
   fi
 
   cp "$ROOT_DIR/.env" "$TMP_DIR/.env"
+  fetch_release_manifest
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_TAG "$DEPLOY_IMAGE_TAG"
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_OWNER "$DEPLOY_IMAGE_OWNER"
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_REGISTRY "$DEPLOY_IMAGE_REGISTRY"
+  while IFS='=' read -r key value; do
+    [[ -n "$key" ]] && set_env_value "$TMP_DIR/.env" "$key" "$value"
+  done < "$TMP_DIR/release.env"
+}
+
+fetch_release_manifest() {
+  local container_id
+  local manifest_image="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}/crate-release-manifest:${DEPLOY_IMAGE_SHA}"
+
+  require_command docker
+  log "Resolving immutable release manifest ${manifest_image}"
+  docker pull -q "$manifest_image" >/dev/null
+  container_id="$(docker create "$manifest_image" true)"
+  if ! docker cp "$container_id:/release-manifest.json" "$TMP_DIR/release-manifest.json"; then
+    docker rm -f "$container_id" >/dev/null 2>&1 || true
+    fail "release manifest image does not contain /release-manifest.json"
+  fi
+  docker rm -f "$container_id" >/dev/null
+
+  "$ROOT_DIR/scripts/release_manifest.py" validate \
+    --manifest "$TMP_DIR/release-manifest.json" \
+    --release-sha "$DEPLOY_IMAGE_SHA" \
+    --registry "$DEPLOY_IMAGE_REGISTRY" \
+    --owner "$DEPLOY_IMAGE_OWNER"
+  "$ROOT_DIR/scripts/release_manifest.py" env \
+    --manifest "$TMP_DIR/release-manifest.json" \
+    --output "$TMP_DIR/release.env"
 }
 
 check_image_manifests() {
   local image
-  local image_name
   local failures=0
-  local prefix="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
 
   if [[ "$DEPLOY_SKIP_IMAGE_CHECK" == "1" ]]; then
     log "Skipping local image manifest checks"
@@ -228,18 +244,21 @@ check_image_manifests() {
   fi
 
   require_command docker
-  log "Checking image manifests for ${prefix}/*:${DEPLOY_IMAGE_TAG}"
+  log "Checking every immutable image referenced by the release manifest"
 
-  for image_name in "${REQUIRED_IMAGE_NAMES[@]}"; do
-    image="${prefix}/${image_name}:${DEPLOY_IMAGE_TAG}"
+  while IFS= read -r image; do
+    [[ -z "$image" ]] && continue
     if ! docker manifest inspect "$image" >/dev/null 2>&1; then
       printf 'Missing or inaccessible image: %s\n' "$image" >&2
       failures=$((failures + 1))
     fi
-  done
+  done < <(
+    "$ROOT_DIR/scripts/release_manifest.py" refs \
+      --manifest "$TMP_DIR/release-manifest.json"
+  )
 
   if [[ "$failures" -gt 0 ]]; then
-    fail "${failures} required image manifest(s) are missing or not pullable. Check that the image workflow finished and GHCR packages are public/pullable, or set DEPLOY_SKIP_IMAGE_CHECK=1 only if the remote host is authenticated to the registry."
+    fail "${failures} immutable release image(s) are missing or not pullable. Check that the image workflow promoted the complete release manifest."
   fi
 }
 
@@ -268,7 +287,7 @@ local_preflight() {
   fi
 
   check_image_manifests
-  log "Deploying ${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER} image tag ${DEPLOY_IMAGE_TAG}${DEPLOY_IMAGE_SHA:+ (${DEPLOY_IMAGE_SHA})}"
+  log "Deploying immutable release ${DEPLOY_IMAGE_SHA} (${DEPLOY_IMAGE_TAG})"
 }
 
 sync_config() {
@@ -280,6 +299,9 @@ sync_config() {
     "$TMP_DIR/docker-compose.project.yaml" \
     "$REMOTE:$SERVER_PATH/"
   scp "$TMP_DIR/.env" "$REMOTE:$SERVER_PATH/.deploy/env.candidate"
+  scp "$TMP_DIR/release.env" "$REMOTE:$SERVER_PATH/.deploy/release.env.candidate"
+  scp "$TMP_DIR/release-manifest.json" \
+    "$REMOTE:$SERVER_PATH/.deploy/release-manifest.json.candidate"
   scp "$TMP_DIR/deploy/traefik/federation-readplane.yml" \
     "$REMOTE:$SERVER_PATH/deploy/traefik/federation-readplane.yml"
   ssh_remote "if [ ! -f '$SERVER_PATH/.env' ]; then cp '$SERVER_PATH/.deploy/env.candidate' '$SERVER_PATH/.env' && chmod 600 '$SERVER_PATH/.env'; fi"
@@ -374,12 +396,24 @@ run_rollback() {
   log "Production rollback ${DEPLOY_ID} completed"
 }
 
+run_image_rollback() {
+  require_deploy_id
+  if [[ "$DEPLOY_CONFIRM" != "rollback-images" ]]; then
+    fail "image-rollback requires DEPLOY_CONFIRM=rollback-images"
+  fi
+  prepare_remote_script
+  resolve_remote_release_settings
+  remote_deploy rollback
+  log "Application image rollback ${DEPLOY_ID} completed"
+}
+
 case "$ACTION" in
   deploy) run_deploy ;;
   preflight) run_preflight ;;
   recovery-snapshot) run_recovery_snapshot ;;
   rollback) run_rollback ;;
+  image-rollback) run_image_rollback ;;
   *)
-    fail "unknown action '${ACTION}' (expected deploy, preflight, recovery-snapshot or rollback)"
+    fail "unknown action '${ACTION}' (expected deploy, preflight, recovery-snapshot, rollback or image-rollback)"
     ;;
 esac

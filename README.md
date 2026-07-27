@@ -379,7 +379,8 @@ make dev-logs [s=svc] # Follow dev logs (optionally filter by service)
 make dev-test         # Run pytest in the worker container
 
 # Deploy (production)
-make deploy           # Sync + pull GHCR images + restart
+make deploy           # Deploy an immutable manifest; restart changed services
+make deploy-image-rollback DEPLOY_ID=X CONFIRM=rollback-images
 make deploy-build     # Deploy with on-server build (fallback)
 make deploy-sync      # Sync files only (no restart)
 make deploy-restart   # Restart remote services

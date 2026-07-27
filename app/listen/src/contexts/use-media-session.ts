@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { Track } from "./player-types";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import { isNative } from "@/lib/capacitor-runtime";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
   onNativeMediaControl,
@@ -105,7 +106,7 @@ export function useMediaSession({
 
   // Update metadata when track changes
   useEffect(() => {
-    if (!("mediaSession" in navigator) || !currentTrack) return;
+    if (isNative || !("mediaSession" in navigator) || !currentTrack) return;
 
     const artwork: MediaImage[] = [];
     const coverUrl = resolveMaybeApiAssetUrl(currentTrack.albumCover);
@@ -129,14 +130,15 @@ export function useMediaSession({
 
   // Update playback state
   useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
+    if (isNative || !("mediaSession" in navigator)) return;
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-  }, [isPlaying]);
+  }, [currentTrack?.id, isPlaying]);
 
   // Update position state for seek bar on lockscreen
   const positionSeconds = Math.floor(Math.min(currentTime, duration));
   useEffect(() => {
-    if (!("mediaSession" in navigator) || !duration) return;
+    if (isNative || !("mediaSession" in navigator) || !duration) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
     try {
       navigator.mediaSession.setPositionState({
         duration: duration || 0,
@@ -146,7 +148,7 @@ export function useMediaSession({
     } catch {
       // Some browsers don't support setPositionState
     }
-  }, [duration, positionSeconds]);
+  }, [duration, isPlaying, positionSeconds]);
 
   const nativePositionSeconds = Math.floor(
     Math.max(0, duration > 0 ? Math.min(currentTime, duration) : currentTime),
@@ -219,7 +221,7 @@ export function useMediaSession({
 
   // Register action handlers
   useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
+    if (isNative || !("mediaSession" in navigator)) return;
 
     const actions: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
       ["play", () => actionsRef.current.resume()],

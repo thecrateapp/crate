@@ -213,6 +213,25 @@ describe("gapless player audio recovery", () => {
     expect(gaplessMock.instances[0]!.playCalls).toBe(1);
   });
 
+  it("ramps Chrome output after resuming a suspended AudioContext", async () => {
+    vi.useFakeTimers();
+    delete document.documentElement.dataset.listenRuntime;
+    const context = gaplessMock.createContext("suspended");
+    gaplessMock.contextQueue.push(context);
+
+    initPlayer();
+    loadQueue(["/tracks/a.flac"], 0);
+    setVolume(0.73);
+
+    await play();
+
+    const player = gaplessMock.instances[0]!;
+    expect(player.volume).toBe(0);
+    await vi.advanceTimersByTimeAsync(40);
+    expect(player.volume).toBeCloseTo(0.73);
+    vi.useRealTimers();
+  });
+
   it("rebuilds the player when the AudioContext was closed while idle", async () => {
     const closedContext = gaplessMock.createContext("closed");
     const freshContext = gaplessMock.createContext("running");
