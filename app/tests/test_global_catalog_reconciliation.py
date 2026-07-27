@@ -306,6 +306,266 @@ def test_full_match_recompute_rebinds_recording_mbid_without_unique_violation(
     assert recording_mbid == "recording-mbid"
 
 
+def test_full_match_recompute_keeps_release_mbid_after_anchor_is_pruned(
+    pg_db,
+):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_local_catalog_batch,
+    )
+
+    pg_db.upsert_artist(
+        {
+            "name": "Linea Aspera",
+            "entity_uid": str(uuid.uuid4()),
+        }
+    )
+    original_album_id = pg_db.upsert_album(
+        {
+            "artist": "Linea Aspera",
+            "name": "Preservation Bias",
+            "path": "/music/Linea Aspera/Preservation Bias",
+            "entity_uid": str(uuid.uuid4()),
+            "musicbrainz_albumid": "release-mbid",
+            "year": "2019",
+            "track_count": 1,
+        }
+    )
+    reconcile_local_catalog()
+
+    replacement_album_id = pg_db.upsert_album(
+        {
+            "artist": "Linea Aspera",
+            "name": "Preservation Bias",
+            "path": "/music/Linea Aspera/2019/Preservation Bias",
+            "entity_uid": str(uuid.uuid4()),
+            "musicbrainz_albumid": "release-mbid",
+            "year": "2019",
+            "track_count": 1,
+        }
+    )
+    reconcile_local_catalog()
+
+    with read_scope() as session:
+        expected_uid = session.execute(
+            text(
+                """
+                SELECT global_entity_uid::text
+                FROM global_catalog_sources
+                WHERE entity_type = 'album'
+                  AND local_id = :album_id
+                """
+            ),
+            {"album_id": replacement_album_id},
+        ).scalar_one()
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET source_deleted_at = NOW(),
+                    source_stale = true
+                WHERE entity_type = 'album'
+                  AND local_id = :album_id
+                """
+            ),
+            {"album_id": original_album_id},
+        )
+        session.execute(
+            text("DELETE FROM library_albums WHERE id = :album_id"),
+            {"album_id": original_album_id},
+        )
+
+    cursor = None
+    while True:
+        batch = reconcile_local_catalog_batch(
+            batch_size=1,
+            cursor=cursor,
+            recompute_matches=True,
+        )
+        if batch["completed"]:
+            break
+        cursor = batch["next_cursor"]
+
+    with read_scope() as session:
+        source_uids = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_entity_uid::text
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'album'
+                      AND local_id = ANY(:album_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"album_ids": [original_album_id, replacement_album_id]},
+            )
+            .scalars()
+            .all()
+        )
+        canonical_count = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_albums
+                WHERE musicbrainz_release_mbid = 'release-mbid'
+                """
+            )
+        ).scalar_one()
+
+    assert source_uids == [expected_uid]
+    assert canonical_count == 1
+
+
+def test_full_match_recompute_keeps_recording_mbid_after_anchor_is_pruned(
+    pg_db,
+):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_local_catalog_batch,
+    )
+
+    pg_db.upsert_artist(
+        {
+            "name": "Pantera",
+            "entity_uid": str(uuid.uuid4()),
+        }
+    )
+    album_id = pg_db.upsert_album(
+        {
+            "artist": "Pantera",
+            "name": "Cowboys From Hell",
+            "path": "/music/Pantera/Cowboys From Hell",
+            "entity_uid": str(uuid.uuid4()),
+            "year": "1990",
+            "track_count": 2,
+        }
+    )
+    original_track_path = "/music/Pantera/Cowboys From Hell/05 - Cemetery Gates.flac"
+    pg_db.upsert_track(
+        {
+            "album_id": album_id,
+            "artist": "Pantera",
+            "album": "Cowboys From Hell",
+            "filename": "05 - Cemetery Gates.flac",
+            "title": "Cemetery Gates",
+            "path": original_track_path,
+            "entity_uid": str(uuid.uuid4()),
+            "musicbrainz_trackid": "recording-mbid",
+            "duration": 423.0,
+            "disc_number": 1,
+            "track_number": 5,
+        }
+    )
+    with read_scope() as session:
+        original_track_id = session.execute(
+            text("SELECT id FROM library_tracks WHERE path = :path"),
+            {"path": original_track_path},
+        ).scalar_one()
+    reconcile_local_catalog()
+
+    replacement_track_path = (
+        "/music/Pantera/Cowboys From Hell/05 - Cemetery Gates (Album Version).flac"
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": album_id,
+            "artist": "Pantera",
+            "album": "Cowboys From Hell",
+            "filename": "05 - Cemetery Gates (Album Version).flac",
+            "title": "Cemetery Gates",
+            "path": replacement_track_path,
+            "entity_uid": str(uuid.uuid4()),
+            "musicbrainz_trackid": "recording-mbid",
+            "duration": 423.0,
+            "disc_number": 1,
+            "track_number": 5,
+        }
+    )
+    with read_scope() as session:
+        replacement_track_id = session.execute(
+            text("SELECT id FROM library_tracks WHERE path = :path"),
+            {"path": replacement_track_path},
+        ).scalar_one()
+    reconcile_local_catalog()
+
+    with read_scope() as session:
+        expected_uid = session.execute(
+            text(
+                """
+                SELECT global_entity_uid::text
+                FROM global_catalog_sources
+                WHERE entity_type = 'track'
+                  AND local_id = :track_id
+                """
+            ),
+            {"track_id": replacement_track_id},
+        ).scalar_one()
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET source_deleted_at = NOW(),
+                    source_stale = true
+                WHERE entity_type = 'track'
+                  AND local_id = :track_id
+                """
+            ),
+            {"track_id": original_track_id},
+        )
+        session.execute(
+            text("DELETE FROM library_tracks WHERE id = :track_id"),
+            {"track_id": original_track_id},
+        )
+
+    cursor = None
+    while True:
+        batch = reconcile_local_catalog_batch(
+            batch_size=1,
+            cursor=cursor,
+            recompute_matches=True,
+        )
+        if batch["completed"]:
+            break
+        cursor = batch["next_cursor"]
+
+    with read_scope() as session:
+        source_uids = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_entity_uid::text
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'track'
+                      AND local_id = ANY(:track_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"track_ids": [original_track_id, replacement_track_id]},
+            )
+            .scalars()
+            .all()
+        )
+        canonical_count = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_tracks
+                WHERE musicbrainz_recording_mbid = 'recording-mbid'
+                """
+            )
+        ).scalar_one()
+
+    assert source_uids == [expected_uid]
+    assert canonical_count == 1
+
+
 def test_full_match_recompute_splits_sources_that_no_longer_match(pg_db):
     from crate.db.tx import read_scope, transaction_scope
     from crate.federation.global_reconciliation import (

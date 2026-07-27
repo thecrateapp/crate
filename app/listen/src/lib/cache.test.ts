@@ -20,6 +20,11 @@ vi.mock("@/lib/api", () => ({
   apiSseUrl: vi.fn((path: string) => `https://api.example.test${path}`),
 }));
 
+vi.mock("@/lib/auth-user-storage", () => ({
+  getStoredAuthUserId: () =>
+    localStorage.getItem("listen-auth-user-id") || null,
+}));
+
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: false,
 }));
@@ -57,6 +62,8 @@ import {
 } from "./cache";
 
 const STORAGE_KEY = "crate-api-cache:v2";
+const cacheStorageKey = (url: string, context = "web:anonymous"): string =>
+  `${STORAGE_KEY}:${context}:${url}`;
 
 beforeEach(() => {
   cacheClear();
@@ -344,8 +351,10 @@ describe("cacheGet / cacheSet", () => {
       data: { bar: 2 },
       timestamp: Date.now(),
       scopes: ["library"],
+      url: "/api/foo",
+      context: "web:anonymous",
     };
-    localStorage.setItem(`${STORAGE_KEY}:/api/foo`, JSON.stringify(entry));
+    localStorage.setItem(cacheStorageKey("/api/foo"), JSON.stringify(entry));
     expect(cacheGet("/api/foo")).toEqual({ bar: 2 });
   });
 
@@ -364,10 +373,12 @@ describe("cacheGet / cacheSet", () => {
       data: "from-storage",
       timestamp: Date.now(),
       scopes: [],
+      url: "/api/foo",
+      context: "web:anonymous",
     };
-    localStorage.setItem(`${STORAGE_KEY}:/api/foo`, JSON.stringify(entry));
+    localStorage.setItem(cacheStorageKey("/api/foo"), JSON.stringify(entry));
     cacheGet("/api/foo");
-    localStorage.removeItem(`${STORAGE_KEY}:/api/foo`);
+    localStorage.removeItem(cacheStorageKey("/api/foo"));
     expect(cacheGet("/api/foo")).toBe("from-storage");
   });
 
@@ -377,8 +388,10 @@ describe("cacheGet / cacheSet", () => {
       data: { stale: true },
       timestamp: old,
       scopes: [],
+      url: "/api/foo",
+      context: "web:anonymous",
     };
-    localStorage.setItem(`${STORAGE_KEY}:/api/foo`, JSON.stringify(entry));
+    localStorage.setItem(cacheStorageKey("/api/foo"), JSON.stringify(entry));
     expect(cacheGet("/api/foo")).toBeNull();
   });
 
@@ -388,10 +401,12 @@ describe("cacheGet / cacheSet", () => {
       data: { stale: true },
       timestamp: old,
       scopes: [],
+      url: "/api/foo",
+      context: "web:anonymous",
     };
-    localStorage.setItem(`${STORAGE_KEY}:/api/foo`, JSON.stringify(entry));
+    localStorage.setItem(cacheStorageKey("/api/foo"), JSON.stringify(entry));
     cacheGet("/api/foo");
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/foo`)).toBeNull();
+    expect(localStorage.getItem(cacheStorageKey("/api/foo"))).toBeNull();
   });
 
   it("treats entries within TTL as valid", () => {
@@ -400,13 +415,15 @@ describe("cacheGet / cacheSet", () => {
       data: "fresh",
       timestamp: recent,
       scopes: [],
+      url: "/api/foo",
+      context: "web:anonymous",
     };
-    localStorage.setItem(`${STORAGE_KEY}:/api/foo`, JSON.stringify(entry));
+    localStorage.setItem(cacheStorageKey("/api/foo"), JSON.stringify(entry));
     expect(cacheGet("/api/foo")).toBe("fresh");
   });
 
   it("handles corrupted localStorage JSON gracefully", () => {
-    localStorage.setItem(`${STORAGE_KEY}:/api/foo`, "not-json");
+    localStorage.setItem(cacheStorageKey("/api/foo"), "not-json");
     expect(cacheGet("/api/foo")).toBeNull();
   });
 
@@ -444,13 +461,15 @@ describe("cacheInvalidate", () => {
 
     // Flush the setTimeout(0) that _scheduleStorageWrite uses
     await vi.runAllTimersAsync();
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/me/likes`)).not.toBeNull();
+    expect(
+      localStorage.getItem(cacheStorageKey("/api/me/likes")),
+    ).not.toBeNull();
 
     cacheInvalidate("likes");
     expect(cacheGet("/api/me/likes")).toBeNull();
     // cacheInvalidate iterates memoryCache and removes matching
     // localStorage keys directly (does NOT use Object.keys()).
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/me/likes`)).toBeNull();
+    expect(localStorage.getItem(cacheStorageKey("/api/me/likes"))).toBeNull();
 
     vi.useRealTimers();
   });
@@ -513,8 +532,12 @@ describe("cacheClear", () => {
     cacheSet("/api/b", 2);
     await vi.runAllTimersAsync();
 
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/a`)).not.toBeNull();
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/b`)).not.toBeNull();
+    expect(
+      localStorage.getItem(`${STORAGE_KEY}:web:anonymous:/api/a`),
+    ).not.toBeNull();
+    expect(
+      localStorage.getItem(`${STORAGE_KEY}:web:anonymous:/api/b`),
+    ).not.toBeNull();
 
     cacheClear();
 
@@ -544,6 +567,40 @@ describe("cacheClear", () => {
     cacheClear();
     expect(cacheGet("/api/a")).toBeNull();
     expect(localStorage.getItem("other-key")).toBe("keep-me");
+  });
+});
+
+describe("cache identity isolation", () => {
+  it("does not reuse user-scoped payloads after the authenticated user changes", () => {
+    localStorage.setItem("listen-auth-user-id", "1");
+    cacheSet("/api/catalog/me/artists", [{ artist_name: "High Vis" }]);
+
+    localStorage.setItem("listen-auth-user-id", "2");
+
+    expect(cacheGet("/api/catalog/me/artists")).toBeNull();
+  });
+
+  it("does not reuse payloads after the active native server changes", () => {
+    localStorage.setItem("listen-auth-user-id", "1");
+    localStorage.setItem("crate-current-server", "server-a");
+    cacheSet("/api/me/home/discovery", { hero: "High Vis" });
+
+    localStorage.setItem("crate-current-server", "server-b");
+
+    expect(cacheGet("/api/me/home/discovery")).toBeNull();
+  });
+
+  it("ignores legacy unscoped payloads from previous app versions", () => {
+    localStorage.setItem(
+      `${STORAGE_KEY}:/api/catalog/me/artists`,
+      JSON.stringify({
+        data: [],
+        timestamp: Date.now(),
+        scopes: ["follows", "library"],
+      }),
+    );
+
+    expect(cacheGet("/api/catalog/me/artists")).toBeNull();
   });
 });
 
@@ -605,14 +662,14 @@ describe("storage write scheduling", () => {
   it("does not write to localStorage synchronously", () => {
     cacheSet("/api/foo", "sync-test");
     expect(cacheGet("/api/foo")).toBe("sync-test");
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/foo`)).toBeNull();
+    expect(localStorage.getItem(cacheStorageKey("/api/foo"))).toBeNull();
   });
 
   it("writes to localStorage after timer flush", async () => {
     vi.useFakeTimers();
     cacheSet("/api/foo", "delayed-write");
     await vi.runAllTimersAsync();
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/foo`)).not.toBeNull();
+    expect(localStorage.getItem(cacheStorageKey("/api/foo"))).not.toBeNull();
     vi.useRealTimers();
   });
 
@@ -621,7 +678,9 @@ describe("storage write scheduling", () => {
     cacheSet("/api/me/likes", [1]);
     cacheInvalidate("likes");
     await vi.runAllTimersAsync();
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/me/likes`)).toBeNull();
+    expect(
+      localStorage.getItem(`${STORAGE_KEY}:web:anonymous:/api/me/likes`),
+    ).toBeNull();
     vi.useRealTimers();
   });
 
@@ -630,7 +689,9 @@ describe("storage write scheduling", () => {
     cacheSet("/api/foo", 1);
     cacheClear();
     await vi.runAllTimersAsync();
-    expect(localStorage.getItem(`${STORAGE_KEY}:/api/foo`)).toBeNull();
+    expect(
+      localStorage.getItem(`${STORAGE_KEY}:web:anonymous:/api/foo`),
+    ).toBeNull();
     vi.useRealTimers();
   });
 
@@ -640,7 +701,9 @@ describe("storage write scheduling", () => {
     cacheSet("/api/foo", 2);
     await vi.runAllTimersAsync();
 
-    const stored = JSON.parse(localStorage.getItem(`${STORAGE_KEY}:/api/foo`)!);
+    const stored = JSON.parse(
+      localStorage.getItem(`${STORAGE_KEY}:web:anonymous:/api/foo`)!,
+    );
     expect(stored.data).toBe(2);
 
     vi.useRealTimers();
@@ -896,11 +959,13 @@ describe("connectCacheEvents", () => {
 describe("cache layer priority", () => {
   it("memory layer wins over localStorage", () => {
     localStorage.setItem(
-      `${STORAGE_KEY}:/api/foo`,
+      cacheStorageKey("/api/foo"),
       JSON.stringify({
         data: "from-storage",
         timestamp: Date.now(),
         scopes: [],
+        url: "/api/foo",
+        context: "web:anonymous",
       }),
     );
     cacheSet("/api/foo", "from-memory");

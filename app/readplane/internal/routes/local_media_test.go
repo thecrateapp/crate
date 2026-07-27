@@ -49,6 +49,39 @@ func TestServeLocalMediaNativeRange(t *testing.T) {
 	assert.Equal(t, "hit", rec.Header().Get("X-Crate-Readplane"))
 }
 
+func TestTrackStreamAcceptsNativeQueryToken(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(root, "track.mp3"), []byte("stream"), 0o644),
+	)
+	server := &Server{
+		cfg: config.Config{
+			Version:           "test",
+			LocalMediaEnabled: true,
+			MusicRoot:         root,
+		},
+		auth:    queryTokenAuthenticator{},
+		catalog: catalog.NewStore(nil, 0),
+		localMedia: stubLocalMediaCatalog{descriptor: catalog.LocalMediaDescriptor{
+			StoredPath: "track.mp3", Root: "music", RequestedPolicy: "original",
+			EffectivePolicy: "original", DeliveryFormat: "mp3",
+		}},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/tracks/1/stream?token=native-token",
+		nil,
+	)
+	response := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, "stream", response.Body.String())
+}
+
 func TestServeLocalMediaReadsTranscodedVariantsFromCacheRoot(t *testing.T) {
 	cacheRoot := t.TempDir()
 	musicRoot := t.TempDir()

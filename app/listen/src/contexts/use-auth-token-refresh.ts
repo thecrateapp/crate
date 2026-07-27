@@ -12,15 +12,24 @@ const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 const FALLBACK_REFRESH_MS = 45 * 60 * 1000;
 const MIN_REFRESH_DELAY_MS = 5_000;
 
+function boundedRefreshMargin(remainingMs: number): number {
+  return Math.min(
+    REFRESH_MARGIN_MS,
+    Math.max(MIN_REFRESH_DELAY_MS, remainingMs * 0.2),
+  );
+}
+
 function nextRefreshDelay(): number | null {
   if (!getAuthToken()) return null;
   const expiresAt = getAuthTokenExpiresAt();
   if (!expiresAt) return FALLBACK_REFRESH_MS;
   const expiresMs = Date.parse(expiresAt);
   if (!Number.isFinite(expiresMs)) return FALLBACK_REFRESH_MS;
+  const remainingMs = expiresMs - Date.now();
+  if (remainingMs <= 0) return MIN_REFRESH_DELAY_MS;
   return Math.max(
     MIN_REFRESH_DELAY_MS,
-    expiresMs - Date.now() - REFRESH_MARGIN_MS,
+    remainingMs - boundedRefreshMargin(remainingMs),
   );
 }
 

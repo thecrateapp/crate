@@ -10,9 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thecrateapp/crate/app/readplane/internal/auth"
+	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
 	"github.com/thecrateapp/crate/app/readplane/internal/media"
 )
@@ -20,6 +23,25 @@ import (
 type stubArtworkCatalog struct {
 	key string
 	err error
+}
+
+type queryTokenAuthenticator struct{}
+
+func (queryTokenAuthenticator) Authenticate(r *http.Request, allowQueryToken bool) (*auth.User, error) {
+	if allowQueryToken && r.URL.Query().Get("token") == "native-token" {
+		return &auth.User{ID: 1, Email: "native@example.test", Role: "user"}, nil
+	}
+	return nil, auth.ErrUnauthorized
+}
+
+func (queryTokenAuthenticator) AuthenticateProfile(r *http.Request, allowQueryToken bool) (*auth.User, error) {
+	return queryTokenAuthenticator{}.Authenticate(r, allowQueryToken)
+}
+
+func (queryTokenAuthenticator) InvalidateScope(string) {}
+
+func (queryTokenAuthenticator) Stats() auth.IdentityCacheStats {
+	return auth.IdentityCacheStats{}
 }
 
 func writeRouteArtworkFixture(t *testing.T, root, kind, key string) {
@@ -84,4 +106,47 @@ func TestNewServerResolvesArtworkFromCacheRoot(t *testing.T) {
 	expected, err := filepath.EvalSymlinks(filepath.Join(cacheRoot, "artwork-variants", "v1", "album-cover", "album-uid", "rev", "256.webp"))
 	require.NoError(t, err)
 	assert.Equal(t, expected, asset.Path)
+}
+
+func TestAlbumArtworkAcceptsNativeQueryToken(t *testing.T) {
+	cacheRoot := t.TempDir()
+	writeRouteArtworkFixture(t, cacheRoot, "album-cover", "album-uid")
+	server := &Server{
+		cfg:             config.Config{Version: "test"},
+		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		auth:            queryTokenAuthenticator{},
+		catalog:         catalog.NewStore(nil, time.Second),
+		artworkCatalog:  stubArtworkCatalog{key: "album-uid"},
+		artworkResolver: media.NewArtworkResolver(cacheRoot),
+	}
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/albums/1/cover?size=128&token=native-token",
+		nil,
+	)
+	response := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, "webp", response.Body.String())
+}
+
+func TestCatalogJSONRejectsQueryToken(t *testing.T) {
+	server := &Server{
+		cfg:     config.Config{Version: "test"},
+		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		auth:    queryTokenAuthenticator{},
+		catalog: catalog.NewStore(nil, time.Second),
+	}
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/catalog/search?q=high+vis&token=native-token",
+		nil,
+	)
+	response := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusUnauthorized, response.Code)
 }
