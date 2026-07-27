@@ -255,7 +255,7 @@ services:
   # Crate — Music stack management
   crate-api:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-api:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_API_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-api:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       target: api
@@ -375,7 +375,7 @@ services:
 
   crate-readplane:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-readplane:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_READPLANE_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-readplane:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app/readplane
     container_name: crate-readplane
@@ -463,7 +463,7 @@ services:
 
   crate-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       target: worker-core
@@ -600,7 +600,7 @@ services:
 
   crate-projector:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       target: worker-core
@@ -647,7 +647,7 @@ services:
 
   crate-maintenance-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       target: worker-core
@@ -757,7 +757,7 @@ services:
 
   crate-analysis-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_ANALYSIS_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       target: worker-analysis
@@ -837,7 +837,7 @@ services:
 
   crate-playback-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-playback-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_PLAYBACK_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-playback-worker:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       target: worker-playback
@@ -909,7 +909,7 @@ services:
 
   crate-media-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-media-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_MEDIA_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-media-worker:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       target: media-worker
@@ -937,7 +937,7 @@ services:
 
   crate-ui:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_UI_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       dockerfile: ui/Dockerfile
@@ -958,7 +958,7 @@ services:
 
   crate-listen:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_LISTEN_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: ./app
       dockerfile: listen/Dockerfile

@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -28,6 +29,91 @@ def test_deploy_version_forwards_one_commit_to_the_release_script() -> None:
 
     assert "DEPLOY_VERSION='0123456789abcdef0123456789abcdef01234567'" in output
     assert "scripts/deploy.sh deploy" in output
+
+
+def test_build_workflow_promotes_a_complete_manifest_after_selective_builds() -> None:
+    workflow = (ROOT / ".github/workflows/build-images.yml").read_text()
+
+    assert "concurrency:" in workflow
+    assert "changes:" in workflow
+    assert "promote-release:" in workflow
+    assert "args=(detect --head" in workflow
+    assert 'scripts/release_manifest.py "${args[@]}"' in workflow
+    assert "scripts/release_manifest.py assemble" in workflow
+    assert "crate-release-manifest:stable" in workflow
+    assert "steps.build.outputs.digest" in workflow
+    assert "needs: changes" in workflow
+    assert "type=raw,value=latest" not in workflow
+    assert "artifact-metadata: write" in workflow
+    assert "Promote release manifest to stable" in workflow
+    assert workflow.index("Attest release manifest") < workflow.index(
+        "Promote release manifest to stable"
+    )
+
+
+@pytest.mark.parametrize(
+    ("compose_name", "service_name", "image_variable"),
+    [
+        ("docker-compose.yaml", "crate-api", "CRATE_API_IMAGE"),
+        ("docker-compose.yaml", "crate-readplane", "CRATE_READPLANE_IMAGE"),
+        ("docker-compose.yaml", "crate-worker", "CRATE_WORKER_IMAGE"),
+        ("docker-compose.yaml", "crate-projector", "CRATE_WORKER_IMAGE"),
+        ("docker-compose.yaml", "crate-maintenance-worker", "CRATE_WORKER_IMAGE"),
+        (
+            "docker-compose.yaml",
+            "crate-analysis-worker",
+            "CRATE_ANALYSIS_WORKER_IMAGE",
+        ),
+        (
+            "docker-compose.yaml",
+            "crate-playback-worker",
+            "CRATE_PLAYBACK_WORKER_IMAGE",
+        ),
+        ("docker-compose.yaml", "crate-media-worker", "CRATE_MEDIA_WORKER_IMAGE"),
+        ("docker-compose.yaml", "crate-ui", "CRATE_UI_IMAGE"),
+        ("docker-compose.yaml", "crate-listen", "CRATE_LISTEN_IMAGE"),
+        ("docker-compose.project.yaml", "crate-site", "CRATE_SITE_IMAGE"),
+        ("docker-compose.project.yaml", "crate-docs", "CRATE_DOCS_IMAGE"),
+        (
+            "docker-compose.home.yaml",
+            "crate-media-worker",
+            "CRATE_MEDIA_WORKER_IMAGE",
+        ),
+        ("docker-compose.home.yaml", "crate-api", "CRATE_API_IMAGE"),
+        (
+            "docker-compose.home.yaml",
+            "crate-readplane",
+            "CRATE_READPLANE_IMAGE",
+        ),
+        ("docker-compose.home.yaml", "crate-worker", "CRATE_WORKER_IMAGE"),
+        ("docker-compose.home.yaml", "crate-projector", "CRATE_WORKER_IMAGE"),
+        (
+            "docker-compose.home.yaml",
+            "crate-maintenance-worker",
+            "CRATE_WORKER_IMAGE",
+        ),
+        (
+            "docker-compose.home.yaml",
+            "crate-analysis-worker",
+            "CRATE_ANALYSIS_WORKER_IMAGE",
+        ),
+        (
+            "docker-compose.home.yaml",
+            "crate-playback-worker",
+            "CRATE_PLAYBACK_WORKER_IMAGE",
+        ),
+        ("docker-compose.home.yaml", "crate-ui", "CRATE_UI_IMAGE"),
+        ("docker-compose.home.yaml", "crate-listen", "CRATE_LISTEN_IMAGE"),
+    ],
+)
+def test_compose_supports_independent_immutable_image_references(
+    compose_name: str, service_name: str, image_variable: str
+) -> None:
+    compose = yaml.safe_load((ROOT / compose_name).read_text())
+    image = compose["services"][service_name]["image"]
+
+    assert image.startswith(f"${{{image_variable}:-")
+    assert "${CRATE_IMAGE_TAG:-latest}" in image
 
 
 def test_deploy_preflight_uses_the_same_versioned_release_contract() -> None:
@@ -61,6 +147,46 @@ def test_deploy_cannot_bypass_remote_release_preflight() -> None:
     assert deploy_body.index("remote_deploy release-preflight") < deploy_body.index(
         "remote_deploy backup"
     )
+
+
+def test_local_deploy_resolves_and_stages_an_immutable_release_manifest() -> None:
+    script = (ROOT / "scripts/deploy.sh").read_text()
+
+    assert "crate-release-manifest:${DEPLOY_IMAGE_SHA}" in script
+    assert "fetch_release_manifest" in script
+    assert 'scripts/release_manifest.py" validate' in script
+    assert 'scripts/release_manifest.py" env' in script
+    assert '"$TMP_DIR/release-manifest.json"' in script
+    assert '"$TMP_DIR/release.env"' in script
+    assert 'scripts/release_manifest.py" refs' in script
+
+
+def test_remote_deploy_only_pulls_and_restarts_changed_release_services() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    config_body = script[script.index("cmd_config() {") : script.index("cmd_pull() {")]
+    pull_body = script[script.index("cmd_pull() {") : script.index("cmd_up() {")]
+    up_body = script[script.index("cmd_up() {") : script.index("cmd_verify() {")]
+
+    assert "record_changed_release_services" in config_body
+    assert "changed_image_refs" in pull_body
+    assert "PROJECT_IMAGES" not in pull_body
+    assert "changed_services" in up_body
+    assert "--no-deps" in up_body
+
+
+def test_image_rollback_restores_only_the_services_changed_by_the_release() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    rollback_body = script[
+        script.index("cmd_rollback() {") : script.index("cmd_state_rollback() {")
+    ]
+    makefile = (ROOT / "Makefile").read_text()
+
+    assert "changed_services" in rollback_body
+    assert "--no-deps" in rollback_body
+    assert "release-manifest.json" in rollback_body
+    assert "deploy-image-rollback:" in makefile
+    assert 'test "$(CONFIRM)" = "rollback-images"' in makefile
+    assert "scripts/deploy.sh image-rollback" in makefile
 
 
 def test_production_compose_propagates_federation_identity_and_secrets() -> None:
@@ -137,6 +263,7 @@ def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
     )
     assert "chmod 600 /backup/redis-durable.tar.gz" in snapshot_body
     assert "docker-compose.yaml" in snapshot_body
+    assert ".deploy/release-manifest.json" in snapshot_body
     assert "recovery.env" in snapshot_body
     assert 'sha256sum "${checksum_files[@]}"' in snapshot_body
     assert "recovery_complete" in script

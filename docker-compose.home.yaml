@@ -209,7 +209,7 @@ services:
 
   crate-media-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-media-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_MEDIA_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-media-worker:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-media-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -232,7 +232,7 @@ services:
 
   crate-api:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-api:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_API_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-api:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-api
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -294,7 +294,7 @@ services:
 
   crate-readplane:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-readplane:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_READPLANE_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-readplane:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-readplane
     restart: unless-stopped
     environment:
@@ -373,7 +373,7 @@ services:
 
   crate-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -453,7 +453,7 @@ services:
 
   crate-projector:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-projector
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -485,7 +485,7 @@ services:
 
   crate-maintenance-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-maintenance-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -533,7 +533,7 @@ services:
 
   crate-analysis-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_ANALYSIS_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-analysis-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -573,7 +573,7 @@ services:
 
   crate-playback-worker:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-playback-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_PLAYBACK_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-playback-worker:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-playback-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -616,7 +616,7 @@ services:
 
   crate-ui:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_UI_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-ui
     restart: unless-stopped
     depends_on:
@@ -637,7 +637,7 @@ services:
 
   crate-listen:
     logging: *default-logging
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_LISTEN_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-listen
     restart: unless-stopped
     depends_on:

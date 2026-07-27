@@ -743,8 +743,8 @@ _create-dirs:
 # DEPLOY (production)
 # ===========================================================================
 
-# Defaults to the short SHA tag published by GitHub Actions for origin/main.
-# VERSION=<full-main-sha> pins compose and every application image to one release.
+# Resolves the immutable release manifest published for origin/main.
+# VERSION=<full-main-sha> pins compose and every application image by OCI digest.
 # Lower-level overrides remain available for development and incident recovery:
 # DEPLOY_IMAGE_TAG=<tag>, DEPLOY_REF=<git-ref>, DEPLOY_IMAGE_OWNER=<owner>, DEPLOY_PUBLIC_CHECKS=0.
 .PHONY: deploy
@@ -766,6 +766,12 @@ deploy-rollback: ## Restore a recovery set (requires CONFIRM=restore-production)
 	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<release-id> is required$(NC)"; exit 1; }
 	@test "$(CONFIRM)" = "restore-production" || { echo "$(RED)CONFIRM=restore-production is required$(NC)"; exit 1; }
 	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh rollback
+
+.PHONY: deploy-image-rollback
+deploy-image-rollback: ## Roll back only application images/config (requires CONFIRM=rollback-images)
+	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<release-id> is required$(NC)"; exit 1; }
+	@test "$(CONFIRM)" = "rollback-images" || { echo "$(RED)CONFIRM=rollback-images is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh image-rollback
 
 .PHONY: deploy-build
 deploy-build: ## Deploy by building on the server (GHCR fallback)

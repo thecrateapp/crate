@@ -5,6 +5,7 @@ SERVER_PATH="${SERVER_PATH:?SERVER_PATH is required}"
 DEPLOY_ID="${DEPLOY_ID:?DEPLOY_ID is required}"
 DEPLOY_CANDIDATE_DIR="${DEPLOY_CANDIDATE_DIR:-}"
 DEPLOY_IMAGE_TAG="${DEPLOY_IMAGE_TAG:?DEPLOY_IMAGE_TAG is required}"
+DEPLOY_RELEASE_SHA="${DEPLOY_RELEASE_SHA:-}"
 DEPLOY_IMAGE_OWNER="${DEPLOY_IMAGE_OWNER:-thecrateapp}"
 DEPLOY_IMAGE_REGISTRY="${DEPLOY_IMAGE_REGISTRY:-ghcr.io}"
 DEPLOY_PUBLIC_CHECKS="${DEPLOY_PUBLIC_CHECKS:-1}"
@@ -27,17 +28,18 @@ PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-projector crate-m
 HEALTHY_SERVICES=(crate-redis crate-postgres crate-api)
 RUNNING_SERVICES=(crate-readplane crate-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs)
 QUIESCE_SERVICES=(crate-api crate-readplane crate-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker)
-PROJECT_IMAGES=(
-  "${IMAGE_PREFIX}/crate-api"
-  "${IMAGE_PREFIX}/crate-readplane"
-  "${IMAGE_PREFIX}/crate-worker"
-  "${IMAGE_PREFIX}/crate-analysis-worker"
-  "${IMAGE_PREFIX}/crate-playback-worker"
-  "${IMAGE_PREFIX}/crate-media-worker"
-  "${IMAGE_PREFIX}/crate-ui"
-  "${IMAGE_PREFIX}/crate-listen"
-  "${IMAGE_PREFIX}/crate-site"
-  "${IMAGE_PREFIX}/crate-docs"
+RELEASE_ENV_KEYS=(
+  CRATE_RELEASE_SHA
+  CRATE_API_IMAGE
+  CRATE_READPLANE_IMAGE
+  CRATE_WORKER_IMAGE
+  CRATE_ANALYSIS_WORKER_IMAGE
+  CRATE_PLAYBACK_WORKER_IMAGE
+  CRATE_MEDIA_WORKER_IMAGE
+  CRATE_UI_IMAGE
+  CRATE_LISTEN_IMAGE
+  CRATE_SITE_IMAGE
+  CRATE_DOCS_IMAGE
 )
 
 declare -A SERVICE_IMAGE_REPOS=(
@@ -54,6 +56,30 @@ declare -A SERVICE_IMAGE_REPOS=(
   [crate-site]="${IMAGE_PREFIX}/crate-site"
   [crate-docs]="${IMAGE_PREFIX}/crate-docs"
 )
+declare -A RELEASE_ENV_REPOS=(
+  [CRATE_API_IMAGE]="${IMAGE_PREFIX}/crate-api"
+  [CRATE_READPLANE_IMAGE]="${IMAGE_PREFIX}/crate-readplane"
+  [CRATE_WORKER_IMAGE]="${IMAGE_PREFIX}/crate-worker"
+  [CRATE_ANALYSIS_WORKER_IMAGE]="${IMAGE_PREFIX}/crate-analysis-worker"
+  [CRATE_PLAYBACK_WORKER_IMAGE]="${IMAGE_PREFIX}/crate-playback-worker"
+  [CRATE_MEDIA_WORKER_IMAGE]="${IMAGE_PREFIX}/crate-media-worker"
+  [CRATE_UI_IMAGE]="${IMAGE_PREFIX}/crate-ui"
+  [CRATE_LISTEN_IMAGE]="${IMAGE_PREFIX}/crate-listen"
+  [CRATE_SITE_IMAGE]="${IMAGE_PREFIX}/crate-site"
+  [CRATE_DOCS_IMAGE]="${IMAGE_PREFIX}/crate-docs"
+)
+declare -A RELEASE_ENV_SERVICES=(
+  [CRATE_API_IMAGE]="crate-api"
+  [CRATE_READPLANE_IMAGE]="crate-readplane"
+  [CRATE_WORKER_IMAGE]="crate-worker crate-projector crate-maintenance-worker"
+  [CRATE_ANALYSIS_WORKER_IMAGE]="crate-analysis-worker"
+  [CRATE_PLAYBACK_WORKER_IMAGE]="crate-playback-worker"
+  [CRATE_MEDIA_WORKER_IMAGE]="crate-media-worker"
+  [CRATE_UI_IMAGE]="crate-ui"
+  [CRATE_LISTEN_IMAGE]="crate-listen"
+  [CRATE_SITE_IMAGE]="crate-site"
+  [CRATE_DOCS_IMAGE]="crate-docs"
+)
 
 log() {
   printf '\n[remote] %s\n' "$*"
@@ -63,15 +89,21 @@ dc() {
   "${COMPOSE[@]}" "$@"
 }
 
-env_value() {
-  local key="$1"
+env_file_value() {
+  local file="$1"
+  local key="$2"
   local value
-  value="$(grep -E "^${key}=" .env 2>/dev/null | tail -n 1 | cut -d= -f2- || true)"
+  value="$(grep -E "^${key}=" "$file" 2>/dev/null | tail -n 1 | cut -d= -f2- || true)"
   value="${value%\"}"
   value="${value#\"}"
   value="${value%\'}"
   value="${value#\'}"
   printf '%s' "$value"
+}
+
+env_value() {
+  local key="$1"
+  env_file_value .env "$key"
 }
 
 compose_has_service() {
@@ -97,21 +129,81 @@ stop_existing_services() {
   fi
 }
 
-set_env_value() {
-  local key="$1"
-  local value="$2"
+set_env_file_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
   local tmp
 
   tmp="$(mktemp)"
-  if [[ -f .env && "$(grep -c -E "^${key}=" .env || true)" -gt 0 ]]; then
-    sed -E "s|^${key}=.*|${key}=${value}|" .env > "$tmp"
+  if [[ -f "$file" && "$(grep -c -E "^${key}=" "$file" || true)" -gt 0 ]]; then
+    sed -E "s|^${key}=.*|${key}=${value}|" "$file" > "$tmp"
   else
-    if [[ -f .env ]]; then
-      cp .env "$tmp"
+    if [[ -f "$file" ]]; then
+      cp "$file" "$tmp"
     fi
     printf '\n%s=%s\n' "$key" "$value" >> "$tmp"
   fi
-  mv "$tmp" .env
+  mv "$tmp" "$file"
+}
+
+set_env_value() {
+  local key="$1"
+  local value="$2"
+  set_env_file_value .env "$key" "$value"
+}
+
+is_release_env_key() {
+  local candidate="$1"
+  local key
+  for key in "${RELEASE_ENV_KEYS[@]}"; do
+    [[ "$candidate" == "$key" ]] && return 0
+  done
+  return 1
+}
+
+validate_release_env_file() {
+  local file="$1"
+  local key
+  local value
+  declare -A seen=()
+
+  test -f "$file"
+  while IFS='=' read -r key value; do
+    [[ -z "$key" ]] && continue
+    if ! is_release_env_key "$key"; then
+      log "Unexpected release environment key: ${key}"
+      return 1
+    fi
+    if [[ -n "${seen[$key]:-}" ]]; then
+      log "Duplicate release environment key: ${key}"
+      return 1
+    fi
+    if [[ "$key" == "CRATE_RELEASE_SHA" ]]; then
+      [[ "$value" =~ ^[0-9a-f]{40}$ ]] || return 1
+    elif [[ ! "$value" =~ ^[^[:space:]]+@sha256:[0-9a-f]{64}$ ]]; then
+      log "Release image reference is not immutable: ${key}"
+      return 1
+    fi
+    seen["$key"]=1
+  done < "$file"
+  for key in "${RELEASE_ENV_KEYS[@]}"; do
+    if [[ -z "${seen[$key]:-}" ]]; then
+      log "Missing release environment key: ${key}"
+      return 1
+    fi
+  done
+}
+
+apply_release_env() {
+  local file="$1"
+  local key
+  local value
+
+  validate_release_env_file "$file"
+  while IFS='=' read -r key value; do
+    [[ -n "$key" ]] && set_env_value "$key" "$value"
+  done < "$file"
 }
 
 assert_compose_redis_auth() {
@@ -182,6 +274,8 @@ cmd_release_preflight() {
   local available_kib
   local backup_running
   local public_api_url
+  local release_env
+  local release_sha
 
   log "Checking production release prerequisites"
   assert_deploy_id
@@ -195,6 +289,14 @@ cmd_release_preflight() {
   fi
   test -f "$DEPLOY_CANDIDATE_DIR/docker-compose.yaml"
   test -f "$DEPLOY_CANDIDATE_DIR/docker-compose.project.yaml"
+  test -f "$DEPLOY_CANDIDATE_DIR/release-manifest.json"
+  release_env="$DEPLOY_CANDIDATE_DIR/release.env"
+  validate_release_env_file "$release_env"
+  release_sha="$(env_file_value "$release_env" CRATE_RELEASE_SHA)"
+  if [[ -n "$DEPLOY_RELEASE_SHA" && "$release_sha" != "$DEPLOY_RELEASE_SHA" ]]; then
+    log "Candidate release SHA does not match the requested release"
+    return 1
+  fi
 
   assert_required_env REDIS_PASSWORD 16
   assert_required_env CRATE_POSTGRES_USER
@@ -226,6 +328,17 @@ cmd_release_preflight() {
   fi
 
   log "Validating candidate compose with the production environment"
+  CRATE_RELEASE_SHA="$release_sha" \
+  CRATE_API_IMAGE="$(env_file_value "$release_env" CRATE_API_IMAGE)" \
+  CRATE_READPLANE_IMAGE="$(env_file_value "$release_env" CRATE_READPLANE_IMAGE)" \
+  CRATE_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_WORKER_IMAGE)" \
+  CRATE_ANALYSIS_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_ANALYSIS_WORKER_IMAGE)" \
+  CRATE_PLAYBACK_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_PLAYBACK_WORKER_IMAGE)" \
+  CRATE_MEDIA_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_MEDIA_WORKER_IMAGE)" \
+  CRATE_UI_IMAGE="$(env_file_value "$release_env" CRATE_UI_IMAGE)" \
+  CRATE_LISTEN_IMAGE="$(env_file_value "$release_env" CRATE_LISTEN_IMAGE)" \
+  CRATE_SITE_IMAGE="$(env_file_value "$release_env" CRATE_SITE_IMAGE)" \
+  CRATE_DOCS_IMAGE="$(env_file_value "$release_env" CRATE_DOCS_IMAGE)" \
   CRATE_IMAGE_TAG="$DEPLOY_IMAGE_TAG" \
   CRATE_IMAGE_OWNER="$DEPLOY_IMAGE_OWNER" \
   CRATE_IMAGE_REGISTRY="$DEPLOY_IMAGE_REGISTRY" \
@@ -404,6 +517,11 @@ cmd_backup() {
       cp -a "$file" "$BACKUP_DIR/$file"
     fi
   done
+  if [[ -f .deploy/release-manifest.json ]]; then
+    mkdir -p "$BACKUP_DIR/.deploy"
+    cp -a .deploy/release-manifest.json \
+      "$BACKUP_DIR/.deploy/release-manifest.json"
+  fi
   if [[ -f deploy/traefik/federation-readplane.yml ]]; then
     mkdir -p "$BACKUP_DIR/deploy/traefik"
     cp -a deploy/traefik/federation-readplane.yml \
@@ -557,6 +675,9 @@ cmd_recovery_snapshot() {
     recovery.env
     recovery_running_services
   )
+  if [[ -f "$BACKUP_DIR/.deploy/release-manifest.json" ]]; then
+    checksum_files+=(.deploy/release-manifest.json)
+  fi
   if [[ -f "$BACKUP_DIR/deploy/traefik/federation-readplane.yml" ]]; then
     checksum_files+=(deploy/traefik/federation-readplane.yml)
   fi
@@ -571,11 +692,57 @@ cmd_recovery_snapshot() {
   log "Run the pinned deploy now, or explicitly restore this recovery set"
 }
 
+record_changed_release_services() {
+  local candidate_env=".deploy/release.env.candidate"
+  local old_env=".env"
+  local force_all=0
+  local key
+  local new_ref
+  local old_ref
+  local service
+  local services=()
+
+  if [[ -f "$BACKUP_DIR/.env" ]]; then
+    old_env="$BACKUP_DIR/.env"
+  fi
+  if ! cmp -s "$BACKUP_DIR/docker-compose.yaml" docker-compose.yaml \
+    || ! cmp -s "$BACKUP_DIR/docker-compose.project.yaml" docker-compose.project.yaml; then
+    force_all=1
+  fi
+
+  : > "$BACKUP_DIR/changed_image_refs"
+  : > "$BACKUP_DIR/changed_services"
+  for key in "${RELEASE_ENV_KEYS[@]}"; do
+    [[ "$key" == "CRATE_RELEASE_SHA" ]] && continue
+    new_ref="$(env_file_value "$candidate_env" "$key")"
+    old_ref="$(env_file_value "$old_env" "$key")"
+    if [[ -z "$old_ref" ]]; then
+      old_ref="${RELEASE_ENV_REPOS[$key]}:$(env_file_value "$old_env" CRATE_IMAGE_TAG)"
+    fi
+    if [[ "$force_all" != "1" && "$new_ref" == "$old_ref" ]]; then
+      continue
+    fi
+    printf '%s\n' "$new_ref" >> "$BACKUP_DIR/changed_image_refs"
+    read -r -a services <<< "${RELEASE_ENV_SERVICES[$key]}"
+    for service in "${services[@]}"; do
+      printf '%s\n' "$service" >> "$BACKUP_DIR/changed_services"
+    done
+  done
+  sort -u -o "$BACKUP_DIR/changed_image_refs" "$BACKUP_DIR/changed_image_refs"
+  sort -u -o "$BACKUP_DIR/changed_services" "$BACKUP_DIR/changed_services"
+}
+
 cmd_config() {
-  log "Validating compose configuration for ${IMAGE_PREFIX}/*:${DEPLOY_IMAGE_TAG}"
+  local candidate_env=".deploy/release.env.candidate"
+
+  log "Validating immutable release configuration"
+  validate_release_env_file "$candidate_env"
+  record_changed_release_services
   set_env_value CRATE_IMAGE_TAG "$DEPLOY_IMAGE_TAG"
   set_env_value CRATE_IMAGE_OWNER "$DEPLOY_IMAGE_OWNER"
   set_env_value CRATE_IMAGE_REGISTRY "$DEPLOY_IMAGE_REGISTRY"
+  apply_release_env "$candidate_env"
+  cp -a .deploy/release-manifest.json.candidate .deploy/release-manifest.json
   dc config -q
   assert_compose_redis_auth
   assert_music_mount_ready
@@ -585,17 +752,24 @@ cmd_pull() {
   local start
   local failures
   local image
+  local changed_image_refs="$BACKUP_DIR/changed_image_refs"
 
-  log "Pulling ${IMAGE_PREFIX} images for tag ${DEPLOY_IMAGE_TAG}"
+  if [[ ! -s "$changed_image_refs" ]]; then
+    log "No application image changed; skipping image pulls"
+    return 0
+  fi
+
+  log "Pulling only immutable images changed by this release"
   start="$SECONDS"
 
   while true; do
     failures=0
-    for image in "${PROJECT_IMAGES[@]}"; do
-      if ! docker pull -q "${image}:${DEPLOY_IMAGE_TAG}" >/dev/null; then
+    while IFS= read -r image; do
+      [[ -z "$image" ]] && continue
+      if ! docker pull -q "$image" >/dev/null; then
         failures=$((failures + 1))
       fi
-    done
+    done < "$changed_image_refs"
 
     if [[ "$failures" -eq 0 ]]; then
       break
@@ -606,36 +780,24 @@ cmd_pull() {
       return 1
     fi
 
-    log "Waiting for GitHub images to become available (${failures} missing)"
+    log "Waiting for ${failures} changed image(s) to become available"
     sleep "$DEPLOY_IMAGE_WAIT_INTERVAL"
   done
-
-  log "Pulling external images"
-  dc pull --ignore-buildable --ignore-pull-failures
-}
-
-ensure_project_images_for_tag() {
-  local tag="$1"
-  local failures=0
-  local image
-
-  for image in "${PROJECT_IMAGES[@]}"; do
-    if docker image inspect "${image}:${tag}" >/dev/null 2>&1; then
-      continue
-    fi
-    if docker pull -q "${image}:${tag}" >/dev/null 2>&1; then
-      continue
-    fi
-    log "Image unavailable for rollback: ${image}:${tag}"
-    failures=$((failures + 1))
-  done
-
-  [[ "$failures" -eq 0 ]]
 }
 
 cmd_up() {
-  log "Starting updated stack without building on the server"
-  dc up -d --no-build --remove-orphans
+  local changed_services="$BACKUP_DIR/changed_services"
+  local services=()
+
+  if [[ -f "$changed_services" ]]; then
+    mapfile -t services < "$changed_services"
+  fi
+  if (( ${#services[@]} == 0 )); then
+    log "No application service changed; leaving the running stack untouched"
+    return 0
+  fi
+  log "Restarting only ${#services[@]} changed application service(s)"
+  dc up -d --no-build --no-deps --remove-orphans "${services[@]}"
 }
 
 cmd_verify() {
@@ -678,8 +840,7 @@ cmd_verify() {
 }
 
 cmd_rollback() {
-  local rollback_tag
-  local target_tag
+  local changed_services="$BACKUP_DIR/changed_services"
   local rollback_services=()
   local service
 
@@ -688,9 +849,14 @@ cmd_rollback() {
     return 1
   fi
 
-  rollback_tag="$(cat "$BACKUP_DIR/rollback_tag" 2>/dev/null || true)"
-  if [[ -z "$rollback_tag" ]]; then
-    rollback_tag="$ROLLBACK_TAG"
+  if [[ -f "$changed_services" ]]; then
+    mapfile -t rollback_services < "$changed_services"
+  else
+    for service in "${PROJECT_SERVICES[@]}"; do
+      if compose_has_service "$service"; then
+        rollback_services+=("$service")
+      fi
+    done
   fi
 
   log "Restoring compose/env from rollback snapshot ${DEPLOY_ID}"
@@ -704,24 +870,24 @@ cmd_rollback() {
     cp -a "$BACKUP_DIR/deploy/traefik/federation-readplane.yml" \
       deploy/traefik/federation-readplane.yml
   fi
-
-  target_tag="$(env_value CRATE_IMAGE_TAG)"
-  if [[ -z "$target_tag" ]]; then
-    target_tag="$rollback_tag"
+  if [[ -f "$BACKUP_DIR/.deploy/release-manifest.json" ]]; then
+    mkdir -p .deploy
+    cp -a "$BACKUP_DIR/.deploy/release-manifest.json" \
+      .deploy/release-manifest.json
+  else
+    rm -f .deploy/release-manifest.json
   fi
-  set_env_value CRATE_IMAGE_TAG "$target_tag"
   dc config -q
 
-  log "Checking rollback images for CRATE_IMAGE_TAG=${target_tag}"
-  ensure_project_images_for_tag "$target_tag"
-
-  log "Restarting previous images with CRATE_IMAGE_TAG=${target_tag}"
-  for service in "${PROJECT_SERVICES[@]}"; do
-    if compose_has_service "$service"; then
-      rollback_services+=("$service")
-    fi
-  done
-  CRATE_IMAGE_TAG="$target_tag" "${COMPOSE[@]}" up -d --no-build --remove-orphans "${rollback_services[@]}"
+  if (( ${#rollback_services[@]} == 0 )); then
+    log "No application service changed; rollback only restored release configuration"
+    DEPLOY_PUBLIC_CHECKS=0 cmd_verify
+    return 0
+  fi
+  log "Restoring ${#rollback_services[@]} service(s) changed by the failed release"
+  dc pull --ignore-buildable "${rollback_services[@]}" >/dev/null 2>&1 || \
+    log "Registry pull failed during rollback; using preserved local images"
+  "${COMPOSE[@]}" up -d --no-build --no-deps --remove-orphans "${rollback_services[@]}"
   DEPLOY_PUBLIC_CHECKS=0 cmd_verify
 }
 
@@ -775,6 +941,13 @@ cmd_state_rollback() {
     cp -a "$BACKUP_DIR/deploy/traefik/federation-readplane.yml" \
       deploy/traefik/federation-readplane.yml
   fi
+  if [[ -f "$BACKUP_DIR/.deploy/release-manifest.json" ]]; then
+    mkdir -p .deploy
+    cp -a "$BACKUP_DIR/.deploy/release-manifest.json" \
+      .deploy/release-manifest.json
+  else
+    rm -f .deploy/release-manifest.json
+  fi
 
   pg_user="$(env_value CRATE_POSTGRES_USER)"
   pg_password="$(env_value CRATE_POSTGRES_PASSWORD)"
@@ -821,15 +994,12 @@ cmd_state_rollback() {
   docker start "$redis_service" >/dev/null
   wait_for_container_healthy "$redis_service"
 
-  target_tag="$(env_value CRATE_IMAGE_TAG)"
-  if [[ -z "$target_tag" ]]; then
-    log "Recovery configuration has no CRATE_IMAGE_TAG"
-    return 1
-  fi
-  ensure_project_images_for_tag "$target_tag"
-
+  target_tag="$(env_value CRATE_RELEASE_SHA)"
+  target_tag="${target_tag:-$(env_value CRATE_IMAGE_TAG)}"
   log "Restarting recovered release ${target_tag}"
-  CRATE_IMAGE_TAG="$target_tag" dc up -d --no-build --remove-orphans
+  dc pull --ignore-buildable "${PROJECT_SERVICES[@]}" >/dev/null 2>&1 || \
+    log "Registry pull failed during state rollback; using preserved local images"
+  dc up -d --no-build --remove-orphans
   DEPLOY_PUBLIC_CHECKS=0 cmd_verify
   log "State rollback ${DEPLOY_ID} completed at schema ${expected_schema}"
 }
