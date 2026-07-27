@@ -306,6 +306,119 @@ def test_full_match_recompute_rebinds_recording_mbid_without_unique_violation(
     assert recording_mbid == "recording-mbid"
 
 
+def test_full_match_recompute_rebinds_new_release_mbid_before_self_match(
+    pg_db,
+):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_local_catalog_batch,
+    )
+
+    pg_db.upsert_artist(
+        {
+            "name": "Between The Buried And Me",
+            "entity_uid": str(uuid.uuid4()),
+        }
+    )
+    original_album_id = pg_db.upsert_album(
+        {
+            "artist": "Between The Buried And Me",
+            "name": "The Blue Nowhere",
+            "path": "/music/Between The Buried And Me/The Blue Nowhere",
+            "entity_uid": str(uuid.uuid4()),
+            "musicbrainz_albumid": "shared-release-mbid",
+            "year": "2025",
+            "track_count": 10,
+        }
+    )
+    deluxe_album_id = pg_db.upsert_album(
+        {
+            "artist": "Between The Buried And Me",
+            "name": "The Blue Nowhere (Deluxe Edition)",
+            "path": (
+                "/music/Between The Buried And Me/The Blue Nowhere (Deluxe Edition)"
+            ),
+            "entity_uid": str(uuid.uuid4()),
+            "year": "2025",
+            "track_count": 14,
+        }
+    )
+    reconcile_local_catalog()
+
+    with read_scope() as session:
+        initial_targets = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_entity_uid::text
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'album'
+                      AND local_id = ANY(:album_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"album_ids": [original_album_id, deluxe_album_id]},
+            )
+            .scalars()
+            .all()
+        )
+    assert len(set(initial_targets)) == 2
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE library_albums
+                SET musicbrainz_albumid = 'shared-release-mbid'
+                WHERE id = :album_id
+                """
+            ),
+            {"album_id": deluxe_album_id},
+        )
+
+    cursor = None
+    while True:
+        batch = reconcile_local_catalog_batch(
+            batch_size=1,
+            cursor=cursor,
+            recompute_matches=True,
+        )
+        if batch["completed"]:
+            break
+        cursor = batch["next_cursor"]
+
+    with read_scope() as session:
+        reconciled_targets = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_entity_uid::text
+                    FROM global_catalog_sources
+                    WHERE entity_type = 'album'
+                      AND local_id = ANY(:album_ids)
+                    ORDER BY local_id
+                    """
+                ),
+                {"album_ids": [original_album_id, deluxe_album_id]},
+            )
+            .scalars()
+            .all()
+        )
+        canonical_count = session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM global_catalog_albums
+                WHERE musicbrainz_release_mbid = 'shared-release-mbid'
+                """
+            )
+        ).scalar_one()
+
+    assert len(set(reconciled_targets)) == 1
+    assert canonical_count == 1
+
+
 def test_full_match_recompute_keeps_release_mbid_after_anchor_is_pruned(
     pg_db,
 ):
