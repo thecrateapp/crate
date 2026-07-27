@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
+from starlette.datastructures import URL
 
 from crate.api.auth import _require_auth as _require_authenticated_user
 from crate.api.browse_artist import (
@@ -974,7 +975,23 @@ def catalog_track_stream(
 ):
     _require_auth(request)
     playback = _catalog_track_playback_payload(request, global_track_uid, delivery)
-    return RedirectResponse(url=playback["stream_url"], status_code=307)
+    return RedirectResponse(
+        url=_authenticated_stream_redirect_url(request, playback["stream_url"]),
+        status_code=307,
+    )
+
+
+def _authenticated_stream_redirect_url(request: Request, stream_url: str) -> str:
+    token = request.query_params.get("token")
+    target = URL(stream_url)
+    if (
+        not token
+        or target.scheme
+        or target.netloc
+        or not target.path.startswith("/api/")
+    ):
+        return stream_url
+    return str(target.include_query_params(token=token))
 
 
 @router.get(

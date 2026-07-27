@@ -220,7 +220,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   };
 
   const onEnded = () => {
-    if (state === Gapless5State.Play) {
+    if (state === Gapless5State.Play && player.currentSource() === this) {
       player.onEndedCallback();
     }
   };
@@ -735,6 +735,10 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         audioObj.addEventListener("loadeddata", onLoadedHTML5Audio, false);
         audioObj.addEventListener("canplay", onLoadedHTML5Audio, false);
         audioObj.addEventListener("canplaythrough", onLoadedHTML5Audio, false);
+        // Background tabs can throttle the transition timer for long enough
+        // to drop the browser MediaSession. The media element's native ended
+        // event remains the authoritative fallback while audio is active.
+        audioObj.addEventListener("ended", onEnded, false);
         audioObj.addEventListener(
           "loadeddata",
           () =>
