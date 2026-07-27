@@ -468,6 +468,17 @@ class LibrarySync:
                 audio_files, tree_mtime = self._scan_album_tree(album_dir)
                 actual_track_count = len(audio_files)
 
+                if actual_track_count == 0:
+                    result = self._sync_album_unlocked(
+                        album_dir,
+                        artist_name,
+                        audio_files=audio_files,
+                        tree_mtime=tree_mtime,
+                    )
+                    total_tracks += result["track_count"]
+                    synced_paths.add(album_path)
+                    continue
+
                 dir_mtime = existing_album.get("dir_mtime") if existing_album else None
                 if (
                     existing_album
@@ -563,6 +574,34 @@ class LibrarySync:
 
         # Get existing tracks for this album to reuse data for unchanged files
         existing_album_id = get_album_id_by_path(str(album_dir))
+
+        if not audio_files:
+            indexed_track_count = (
+                get_album_track_count(existing_album_id) if existing_album_id else 0
+            )
+            if existing_album_id and indexed_track_count == 0:
+                log.info(
+                    "Removing empty album index for sidecar-only directory %s",
+                    album_dir,
+                )
+                delete_album(str(album_dir))
+                existing_album_id = None
+            elif existing_album_id:
+                log.warning(
+                    "Preserving album %s after an empty filesystem scan because "
+                    "%d indexed tracks remain",
+                    album_dir,
+                    indexed_track_count,
+                )
+
+            return {
+                "album_id": existing_album_id,
+                "track_count": indexed_track_count,
+                "total_size": 0,
+                "formats": [],
+                "native_scan_payload_shadow": None,
+                "native_scan_payload_used": False,
+            }
 
         existing_tracks_by_path: dict[str, dict] = {}
         if existing_album_id:

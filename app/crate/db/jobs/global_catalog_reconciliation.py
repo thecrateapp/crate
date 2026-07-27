@@ -1290,7 +1290,16 @@ def _resolve_artist_target(
     if forced_target:
         return forced_target, MatchScore(1.0, "manual_force_merge", auto_merge=True)
 
+    payload = source["source_payload"]
     existing_target = _existing_source_target(session, source)
+    identity_target = _canonical_identity_target(session, "artist", payload)
+    if identity_target and identity_target[0] != existing_target:
+        return identity_target[0], MatchScore(
+            1.0,
+            identity_target[1],
+            auto_merge=True,
+        )
+
     existing_target_allowed = bool(
         existing_target
         and not merge_blocked_for_source(session, source, existing_target)
@@ -1307,7 +1316,6 @@ def _resolve_artist_target(
         if revalidated is not None:
             return revalidated
 
-    payload = source["source_payload"]
     rows = _candidate_artists(session, payload)
     existing_identity_match = (
         recompute_matches
@@ -1355,9 +1363,8 @@ def _resolve_album_target(
     if forced_target:
         return forced_target, MatchScore(1.0, "manual_force_merge", auto_merge=True)
 
-    provenance_target = str(
-        source["source_payload"].get("imported_global_album_uid") or ""
-    )
+    payload = source["source_payload"]
+    provenance_target = str(payload.get("imported_global_album_uid") or "")
     if provenance_target and not merge_blocked_for_source(
         session,
         source,
@@ -1370,6 +1377,14 @@ def _resolve_album_target(
         )
 
     existing_target = _existing_source_target(session, source)
+    identity_target = _canonical_identity_target(session, "album", payload)
+    if identity_target and identity_target[0] != existing_target:
+        return identity_target[0], MatchScore(
+            1.0,
+            identity_target[1],
+            auto_merge=True,
+        )
+
     existing_target_allowed = bool(
         existing_target
         and not merge_blocked_for_source(session, source, existing_target)
@@ -1386,7 +1401,6 @@ def _resolve_album_target(
         if revalidated is not None:
             return revalidated
 
-    payload = source["source_payload"]
     rows = _candidate_albums(session, payload, artist_uid)
     existing_identity_match = (
         recompute_matches
@@ -1434,7 +1448,16 @@ def _resolve_track_target(
     if forced_target:
         return forced_target, MatchScore(1.0, "manual_force_merge", auto_merge=True)
 
+    payload = source["source_payload"]
     existing_target = _existing_source_target(session, source)
+    identity_target = _canonical_identity_target(session, "track", payload)
+    if identity_target and identity_target[0] != existing_target:
+        return identity_target[0], MatchScore(
+            1.0,
+            identity_target[1],
+            auto_merge=True,
+        )
+
     existing_target_allowed = bool(
         existing_target
         and not merge_blocked_for_source(session, source, existing_target)
@@ -1451,7 +1474,6 @@ def _resolve_track_target(
         if revalidated is not None:
             return revalidated
 
-    payload = source["source_payload"]
     rows = _candidate_tracks(session, payload, artist_uid)
     existing_identity_match = (
         recompute_matches
@@ -1591,6 +1613,62 @@ def _has_strong_identity_match(
         payload.get(identifier) and payload.get(identifier) == candidate.get(identifier)
         for identifier in identifiers
     )
+
+
+def _canonical_identity_target(
+    session,
+    entity_type: str,
+    payload: dict[str, Any],
+) -> tuple[str, str] | None:
+    if entity_type == "artist":
+        identifier = payload.get("musicbrainz_artist_mbid")
+        if not identifier:
+            return None
+        target = session.execute(
+            text(
+                """
+                SELECT global_artist_uid::text
+                FROM global_catalog_artists
+                WHERE musicbrainz_artist_mbid = :identifier
+                """
+            ),
+            {"identifier": identifier},
+        ).scalar_one_or_none()
+        method = "musicbrainz_artist_mbid"
+    elif entity_type == "album":
+        identifier = payload.get("musicbrainz_release_mbid")
+        if not identifier:
+            return None
+        target = session.execute(
+            text(
+                """
+                SELECT global_album_uid::text
+                FROM global_catalog_albums
+                WHERE musicbrainz_release_mbid = :identifier
+                """
+            ),
+            {"identifier": identifier},
+        ).scalar_one_or_none()
+        method = "musicbrainz_release_mbid"
+    else:
+        identifier = payload.get("musicbrainz_recording_mbid")
+        if not identifier:
+            return None
+        target = session.execute(
+            text(
+                """
+                SELECT global_track_uid::text
+                FROM global_catalog_tracks
+                WHERE musicbrainz_recording_mbid = :identifier
+                """
+            ),
+            {"identifier": identifier},
+        ).scalar_one_or_none()
+        method = "musicbrainz_recording_mbid"
+
+    if target is None:
+        return None
+    return str(target), method
 
 
 def _existing_source_target(session, source: dict[str, Any]) -> str | None:

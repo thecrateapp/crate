@@ -298,6 +298,37 @@ class TestSyncAlbum:
                 assert queued_asset.entity_key == ALBUM_ENTITY_UID
                 assert mock_queue.call_args.kwargs == {"reason": "library-sync"}
 
+    def test_sync_album_ignores_sidecar_only_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            album_dir = lib / "Artist" / "album-uid"
+            album_dir.mkdir(parents=True)
+            (album_dir / "cover.jpg").write_bytes(b"cover")
+            (album_dir / "album.json").write_text("{}")
+
+            config = {
+                "library_path": str(lib),
+                "audio_extensions": [".flac"],
+            }
+
+            from crate.library_sync import LibrarySync
+
+            with (
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.upsert_scanned_album") as mock_upsert,
+                patch.object(
+                    LibrarySync, "_refresh_artist_summary_unlocked"
+                ) as mock_refresh,
+                patch("crate.library_sync.delete_album") as mock_delete,
+            ):
+                result = LibrarySync(config).sync_album(album_dir, "Artist")
+
+            assert result["album_id"] is None
+            assert result["track_count"] == 0
+            mock_upsert.assert_not_called()
+            mock_delete.assert_not_called()
+            mock_refresh.assert_called_once()
+
     def test_sync_album_refreshes_artist_summary_after_album_upsert(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             lib = Path(tmpdir)
@@ -829,6 +860,133 @@ class TestSyncAlbum:
 
                 assert count == 0
                 mock_delete_album.assert_not_called()
+
+    def test_sync_artist_dirs_ignores_new_sidecar_only_album(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            artist_dir = lib / "artist-uid"
+            album_dir = artist_dir / "album-uid"
+            album_dir.mkdir(parents=True)
+            (album_dir / "cover.jpg").write_bytes(b"art")
+            (album_dir / "album.json").write_text("{}")
+
+            config = {
+                "library_path": str(lib),
+                "audio_extensions": [".flac"],
+            }
+
+            from crate.library_sync import LibrarySync
+
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Between The Buried And Me"},
+                ),
+                patch("crate.library_sync.get_library_albums", return_value=[]),
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.upsert_scanned_album") as mock_upsert,
+                patch.object(LibrarySync, "_refresh_artist_summary_unlocked"),
+                patch("crate.library_sync.delete_album") as mock_delete_album,
+            ):
+                count = LibrarySync(config).sync_artist_dirs(
+                    "Between The Buried And Me",
+                    [artist_dir],
+                )
+
+            assert count == 0
+            mock_upsert.assert_not_called()
+            mock_delete_album.assert_not_called()
+
+    def test_sync_artist_dirs_deletes_indexed_sidecar_only_album_without_tracks(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            artist_dir = lib / "artist-uid"
+            album_dir = artist_dir / "album-uid"
+            album_dir.mkdir(parents=True)
+            (album_dir / "cover.jpg").write_bytes(b"art")
+            (album_dir / "album.json").write_text("{}")
+
+            config = {
+                "library_path": str(lib),
+                "audio_extensions": [".flac"],
+            }
+            existing_album = {
+                "id": 143,
+                "path": str(album_dir),
+                "track_count": 0,
+                "dir_mtime": 0,
+            }
+
+            from crate.library_sync import LibrarySync
+
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Between The Buried And Me"},
+                ),
+                patch(
+                    "crate.library_sync.get_library_albums",
+                    return_value=[existing_album],
+                ),
+                patch("crate.library_sync.get_album_id_by_path", return_value=143),
+                patch("crate.library_sync.get_album_track_count", return_value=0),
+                patch("crate.library_sync.upsert_scanned_album") as mock_upsert,
+                patch.object(LibrarySync, "_refresh_artist_summary_unlocked"),
+                patch("crate.library_sync.delete_album") as mock_delete_album,
+            ):
+                count = LibrarySync(config).sync_artist_dirs(
+                    "Between The Buried And Me",
+                    [artist_dir],
+                )
+
+            assert count == 0
+            mock_upsert.assert_not_called()
+            mock_delete_album.assert_called_once_with(str(album_dir))
+
+    def test_sync_artist_dirs_preserves_indexed_album_on_transient_empty_scan(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            artist_dir = lib / "artist-uid"
+            album_dir = artist_dir / "album-uid"
+            album_dir.mkdir(parents=True)
+            (album_dir / "cover.jpg").write_bytes(b"art")
+
+            config = {
+                "library_path": str(lib),
+                "audio_extensions": [".flac"],
+            }
+            existing_album = {
+                "id": 143,
+                "path": str(album_dir),
+                "track_count": 11,
+                "dir_mtime": 0,
+            }
+
+            from crate.library_sync import LibrarySync
+
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Between The Buried And Me"},
+                ),
+                patch(
+                    "crate.library_sync.get_library_albums",
+                    return_value=[existing_album],
+                ),
+                patch("crate.library_sync.get_album_id_by_path", return_value=143),
+                patch("crate.library_sync.get_album_track_count", return_value=11),
+                patch("crate.library_sync.upsert_scanned_album") as mock_upsert,
+                patch.object(LibrarySync, "_refresh_artist_summary_unlocked"),
+                patch("crate.library_sync.delete_album") as mock_delete_album,
+            ):
+                count = LibrarySync(config).sync_artist_dirs(
+                    "Between The Buried And Me",
+                    [artist_dir],
+                )
+
+            assert count == 11
+            mock_upsert.assert_not_called()
+            mock_delete_album.assert_not_called()
 
     def test_sync_artist_dirs_rolls_up_album_formats(self):
         with tempfile.TemporaryDirectory() as tmpdir:
