@@ -17,7 +17,7 @@ func (s *Server) catalogArtworkRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 3 && parts[0] == "albums" && parts[2] == "cover" {
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		key, err := s.artworkCatalog.GlobalAlbumArtworkKey(r.Context(), parts[1])
@@ -25,7 +25,7 @@ func (s *Server) catalogArtworkRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 3 && parts[0] == "artists" && (parts[2] == "photo" || parts[2] == "background") {
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		key, err := s.artworkCatalog.GlobalArtistArtworkKey(r.Context(), parts[1])

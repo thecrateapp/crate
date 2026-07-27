@@ -32,7 +32,7 @@ type Server struct {
 	cfg             config.Config
 	pool            *pgxpool.Pool
 	redis           *redis.Client
-	auth            *auth.Authenticator
+	auth            routeAuthenticator
 	catalog         *catalog.Store
 	localMedia      localMediaCatalog
 	artworkCatalog  artworkCatalog
@@ -42,6 +42,13 @@ type Server struct {
 	fallback        *httpx.FallbackProxy
 	federationProxy *readplanefederation.Proxy
 	logger          *slog.Logger
+}
+
+type routeAuthenticator interface {
+	Authenticate(*http.Request, bool) (*auth.User, error)
+	AuthenticateProfile(*http.Request, bool) (*auth.User, error)
+	InvalidateScope(string)
+	Stats() auth.IdentityCacheStats
 }
 
 type localMediaCatalog interface {
@@ -178,7 +185,7 @@ func (s *Server) federatedStream(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusServiceUnavailable, "Federation stream proxy unavailable")
 		return
 	}
-	user, err := s.auth.Authenticate(r, false)
+	user, err := s.auth.Authenticate(r, true)
 	if err != nil {
 		s.fallbackOrAuthError(w, r, err)
 		return

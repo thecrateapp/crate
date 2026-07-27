@@ -1,4 +1,5 @@
 import { apiSseUrl } from "@/lib/api";
+import { getStoredAuthUserId } from "@/lib/auth-user-storage";
 import { usesConfigurableServer } from "@/lib/platform";
 import { recordAssetInvalidationScope } from "@/lib/library-routes";
 import {
@@ -17,6 +18,8 @@ interface CacheEntry<T = unknown> {
   data: T;
   timestamp: number;
   scopes: string[];
+  url: string;
+  context: string;
 }
 
 const STORAGE_KEY = "crate-api-cache:v2";
@@ -35,10 +38,28 @@ const pendingStorageWrites = new Map<string, ScheduledStorageWriteHandle>();
 const LOCALSTORAGE_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
 const STORAGE_WRITE_TIMEOUT_MS = 250;
 
-function _cancelPendingStorageWrite(url: string): void {
-  const handle = pendingStorageWrites.get(url);
+function cacheContext(): string {
+  try {
+    const serverId = localStorage.getItem("crate-current-server") || "web";
+    const userId = getStoredAuthUserId() || "anonymous";
+    return `${serverId}:${userId}`;
+  } catch {
+    return "web:anonymous";
+  }
+}
+
+function scopedCacheKey(url: string, context = cacheContext()): string {
+  return `${context}\u0000${url}`;
+}
+
+function storageCacheKey(url: string, context = cacheContext()): string {
+  return `${STORAGE_KEY}:${context}:${url}`;
+}
+
+function _cancelPendingStorageWrite(cacheKey: string): void {
+  const handle = pendingStorageWrites.get(cacheKey);
   if (handle == null) return;
-  pendingStorageWrites.delete(url);
+  pendingStorageWrites.delete(cacheKey);
   if (
     typeof handle === "number" &&
     typeof globalThis.cancelIdleCallback === "function"
@@ -49,38 +70,44 @@ function _cancelPendingStorageWrite(url: string): void {
   globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>);
 }
 
-function _writeEntryToStorage(url: string): void {
-  pendingStorageWrites.delete(url);
-  const entry = memoryCache.get(url);
+function _writeEntryToStorage(cacheKey: string): void {
+  pendingStorageWrites.delete(cacheKey);
+  const entry = memoryCache.get(cacheKey);
   if (!entry) return;
 
   try {
-    localStorage.setItem(`${STORAGE_KEY}:${url}`, JSON.stringify(entry));
+    localStorage.setItem(
+      storageCacheKey(entry.url, entry.context),
+      JSON.stringify(entry),
+    );
   } catch {
     _evictOldest(5);
     try {
-      localStorage.setItem(`${STORAGE_KEY}:${url}`, JSON.stringify(entry));
+      localStorage.setItem(
+        storageCacheKey(entry.url, entry.context),
+        JSON.stringify(entry),
+      );
     } catch {
       /* give up */
     }
   }
 }
 
-function _scheduleStorageWrite(url: string): void {
-  _cancelPendingStorageWrite(url);
+function _scheduleStorageWrite(cacheKey: string): void {
+  _cancelPendingStorageWrite(cacheKey);
 
-  const runWrite = () => _writeEntryToStorage(url);
+  const runWrite = () => _writeEntryToStorage(cacheKey);
 
   if (typeof globalThis.requestIdleCallback === "function") {
     const handle = globalThis.requestIdleCallback(runWrite, {
       timeout: STORAGE_WRITE_TIMEOUT_MS,
     });
-    pendingStorageWrites.set(url, handle);
+    pendingStorageWrites.set(cacheKey, handle);
     return;
   }
 
   const handle = globalThis.setTimeout(runWrite, 0);
-  pendingStorageWrites.set(url, handle);
+  pendingStorageWrites.set(cacheKey, handle);
 }
 
 /** Scope tags for API URLs — determines what invalidation events
@@ -178,20 +205,22 @@ export function scopesForUrl(url: string): string[] {
 
 /** Get cached data for a URL. Returns null if not cached or expired. */
 export function cacheGet<T>(url: string): T | null {
-  const entry = memoryCache.get(url);
+  const context = cacheContext();
+  const cacheKey = scopedCacheKey(url, context);
+  const entry = memoryCache.get(cacheKey);
   if (entry) return entry.data as T;
 
   // Fallback to localStorage with TTL check
   try {
-    const raw = localStorage.getItem(`${STORAGE_KEY}:${url}`);
+    const raw = localStorage.getItem(storageCacheKey(url, context));
     if (raw) {
       const parsed: CacheEntry<T> = JSON.parse(raw);
       // Discard entries older than the safety-net TTL
       if (Date.now() - parsed.timestamp > LOCALSTORAGE_MAX_AGE_MS) {
-        localStorage.removeItem(`${STORAGE_KEY}:${url}`);
+        localStorage.removeItem(storageCacheKey(url, context));
         return null;
       }
-      memoryCache.set(url, parsed);
+      memoryCache.set(cacheKey, parsed);
       return parsed.data;
     }
   } catch {
@@ -203,10 +232,18 @@ export function cacheGet<T>(url: string): T | null {
 
 /** Store data in cache with scope tags. */
 export function cacheSet<T>(url: string, data: T): void {
+  const context = cacheContext();
   const scopes = scopesForUrl(url);
-  const entry: CacheEntry<T> = { data, timestamp: Date.now(), scopes };
-  memoryCache.set(url, entry);
-  _scheduleStorageWrite(url);
+  const entry: CacheEntry<T> = {
+    data,
+    timestamp: Date.now(),
+    scopes,
+    url,
+    context,
+  };
+  const cacheKey = scopedCacheKey(url, context);
+  memoryCache.set(cacheKey, entry);
+  _scheduleStorageWrite(cacheKey);
 }
 
 /** Invalidate all cache entries matching a scope. */
@@ -220,10 +257,13 @@ export function cacheInvalidate(scope: string): void {
   }
 
   for (const key of keysToRemove) {
+    const entry = memoryCache.get(key);
     _cancelPendingStorageWrite(key);
     memoryCache.delete(key);
     try {
-      localStorage.removeItem(`${STORAGE_KEY}:${key}`);
+      if (entry) {
+        localStorage.removeItem(storageCacheKey(entry.url, entry.context));
+      }
     } catch {
       /* ignore */
     }
@@ -232,8 +272,8 @@ export function cacheInvalidate(scope: string): void {
 
 /** Clear entire cache. */
 export function cacheClear(): void {
-  for (const key of pendingStorageWrites.keys()) {
-    _cancelPendingStorageWrite(key);
+  for (const cacheKey of pendingStorageWrites.keys()) {
+    _cancelPendingStorageWrite(cacheKey);
   }
   memoryCache.clear();
   try {
@@ -250,11 +290,11 @@ function _evictOldest(count: number): void {
   const entries = [...memoryCache.entries()]
     .sort((a, b) => a[1].timestamp - b[1].timestamp)
     .slice(0, count);
-  for (const [key] of entries) {
+  for (const [key, entry] of entries) {
     _cancelPendingStorageWrite(key);
     memoryCache.delete(key);
     try {
-      localStorage.removeItem(`${STORAGE_KEY}:${key}`);
+      localStorage.removeItem(storageCacheKey(entry.url, entry.context));
     } catch {
       /* ignore */
     }

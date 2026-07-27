@@ -155,14 +155,14 @@ func (s *Server) albumRoute(w http.ResponseWriter, r *http.Request) {
 			s.fallbackOrRouteMiss(w, r)
 			return
 		}
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		s.serveAlbumArtworkByID(w, r, albumID)
 		return
 	}
 	if len(parts) == 3 && parts[0] == "by-entity" && parts[2] == "cover" && isRouteUUID(parts[1]) {
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		s.serveAlbumArtworkByEntityUID(w, r, parts[1])
@@ -246,14 +246,14 @@ func (s *Server) artistRoute(w http.ResponseWriter, r *http.Request) {
 			s.fallbackOrRouteMiss(w, r)
 			return
 		}
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		s.serveArtistArtworkByID(w, r, artistID, parts[1])
 		return
 	}
 	if len(parts) == 3 && parts[0] == "by-entity" && (parts[2] == "photo" || parts[2] == "background") && isRouteUUID(parts[1]) {
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		s.serveArtistArtworkByEntityUID(w, r, parts[1], parts[2])
@@ -326,7 +326,7 @@ func (s *Server) trackRoute(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) trackByIDRoute(w http.ResponseWriter, r *http.Request, trackID int64, action string) {
 	if action == "stream" {
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		s.serveLocalMediaByID(w, r, trackID)
@@ -364,7 +364,7 @@ func (s *Server) trackByIDRoute(w http.ResponseWriter, r *http.Request, trackID 
 
 func (s *Server) trackByEntityRoute(w http.ResponseWriter, r *http.Request, entityUID string, action string) {
 	if action == "stream" {
-		if !s.requireCatalogAuth(w, r) {
+		if !s.requireCatalogAssetAuth(w, r) {
 			return
 		}
 		s.serveLocalMediaByEntityUID(w, r, entityUID)
@@ -480,12 +480,25 @@ func (s *Server) requireCatalogAuth(w http.ResponseWriter, r *http.Request) bool
 	return ok
 }
 
+func (s *Server) requireCatalogAssetAuth(w http.ResponseWriter, r *http.Request) bool {
+	_, ok := s.requireCatalogUserWithQueryToken(w, r, true)
+	return ok
+}
+
 func (s *Server) requireCatalogUser(w http.ResponseWriter, r *http.Request) (*auth.User, bool) {
+	return s.requireCatalogUserWithQueryToken(w, r, false)
+}
+
+func (s *Server) requireCatalogUserWithQueryToken(
+	w http.ResponseWriter,
+	r *http.Request,
+	allowQueryToken bool,
+) (*auth.User, bool) {
 	if s.catalog == nil || s.auth == nil {
 		s.catalogUnavailable(w, r, "Readplane catalog unavailable")
 		return nil, false
 	}
-	user, err := s.auth.Authenticate(r, false)
+	user, err := s.auth.Authenticate(r, allowQueryToken)
 	if err != nil {
 		if errors.Is(err, auth.ErrUnauthorized) {
 			httpx.MarkReadplane(w, "miss")
