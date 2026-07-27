@@ -13,6 +13,7 @@ DEPLOY_REF="${DEPLOY_REF:-origin/main}"
 DEPLOY_CONFIRM="${DEPLOY_CONFIRM:-}"
 DEPLOY_IMAGE_OWNER="${DEPLOY_IMAGE_OWNER:-}"
 DEPLOY_IMAGE_REGISTRY="${DEPLOY_IMAGE_REGISTRY:-}"
+DEPLOY_IMAGE_PLATFORM="${DEPLOY_IMAGE_PLATFORM:-linux/amd64}"
 DEPLOY_PUBLIC_CHECKS="${DEPLOY_PUBLIC_CHECKS:-1}"
 DEPLOY_SKIP_IMAGE_CHECK="${DEPLOY_SKIP_IMAGE_CHECK:-0}"
 DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
@@ -200,7 +201,8 @@ prepare_payload() {
       | tar -x -C "$TMP_DIR"
   fi
 
-  cp "$ROOT_DIR/.env" "$TMP_DIR/.env"
+  scp "$REMOTE:$SERVER_PATH/.env" "$TMP_DIR/.env"
+  chmod 600 "$TMP_DIR/.env"
   fetch_release_manifest
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_TAG "$DEPLOY_IMAGE_TAG"
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_OWNER "$DEPLOY_IMAGE_OWNER"
@@ -216,8 +218,10 @@ fetch_release_manifest() {
 
   require_command docker
   log "Resolving immutable release manifest ${manifest_image}"
-  docker pull -q "$manifest_image" >/dev/null
-  container_id="$(docker create "$manifest_image" true)"
+  docker pull -q --platform "$DEPLOY_IMAGE_PLATFORM" "$manifest_image" >/dev/null
+  container_id="$(
+    docker create --platform "$DEPLOY_IMAGE_PLATFORM" "$manifest_image" true
+  )"
   if ! docker cp "$container_id:/release-manifest.json" "$TMP_DIR/release-manifest.json"; then
     docker rm -f "$container_id" >/dev/null 2>&1 || true
     fail "release manifest image does not contain /release-manifest.json"
@@ -268,11 +272,6 @@ local_preflight() {
   require_command ssh
   require_command scp
   require_command tar
-
-  test -f "$ROOT_DIR/.env" || fail ".env not found"
-  if [[ -z "$(env_file_value "$ROOT_DIR/.env" REDIS_PASSWORD)" ]]; then
-    fail "REDIS_PASSWORD must be set in .env before deploying"
-  fi
 
   resolve_image_tag
   prepare_payload

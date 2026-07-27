@@ -51,6 +51,28 @@ def test_build_workflow_promotes_a_complete_manifest_after_selective_builds() ->
     )
 
 
+def test_deploy_extracts_release_manifest_for_production_platform() -> None:
+    deploy_script = (ROOT / "scripts/deploy.sh").read_text()
+
+    assert (
+        'docker pull -q --platform "$DEPLOY_IMAGE_PLATFORM" "$manifest_image"'
+        in deploy_script
+    )
+    assert (
+        'docker create --platform "$DEPLOY_IMAGE_PLATFORM" "$manifest_image" true'
+        in deploy_script
+    )
+
+
+def test_deploy_builds_candidate_from_the_remote_production_environment() -> None:
+    deploy_script = (ROOT / "scripts/deploy.sh").read_text()
+
+    assert 'scp "$REMOTE:$SERVER_PATH/.env" "$TMP_DIR/.env"' in deploy_script
+    assert 'chmod 600 "$TMP_DIR/.env"' in deploy_script
+    assert 'cp "$ROOT_DIR/.env" "$TMP_DIR/.env"' not in deploy_script
+    assert 'test -f "$ROOT_DIR/.env"' not in deploy_script
+
+
 @pytest.mark.parametrize(
     ("compose_name", "service_name", "image_variable"),
     [
