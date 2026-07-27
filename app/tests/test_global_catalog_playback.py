@@ -339,6 +339,54 @@ def test_catalog_track_stream_endpoint_redirects_to_resolved_stream(test_app):
     assert response.headers["location"] == "/api/federation/remote/streams/ticket-1"
 
 
+def test_catalog_track_stream_preserves_native_query_token_on_internal_redirect(
+    test_app,
+):
+    global_uid = str(uuid.uuid4())
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            "crate.api.catalog._catalog_track_playback_payload",
+            lambda request, uid, delivery: {
+                "stream_url": (
+                    "/api/tracks/by-entity/track-local-1/stream?delivery=balanced"
+                )
+            },
+        )
+
+        response = test_app.get(
+            f"/api/catalog/tracks/{global_uid}/stream"
+            "?delivery=balanced&token=native-token",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == (
+        "/api/tracks/by-entity/track-local-1/stream"
+        "?delivery=balanced&token=native-token"
+    )
+
+
+def test_catalog_track_stream_does_not_forward_token_to_external_redirect(test_app):
+    global_uid = str(uuid.uuid4())
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(
+            "crate.api.catalog._catalog_track_playback_payload",
+            lambda request, uid, delivery: {
+                "stream_url": "https://media.example/track.flac"
+            },
+        )
+
+        response = test_app.get(
+            f"/api/catalog/tracks/{global_uid}/stream?token=native-token",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "https://media.example/track.flac"
+
+
 def test_catalog_track_eq_features_endpoint_delegates_to_local_track(test_app):
     global_uid = str(uuid.uuid4())
 

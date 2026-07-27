@@ -8,6 +8,7 @@ import {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 function ranges(values: Array<[number, number]>): TimeRanges {
@@ -86,6 +87,74 @@ describe("Gapless5.replaceTrack", () => {
       "four",
       "five-refreshed",
     ]);
+    player.removeAllTracks();
+  });
+});
+
+describe("Gapless5 mobile background auto-advance", () => {
+  it("advances from the native HTMLAudioElement ended event", async () => {
+    vi.useFakeTimers();
+    const instances: FakeAudio[] = [];
+
+    class FakeAudio extends EventTarget {
+      buffered = ranges([]);
+      controls = false;
+      crossOrigin: string | null = null;
+      currentTime = 0;
+      duration = 180;
+      error: MediaError | null = null;
+      loop = false;
+      networkState = 1;
+      paused = true;
+      playbackRate = 1;
+      preload = "auto";
+      preservesPitch = true;
+      readyState = 4;
+      seekable = ranges([[0, 180]]);
+      src = "";
+      srcObject: MediaProvider | null = null;
+      volume = 1;
+
+      constructor() {
+        super();
+        instances.push(this);
+      }
+
+      load() {}
+
+      pause() {
+        this.paused = true;
+      }
+
+      play() {
+        this.paused = false;
+        return Promise.resolve();
+      }
+    }
+
+    vi.stubGlobal("Audio", FakeAudio);
+    const player = new Gapless5({
+      tracks: ["one", "two"],
+      useHTML5Audio: true,
+      useWebAudio: false,
+      loadLimit: 2,
+    });
+    const first = instances.find((audio) => audio.src === "one");
+    expect(first).toBeDefined();
+    first!.dispatchEvent(new Event("loadedmetadata"));
+    first!.dispatchEvent(new Event("loadeddata"));
+    const second = instances.find((audio) => audio.src === "two");
+    expect(second).toBeDefined();
+    second!.dispatchEvent(new Event("loadedmetadata"));
+    second!.dispatchEvent(new Event("loadeddata"));
+
+    player.play();
+    await Promise.resolve();
+    first!.dispatchEvent(new Event("ended"));
+
+    expect(player.getIndex()).toBe(1);
+    first!.dispatchEvent(new Event("ended"));
+    expect(player.getIndex()).toBe(1);
     player.removeAllTracks();
   });
 });
