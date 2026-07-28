@@ -1,13 +1,9 @@
-import { createRequire } from "node:module";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 import { translationDevPlugin } from "./src/i18n/dev/translation-dev-plugin";
-
-const require = createRequire(import.meta.url);
-const lodashEsRoot = path.dirname(require.resolve("lodash-es/package.json"));
 
 export default defineConfig({
   plugins: [
@@ -54,7 +50,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      lodash: lodashEsRoot,
     },
   },
   optimizeDeps: {

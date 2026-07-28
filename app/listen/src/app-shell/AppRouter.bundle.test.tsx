@@ -92,5 +92,12 @@ describe("AppRouter mobile bundle boundary", () => {
     expect(listenPackage.dependencies).not.toHaveProperty("lucide-react");
     expect(listenPackage.dependencies).not.toHaveProperty("iconoir-react");
     expect(listenPackage.dependencies).not.toHaveProperty("lodash-es");
+
+    const viteConfig = readFileSync(
+      path.join(process.cwd(), "vite.config.ts"),
+      "utf8",
+    );
+    expect(viteConfig).not.toContain("lodash-es");
+    expect(viteConfig).not.toContain("createRequire");
   });
 });
