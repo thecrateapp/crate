@@ -101,6 +101,37 @@ function isApiUrl(url: string): boolean {
   }
 }
 
+function isPublicCacheableApiAsset(url: string): boolean {
+  try {
+    const parsed = new URL(
+      url,
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "https://crate.local",
+    );
+    return parsed.pathname === "/api/network/external-artist/photo";
+  } catch {
+    return false;
+  }
+}
+
+function withoutMediaCredentials(url: string): string {
+  const absolute = isAbsoluteHttpUrl(url);
+  const base =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://crate.local";
+  try {
+    const parsed = new URL(url, base);
+    parsed.searchParams.delete("token");
+    parsed.searchParams.delete("media_ticket");
+    if (absolute) return parsed.toString();
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return url;
+  }
+}
+
 function apiCredentials(): RequestCredentials {
   return usesConfigurableServer ? "omit" : "include";
 }
@@ -150,6 +181,9 @@ export function apiSseUrl(path: string): string {
 export function apiAssetUrl(path: string): string {
   const baseUrl = isAbsoluteHttpUrl(path) ? path : apiUrl(path);
   if (!isApiUrl(baseUrl)) return baseUrl;
+  if (isPublicCacheableApiAsset(baseUrl)) {
+    return withoutMediaCredentials(baseUrl);
+  }
   return withMediaAccessTicket(baseUrl, "artwork");
 }
 
@@ -204,6 +238,7 @@ export function requiresMediaAccessTicket(
   url: string | null | undefined,
 ): boolean {
   if (!url || !usesConfigurableServer || !isApiUrl(url)) return false;
+  if (isPublicCacheableApiAsset(url)) return false;
   try {
     const server = getCurrentServer();
     const parsed = new URL(url, server?.url || "https://crate.local");

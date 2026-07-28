@@ -18,7 +18,6 @@ import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   artistPagePath,
@@ -86,10 +85,9 @@ export function ArtistCard({
   const [externalArtworkRetry, setExternalArtworkRetry] = useState(0);
   const [loadedPhotoUrl, setLoadedPhotoUrl] = useState<string | null>(null);
   const externalArtworkRetryTimer = useRef<number | null>(null);
-  const resolvedPhotoUrl = resolveMaybeApiAssetUrl(photo);
   const shouldResolvePhoto = hasPhoto !== false;
   const photoUrl =
-    resolvedPhotoUrl ||
+    photo ||
     (shouldResolvePhoto
       ? artistPhotoApiUrl(
           {
@@ -103,7 +101,7 @@ export function ArtistCard({
         )
       : "") ||
     undefined;
-  const photoSrcSet = resolvedPhotoUrl
+  const photoSrcSet = photo
     ? undefined
     : responsiveImageSrcSet(ARTIST_CARD_IMAGE_WIDTHS, (size) =>
         artistPhotoApiUrl(

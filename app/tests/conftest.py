@@ -242,11 +242,14 @@ def pg_db(pg_database_factory):
     import crate.db as db_mod
 
     from crate.db.engine import reset_engine
+    from crate.genre_taxonomy import invalidate_runtime_taxonomy_cache
 
     reset_engine()
+    invalidate_runtime_taxonomy_cache()
     try:
         yield db_mod
     finally:
+        invalidate_runtime_taxonomy_cache()
         reset_engine()
         if original_database is None:
             os.environ.pop("CRATE_POSTGRES_DB", None)

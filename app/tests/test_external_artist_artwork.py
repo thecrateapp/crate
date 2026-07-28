@@ -35,7 +35,7 @@ def test_external_artist_artwork_remains_available_while_stale(tmp_path, monkeyp
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     external_artist_artwork.persist_external_artist_artwork("Converge", _jpeg_bytes())
     artwork_path = next((tmp_path / "external-artist-artwork").glob("*.webp"))
-    expired_at = time.time() - (30 * 86400) - 1
+    expired_at = time.time() - (366 * 86400)
     os.utime(artwork_path, (expired_at, expired_at))
 
     cached = external_artist_artwork.get_cached_external_artist_artwork("Converge")
@@ -43,6 +43,36 @@ def test_external_artist_artwork_remains_available_while_stale(tmp_path, monkeyp
     assert cached is not None
     assert cached["stale"] is True
     assert cached["content"].startswith(b"RIFF")
+
+
+def test_external_artist_artwork_stays_fresh_for_one_year(tmp_path, monkeypatch):
+    from crate import external_artist_artwork
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    external_artist_artwork.persist_external_artist_artwork("Converge", _jpeg_bytes())
+    artwork_path = next((tmp_path / "external-artist-artwork").glob("*.webp"))
+    still_fresh_at = time.time() - (364 * 86400)
+    os.utime(artwork_path, (still_fresh_at, still_fresh_at))
+
+    cached = external_artist_artwork.get_cached_external_artist_artwork("Converge")
+
+    assert cached is not None
+    assert cached["stale"] is False
+
+
+def test_external_artist_artwork_keeps_multi_year_stale_fallback(tmp_path, monkeypatch):
+    from crate import external_artist_artwork
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    external_artist_artwork.persist_external_artist_artwork("Converge", _jpeg_bytes())
+    artwork_path = next((tmp_path / "external-artist-artwork").glob("*.webp"))
+    old_but_usable_at = time.time() - (5 * 365 * 86400)
+    os.utime(artwork_path, (old_but_usable_at, old_but_usable_at))
+
+    cached = external_artist_artwork.get_cached_external_artist_artwork("Converge")
+
+    assert cached is not None
+    assert cached["stale"] is True
 
 
 def test_external_artist_artwork_path_lookup_does_not_read_image_bytes(
@@ -183,7 +213,13 @@ def test_external_artist_photo_serves_cached_bytes_without_remote_lookup(
     from crate.api import browse_artist
 
     queued: list[str] = []
-    monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(
+        browse_artist,
+        "_require_auth",
+        lambda _request: (_ for _ in ()).throw(
+            AssertionError("public external artwork must not require authentication")
+        ),
+    )
     cached_path = tmp_path / "cached.webp"
     cached_path.write_bytes(_jpeg_bytes())
     monkeypatch.setattr(
@@ -213,10 +249,14 @@ def test_external_artist_photo_serves_cached_bytes_without_remote_lookup(
 
     assert response.status_code == 200
     assert response.media_type == "image/webp"
+    assert response.headers["cache-control"] == (
+        "public, max-age=2592000, stale-while-revalidate=31536000, "
+        "stale-if-error=31536000"
+    )
     assert queued == []
 
 
-def test_external_artist_photo_serves_stale_bytes_while_revalidating(
+def test_external_artist_photo_serves_stale_bytes_without_public_revalidation(
     monkeypatch, tmp_path
 ):
     from crate.api import browse_artist
@@ -252,11 +292,10 @@ def test_external_artist_photo_serves_stale_bytes_while_revalidating(
     )
 
     assert response.status_code == 200
-    assert response.headers["x-crate-external-artwork"] == "revalidating"
-    assert queued == ["Converge"]
+    assert queued == []
 
 
-def test_external_artist_photo_queues_a_deduplicated_background_resolution(
+def test_external_artist_photo_public_cache_miss_does_not_queue_remote_work(
     monkeypatch,
 ):
     from crate.api import browse_artist
@@ -265,9 +304,8 @@ def test_external_artist_photo_queues_a_deduplicated_background_resolution(
     monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
     monkeypatch.setattr(
         browse_artist,
-        "get_cached_external_artist_artwork",
+        "get_cached_external_artist_artwork_path",
         lambda _name: None,
-        raising=False,
     )
     monkeypatch.setattr(
         browse_artist,
@@ -292,6 +330,35 @@ def test_external_artist_photo_queues_a_deduplicated_background_resolution(
     assert response.status_code == 404
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["retry-after"] == "2"
+    assert queued == []
+
+
+def test_authenticated_related_artist_enrichment_queues_external_artwork(
+    monkeypatch,
+):
+    from crate.api import browse_artist
+
+    queued: list[str] = []
+    monkeypatch.setattr(browse_artist, "get_similar_artist_refs", lambda _names: {})
+    monkeypatch.setattr(browse_artist, "get_cached_artist_info", lambda _name: None)
+    monkeypatch.setattr(
+        browse_artist,
+        "get_cached_external_artist_artwork_path",
+        lambda _name: None,
+    )
+    monkeypatch.setattr(
+        browse_artist,
+        "queue_external_artist_artwork",
+        lambda name: queued.append(name),
+    )
+
+    enriched = browse_artist._enrich_similar_artists(
+        [{"name": "Converge", "match": 1.0}]
+    )
+
+    assert enriched[0]["image_url"] == (
+        "/api/network/external-artist/photo?name=Converge"
+    )
     assert queued == ["Converge"]
 
 

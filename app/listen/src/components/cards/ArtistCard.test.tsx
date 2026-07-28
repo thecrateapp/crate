@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -233,6 +234,64 @@ describe("ArtistCard", () => {
       "https://api.example.test/api/network/external-artist/photo?name=Poison%20The%20Well&token=desktop-token",
     );
   });
+
+  it.each([
+    {
+      external: false,
+      name: "High Vis",
+      photo: "/api/artists/9/photo?size=384&format=webp",
+    },
+    {
+      external: true,
+      name: "Poison The Well",
+      photo:
+        "/api/network/external-artist/photo?name=Poison%20The%20Well&size=384",
+    },
+  ])(
+    "keeps loaded $name artwork visible when credentials rotate",
+    ({ external, name, photo }) => {
+      let ticket = "ticket-1";
+      resolveMaybeApiAssetUrlMock.mockImplementation((url) => {
+        if (!url) return null;
+        const separator = url.includes("?") ? "&" : "?";
+        return `${url}${separator}media_ticket=${ticket}`;
+      });
+
+      function CredentialRotationHarness() {
+        const [, setCredentialVersion] = useState(1);
+        return (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                ticket = "ticket-2";
+                setCredentialVersion(2);
+              }}
+            >
+              Rotate credentials
+            </button>
+            <ArtistCard
+              name={name}
+              artistId={external ? undefined : 9}
+              photo={photo}
+              external={external}
+            />
+          </>
+        );
+      }
+
+      renderWithListenProviders(<CredentialRotationHarness />);
+
+      fireEvent.load(screen.getByAltText(name));
+      expect(screen.getByAltText(name)).toHaveClass("visible");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Rotate credentials" }),
+      );
+
+      expect(screen.getByAltText(name)).toHaveClass("visible");
+    },
+  );
 
   it("does not request a generated artist photo when catalog says none exists", () => {
     renderWithListenProviders(
