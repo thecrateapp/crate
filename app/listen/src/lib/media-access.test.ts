@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   clearMediaAccessTickets,
+  getMediaAccessResumeVersion,
   getMediaAccessTargets,
   getMediaAccessTicketsVersion,
   getMediaAccessTicket,
+  invalidateMediaAccessAudience,
   setMediaAccessTickets,
+  signalMediaAccessResume,
+  subscribeMediaAccessResumes,
   subscribeMediaAccessTickets,
 } from "@/lib/media-access";
 
@@ -97,6 +101,36 @@ describe("media access ticket cache", () => {
     ).toBeNull();
   });
 
+  it("invalidates only the selected audience for a server", () => {
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    setMediaAccessTickets(
+      [
+        {
+          audience: "artwork",
+          path: "/api/albums/12/cover",
+          ticket: "artwork-ticket",
+          expires_at: expiresAt,
+        },
+        {
+          audience: "stream",
+          path: "/api/tracks/12/stream",
+          ticket: "stream-ticket",
+          expires_at: expiresAt,
+        },
+      ],
+      "server-a",
+    );
+
+    invalidateMediaAccessAudience("artwork", "server-a");
+
+    expect(
+      getMediaAccessTicket("artwork", "/api/albums/12/cover", "server-a"),
+    ).toBeNull();
+    expect(
+      getMediaAccessTicket("stream", "/api/tracks/12/stream", "server-a"),
+    ).toBe("stream-ticket");
+  });
+
   it("remembers requested paths so short-lived tickets can be refreshed", () => {
     expect(
       getMediaAccessTicket("sse", "/api/events/task/task-1", "server-a"),
@@ -122,6 +156,21 @@ describe("media access ticket cache", () => {
 
     unsubscribe();
     clearMediaAccessTickets();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifies mounted media when the app resumes", () => {
+    const listener = vi.fn();
+    const initialVersion = getMediaAccessResumeVersion();
+    const unsubscribe = subscribeMediaAccessResumes(listener);
+
+    signalMediaAccessResume();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(getMediaAccessResumeVersion()).toBe(initialVersion + 1);
+
+    unsubscribe();
+    signalMediaAccessResume();
     expect(listener).toHaveBeenCalledTimes(1);
   });
 });

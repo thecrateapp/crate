@@ -1,13 +1,26 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mediaVersion, ensureMediaAccessUrlMock } = vi.hoisted(() => ({
-  mediaVersion: { value: 1 },
-  ensureMediaAccessUrlMock: vi.fn(),
-}));
+const {
+  mediaVersion,
+  mediaResumeVersion,
+  ensureMediaAccessUrlMock,
+  resolveMaybeApiAssetUrlMock,
+} = vi.hoisted(() => {
+  const mediaVersionState = { value: 1 };
+  return {
+    mediaVersion: mediaVersionState,
+    mediaResumeVersion: { value: 0 },
+    ensureMediaAccessUrlMock: vi.fn(),
+    resolveMaybeApiAssetUrlMock: vi.fn((url: string | null | undefined) =>
+      url ? `${url}?ticket-version=${mediaVersionState.value}` : null,
+    ),
+  };
+});
 
 vi.mock("@/hooks/use-media-access-version", () => ({
   useMediaAccessVersion: () => mediaVersion.value,
+  useMediaAccessResumeVersion: () => mediaResumeVersion.value,
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -16,8 +29,7 @@ vi.mock("@/lib/api", () => ({
     Boolean(url?.includes("ticket-version") || url?.includes("media_ticket")),
   requiresMediaAccessTicket: (url: string | null | undefined) =>
     Boolean(url?.startsWith("/api/")),
-  resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
-    url ? `${url}?ticket-version=${mediaVersion.value}` : null,
+  resolveMaybeApiAssetUrl: resolveMaybeApiAssetUrlMock,
 }));
 
 import { AuthenticatedMediaImage } from "./AuthenticatedMediaImage";
@@ -25,7 +37,9 @@ import { AuthenticatedMediaImage } from "./AuthenticatedMediaImage";
 describe("AuthenticatedMediaImage", () => {
   beforeEach(() => {
     mediaVersion.value = 1;
+    mediaResumeVersion.value = 0;
     ensureMediaAccessUrlMock.mockReset();
+    resolveMaybeApiAssetUrlMock.mockClear();
     ensureMediaAccessUrlMock.mockResolvedValue(
       "/api/albums/1/cover?media_ticket=renewed",
     );
@@ -46,6 +60,44 @@ describe("AuthenticatedMediaImage", () => {
     expect(screen.getByRole("img", { name: "Cover" })).toHaveAttribute(
       "src",
       "/api/albums/1/cover?ticket-version=1",
+    );
+  });
+
+  it("proactively replaces an expired source after the app resumes", async () => {
+    const { rerender } = render(
+      <AuthenticatedMediaImage src="/api/albums/1/cover" alt="Cover" />,
+    );
+    const image = screen.getByRole("img", { name: "Cover" });
+    fireEvent.load(image);
+
+    mediaResumeVersion.value = 1;
+    rerender(<AuthenticatedMediaImage src="/api/albums/1/cover" alt="Cover" />);
+
+    await waitFor(() =>
+      expect(ensureMediaAccessUrlMock).toHaveBeenCalledWith(
+        "/api/albums/1/cover",
+        "artwork",
+        { forceRefresh: true },
+      ),
+    );
+    expect(image).toHaveAttribute(
+      "src",
+      "/api/albums/1/cover?media_ticket=renewed",
+    );
+  });
+
+  it("re-registers the protected path during the resume render for batching", async () => {
+    const { rerender } = render(
+      <AuthenticatedMediaImage src="/api/albums/1/cover" alt="Cover" />,
+    );
+    expect(resolveMaybeApiAssetUrlMock).toHaveBeenCalledTimes(1);
+
+    mediaResumeVersion.value = 1;
+    rerender(<AuthenticatedMediaImage src="/api/albums/1/cover" alt="Cover" />);
+
+    expect(resolveMaybeApiAssetUrlMock).toHaveBeenCalledTimes(2);
+    await waitFor(() =>
+      expect(ensureMediaAccessUrlMock).toHaveBeenCalledTimes(1),
     );
   });
 

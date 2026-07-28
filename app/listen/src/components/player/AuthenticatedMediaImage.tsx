@@ -6,7 +6,10 @@ import {
   type ImgHTMLAttributes,
 } from "react";
 
-import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
+import {
+  useMediaAccessResumeVersion,
+  useMediaAccessVersion,
+} from "@/hooks/use-media-access-version";
 import {
   ensureMediaAccessUrl,
   isUsableMediaAssetUrl,
@@ -50,6 +53,20 @@ function canonicalSourceSetIdentity(sourceSet: string | undefined): string {
     .join(", ");
 }
 
+function resolveAuthenticatedSourceSet(
+  sourceSet: string | undefined,
+): string | undefined {
+  if (!sourceSet) return undefined;
+  const candidates = sourceSet.split(",").map((candidate) => {
+    const match = candidate.trim().match(/^(\S+)(\s+.+)?$/);
+    if (!match?.[1]) return null;
+    const resolved = resolveMaybeApiAssetUrl(match[1]);
+    if (!resolved || !isUsableMediaAssetUrl(resolved)) return null;
+    return `${resolved}${match[2] ?? ""}`;
+  });
+  return candidates.every(Boolean) ? candidates.join(", ") : undefined;
+}
+
 export function AuthenticatedMediaImage({
   src,
   srcSet,
@@ -58,24 +75,18 @@ export function AuthenticatedMediaImage({
   ...props
 }: AuthenticatedMediaImageProps) {
   const ticketVersion = useMediaAccessVersion();
+  const resumeVersion = useMediaAccessResumeVersion();
   const sourceKey = `${canonicalSourceIdentity(
     src,
   )}\u0000${canonicalSourceSetIdentity(srcSet)}`;
   const resolvedSource = useMemo(
     () => resolveMaybeApiAssetUrl(src),
-    [src, ticketVersion],
+    [resumeVersion, src, ticketVersion],
   );
-  const resolvedSourceSet = useMemo(() => {
-    if (!srcSet) return undefined;
-    const candidates = srcSet.split(",").map((candidate) => {
-      const match = candidate.trim().match(/^(\S+)(\s+.+)?$/);
-      if (!match?.[1]) return null;
-      const resolved = resolveMaybeApiAssetUrl(match[1]);
-      if (!resolved || !isUsableMediaAssetUrl(resolved)) return null;
-      return `${resolved}${match[2] ?? ""}`;
-    });
-    return candidates.every(Boolean) ? candidates.join(", ") : undefined;
-  }, [srcSet, ticketVersion]);
+  const resolvedSourceSet = useMemo(
+    () => resolveAuthenticatedSourceSet(srcSet),
+    [resumeVersion, srcSet, ticketVersion],
+  );
   const usableSource =
     resolvedSource && isUsableMediaAssetUrl(resolvedSource)
       ? resolvedSource
@@ -86,6 +97,7 @@ export function AuthenticatedMediaImage({
     sourceSet: resolvedSourceSet,
   }));
   const recoveryAttemptedFor = useRef<string | null>(null);
+  const handledResumeVersion = useRef(resumeVersion);
 
   useEffect(() => {
     recoveryAttemptedFor.current = null;
@@ -108,6 +120,31 @@ export function AuthenticatedMediaImage({
       };
     });
   }, [resolvedSourceSet, sourceKey, usableSource]);
+
+  useEffect(() => {
+    if (handledResumeVersion.current === resumeVersion) return;
+    handledResumeVersion.current = resumeVersion;
+    if (!src || !requiresMediaAccessTicket(src)) return;
+
+    let cancelled = false;
+    void ensureMediaAccessUrl(src, "artwork", {
+      forceRefresh: true,
+    })
+      .then((source) => {
+        if (cancelled) return;
+        setActive({
+          key: sourceKey,
+          source,
+          sourceSet: resolveAuthenticatedSourceSet(srcSet),
+        });
+      })
+      .catch(() => {
+        // Keep the previously rendered bitmap while normal error recovery runs.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeVersion, sourceKey, src, srcSet]);
 
   const rendered =
     active.key === sourceKey
@@ -143,22 +180,10 @@ export function AuthenticatedMediaImage({
           forceRefresh: true,
         })
           .then((source) => {
-            const refreshedCandidates = srcSet?.split(",").map((candidate) => {
-              const match = candidate.trim().match(/^(\S+)(\s+.+)?$/);
-              if (!match?.[1]) return null;
-              const resolved = resolveMaybeApiAssetUrl(match[1]);
-              return resolved && isUsableMediaAssetUrl(resolved)
-                ? `${resolved}${match[2] ?? ""}`
-                : null;
-            });
             setActive({
               key: sourceKey,
               source,
-              sourceSet:
-                refreshedCandidates?.every(Boolean) &&
-                refreshedCandidates.length
-                  ? refreshedCandidates.join(", ")
-                  : undefined,
+              sourceSet: resolveAuthenticatedSourceSet(srcSet),
             });
           })
           .catch(() => {

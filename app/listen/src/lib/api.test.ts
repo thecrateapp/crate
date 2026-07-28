@@ -1096,6 +1096,51 @@ describe("native (configurable server) mode", () => {
   });
 
   describe("media access refresh", () => {
+    it("starts immediate artwork recovery without refreshing historical targets", async () => {
+      setupServer();
+      const initialResumeVersion = mediaAccess.getMediaAccessResumeVersion();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        mockJsonResponse({
+          tickets: [],
+        }),
+      );
+      const stop = apiMod.startMediaAccessTicketRefresh();
+
+      window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+
+      await vi.waitFor(() =>
+        expect(mediaAccess.getMediaAccessResumeVersion()).toBe(
+          initialResumeVersion + 1,
+        ),
+      );
+      await Promise.resolve();
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      stop();
+    });
+
+    it("invalidates cached artwork credentials before mounted images resume", async () => {
+      setupServer();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        mockJsonResponse({
+          tickets: [],
+        }),
+      );
+      const stop = apiMod.startMediaAccessTicketRefresh();
+      expect(apiMod.apiAssetUrl("/api/cover.jpg")).toContain(
+        "media_ticket=artwork-ticket",
+      );
+
+      window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+
+      expect(apiMod.apiAssetUrl("/api/cover.jpg")).toBe(
+        "https://api.example.com/api/cover.jpg",
+      );
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+      stop();
+    });
+
     it("requests a missing ticket for the exact path without blocking URL generation", async () => {
       const server = setupServer();
       mediaAccess.clearMediaAccessTickets();
