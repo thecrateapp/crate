@@ -15,6 +15,7 @@ declare module "@/lib/gapless5/gapless5" {
     crossfade?: number;
     // Runtime values: None=1, Linear=2, EqualPower=3
     crossfadeShape?: number;
+    persistentHTML5Audio?: boolean;
     playbackRate?: number;
     // Runtime values: Debug=1, Info=2, Warning=3, Error=4, None=5
     logLevel?: number;

@@ -157,6 +157,7 @@ vi.mock("@/lib/gapless5/gapless5", () => ({
 }));
 
 vi.mock("@/lib/mobile-audio-mode", () => ({
+  isMobileAudioRuntime: false,
   stableMobileAudioPipeline: false,
 }));
 

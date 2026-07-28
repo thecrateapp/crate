@@ -1104,6 +1104,84 @@ describe("native (configurable server) mode", () => {
         ),
       ).toBe("fresh-artwork-ticket");
     });
+
+    it("waits for a cold exact-path ticket before returning a protected URL", async () => {
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "stream",
+              path: "/api/tracks/42/stream",
+              ticket: "cold-stream-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+
+      await expect(
+        apiMod.ensureMediaAccessUrl(
+          "/api/tracks/42/stream?delivery=balanced",
+          "stream",
+        ),
+      ).resolves.toBe(
+        "https://api.example.com/api/tracks/42/stream?delivery=balanced&media_ticket=cold-stream-ticket",
+      );
+    });
+
+    it("deduplicates concurrent ticket acquisition for the same target", async () => {
+      const server = setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/42/cover",
+              ticket: "shared-artwork-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+
+      const [first, second] = await Promise.all([
+        apiMod.ensureMediaAccessUrl("/api/albums/42/cover", "artwork"),
+        apiMod.ensureMediaAccessUrl("/api/albums/42/cover", "artwork"),
+      ]);
+
+      expect(first).toContain("media_ticket=shared-artwork-ticket");
+      expect(second).toContain("media_ticket=shared-artwork-ticket");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(
+        mediaAccess.getMediaAccessTicket(
+          "artwork",
+          "/api/albums/42/cover",
+          server.id,
+        ),
+      ).toBe("shared-artwork-ticket");
+    });
+
+    it("rejects instead of returning an unticketed protected URL", async () => {
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockFetchResponse(503),
+      );
+
+      await expect(
+        apiMod.ensureMediaAccessUrl("/api/tracks/42/stream", "stream"),
+      ).rejects.toMatchObject({
+        name: "MediaAccessTicketError",
+        audience: "stream",
+        path: "/api/tracks/42/stream",
+      });
+    });
   });
 
   describe("apiStreamUrl", () => {

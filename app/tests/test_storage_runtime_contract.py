@@ -106,17 +106,13 @@ def test_deploy_cleanup_retains_rollback_and_prunes_unused_images_and_build_cach
 @pytest.mark.parametrize(
     "compose_name", ["docker-compose.yaml", "docker-compose.home.yaml"]
 )
-def test_traefik_logs_are_bounded_and_use_container_log_rotation(compose_name):
+def test_traefik_logs_exclude_sensitive_request_urls(compose_name):
     traefik = yaml.safe_load((ROOT / compose_name).read_text())["services"]["traefik"]
     command = set(traefik.get("command") or [])
 
     assert "--log.level=INFO" in command
     assert "--log.filePath=" in command
-    assert "--accesslog.filePath=" in command
-    assert "--accesslog.filters.statusCodes=400-599" in command
-    assert "--accesslog.filters.retryAttempts=true" in command
-    assert "--accesslog.filters.minDuration=1s" in command
-    assert "--accesslog.fields.headers.defaultMode=drop" in command
+    assert not any(option.startswith("--accesslog") for option in command)
 
 
 def test_storage_retention_runbook_documents_cache_and_image_safety_controls():

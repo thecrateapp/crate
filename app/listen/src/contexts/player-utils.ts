@@ -3,7 +3,10 @@ import { apiStreamUrl, getApiBase, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { trackStreamApiPath } from "@/lib/library-routes";
-import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
+import {
+  isMobileAudioRuntime,
+  stableMobileAudioPipeline,
+} from "@/lib/mobile-audio-mode";
 import { getOfflineNativePlaybackUrl } from "@/lib/offline";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 
@@ -509,6 +512,13 @@ export function getEffectiveCrossfadeSeconds(
     mobileEnhancedAudio?: boolean;
   } = {},
 ): number {
+  if (
+    isMobileAudioRuntime ||
+    options.androidNative ||
+    options.html5OnlyPlayback
+  ) {
+    return 0;
+  }
   const clampedSeconds = Math.max(0, configuredSeconds || 0);
   const continuousAlbumTransition = isContinuousAlbumTransition(
     currentTrack,

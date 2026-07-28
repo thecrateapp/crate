@@ -8,8 +8,6 @@ import type { PlaySource, Track } from "./player-types";
 import { getOfflineNativePlaybackUrl } from "@/lib/offline";
 import { setPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
 import {
-  ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
-  ANDROID_MEDIA_SESSION_HANDOFF_SECONDS,
   getEffectiveCrossfadeSeconds,
   getStoredQueue,
   getStreamUrl,
@@ -316,7 +314,7 @@ describe("getEffectiveCrossfadeSeconds", () => {
     ).toBe(0);
   });
 
-  it("uses a short Android mask for continuous album playback when WebAudio gapless is unavailable", () => {
+  it("disables crossfade for Android native album playback", () => {
     expect(
       getEffectiveCrossfadeSeconds(
         ALBUM_TRACK_A,
@@ -327,10 +325,10 @@ describe("getEffectiveCrossfadeSeconds", () => {
         true,
         { androidNative: true },
       ),
-    ).toBe(ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS);
+    ).toBe(0);
   });
 
-  it("uses the same short mask for iOS/Safari HTML5 playback", () => {
+  it("disables crossfade for mobile HTML5 playback", () => {
     expect(
       getEffectiveCrossfadeSeconds(
         ALBUM_TRACK_A,
@@ -341,10 +339,10 @@ describe("getEffectiveCrossfadeSeconds", () => {
         true,
         { html5OnlyPlayback: true },
       ),
-    ).toBe(ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS);
+    ).toBe(0);
   });
 
-  it("keeps a minimal HTML5 mask for continuous albums even when crossfade preference is off", () => {
+  it("does not add a hidden mobile album overlap when crossfade is off", () => {
     expect(
       getEffectiveCrossfadeSeconds(
         ALBUM_TRACK_A,
@@ -355,10 +353,10 @@ describe("getEffectiveCrossfadeSeconds", () => {
         true,
         { html5OnlyPlayback: true },
       ),
-    ).toBe(ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS);
+    ).toBe(0);
   });
 
-  it("keeps a minimal HTML5 handoff for non-album queues when crossfade is off", () => {
+  it("does not add a hidden mobile playlist overlap when crossfade is off", () => {
     expect(
       getEffectiveCrossfadeSeconds(
         TRACK_A,
@@ -369,7 +367,7 @@ describe("getEffectiveCrossfadeSeconds", () => {
         true,
         { html5OnlyPlayback: true },
       ),
-    ).toBe(ANDROID_MEDIA_SESSION_HANDOFF_SECONDS);
+    ).toBe(0);
   });
 
   it("keeps true gapless album playback when enhanced mobile audio is enabled", () => {

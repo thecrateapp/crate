@@ -1,18 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, authState, ensureFreshAuthTokenMock, offlineUrlState } =
-  vi.hoisted(() => ({
-    apiMock: vi.fn(),
-    authState: { token: "listen-token" },
-    ensureFreshAuthTokenMock: vi.fn(),
-    offlineUrlState: { url: null as string | null },
-  }));
+const {
+  apiMock,
+  authState,
+  ensureFreshAuthTokenMock,
+  ensureMediaAccessUrlMock,
+  offlineUrlState,
+} = vi.hoisted(() => ({
+  apiMock: vi.fn(),
+  authState: { token: "listen-token" },
+  ensureFreshAuthTokenMock: vi.fn(),
+  ensureMediaAccessUrlMock: vi.fn(),
+  offlineUrlState: { url: null as string | null },
+}));
 
 vi.mock("@/lib/api", () => ({
   api: apiMock,
   getApiBase: () => "https://listen.example",
   getAuthToken: () => authState.token,
   ensureFreshAuthToken: ensureFreshAuthTokenMock,
+  ensureMediaAccessUrl: ensureMediaAccessUrlMock,
   apiStreamUrl: (url: string) => url,
   resolveMaybeApiStreamUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/") ? `https://listen.example${url}` : url ?? null,
@@ -45,6 +52,8 @@ describe("player engine adapter", () => {
     apiMock.mockReset();
     ensureFreshAuthTokenMock.mockReset();
     ensureFreshAuthTokenMock.mockResolvedValue(true);
+    ensureMediaAccessUrlMock.mockReset();
+    ensureMediaAccessUrlMock.mockImplementation(async (url: string) => url);
     offlineUrlState.url = null;
   });
 
@@ -198,22 +207,38 @@ describe("player engine adapter", () => {
     );
   });
 
-  it("resolves only the active global track before loading a queue", async () => {
-    apiMock.mockResolvedValueOnce({
-      stream_url: "/api/federation/remote/streams/ticket-current",
-      requested_policy: "original",
-      effective_policy: "balanced",
-      source: {},
-      delivery: {},
-      transcoded: false,
-      cache_hit: false,
-      preparing: false,
-      task_id: null,
-      variant_id: null,
-      variant_status: null,
-      playback_session: "signed-current-playback",
-      content_origin: "remote",
-    });
+  it("resolves and tickets the active and next web tracks before loading a queue", async () => {
+    apiMock
+      .mockResolvedValueOnce({
+        stream_url: "/api/federation/remote/streams/ticket-current",
+        requested_policy: "original",
+        effective_policy: "balanced",
+        source: {},
+        delivery: {},
+        transcoded: false,
+        cache_hit: false,
+        preparing: false,
+        task_id: null,
+        variant_id: null,
+        variant_status: null,
+        playback_session: "signed-current-playback",
+        content_origin: "remote",
+      })
+      .mockResolvedValueOnce({
+        stream_url: "/api/federation/remote/streams/ticket-next",
+        requested_policy: "original",
+        effective_policy: "balanced",
+        source: {},
+        delivery: {},
+        transcoded: false,
+        cache_hit: false,
+        preparing: false,
+        task_id: null,
+        variant_id: null,
+        variant_status: null,
+        playback_session: "signed-next-playback",
+        content_origin: "remote",
+      });
     const queue = [
       {
         id: "global-track-current",
@@ -231,13 +256,25 @@ describe("player engine adapter", () => {
 
     const tracks = await toStartupEngineTracks(queue, 0);
 
-    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledTimes(2);
     expect(apiMock).toHaveBeenCalledWith(
       "/api/catalog/tracks/global-track-current/playback",
     );
     expect(tracks[0]?.url).toContain("ticket-current");
-    expect(tracks[1]?.url).toContain(
-      "/api/catalog/tracks/global-track-next/stream",
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/catalog/tracks/global-track-next/playback",
+    );
+    expect(tracks[1]?.url).toContain("ticket-next");
+    expect(ensureMediaAccessUrlMock).toHaveBeenCalledTimes(2);
+    expect(ensureMediaAccessUrlMock).toHaveBeenNthCalledWith(
+      1,
+      "https://listen.example/api/federation/remote/streams/ticket-current",
+      "stream",
+    );
+    expect(ensureMediaAccessUrlMock).toHaveBeenNthCalledWith(
+      2,
+      "https://listen.example/api/federation/remote/streams/ticket-next",
+      "stream",
     );
   });
 });

@@ -1,4 +1,11 @@
 import { apiFetch, getApiBase } from "@/lib/api";
+import {
+  isAndroidBrowser,
+  isAndroidNative,
+  isIosBrowser,
+  isIosNative,
+} from "@/lib/capacitor-runtime";
+import { isTauriRuntime } from "@/lib/platform";
 import type { ConcretePlaybackDeliveryPolicy } from "@/lib/playback-network-quality";
 
 export type PlaybackQoeEventName =
@@ -7,6 +14,13 @@ export type PlaybackQoeEventName =
   | "stall_end"
   | "recovery";
 export type PlaybackQoeOrigin = "local" | "remote" | "imported";
+export type PlaybackQoeRuntime =
+  | "desktop_web"
+  | "mobile_web"
+  | "android_native"
+  | "ios_native"
+  | "tauri";
+export type PlaybackQoeEngine = "gapless" | "media3";
 
 export interface PlaybackQoeInput {
   event: PlaybackQoeEventName;
@@ -16,6 +30,8 @@ export interface PlaybackQoeInput {
   durationMs?: number;
   bufferedAheadSeconds?: number;
   attempt?: number;
+  runtime?: PlaybackQoeRuntime;
+  engine?: PlaybackQoeEngine;
 }
 
 export interface PlaybackQoeEvent {
@@ -26,6 +42,8 @@ export interface PlaybackQoeEvent {
   duration_ms?: number;
   buffered_ahead_seconds?: number;
   attempt?: number;
+  runtime?: PlaybackQoeRuntime;
+  engine?: PlaybackQoeEngine;
 }
 
 const MAX_EVENTS_PER_SESSION = 24;
@@ -66,6 +84,28 @@ function isConcretePolicy(
   return ["original", "balanced", "data_saver"].includes(String(value));
 }
 
+function isRuntime(value: unknown): value is PlaybackQoeRuntime {
+  return [
+    "desktop_web",
+    "mobile_web",
+    "android_native",
+    "ios_native",
+    "tauri",
+  ].includes(String(value));
+}
+
+function isEngine(value: unknown): value is PlaybackQoeEngine {
+  return ["gapless", "media3"].includes(String(value));
+}
+
+export function getPlaybackQoeRuntime(): PlaybackQoeRuntime {
+  if (isAndroidNative) return "android_native";
+  if (isIosNative) return "ios_native";
+  if (isTauriRuntime) return "tauri";
+  if (isAndroidBrowser || isIosBrowser) return "mobile_web";
+  return "desktop_web";
+}
+
 /** Shape telemetry explicitly, discarding every identifier and network hint. */
 export function shapePlaybackQoeEvent(
   input: PlaybackQoeInput | Record<string, unknown>,
@@ -97,6 +137,8 @@ export function shapePlaybackQoeEvent(
     event.buffered_ahead_seconds = bufferedAheadSeconds;
   }
   if (attempt !== undefined) event.attempt = attempt;
+  if (isRuntime(input.runtime)) event.runtime = input.runtime;
+  if (isEngine(input.engine)) event.engine = input.engine;
   return event;
 }
 

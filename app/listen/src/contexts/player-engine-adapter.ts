@@ -6,6 +6,7 @@ import {
 } from "@/contexts/player-utils";
 import {
   ensureFreshAuthToken,
+  ensureMediaAccessUrl,
   getApiBase,
   getAuthToken,
   resolveMaybeApiAssetUrl,
@@ -149,14 +150,21 @@ export async function toStartupEngineTracks(
     0,
     Math.min(Math.trunc(activeIndex), tracks.length - 1),
   );
-  const activeTrack = tracks[normalizedIndex];
-  if (!activeTrack) return engineTracks;
-
-  engineTracks[normalizedIndex] = toEngineTrack(
-    activeTrack,
-    eqGainsByTrackId?.get(activeTrack.id),
-    await resolveFreshEngineStreamUrl(activeTrack, options),
-    options,
+  const startupIndices = new Set([
+    normalizedIndex,
+    Math.min(normalizedIndex + 1, tracks.length - 1),
+  ]);
+  await Promise.all(
+    Array.from(startupIndices).map(async (index) => {
+      const track = tracks[index];
+      if (!track) return;
+      engineTracks[index] = toEngineTrack(
+        track,
+        eqGainsByTrackId?.get(track.id),
+        await resolveFreshEngineStreamUrl(track, options),
+        options,
+      );
+    }),
   );
   return engineTracks;
 }
@@ -173,15 +181,23 @@ async function resolveFreshEngineStreamUrl(
 ): Promise<string> {
   const offlineUrl = getOfflineStreamUrl(track, options);
   if (offlineUrl) return offlineUrl;
-  if (hasFreshRemoteStream(track)) return getStreamUrl(track, options);
-  if (!track.globalTrackUid) return getStreamUrl(track, options);
-
-  const playback = await fetchTrackPlayback(
-    track,
-    getEffectivePlaybackDeliveryPolicy(),
-  );
-  if (!playback) return getStreamUrl(track, options);
-  setPlaybackSession(track, playback.playback_session);
-  setPlaybackDeliveryProvenance(track, playback);
-  return resolveMaybeApiStreamUrl(playback.stream_url) || playback.stream_url;
+  let resolvedUrl: string;
+  if (hasFreshRemoteStream(track) || !track.globalTrackUid) {
+    resolvedUrl = getStreamUrl(track, options);
+  } else {
+    const playback = await fetchTrackPlayback(
+      track,
+      getEffectivePlaybackDeliveryPolicy(),
+    );
+    if (!playback) {
+      resolvedUrl = getStreamUrl(track, options);
+    } else {
+      setPlaybackSession(track, playback.playback_session);
+      setPlaybackDeliveryProvenance(track, playback);
+      resolvedUrl =
+        resolveMaybeApiStreamUrl(playback.stream_url) || playback.stream_url;
+    }
+  }
+  if (options.target === "android-native") return resolvedUrl;
+  return ensureMediaAccessUrl(resolvedUrl, "stream");
 }

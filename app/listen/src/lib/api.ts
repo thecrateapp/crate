@@ -350,6 +350,19 @@ const queuedMediaAccessTargets = new Map<
 >();
 const scheduledMediaAccessScopes = new Set<string>();
 const mediaAccessRefreshPromises = new Map<string, Promise<boolean>>();
+const ensuredMediaAccessPromises = new Map<string, Promise<string>>();
+
+export class MediaAccessTicketError extends Error {
+  readonly audience: MediaAccessAudience;
+  readonly path: string;
+
+  constructor(audience: MediaAccessAudience, path: string) {
+    super(`Could not acquire ${audience} access for ${path}`);
+    this.name = "MediaAccessTicketError";
+    this.audience = audience;
+    this.path = path;
+  }
+}
 
 function mediaAccessTargetKey(target: MediaAccessTarget): string {
   return `${target.audience}:${target.path}`;
@@ -437,6 +450,83 @@ export async function refreshMediaAccessTickets(
     queueMediaAccessTarget(target.audience, target.path, server.id);
   }
   return flushMediaAccessTargets(server.id);
+}
+
+/**
+ * Resolve a protected media URL only after its exact-path ticket is available.
+ *
+ * Synchronous URL helpers remain suitable for lazy page artwork, where a
+ * ticket refresh can trigger a rerender. Audio engines and other connection
+ * boundaries must use this function so they never receive a cold unticketed
+ * URL in configurable-server runtimes.
+ */
+export async function ensureMediaAccessUrl(
+  url: string,
+  audience: MediaAccessAudience,
+  options: { forceRefresh?: boolean } = {},
+): Promise<string> {
+  const baseUrl = isAbsoluteHttpUrl(url) ? url : apiUrl(url);
+  if (!isApiUrl(baseUrl)) return baseUrl;
+  if (!usesConfigurableServer) {
+    return withMediaAccessTicket(baseUrl, audience);
+  }
+
+  const server = getCurrentServer();
+  if (!server?.token || !server.id) {
+    return withMediaAccessTicket(baseUrl, audience);
+  }
+
+  let parsed: URL;
+  let serverOrigin: URL;
+  try {
+    parsed = new URL(baseUrl, server.url);
+    serverOrigin = new URL(server.url);
+  } catch {
+    return baseUrl;
+  }
+  parsed.searchParams.delete("token");
+  parsed.searchParams.delete("media_ticket");
+  if (
+    parsed.origin !== serverOrigin.origin ||
+    !parsed.pathname.startsWith("/api/")
+  ) {
+    return parsed.toString();
+  }
+  const currentTicket = getMediaAccessTicket(
+    audience,
+    parsed.pathname,
+    server.id,
+  );
+  if (currentTicket && !options.forceRefresh) {
+    parsed.searchParams.set("media_ticket", currentTicket);
+    return parsed.toString();
+  }
+
+  const key = `${server.id}:${audience}:${parsed.pathname}:${
+    options.forceRefresh ? "refresh" : "ensure"
+  }`;
+  const existing = ensuredMediaAccessPromises.get(key);
+  if (existing) return existing;
+
+  const pending = (async () => {
+    const refreshed = await refreshMediaAccessTickets([
+      { audience, path: parsed.pathname },
+    ]);
+    const currentServer = getCurrentServer();
+    const ticket =
+      refreshed && currentServer?.id === server.id
+        ? getMediaAccessTicket(audience, parsed.pathname, server.id)
+        : null;
+    if (!ticket) {
+      throw new MediaAccessTicketError(audience, parsed.pathname);
+    }
+    parsed.searchParams.set("media_ticket", ticket);
+    return parsed.toString();
+  })().finally(() => {
+    ensuredMediaAccessPromises.delete(key);
+  });
+  ensuredMediaAccessPromises.set(key, pending);
+  return pending;
 }
 
 export function startMediaAccessTicketRefresh(): () => void {

@@ -42,6 +42,8 @@ describe("playback QoE", () => {
         url: "https://peer.example/private-ticket",
         downlinkMbps: 0.5,
         rttMs: 900,
+        runtime: "android_native",
+        engine: "media3",
       }),
     ).toEqual({
       event: "startup",
@@ -50,6 +52,8 @@ describe("playback QoE", () => {
       effective_policy: "data_saver",
       duration_ms: 240,
       buffered_ahead_seconds: 2.5,
+      runtime: "android_native",
+      engine: "media3",
     });
   });
 
