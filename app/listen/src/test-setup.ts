@@ -1,5 +1,28 @@
 import "@testing-library/jest-dom/vitest";
 
+import caCatalog from "@/i18n/catalogs/ca.json";
+import deCatalog from "@/i18n/catalogs/de.json";
+import enCatalog from "@/i18n/catalogs/en.json";
+import esCatalog from "@/i18n/catalogs/es.json";
+import euCatalog from "@/i18n/catalogs/eu.json";
+import frCatalog from "@/i18n/catalogs/fr.json";
+import itCatalog from "@/i18n/catalogs/it.json";
+import type { ListenResources } from "@/i18n/I18nProvider";
+
+type ListenTestGlobal = typeof globalThis & {
+  __CRATE_LISTEN_TEST_I18N_RESOURCES__?: ListenResources;
+};
+
+(globalThis as ListenTestGlobal).__CRATE_LISTEN_TEST_I18N_RESOURCES__ = {
+  ca: { translation: caCatalog },
+  de: { translation: deCatalog },
+  en: { translation: enCatalog },
+  es: { translation: esCatalog },
+  eu: { translation: euCatalog },
+  fr: { translation: frCatalog },
+  it: { translation: itCatalog },
+};
+
 /**
  * Vitest setup: polyfill localStorage. jsdom's implementation is
  * incomplete in some environments — replace with an in-memory map for

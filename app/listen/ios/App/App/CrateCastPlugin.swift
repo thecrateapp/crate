@@ -136,7 +136,7 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
     private func unavailable(_ reason: String) -> [String: Any] {
         [
             "platform": "native",
-            "visible": true,
+            "visible": false,
             "available": false,
             "activeSession": false,
             "reason": reason

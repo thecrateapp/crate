@@ -435,7 +435,7 @@ async function getNativeCastCapabilities(): Promise<CastSenderCapabilities> {
     const capabilities = await getNativeCast().getCapabilities();
     return {
       platform: "native",
-      visible: true,
+      visible: capabilities.visible,
       available: capabilities.available,
       activeSession: Boolean(capabilities.activeSession),
       targetName: capabilities.targetName,
@@ -444,7 +444,7 @@ async function getNativeCastCapabilities(): Promise<CastSenderCapabilities> {
   } catch {
     return {
       platform: "native",
-      visible: true,
+      visible: false,
       available: false,
       activeSession: false,
       reason: "Native Cast sender is not installed in this build.",

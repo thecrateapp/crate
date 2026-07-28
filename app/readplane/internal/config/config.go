@@ -55,6 +55,7 @@ type Config struct {
 	LocalMediaEnabled              bool
 	MusicRoot                      string
 	CacheRoot                      string
+	CORSAllowedOrigins             []string
 }
 
 // Load reads environment variables and returns a populated Config.
@@ -93,7 +94,52 @@ func Load(version string) Config {
 		LocalMediaEnabled:              boolEnv("READPLANE_LOCAL_MEDIA_ENABLED", false),
 		MusicRoot:                      absolutePathEnv("READPLANE_MUSIC_ROOT", "/music"),
 		CacheRoot:                      absolutePathEnv("READPLANE_CACHE_ROOT", "/cache"),
+		CORSAllowedOrigins:             corsAllowedOrigins(),
 	}
+}
+
+func corsAllowedOrigins() []string {
+	domain := stringEnv("DOMAIN", "localhost")
+	candidates := []string{
+		"https://admin." + domain,
+		"https://listen." + domain,
+		"https://api." + domain,
+		"https://" + domain,
+		"capacitor://localhost",
+		"https://localhost",
+		"tauri://localhost",
+		"http://tauri.localhost",
+		"https://tauri.localhost",
+		"https://docs.cratemusic.app",
+	}
+	if domain == "localhost" || domain == "127.0.0.1" {
+		candidates = append(candidates,
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"http://localhost:5174",
+			"http://localhost:4173",
+			"http://localhost:5178",
+			"http://127.0.0.1:5178",
+			"http://127.0.0.1:4173",
+			"http://localhost:8585",
+		)
+	}
+	candidates = append(candidates, strings.Split(os.Getenv("CRATE_CORS_EXTRA_ORIGINS"), ",")...)
+
+	origins := make([]string, 0, len(candidates))
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		origin := strings.TrimRight(strings.TrimSpace(candidate), "/")
+		if origin == "" {
+			continue
+		}
+		if _, exists := seen[origin]; exists {
+			continue
+		}
+		seen[origin] = struct{}{}
+		origins = append(origins, origin)
+	}
+	return origins
 }
 
 func absolutePathEnv(key string, fallback string) string {

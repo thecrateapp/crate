@@ -18,6 +18,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 
+import androidx.media3.common.util.UnstableApi;
+
 import org.json.JSONException;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,6 +33,7 @@ import java.util.List;
         @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS })
     }
 )
+@UnstableApi
 public class CrateNativePlaybackPlugin extends Plugin {
     private static final String TAG = "CrateNativePlaybackPlugin";
 
@@ -330,6 +333,7 @@ public class CrateNativePlaybackPlugin extends Plugin {
         return new CrateNativePlaybackService.NativeTrack(
             track.optString("id", ""),
             track.optString("url", ""),
+            track.optString("authorization", ""),
             track.optString("title", "Unknown"),
             track.optString("artist", ""),
             track.optString("album", ""),

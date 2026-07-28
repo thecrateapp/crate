@@ -60,6 +60,7 @@ import {
   onCacheEventsHealthChange,
   connectCacheEvents,
 } from "./cache";
+import { setMediaAccessTickets } from "@/lib/media-access";
 
 const STORAGE_KEY = "crate-api-cache:v2";
 const cacheStorageKey = (url: string, context = "web:anonymous"): string =>
@@ -783,6 +784,7 @@ afterEach(() => {
 describe("connectCacheEvents", () => {
   let origEventSource: typeof EventSource;
   let constructedUrl: string | null;
+  let constructedCount: number;
   let mockEs: {
     onopen: (() => void) | null;
     onmessage: ((e: MessageEvent) => void) | null;
@@ -794,6 +796,7 @@ describe("connectCacheEvents", () => {
   beforeEach(() => {
     origEventSource = globalThis.EventSource;
     constructedUrl = null;
+    constructedCount = 0;
 
     mockEs = {
       onopen: null,
@@ -807,6 +810,7 @@ describe("connectCacheEvents", () => {
     // connectCacheEvents's property assignments (eventSource.onopen,
     // eventSource.onmessage, etc.) land directly on mockEs.
     function MockEventSource(url: string | URL) {
+      constructedCount += 1;
       constructedUrl = String(url);
       return mockEs;
     }
@@ -932,6 +936,25 @@ describe("connectCacheEvents", () => {
     disconnect2(); // no-op, harmless
 
     expect(mockEs.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnects with a fresh scoped ticket after ticket rotation", () => {
+    _safeConnect();
+
+    setMediaAccessTickets(
+      [
+        {
+          audience: "sse",
+          path: "/api/cache/events",
+          ticket: "fresh-cache-ticket",
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ],
+      "server-a",
+    );
+
+    expect(mockEs.close).toHaveBeenCalledTimes(1);
+    expect(constructedCount).toBe(2);
   });
 
   it("survives listener errors without breaking other listeners", () => {

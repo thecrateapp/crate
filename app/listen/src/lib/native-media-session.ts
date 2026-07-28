@@ -1,48 +1,21 @@
-import { registerPlugin, type PluginListenerHandle } from "@capacitor/core";
-
 import { isNative } from "@/lib/capacitor-runtime";
+import {
+  getNativeMediaSessionBridge,
+  type NativeMediaControlEvent,
+  type NativeMediaSessionPayload,
+} from "@/lib/native-media-session-bridge";
 
-export type NativeMediaControl =
-  | "play"
-  | "pause"
-  | "next"
-  | "previous"
-  | "seekTo";
-
-export type NativeMediaSessionPayload = {
-  title: string;
-  artist?: string;
-  album?: string;
-  artwork?: string;
-  isPlaying: boolean;
-  position: number;
-  duration: number;
-};
-
-type NativeMediaControlEvent = {
-  control?: NativeMediaControl;
-  position?: number;
-};
-
-type CrateMediaSessionPlugin = {
-  start(options: NativeMediaSessionPayload): Promise<void>;
-  update(options: NativeMediaSessionPayload): Promise<void>;
-  stop(options?: { suppressControl?: boolean }): Promise<void>;
-  addListener(
-    eventName: "control",
-    listener: (event: NativeMediaControlEvent) => void,
-  ): Promise<PluginListenerHandle>;
-};
-
-const nativeMediaSession =
-  registerPlugin<CrateMediaSessionPlugin>("CrateMediaSession");
+export type {
+  NativeMediaControl,
+  NativeMediaSessionPayload,
+} from "@/lib/native-media-session-bridge";
 
 export async function syncNativeMediaSession(
   payload: NativeMediaSessionPayload,
 ): Promise<void> {
   if (!isNative) return;
   try {
-    await nativeMediaSession.update(payload);
+    await getNativeMediaSessionBridge().update(payload);
   } catch {
     // Native media controls are best-effort and should never interrupt playback.
   }
@@ -53,7 +26,7 @@ export async function stopNativeMediaSession(options?: {
 }): Promise<void> {
   if (!isNative) return;
   try {
-    await nativeMediaSession.stop(options);
+    await getNativeMediaSessionBridge().stop(options);
   } catch {
     // Ignore native bridge failures during teardown.
   }
@@ -63,7 +36,10 @@ export async function onNativeMediaControl(
   listener: (event: NativeMediaControlEvent) => void,
 ): Promise<() => void> {
   if (!isNative) return () => {};
-  const handle = await nativeMediaSession.addListener("control", listener);
+  const handle = await getNativeMediaSessionBridge().addListener(
+    "control",
+    listener,
+  );
   return () => {
     void handle.remove();
   };

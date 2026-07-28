@@ -139,10 +139,10 @@ describe("apiAssetUrl", () => {
     );
   });
 
-  it("adds token to absolute cross-origin API URLs", () => {
+  it("does not leak the bearer to absolute cross-origin API URLs", () => {
     localStorage.setItem("listen-auth-token", "tok");
     expect(apiAssetUrl("https://api.example.com/api/playlists/1/cover")).toBe(
-      "https://api.example.com/api/playlists/1/cover?token=tok",
+      "https://api.example.com/api/playlists/1/cover",
     );
   });
 
@@ -154,17 +154,17 @@ describe("apiAssetUrl", () => {
     );
   });
 
-  it("does not duplicate an existing token query param", () => {
+  it("removes an existing bearer query param from API assets", () => {
     localStorage.setItem("listen-auth-token", "tok");
     expect(apiAssetUrl("https://api.example.com/api/cover?token=tok")).toBe(
-      "https://api.example.com/api/cover?token=tok",
+      "https://api.example.com/api/cover",
     );
   });
 
-  it("appends token with & when URL already has query params", () => {
+  it("preserves cross-origin query params without adding a bearer", () => {
     localStorage.setItem("listen-auth-token", "tok");
     expect(apiAssetUrl("https://api.example.com/api/cover?size=256")).toBe(
-      "https://api.example.com/api/cover?size=256&token=tok",
+      "https://api.example.com/api/cover?size=256",
     );
   });
 
@@ -174,10 +174,10 @@ describe("apiAssetUrl", () => {
     );
   });
 
-  it("adds token to any cross-origin absolute URL (not just /api/ paths)", () => {
+  it("never adds a bearer to arbitrary external URLs", () => {
     localStorage.setItem("listen-auth-token", "tok");
     expect(apiAssetUrl("https://example.com/photo.jpg")).toBe(
-      "https://example.com/photo.jpg?token=tok",
+      "https://example.com/photo.jpg",
     );
   });
 });
@@ -224,11 +224,11 @@ describe("resolveMaybeApiAssetUrl", () => {
     );
   });
 
-  it("adds token to absolute crate API asset URLs", () => {
+  it("does not expose the bearer in absolute crate API asset URLs", () => {
     localStorage.setItem("listen-auth-token", "listen-token");
     expect(
       resolveMaybeApiAssetUrl("https://api.example.test/api/playlists/1/cover"),
-    ).toBe("https://api.example.test/api/playlists/1/cover?token=listen-token");
+    ).toBe("https://api.example.test/api/playlists/1/cover");
   });
 
   it("strips origin from same-origin absolute /api/ URLs", () => {
@@ -249,11 +249,11 @@ describe("resolveMaybeApiAssetUrl", () => {
     ).toBe("https://example.com/images/photo.jpg");
   });
 
-  it("adds token to absolute URLs whose pathname starts with /api/", () => {
+  it("does not expose the bearer on another absolute API origin", () => {
     localStorage.setItem("listen-auth-token", "tok");
     expect(
       resolveMaybeApiAssetUrl("https://cdn.example.com/api/images/cover.jpg"),
-    ).toBe("https://cdn.example.com/api/images/cover.jpg?token=tok");
+    ).toBe("https://cdn.example.com/api/images/cover.jpg");
   });
 });
 
@@ -276,11 +276,11 @@ describe("apiSseUrl", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("apiWsUrl", () => {
-  it("returns ws URL with token", () => {
+  it("does not put the bearer in a web socket URL", () => {
     localStorage.setItem("listen-auth-token", "tok");
     const url = apiWsUrl("/api/ws");
     expect(url.startsWith("ws://")).toBe(true);
-    expect(url).toContain("token=tok");
+    expect(url).not.toContain("token=");
   });
 
   it("returns ws URL without token when absent", () => {
@@ -289,10 +289,11 @@ describe("apiWsUrl", () => {
     expect(url).not.toContain("token=");
   });
 
-  it("appends with & when path already has query params", () => {
+  it("preserves existing query params without adding a bearer", () => {
     localStorage.setItem("listen-auth-token", "tok");
     const url = apiWsUrl("/api/ws?room=main");
-    expect(url).toContain("room=main&token=tok");
+    expect(url).toContain("room=main");
+    expect(url).not.toContain("token=");
   });
 
   it("replaces http with ws in the origin", () => {
@@ -815,12 +816,14 @@ describe("apiFetch", () => {
 describe("native (configurable server) mode", () => {
   let apiMod: typeof import("@/lib/api");
   let serverStore: typeof import("@/lib/server-store");
+  let mediaAccess: typeof import("@/lib/media-access");
 
   beforeEach(async () => {
     vi.resetModules();
     vi.doMock("@/lib/platform", () => ({
       usesConfigurableServer: true,
       isTauriRuntime: false,
+      isCapacitorRuntime: true,
       getListenAppId: () => "listen-capacitor",
     }));
     vi.doMock("@/lib/listen-device", () => ({
@@ -839,12 +842,55 @@ describe("native (configurable server) mode", () => {
     localStorage.clear();
     apiMod = await import("@/lib/api");
     serverStore = await import("@/lib/server-store");
+    mediaAccess = await import("@/lib/media-access");
   });
 
   function setupServer(url = "https://api.example.com", token = "native-tok") {
     const s = serverStore.addServer(url);
     serverStore.setCurrentServerId(s.id);
     serverStore.setCurrentServerToken(token);
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    mediaAccess.setMediaAccessTickets(
+      [
+        {
+          audience: "artwork",
+          path: "/api/cover.jpg",
+          ticket: "artwork-ticket",
+          expires_at: expiresAt,
+        },
+        {
+          audience: "artwork",
+          path: "/api/network/external-artist/photo",
+          ticket: "artwork-ticket",
+          expires_at: expiresAt,
+        },
+        {
+          audience: "artwork",
+          path: "/api/genres/hardcore/cover",
+          ticket: "artwork-ticket",
+          expires_at: expiresAt,
+        },
+        {
+          audience: "stream",
+          path: "/api/tracks/1/stream",
+          ticket: "stream-ticket",
+          expires_at: expiresAt,
+        },
+        {
+          audience: "sse",
+          path: "/api/events",
+          ticket: "sse-ticket",
+          expires_at: expiresAt,
+        },
+        {
+          audience: "ws",
+          path: "/api/ws",
+          ticket: "ws-ticket",
+          expires_at: expiresAt,
+        },
+      ],
+      s.id,
+    );
     return s;
   }
 
@@ -873,17 +919,17 @@ describe("native (configurable server) mode", () => {
   });
 
   describe("apiSseUrl", () => {
-    it("appends token query param", () => {
+    it("appends an SSE-scoped ticket", () => {
       setupServer();
       expect(apiMod.apiSseUrl("/api/events")).toBe(
-        "https://api.example.com/api/events?token=native-tok",
+        "https://api.example.com/api/events?media_ticket=sse-ticket",
       );
     });
 
     it("uses & separator when URL already has query params", () => {
       setupServer();
       expect(apiMod.apiSseUrl("/api/events?stream=ops")).toBe(
-        "https://api.example.com/api/events?stream=ops&token=native-tok",
+        "https://api.example.com/api/events?stream=ops&media_ticket=sse-ticket",
       );
     });
 
@@ -897,27 +943,48 @@ describe("native (configurable server) mode", () => {
   });
 
   describe("apiAssetUrl", () => {
-    it("appends token to all absolute URLs for configurable server", () => {
+    it("never reuses an artwork ticket for another API path", () => {
+      setupServer();
+
+      expect(apiMod.apiAssetUrl("/api/cover.jpg")).toContain(
+        "media_ticket=artwork-ticket",
+      );
+      expect(apiMod.apiAssetUrl("/api/artists/99/photo")).toBe(
+        "https://api.example.com/api/artists/99/photo",
+      );
+    });
+
+    it("never sends a media ticket to another absolute origin", () => {
+      setupServer();
+
+      expect(apiMod.apiAssetUrl("https://cdn.example.net/api/cover.jpg")).toBe(
+        "https://cdn.example.net/api/cover.jpg",
+      );
+    });
+
+    it("appends an artwork-scoped ticket for configurable servers", () => {
       setupServer();
       expect(apiMod.apiAssetUrl("/api/cover.jpg")).toBe(
-        "https://api.example.com/api/cover.jpg?token=native-tok",
+        "https://api.example.com/api/cover.jpg?media_ticket=artwork-ticket",
       );
     });
 
     it("appends with & when query params exist", () => {
       setupServer();
       expect(apiMod.apiAssetUrl("/api/cover.jpg?size=256")).toBe(
-        "https://api.example.com/api/cover.jpg?size=256&token=native-tok",
+        "https://api.example.com/api/cover.jpg?size=256&media_ticket=artwork-ticket",
       );
     });
 
-    it("does not duplicate token", () => {
+    it("replaces a legacy bearer query with the scoped ticket", () => {
       setupServer();
       expect(
         apiMod.apiAssetUrl(
           "https://api.example.com/api/cover.jpg?token=native-tok",
         ),
-      ).toBe("https://api.example.com/api/cover.jpg?token=native-tok");
+      ).toBe(
+        "https://api.example.com/api/cover.jpg?media_ticket=artwork-ticket",
+      );
     });
 
     it("returns URL unchanged when no token", () => {
@@ -927,13 +994,134 @@ describe("native (configurable server) mode", () => {
         "https://api.example.com/api/cover.jpg",
       );
     });
+
+    it("does not reuse an artwork ticket after switching servers", () => {
+      setupServer("https://api-a.example.com");
+      const serverB = serverStore.addServer("https://api-b.example.com");
+      serverStore.setCurrentServerId(serverB.id);
+      serverStore.setCurrentServerToken("server-b-token");
+
+      expect(apiMod.apiAssetUrl("/api/cover.jpg")).toBe(
+        "https://api-b.example.com/api/cover.jpg",
+      );
+    });
+  });
+
+  describe("media access refresh", () => {
+    it("requests a missing ticket for the exact path without blocking URL generation", async () => {
+      const server = setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/artists/99/photo",
+              ticket: "artist-photo-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+
+      expect(apiMod.apiAssetUrl("/api/artists/99/photo")).toBe(
+        "https://api.example.com/api/artists/99/photo",
+      );
+
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      const [, init] = fetchMock.mock.calls[0]!;
+      expect(JSON.parse(String(init?.body))).toEqual({
+        targets: [
+          {
+            audience: "artwork",
+            path: "/api/artists/99/photo",
+          },
+        ],
+      });
+      expect(
+        mediaAccess.getMediaAccessTicket(
+          "artwork",
+          "/api/artists/99/photo",
+          server.id,
+        ),
+      ).toBe("artist-photo-ticket");
+      expect(apiMod.apiAssetUrl("/api/artists/99/photo")).toBe(
+        "https://api.example.com/api/artists/99/photo?media_ticket=artist-photo-ticket",
+      );
+    });
+
+    it("exchanges the bearer through an Authorization header", async () => {
+      const server = setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/12/cover",
+              ticket: "fresh-artwork-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+
+      await expect(
+        apiMod.refreshMediaAccessTickets([
+          {
+            audience: "artwork",
+            path: "/api/albums/12/cover",
+          },
+        ]),
+      ).resolves.toBe(true);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.example.com/api/auth/media-access",
+        expect.objectContaining({
+          method: "POST",
+          credentials: "omit",
+          headers: expect.objectContaining({
+            Authorization: "Bearer native-tok",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({
+            targets: [
+              {
+                audience: "artwork",
+                path: "/api/albums/12/cover",
+              },
+            ],
+          }),
+        }),
+      );
+      expect(
+        mediaAccess.getMediaAccessTicket(
+          "artwork",
+          "/api/albums/12/cover",
+          server.id,
+        ),
+      ).toBe("fresh-artwork-ticket");
+    });
+  });
+
+  describe("apiStreamUrl", () => {
+    it("uses a stream-scoped ticket without exposing the bearer", () => {
+      setupServer();
+      expect(
+        apiMod.apiStreamUrl("/api/tracks/1/stream?delivery=balanced"),
+      ).toBe(
+        "https://api.example.com/api/tracks/1/stream?delivery=balanced&media_ticket=stream-ticket",
+      );
+    });
   });
 
   describe("apiWsUrl", () => {
     it("uses server base as ws:// origin", () => {
       setupServer();
       const url = apiMod.apiWsUrl("/api/ws");
-      expect(url).toBe("wss://api.example.com/api/ws?token=native-tok");
+      expect(url).toBe("wss://api.example.com/api/ws?media_ticket=ws-ticket");
     });
 
     it("returns ws URL without token when absent", () => {
@@ -950,7 +1138,7 @@ describe("native (configurable server) mode", () => {
         "https://api.example.com/api/cover.jpg",
       );
       expect(result).toBe(
-        "https://api.example.com/api/cover.jpg?token=native-tok",
+        "https://api.example.com/api/cover.jpg?media_ticket=artwork-ticket",
       );
     });
 
@@ -960,7 +1148,7 @@ describe("native (configurable server) mode", () => {
         "/api/network/external-artist/photo?name=Slowthai",
       );
       expect(result).toBe(
-        "https://api.example.com/api/network/external-artist/photo?name=Slowthai&token=native-tok",
+        "https://api.example.com/api/network/external-artist/photo?name=Slowthai&media_ticket=artwork-ticket",
       );
     });
 
@@ -970,7 +1158,7 @@ describe("native (configurable server) mode", () => {
         "api/genres/hardcore/cover?size=1280&format=webp",
       );
       expect(result).toBe(
-        "https://api.example.com/api/genres/hardcore/cover?size=1280&format=webp&token=native-tok",
+        "https://api.example.com/api/genres/hardcore/cover?size=1280&format=webp&media_ticket=artwork-ticket",
       );
     });
   });

@@ -1,5 +1,6 @@
 App/build
 App/Pods
+App/App.xcworkspace
 App/output
 App/App/public
 App/App.xcodeproj/xcuserdata

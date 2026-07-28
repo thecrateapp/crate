@@ -48,6 +48,7 @@ import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
+import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { AUTH_TOKEN_EVENT, api, apiSseUrl } from "@/lib/api";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
@@ -109,6 +110,7 @@ const HOME_DISCOVERY_DEGRADE_AFTER_MS = 75_000;
 const HOME_DISCOVERY_DEGRADED_REFRESH_MS = 60_000;
 
 export function Home() {
+  const mediaAccessVersion = useMediaAccessVersion();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { play, playAll } = usePlayerActions();
@@ -220,7 +222,12 @@ export function Home() {
       });
       source.close();
     };
-  }, [applyDiscoveryPayload, authTokenRevision, refreshLiveDiscovery]);
+  }, [
+    applyDiscoveryPayload,
+    authTokenRevision,
+    mediaAccessVersion,
+    refreshLiveDiscovery,
+  ]);
 
   useEffect(() => {
     return onSseChannelState(HOME_DISCOVERY_SSE_CHANNEL, (state) => {

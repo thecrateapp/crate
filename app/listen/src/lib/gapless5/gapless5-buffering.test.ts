@@ -61,6 +61,10 @@ describe("getLoadableTrackIndices", () => {
     expect(getLoadableTrackIndices(4, 5, 2)).toEqual([3, 4]);
   });
 
+  it("retains the previous mobile source while preloading the successor", () => {
+    expect(getLoadableTrackIndices(2, 5, 3)).toEqual([1, 2, 3]);
+  });
+
   it("keeps the unlimited mode bounded to real source indices", () => {
     expect(getLoadableTrackIndices(0, 3, -1)).toEqual([0, 1, 2]);
   });

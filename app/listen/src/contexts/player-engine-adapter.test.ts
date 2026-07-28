@@ -13,6 +13,9 @@ vi.mock("@/lib/api", () => ({
   getApiBase: () => "https://listen.example",
   getAuthToken: () => authState.token,
   ensureFreshAuthToken: ensureFreshAuthTokenMock,
+  apiStreamUrl: (url: string) => url,
+  resolveMaybeApiStreamUrl: (url: string | null | undefined) =>
+    url?.startsWith("/api/") ? `https://listen.example${url}` : url ?? null,
   resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/")
       ? `https://listen.example${url}?token=${authState.token}`
@@ -79,15 +82,36 @@ describe("player engine adapter", () => {
       return true;
     });
 
-    const track = await toFreshEngineTrack({
-      id: "track-1",
-      entityUid: "entity-1",
-      title: "Track One",
-      artist: "Artist",
-    });
+    const track = await toFreshEngineTrack(
+      {
+        id: "track-1",
+        entityUid: "entity-1",
+        title: "Track One",
+        artist: "Artist",
+      },
+      undefined,
+      { target: "android-native" },
+    );
 
     expect(ensureFreshAuthTokenMock).toHaveBeenCalledTimes(1);
-    expect(track.url).toContain("token=fresh-token");
+    expect(track.url).not.toContain("token=");
+    expect(track.authorization).toBe("Bearer fresh-token");
+  });
+
+  it("never forwards the Crate bearer to an external media origin", () => {
+    const track = toEngineTrack(
+      {
+        id: "external-track",
+        title: "External Track",
+        artist: "External Artist",
+      },
+      undefined,
+      "https://cdn.example.net/audio/track.flac",
+      { target: "android-native" },
+    );
+
+    expect(track.url).toBe("https://cdn.example.net/audio/track.flac");
+    expect(track.authorization).toBeUndefined();
   });
 
   it("resolves global catalog playback before handing URLs to the engine", async () => {
@@ -113,14 +137,17 @@ describe("player engine adapter", () => {
       title: "Remote Song",
       artist: "Remote Band",
     };
-    const track = await toFreshEngineTrack(sourceTrack);
+    const track = await toFreshEngineTrack(sourceTrack, undefined, {
+      target: "android-native",
+    });
 
     expect(apiMock).toHaveBeenCalledWith(
       "/api/catalog/tracks/global-track-1/playback",
     );
     expect(track.url).toBe(
-      "https://listen.example/api/federation/remote/streams/ticket-1?token=listen-token",
+      "https://listen.example/api/federation/remote/streams/ticket-1",
     );
+    expect(track.authorization).toBe("Bearer listen-token");
     expect(track.url).not.toContain(
       "/api/catalog/tracks/global-track-1/stream",
     );

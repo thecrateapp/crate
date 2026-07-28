@@ -13,6 +13,7 @@ import {
 import {
   getCurrentServer,
   migrateLegacyToken,
+  SERVER_STORE_EVENT,
   seedDefaultServer,
   setCurrentServerAuthTokens,
   setCurrentServerRefreshToken,
@@ -22,6 +23,15 @@ import {
   getListenDeviceFingerprint,
   getListenDeviceLabel,
 } from "@/lib/listen-device";
+import {
+  clearMediaAccessTickets,
+  getMediaAccessTicket,
+  getMediaAccessTargets,
+  setMediaAccessTickets,
+  type MediaAccessAudience,
+  type MediaAccessTarget,
+  type MediaAccessTickets,
+} from "@/lib/media-access";
 
 export const AUTH_TOKEN_EVENT = "crate:auth-token-updated";
 const WEB_TOKEN_EXPIRES_AT_KEY = "listen-auth-token-expires-at";
@@ -73,7 +83,7 @@ function isAbsoluteHttpUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
-function hasQueryParam(url: string, name: string): boolean {
+function isApiUrl(url: string): boolean {
   try {
     const parsed = new URL(
       url,
@@ -81,49 +91,68 @@ function hasQueryParam(url: string, name: string): boolean {
         ? window.location.origin
         : "https://crate.local",
     );
-    return parsed.searchParams.has(name);
+    return parsed.pathname.startsWith("/api/");
   } catch {
-    return new RegExp(`[?&]${name}=`).test(url);
+    return url.startsWith("/api/") || url.startsWith("api/");
   }
-}
-
-function isSameOriginUrl(url: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const parsed = new URL(url, window.location.origin);
-    return parsed.origin === window.location.origin;
-  } catch {
-    return false;
-  }
-}
-
-function shouldAttachQueryToken(url: string): boolean {
-  if (usesConfigurableServer) return true;
-  return isAbsoluteHttpUrl(url) && !isSameOriginUrl(url);
 }
 
 function apiCredentials(): RequestCredentials {
   return usesConfigurableServer ? "omit" : "include";
 }
 
-/** Resolve an SSE path to a full URL, adding auth token for native clients. */
-export function apiSseUrl(path: string): string {
-  if (!usesConfigurableServer) return apiUrl(path);
-  const token = getAuthToken();
-  if (!token) return apiUrl(path);
-  const separator = path.includes("?") ? "&" : "?";
-  return `${getApiBase()}${path}${separator}token=${encodeURIComponent(token)}`;
+function withMediaAccessTicket(
+  url: string,
+  audience: MediaAccessAudience,
+): string {
+  const absolute = /^(?:https?|wss?):\/\//i.test(url);
+  const base =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://crate.local";
+  try {
+    const parsed = new URL(url, base);
+    parsed.searchParams.delete("token");
+    parsed.searchParams.delete("media_ticket");
+    const server = usesConfigurableServer ? getCurrentServer() : null;
+    const serverOrigin = server?.url ? new URL(server.url) : null;
+    const targetsCurrentServer =
+      !absolute ||
+      !serverOrigin ||
+      (parsed.host === serverOrigin.host &&
+        (parsed.protocol === "https:" || parsed.protocol === "wss:") ===
+          (serverOrigin.protocol === "https:"));
+    const ticket =
+      targetsCurrentServer && server?.token && server.id
+        ? getMediaAccessTicket(audience, parsed.pathname, server.id)
+        : null;
+    if (!ticket && targetsCurrentServer && server?.token && server.id) {
+      queueMediaAccessTarget(audience, parsed.pathname, server.id);
+    }
+    if (ticket) parsed.searchParams.set("media_ticket", ticket);
+    if (absolute) return parsed.toString();
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return url.replace(/([?&])token=[^&]*&?/g, "$1").replace(/[?&]$/, "");
+  }
 }
 
-/** Resolve an API media path to a full URL, adding auth token for <img>/<video> requests. */
+/** Resolve an SSE path to a full URL using a short-lived scoped ticket. */
+export function apiSseUrl(path: string): string {
+  return withMediaAccessTicket(apiUrl(path), "sse");
+}
+
+/** Resolve an API media path using a short-lived artwork ticket. */
 export function apiAssetUrl(path: string): string {
   const baseUrl = isAbsoluteHttpUrl(path) ? path : apiUrl(path);
-  const token = getAuthToken();
-  if (!token) return baseUrl;
-  if (!shouldAttachQueryToken(baseUrl)) return baseUrl;
-  if (hasQueryParam(baseUrl, "token")) return baseUrl;
-  const separator = baseUrl.includes("?") ? "&" : "?";
-  return `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
+  if (!isApiUrl(baseUrl)) return baseUrl;
+  return withMediaAccessTicket(baseUrl, "artwork");
+}
+
+export function apiStreamUrl(path: string): string {
+  const baseUrl = isAbsoluteHttpUrl(path) ? path : apiUrl(path);
+  if (!isApiUrl(baseUrl)) return baseUrl;
+  return withMediaAccessTicket(baseUrl, "stream");
 }
 
 export function resolveMaybeApiAssetUrl(
@@ -167,16 +196,31 @@ export function resolveMaybeApiAssetUrl(
   return url;
 }
 
+export function resolveMaybeApiStreamUrl(
+  url: string | null | undefined,
+): string | null {
+  if (!url) return null;
+  if (
+    url.startsWith("blob:") ||
+    url.startsWith("file:") ||
+    url.startsWith("capacitor:") ||
+    url.startsWith("content:")
+  ) {
+    return url;
+  }
+  if (url.startsWith("/api/")) return apiStreamUrl(url);
+  if (url.startsWith("api/")) return apiStreamUrl(`/${url}`);
+  if (isAbsoluteHttpUrl(url) && isApiUrl(url)) return apiStreamUrl(url);
+  return url;
+}
+
 /** Resolve an API path to a full WebSocket URL. */
 export function apiWsUrl(path: string): string {
   const base = getApiBase();
   const baseOrigin = base
     ? base.replace(/^http/i, "ws")
     : window.location.origin.replace(/^http/i, "ws");
-  const token = getAuthToken();
-  if (!token) return `${baseOrigin}${path}`;
-  const separator = path.includes("?") ? "&" : "?";
-  return `${baseOrigin}${path}${separator}token=${encodeURIComponent(token)}`;
+  return withMediaAccessTicket(`${baseOrigin}${path}`, "ws");
 }
 
 // ── Auth token ──────────────────────────────────────────────────────
@@ -265,6 +309,8 @@ export function setAuthTokens(
       setCurrentServerToken(token, nextAccessExpiresAt);
     else setCurrentServerAuthTokens(token, refreshToken, nextAccessExpiresAt);
     emitAuthTokenChange();
+    if (!token) clearMediaAccessTickets();
+    else void refreshMediaAccessTickets();
     return;
   }
   try {
@@ -296,6 +342,126 @@ export function getApiAuthHeaders(): Record<string, string> {
   return headers;
 }
 export { shouldRedirectToLoginOnUnauthorized };
+
+const MEDIA_ACCESS_BATCH_SIZE = 128;
+const queuedMediaAccessTargets = new Map<
+  string,
+  Map<string, MediaAccessTarget>
+>();
+const scheduledMediaAccessScopes = new Set<string>();
+const mediaAccessRefreshPromises = new Map<string, Promise<boolean>>();
+
+function mediaAccessTargetKey(target: MediaAccessTarget): string {
+  return `${target.audience}:${target.path}`;
+}
+
+function scheduleMediaAccessFlush(scope: string): void {
+  if (
+    scheduledMediaAccessScopes.has(scope) ||
+    mediaAccessRefreshPromises.has(scope)
+  ) {
+    return;
+  }
+  scheduledMediaAccessScopes.add(scope);
+  queueMicrotask(() => {
+    scheduledMediaAccessScopes.delete(scope);
+    void flushMediaAccessTargets(scope);
+  });
+}
+
+function queueMediaAccessTarget(
+  audience: MediaAccessAudience,
+  path: string,
+  scope: string,
+): void {
+  const targets = queuedMediaAccessTargets.get(scope) ?? new Map();
+  const target = { audience, path };
+  targets.set(mediaAccessTargetKey(target), target);
+  queuedMediaAccessTargets.set(scope, targets);
+  scheduleMediaAccessFlush(scope);
+}
+
+async function requestMediaAccessTickets(
+  server: NonNullable<ReturnType<typeof getCurrentServer>>,
+  targets: MediaAccessTarget[],
+): Promise<boolean> {
+  const response = await fetch(`${server.url}/api/auth/media-access`, {
+    method: "POST",
+    credentials: "omit",
+    headers: {
+      ...getApiAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ targets }),
+  }).catch(() => null);
+  if (!response?.ok) return false;
+  const payload = (await response.json().catch(() => null)) as {
+    tickets?: MediaAccessTickets;
+  } | null;
+  if (!Array.isArray(payload?.tickets)) return false;
+  if (getCurrentServer()?.id !== server.id) return false;
+  setMediaAccessTickets(payload.tickets, server.id);
+  return true;
+}
+
+async function flushMediaAccessTargets(scope: string): Promise<boolean> {
+  const existing = mediaAccessRefreshPromises.get(scope);
+  if (existing) return existing;
+  const server = getCurrentServer();
+  if (!server?.token || server.id !== scope) return false;
+  const queued = queuedMediaAccessTargets.get(scope);
+  if (!queued?.size) return true;
+  const targets = Array.from(queued.values()).slice(0, MEDIA_ACCESS_BATCH_SIZE);
+  for (const target of targets) queued.delete(mediaAccessTargetKey(target));
+
+  const promise = requestMediaAccessTickets(server, targets).finally(() => {
+    mediaAccessRefreshPromises.delete(scope);
+    if (queued.size > 0) scheduleMediaAccessFlush(scope);
+  });
+  mediaAccessRefreshPromises.set(scope, promise);
+  return promise;
+}
+
+export async function refreshMediaAccessTickets(
+  targets?: MediaAccessTarget[],
+): Promise<boolean> {
+  if (!usesConfigurableServer) return true;
+  const server = getCurrentServer();
+  if (!server?.token) {
+    clearMediaAccessTickets();
+    return false;
+  }
+  const requested = targets ?? getMediaAccessTargets(server.id);
+  if (requested.length === 0) return true;
+  for (const target of requested) {
+    queueMediaAccessTarget(target.audience, target.path, server.id);
+  }
+  return flushMediaAccessTargets(server.id);
+}
+
+export function startMediaAccessTicketRefresh(): () => void {
+  if (!usesConfigurableServer || typeof window === "undefined") return () => {};
+  const refresh = () => {
+    if (document.visibilityState === "visible") {
+      void refreshMediaAccessTickets();
+    }
+  };
+  const interval = window.setInterval(
+    () => void refreshMediaAccessTickets(),
+    45_000,
+  );
+  const handleServerChange = () => {
+    clearMediaAccessTickets();
+    void refreshMediaAccessTickets();
+  };
+  document.addEventListener("visibilitychange", refresh);
+  window.addEventListener(SERVER_STORE_EVENT, handleServerChange);
+  return () => {
+    window.clearInterval(interval);
+    document.removeEventListener("visibilitychange", refresh);
+    window.removeEventListener(SERVER_STORE_EVENT, handleServerChange);
+  };
+}
 
 if (typeof window !== "undefined") {
   (

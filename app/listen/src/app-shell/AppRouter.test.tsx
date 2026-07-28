@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import { Outlet } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -89,8 +89,12 @@ describe("AppRouter", () => {
       route: "/",
     });
 
-    expect(await screen.findByTestId("shell")).toBeTruthy();
-    expect(await screen.findByText("Home page")).toBeTruthy();
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
+
+    expect(screen.getByTestId("shell")).toBeTruthy();
+    expect(screen.getByText("Home page")).toBeTruthy();
   });
 
   it("keeps the OAuth callback public so it does not bounce through auth guards", async () => {

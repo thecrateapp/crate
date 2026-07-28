@@ -2,6 +2,7 @@ import { apiSseUrl } from "@/lib/api";
 import { getStoredAuthUserId } from "@/lib/auth-user-storage";
 import { usesConfigurableServer } from "@/lib/platform";
 import { recordAssetInvalidationScope } from "@/lib/library-routes";
+import { subscribeMediaAccessTickets } from "@/lib/media-access";
 import {
   markSseChannelClosed,
   markSseChannelError,
@@ -355,59 +356,71 @@ export function onCacheEventsHealthChange(
 export function connectCacheEvents(): () => void {
   if (eventSource) return () => {};
 
-  const lastEventId = persistedCacheEventId();
-  const path = lastEventId
-    ? `/api/cache/events?last_event_id=${encodeURIComponent(lastEventId)}`
-    : "/api/cache/events";
-  const url = apiSseUrl(path);
+  let disposed = false;
+  const open = () => {
+    const lastEventId = persistedCacheEventId();
+    const path = lastEventId
+      ? `/api/cache/events?last_event_id=${encodeURIComponent(lastEventId)}`
+      : "/api/cache/events";
+    const url = apiSseUrl(path);
 
-  try {
-    eventSource = new EventSource(url, {
-      withCredentials: !usesConfigurableServer,
-    });
-
-    eventSource.onopen = () => {
-      markSseChannelOpen(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+    try {
+      eventSource = new EventSource(url, {
+        withCredentials: !usesConfigurableServer,
       });
-    };
 
-    eventSource.onmessage = (event) => {
-      const scope = event.data?.trim();
-      if (!scope) return;
-      persistCacheEventId(event.lastEventId);
-      markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-      });
-      recordAssetInvalidationScope(scope);
-      cacheInvalidate(scope);
-      for (const fn of invalidationListeners) {
-        try {
-          fn(scope);
-        } catch {
-          /* ignore listener errors */
+      eventSource.onopen = () => {
+        markSseChannelOpen(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
+      };
+
+      eventSource.onmessage = (event) => {
+        const scope = event.data?.trim();
+        if (!scope) return;
+        persistCacheEventId(event.lastEventId);
+        markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
+        recordAssetInvalidationScope(scope);
+        cacheInvalidate(scope);
+        for (const fn of invalidationListeners) {
+          try {
+            fn(scope);
+          } catch {
+            /* ignore listener errors */
+          }
         }
-      }
-    };
+      };
 
-    eventSource.addEventListener("heartbeat", () => {
-      markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+      eventSource.addEventListener("heartbeat", () => {
+        markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
       });
-    });
 
-    eventSource.onerror = () => {
-      markSseChannelError(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-      });
-      // EventSource auto-reconnects with Last-Event-ID. Just log.
-      console.debug("[cache] SSE connection lost, reconnecting...");
-    };
-  } catch {
-    // EventSource not supported or blocked
-  }
+      eventSource.onerror = () => {
+        markSseChannelError(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
+        console.debug("[cache] SSE connection lost, reconnecting...");
+      };
+    } catch {
+      eventSource = null;
+    }
+  };
+
+  open();
+  const unsubscribeTickets = subscribeMediaAccessTickets(() => {
+    if (disposed) return;
+    eventSource?.close();
+    eventSource = null;
+    open();
+  });
 
   return () => {
+    disposed = true;
+    unsubscribeTickets();
     markSseChannelClosed(CACHE_EVENTS_CHANNEL, {
       degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
     });

@@ -4,7 +4,13 @@ import {
   getStreamUrl,
   type StreamUrlOptions,
 } from "@/contexts/player-utils";
-import { ensureFreshAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
+import {
+  ensureFreshAuthToken,
+  getApiBase,
+  getAuthToken,
+  resolveMaybeApiAssetUrl,
+  resolveMaybeApiStreamUrl,
+} from "@/lib/api";
 import { fetchTrackPlayback } from "@/lib/track-playback";
 import type { EngineTrack } from "@/lib/playback-engine";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
@@ -20,10 +26,15 @@ export function toEngineTrack(
   options: StreamUrlOptions = {},
 ): EngineTrack {
   const artwork = resolveMaybeApiAssetUrl(track.albumCover) || undefined;
+  const resolvedUrl = streamUrl ?? getStreamUrl(track, options);
+  const androidNativeHttp =
+    options.target === "android-native" &&
+    isTrustedNativeApiUrl(resolvedUrl, getApiBase());
 
   return {
     id: track.id,
-    url: streamUrl ?? getStreamUrl(track, options),
+    url: androidNativeHttp ? withoutCredentialQuery(resolvedUrl) : resolvedUrl,
+    authorization: androidNativeHttp ? bearerAuthorizationHeader() : undefined,
     title: track.title || "Unknown",
     artist: track.artist || "",
     album: track.album || undefined,
@@ -37,6 +48,51 @@ export function toEngineTrack(
     sourcePath: track.path,
     eqGains,
   };
+}
+
+function isTrustedNativeApiUrl(url: string, apiBase: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const configuredApi = new URL(apiBase);
+    if (
+      parsed.origin !== configuredApi.origin ||
+      !parsed.pathname.startsWith("/api/")
+    ) {
+      return false;
+    }
+    if (parsed.protocol === "https:") return true;
+    return (
+      parsed.protocol === "http:" &&
+      (parsed.hostname === "localhost" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "[::1]")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function withoutCredentialQuery(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.delete("token");
+    parsed.searchParams.delete("media_ticket");
+    return parsed.toString();
+  } catch {
+    return url
+      .replace(/([?&])token=[^&]*&?/g, (_match, separator) =>
+        separator === "?" ? "?" : "",
+      )
+      .replace(/([?&])media_ticket=[^&]*&?/g, (_match, separator) =>
+        separator === "?" ? "?" : "",
+      )
+      .replace(/[?&]$/, "");
+  }
+}
+
+function bearerAuthorizationHeader(): string | undefined {
+  const token = getAuthToken();
+  return token ? `Bearer ${token}` : undefined;
 }
 
 export function toEngineTracks(
@@ -127,5 +183,5 @@ async function resolveFreshEngineStreamUrl(
   if (!playback) return getStreamUrl(track, options);
   setPlaybackSession(track, playback.playback_session);
   setPlaybackDeliveryProvenance(track, playback);
-  return resolveMaybeApiAssetUrl(playback.stream_url) || playback.stream_url;
+  return resolveMaybeApiStreamUrl(playback.stream_url) || playback.stream_url;
 }

@@ -15,6 +15,7 @@ export type EngineTransitionType =
 export interface EngineTrack {
   id: string;
   url: string;
+  authorization?: string;
   title: string;
   artist: string;
   album?: string;
@@ -100,6 +101,12 @@ export interface EngineEventMap {
   bufferingChanged: { revision: string; isBuffering: boolean };
   queueEnded: { revision: string };
   nearQueueEnd: { revision: string; remainingTracks: number };
+  resumeAuthorizationRequired: {
+    revision: string;
+    index: number;
+    positionMs: number;
+    playWhenReady: boolean;
+  };
   error: EngineErrorEvent;
 }
 

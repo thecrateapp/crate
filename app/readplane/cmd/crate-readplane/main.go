@@ -82,6 +82,23 @@ func main() {
 		cfg.AuthCacheTTL,
 		cfg.AuthCacheMaxEntries,
 	)
+	authenticator.SetMediaTicketLookup(func(
+		ticketCtx context.Context,
+		key string,
+	) (string, time.Duration, error) {
+		value, err := redisClient.Get(ticketCtx, key).Result()
+		if errors.Is(err, redis.Nil) {
+			return "", 0, nil
+		}
+		if err != nil {
+			return "", 0, err
+		}
+		ttl, err := redisClient.PTTL(ticketCtx, key).Result()
+		if err != nil {
+			return "", 0, err
+		}
+		return value, ttl, nil
+	})
 	authenticator.SetSessionTouchInterval(cfg.SessionTouchInterval)
 	catalogStore := catalog.NewStore(pool, cfg.QueryTimeout)
 	snapshotStore := snapshots.NewStore(pool, cfg.QueryTimeout, cfg.SnapshotMaxAge, cfg.StaleMaxAge)
@@ -161,9 +178,6 @@ func runHealthcheck() {
 }
 
 func mustRedis(ctx context.Context, cfg config.Config, logger *slog.Logger) *redis.Client {
-	if !cfg.EnableSSE {
-		return nil
-	}
 	return mustRedisURL(ctx, cfg.RedisURL, cfg.QueryTimeout, logger, "cache")
 }
 

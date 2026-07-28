@@ -46,7 +46,10 @@ type WindowWithGaplessContext = Window & {
 const GAPLESS_LOG_LEVEL_WARNING = 3;
 const GAPLESS_CROSSFADE_EQUAL_POWER = 3;
 const DESKTOP_DECODE_TRACK_LIMIT = 2;
-const MOBILE_HTML5_TRACK_LIMIT = 2;
+// Keep the previous element alive while the current and next tracks overlap.
+// Android Chrome can otherwise drop its MediaSession when the ended element
+// is unloaded during the transition.
+const MOBILE_HTML5_TRACK_LIMIT = 3;
 const ADJACENT_LOAD_BUFFER_SECONDS = 15;
 const RESUMED_AUDIO_CONTEXT_RAMP_MS = 24;
 

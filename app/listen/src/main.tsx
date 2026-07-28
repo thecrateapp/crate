@@ -3,9 +3,11 @@ import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
 import { App } from "./App";
 import { I18nProvider } from "./i18n";
+import { startMediaAccessTicketRefresh } from "./lib/api";
 import { initCapacitor } from "./lib/capacitor";
 import { primeOfflineRuntimeProfile } from "./lib/offline";
 import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
+import { bootstrapNativeSessionStore } from "./lib/server-store";
 import "./index.css";
 
 async function disableDevServiceWorker() {
@@ -43,35 +45,63 @@ if (!isCapacitorBuild && !usesMobileShell) {
   import("../../shared/fonts/poppins.css");
 }
 
-initCapacitor();
-void primeOfflineRuntimeProfile();
-
-if (
-  shouldRegisterServiceWorker &&
-  typeof window !== "undefined" &&
-  "serviceWorker" in navigator
-) {
-  if (import.meta.env.DEV) {
-    void disableDevServiceWorker();
-  } else {
-    void navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Ignore registration failures; the app still works without offline mirror.
-    });
-  }
+function renderApp(): void {
+  createRoot(document.getElementById("root")!).render(
+    <BrowserRouter>
+      <I18nProvider>
+        <App />
+      </I18nProvider>
+      <Toaster
+        theme="dark"
+        position="bottom-center"
+        richColors
+        mobileOffset={{
+          bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
+        }}
+      />
+    </BrowserRouter>,
+  );
 }
 
-createRoot(document.getElementById("root")!).render(
-  <BrowserRouter>
-    <I18nProvider>
-      <App />
-    </I18nProvider>
-    <Toaster
-      theme="dark"
-      position="bottom-center"
-      richColors
-      mobileOffset={{
-        bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
-      }}
-    />
-  </BrowserRouter>,
-);
+function renderSecureSessionError(): void {
+  const root = document.getElementById("root");
+  if (!root) return;
+  root.innerHTML = `
+    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#08090d;color:#f4f6fb;font-family:system-ui,sans-serif">
+      <section style="max-width:420px;text-align:center">
+        <h1 style="font-size:1.25rem;margin:0 0 12px">Unable to unlock this session</h1>
+        <p style="color:#98a2b8;margin:0 0 20px">Crate could not access the device secure storage. Restart the app and try again.</p>
+        <button type="button" onclick="window.location.reload()" style="border:0;border-radius:999px;padding:10px 18px;background:#13bde2;color:#061017;font-weight:700">Retry</button>
+      </section>
+    </main>`;
+}
+
+async function bootstrap(): Promise<void> {
+  try {
+    await bootstrapNativeSessionStore();
+  } catch {
+    renderSecureSessionError();
+    return;
+  }
+
+  startMediaAccessTicketRefresh();
+  initCapacitor();
+  void primeOfflineRuntimeProfile();
+
+  if (
+    shouldRegisterServiceWorker &&
+    typeof window !== "undefined" &&
+    "serviceWorker" in navigator
+  ) {
+    if (import.meta.env.DEV) {
+      void disableDevServiceWorker();
+    } else {
+      void navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Ignore registration failures; the app still works without offline mirror.
+      });
+    }
+  }
+  renderApp();
+}
+
+void bootstrap();

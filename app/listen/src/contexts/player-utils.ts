@@ -1,5 +1,5 @@
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
-import { getApiBase, getAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
+import { apiStreamUrl, getApiBase, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { trackStreamApiPath } from "@/lib/library-routes";
@@ -239,22 +239,18 @@ export function getStreamUrl(
   return url;
 }
 
-/** Append playback-delivery policy and native auth token. Same-origin web
- *  playback uses the httpOnly session cookie instead of tokenized URLs. */
+/** Append playback delivery and a bounded WebView stream ticket. */
 function withStreamQuery(url: string): string {
   const params = new URLSearchParams();
   const delivery = getEffectivePlaybackDeliveryPolicy();
   if (delivery !== "original") {
     params.set("delivery", delivery);
   }
-  try {
-    const token = isNative ? getAuthToken() : null;
-    if (token) params.set("token", token);
-  } catch {
-    // ignore token lookup failures
-  }
   const query = params.toString();
-  return query ? `${url}${url.includes("?") ? "&" : "?"}${query}` : url;
+  const resolved = query
+    ? `${url}${url.includes("?") ? "&" : "?"}${query}`
+    : url;
+  return isNative ? apiStreamUrl(resolved) : resolved;
 }
 
 /** Lazy-read API base so server switches in native builds take effect immediately. */

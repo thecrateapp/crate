@@ -1,7 +1,13 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 import { KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 
-const allowMixedContent = process.env.CRATE_ALLOW_MIXED_CONTENT === "true";
+const isReleaseBuild = process.env.CRATE_MOBILE_RELEASE === "true";
+const allowMixedContent =
+  !isReleaseBuild && process.env.CRATE_ALLOW_MIXED_CONTENT === "true";
+
+if (isReleaseBuild && process.env.CRATE_ALLOW_MIXED_CONTENT === "true") {
+  throw new Error("Release mobile builds cannot enable mixed content");
+}
 
 const config: CapacitorConfig = {
   // Reverse-DNS of the project domain (cratemusic.app). Native apps are
@@ -12,8 +18,8 @@ const config: CapacitorConfig = {
   webDir: "dist",
 
   server: {
-    // App loads from local bundle. Auth uses Bearer token (not cookies)
-    // so cross-origin is not a problem.
+    // App loads from the local bundle. API calls use bearer headers and
+    // browser media surfaces use short-lived scoped tickets.
     androidScheme: "https",
     iosScheme: "https",
     allowMixedContent,

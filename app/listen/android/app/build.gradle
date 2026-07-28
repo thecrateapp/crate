@@ -1,5 +1,36 @@
 apply plugin: 'com.android.application'
 
+def releaseTaskRequested = gradle.startParameter.taskNames.any {
+    it.toLowerCase().contains("release")
+}
+def releaseKeystorePath = System.getenv("CRATE_ANDROID_KEYSTORE_FILE")
+def releaseStorePassword = System.getenv("CRATE_ANDROID_KEYSTORE_PASSWORD")
+def releaseKeyAlias = System.getenv("CRATE_ANDROID_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("CRATE_ANDROID_KEY_PASSWORD")
+def releaseVersionName = System.getenv("CRATE_ANDROID_VERSION_NAME")
+def releaseVersionCode = System.getenv("CRATE_ANDROID_VERSION_CODE")
+def requiredReleaseValues = [
+    "CRATE_ANDROID_KEYSTORE_FILE": releaseKeystorePath,
+    "CRATE_ANDROID_KEYSTORE_PASSWORD": releaseStorePassword,
+    "CRATE_ANDROID_KEY_ALIAS": releaseKeyAlias,
+    "CRATE_ANDROID_KEY_PASSWORD": releaseKeyPassword,
+    "CRATE_ANDROID_VERSION_NAME": releaseVersionName,
+    "CRATE_ANDROID_VERSION_CODE": releaseVersionCode,
+]
+if (releaseTaskRequested) {
+    def missing = requiredReleaseValues.findAll { !it.value }.keySet()
+    if (!missing.isEmpty()) {
+        throw new GradleException(
+            "Release build requires environment variables: ${missing.join(', ')}"
+        )
+    }
+    if (!file(releaseKeystorePath).exists()) {
+        throw new GradleException(
+            "Release keystore does not exist: ${releaseKeystorePath}"
+        )
+    }
+}
+
 android {
     namespace = "app.cratemusic.crate"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +38,8 @@ android {
         applicationId "app.cratemusic.crate"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode releaseVersionCode ? Integer.parseInt(releaseVersionCode) : 1
+        versionName releaseVersionName ?: "0.0.0-dev"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,9 +47,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (releaseKeystorePath) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

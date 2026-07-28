@@ -20,6 +20,7 @@ import type {
 const NATIVE_PLAYER_DISABLED_KEY = "crate-native-player-disabled";
 const NATIVE_PLAYER_CROSSFADE_KEY = "crate-native-player-crossfade-enabled";
 const NATIVE_PLAYER_EQ_KEY = "crate-native-player-eq-enabled";
+const NATIVE_READY_PROBE_DELAYS_MS = [0, 100, 250] as const;
 
 type NativeEventEnvelope = {
   event?: EngineEventName;
@@ -131,11 +132,18 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private notificationPermissionPrompted = false;
 
   private async ensureReady(): Promise<void> {
-    try {
-      await nativePlayback.getState();
-      return;
-    } catch {
-      // The Capacitor plugin may still be binding the service after WebView load.
+    for (const delayMs of NATIVE_READY_PROBE_DELAYS_MS) {
+      if (delayMs > 0) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, delayMs);
+        });
+      }
+      try {
+        await nativePlayback.getState();
+        return;
+      } catch {
+        // The Capacitor plugin may still be binding the service after WebView load.
+      }
     }
 
     if (!this.readyPromise) {

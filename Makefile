@@ -910,6 +910,7 @@ CAP_IOS_TARGET ?= $(shell cd $(CAP_DIR) && npx cap run ios --list 2>/dev/null | 
 CAP_DEBUG_SERVER_URL ?= https://listen.lespedants.org
 CAP_ANDROID_OUTPUT_DIR ?= artifacts/capacitor/android
 CAP_ANDROID_GRADLE_VARIANT ?= debug
+CAP_ANDROID_RELEASE_TAG ?= $(shell git describe --tags --exact-match 2>/dev/null)
 
 # Android Studio JBR + SDK paths (required for Gradle/emulator)
 export JAVA_HOME ?= $(HOME)/Applications/Android Studio.app/Contents/jbr/Contents/Home
@@ -968,6 +969,25 @@ cap-android-artifacts: ## Build Android APK and copy output to a local artifacts
 	dst="$(CAP_ANDROID_OUTPUT_DIR)/crate-listen-$(CAP_ANDROID_GRADLE_VARIANT)-$${ts}-$${sha}.apk"; \
 	cp "$$out" "$$dst"; \
 	echo "$(GREEN)Artifact copied to:$$dst$(NC)"
+
+.PHONY: cap-android-release
+cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact release tag
+	@test -n "$(CAP_ANDROID_RELEASE_TAG)" || { echo "$(RED)CAP_ANDROID_RELEASE_TAG or an exact git tag is required$(NC)"; exit 1; }
+	@test -n "$$CRATE_ANDROID_KEYSTORE_FILE" || { echo "$(RED)CRATE_ANDROID_KEYSTORE_FILE is required$(NC)"; exit 1; }
+	@test -n "$$CRATE_ANDROID_KEYSTORE_PASSWORD" || { echo "$(RED)CRATE_ANDROID_KEYSTORE_PASSWORD is required$(NC)"; exit 1; }
+	@test -n "$$CRATE_ANDROID_KEY_ALIAS" || { echo "$(RED)CRATE_ANDROID_KEY_ALIAS is required$(NC)"; exit 1; }
+	@test -n "$$CRATE_ANDROID_KEY_PASSWORD" || { echo "$(RED)CRATE_ANDROID_KEY_PASSWORD is required$(NC)"; exit 1; }
+	@cd $(CAP_DIR) && npm run build:cap
+	@cd $(CAP_DIR) && eval "$$(node scripts/android-release-version.mjs "$(CAP_ANDROID_RELEASE_TAG)")"; \
+	export CRATE_ANDROID_VERSION_NAME CRATE_ANDROID_VERSION_CODE; \
+	cd android && ./gradlew bundleRelease assembleRelease lintRelease --no-daemon
+	@mkdir -p "$(CAP_ANDROID_OUTPUT_DIR)"
+	@safe_tag="$$(printf '%s' "$(CAP_ANDROID_RELEASE_TAG)" | sed 's#[^A-Za-z0-9._-]#-#g')"; \
+	cp "$(CAP_DIR)/android/app/build/outputs/apk/release/app-release.apk" \
+		"$(CAP_ANDROID_OUTPUT_DIR)/crate-$${safe_tag}.apk"; \
+	cp "$(CAP_DIR)/android/app/build/outputs/bundle/release/app-release.aab" \
+		"$(CAP_ANDROID_OUTPUT_DIR)/crate-$${safe_tag}.aab"; \
+	echo "$(GREEN)Signed Android artifacts copied to $(CAP_ANDROID_OUTPUT_DIR)$(NC)"
 
 # ===========================================================================
 # TAURI (desktop native builds)

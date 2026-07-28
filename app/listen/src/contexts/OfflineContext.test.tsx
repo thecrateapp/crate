@@ -78,7 +78,7 @@ vi.mock("@/lib/offline", () => ({
     );
   },
   getOfflineTrackManifestPaths: vi.fn(() => ["/api/offline/tracks/1/manifest"]),
-  hasCachedTrackAsset: vi.fn(async () => false),
+  hasCachedTrackAssets: vi.fn(async () => new Set()),
   hydrateOfflineProfileState: hydrateOfflineProfileStateMock,
   isOfflineBusy: (state: string) =>
     ["queued", "downloading", "syncing"].includes(state),

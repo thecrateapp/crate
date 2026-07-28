@@ -26,7 +26,7 @@ describe("Register", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the registration form in the active locale", () => {
+  it("renders the registration form in the active locale", async () => {
     renderWithListenProviders(<Register />, {
       auth: { user: null, loading: false },
       locale: "es",
@@ -34,7 +34,7 @@ describe("Register", () => {
     });
 
     expect(
-      screen.getByRole("heading", { name: "Crear cuenta" }),
+      await screen.findByRole("heading", { name: "Crear cuenta" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Tu música, a tu manera")).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre")).toBeInTheDocument();

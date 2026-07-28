@@ -75,19 +75,20 @@ type Authenticator struct {
 	cachedDBSecret string
 	secretLoadedAt time.Time
 
-	cacheTTL        time.Duration
-	cacheMaxEntries int
-	cacheMu         sync.Mutex
-	cache           map[string]*list.Element
-	cacheList       *list.List
-	lookupGroup     singleflight.Group
-	identityLookup  func(context.Context, JWTPayload) (*User, time.Time, error)
-	accountsLookup  func(context.Context, int64) ([]ConnectedAccount, error)
-	hits            atomic.Int64
-	misses          atomic.Int64
-	evictions       atomic.Int64
-	invalidations   atomic.Int64
-	dbLookups       atomic.Int64
+	cacheTTL          time.Duration
+	cacheMaxEntries   int
+	cacheMu           sync.Mutex
+	cache             map[string]*list.Element
+	cacheList         *list.List
+	lookupGroup       singleflight.Group
+	identityLookup    func(context.Context, JWTPayload) (*User, time.Time, error)
+	accountsLookup    func(context.Context, int64) ([]ConnectedAccount, error)
+	mediaTicketLookup MediaTicketLookup
+	hits              atomic.Int64
+	misses            atomic.Int64
+	evictions         atomic.Int64
+	invalidations     atomic.Int64
+	dbLookups         atomic.Int64
 
 	touchMu         sync.Mutex
 	touchInterval   time.Duration
@@ -129,6 +130,11 @@ func NewAuthenticatorWithCache(
 	}
 }
 
+// SetMediaTicketLookup enables short-lived, exact-path media credentials.
+func (a *Authenticator) SetMediaTicketLookup(lookup MediaTicketLookup) {
+	a.mediaTicketLookup = lookup
+}
+
 // SetSessionTouchInterval controls how often an active session updates last_seen_at.
 func (a *Authenticator) SetSessionTouchInterval(interval time.Duration) {
 	if interval <= 0 {
@@ -141,8 +147,20 @@ func (a *Authenticator) SetSessionTouchInterval(interval time.Duration) {
 
 // AuthenticateIdentity verifies revocation and returns only hot-path identity fields.
 func (a *Authenticator) AuthenticateIdentity(r *http.Request, allowQueryToken bool) (*User, error) {
+	var mediaTicketErr error
+	if allowQueryToken && !hasAuthoritativeToken(r) && strings.TrimSpace(r.URL.Query().Get("media_ticket")) != "" {
+		user, err := a.authenticateMediaTicket(r)
+		if err == nil {
+			return user, nil
+		}
+		mediaTicketErr = err
+	}
+
 	tokens := ExtractTokenCandidates(r, allowQueryToken)
 	if len(tokens) == 0 {
+		if mediaTicketErr != nil {
+			return nil, mediaTicketErr
+		}
 		return nil, ErrUnauthorized
 	}
 
@@ -157,34 +175,8 @@ func (a *Authenticator) AuthenticateIdentity(r *http.Request, allowQueryToken bo
 			continue
 		}
 		key := identityCacheKey(token)
-		if user := a.cacheGet(key, time.Now()); user != nil {
-			a.hits.Add(1)
-			a.touchAuthenticatedSession(user)
-			return user, nil
-		}
-		a.misses.Add(1)
-		value, err, shared := a.lookupGroup.Do(key, func() (any, error) {
-			if user := a.cacheGet(key, time.Now()); user != nil {
-				return user, nil
-			}
-			a.dbLookups.Add(1)
-			lookup := a.identityLookup
-			if lookup == nil {
-				lookup = a.loadIdentity
-			}
-			user, sessionExpiry, lookupErr := lookup(r.Context(), payload)
-			if lookupErr != nil {
-				return nil, lookupErr
-			}
-			a.cacheSet(key, user, identityExpiry(payload, sessionExpiry, a.cacheTTL))
-			return cloneUser(user), nil
-		})
-		if shared {
-			a.hits.Add(1)
-		}
+		user, err := a.authenticatePayload(r.Context(), payload, key)
 		if err == nil {
-			user := value.(*User)
-			a.touchAuthenticatedSession(user)
 			return user, nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -193,6 +185,44 @@ func (a *Authenticator) AuthenticateIdentity(r *http.Request, allowQueryToken bo
 	}
 
 	return nil, ErrUnauthorized
+}
+
+func (a *Authenticator) authenticatePayload(
+	ctx context.Context,
+	payload JWTPayload,
+	key string,
+) (*User, error) {
+	if user := a.cacheGet(key, time.Now()); user != nil {
+		a.hits.Add(1)
+		a.touchAuthenticatedSession(user)
+		return user, nil
+	}
+	a.misses.Add(1)
+	value, err, shared := a.lookupGroup.Do(key, func() (any, error) {
+		if user := a.cacheGet(key, time.Now()); user != nil {
+			return user, nil
+		}
+		a.dbLookups.Add(1)
+		lookup := a.identityLookup
+		if lookup == nil {
+			lookup = a.loadIdentity
+		}
+		user, sessionExpiry, lookupErr := lookup(ctx, payload)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		a.cacheSet(key, user, identityExpiry(payload, sessionExpiry, a.cacheTTL))
+		return cloneUser(user), nil
+	})
+	if shared {
+		a.hits.Add(1)
+	}
+	if err != nil {
+		return nil, err
+	}
+	user := value.(*User)
+	a.touchAuthenticatedSession(user)
+	return user, nil
 }
 
 func (a *Authenticator) touchAuthenticatedSession(user *User) {

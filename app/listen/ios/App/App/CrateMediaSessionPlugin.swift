@@ -272,9 +272,10 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 let self,
                 currentRequestId == self.artworkRequestId,
                 let data,
-                let image = UIImage(data: data)
+                let decodedArtwork = CrateArtworkDownsampler.decode(data: data)
             else { return }
 
+            let image = UIImage(cgImage: decodedArtwork)
             let mediaArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
             DispatchQueue.main.async {
                 guard currentRequestId == self.artworkRequestId else { return }

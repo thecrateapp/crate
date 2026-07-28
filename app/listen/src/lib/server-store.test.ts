@@ -2,10 +2,12 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: true,
+  isCapacitorRuntime: false,
 }));
 
 import {
   normaliseServerUrl,
+  isAllowedServerUrl,
   deriveLabel,
   getServers,
   addServer,
@@ -34,6 +36,29 @@ describe("normaliseServerUrl", () => {
 
   it("returns empty for empty input", () => {
     expect(normaliseServerUrl("")).toBe("");
+  });
+});
+
+describe("isAllowedServerUrl", () => {
+  it("accepts HTTPS servers", () => {
+    expect(isAllowedServerUrl("https://crate.example")).toBe(true);
+  });
+
+  it("rejects insecure remote servers", () => {
+    expect(
+      isAllowedServerUrl("http://crate.example", {
+        allowInsecureLoopback: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("allows insecure loopback only behind the explicit development switch", () => {
+    expect(isAllowedServerUrl("http://127.0.0.1:8585")).toBe(false);
+    expect(
+      isAllowedServerUrl("http://localhost:8585", {
+        allowInsecureLoopback: true,
+      }),
+    ).toBe(true);
   });
 });
 

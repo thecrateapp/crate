@@ -11,6 +11,7 @@ import {
 
 import {
   addServer,
+  isAllowedServerUrl,
   normaliseServerUrl,
   setCurrentServerId,
 } from "@/lib/server-store";
@@ -91,6 +92,19 @@ export function ServerSetup() {
       setProbeState({
         status: "error",
         messageKey: "serverSetup.errors.required",
+      });
+      return;
+    }
+    if (
+      !isAllowedServerUrl(normalised, {
+        allowInsecureLoopback:
+          import.meta.env.DEV &&
+          import.meta.env.VITE_ALLOW_INSECURE_LOOPBACK === "true",
+      })
+    ) {
+      setProbeState({
+        status: "error",
+        messageKey: "serverSetup.errors.host",
       });
       return;
     }
