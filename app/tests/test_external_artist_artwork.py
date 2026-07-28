@@ -60,9 +60,7 @@ def test_external_artist_artwork_stays_fresh_for_one_year(tmp_path, monkeypatch)
     assert cached["stale"] is False
 
 
-def test_external_artist_artwork_keeps_multi_year_stale_fallback(
-    tmp_path, monkeypatch
-):
+def test_external_artist_artwork_keeps_multi_year_stale_fallback(tmp_path, monkeypatch):
     from crate import external_artist_artwork
 
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
