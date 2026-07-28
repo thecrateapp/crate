@@ -112,6 +112,26 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     expect(stored.savedAt).toEqual(expect.any(String));
   });
 
+  it("persists canonical artwork URLs without expiring credentials", () => {
+    saveQueue(
+      [
+        {
+          ...TRACK_A,
+          albumCover:
+            "https://listen.example/api/albums/1/cover?size=512&media_ticket=expired&token=secret",
+        },
+      ],
+      0,
+    );
+
+    const raw = localStorage.getItem(STORAGE_KEY);
+    expect(raw).not.toContain("expired");
+    expect(raw).not.toContain("secret");
+    expect(getStoredQueue().queue[0]?.albumCover).toBe(
+      "https://listen.example/api/albums/1/cover?size=512",
+    );
+  });
+
   it("persists shuffle flag + unshuffledQueue snapshot", () => {
     // User started with [A, B] then activated shuffle; current order
     // is [B, A]. The original [A, B] is preserved so toggling shuffle

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, Settings, SlidersHorizontal } from "@crate/ui/icons";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { PlayerSurfaceModeSwitch } from "@/components/player/PlayerSurfaceModeSwitch";
 import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
@@ -309,7 +310,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
               {crossfadeTransition ? (
                 <>
                   {crossfadeTransition.outgoing.albumCover ? (
-                    <img
+                    <AuthenticatedMediaImage
                       src={crossfadeTransition.outgoing.albumCover}
                       alt=""
                       className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
@@ -322,7 +323,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                     />
                   ) : null}
                   {crossfadeTransition.incoming.albumCover ? (
-                    <img
+                    <AuthenticatedMediaImage
                       src={crossfadeTransition.incoming.albumCover}
                       alt=""
                       className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
@@ -336,7 +337,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                   ) : null}
                 </>
               ) : currentTrack.albumCover ? (
-                <img
+                <AuthenticatedMediaImage
                   src={currentTrack.albumCover}
                   alt=""
                   className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"

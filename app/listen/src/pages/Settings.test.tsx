@@ -5,6 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Settings } from "@/pages/Settings";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
+const { androidNativePlayerState } = vi.hoisted(() => ({
+  androidNativePlayerState: { enabled: false },
+}));
+
+vi.mock("@/lib/android-native-engine", () => ({
+  shouldUseAndroidNativePlayer: () => androidNativePlayerState.enabled,
+}));
+
 vi.mock("@/components/settings/ServersSection", () => ({
   ServersSection: () => <section>Servers</section>,
 }));
@@ -37,6 +45,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 describe("Settings", () => {
   beforeEach(() => {
     localStorage.clear();
+    androidNativePlayerState.enabled = false;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 1024,
@@ -103,6 +112,24 @@ describe("Settings", () => {
     expect(
       screen.queryByText("Enhanced mobile audio (EQ)"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the native equalizer toggle on Android and defaults it on", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    androidNativePlayerState.enabled = true;
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    const toggle = screen.getByRole("button", { name: "Equalizer" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(toggle);
+    expect(localStorage.getItem("listen-eq-enabled")).toBe("false");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
   });
 
   it("keeps crossfade controls on desktop", () => {

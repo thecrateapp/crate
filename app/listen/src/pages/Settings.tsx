@@ -63,6 +63,11 @@ import {
   type SleepTimerMode,
   type SleepTimerState,
 } from "@/lib/sleep-timer";
+import {
+  getEqualizerEnabled,
+  setEqualizerEnabled,
+} from "@/lib/equalizer-prefs";
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 
 interface AuthProviderState {
   enabled: boolean;
@@ -316,6 +321,10 @@ export function Settings() {
     getPlaybackDeliveryPolicyPreference,
   );
   const mobilePlaybackRuntime = isMobilePlaybackRuntime();
+  const androidNativePlayerEnabled = shouldUseAndroidNativePlayer();
+  const [equalizerEnabled, setEqualizerEnabledState] = useState(() =>
+    getEqualizerEnabled(androidNativePlayerEnabled),
+  );
   const publicProfilePath = useMemo(() => {
     return user?.username ? `/users/${user.username}` : "/people";
   }, [user?.username]);
@@ -418,6 +427,16 @@ export function Settings() {
               }}
             />
           </>
+        ) : null}
+        {!mobilePlaybackRuntime || androidNativePlayerEnabled ? (
+          <ToggleRow
+            label={t("player.equalizer")}
+            checked={equalizerEnabled}
+            onChange={(value) => {
+              setEqualizerEnabledState(value);
+              setEqualizerEnabled(value);
+            }}
+          />
         ) : null}
         <ToggleRow
           label={t("settings.playback.smartPlaylistSuggestions")}

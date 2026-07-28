@@ -28,6 +28,8 @@ const apiMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 vi.mock("@/lib/api", () => ({
   api: apiMock,
   AUTH_TOKEN_EVENT: "crate:auth-token-updated",
+  ensureMediaAccessUrl: vi.fn(async (url: string) => url),
+  resolveMaybeApiAssetUrl: (url: string | null | undefined) => url ?? null,
 }));
 
 const androidNativeEngineMock = vi.hoisted(() => ({

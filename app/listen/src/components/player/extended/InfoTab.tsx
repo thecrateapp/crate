@@ -15,6 +15,7 @@ import {
 } from "@crate/ui/icons";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { useTrackInfo } from "@/hooks/use-track-info";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { extractPalette } from "@/lib/palette";
@@ -330,7 +331,7 @@ export function InfoTab({ className }: { className?: string }) {
           <div className="relative flex items-start gap-4">
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[22px] border border-white/10 bg-white/5 shadow-[0_12px_30px_rgba(0,0,0,0.4)] sm:h-28 sm:w-28">
               {currentTrack.albumCover ? (
-                <img
+                <AuthenticatedMediaImage
                   src={currentTrack.albumCover}
                   alt={t("player.info.albumCoverAlt", {
                     name:

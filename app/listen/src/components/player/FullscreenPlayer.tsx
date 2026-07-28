@@ -14,15 +14,12 @@ import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 import { useResolvedPlayerArtist } from "@/components/player/useResolvedPlayerArtist";
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { InfoTab } from "@/components/player/extended/InfoTab";
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { api } from "@/lib/api";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
-import {
-  canUseWebAudioEffects,
-  isMobileAudioRuntime,
-  stableMobileAudioPipeline,
-} from "@/lib/mobile-audio-mode";
+import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import {
   getPlayerSurfaceModePreference,
   PLAYER_VIZ_PREFS_EVENT,
@@ -133,7 +130,7 @@ function FullscreenQueueRow({
       className="flex items-center gap-3 w-full py-2 text-left active:bg-white/5 rounded-lg transition-colors focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       {track.albumCover ? (
-        <img
+        <AuthenticatedMediaImage
           src={track.albumCover}
           alt=""
           loading="lazy"
@@ -218,8 +215,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     duration,
   );
   const navigate = useNavigate();
-  const allowMobileEqualizer = canUseWebAudioEffects;
-  const spinningDiscJogSeekMode = shouldUseAndroidNativePlayer()
+  const androidNativePlayerEnabled = shouldUseAndroidNativePlayer();
+  const allowMobileEqualizer =
+    canUseWebAudioEffects || androidNativePlayerEnabled;
+  const spinningDiscJogSeekMode = androidNativePlayerEnabled
     ? "commit"
     : "live";
 
@@ -705,7 +704,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   {crossfadeTransition ? (
                     <>
                       {crossfadeTransition.outgoing.albumCover ? (
-                        <img
+                        <AuthenticatedMediaImage
                           src={crossfadeTransition.outgoing.albumCover}
                           alt=""
                           className="absolute inset-0 h-full w-full object-cover shadow-2xl shadow-black/60"
@@ -715,7 +714,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                         />
                       ) : null}
                       {crossfadeTransition.incoming.albumCover ? (
-                        <img
+                        <AuthenticatedMediaImage
                           src={crossfadeTransition.incoming.albumCover}
                           alt=""
                           className="absolute inset-0 h-full w-full object-cover shadow-2xl shadow-black/60"
@@ -726,7 +725,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                       ) : null}
                     </>
                   ) : currentTrack.albumCover ? (
-                    <img
+                    <AuthenticatedMediaImage
                       src={currentTrack.albumCover}
                       alt=""
                       className="h-full w-full object-cover shadow-2xl shadow-black/60"
@@ -868,22 +867,6 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                       ? "text-primary"
                       : "text-white/55 active:text-white"
                   }`}
-                >
-                  <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
-                </button>
-              ) : isMobileAudioRuntime ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic("warning");
-                    toast.info(
-                      stableMobileAudioPipeline
-                        ? "Enable Enhanced mobile audio in Settings, then restart Listen to use EQ on mobile."
-                        : "Restart Listen to apply the mobile audio mode change.",
-                    );
-                  }}
-                  aria-label="Equalizer is disabled in stable mobile audio mode"
-                  className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/20"
                 >
                   <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
                 </button>
