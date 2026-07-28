@@ -1353,14 +1353,15 @@ describe("native (configurable server) mode", () => {
       );
     });
 
-    it("resolves relative API artist photos against the configured server", () => {
+    it("keeps public external artist photos stable across ticket rotations", () => {
       setupServer();
       const result = apiMod.resolveMaybeApiAssetUrl(
         "/api/network/external-artist/photo?name=Slowthai",
       );
       expect(result).toBe(
-        "https://api.example.com/api/network/external-artist/photo?name=Slowthai&media_ticket=artwork-ticket",
+        "https://api.example.com/api/network/external-artist/photo?name=Slowthai",
       );
+      expect(apiMod.requiresMediaAccessTicket(result)).toBe(false);
     });
 
     it("resolves genre cover fallbacks against the configured server", () => {

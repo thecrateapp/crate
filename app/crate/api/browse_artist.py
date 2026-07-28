@@ -212,6 +212,11 @@ def _enrich_similar_artists(similar: list[dict]) -> list[dict]:
             current.setdefault("slug", ref.get("slug"))
         elif index < 15:
             current["image_url"] = _external_artist_photo_url(name)
+            cached_artwork = get_cached_external_artist_artwork_path(name)
+            if (
+                cached_artwork is None or cached_artwork.get("stale", False)
+            ) and not is_external_artist_artwork_missing(name):
+                queue_external_artist_artwork(name)
             try:
                 info = get_cached_artist_info(name)
             except Exception:
@@ -1674,7 +1679,7 @@ def api_external_artist_photo(
     size: int | None = Query(None, ge=32, le=2048),
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
-    _require_auth(request)
+    del request
     artist_name = name.strip()
     if not artist_name:
         return Response(status_code=404)
@@ -1682,15 +1687,16 @@ def api_external_artist_photo(
     cached = get_cached_external_artist_artwork_path(artist_name)
     if cached is not None:
         headers = {
-            "Cache-Control": "public, max-age=604800, stale-while-revalidate=2592000"
+            "Cache-Control": (
+                "public, max-age=2592000, stale-while-revalidate=31536000, "
+                "stale-if-error=31536000"
+            )
         }
         if cached.get("stale", False):
             headers["Cache-Control"] = (
-                "public, max-age=60, stale-while-revalidate=2592000"
+                "public, max-age=86400, stale-while-revalidate=31536000, "
+                "stale-if-error=31536000"
             )
-            if not is_external_artist_artwork_missing(artist_name):
-                queue_external_artist_artwork(artist_name)
-                headers["X-Crate-External-Artwork"] = "revalidating"
         response = deliver_artwork(
             external_artist_asset(artist_name),
             requested_size=size,
@@ -1703,7 +1709,6 @@ def api_external_artist_photo(
     if is_external_artist_artwork_missing(artist_name):
         return Response(status_code=404, headers={"Cache-Control": "no-store"})
 
-    queue_external_artist_artwork(artist_name)
     return Response(
         status_code=404,
         headers={
