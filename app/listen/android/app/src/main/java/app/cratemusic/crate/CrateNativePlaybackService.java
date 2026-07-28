@@ -928,7 +928,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             .build();
     }
 
-    private MediaItem toCheckpointMediaItem(NativeTrack track) {
+    static MediaItem toCheckpointMediaItem(NativeTrack track) {
         androidx.media3.common.MediaMetadata.Builder metadata =
             new androidx.media3.common.MediaMetadata.Builder()
                 .setTitle(track.title)
@@ -942,6 +942,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
         return new MediaItem.Builder()
             .setMediaId(track.id)
+            .setUri(
+                new Uri.Builder()
+                    .scheme("crate-resume")
+                    .authority("pending")
+                    .appendPath(track.id)
+                    .build()
+            )
             .setMediaMetadata(metadata.build())
             .build();
     }
