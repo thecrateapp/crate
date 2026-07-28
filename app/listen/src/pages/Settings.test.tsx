@@ -37,6 +37,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
 describe("Settings", () => {
   beforeEach(() => {
     localStorage.clear();
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1024,
+    });
   });
 
   it("localizes the settings page chrome", () => {
@@ -84,6 +88,28 @@ describe("Settings", () => {
 
     await user.click(auto);
     expect(localStorage.getItem("listen-player-delivery-policy")).toBe("auto");
+  });
+
+  it("hides crossfade controls on mobile", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    expect(screen.queryByText("Crossfade")).not.toBeInTheDocument();
+    expect(screen.queryByText("Smart transitions")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Enhanced mobile audio (EQ)"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps crossfade controls on desktop", () => {
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    expect(screen.getByText("Crossfade")).toBeInTheDocument();
+    expect(screen.getByText("Smart transitions")).toBeInTheDocument();
   });
 
   it("keeps remote scrobbling opt-in and persists an explicit toggle", async () => {

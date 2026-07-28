@@ -101,11 +101,6 @@ services:
     command:
       - --log.level=INFO
       - --log.filePath=
-      - --accesslog.filePath=
-      - --accesslog.filters.statusCodes=400-599
-      - --accesslog.filters.retryAttempts=true
-      - --accesslog.filters.minDuration=1s
-      - --accesslog.fields.headers.defaultMode=drop
     security_opt:
       - "no-new-privileges:true"
     environment:

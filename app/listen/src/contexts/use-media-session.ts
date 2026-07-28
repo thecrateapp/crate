@@ -3,6 +3,7 @@ import type { Track } from "./player-types";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
+import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
   onNativeMediaControl,
@@ -37,6 +38,7 @@ export function useMediaSession({
   prev: () => void;
   seek: (time: number) => void;
 }) {
+  const mediaAccessVersion = useMediaAccessVersion();
   const actionsRef = useRef({
     pause,
     resume,
@@ -127,6 +129,7 @@ export function useMediaSession({
     currentTrack?.album,
     currentTrack?.albumCover,
     isPlaying,
+    mediaAccessVersion,
   ]);
 
   // Update playback state
@@ -188,6 +191,7 @@ export function useMediaSession({
     currentTrack?.albumCover,
     duration,
     isPlaying,
+    mediaAccessVersion,
     nativePositionSeconds,
   ]);
 
@@ -217,6 +221,7 @@ export function useMediaSession({
     currentTrack?.albumCover,
     duration,
     isPlaying,
+    mediaAccessVersion,
     nativePositionSeconds,
   ]);
 

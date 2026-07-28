@@ -8,6 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 PlaybackQoeEventName = Literal["startup", "stall_start", "stall_end", "recovery"]
 PlaybackQoeOrigin = Literal["local", "remote", "imported"]
 PlaybackQoePolicy = Literal["original", "balanced", "data_saver"]
+PlaybackQoeRuntime = Literal[
+    "desktop_web", "mobile_web", "android_native", "ios_native", "tauri"
+]
+PlaybackQoeEngine = Literal["gapless", "media3"]
 
 
 class PlaybackQoeEventRequest(BaseModel):
@@ -22,6 +26,8 @@ class PlaybackQoeEventRequest(BaseModel):
     duration_ms: int | None = Field(default=None, ge=0, le=600_000)
     buffered_ahead_seconds: float | None = Field(default=None, ge=0, le=7_200)
     attempt: int | None = Field(default=None, ge=1, le=3)
+    runtime: PlaybackQoeRuntime | None = None
+    engine: PlaybackQoeEngine | None = None
 
 
 class PlaybackQoeBatchRequest(BaseModel):

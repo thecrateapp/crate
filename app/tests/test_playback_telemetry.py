@@ -50,6 +50,8 @@ def test_qoe_ingestion_records_only_low_cardinality_metrics(monkeypatch):
                     "requested_policy": "original",
                     "effective_policy": "original",
                     "duration_ms": 215,
+                    "runtime": "android_native",
+                    "engine": "media3",
                 },
                 {
                     "event": "stall_start",
@@ -80,6 +82,8 @@ def test_qoe_ingestion_records_only_low_cardinality_metrics(monkeypatch):
                 "origin": "local",
                 "requested_policy": "original",
                 "effective_policy": "original",
+                "runtime": "android_native",
+                "engine": "media3",
             },
         ),
         (

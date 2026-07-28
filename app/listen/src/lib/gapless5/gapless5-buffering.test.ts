@@ -96,6 +96,75 @@ describe("Gapless5.replaceTrack", () => {
 });
 
 describe("Gapless5 mobile background auto-advance", () => {
+  it("reuses one persistent media element across track transitions", async () => {
+    vi.useFakeTimers();
+    const instances: FakeAudio[] = [];
+
+    class FakeAudio extends EventTarget {
+      buffered = ranges([[0, 180]]);
+      controls = false;
+      crossOrigin: string | null = null;
+      currentTime = 0;
+      duration = 180;
+      error: MediaError | null = null;
+      loop = false;
+      networkState = 1;
+      paused = true;
+      playbackRate = 1;
+      preload = "auto";
+      preservesPitch = true;
+      readyState = 4;
+      seekable = ranges([[0, 180]]);
+      src = "";
+      srcObject: MediaProvider | null = null;
+      volume = 1;
+
+      constructor() {
+        super();
+        instances.push(this);
+      }
+
+      load() {}
+
+      pause() {
+        this.paused = true;
+      }
+
+      play() {
+        this.paused = false;
+        return Promise.resolve();
+      }
+    }
+
+    vi.stubGlobal("Audio", FakeAudio);
+    const player = new Gapless5({
+      tracks: ["one", "two"],
+      useHTML5Audio: true,
+      useWebAudio: false,
+      loadLimit: 1,
+      persistentHTML5Audio: true,
+    });
+    const mediaElement = instances.find((audio) => audio.src === "one");
+    expect(mediaElement).toBeDefined();
+    const createdAfterFirstLoad = instances.length;
+    mediaElement!.dispatchEvent(new Event("loadedmetadata"));
+    mediaElement!.dispatchEvent(new Event("loadeddata"));
+
+    player.play();
+    await Promise.resolve();
+    mediaElement!.dispatchEvent(new Event("ended"));
+
+    expect(player.getIndex()).toBe(1);
+    expect(mediaElement!.src).toBe("two");
+    expect(instances).toHaveLength(createdAfterFirstLoad);
+    mediaElement!.dispatchEvent(new Event("loadedmetadata"));
+    mediaElement!.dispatchEvent(new Event("loadeddata"));
+    await Promise.resolve();
+    expect(mediaElement!.paused).toBe(false);
+
+    player.removeAllTracks();
+  });
+
   it("defers the next request until the active stream has a safe buffer", () => {
     vi.useFakeTimers();
     const instances: FakeAudio[] = [];

@@ -1,12 +1,11 @@
 import {
   getCrossfadeDurationPreference,
   getInfinitePlaybackPreference,
-  getMobileEnhancedAudioPreference,
+  isMobilePlaybackRuntime,
   getPlaybackDeliveryPolicyPreference,
   getSmartCrossfadePreference,
   getSmartPlaylistSuggestionsCadencePreference,
   getSmartPlaylistSuggestionsPreference,
-  setMobileEnhancedAudioPreference,
   setPlaybackDeliveryPolicyPreference,
   setInfinitePlaybackPreference,
   setCrossfadeDurationPreference,
@@ -55,7 +54,6 @@ import {
 import { ServersSection } from "@/components/settings/ServersSection";
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 import { api } from "@/lib/api";
-import { isMobileAudioRuntime } from "@/lib/mobile-audio-mode";
 import { isTauriRuntime } from "@/lib/platform";
 import {
   subscribeSleepTimer,
@@ -317,9 +315,7 @@ export function Settings() {
   const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] = useState(
     getPlaybackDeliveryPolicyPreference,
   );
-  const [mobileEnhancedAudioEnabled, setMobileEnhancedAudioEnabled] = useState(
-    getMobileEnhancedAudioPreference,
-  );
+  const mobilePlaybackRuntime = isMobilePlaybackRuntime();
   const publicProfilePath = useMemo(() => {
     return user?.username ? `/users/${user.username}` : "/people";
   }, [user?.username]);
@@ -384,22 +380,6 @@ export function Settings() {
             })}
           </div>
         </div>
-        {isMobileAudioRuntime ? (
-          <ToggleRow
-            label={t("settings.playback.enhancedMobileAudio")}
-            description={t("settings.playback.enhancedMobileAudioDescription")}
-            checked={mobileEnhancedAudioEnabled}
-            onChange={(value) => {
-              setMobileEnhancedAudioEnabled(value);
-              setMobileEnhancedAudioPreference(value);
-              toast.info(
-                value
-                  ? t("settings.playback.toasts.enhancedMobileEnabled")
-                  : t("settings.playback.toasts.enhancedMobileDisabled"),
-              );
-            }}
-          />
-        ) : null}
         <ToggleRow
           label={t("settings.playback.infinitePlayback")}
           description={t("settings.playback.infinitePlaybackDescription")}
@@ -409,32 +389,36 @@ export function Settings() {
             setInfinitePlaybackPreference(value);
           }}
         />
-        <ToggleRow
-          label={t("settings.playback.smartTransitions")}
-          description={t("settings.playback.smartTransitionsDescription")}
-          checked={smartCrossfadeEnabled}
-          onChange={(value) => {
-            setSmartCrossfadeEnabled(value);
-            setSmartCrossfadePreference(value);
-          }}
-        />
-        <RangeRow
-          label={t("settings.playback.crossfade")}
-          description={t("settings.playback.crossfadeDescription")}
-          value={crossfadeSeconds}
-          min={0}
-          max={12}
-          step={1}
-          displayValue={
-            crossfadeSeconds === 0
-              ? t("common.off")
-              : t("common.secondsShort", { count: crossfadeSeconds })
-          }
-          onChange={(value) => {
-            setCrossfadeSeconds(value);
-            setCrossfadeDurationPreference(value);
-          }}
-        />
+        {!mobilePlaybackRuntime ? (
+          <>
+            <ToggleRow
+              label={t("settings.playback.smartTransitions")}
+              description={t("settings.playback.smartTransitionsDescription")}
+              checked={smartCrossfadeEnabled}
+              onChange={(value) => {
+                setSmartCrossfadeEnabled(value);
+                setSmartCrossfadePreference(value);
+              }}
+            />
+            <RangeRow
+              label={t("settings.playback.crossfade")}
+              description={t("settings.playback.crossfadeDescription")}
+              value={crossfadeSeconds}
+              min={0}
+              max={12}
+              step={1}
+              displayValue={
+                crossfadeSeconds === 0
+                  ? t("common.off")
+                  : t("common.secondsShort", { count: crossfadeSeconds })
+              }
+              onChange={(value) => {
+                setCrossfadeSeconds(value);
+                setCrossfadeDurationPreference(value);
+              }}
+            />
+          </>
+        ) : null}
         <ToggleRow
           label={t("settings.playback.smartPlaylistSuggestions")}
           description={t(

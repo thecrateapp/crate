@@ -34,7 +34,7 @@ const PLAYBACK_DELIVERY_POLICIES = new Set<PlaybackDeliveryPreference>([
   "data_saver",
 ]);
 
-function isMobileRuntime(): boolean {
+export function isMobilePlaybackRuntime(): boolean {
   if (typeof window === "undefined" || typeof navigator === "undefined")
     return false;
   const ua = navigator.userAgent || "";
@@ -69,7 +69,7 @@ function normalizePlaybackDeliveryPolicy(
 }
 
 export function getDefaultPlaybackDeliveryPolicy(): PlaybackDeliveryPolicy {
-  return isMobileRuntime() ? "balanced" : "original";
+  return isMobilePlaybackRuntime() ? "balanced" : "original";
 }
 
 export function getPlaybackDeliveryPolicyPreference(): PlaybackDeliveryPreference {
@@ -132,6 +132,10 @@ export function setPlaybackDeliveryPolicyPreference(
 
 export function getMobileEnhancedAudioPreference(): boolean {
   try {
+    if (isMobilePlaybackRuntime()) {
+      localStorage.removeItem(MOBILE_ENHANCED_AUDIO_KEY);
+      return false;
+    }
     return localStorage.getItem(MOBILE_ENHANCED_AUDIO_KEY) === "true";
   } catch {
     return false;
@@ -140,10 +144,18 @@ export function getMobileEnhancedAudioPreference(): boolean {
 
 export function setMobileEnhancedAudioPreference(enabled: boolean) {
   try {
-    localStorage.setItem(MOBILE_ENHANCED_AUDIO_KEY, enabled ? "true" : "false");
+    const effectiveEnabled = isMobilePlaybackRuntime() ? false : enabled;
+    if (isMobilePlaybackRuntime()) {
+      localStorage.removeItem(MOBILE_ENHANCED_AUDIO_KEY);
+    } else {
+      localStorage.setItem(
+        MOBILE_ENHANCED_AUDIO_KEY,
+        effectiveEnabled ? "true" : "false",
+      );
+    }
     window.dispatchEvent(
       new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, {
-        detail: { mobileEnhancedAudioEnabled: enabled },
+        detail: { mobileEnhancedAudioEnabled: effectiveEnabled },
       }),
     );
   } catch {
@@ -153,6 +165,10 @@ export function setMobileEnhancedAudioPreference(enabled: boolean) {
 
 export function getCrossfadeDurationPreference(): number {
   try {
+    if (isMobilePlaybackRuntime()) {
+      localStorage.removeItem(CROSSFADE_DURATION_KEY);
+      return 0;
+    }
     const raw = localStorage.getItem(CROSSFADE_DURATION_KEY);
     if (!raw) return 0;
     const parsed = Number.parseFloat(raw);
@@ -164,9 +180,15 @@ export function getCrossfadeDurationPreference(): number {
 }
 
 export function setCrossfadeDurationPreference(seconds: number) {
-  const value = Math.max(0, Math.min(seconds, 12));
+  const value = isMobilePlaybackRuntime()
+    ? 0
+    : Math.max(0, Math.min(seconds, 12));
   try {
-    localStorage.setItem(CROSSFADE_DURATION_KEY, String(value));
+    if (value === 0 && isMobilePlaybackRuntime()) {
+      localStorage.removeItem(CROSSFADE_DURATION_KEY);
+    } else {
+      localStorage.setItem(CROSSFADE_DURATION_KEY, String(value));
+    }
     window.dispatchEvent(
       new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, {
         detail: { crossfadeSeconds: value },
@@ -179,6 +201,10 @@ export function setCrossfadeDurationPreference(seconds: number) {
 
 export function getSmartCrossfadePreference(): boolean {
   try {
+    if (isMobilePlaybackRuntime()) {
+      localStorage.removeItem(SMART_CROSSFADE_KEY);
+      return false;
+    }
     const raw = localStorage.getItem(SMART_CROSSFADE_KEY);
     if (raw == null) return true;
     return raw !== "false";
@@ -189,10 +215,18 @@ export function getSmartCrossfadePreference(): boolean {
 
 export function setSmartCrossfadePreference(enabled: boolean) {
   try {
-    localStorage.setItem(SMART_CROSSFADE_KEY, enabled ? "true" : "false");
+    const effectiveEnabled = isMobilePlaybackRuntime() ? false : enabled;
+    if (isMobilePlaybackRuntime()) {
+      localStorage.removeItem(SMART_CROSSFADE_KEY);
+    } else {
+      localStorage.setItem(
+        SMART_CROSSFADE_KEY,
+        effectiveEnabled ? "true" : "false",
+      );
+    }
     window.dispatchEvent(
       new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, {
-        detail: { smartCrossfadeEnabled: enabled },
+        detail: { smartCrossfadeEnabled: effectiveEnabled },
       }),
     );
   } catch {

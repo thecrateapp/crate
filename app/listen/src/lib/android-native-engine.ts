@@ -5,7 +5,6 @@ import {
 } from "@capacitor/core";
 
 import { isAndroidNative } from "@/lib/capacitor-runtime";
-import { getCrossfadeDurationPreference } from "@/lib/player-playback-prefs";
 import type {
   EngineEventListener,
   EngineEventMap,
@@ -90,7 +89,7 @@ export function isAndroidNativePlayerAvailable(): boolean {
 export function shouldUseAndroidNativePlayer(): boolean {
   if (!isAndroidNativePlayerAvailable()) return false;
   try {
-    if (getCrossfadeDurationPreference() > 0) return false;
+    localStorage.removeItem(NATIVE_PLAYER_CROSSFADE_KEY);
     return localStorage.getItem(NATIVE_PLAYER_DISABLED_KEY) !== "true";
   } catch {
     return true;
@@ -107,14 +106,6 @@ export function setAndroidNativePlayerEnabled(enabled: boolean): void {
     window.dispatchEvent(new CustomEvent("crate:native-player-pref-changed"));
   } catch {
     // Preference changes are best-effort in constrained storage modes.
-  }
-}
-
-export function isAndroidNativeCrossfadeEnabled(): boolean {
-  try {
-    return localStorage.getItem(NATIVE_PLAYER_CROSSFADE_KEY) === "true";
-  } catch {
-    return false;
   }
 }
 
@@ -204,7 +195,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
       await this.ensureNotificationPermission();
     }
     this.queueRevision = snapshot.revision;
-    return nativePlayback.setQueue(snapshot);
+    return nativePlayback.setQueue({ ...snapshot, crossfadeMs: 0 });
   }
 
   async play(): Promise<EngineState> {
@@ -280,8 +271,9 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async setCrossfadeMs(crossfadeMs: number): Promise<EngineState> {
+    void crossfadeMs;
     await this.ensureReady();
-    return nativePlayback.setCrossfadeMs({ crossfadeMs });
+    return nativePlayback.setCrossfadeMs({ crossfadeMs: 0 });
   }
 
   async setVolume(volume: number): Promise<EngineState> {

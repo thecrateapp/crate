@@ -11,6 +11,7 @@ vi.mock("@/lib/gapless5/gapless5", () => ({
 }));
 
 vi.mock("@/lib/mobile-audio-mode", () => ({
+  isMobileAudioRuntime: false,
   stableMobileAudioPipeline: false,
 }));
 
@@ -178,8 +179,8 @@ describe("getCurrentBufferedAheadSeconds", () => {
 });
 
 describe("initPlayer", () => {
-  it("keeps the previous HTML5 element alive across mobile auto-advance", () => {
-    expect(getPlaybackLoadLimit(true)).toBe(3);
+  it("uses one decoder owner for the persistent mobile transport", () => {
+    expect(getPlaybackLoadLimit(true)).toBe(1);
   });
 
   it("creates a Gapless5 instance with expected options", () => {

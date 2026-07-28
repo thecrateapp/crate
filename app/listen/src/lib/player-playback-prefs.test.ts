@@ -20,6 +20,10 @@ import {
 
 beforeEach(() => {
   localStorage.clear();
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: 1024,
+  });
 });
 
 afterEach(() => {
@@ -56,6 +60,37 @@ describe("crossfade", () => {
     expect(handler).toHaveBeenCalled();
     window.removeEventListener(PLAYER_PLAYBACK_PREFS_EVENT, handler);
   });
+
+  it("ignores and clears a legacy crossfade value on mobile", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    localStorage.setItem("listen-player-crossfade-seconds", "4");
+
+    expect(getCrossfadeDurationPreference()).toBe(0);
+    expect(localStorage.getItem("listen-player-crossfade-seconds")).toBeNull();
+  });
+
+  it("cannot enable crossfade on mobile", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    const handler = vi.fn();
+    window.addEventListener(PLAYER_PLAYBACK_PREFS_EVENT, handler);
+
+    setCrossfadeDurationPreference(5);
+
+    expect(getCrossfadeDurationPreference()).toBe(0);
+    expect(localStorage.getItem("listen-player-crossfade-seconds")).toBeNull();
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: { crossfadeSeconds: 0 },
+      }),
+    );
+    window.removeEventListener(PLAYER_PLAYBACK_PREFS_EVENT, handler);
+  });
 });
 
 describe("smart crossfade", () => {
@@ -71,6 +106,22 @@ describe("smart crossfade", () => {
   it("round-trips", () => {
     setSmartCrossfadePreference(false);
     expect(getSmartCrossfadePreference()).toBe(false);
+  });
+
+  it("cannot enable smart transitions on mobile", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    localStorage.setItem("listen-player-smart-crossfade", "true");
+
+    expect(getSmartCrossfadePreference()).toBe(false);
+    expect(localStorage.getItem("listen-player-smart-crossfade")).toBeNull();
+
+    setSmartCrossfadePreference(true);
+
+    expect(getSmartCrossfadePreference()).toBe(false);
+    expect(localStorage.getItem("listen-player-smart-crossfade")).toBeNull();
   });
 });
 
@@ -180,5 +231,18 @@ describe("mobile enhanced audio", () => {
   it("round-trips", () => {
     setMobileEnhancedAudioPreference(true);
     expect(getMobileEnhancedAudioPreference()).toBe(true);
+  });
+
+  it("ignores and clears the experimental pipeline on mobile", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    localStorage.setItem("listen-player-mobile-enhanced-audio", "true");
+
+    expect(getMobileEnhancedAudioPreference()).toBe(false);
+    expect(
+      localStorage.getItem("listen-player-mobile-enhanced-audio"),
+    ).toBeNull();
   });
 });

@@ -200,6 +200,94 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     return getBufferedAheadSeconds(audio);
   };
 
+  const onHtml5LoadedDataDebug = () => {
+    if (!audio) return;
+    devLog(
+      "gapless5",
+      "html5 loadeddata",
+      {
+        path: this.audioPath,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+      },
+      "debug",
+    );
+  };
+
+  const onHtml5CanPlayDebug = () => {
+    if (!audio) return;
+    devLog(
+      "gapless5",
+      "html5 canplay",
+      {
+        path: this.audioPath,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+      },
+      "debug",
+    );
+  };
+
+  const onHtml5Error = (err) => {
+    if (!audio) return;
+    if (buffer !== null && state === Gapless5State.Play) {
+      log.warn(
+        `HTML5 audio error ignored (WebAudio is live): ${this.audioPath}`,
+      );
+      return;
+    }
+    if (player.useWebAudio && request !== null && audio.error?.code === 4) {
+      log.warn(
+        `HTML5 audio cannot play ${this.audioPath}; waiting for WebAudio decode`,
+      );
+      devLog(
+        "gapless5",
+        "html5 unsupported; waiting for webaudio",
+        {
+          path: this.audioPath,
+          readyState: audio.readyState,
+          networkState: audio.networkState,
+        },
+        "warn",
+      );
+      return;
+    }
+    devLog(
+      "gapless5",
+      "html5 error",
+      {
+        path: this.audioPath,
+        code: audio.error?.code ?? null,
+        message: audio.error?.message ?? null,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+      },
+      "error",
+    );
+    onError(err);
+  };
+
+  const detachHtml5Listeners = (audioObj) => {
+    audioObj.removeEventListener(
+      "loadedmetadata",
+      onLoadedHTML5Metadata,
+      false,
+    );
+    audioObj.removeEventListener("loadeddata", onLoadedHTML5Audio, false);
+    audioObj.removeEventListener("canplay", onLoadedHTML5Audio, false);
+    audioObj.removeEventListener("canplaythrough", onLoadedHTML5Audio, false);
+    audioObj.removeEventListener("ended", onEnded, false);
+    audioObj.removeEventListener("loadeddata", onHtml5LoadedDataDebug, false);
+    audioObj.removeEventListener("canplay", onHtml5CanPlayDebug, false);
+    audioObj.removeEventListener("error", onHtml5Error, false);
+  };
+
+  this.releasePersistentHTML5Audio = () => {
+    if (!audio) return;
+    detachHtml5Listeners(audio);
+    audio = null;
+  };
+
   this.unload = (isError) => {
     this.stop();
     setState(isError ? Gapless5State.Error : Gapless5State.None);
@@ -207,17 +295,18 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
       request.abort();
     }
     if (audio) {
-      audio.removeEventListener("loadedmetadata", onLoadedHTML5Metadata, false);
-      audio.removeEventListener("loadeddata", onLoadedHTML5Audio, false);
-      audio.removeEventListener("canplay", onLoadedHTML5Audio, false);
-      audio.removeEventListener("canplaythrough", onLoadedHTML5Audio, false);
-      audio.removeEventListener("ended", onEnded, false);
-      try {
-        audio.removeAttribute?.("src");
-        audio.srcObject = null;
-        audio.load();
-      } catch {
-        // Releasing a detached media element is best-effort.
+      const audioObj = audio;
+      detachHtml5Listeners(audioObj);
+      if (player.persistentHTML5Audio) {
+        player.releasePersistentHTML5Audio(this, true);
+      } else {
+        try {
+          audioObj.removeAttribute?.("src");
+          audioObj.srcObject = null;
+          audioObj.load();
+        } catch {
+          // Releasing a detached media element is best-effort.
+        }
       }
     }
     audio = null;
@@ -545,7 +634,10 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         }
       }
       if (audio !== null) {
-        audio.volume = this.getVolume();
+        const nextVolume = this.getVolume();
+        if (Math.abs(audio.volume - nextVolume) > 0.001) {
+          audio.volume = nextVolume;
+        }
       }
       if (gainNode !== null) {
         const { currentTime } = window.gapless5AudioContext;
@@ -734,7 +826,9 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     }
     if (player.useHTML5Audio) {
       const getHtml5Audio = () => {
-        const audioObj = new Audio();
+        const audioObj = player.persistentHTML5Audio
+          ? player.acquirePersistentHTML5Audio(this)
+          : new Audio();
         audioObj.controls = false;
         audioObj.preload = "auto";
         audioObj.crossOrigin = "anonymous";
@@ -754,36 +848,8 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         // to drop the browser MediaSession. The media element's native ended
         // event remains the authoritative fallback while audio is active.
         audioObj.addEventListener("ended", onEnded, false);
-        audioObj.addEventListener(
-          "loadeddata",
-          () =>
-            devLog(
-              "gapless5",
-              "html5 loadeddata",
-              {
-                path: audioPath,
-                readyState: audioObj.readyState,
-                networkState: audioObj.networkState,
-              },
-              "debug",
-            ),
-          false,
-        );
-        audioObj.addEventListener(
-          "canplay",
-          () =>
-            devLog(
-              "gapless5",
-              "html5 canplay",
-              {
-                path: audioPath,
-                readyState: audioObj.readyState,
-                networkState: audioObj.networkState,
-              },
-              "debug",
-            ),
-          false,
-        );
+        audioObj.addEventListener("loadeddata", onHtml5LoadedDataDebug, false);
+        audioObj.addEventListener("canplay", onHtml5CanPlayDebug, false);
         // [vendored patch] Once WebAudio has taken over (buffer !== null
         // + state === Play), the HTML5 element is dormant: source of
         // sound is the decoded RAM buffer, not the <audio> tag. A
@@ -791,51 +857,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         // the browser is still chewing on the stream) is irrelevant
         // and must NOT kill playback. If WebAudio hasn't switched yet,
         // the HTML5 element IS the source and we do want to escalate.
-        audioObj.addEventListener(
-          "error",
-          (err) => {
-            if (buffer !== null && state === Gapless5State.Play) {
-              log.warn(
-                `HTML5 audio error ignored (WebAudio is live): ${audioPath}`,
-              );
-              return;
-            }
-            if (
-              player.useWebAudio &&
-              request !== null &&
-              audioObj.error?.code === 4
-            ) {
-              log.warn(
-                `HTML5 audio cannot play ${audioPath}; waiting for WebAudio decode`,
-              );
-              devLog(
-                "gapless5",
-                "html5 unsupported; waiting for webaudio",
-                {
-                  path: audioPath,
-                  readyState: audioObj.readyState,
-                  networkState: audioObj.networkState,
-                },
-                "warn",
-              );
-              return;
-            }
-            devLog(
-              "gapless5",
-              "html5 error",
-              {
-                path: audioPath,
-                code: audioObj.error?.code ?? null,
-                message: audioObj.error?.message ?? null,
-                readyState: audioObj.readyState,
-                networkState: audioObj.networkState,
-              },
-              "error",
-            );
-            onError(err);
-          },
-          false,
-        );
+        audioObj.addEventListener("error", onHtml5Error, false);
         // TODO: switch to audio.networkState, now that it's universally supported
         return audioObj;
       };
@@ -1384,6 +1406,35 @@ function Gapless5(options = {}, deprecated = {}) {
   // these default to true if not defined
   this.useWebAudio = options.useWebAudio !== false;
   this.useHTML5Audio = options.useHTML5Audio !== false;
+  this.persistentHTML5Audio =
+    this.useHTML5Audio && options.persistentHTML5Audio === true;
+  this.persistentAudioElement = this.persistentHTML5Audio ? new Audio() : null;
+  this.persistentAudioOwner = null;
+  this.acquirePersistentHTML5Audio = (owner) => {
+    if (!this.persistentAudioElement) {
+      return new Audio();
+    }
+    if (this.persistentAudioOwner && this.persistentAudioOwner !== owner) {
+      this.persistentAudioElement.pause();
+      this.persistentAudioOwner.releasePersistentHTML5Audio();
+    }
+    this.persistentAudioOwner = owner;
+    return this.persistentAudioElement;
+  };
+  this.releasePersistentHTML5Audio = (owner, clearMedia = false) => {
+    if (!this.persistentAudioElement || this.persistentAudioOwner !== owner) {
+      return;
+    }
+    this.persistentAudioOwner = null;
+    if (!clearMedia) return;
+    try {
+      this.persistentAudioElement.removeAttribute?.("src");
+      this.persistentAudioElement.srcObject = null;
+      this.persistentAudioElement.load();
+    } catch {
+      // Releasing the final persistent media source is best-effort.
+    }
+  };
   this.playbackRate = options.playbackRate || 1.0;
   this.id = options.guiId || Math.floor((1 + Math.random()) * 0x10000);
   window.gapless5Players[this.id] = this;

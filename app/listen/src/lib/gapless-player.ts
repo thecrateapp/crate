@@ -6,7 +6,10 @@
  */
 
 import { Gapless5 } from "@/lib/gapless5/gapless5";
-import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
+import {
+  isMobileAudioRuntime,
+  stableMobileAudioPipeline,
+} from "@/lib/mobile-audio-mode";
 import {
   createEqChain,
   isFlatGains,
@@ -46,10 +49,7 @@ type WindowWithGaplessContext = Window & {
 const GAPLESS_LOG_LEVEL_WARNING = 3;
 const GAPLESS_CROSSFADE_EQUAL_POWER = 3;
 const DESKTOP_DECODE_TRACK_LIMIT = 2;
-// Keep the previous element alive while the current and next tracks overlap.
-// Android Chrome can otherwise drop its MediaSession when the ended element
-// is unloaded during the transition.
-const MOBILE_HTML5_TRACK_LIMIT = 3;
+const MOBILE_HTML5_TRACK_LIMIT = 1;
 const ADJACENT_LOAD_BUFFER_SECONDS = 15;
 const RESUMED_AUDIO_CONTEXT_RAMP_MS = 24;
 
@@ -243,12 +243,15 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     analyserPrecision: preferHtml5Audio ? null : 2048,
     crossfade: getCrossfadeMs(),
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
+    persistentHTML5Audio: isMobileAudioRuntime,
     volume: lastVolume,
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
     // Keep the next mobile <audio> source ready before the active element
     // reaches ended, but only after the current stream has a safe buffer.
     // Starting both FLAC requests together can starve Android's active decoder.
-    loadLimit: getPlaybackLoadLimit(preferHtml5Audio),
+    loadLimit: isMobileAudioRuntime
+      ? MOBILE_HTML5_TRACK_LIMIT
+      : getPlaybackLoadLimit(preferHtml5Audio),
     deferAdjacentLoadsUntilBufferedSeconds: ADJACENT_LOAD_BUFFER_SECONDS,
     // Switching an audible source from HTML5 to WebAudio mid-track can click
     // even when both clocks are aligned. Decoded buffers remain available for

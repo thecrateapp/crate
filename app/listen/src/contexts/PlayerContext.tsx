@@ -101,6 +101,7 @@ import {
 } from "@/lib/playback-network-quality";
 import { getPlaybackDeliveryProvenance } from "@/lib/playback-provenance";
 import {
+  getPlaybackQoeRuntime,
   installPlaybackQoeFlush,
   recordPlaybackQoe,
   type PlaybackQoeEventName,
@@ -444,6 +445,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           (track.origin === "remote" ? "remote" : "local"),
         requestedPolicy: provenance?.requestedPolicy ?? policy,
         effectivePolicy: provenance?.effectivePolicy ?? policy,
+        runtime: getPlaybackQoeRuntime(),
+        engine: shouldUseAndroidNativePlayer() ? "media3" : "gapless",
         ...details,
       });
     },

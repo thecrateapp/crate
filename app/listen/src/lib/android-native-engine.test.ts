@@ -67,18 +67,18 @@ describe("android native engine flags", () => {
     expect(shouldUseAndroidNativePlayer()).toBe(false);
   });
 
-  it("keeps the native player disabled while web crossfade is active", async () => {
+  it("keeps the native player enabled with a legacy crossfade preference", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { setCrossfadeDurationPreference } = await import(
-      "@/lib/player-playback-prefs"
-    );
+    localStorage.setItem("listen-player-crossfade-seconds", "4");
+    localStorage.setItem("crate-native-player-crossfade-enabled", "true");
     const { shouldUseAndroidNativePlayer } = await import(
       "@/lib/android-native-engine"
     );
 
-    setCrossfadeDurationPreference(4);
-
-    expect(shouldUseAndroidNativePlayer()).toBe(false);
+    expect(shouldUseAndroidNativePlayer()).toBe(true);
+    expect(
+      localStorage.getItem("crate-native-player-crossfade-enabled"),
+    ).toBeNull();
   });
 
   it("sends the active queue revision with native queue mutations", async () => {
@@ -114,7 +114,7 @@ describe("android native engine flags", () => {
       positionMs: 0,
       autoplay: false,
       repeat: "off",
-      crossfadeMs: 0,
+      crossfadeMs: 4000,
       volume: 1,
     });
     await engine.appendTracks([track]);
@@ -128,6 +128,14 @@ describe("android native engine flags", () => {
     ).toMatchObject({
       url: "https://listen.example/api/tracks/1/stream",
       authorization: "Bearer secret-token",
+    });
+    expect(nativePlaybackMock.setQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ crossfadeMs: 0 }),
+    );
+
+    await engine.setCrossfadeMs(5000);
+    expect(nativePlaybackMock.setCrossfadeMs).toHaveBeenCalledWith({
+      crossfadeMs: 0,
     });
   });
 

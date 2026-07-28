@@ -37,11 +37,16 @@ def _allow_qoe_events(user_id: int, event_count: int) -> bool:
 
 
 def _metric_tags(event) -> dict[str, str]:
-    return {
+    tags = {
         "origin": event.origin,
         "requested_policy": event.requested_policy,
         "effective_policy": event.effective_policy,
     }
+    if event.runtime is not None:
+        tags["runtime"] = event.runtime
+    if event.engine is not None:
+        tags["engine"] = event.engine
+    return tags
 
 
 def _record_qoe_event(event) -> None:

@@ -64,4 +64,8 @@ does not need tickets or URL credentials.
 Both `token` and `media_ticket` query values are sensitive. Backend and native
 playback redactors replace their values before a URL reaches logs, errors or
 bridge payloads. Federation and Cast tickets retain their existing,
-independent trust contracts.
+independent trust contracts. Traefik request access logging is disabled because
+its standard format cannot reliably redact selected query parameters; Crate
+retains application metrics and structured error logs without full request
+URLs. Do not re-enable proxy access logs until the sink strips query strings
+before persistence.
