@@ -1,6 +1,15 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/components/player/AuthenticatedMediaImage", () => ({
+  AuthenticatedMediaImage: ({
+    src,
+    ...props
+  }: React.ImgHTMLAttributes<HTMLImageElement>) => (
+    <img data-testid="authenticated-disc-artwork" src={src} {...props} />
+  ),
+}));
+
 import { SpinningDisc } from "@/components/player/SpinningDisc";
 
 const bounds = {
@@ -54,6 +63,15 @@ describe("SpinningDisc", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("renders album artwork through the authenticated media image", () => {
+    renderDisc({ albumCover: "/api/albums/1/cover" });
+
+    expect(screen.getByTestId("authenticated-disc-artwork")).toHaveAttribute(
+      "src",
+      "/api/albums/1/cover",
+    );
   });
 
   it("seeks while dragging in live jog mode", () => {

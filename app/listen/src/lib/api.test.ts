@@ -943,6 +943,35 @@ describe("native (configurable server) mode", () => {
   });
 
   describe("apiAssetUrl", () => {
+    it("marks protected URLs usable only after a credential is attached", () => {
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+
+      expect(
+        apiMod.isUsableMediaAssetUrl(
+          "https://api.example.com/api/albums/1/cover?size=256",
+        ),
+      ).toBe(false);
+      expect(
+        apiMod.isUsableMediaAssetUrl(
+          "https://api.example.com/api/albums/1/cover?size=256&media_ticket=fresh",
+        ),
+      ).toBe(true);
+      expect(
+        apiMod.isUsableMediaAssetUrl("https://cdn.example.net/cover.webp"),
+      ).toBe(true);
+      expect(
+        apiMod.requiresMediaAccessTicket(
+          "https://api.example.com/api/albums/1/cover?size=256",
+        ),
+      ).toBe(true);
+      expect(
+        apiMod.requiresMediaAccessTicket(
+          "https://cdn.example.net/api/albums/1/cover",
+        ),
+      ).toBe(false);
+    });
+
     it("never reuses an artwork ticket for another API path", () => {
       setupServer();
 
@@ -959,6 +988,65 @@ describe("native (configurable server) mode", () => {
 
       expect(apiMod.apiAssetUrl("https://cdn.example.net/api/cover.jpg")).toBe(
         "https://cdn.example.net/api/cover.jpg",
+      );
+    });
+
+    it("waits until its own ticket batch completes during concurrent recovery", async () => {
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      let releaseFirst: (() => void) | undefined;
+      const firstRequestPending = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      let releaseSecond: (() => void) | undefined;
+      const secondRequestPending = new Promise<void>((resolve) => {
+        releaseSecond = resolve;
+      });
+      const requestedBatches: Array<
+        Array<{ audience: "artwork"; path: string }>
+      > = [];
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+        const body = JSON.parse(String(init?.body)) as {
+          targets: Array<{ audience: "artwork"; path: string }>;
+        };
+        requestedBatches.push(body.targets);
+        if (requestedBatches.length === 1) await firstRequestPending;
+        if (requestedBatches.length === 2) await secondRequestPending;
+        return mockJsonResponse({
+          tickets: body.targets.map((target) => ({
+            ...target,
+            ticket: `ticket:${target.path}`,
+            expires_at: new Date(Date.now() + 60_000).toISOString(),
+          })),
+        });
+      });
+
+      const first = apiMod.ensureMediaAccessUrl(
+        "/api/albums/1/cover",
+        "artwork",
+        { forceRefresh: true },
+      );
+      await vi.waitFor(() => expect(requestedBatches).toHaveLength(1));
+      const second = apiMod.ensureMediaAccessUrl(
+        "/api/albums/2/cover",
+        "artwork",
+        { forceRefresh: true },
+      );
+      releaseFirst?.();
+      await vi.waitFor(() => expect(requestedBatches).toHaveLength(2));
+      releaseSecond?.();
+
+      await expect(first).resolves.toContain(
+        "media_ticket=ticket%3A%2Fapi%2Falbums%2F1%2Fcover",
+      );
+      await expect(second).resolves.toContain(
+        "media_ticket=ticket%3A%2Fapi%2Falbums%2F2%2Fcover",
+      );
+      expect(requestedBatches.flat()).toEqual(
+        expect.arrayContaining([
+          { audience: "artwork", path: "/api/albums/1/cover" },
+          { audience: "artwork", path: "/api/albums/2/cover" },
+        ]),
       );
     });
 

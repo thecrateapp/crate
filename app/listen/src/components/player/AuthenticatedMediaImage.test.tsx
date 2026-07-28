@@ -12,6 +12,10 @@ vi.mock("@/hooks/use-media-access-version", () => ({
 
 vi.mock("@/lib/api", () => ({
   ensureMediaAccessUrl: ensureMediaAccessUrlMock,
+  isUsableMediaAssetUrl: (url: string | null | undefined) =>
+    Boolean(url?.includes("ticket-version") || url?.includes("media_ticket")),
+  requiresMediaAccessTicket: (url: string | null | undefined) =>
+    Boolean(url?.startsWith("/api/")),
   resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
     url ? `${url}?ticket-version=${mediaVersion.value}` : null,
 }));
@@ -27,7 +31,7 @@ describe("AuthenticatedMediaImage", () => {
     );
   });
 
-  it("re-resolves the source when media tickets change", () => {
+  it("keeps a loaded source stable when media tickets rotate", () => {
     const { rerender } = render(
       <AuthenticatedMediaImage src="/api/albums/1/cover" alt="Cover" />,
     );
@@ -41,11 +45,53 @@ describe("AuthenticatedMediaImage", () => {
 
     expect(screen.getByRole("img", { name: "Cover" })).toHaveAttribute(
       "src",
-      "/api/albums/1/cover?ticket-version=2",
+      "/api/albums/1/cover?ticket-version=1",
     );
   });
 
-  it("renews a failed protected image once", async () => {
+  it("keeps a loaded source stable when bearer credentials rotate", () => {
+    const { rerender } = render(
+      <AuthenticatedMediaImage
+        src="/api/albums/1/cover?token=old"
+        alt="Cover"
+      />,
+    );
+    expect(screen.getByRole("img", { name: "Cover" })).toHaveAttribute(
+      "src",
+      "/api/albums/1/cover?token=old?ticket-version=1",
+    );
+
+    mediaVersion.value = 2;
+    rerender(
+      <AuthenticatedMediaImage
+        src="/api/albums/1/cover?token=new"
+        alt="Cover"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Cover" })).toHaveAttribute(
+      "src",
+      "/api/albums/1/cover?token=old?ticket-version=1",
+    );
+  });
+
+  it("resolves every responsive candidate with the same ticket lifecycle", () => {
+    render(
+      <AuthenticatedMediaImage
+        src="/api/albums/1/cover?size=256"
+        srcSet="/api/albums/1/cover?size=160 160w, /api/albums/1/cover?size=320 320w"
+        sizes="50vw"
+        alt="Cover"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Cover" })).toHaveAttribute(
+      "srcset",
+      "/api/albums/1/cover?size=160?ticket-version=1 160w, /api/albums/1/cover?size=320?ticket-version=1 320w",
+    );
+  });
+
+  it("renews a protected credential again after the replacement loaded", async () => {
     render(<AuthenticatedMediaImage src="/api/albums/1/cover" alt="Cover" />);
 
     fireEvent.error(screen.getByRole("img", { name: "Cover" }));
@@ -62,7 +108,31 @@ describe("AuthenticatedMediaImage", () => {
       "/api/albums/1/cover?media_ticket=renewed",
     );
 
+    fireEvent.load(screen.getByRole("img", { name: "Cover" }));
     fireEvent.error(screen.getByRole("img", { name: "Cover" }));
+    await waitFor(() =>
+      expect(ensureMediaAccessUrlMock).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it("delegates a persistent protected failure after one bounded retry", async () => {
+    const onError = vi.fn();
+    render(
+      <AuthenticatedMediaImage
+        src="/api/albums/1/cover"
+        alt="Cover"
+        onError={onError}
+      />,
+    );
+
+    fireEvent.error(screen.getByRole("img", { name: "Cover" }));
+    await waitFor(() =>
+      expect(ensureMediaAccessUrlMock).toHaveBeenCalledTimes(1),
+    );
+    expect(onError).not.toHaveBeenCalled();
+
+    fireEvent.error(screen.getByRole("img", { name: "Cover" }));
+    expect(onError).toHaveBeenCalledTimes(1);
     expect(ensureMediaAccessUrlMock).toHaveBeenCalledTimes(1);
   });
 });

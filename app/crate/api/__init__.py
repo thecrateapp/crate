@@ -118,6 +118,27 @@ def _queue_artwork_variant_backfill() -> None:
     )
 
 
+def _queue_artwork_manifest_permission_repair() -> None:
+    """Queue the one-time cache manifest mode repair for readplane access."""
+    from crate.artwork_tasks import ARTWORK_MANIFEST_PERMISSIONS_VERSION
+    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.tasks import create_task_dedup
+
+    if (
+        get_setting("artwork_manifest_permissions_version")
+        == ARTWORK_MANIFEST_PERMISSIONS_VERSION
+    ):
+        return
+    create_task_dedup(
+        "repair_artwork_variants",
+        {"max_assets": 100_000, "repair_manifest_permissions": True},
+        dedup_key=(
+            "bootstrap:artwork-manifest-permissions:"
+            f"v{ARTWORK_MANIFEST_PERMISSIONS_VERSION}"
+        ),
+    )
+
+
 def _queue_stats_dashboard_backfill() -> None:
     """Prewarm the canonical dashboard projection for every active user."""
     from crate.db.user_stats_dashboard_surface import (
@@ -165,6 +186,7 @@ async def lifespan(app: FastAPI):
     _bootstrap_federation_identity()
     _queue_global_catalog_bootstrap()
     _queue_artwork_variant_backfill()
+    _queue_artwork_manifest_permission_repair()
     _queue_stats_dashboard_backfill()
     _queue_artist_top_track_ranking_backfill()
     from crate.utils import init_musicbrainz

@@ -23,6 +23,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import {
   ContextMenu,
   type ContextMenuEntry,
@@ -167,7 +168,7 @@ export function TopBarUserMenu() {
           {...actionMenu.longPressHandlers}
         >
           {avatarUrl ? (
-            <img
+            <AuthenticatedMediaImage
               src={avatarUrl}
               alt=""
               onError={handleAvatarError}

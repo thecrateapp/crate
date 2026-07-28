@@ -13,6 +13,7 @@ import { toTrackRowData } from "@/lib/track-row-data";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { TrackRow } from "@/components/cards/TrackRow";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 
@@ -305,7 +306,7 @@ export function SearchResults() {
                 >
                   <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
                     {a.has_cover ? (
-                      <img
+                      <AuthenticatedMediaImage
                         src={
                           globalUid
                             ? albumCoverApiUrl(

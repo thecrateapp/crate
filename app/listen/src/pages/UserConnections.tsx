@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 
 interface UserListItem {
   id: number;
@@ -28,7 +29,7 @@ function UserAvatar({
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
   if (avatarUrl) {
     return (
-      <img
+      <AuthenticatedMediaImage
         src={avatarUrl}
         alt={name}
         onError={handleAvatarError}

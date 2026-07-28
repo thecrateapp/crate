@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { useMemo } from "react";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -22,10 +23,14 @@ import {
   type UpcomingItem,
 } from "@/components/upcoming/UpcomingRows";
 import {
+  albumCoverApiUrl,
   albumPagePath,
   artistPagePath,
   artistTopTracksPath,
+  responsiveImageSrcSet,
 } from "@/lib/library-routes";
+
+const ARTIST_ALBUM_IMAGE_WIDTHS = [160, 256, 320, 480] as const;
 
 interface ArtistTopTracksSectionProps {
   artistId?: number;
@@ -185,7 +190,22 @@ function ArtistAlbumItem({
       localAlbumId,
       album.slug,
       globalAlbumUid,
+      album.entity_uid,
     );
+  const coverRouteInput = {
+    albumId: localAlbumId,
+    albumEntityUid: album.entity_uid ?? undefined,
+    globalAlbumUid: album.entity_uid ? undefined : globalAlbumUid,
+    albumSlug: album.slug,
+    artistSlug,
+    artistName,
+    albumName: album.display_name || album.name,
+  };
+  const coverSrcSet = album.cover_url
+    ? undefined
+    : responsiveImageSrcSet(ARTIST_ALBUM_IMAGE_WIDTHS, (size) =>
+        albumCoverApiUrl(coverRouteInput, { size }),
+      );
 
   if (globalAlbumUid) {
     return (
@@ -202,14 +222,14 @@ function ArtistAlbumItem({
       >
         <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
           {cover ? (
-            <img
+            <AuthenticatedMediaImage
               src={cover}
+              srcSet={coverSrcSet}
+              sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 20vw"
               alt={album.display_name || album.name}
               loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
-              onError={(event) => {
-                (event.target as HTMLImageElement).style.display = "none";
-              }}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">

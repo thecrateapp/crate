@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { AppModal } from "@crate/ui/primitives/AppModal";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import {
   buildShareText,
   buildTelegramShareUrl,
@@ -162,7 +163,7 @@ export function ShareSheetHost() {
 function SharePreviewImage({ payload }: { payload: SharePayload }) {
   if (payload.imageUrl) {
     return (
-      <img
+      <AuthenticatedMediaImage
         src={payload.imageUrl}
         alt=""
         className="h-14 w-14 shrink-0 rounded-xl border border-white/10 object-cover shadow-[0_16px_40px_rgba(0,0,0,0.35)]"

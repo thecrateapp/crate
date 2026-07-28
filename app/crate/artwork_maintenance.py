@@ -137,6 +137,25 @@ def find_corrupt_artwork_assets(*, max_assets: int = 1000) -> list[ArtworkAsset]
     return corrupt
 
 
+def repair_artwork_manifest_permissions(*, max_assets: int = 1000) -> dict[str, int]:
+    result = {"assets_checked": 0, "permissions_repaired": 0}
+    for asset in _iter_assets(max(1, int(max_assets))):
+        result["assets_checked"] += 1
+        manifest = (
+            artwork_variant_root() / asset.kind / asset.entity_key / "current.json"
+        )
+        try:
+            if not manifest.is_file():
+                continue
+            if manifest.stat().st_mode & 0o777 == 0o644:
+                continue
+            manifest.chmod(0o644)
+            result["permissions_repaired"] += 1
+        except OSError:
+            continue
+    return result
+
+
 def cleanup_artwork_variants(*, max_assets: int = 1000) -> dict[str, int]:
     now = time.time()
     result = {
@@ -189,4 +208,5 @@ __all__ = [
     "cleanup_artwork_variants",
     "find_corrupt_artwork_assets",
     "inspect_artwork_variants",
+    "repair_artwork_manifest_permissions",
 ]

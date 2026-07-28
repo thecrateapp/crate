@@ -44,6 +44,7 @@ import {
   type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { triggerHaptic } from "@/lib/haptics";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { useAudioVisualizer } from "@/hooks/use-audio-visualizer";
@@ -176,7 +177,8 @@ export function PlayerBar() {
   const connectEnabled = useCrateConnectEnabled();
   const legacyConnectEnabled =
     connectEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED;
-  const allowEqualizer = canUseWebAudioEffects;
+  const allowEqualizer =
+    canUseWebAudioEffects || shouldUseAndroidNativePlayer();
   const showPlayerBarAnalyzer =
     SHOW_PLAYER_BAR_ANALYZER && isDesktop && allowEqualizer;
 

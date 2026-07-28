@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { useHoverCapability } from "@/hooks/use-hover-capability";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { api, ApiError } from "@/lib/api";
@@ -39,7 +40,7 @@ import {
 function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
   if (item.imageUrl) {
     return (
-      <img
+      <AuthenticatedMediaImage
         src={item.imageUrl}
         alt=""
         className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${

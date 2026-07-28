@@ -5,12 +5,16 @@ const {
   authState,
   ensureFreshAuthTokenMock,
   ensureMediaAccessUrlMock,
+  refreshMediaAccessTicketsMock,
+  artworkTicketState,
   offlineUrlState,
 } = vi.hoisted(() => ({
   apiMock: vi.fn(),
   authState: { token: "listen-token" },
   ensureFreshAuthTokenMock: vi.fn(),
   ensureMediaAccessUrlMock: vi.fn(),
+  refreshMediaAccessTicketsMock: vi.fn(),
+  artworkTicketState: { fresh: false },
   offlineUrlState: { url: null as string | null },
 }));
 
@@ -20,12 +24,17 @@ vi.mock("@/lib/api", () => ({
   getAuthToken: () => authState.token,
   ensureFreshAuthToken: ensureFreshAuthTokenMock,
   ensureMediaAccessUrl: ensureMediaAccessUrlMock,
+  refreshMediaAccessTickets: refreshMediaAccessTicketsMock,
   apiStreamUrl: (url: string) => url,
   resolveMaybeApiStreamUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/") ? `https://listen.example${url}` : url ?? null,
   resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/")
-      ? `https://listen.example${url}?token=${authState.token}`
+      ? artworkTicketState.fresh
+        ? `https://listen.example${url}${
+            url.includes("?") ? "&" : "?"
+          }media_ticket=fresh-artwork`
+        : `https://listen.example${url}?token=${authState.token}`
       : url ?? null,
 }));
 
@@ -54,6 +63,12 @@ describe("player engine adapter", () => {
     ensureFreshAuthTokenMock.mockResolvedValue(true);
     ensureMediaAccessUrlMock.mockReset();
     ensureMediaAccessUrlMock.mockImplementation(async (url: string) => url);
+    artworkTicketState.fresh = false;
+    refreshMediaAccessTicketsMock.mockReset();
+    refreshMediaAccessTicketsMock.mockImplementation(async () => {
+      artworkTicketState.fresh = true;
+      return true;
+    });
     offlineUrlState.url = null;
   });
 
@@ -276,5 +291,37 @@ describe("player engine adapter", () => {
       "https://listen.example/api/federation/remote/streams/ticket-next",
       "stream",
     );
+  });
+
+  it("refreshes queue artwork tickets before restoring the native player", async () => {
+    const queue = [
+      {
+        id: "track-current",
+        entityUid: "entity-current",
+        title: "Current Song",
+        artist: "Band",
+        albumCover: "/api/albums/1/cover?size=512",
+      },
+      {
+        id: "track-next",
+        entityUid: "entity-next",
+        title: "Next Song",
+        artist: "Band",
+        albumCover: "/api/albums/2/cover?size=512",
+      },
+    ];
+
+    const tracks = await toStartupEngineTracks(queue, 0, undefined, {
+      target: "android-native",
+    });
+
+    expect(refreshMediaAccessTicketsMock).toHaveBeenCalledWith([
+      { audience: "artwork", path: "/api/albums/1/cover" },
+      { audience: "artwork", path: "/api/albums/2/cover" },
+    ]);
+    expect(tracks.map((track) => track.artwork)).toEqual([
+      "https://listen.example/api/albums/1/cover?size=512&media_ticket=fresh-artwork",
+      "https://listen.example/api/albums/2/cover?size=512&media_ticket=fresh-artwork",
+    ]);
   });
 });

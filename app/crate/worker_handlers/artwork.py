@@ -9,10 +9,14 @@ from crate.artwork_materializer import materialize_artwork
 from crate.artwork_maintenance import (
     cleanup_artwork_variants,
     find_corrupt_artwork_assets,
+    repair_artwork_manifest_permissions,
 )
 from crate.artwork_sources import resolve_artwork_source
 from crate.artwork_tasks import queue_artwork_materialization
-from crate.artwork_tasks import ARTWORK_BACKFILL_VERSION
+from crate.artwork_tasks import (
+    ARTWORK_BACKFILL_VERSION,
+    ARTWORK_MANIFEST_PERMISSIONS_VERSION,
+)
 from crate.artwork_variants import (
     ARTWORK_KINDS,
     ArtworkAsset,
@@ -234,7 +238,22 @@ def _handle_repair_artwork_variants(task_id: str, params: dict, config: dict) ->
     corrupt = find_corrupt_artwork_assets(max_assets=max_assets)
     for asset in corrupt:
         queue_artwork_materialization(asset, reason="integrity-repair")
-    return {"assets_checked": max_assets, "requeued": len(corrupt)}
+    result = {"assets_checked": max_assets, "requeued": len(corrupt)}
+    if bool(params.get("repair_manifest_permissions")):
+        permissions = repair_artwork_manifest_permissions(max_assets=max_assets)
+        result.update(
+            {
+                "manifest_assets_checked": permissions["assets_checked"],
+                "permissions_repaired": permissions["permissions_repaired"],
+            }
+        )
+        from crate.db.cache_settings import set_setting
+
+        set_setting(
+            "artwork_manifest_permissions_version",
+            ARTWORK_MANIFEST_PERMISSIONS_VERSION,
+        )
+    return result
 
 
 def _handle_resolve_external_artist_artwork(

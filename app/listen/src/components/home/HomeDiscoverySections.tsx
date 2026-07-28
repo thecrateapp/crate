@@ -32,6 +32,7 @@ import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
@@ -665,7 +666,7 @@ function HeroSlide({
     >
       <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(6,10,14,0.98)_0%,rgba(10,16,22,0.96)_52%,rgba(4,9,13,0.98)_100%)]" />
       {backgroundSrc ? (
-        <img
+        <AuthenticatedMediaImage
           src={backgroundSrc}
           alt=""
           aria-hidden="true"
@@ -922,7 +923,7 @@ function RecentEntityRowFrame({
             className="h-full w-full rounded-xl"
           />
         ) : artworkUrl ? (
-          <img
+          <AuthenticatedMediaImage
             src={artworkUrl}
             alt=""
             loading="lazy"
@@ -1361,12 +1362,15 @@ export function RadioStationCard({
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
-      <div
-        className="aspect-square bg-cover bg-center transition-transform duration-300 group-hover:scale-[1.04]"
-        style={{
-          backgroundImage: artworkUrl ? `url(${artworkUrl})` : undefined,
-        }}
-      />
+      {artworkUrl ? (
+        <AuthenticatedMediaImage
+          src={artworkUrl}
+          alt=""
+          className="aspect-square h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.04]"
+        />
+      ) : (
+        <div className="aspect-square" />
+      )}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(6,8,12,0.92)_100%)]" />
       <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-black/35 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary shadow-[0_0_18px_rgba(6,182,212,0.16)] backdrop-blur-md">
         <Radio size={12} className="inline-block" /> {seedTypeLabel}

@@ -1,7 +1,7 @@
 name: Build Android
 
-# Tag pushes publish signed, shrunk release artifacts. Manual dispatches build
-# a debug APK only and can never replace the stable release download.
+# Pull requests, main pushes, and manual dispatches validate the mobile app.
+# Only tag pushes build and publish signed, shrunk end-user artifacts.
 on:
   push:
     branches:
@@ -131,48 +131,34 @@ jobs:
         run: ./gradlew bundleRelease assembleRelease lintRelease --no-daemon
         working-directory: app/listen/android
 
-      - name: Build debug APK and instrumentation tests
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
-        working-directory: app/listen/android
-
-      - name: Locate Android artifacts
+      - name: Locate Android release artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
         id: locate
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            APK_PATH=$(find app/listen/android/app/build/outputs/apk/release -name '*.apk' | head -n1)
-            AAB_PATH=$(find app/listen/android/app/build/outputs/bundle/release -name '*.aab' | head -n1)
-            test -n "$AAB_PATH"
-            echo "aab_path=$AAB_PATH" >> "$GITHUB_OUTPUT"
-          else
-            APK_PATH=$(find app/listen/android/app/build/outputs/apk/debug -name '*.apk' | head -n1)
-          fi
+          APK_PATH=$(find app/listen/android/app/build/outputs/apk/release -name '*.apk' | head -n1)
+          AAB_PATH=$(find app/listen/android/app/build/outputs/bundle/release -name '*.aab' | head -n1)
           test -n "$APK_PATH"
+          test -n "$AAB_PATH"
           echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
-          ls -la "$APK_PATH"
+          echo "aab_path=$AAB_PATH" >> "$GITHUB_OUTPUT"
+          ls -la "$APK_PATH" "$AAB_PATH"
 
-      - name: Prepare published artifacts
+      - name: Prepare published release artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
         id: rename
         run: |
-          TAG_NAME="${GITHUB_REF_NAME}"
-          if [[ "$TAG_NAME" == "" || "$TAG_NAME" == "main" ]]; then
-            TAG_NAME="dev"
-          fi
-          SAFE_TAG_NAME=$(printf '%s' "$TAG_NAME" | sed 's#[^A-Za-z0-9._-]#-#g')
-          if [[ "$SAFE_TAG_NAME" == "" ]]; then
-            SAFE_TAG_NAME="dev"
-          fi
+          SAFE_TAG_NAME=$(printf '%s' "$GITHUB_REF_NAME" | sed 's#[^A-Za-z0-9._-]#-#g')
+          test -n "$SAFE_TAG_NAME"
           APK_DEST="crate-${SAFE_TAG_NAME}.apk"
+          AAB_DEST="crate-${SAFE_TAG_NAME}.aab"
           cp "${{ steps.locate.outputs.apk_path }}" "$APK_DEST"
+          cp "${{ steps.locate.outputs.aab_path }}" "$AAB_DEST"
+          cp "$APK_DEST" "crate.apk"
           echo "apk_dest=$APK_DEST" >> "$GITHUB_OUTPUT"
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            AAB_DEST="crate-${SAFE_TAG_NAME}.aab"
-            cp "${{ steps.locate.outputs.aab_path }}" "$AAB_DEST"
-            cp "$APK_DEST" "crate.apk"
-            echo "aab_dest=$AAB_DEST" >> "$GITHUB_OUTPUT"
-          fi
+          echo "aab_dest=$AAB_DEST" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK build artifact
+      - name: Upload signed APK build artifact
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.rename.outputs.apk_dest }}

@@ -1,5 +1,5 @@
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
-import { apiStreamUrl, getApiBase, resolveMaybeApiAssetUrl } from "@/lib/api";
+import { apiStreamUrl, getApiBase } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { trackStreamApiPath } from "@/lib/library-routes";
@@ -111,11 +111,10 @@ export function getStoredQueue(): StoredQueue {
 }
 
 function normalizeStoredTrack(track: Track): Track {
-  const albumCover = resolveMaybeApiAssetUrl(track.albumCover);
-  const normalized =
-    albumCover && albumCover !== track.albumCover
-      ? { ...track, albumCover }
-      : { ...track };
+  const normalized = {
+    ...track,
+    albumCover: canonicalMediaUrl(track.albumCover),
+  };
   // Strip remote stream URL on restore — always request fresh playback resolution
   if (normalized.remote) {
     normalized.remote = {
@@ -162,9 +161,13 @@ export function saveQueue(
 }
 
 function sanitizeTrackForPersistence(track: Track): Track {
-  if (!track.remote) return track;
-  return {
+  const safeTrack = {
     ...track,
+    albumCover: canonicalMediaUrl(track.albumCover),
+  };
+  if (!track.remote) return safeTrack;
+  return {
+    ...safeTrack,
     path: undefined,
     remote: {
       ...track.remote,
@@ -172,6 +175,25 @@ function sanitizeTrackForPersistence(track: Track): Track {
       streamUrlExpiresAt: undefined,
     },
   };
+}
+
+function canonicalMediaUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url, "https://crate.local");
+    parsed.searchParams.delete("token");
+    parsed.searchParams.delete("media_ticket");
+    if (parsed.origin === "https://crate.local") {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.toString();
+  } catch {
+    return url
+      .replace(/([?&])(token|media_ticket)=[^&]*&?/g, (_match, separator) =>
+        separator === "?" ? "?" : "",
+      )
+      .replace(/[?&]$/, "");
+  }
 }
 
 export function getStoredRecentlyPlayed(): Track[] {

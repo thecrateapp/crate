@@ -12,6 +12,7 @@ import {
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { getPlaySourceLabel } from "@/components/player/player-source";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import {
   usePlayerActions,
   usePlayerState,
@@ -217,7 +218,7 @@ export function QueueTab() {
               {currentIndex + 1}
             </span>
             {currentTrack.albumCover ? (
-              <img
+              <AuthenticatedMediaImage
                 src={currentTrack.albumCover}
                 alt=""
                 loading="lazy"

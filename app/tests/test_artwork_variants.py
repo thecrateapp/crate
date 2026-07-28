@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from pathlib import Path
 
 import pytest
@@ -104,6 +105,33 @@ def test_resolve_materialized_variant_reads_only_current_revision(
     assert resolved.media_type == "image/webp"
     assert resolved.source_revision == "revision-a"
     assert (resolved.width, resolved.height) == (256, 256)
+
+
+def test_publish_manifest_is_readable_by_the_readplane(monkeypatch, tmp_path):
+    from crate.artwork_variants import (
+        ArtworkAsset,
+        artwork_asset_root,
+        publish_manifest_atomically,
+    )
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    asset = ArtworkAsset("album-cover", "album-entity")
+
+    publish_manifest_atomically(
+        asset,
+        {
+            "version": 1,
+            "kind": asset.kind,
+            "entity_key": asset.entity_key,
+            "source_revision": "revision-a",
+            "variants": {"256": "revision-a/256.webp"},
+        },
+    )
+
+    manifest_mode = stat.S_IMODE(
+        (artwork_asset_root(asset) / "current.json").stat().st_mode
+    )
+    assert manifest_mode == 0o644
 
 
 @pytest.mark.parametrize(

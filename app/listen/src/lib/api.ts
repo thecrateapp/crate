@@ -27,6 +27,7 @@ import {
   clearMediaAccessTickets,
   getMediaAccessTicket,
   getMediaAccessTargets,
+  invalidateMediaAccessTicket,
   setMediaAccessTickets,
   type MediaAccessAudience,
   type MediaAccessTarget,
@@ -196,6 +197,48 @@ export function resolveMaybeApiAssetUrl(
   return url;
 }
 
+export function requiresMediaAccessTicket(
+  url: string | null | undefined,
+): boolean {
+  if (!url || !usesConfigurableServer || !isApiUrl(url)) return false;
+  try {
+    const server = getCurrentServer();
+    const parsed = new URL(url, server?.url || "https://crate.local");
+    if (server?.url && parsed.origin !== new URL(server.url).origin) {
+      return false;
+    }
+    return parsed.pathname.startsWith("/api/");
+  } catch {
+    return url.startsWith("/api/") || url.startsWith("api/");
+  }
+}
+
+export function isUsableMediaAssetUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  if (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("file:") ||
+    url.startsWith("capacitor:")
+  ) {
+    return true;
+  }
+  if (!requiresMediaAccessTicket(url)) return true;
+
+  try {
+    const parsed = new URL(
+      url,
+      getCurrentServer()?.url || "https://crate.local",
+    );
+    return (
+      parsed.searchParams.has("media_ticket") ||
+      parsed.searchParams.has("token")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function resolveMaybeApiStreamUrl(
   url: string | null | undefined,
 ): string | null {
@@ -350,6 +393,7 @@ const queuedMediaAccessTargets = new Map<
 >();
 const scheduledMediaAccessScopes = new Set<string>();
 const mediaAccessRefreshPromises = new Map<string, Promise<boolean>>();
+const inFlightMediaAccessTargets = new Map<string, Set<string>>();
 const ensuredMediaAccessPromises = new Map<string, Promise<string>>();
 
 export class MediaAccessTicketError extends Error {
@@ -387,9 +431,11 @@ function queueMediaAccessTarget(
   path: string,
   scope: string,
 ): void {
+  const key = mediaAccessTargetKey({ audience, path });
+  if (inFlightMediaAccessTargets.get(scope)?.has(key)) return;
   const targets = queuedMediaAccessTargets.get(scope) ?? new Map();
   const target = { audience, path };
-  targets.set(mediaAccessTargetKey(target), target);
+  targets.set(key, target);
   queuedMediaAccessTargets.set(scope, targets);
   scheduleMediaAccessFlush(scope);
 }
@@ -426,8 +472,13 @@ async function flushMediaAccessTargets(scope: string): Promise<boolean> {
   if (!queued?.size) return true;
   const targets = Array.from(queued.values()).slice(0, MEDIA_ACCESS_BATCH_SIZE);
   for (const target of targets) queued.delete(mediaAccessTargetKey(target));
+  const inFlight = inFlightMediaAccessTargets.get(scope) ?? new Set<string>();
+  for (const target of targets) inFlight.add(mediaAccessTargetKey(target));
+  inFlightMediaAccessTargets.set(scope, inFlight);
 
   const promise = requestMediaAccessTickets(server, targets).finally(() => {
+    for (const target of targets) inFlight.delete(mediaAccessTargetKey(target));
+    if (inFlight.size === 0) inFlightMediaAccessTargets.delete(scope);
     mediaAccessRefreshPromises.delete(scope);
     if (queued.size > 0) scheduleMediaAccessFlush(scope);
   });
@@ -492,12 +543,15 @@ export async function ensureMediaAccessUrl(
   ) {
     return parsed.toString();
   }
+  if (options.forceRefresh) {
+    invalidateMediaAccessTicket(audience, parsed.pathname, server.id);
+  }
   const currentTicket = getMediaAccessTicket(
     audience,
     parsed.pathname,
     server.id,
   );
-  if (currentTicket && !options.forceRefresh) {
+  if (currentTicket) {
     parsed.searchParams.set("media_ticket", currentTicket);
     return parsed.toString();
   }
@@ -509,19 +563,21 @@ export async function ensureMediaAccessUrl(
   if (existing) return existing;
 
   const pending = (async () => {
-    const refreshed = await refreshMediaAccessTickets([
-      { audience, path: parsed.pathname },
-    ]);
-    const currentServer = getCurrentServer();
-    const ticket =
-      refreshed && currentServer?.id === server.id
-        ? getMediaAccessTicket(audience, parsed.pathname, server.id)
-        : null;
-    if (!ticket) {
-      throw new MediaAccessTicketError(audience, parsed.pathname);
+    const target = { audience, path: parsed.pathname };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const refreshed = await refreshMediaAccessTickets([target]);
+      const currentServer = getCurrentServer();
+      const ticket =
+        refreshed && currentServer?.id === server.id
+          ? getMediaAccessTicket(audience, parsed.pathname, server.id)
+          : null;
+      if (ticket) {
+        parsed.searchParams.set("media_ticket", ticket);
+        return parsed.toString();
+      }
+      if (!refreshed) break;
     }
-    parsed.searchParams.set("media_ticket", ticket);
-    return parsed.toString();
+    throw new MediaAccessTicketError(audience, parsed.pathname);
   })().finally(() => {
     ensuredMediaAccessPromises.delete(key);
   });

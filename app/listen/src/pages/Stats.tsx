@@ -16,6 +16,7 @@ import {
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 
 import { WindowPicker } from "@/components/stats/StatsPanels";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import {
   buildRecapHighlights,
   formatStatsMinutes,
@@ -619,7 +620,7 @@ function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
             )}
           >
             {cover ? (
-              <img
+              <AuthenticatedMediaImage
                 src={cover}
                 alt=""
                 className="h-full w-full object-cover grayscale-[35%] saturate-[0.85]"
@@ -1338,7 +1339,7 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
       className="group relative min-h-40 overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4 transition hover:border-primary/35"
     >
       {photo ? (
-        <img
+        <AuthenticatedMediaImage
           src={photo}
           alt=""
           className="absolute inset-0 h-full w-full object-cover grayscale opacity-55 transition duration-500 group-hover:scale-105 group-hover:opacity-70"
@@ -1413,7 +1414,7 @@ function TopAlbumsPanel({
                   },
                   { size: 384 },
                 ) ? (
-                  <img
+                  <AuthenticatedMediaImage
                     src={albumCoverApiUrl(
                       {
                         albumId: item.album_id,
@@ -1513,7 +1514,7 @@ function TrackCover({
       )}
     >
       {cover ? (
-        <img
+        <AuthenticatedMediaImage
           src={cover}
           alt=""
           className="h-full w-full object-cover"

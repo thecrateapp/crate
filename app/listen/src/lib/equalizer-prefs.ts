@@ -4,6 +4,7 @@ import {
   type EqGains,
   type EqPresetName,
 } from "@/lib/equalizer";
+import { isAndroidNative } from "@/lib/capacitor-runtime";
 
 export const EQ_PREFS_EVENT = "listen-equalizer-prefs";
 
@@ -34,11 +35,14 @@ export interface EqualizerSnapshot {
   genreAdaptive: boolean;
 }
 
-export function getEqualizerEnabled(): boolean {
+export function getEqualizerEnabled(
+  defaultEnabled: boolean = isAndroidNative,
+): boolean {
   try {
-    return localStorage.getItem(ENABLED_KEY) === "true";
+    const value = localStorage.getItem(ENABLED_KEY);
+    return value == null ? defaultEnabled : value === "true";
   } catch {
-    return false;
+    return defaultEnabled;
   }
 }
 

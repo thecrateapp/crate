@@ -14,6 +14,7 @@ import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 
 interface QueuePanelProps {
   open: boolean;
@@ -83,7 +84,7 @@ function QueuePanelRow({
         {indexLabel}
       </span>
       {track.albumCover ? (
-        <img
+        <AuthenticatedMediaImage
           src={track.albumCover}
           alt=""
           loading="lazy"
@@ -176,7 +177,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
           </p>
           <div className="flex items-center gap-3">
             {currentTrack.albumCover ? (
-              <img
+              <AuthenticatedMediaImage
                 src={currentTrack.albumCover}
                 alt=""
                 className="w-10 h-10 rounded object-cover shrink-0"

@@ -20,6 +20,7 @@ import {
   type ArtistInfo,
 } from "@/components/artist/artist-model";
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { ContextMenu, type ContextMenuEntry } from "@crate/ui/domain/actions";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -203,20 +204,20 @@ export function ArtistHeroSection({
         : null}
       <div className="relative h-[420px] overflow-hidden sm:h-[400px]">
         {photoUrl ? (
-          <img
+          <AuthenticatedMediaImage
             src={photoUrl}
             alt=""
             className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] brightness-[0.72] contrast-110 opacity-[0.82] sm:hidden"
           />
         ) : heroBackgroundSrc ? (
-          <img
+          <AuthenticatedMediaImage
             src={heroBackgroundSrc}
             alt=""
             className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] brightness-[0.72] contrast-110 opacity-[0.82] sm:hidden"
           />
         ) : null}
         {heroBackgroundSrc ? (
-          <img
+          <AuthenticatedMediaImage
             src={heroBackgroundSrc}
             alt=""
             className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 opacity-[0.45] hidden sm:block"
@@ -240,13 +241,10 @@ export function ArtistHeroSection({
         <div className="relative mx-auto flex h-full w-full max-w-[1480px] items-end px-4 pb-6 sm:px-6">
           <div className="flex w-full flex-col gap-5 sm:flex-row sm:items-end">
             <div className="hidden h-40 w-40 flex-shrink-0 overflow-hidden rounded-full bg-white/5 shadow-2xl ring-2 ring-white/10 sm:block">
-              <img
+              <AuthenticatedMediaImage
                 src={photoUrl}
                 alt={artist.name}
                 className="h-full w-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
               />
             </div>
             <div className="max-w-3xl pb-1">

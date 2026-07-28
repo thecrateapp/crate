@@ -522,6 +522,7 @@ function Cover({
     >
       {coverUrl ? (
         <img
+          data-public-media="true"
           src={coverUrl}
           alt=""
           loading="lazy"
