@@ -236,9 +236,7 @@ def test_ticket_endpoint_issues_only_the_requested_exact_paths(
     assert response.status_code == 200
     payload = response.json()
     assert isinstance(payload["tickets"], list)
-    assert [
-        (item["audience"], item["path"]) for item in payload["tickets"]
-    ] == [
+    assert [(item["audience"], item["path"]) for item in payload["tickets"]] == [
         ("artwork", "/api/albums/12/cover"),
         ("sse", "/api/events/task/task-1"),
     ]
