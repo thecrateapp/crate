@@ -1,0 +1,8 @@
+platform :ios, '15.0'
+
+project 'App.xcodeproj'
+
+target 'App' do
+  use_frameworks!
+  pod 'google-cast-sdk', '4.8.4'
+end

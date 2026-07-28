@@ -126,6 +126,7 @@ export function useMediaSession({
     currentTrack?.artist,
     currentTrack?.album,
     currentTrack?.albumCover,
+    isPlaying,
   ]);
 
   // Update playback state

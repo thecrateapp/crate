@@ -9,6 +9,7 @@ import android.media.MediaRouter2;
 import android.os.Build;
 import android.util.Log;
 
+import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSObject;
@@ -31,9 +32,9 @@ public class CrateMediaSessionPlugin extends Plugin {
             @Override
             public void onReceive(Context context, Intent intent) {
                 JSObject payload = new JSObject();
-                payload.put("control", intent.getStringExtra(CratePlaybackService.EXTRA_CONTROL));
-                if (intent.hasExtra(CratePlaybackService.EXTRA_POSITION)) {
-                    payload.put("position", intent.getDoubleExtra(CratePlaybackService.EXTRA_POSITION, 0.0));
+                payload.put("control", intent.getStringExtra(LegacyPlaybackContract.EXTRA_CONTROL));
+                if (intent.hasExtra(LegacyPlaybackContract.EXTRA_POSITION)) {
+                    payload.put("position", intent.getDoubleExtra(LegacyPlaybackContract.EXTRA_POSITION, 0.0));
                 }
                 notifyListeners("control", payload, true);
             }
@@ -41,7 +42,7 @@ public class CrateMediaSessionPlugin extends Plugin {
         ContextCompat.registerReceiver(
             getContext(),
             controlReceiver,
-            new IntentFilter(CratePlaybackService.BROADCAST_CONTROL),
+            new IntentFilter(LegacyPlaybackContract.BROADCAST_CONTROL),
             ContextCompat.RECEIVER_NOT_EXPORTED
         );
         registerRouteCallback();
@@ -49,22 +50,22 @@ public class CrateMediaSessionPlugin extends Plugin {
 
     @PluginMethod
     public void start(PluginCall call) {
-        sendPlaybackIntent(CratePlaybackService.ACTION_START, call);
+        sendPlaybackIntent(LegacyPlaybackContract.ACTION_START, call);
         call.resolve();
     }
 
     @PluginMethod
     public void update(PluginCall call) {
-        sendPlaybackIntent(CratePlaybackService.ACTION_UPDATE, call);
+        sendPlaybackIntent(LegacyPlaybackContract.ACTION_UPDATE, call);
         call.resolve();
     }
 
     @PluginMethod
     public void stop(PluginCall call) {
         Intent intent = new Intent(getContext(), CratePlaybackService.class)
-            .setAction(CratePlaybackService.ACTION_STOP_SERVICE)
+            .setAction(LegacyPlaybackContract.ACTION_STOP_SERVICE)
             .putExtra(
-                CratePlaybackService.EXTRA_SUPPRESS_CONTROL,
+                LegacyPlaybackContract.EXTRA_SUPPRESS_CONTROL,
                 call.getBoolean("suppressControl", false)
             );
         getContext().startService(intent);
@@ -130,13 +131,13 @@ public class CrateMediaSessionPlugin extends Plugin {
     private void sendPlaybackIntent(String action, PluginCall call) {
         Intent intent = new Intent(getContext(), CratePlaybackService.class)
             .setAction(action)
-            .putExtra(CratePlaybackService.EXTRA_TITLE, call.getString("title", "Crate"))
-            .putExtra(CratePlaybackService.EXTRA_ARTIST, call.getString("artist", ""))
-            .putExtra(CratePlaybackService.EXTRA_ALBUM, call.getString("album", ""))
-            .putExtra(CratePlaybackService.EXTRA_ARTWORK, call.getString("artwork", ""))
-            .putExtra(CratePlaybackService.EXTRA_IS_PLAYING, call.getBoolean("isPlaying", false))
-            .putExtra(CratePlaybackService.EXTRA_POSITION, call.getDouble("position", 0.0))
-            .putExtra(CratePlaybackService.EXTRA_DURATION, call.getDouble("duration", 0.0));
+            .putExtra(LegacyPlaybackContract.EXTRA_TITLE, call.getString("title", "Crate"))
+            .putExtra(LegacyPlaybackContract.EXTRA_ARTIST, call.getString("artist", ""))
+            .putExtra(LegacyPlaybackContract.EXTRA_ALBUM, call.getString("album", ""))
+            .putExtra(LegacyPlaybackContract.EXTRA_ARTWORK, call.getString("artwork", ""))
+            .putExtra(LegacyPlaybackContract.EXTRA_IS_PLAYING, call.getBoolean("isPlaying", false))
+            .putExtra(LegacyPlaybackContract.EXTRA_POSITION, call.getDouble("position", 0.0))
+            .putExtra(LegacyPlaybackContract.EXTRA_DURATION, call.getDouble("duration", 0.0));
         ContextCompat.startForegroundService(getContext(), intent);
     }
 
@@ -195,6 +196,7 @@ public class CrateMediaSessionPlugin extends Plugin {
         return route;
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private JSObject routePayload(MediaRoute2Info routeInfo) {
         JSObject route = new JSObject();
         route.put("id", routeInfo.getId());
@@ -204,6 +206,7 @@ public class CrateMediaSessionPlugin extends Plugin {
         return route;
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private String routeType(MediaRoute2Info routeInfo) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             return "system";

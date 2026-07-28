@@ -1,17 +1,11 @@
 import type { ReactNode } from "react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import i18next from "i18next";
-import type { PostProcessorModule } from "i18next";
+import type { i18n, PostProcessorModule } from "i18next";
 import ICU from "i18next-icu";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 
-import ca from "@/i18n/catalogs/ca.json";
-import de from "@/i18n/catalogs/de.json";
-import en from "@/i18n/catalogs/en.json";
-import es from "@/i18n/catalogs/es.json";
-import eu from "@/i18n/catalogs/eu.json";
-import fr from "@/i18n/catalogs/fr.json";
-import it from "@/i18n/catalogs/it.json";
+import { loadListenCatalog, type ListenCatalog } from "@/i18n/catalog-loader";
 import { detectPreferredLocale } from "@/i18n/language-detector";
 import { getLocalListenLocalePreference } from "@/i18n/language-preference";
 import {
@@ -52,17 +46,22 @@ const translationMarkerPostProcessor: PostProcessorModule = {
   },
 };
 
-const resources = {
-  en: { translation: en },
-  es: { translation: es },
-  fr: { translation: fr },
-  de: { translation: de },
-  it: { translation: it },
-  ca: { translation: ca },
-  eu: { translation: eu },
+export type ListenResources = Partial<
+  Record<ListenLocale, { translation: ListenCatalog }>
+>;
+
+type ListenTestGlobal = typeof globalThis & {
+  __CRATE_LISTEN_TEST_I18N_RESOURCES__?: ListenResources;
 };
 
-function withCachedRemoteBundle(locale: ListenLocale) {
+function getSynchronousTestResources(): ListenResources | undefined {
+  return (globalThis as ListenTestGlobal).__CRATE_LISTEN_TEST_I18N_RESOURCES__;
+}
+
+function withCachedRemoteBundle(
+  locale: ListenLocale,
+  resources: ListenResources,
+) {
   const cached = readCachedBundle(
     getI18nServerCacheId(),
     locale,
@@ -74,7 +73,7 @@ function withCachedRemoteBundle(locale: ListenLocale) {
     ...resources,
     [locale]: {
       translation: {
-        ...resources[locale].translation,
+        ...(resources[locale]?.translation ?? {}),
         ...cached,
       },
     },
@@ -86,23 +85,45 @@ function browserLanguages(): readonly string[] {
   return navigator.languages;
 }
 
-export function createListenI18n(initialLocale?: ListenLocale) {
-  const instance = i18next.createInstance();
-  const translationModeEnabled =
-    import.meta.env.DEV && import.meta.env.VITE_TRANSLATION_MODE === "1";
-  const locale =
+function resolveInitialLocale(initialLocale?: ListenLocale): ListenLocale {
+  return (
     initialLocale ??
     detectPreferredLocale({
       devicePreference: getLocalListenLocalePreference(),
       browserLanguages: browserLanguages(),
-    });
+    })
+  );
+}
+
+async function loadInitialResources(
+  locale: ListenLocale,
+): Promise<ListenResources> {
+  const locales = new Set<ListenLocale>([LISTEN_FALLBACK_LOCALE, locale]);
+  const loaded = await Promise.all(
+    [...locales].map(async (current) => [
+      current,
+      await loadListenCatalog(current),
+    ]),
+  );
+  return Object.fromEntries(
+    loaded.map(([current, translation]) => [current, { translation }]),
+  ) as ListenResources;
+}
+
+export function createListenI18n(
+  initialLocale: ListenLocale,
+  resources: ListenResources,
+) {
+  const instance = i18next.createInstance();
+  const translationModeEnabled =
+    import.meta.env.DEV && import.meta.env.VITE_TRANSLATION_MODE === "1";
   instance.use(new ICU({ bindI18nStore: "added removed" }));
   if (translationModeEnabled) {
     instance.use(translationMarkerPostProcessor);
   }
   void instance.use(initReactI18next).init({
-    resources: withCachedRemoteBundle(locale),
-    lng: locale,
+    resources: withCachedRemoteBundle(initialLocale, resources),
+    lng: initialLocale,
     fallbackLng: LISTEN_FALLBACK_LOCALE,
     keySeparator: false,
     interpolation: { escapeValue: false },
@@ -119,18 +140,12 @@ interface I18nProviderProps {
   initialLocale?: ListenLocale;
 }
 
-export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
-  const i18n = useMemo(() => createListenI18n(initialLocale), [initialLocale]);
+interface ReadyI18nProviderProps {
+  children: ReactNode;
+  i18n: i18n;
+}
 
-  useEffect(() => {
-    if (initialLocale || getLocalListenLocalePreference()) return;
-
-    const candidate = findUnsupportedLocaleRequestCandidate(browserLanguages());
-    if (!candidate) return;
-
-    void requestUnsupportedLocaleTranslation(candidate.detectedLocale);
-  }, [initialLocale]);
-
+function ReadyI18nProvider({ children, i18n }: ReadyI18nProviderProps) {
   useEffect(() => {
     let cancelled = false;
 
@@ -138,21 +153,29 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
       const locale = toSupportedListenLocale(language);
       if (!locale) return;
 
-      const cached = readCachedBundle(
-        getI18nServerCacheId(),
-        locale,
-        LISTEN_I18N_SOURCE_VERSION,
-      );
-      if (cached) {
-        i18n.addResourceBundle(locale, "translation", cached, true, true);
-      }
+      void loadListenCatalog(locale).then((localMessages) => {
+        if (cancelled) return;
+        i18n.addResourceBundle(
+          locale,
+          "translation",
+          localMessages,
+          true,
+          false,
+        );
 
-      void refreshCachedRemoteBundle(locale).then((messages) => {
-        if (cancelled || !messages) return;
-        i18n.addResourceBundle(locale, "translation", messages, true, true);
-        if (toSupportedListenLocale(i18n.language) === locale) {
-          void i18n.changeLanguage(locale);
+        const cached = readCachedBundle(
+          getI18nServerCacheId(),
+          locale,
+          LISTEN_I18N_SOURCE_VERSION,
+        );
+        if (cached) {
+          i18n.addResourceBundle(locale, "translation", cached, true, true);
         }
+
+        void refreshCachedRemoteBundle(locale).then((messages) => {
+          if (cancelled || !messages) return;
+          i18n.addResourceBundle(locale, "translation", messages, true, true);
+        });
       });
     };
 
@@ -166,4 +189,51 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
   }, [i18n]);
 
   return <I18nextProvider i18n={i18n}>{children}</I18nextProvider>;
+}
+
+export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
+  const locale = useMemo(
+    () => resolveInitialLocale(initialLocale),
+    [initialLocale],
+  );
+  const testResources = getSynchronousTestResources();
+  const [i18n, setI18n] = useState<i18n | null>(() =>
+    testResources ? createListenI18n(locale, testResources) : null,
+  );
+
+  useEffect(() => {
+    if (testResources) {
+      setI18n((current) => {
+        const currentLocale = toSupportedListenLocale(
+          current?.resolvedLanguage ?? current?.language,
+        );
+        return current && currentLocale === locale
+          ? current
+          : createListenI18n(locale, testResources);
+      });
+      return;
+    }
+
+    let cancelled = false;
+    void loadInitialResources(locale).then((resources) => {
+      if (!cancelled) {
+        setI18n(createListenI18n(locale, resources));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale, testResources]);
+
+  useEffect(() => {
+    if (initialLocale || getLocalListenLocalePreference()) return;
+
+    const candidate = findUnsupportedLocaleRequestCandidate(browserLanguages());
+    if (!candidate) return;
+
+    void requestUnsupportedLocaleTranslation(candidate.detectedLocale);
+  }, [initialLocale]);
+
+  if (!i18n) return null;
+  return <ReadyI18nProvider i18n={i18n}>{children}</ReadyI18nProvider>;
 }

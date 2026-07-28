@@ -7,8 +7,10 @@ import {
   ArtistChildRoute,
   LegacyArtistTopTracksRedirect,
 } from "@/app-shell/LibraryRouteCompat";
-import { Home } from "@/pages/Home";
 
+const Home = React.lazy(() =>
+  import("@/pages/Home").then((m) => ({ default: m.Home })),
+);
 const ServerSetup = React.lazy(() =>
   import("@/pages/ServerSetup").then((m) => ({ default: m.ServerSetup })),
 );
@@ -118,7 +120,7 @@ export const publicAppRoutes: AppRouteDefinition[] = [
 ];
 
 export const protectedAppRoutes: AppRouteDefinition[] = [
-  { index: true, element: <Home /> },
+  { index: true, element: deferred(<Home />) },
   { path: "explore", element: deferred(<Explore />) },
   { path: "search", element: deferred(<SearchResults />) },
   { path: "library", element: deferred(<Library />) },

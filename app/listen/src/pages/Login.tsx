@@ -11,6 +11,7 @@ import {
   TAURI_AUTH_DIAGNOSTIC_EVENT,
   type TauriAuthDiagnostic,
 } from "@/lib/tauri-auth-diagnostic";
+import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
 
 export function Login() {
   const navigate = useNavigate();
@@ -71,6 +72,12 @@ export function Login() {
           res.refresh_token ?? undefined,
           res.access_expires_at ?? undefined,
         );
+        try {
+          await waitForPendingSecureSessionWrites();
+        } catch (error) {
+          setAuthTokens(null, null, null);
+          throw error;
+        }
       }
       await refetch();
       navigate(returnTo, { replace: true });

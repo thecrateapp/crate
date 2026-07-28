@@ -2,6 +2,7 @@ import base64
 import hashlib
 import logging
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
@@ -48,6 +49,7 @@ from crate.api.schemas.auth import (
     CreateUserRequest,
     HeartbeatRequest,
     LoginRequest,
+    NativeOAuthExchangeRequest,
     OAuthStartRequest,
     OAuthStartResponse,
     ProviderToggleRequest,
@@ -58,6 +60,12 @@ from crate.api.schemas.auth import (
     UpdateProfileRequest,
     UpdateUserRoleRequest,
     UpdateUserStatusRequest,
+)
+from crate.api.native_oauth import (
+    InvalidNativeOAuthHandoff,
+    NativeOAuthUnavailable,
+    consume_handoff as consume_native_oauth_handoff,
+    issue_handoff as issue_native_oauth_handoff,
 )
 from crate.api.schemas.common import OkResponse
 from crate.auth import (
@@ -324,6 +332,72 @@ def _is_native_listen_app_id(app_id: str | None) -> bool:
         "listen-native",
         "listen-tauri",
     }
+
+
+def _is_mobile_native_listen_app_id(app_id: str | None) -> bool:
+    normalized = (app_id or "").strip().lower()
+    return normalized in {"listen-android", "listen-ios", "listen-native"}
+
+
+def _env_enabled(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _native_oauth_exchange_enabled() -> bool:
+    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", False)
+
+
+def _native_oauth_legacy_redirect_enabled() -> bool:
+    return _env_enabled("NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED", True)
+
+
+_NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
+_NATIVE_CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
+_NATIVE_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
+_NATIVE_VERIFIER_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
+
+
+def _validate_native_oauth_start(
+    *,
+    app_id: str | None,
+    mode: str,
+    return_to: str | None,
+    challenge: str | None,
+    state: str | None,
+) -> bool:
+    requested = challenge is not None or state is not None
+    if not requested:
+        if (
+            _is_mobile_native_listen_app_id(app_id)
+            and not _native_oauth_legacy_redirect_enabled()
+        ):
+            raise HTTPException(
+                status_code=426,
+                detail="Native app upgrade required",
+            )
+        return False
+    if not _native_oauth_exchange_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is not enabled",
+        )
+    if mode != "login" or not _is_mobile_native_listen_app_id(app_id):
+        raise HTTPException(status_code=400, detail="Invalid native OAuth client")
+    if return_to != _NATIVE_CALLBACK_URL:
+        raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
+    if not challenge or not state:
+        raise HTTPException(status_code=400, detail="Incomplete native OAuth binding")
+    if not _NATIVE_CHALLENGE_RE.fullmatch(challenge):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid native OAuth code challenge",
+        )
+    if not _NATIVE_STATE_RE.fullmatch(state):
+        raise HTTPException(status_code=400, detail="Invalid native OAuth state")
+    return True
 
 
 def _is_listen_return_to(return_to: str | None) -> bool:
@@ -963,6 +1037,8 @@ def _build_oauth_state(
     user_id: int | None,
     invite_token: str | None,
     app_id: str | None = None,
+    native_code_challenge: str | None = None,
+    native_state: str | None = None,
 ) -> str:
     verifier = secrets.token_urlsafe(48)
     invite_key = None
@@ -976,6 +1052,8 @@ def _build_oauth_state(
         "user_id": user_id,
         "invite_key": invite_key,
         "app_id": app_id,
+        "native_code_challenge": native_code_challenge,
+        "native_state": native_state,
         "verifier": verifier,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
@@ -1299,17 +1377,15 @@ class AuthMiddleware:
     def __init__(self, app: ASGIApp):
         self.app = app
 
-    def _resolve_token_user(self, token: str) -> dict | None:
-        payload = verify_jwt(token)
-        if not payload:
-            return None
-
+    def _resolve_session_user(
+        self, user_id: int, session_id: str | None
+    ) -> dict | None:
         from crate.api.auth_cache import get_cached_session, get_cached_user
 
-        session_id = payload.get("sid")
         session = get_cached_session(session_id) if session_id else None
         if session_id and (
             not session
+            or int(session.get("user_id") or 0) != user_id
             or session.get("revoked_at") is not None
             or (
                 session.get("expires_at")
@@ -1318,7 +1394,7 @@ class AuthMiddleware:
         ):
             return None
 
-        current_user = get_cached_user(payload["user_id"])
+        current_user = get_cached_user(user_id)
         if not current_user or _user_status(current_user) != "active":
             return None
 
@@ -1328,8 +1404,22 @@ class AuthMiddleware:
             "role": current_user.get("role", "user"),
             "username": current_user.get("username"),
             "name": current_user.get("name"),
-            "session_id": payload.get("sid"),
+            "session_id": session_id,
         }
+
+    def _resolve_token_user(self, token: str) -> dict | None:
+        payload = verify_jwt(token)
+        if not payload:
+            return None
+        try:
+            user_id = int(payload["user_id"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        session_id = payload.get("sid")
+        return self._resolve_session_user(
+            user_id,
+            str(session_id) if session_id else None,
+        )
 
     async def resolve_user(self, request: Request) -> dict | None:
         user = None
@@ -1346,6 +1436,31 @@ class AuthMiddleware:
         if token:
             user = await run_in_threadpool(self._resolve_token_user, token)
         else:
+            media_ticket = request.query_params.get("media_ticket")
+            if media_ticket:
+                from crate.media_access import (
+                    media_audience_for_path,
+                    validate_media_access_ticket,
+                )
+
+                audience = media_audience_for_path(request.url.path)
+                validated = (
+                    validate_media_access_ticket(
+                        media_ticket,
+                        audience=audience,
+                        request_path=request.url.path,
+                    )
+                    if audience
+                    else None
+                )
+                if validated:
+                    user = await run_in_threadpool(
+                        self._resolve_session_user,
+                        validated.user_id,
+                        validated.session_id,
+                    )
+
+        if not user and not token:
             for cookie_name in _auth_cookie_candidates(request):
                 cookie_token = request.cookies.get(cookie_name)
                 if not cookie_token:
@@ -2000,6 +2115,13 @@ def _oauth_start_response(
         )
 
     app_id = _infer_oauth_app_id(request, body.return_to)
+    native_exchange = _validate_native_oauth_start(
+        app_id=app_id,
+        mode=mode,
+        return_to=body.return_to,
+        challenge=body.native_code_challenge,
+        state=body.native_state,
+    )
     state = _build_oauth_state(
         provider=provider,
         return_to=body.return_to,
@@ -2007,6 +2129,8 @@ def _oauth_start_response(
         user_id=user_id if mode == "link" else None,
         invite_token=body.invite_token,
         app_id=app_id,
+        native_code_challenge=(body.native_code_challenge if native_exchange else None),
+        native_state=body.native_state if native_exchange else None,
     )
     parsed_state = _parse_oauth_state(state)
     verifier = parsed_state["verifier"]
@@ -2256,6 +2380,41 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
         raise HTTPException(status_code=401, detail="OAuth user could not be loaded")
     _ensure_user_active(user)
 
+    native_challenge = parsed_state.get("native_code_challenge")
+    native_state = parsed_state.get("native_state")
+    if native_challenge is not None or native_state is not None:
+        _validate_native_oauth_start(
+            app_id=app_id,
+            mode=str(parsed_state.get("mode") or ""),
+            return_to=parsed_state.get("return_to"),
+            challenge=native_challenge,
+            state=native_state,
+        )
+        try:
+            handoff_code = issue_native_oauth_handoff(
+                user_id=int(user["id"]),
+                app_id=str(app_id),
+                state=str(native_state),
+                challenge=str(native_challenge),
+            )
+        except NativeOAuthUnavailable as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Native OAuth exchange is temporarily unavailable",
+            ) from exc
+        _clear_failed_login(rate_key, request)
+        redirect_url = _append_query_param(
+            _NATIVE_CALLBACK_URL,
+            "code",
+            handoff_code,
+        )
+        redirect_url = _append_query_param(
+            redirect_url,
+            "state",
+            str(native_state),
+        )
+        return RedirectResponse(url=redirect_url)
+
     update_user_last_login(user["id"])
     token, _session, refresh_token = _create_login_session(user, request, app_id=app_id)
     _clear_failed_login(rate_key, request)
@@ -2309,6 +2468,57 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
         response, request, token, refresh_token, app_id=app_id, return_to=safe_return
     )
     return response
+
+
+@router.post(
+    "/native/exchange",
+    response_model=AuthLoginResponse,
+    responses=_AUTH_PUBLIC_RESPONSES,
+    summary="Exchange a native OAuth handoff code",
+)
+def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
+    if not _native_oauth_exchange_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is not enabled",
+        )
+    app_id = (request.headers.get("x-crate-app") or "").strip().lower()
+    if not _is_mobile_native_listen_app_id(app_id):
+        raise HTTPException(status_code=400, detail="Invalid native OAuth client")
+    if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid native OAuth code verifier",
+        )
+    if not _NATIVE_STATE_RE.fullmatch(body.state):
+        raise HTTPException(status_code=400, detail="Invalid native OAuth state")
+    try:
+        handoff = consume_native_oauth_handoff(
+            code=body.code,
+            state=body.state,
+            verifier=body.code_verifier,
+        )
+    except InvalidNativeOAuthHandoff as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Native OAuth handoff is invalid or expired",
+        ) from exc
+    except NativeOAuthUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is temporarily unavailable",
+        ) from exc
+    if not secrets.compare_digest(handoff.app_id, app_id):
+        raise HTTPException(status_code=401, detail="Native OAuth client mismatch")
+    user = get_user_by_id(handoff.user_id)
+    user = _ensure_user_active(user)
+    update_user_last_login(user["id"])
+    token, session, refresh_token = _create_login_session(
+        user,
+        request,
+        app_id=app_id,
+    )
+    return _auth_login_payload(user, token, session, refresh_token)
 
 
 @router.post(

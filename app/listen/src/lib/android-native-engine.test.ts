@@ -104,6 +104,7 @@ describe("android native engine flags", () => {
       url: "https://listen.example/api/tracks/1/stream",
       title: "Track One",
       artist: "Artist",
+      authorization: "Bearer secret-token",
     };
 
     await engine.loadQueue({
@@ -122,5 +123,53 @@ describe("android native engine flags", () => {
       revision: "queue-rev-1",
       tracks: [track],
     });
+    expect(
+      nativePlaybackMock.setQueue.mock.calls[0]?.[0].tracks[0],
+    ).toMatchObject({
+      url: "https://listen.example/api/tracks/1/stream",
+      authorization: "Bearer secret-token",
+    });
+  });
+
+  it("retries readiness probes while the native service is binding", async () => {
+    vi.useFakeTimers();
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 1,
+      crossfadeMs: 0,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState
+      .mockRejectedValueOnce(new Error("service binding"))
+      .mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    nativePlaybackMock.addListener.mockResolvedValue({
+      remove: vi.fn(),
+    });
+    const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = new AndroidNativeEngine();
+
+    const loadPromise = engine.loadQueue({
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 0,
+      volume: 1,
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+    expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(2);
+    await expect(loadPromise).resolves.toEqual(state);
+    expect(nativePlaybackMock.addListener).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

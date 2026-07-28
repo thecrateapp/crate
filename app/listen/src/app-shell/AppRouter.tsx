@@ -1,14 +1,19 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router";
 
-import { AppProviders } from "@/app-shell/AppProviders";
 import { ProtectedRoute, ServerGate } from "@/app-shell/RouteGuards";
 import {
   protectedAppRoutes,
   publicAppRoutes,
   type AppRouteDefinition,
 } from "@/app-shell/route-table";
-import { Shell } from "@/components/layout/Shell";
 import { TranslationOverlay } from "@/i18n/translation-mode/TranslationOverlay";
+
+const AuthenticatedApp = lazy(() =>
+  import("@/app-shell/AuthenticatedApp").then((module) => ({
+    default: module.AuthenticatedApp,
+  })),
+);
 
 function renderRoute(route: AppRouteDefinition) {
   if (route.index) {
@@ -25,9 +30,9 @@ export function AppRouter() {
         <Route
           element={
             <ProtectedRoute>
-              <AppProviders>
-                <Shell />
-              </AppProviders>
+              <Suspense fallback={null}>
+                <AuthenticatedApp />
+              </Suspense>
             </ProtectedRoute>
           }
         >

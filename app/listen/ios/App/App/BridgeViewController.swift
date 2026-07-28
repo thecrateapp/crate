@@ -6,5 +6,7 @@ class BridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(CrateMediaSessionPlugin())
         bridge?.registerPluginInstance(CrateCastPlugin())
         bridge?.registerPluginInstance(CrateSocialSharePlugin())
+        bridge?.registerPluginInstance(CrateSecureSessionPlugin())
+        bridge?.registerPluginInstance(CrateOfflineIntegrityPlugin())
     }
 }

@@ -1,0 +1,86 @@
+name: Build iOS
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - ".github/workflows/build-ios.yml"
+      - "app/listen/**"
+      - "app/shared/**"
+      - "package-lock.json"
+  pull_request:
+    paths:
+      - ".github/workflows/build-ios.yml"
+      - "app/listen/**"
+      - "app/shared/**"
+      - "package-lock.json"
+  workflow_dispatch:
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Listen dependencies
+        run: npm ci
+
+      - name: Test iOS bridge contracts
+        run: >-
+          npm run test -- --run
+          src/lib/cast-sender.test.ts
+          src/lib/native-media-session.test.ts
+          src/lib/native-secure-session.test.ts
+          src/lib/capacitor.test.ts
+        working-directory: app/listen
+
+      - name: Test bounded iOS artwork decoding
+        run: app/listen/scripts/test-ios-artwork-downsample.sh
+
+      - name: Test iOS secure-session Keychain round trip
+        run: app/listen/scripts/test-ios-secure-session.sh
+
+      - name: Build and sync Capacitor bundle
+        run: npm run build:cap
+        working-directory: app/listen
+
+      - name: Install CocoaPods
+        run: command -v pod >/dev/null || brew install cocoapods
+
+      - name: Install locked iOS dependencies
+        run: pod install --deployment
+        working-directory: app/listen/ios/App
+
+      - name: Resolve iOS version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            IOS_MARKETING_VERSION=$(printf '%s' "$GITHUB_REF_NAME" \
+              | sed -E 's/^v//' | sed -E 's/-.*$//')
+          else
+            IOS_MARKETING_VERSION="0.0.0"
+          fi
+          echo "IOS_MARKETING_VERSION=$IOS_MARKETING_VERSION" >> "$GITHUB_ENV"
+
+      - name: Build iOS simulator app
+        run: >-
+          xcodebuild
+          -workspace App.xcworkspace
+          -scheme App
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          MARKETING_VERSION="$IOS_MARKETING_VERSION"
+          CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
+          build
+        working-directory: app/listen/ios/App

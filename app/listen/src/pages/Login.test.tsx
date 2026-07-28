@@ -26,14 +26,16 @@ describe("Login", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the auth form in the active locale", () => {
+  it("renders the auth form in the active locale", async () => {
     renderWithListenProviders(<Login />, {
       auth: { user: null, loading: false },
       locale: "es",
       route: "/login",
     });
 
-    expect(screen.getByText("Tu música, a tu manera")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Tu música, a tu manera"),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Correo electrónico")).toBeInTheDocument();
     expect(screen.getByLabelText("Contraseña")).toBeInTheDocument();
     expect(

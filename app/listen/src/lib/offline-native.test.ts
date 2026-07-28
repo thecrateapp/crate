@@ -8,6 +8,7 @@ const filesystemMock = vi.hoisted(() => ({
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
 }));
+const verifyAssetsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
@@ -15,6 +16,9 @@ vi.mock("@capacitor/core", () => ({
     getPlatform: () => "android",
     isNativePlatform: () => true,
   },
+  registerPlugin: () => ({
+    verifyAssets: verifyAssetsMock,
+  }),
 }));
 
 vi.mock("@capacitor/filesystem", () => ({
@@ -86,5 +90,39 @@ describe("native offline playback bootstrap", () => {
         target: "android-native",
       }),
     ).toBe("file:///offline-media/profile/song.m4a");
+  });
+
+  it("verifies a bounded asset batch in one native bridge call", async () => {
+    verifyAssetsMock.mockResolvedValueOnce({
+      assets: [
+        {
+          path: "offline-media/profile/one.m4a",
+          exists: true,
+          size: 1234,
+          valid: true,
+        },
+        {
+          path: "offline-media/profile/two.m4a",
+          exists: false,
+          size: 0,
+          valid: false,
+        },
+      ],
+    });
+    const { verifyNativeOfflineAssets } = await import("@/lib/offline-native");
+
+    const results = await verifyNativeOfflineAssets([
+      {
+        path: "offline-media/profile/one.m4a",
+        expectedBytes: 1234,
+      },
+      {
+        path: "offline-media/profile/two.m4a",
+        expectedBytes: 4567,
+      },
+    ]);
+
+    expect(verifyAssetsMock).toHaveBeenCalledTimes(1);
+    expect(results.map((result) => result.valid)).toEqual([true, false]);
   });
 });

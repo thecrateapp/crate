@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, isNativeMock } = vi.hoisted(() => ({
+const { apiMock, runtimeMock, nativeCapabilitiesMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
-  isNativeMock: false,
+  runtimeMock: { isNative: false },
+  nativeCapabilitiesMock: vi.fn(),
+}));
+
+vi.mock("@capacitor/core", () => ({
+  registerPlugin: () => ({
+    getCapabilities: nativeCapabilitiesMock,
+  }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -12,7 +19,7 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/capacitor-runtime", () => ({
   get isNative() {
-    return isNativeMock;
+    return runtimeMock.isNative;
   },
 }));
 
@@ -29,6 +36,7 @@ import {
 describe("cast sender", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    runtimeMock.isNative = false;
   });
 
   it("builds auto delivery cast tickets from stable track references", () => {
@@ -81,6 +89,26 @@ describe("cast sender", () => {
       activeSession: false,
     });
     chromeWindow.chrome = previousChrome;
+  });
+
+  it("hides native Cast when the platform build has no sender SDK", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValueOnce({
+      platform: "native",
+      visible: false,
+      available: false,
+      activeSession: false,
+      reason: "Google Cast SDK is not linked in this iOS build.",
+    });
+
+    const capabilities = await getCastSenderCapabilities();
+
+    expect(capabilities).toMatchObject({
+      platform: "native",
+      visible: false,
+      available: false,
+      activeSession: false,
+    });
   });
 
   it("does not request tickets when the track has no cast reference", async () => {

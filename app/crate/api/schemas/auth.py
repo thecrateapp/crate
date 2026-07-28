@@ -42,6 +42,14 @@ class UpdateUserStatusRequest(BaseModel):
 class OAuthStartRequest(BaseModel):
     return_to: str | None = None
     invite_token: str | None = None
+    native_code_challenge: str | None = None
+    native_state: str | None = None
+
+
+class NativeOAuthExchangeRequest(BaseModel):
+    code: str = Field(min_length=16, max_length=256)
+    code_verifier: str = Field(min_length=43, max_length=128)
+    state: str = Field(min_length=16, max_length=256)
 
 
 class ProviderToggleRequest(BaseModel):

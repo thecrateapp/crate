@@ -1328,6 +1328,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         commitIsBuffering(false);
         return;
       }
+      if (eventName === "resumeAuthorizationRequired") {
+        void recoverNativeBuffering({
+          forceRefresh: false,
+          probeStatus: "resume-authorization",
+        }).catch((error) => {
+          console.error(
+            "[native-player] failed to authorize restored playback:",
+            error,
+          );
+          toast.error("Open Crate to resume playback", {
+            description: "The saved queue needs fresh server authorization.",
+          });
+        });
+        return;
+      }
       if (eventName === "error") {
         const nativeError = payload as EngineEventMap["error"];
         const summary = nativePlaybackErrorMessage(nativeError);
@@ -1363,6 +1378,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentIndexRef,
       flushCurrentPlayEvent,
       queueRef,
+      recoverNativeBuffering,
       retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
     ],
@@ -1523,6 +1539,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         },
       );
       removers.push(queueEndedRemove);
+
+      const resumeAuthorizationRemove = await androidNativeEngine.on(
+        "resumeAuthorizationRequired",
+        (event) => {
+          if (disposed) return;
+          handleNativeEvent("resumeAuthorizationRequired", event);
+        },
+      );
+      removers.push(resumeAuthorizationRemove);
 
       const errorRemove = await androidNativeEngine.on("error", (event) => {
         if (disposed) return;

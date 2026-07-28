@@ -1,4 +1,5 @@
 export {
+  beginNativeOAuth,
   clearPendingOAuthNext,
   consumeOAuthCallbackUrl,
   consumePendingOAuthNext,

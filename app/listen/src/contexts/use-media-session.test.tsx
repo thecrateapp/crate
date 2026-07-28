@@ -69,17 +69,32 @@ let originalMediaMetadata: PropertyDescriptor | undefined;
 function renderSession(
   currentTrack: Track | undefined = TRACK_A,
   currentTime = 0,
+  isPlaying = true,
 ) {
   return renderHook(
-    ({ track, time }: { track: Track | undefined; time: number }) =>
+    ({
+      track,
+      time,
+      playing,
+    }: {
+      track: Track | undefined;
+      time: number;
+      playing: boolean;
+    }) =>
       useMediaSession({
         currentTrack: track,
-        isPlaying: true,
+        isPlaying: playing,
         currentTime: time,
         duration: 180,
         ...controls,
       }),
-    { initialProps: { track: currentTrack, time: currentTime } },
+    {
+      initialProps: {
+        track: currentTrack,
+        time: currentTime,
+        playing: isPlaying,
+      },
+    },
   );
 }
 
@@ -131,7 +146,7 @@ describe("useMediaSession", () => {
     expect(mediaSession.playbackState).toBe("playing");
 
     mediaSession.playbackState = "none";
-    rerender({ track: TRACK_B, time: 0 });
+    rerender({ track: TRACK_B, time: 0, playing: true });
 
     expect(mediaSession.playbackState).toBe("playing");
   });
@@ -140,7 +155,7 @@ describe("useMediaSession", () => {
     const { rerender } = renderSession();
     mediaSession.playbackState = "none";
 
-    rerender({ track: TRACK_A, time: 1 });
+    rerender({ track: TRACK_A, time: 1, playing: true });
 
     expect(mediaSession.playbackState).toBe("playing");
   });
@@ -152,7 +167,7 @@ describe("useMediaSession", () => {
       throw new Error("unsupported");
     });
 
-    rerender({ track: TRACK_A, time: 2 });
+    rerender({ track: TRACK_A, time: 2, playing: true });
 
     expect(mediaSession.playbackState).toBe("playing");
   });
@@ -166,5 +181,15 @@ describe("useMediaSession", () => {
     expect(mediaSession.playbackState).toBe("none");
     expect(mediaSession.setActionHandler).not.toHaveBeenCalled();
     expect(mediaSession.setPositionState).not.toHaveBeenCalled();
+  });
+
+  it("restores metadata when Android Chrome acquires audio focus on play", () => {
+    const { rerender } = renderSession(TRACK_A, 0, false);
+    mediaSession.metadata = null;
+
+    rerender({ track: TRACK_A, time: 0, playing: true });
+
+    expect(mediaSession.metadata).not.toBeNull();
+    expect(mediaSession.playbackState).toBe("playing");
   });
 });

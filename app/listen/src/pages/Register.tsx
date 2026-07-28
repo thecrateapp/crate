@@ -5,6 +5,7 @@ import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
 
 export function Register() {
   const navigate = useNavigate();
@@ -54,6 +55,12 @@ export function Register() {
           res.refresh_token ?? undefined,
           res.access_expires_at ?? undefined,
         );
+        try {
+          await waitForPendingSecureSessionWrites();
+        } catch (error) {
+          setAuthTokens(null, null, null);
+          throw error;
+        }
       }
       await refetch();
       navigate(returnTo, { replace: true });

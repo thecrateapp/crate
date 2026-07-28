@@ -186,11 +186,53 @@ async function buildInstagramStoryCard(payload: SharePayload): Promise<string> {
       logo?.image ?? null,
     );
 
-    return canvas.toDataURL("image/jpeg", 0.94);
+    const encodeStartedAt = performance.now();
+    const blob = await canvasToJpegBlob(canvas);
+    const dataUrl = await blobToDataUrl(blob);
+    recordDevLog("share", "Instagram story card encoded", {
+      durationMs: Math.round(performance.now() - encodeStartedAt),
+      byteLength: blob.size,
+    });
+    return dataUrl;
   } finally {
     artwork?.release();
     logo?.release();
   }
+}
+
+export function canvasToJpegBlob(
+  canvas: HTMLCanvasElement,
+  quality = 0.94,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+        reject(new Error("Story card encoding failed"));
+      },
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Story card encoding failed"));
+    };
+    reader.onerror = () =>
+      reject(reader.error || new Error("Story card encoding failed"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 let storyFontsPromise: Promise<void> | null = null;

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   deriveOfflineProfileKeyFromStoredUser,
+  ensureOfflineStorageBudget,
   getActiveOfflineProfileKey,
   getOfflineItemKey,
   getOfflineTrackManifestPaths,
@@ -311,5 +312,52 @@ describe("getOfflineActionLabel", () => {
     expect(getOfflineActionLabel("ready")).toBe("Remove offline copy");
     expect(getOfflineActionLabel("error")).toBe("Retry offline copy");
     expect(getOfflineActionLabel("idle")).toBe("Make available offline");
+  });
+});
+
+describe("ensureOfflineStorageBudget", () => {
+  it("checks known-missing tracks without repeating an integrity lookup", async () => {
+    const originalStorage = navigator.storage;
+    const originalCaches = globalThis.caches;
+    Object.defineProperty(navigator, "storage", {
+      configurable: true,
+      value: {
+        estimate: async () => ({ quota: 1, usage: 0 }),
+      },
+    });
+    Object.defineProperty(globalThis, "caches", {
+      configurable: true,
+      value: {
+        open: async () => {
+          throw new Error("integrity lookup should not run");
+        },
+      },
+    });
+
+    await expect(
+      ensureOfflineStorageBudget(
+        "profile-1",
+        [
+          {
+            entity_uid: "entity-1",
+            title: "Track",
+            artist: "Artist",
+            byte_length: 1024,
+            stream_url: "/stream",
+            download_url: "/download",
+          },
+        ],
+        { assumeMissing: true },
+      ),
+    ).rejects.toThrow("Not enough browser storage");
+
+    Object.defineProperty(navigator, "storage", {
+      configurable: true,
+      value: originalStorage,
+    });
+    Object.defineProperty(globalThis, "caches", {
+      configurable: true,
+      value: originalCaches,
+    });
   });
 });

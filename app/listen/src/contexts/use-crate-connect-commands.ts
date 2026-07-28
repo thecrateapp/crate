@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { AuthUser } from "@/contexts/auth-context";
+import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import type { RemotePlaybackState } from "@/lib/remote-playback-state";
 import {
   acknowledgeConnectCommand,
@@ -146,6 +147,7 @@ export function useCrateConnectCommands({
   setVolume,
   onTransferIn,
 }: UseCrateConnectCommandsOptions): void {
+  const mediaAccessVersion = useMediaAccessVersion();
   const handlersRef = useRef<ConnectCommandHandlers>({
     pause,
     resume,
@@ -286,7 +288,7 @@ export function useCrateConnectCommands({
       );
       source.close();
     };
-  }, [authUser, enabled, processCommand]);
+  }, [authUser, enabled, mediaAccessVersion, processCommand]);
 
   useEffect(() => {
     if (!authUser || !enabled) return;

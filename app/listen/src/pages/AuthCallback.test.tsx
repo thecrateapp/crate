@@ -72,7 +72,7 @@ describe("AuthCallback", () => {
     expect(mockSetAuthTokens).toHaveBeenCalledWith(
       "oauth-token",
       undefined,
-      null,
+      undefined,
     );
     expect(localStorage.getItem("crate-oauth-next")).toBeNull();
     expect(mockRefetch).toHaveBeenCalledTimes(1);

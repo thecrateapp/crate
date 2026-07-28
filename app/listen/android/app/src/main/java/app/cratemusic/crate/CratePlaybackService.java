@@ -1,5 +1,21 @@
 package app.cratemusic.crate;
 
+import static app.cratemusic.crate.LegacyPlaybackContract.ACTION_NEXT;
+import static app.cratemusic.crate.LegacyPlaybackContract.ACTION_PAUSE;
+import static app.cratemusic.crate.LegacyPlaybackContract.ACTION_PLAY;
+import static app.cratemusic.crate.LegacyPlaybackContract.ACTION_PREVIOUS;
+import static app.cratemusic.crate.LegacyPlaybackContract.ACTION_STOP_SERVICE;
+import static app.cratemusic.crate.LegacyPlaybackContract.BROADCAST_CONTROL;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_ALBUM;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_ARTIST;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_ARTWORK;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_CONTROL;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_DURATION;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_IS_PLAYING;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_POSITION;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_SUPPRESS_CONTROL;
+import static app.cratemusic.crate.LegacyPlaybackContract.EXTRA_TITLE;
+
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -28,25 +44,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class CratePlaybackService extends Service {
-    public static final String ACTION_START = "app.cratemusic.crate.playback.START";
-    public static final String ACTION_UPDATE = "app.cratemusic.crate.playback.UPDATE";
-    public static final String ACTION_STOP_SERVICE = "app.cratemusic.crate.playback.STOP_SERVICE";
-    public static final String ACTION_PLAY = "app.cratemusic.crate.playback.PLAY";
-    public static final String ACTION_PAUSE = "app.cratemusic.crate.playback.PAUSE";
-    public static final String ACTION_NEXT = "app.cratemusic.crate.playback.NEXT";
-    public static final String ACTION_PREVIOUS = "app.cratemusic.crate.playback.PREVIOUS";
-
-    public static final String BROADCAST_CONTROL = "app.cratemusic.crate.playback.CONTROL";
-    public static final String EXTRA_CONTROL = "control";
-    public static final String EXTRA_POSITION = "position";
-    public static final String EXTRA_TITLE = "title";
-    public static final String EXTRA_ARTIST = "artist";
-    public static final String EXTRA_ALBUM = "album";
-    public static final String EXTRA_ARTWORK = "artwork";
-    public static final String EXTRA_IS_PLAYING = "isPlaying";
-    public static final String EXTRA_DURATION = "duration";
-    public static final String EXTRA_SUPPRESS_CONTROL = "suppressControl";
-
     private static final String CHANNEL_ID = "crate_playback";
     private static final int NOTIFICATION_ID = 4201;
 

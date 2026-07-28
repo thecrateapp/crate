@@ -1,53 +1,19 @@
-import { registerPlugin, type PluginListenerHandle } from "@capacitor/core";
-
 import {
   isAndroidNative,
   isIosNative,
   isNative,
 } from "@/lib/capacitor-runtime";
+import {
+  getNativeMediaSessionBridge,
+  type NativeOutputCapabilities,
+  type NativeOutputPickerResult,
+  type NativeOutputRoute,
+} from "@/lib/native-media-session-bridge";
 
-export interface NativeOutputCapabilities {
-  platform: "android" | "ios" | "unknown";
-  canShowSystemOutputSwitcher: boolean;
-  canPresentRoutePicker: boolean;
-  canReportCurrentRoute: boolean;
-  routePickerKind?: "android-output-switcher" | "ios-route-picker";
-}
-
-export interface NativeOutputRoute {
-  id: string;
-  name: string;
-  type: string;
-  platform: "android" | "ios" | "unknown";
-}
-
-interface NativeOutputRouteEvent {
-  route?: NativeOutputRoute | null;
-}
-
-interface NativeOutputPickerResult {
-  shown?: boolean;
-  reason?: string;
-}
-
-type CrateNativeOutputRouterPlugin = {
-  getOutputCapabilities(): Promise<NativeOutputCapabilities>;
-  getCurrentRoute(): Promise<{ route?: NativeOutputRoute | null }>;
-  showSystemOutputSwitcher(): Promise<NativeOutputPickerResult>;
-  presentRoutePicker(): Promise<NativeOutputPickerResult>;
-  addListener(
-    eventName: "routeChanged",
-    listener: (event: NativeOutputRouteEvent) => void,
-  ): Promise<PluginListenerHandle>;
-};
-
-let nativeOutputRouter: CrateNativeOutputRouterPlugin | null = null;
-
-function getNativeOutputRouter(): CrateNativeOutputRouterPlugin {
-  nativeOutputRouter ??=
-    registerPlugin<CrateNativeOutputRouterPlugin>("CrateMediaSession");
-  return nativeOutputRouter;
-}
+export type {
+  NativeOutputCapabilities,
+  NativeOutputRoute,
+} from "@/lib/native-media-session-bridge";
 
 export function isNativeOutputRoutingAvailable(): boolean {
   return isNative && (isAndroidNative || isIosNative);
@@ -63,7 +29,7 @@ export async function getNativeOutputCapabilities(): Promise<NativeOutputCapabil
     };
   }
   try {
-    return await getNativeOutputRouter().getOutputCapabilities();
+    return await getNativeMediaSessionBridge().getOutputCapabilities();
   } catch {
     return {
       platform: isAndroidNative ? "android" : isIosNative ? "ios" : "unknown",
@@ -77,7 +43,7 @@ export async function getNativeOutputCapabilities(): Promise<NativeOutputCapabil
 export async function getNativeCurrentOutputRoute(): Promise<NativeOutputRoute | null> {
   if (!isNativeOutputRoutingAvailable()) return null;
   try {
-    const response = await getNativeOutputRouter().getCurrentRoute();
+    const response = await getNativeMediaSessionBridge().getCurrentRoute();
     return response.route ?? null;
   } catch {
     return null;
@@ -90,9 +56,9 @@ export async function showNativeOutputPicker(): Promise<NativeOutputPickerResult
   }
   try {
     if (isAndroidNative) {
-      return await getNativeOutputRouter().showSystemOutputSwitcher();
+      return await getNativeMediaSessionBridge().showSystemOutputSwitcher();
     }
-    return await getNativeOutputRouter().presentRoutePicker();
+    return await getNativeMediaSessionBridge().presentRoutePicker();
   } catch {
     return { shown: false, reason: "Could not open the system output picker." };
   }
@@ -102,7 +68,7 @@ export async function onNativeOutputRouteChanged(
   listener: (route: NativeOutputRoute | null) => void,
 ): Promise<() => void> {
   if (!isNativeOutputRoutingAvailable()) return () => {};
-  const handle = await getNativeOutputRouter().addListener(
+  const handle = await getNativeMediaSessionBridge().addListener(
     "routeChanged",
     (event) => {
       listener(event.route ?? null);

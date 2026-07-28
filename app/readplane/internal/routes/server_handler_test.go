@@ -777,6 +777,61 @@ func TestCommonHeaders_PresentOnAllRoutes(t *testing.T) {
 	}
 }
 
+func TestCORS_AllowsNativeShellOnReadplaneResponses(t *testing.T) {
+	server := newTestServerWithAuth()
+	server.cfg.CORSAllowedOrigins = []string{"https://localhost"}
+	for _, path := range []string{
+		"/api/me/home/discovery",
+		"/api/me/follows",
+		"/api/me/likes",
+		"/api/me/albums",
+	} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.Header.Set("Origin", "https://localhost")
+			rec := httptest.NewRecorder()
+
+			server.Handler().ServeHTTP(rec, req)
+
+			assert.Equal(t, "https://localhost", rec.Header().Get("Access-Control-Allow-Origin"))
+			assert.Equal(t, "true", rec.Header().Get("Access-Control-Allow-Credentials"))
+			assert.Contains(t, rec.Header().Values("Vary"), "Origin")
+		})
+	}
+}
+
+func TestCORS_HandlesNativeShellPreflightWithoutFallback(t *testing.T) {
+	server := newTestServerNoAuth()
+	server.cfg.CORSAllowedOrigins = []string{"https://localhost"}
+	req := httptest.NewRequest(http.MethodOptions, "/api/me/home/discovery", nil)
+	req.Header.Set("Origin", "https://localhost")
+	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	req.Header.Set(
+		"Access-Control-Request-Headers",
+		"authorization,x-crate-app,x-device-label,x-device-fingerprint",
+	)
+	rec := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Equal(t, "https://localhost", rec.Header().Get("Access-Control-Allow-Origin"))
+	assert.Contains(t, rec.Header().Get("Access-Control-Allow-Methods"), http.MethodGet)
+	assert.Contains(t, rec.Header().Get("Access-Control-Allow-Headers"), "Authorization")
+}
+
+func TestCORS_DoesNotTrustUnknownOrigins(t *testing.T) {
+	server := newTestServerWithAuth()
+	server.cfg.CORSAllowedOrigins = []string{"https://localhost"}
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	req.Header.Set("Origin", "https://attacker.example")
+	rec := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(rec, req)
+
+	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
+}
+
 // ── Snapshots-dependent handlers (unit tests for helper functions only) ──
 
 func TestHomeSlice_SnapshotDependent(t *testing.T) {

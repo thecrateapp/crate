@@ -11,14 +11,24 @@
  *   - a "current server" concept for the whole app
  *   - live reactivity when the current server changes
  *
- * Everything lives in localStorage. The shape is intentionally small so
- * a future export/import flow is trivial.
+ * Public server descriptors live in localStorage. Capacitor credentials live
+ * in the platform keystore/keychain and are loaded into memory before React
+ * renders. Tauri keeps the existing storage contract until its native store
+ * migration is implemented separately.
  */
-import { usesConfigurableServer } from "@/lib/platform";
+import {
+  getSecureSessionValue,
+  removeSecureSessionValue,
+  setSecureSessionValue,
+} from "@/lib/native-secure-session";
+import { isCapacitorRuntime, usesConfigurableServer } from "@/lib/platform";
 
 const SERVERS_KEY = "crate-servers";
 const CURRENT_KEY = "crate-current-server";
 const LEGACY_TOKEN_KEY = "crate-auth-token";
+const ALLOW_INSECURE_LOOPBACK =
+  import.meta.env.DEV &&
+  import.meta.env.VITE_ALLOW_INSECURE_LOOPBACK === "true";
 
 export const SERVER_STORE_EVENT = "crate-server-store-change";
 
@@ -36,6 +46,23 @@ export interface ServerConfig {
   /** Long-lived refresh token for this server, or null when unavailable. */
   refreshToken: string | null;
 }
+
+interface StoredServerConfig {
+  id: string;
+  label: string;
+  url: string;
+  tokenExpiresAt: string | null;
+  token?: string | null;
+  refreshToken?: string | null;
+}
+
+interface ServerSecret {
+  token: string | null;
+  refreshToken: string | null;
+}
+
+const runtimeSecrets = new Map<string, ServerSecret>();
+const pendingSecretWrites = new Set<Promise<void>>();
 
 function safeJsonParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
@@ -68,6 +95,25 @@ export function normaliseServerUrl(input: string): string {
   return url.replace(/\/+$/, "");
 }
 
+export function isAllowedServerUrl(
+  input: string,
+  options: { allowInsecureLoopback?: boolean } = {},
+): boolean {
+  try {
+    const url = new URL(input);
+    if (url.protocol === "https:") return true;
+    if (url.protocol !== "http:" || !options.allowInsecureLoopback)
+      return false;
+    return (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "[::1]"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function deriveLabel(url: string): string {
   try {
     const host = new URL(url).hostname;
@@ -80,13 +126,18 @@ export function deriveLabel(url: string): string {
 export function getServers(): ServerConfig[] {
   if (!usesConfigurableServer) return [];
   try {
-    return safeJsonParse<ServerConfig[]>(
+    return safeJsonParse<StoredServerConfig[]>(
       localStorage.getItem(SERVERS_KEY),
       [],
     ).map((server) => ({
       ...server,
+      token: isCapacitorRuntime
+        ? runtimeSecrets.get(server.id)?.token ?? null
+        : server.token ?? null,
       tokenExpiresAt: server.tokenExpiresAt ?? null,
-      refreshToken: server.refreshToken ?? null,
+      refreshToken: isCapacitorRuntime
+        ? runtimeSecrets.get(server.id)?.refreshToken ?? null
+        : server.refreshToken ?? null,
     }));
   } catch {
     return [];
@@ -110,10 +161,122 @@ export function getCurrentServer(): ServerConfig | null {
 
 function writeServers(servers: ServerConfig[]): void {
   try {
-    localStorage.setItem(SERVERS_KEY, JSON.stringify(servers));
+    const persisted: StoredServerConfig[] = servers.map((server) => ({
+      id: server.id,
+      label: server.label,
+      url: server.url,
+      tokenExpiresAt: server.tokenExpiresAt,
+      ...(isCapacitorRuntime
+        ? {}
+        : {
+            token: server.token,
+            refreshToken: server.refreshToken,
+          }),
+    }));
+    localStorage.setItem(SERVERS_KEY, JSON.stringify(persisted));
   } catch {
     /* ignore */
   }
+}
+
+function secureSessionKey(serverId: string): string {
+  return `crate.session.${serverId}`;
+}
+
+function parseServerSecret(value: string | null): ServerSecret {
+  if (!value) return { token: null, refreshToken: null };
+  try {
+    const parsed = JSON.parse(value) as Partial<ServerSecret>;
+    return {
+      token: typeof parsed.token === "string" ? parsed.token : null,
+      refreshToken:
+        typeof parsed.refreshToken === "string" ? parsed.refreshToken : null,
+    };
+  } catch {
+    return { token: null, refreshToken: null };
+  }
+}
+
+function serializedSecret(secret: ServerSecret): string {
+  return JSON.stringify(secret);
+}
+
+function queueSecretWrite(serverId: string, secret: ServerSecret): void {
+  if (!isCapacitorRuntime) return;
+  const operation =
+    secret.token || secret.refreshToken
+      ? setSecureSessionValue(
+          secureSessionKey(serverId),
+          serializedSecret(secret),
+        )
+      : removeSecureSessionValue(secureSessionKey(serverId));
+  pendingSecretWrites.add(operation);
+  void operation
+    .catch(() => {
+      // The in-memory session remains usable. Bootstrap will surface a
+      // persistent-store failure on the next launch instead of leaking the
+      // credential back to browser storage.
+    })
+    .finally(() => pendingSecretWrites.delete(operation));
+}
+
+export async function waitForPendingSecureSessionWrites(): Promise<void> {
+  const results = await Promise.allSettled([...pendingSecretWrites]);
+  if (results.some((result) => result.status === "rejected")) {
+    throw new Error("Native session persistence failed");
+  }
+}
+
+export async function bootstrapNativeSessionStore(): Promise<void> {
+  if (!isCapacitorRuntime) return;
+  const records = safeJsonParse<StoredServerConfig[]>(
+    localStorage.getItem(SERVERS_KEY),
+    [],
+  );
+  const nextSecrets = new Map<string, ServerSecret>();
+  try {
+    for (const server of records) {
+      const legacySecret: ServerSecret = {
+        token: server.token ?? null,
+        refreshToken: server.refreshToken ?? null,
+      };
+      if (legacySecret.token || legacySecret.refreshToken) {
+        const serialized = serializedSecret(legacySecret);
+        await setSecureSessionValue(secureSessionKey(server.id), serialized);
+        const verified = await getSecureSessionValue(
+          secureSessionKey(server.id),
+        );
+        if (verified !== serialized) {
+          throw new Error("Secure session verification failed");
+        }
+        nextSecrets.set(server.id, legacySecret);
+      } else {
+        nextSecrets.set(
+          server.id,
+          parseServerSecret(
+            await getSecureSessionValue(secureSessionKey(server.id)),
+          ),
+        );
+      }
+    }
+  } catch {
+    throw new Error("Native session migration failed");
+  }
+  runtimeSecrets.clear();
+  for (const [serverId, secret] of nextSecrets) {
+    runtimeSecrets.set(serverId, secret);
+  }
+  writeServers(
+    records.map((server) => ({
+      id: server.id,
+      label: server.label,
+      url: server.url,
+      token: nextSecrets.get(server.id)?.token ?? null,
+      tokenExpiresAt: server.tokenExpiresAt ?? null,
+      refreshToken: nextSecrets.get(server.id)?.refreshToken ?? null,
+    })),
+  );
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 
 function dispatchChange(): void {
@@ -126,6 +289,13 @@ function dispatchChange(): void {
 
 export function addServer(url: string, label?: string): ServerConfig {
   const normalised = normaliseServerUrl(url);
+  if (
+    !isAllowedServerUrl(normalised, {
+      allowInsecureLoopback: ALLOW_INSECURE_LOOPBACK,
+    })
+  ) {
+    throw new Error("Crate servers must use HTTPS");
+  }
   // Don't duplicate a server we already know about — return the
   // existing entry so the caller can keep its token.
   const existing = getServers().find((s) => s.url === normalised);
@@ -155,6 +325,10 @@ export function removeServer(id: string): void {
       /* ignore */
     }
   }
+  runtimeSecrets.delete(id);
+  if (isCapacitorRuntime) {
+    void removeSecureSessionValue(secureSessionKey(id)).catch(() => {});
+  }
   dispatchChange();
 }
 
@@ -174,6 +348,15 @@ export function setCurrentServerToken(
 ): void {
   const id = getCurrentServerId();
   if (!id) return;
+  if (isCapacitorRuntime) {
+    const current = runtimeSecrets.get(id) ?? {
+      token: null,
+      refreshToken: null,
+    };
+    const nextSecret = { ...current, token };
+    runtimeSecrets.set(id, nextSecret);
+    queueSecretWrite(id, nextSecret);
+  }
   const servers = getServers().map((s) =>
     s.id === id
       ? {
@@ -193,6 +376,15 @@ export function setCurrentServerRefreshToken(
 ): void {
   const id = getCurrentServerId();
   if (!id) return;
+  if (isCapacitorRuntime) {
+    const current = runtimeSecrets.get(id) ?? {
+      token: null,
+      refreshToken: null,
+    };
+    const nextSecret = { ...current, refreshToken };
+    runtimeSecrets.set(id, nextSecret);
+    queueSecretWrite(id, nextSecret);
+  }
   const servers = getServers().map((s) =>
     s.id === id ? { ...s, refreshToken } : s,
   );
@@ -207,6 +399,19 @@ export function setCurrentServerAuthTokens(
 ): void {
   const id = getCurrentServerId();
   if (!id) return;
+  if (isCapacitorRuntime) {
+    const current = runtimeSecrets.get(id) ?? {
+      token: null,
+      refreshToken: null,
+    };
+    const nextSecret = {
+      token,
+      refreshToken:
+        refreshToken === undefined ? current.refreshToken : refreshToken,
+    };
+    runtimeSecrets.set(id, nextSecret);
+    queueSecretWrite(id, nextSecret);
+  }
   const servers = getServers().map((s) =>
     s.id === id
       ? {
@@ -246,6 +451,19 @@ export function migrateLegacyToken(defaultUrl: string): void {
     const legacyToken = localStorage.getItem(LEGACY_TOKEN_KEY);
     if (!legacyToken || !defaultUrl) return;
     const seeded = addServer(defaultUrl);
+    if (isCapacitorRuntime) {
+      const migrationRecord: StoredServerConfig = {
+        id: seeded.id,
+        label: seeded.label,
+        url: seeded.url,
+        token: legacyToken,
+        tokenExpiresAt: null,
+        refreshToken: null,
+      };
+      localStorage.setItem(SERVERS_KEY, JSON.stringify([migrationRecord]));
+      setCurrentServerId(seeded.id);
+      return;
+    }
     const patched = getServers().map((s) =>
       s.id === seeded.id
         ? { ...s, token: legacyToken, tokenExpiresAt: null, refreshToken: null }

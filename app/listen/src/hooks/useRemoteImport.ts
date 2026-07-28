@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { ApiError, api, apiSseUrl } from "@/lib/api";
 import { cacheInvalidate } from "@/lib/cache";
 
@@ -39,6 +40,7 @@ function errorStatus(error: unknown): number | null {
 }
 
 export function useRemoteImport(globalAlbumUid: string) {
+  const mediaAccessVersion = useMediaAccessVersion();
   const [request, setRequest] = useState<RemoteImportRequest | null>(null);
   const [status, setStatus] = useState<RemoteImportStatus>("idle");
 
@@ -95,7 +97,13 @@ export function useRemoteImport(globalAlbumUid: string) {
     const source = new EventSource(apiSseUrl("/api/events"));
     source.onmessage = () => void refresh();
     return () => source.close();
-  }, [refresh, request?.request_id, request?.task_id, status]);
+  }, [
+    mediaAccessVersion,
+    refresh,
+    request?.request_id,
+    request?.task_id,
+    status,
+  ]);
 
   useEffect(() => {
     const taskId = request?.task_id;
@@ -132,7 +140,7 @@ export function useRemoteImport(globalAlbumUid: string) {
     source.addEventListener("progress", onProgress);
     source.addEventListener("task_done", onDone);
     return () => source.close();
-  }, [globalAlbumUid, refresh, request?.task_id]);
+  }, [globalAlbumUid, mediaAccessVersion, refresh, request?.task_id]);
 
   const expected = Number(request?.expected_bytes || 0);
   const received = Number(request?.received_bytes || 0);

@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { Loader2, X } from "@crate/ui/icons/translation";
 
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslationOverlay } from "@/i18n/translation-mode/useTranslationOverlay";

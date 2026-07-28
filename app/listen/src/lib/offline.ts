@@ -14,6 +14,17 @@ import {
   isIosBrowser,
   isNative,
 } from "@/lib/capacitor-runtime";
+import { verifyNativeOfflineAssets } from "@/lib/offline-native";
+import {
+  encodeOfflineProfileIdentity,
+  readOfflineStoreItem,
+  writeOfflineStoreItem,
+} from "@/lib/offline-store";
+import {
+  cacheWebOfflineAsset,
+  deleteWebOfflineAssets,
+  hasWebOfflineAsset,
+} from "@/lib/offline-web";
 import {
   trackOfflineManifestApiPath,
   trackStreamApiPath,
@@ -129,17 +140,6 @@ const nativeAssetIndexLoaders = new Map<
   Promise<Record<string, OfflineNativeAssetRecord>>
 >();
 
-function encodeKey(input: string): string {
-  try {
-    return btoa(unescape(encodeURIComponent(input)))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
-  } catch {
-    return encodeURIComponent(input);
-  }
-}
-
 export function deriveOfflineProfileKey(
   userId: number,
   serverOrigin?: string,
@@ -150,7 +150,7 @@ export function deriveOfflineProfileKey(
     window.location.origin ||
     "listen"
   ).replace(/\/+$/, "");
-  return encodeKey(`${origin}|${userId}`);
+  return encodeOfflineProfileIdentity(`${origin}|${userId}`);
 }
 
 export function deriveOfflineProfileKeyFromStoredUser(
@@ -186,25 +186,11 @@ export function getOfflineItemKey(
 }
 
 export function getActiveOfflineProfileKey(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(OFFLINE_ACTIVE_PROFILE_KEY);
-  } catch {
-    return null;
-  }
+  return readOfflineStoreItem(OFFLINE_ACTIVE_PROFILE_KEY);
 }
 
 export function setActiveOfflineProfileKey(profileKey: string | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (profileKey) {
-      localStorage.setItem(OFFLINE_ACTIVE_PROFILE_KEY, profileKey);
-    } else {
-      localStorage.removeItem(OFFLINE_ACTIVE_PROFILE_KEY);
-    }
-  } catch {
-    // ignore persistence failures
-  }
+  writeOfflineStoreItem(OFFLINE_ACTIVE_PROFILE_KEY, profileKey);
 }
 
 function getOfflineNativeAssetStorageKey(profileKey: string): string {
@@ -799,30 +785,91 @@ export async function hasCachedTrackAsset(
   track: OfflineTrackIdentityInput,
   storageId?: string | null,
 ): Promise<boolean> {
+  if (isNative) {
+    const found = await hasCachedTrackAssets(profileKey, [
+      typeof track === "object" && track
+        ? (track as OfflineManifestTrack)
+        : ({
+            storage_id:
+              typeof track === "string"
+                ? normalizeIdentityValue(storageId) ||
+                  normalizeIdentityValue(track)
+                : normalizeIdentityValue(storageId),
+            title: "",
+            artist: "",
+            stream_url: "",
+            download_url: "",
+          } satisfies OfflineManifestTrack),
+    ]);
+    const assetKey = getOfflineTrackAssetKey(track, storageId);
+    return Boolean(assetKey && found.has(assetKey));
+  }
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return false;
-  if (isNative) {
-    const assets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-    const entry = aliases.map((alias) => assets[alias]).find(Boolean);
-    if (!entry?.path) return false;
-    try {
-      await Filesystem.stat({ path: entry.path, directory: Directory.Data });
-      return true;
-    } catch {
-      const nextAssets = loadOfflineNativeAssetIndex(profileKey);
-      for (const alias of aliases) {
-        delete nextAssets[alias];
+  const cache = await caches.open(getOfflineCacheName(profileKey));
+  return hasWebOfflineAsset(cache, getOfflineTrackCacheUrls(track, storageId));
+}
+
+export async function hasCachedTrackAssets(
+  profileKey: string,
+  tracks: OfflineManifestTrack[],
+): Promise<Set<string>> {
+  if (!tracks.length) return new Set();
+  if (!isNative) {
+    const found = new Set<string>();
+    for (const track of tracks) {
+      const assetKey = getOfflineTrackAssetKey(track);
+      if (assetKey && (await hasCachedTrackAsset(profileKey, track))) {
+        found.add(assetKey);
       }
-      saveOfflineNativeAssetIndex(profileKey, nextAssets);
-      return false;
+    }
+    return found;
+  }
+
+  const assets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
+  const expectations: Array<{
+    assetKey: string;
+    aliases: string[];
+    path: string;
+    expectedBytes: number | null;
+  }> = [];
+  for (const track of tracks) {
+    const assetKey = getOfflineTrackAssetKey(track);
+    if (!assetKey) continue;
+    const aliases = getOfflineTrackAssetAliases(track);
+    const entry = aliases.map((alias) => assets[alias]).find(Boolean);
+    if (!entry?.path) continue;
+    expectations.push({
+      assetKey,
+      aliases,
+      path: entry.path,
+      expectedBytes: entry.byteLength ?? track.byte_length ?? null,
+    });
+  }
+
+  const results = await verifyNativeOfflineAssets(
+    expectations.map(({ path, expectedBytes }) => ({ path, expectedBytes })),
+  );
+  const found = new Set<string>();
+  const nextAssets = { ...assets };
+  let changed = false;
+  for (let index = 0; index < expectations.length; index += 1) {
+    const expectation = expectations[index];
+    const result = results[index];
+    if (!expectation) continue;
+    if (result?.exists && result.valid) {
+      found.add(expectation.assetKey);
+      continue;
+    }
+    for (const alias of expectation.aliases) {
+      if (nextAssets[alias]) {
+        delete nextAssets[alias];
+        changed = true;
+      }
     }
   }
-  const cache = await caches.open(getOfflineCacheName(profileKey));
-  for (const url of getOfflineTrackCacheUrls(track, storageId)) {
-    const match = await cache.match(url);
-    if (match) return true;
-  }
-  return false;
+  if (changed) saveOfflineNativeAssetIndex(profileKey, nextAssets);
+  return found;
 }
 
 function normalizeAudioExtension(value?: string | null): string | null {
@@ -877,17 +924,6 @@ async function assertNativeTrackIntegrity(
   return { uri: stat.uri, size: actualSize };
 }
 
-async function assertWebTrackIntegrity(
-  response: Response,
-  track: OfflineManifestTrack,
-): Promise<void> {
-  const headerSize = Number(response.headers.get("content-length") || 0);
-  const expectedSize = expectedTrackBytes(track);
-  if (expectedSize > 0 && headerSize > 0 && headerSize !== expectedSize) {
-    throw new Error("Offline copy failed integrity check");
-  }
-}
-
 async function estimateMissingOfflineBytes(
   profileKey: string,
   tracks: OfflineManifestTrack[],
@@ -914,8 +950,16 @@ async function estimateNativeOfflineBytes(profileKey: string): Promise<number> {
 export async function ensureOfflineStorageBudget(
   profileKey: string,
   tracks: OfflineManifestTrack[],
+  options: { assumeMissing?: boolean } = {},
 ): Promise<void> {
-  const pendingBytes = await estimateMissingOfflineBytes(profileKey, tracks);
+  const pendingBytes = options.assumeMissing
+    ? tracks.reduce(
+        (total, track) =>
+          total +
+          (getOfflineTrackAssetKey(track) ? expectedTrackBytes(track) : 0),
+        0,
+      )
+    : await estimateMissingOfflineBytes(profileKey, tracks);
   if (pendingBytes <= 0) return;
   if (isNative) {
     const currentBytes = await estimateNativeOfflineBytes(profileKey);
@@ -1093,14 +1137,12 @@ export async function cacheTrackAsset(
 
   const cache = await caches.open(getOfflineCacheName(profileKey));
   const cacheKey = apiUrl(track.stream_url);
-  const existing = await cache.match(cacheKey);
-  if (existing) return;
-  const response = await apiFetch(track.stream_url, { method: "GET" });
-  if (!response.ok) {
-    throw new Error(`Failed to cache track (${response.status})`);
-  }
-  await assertWebTrackIntegrity(response, track);
-  await cache.put(cacheKey, response.clone());
+  await cacheWebOfflineAsset(
+    cache,
+    cacheKey,
+    () => apiFetch(track.stream_url, { method: "GET" }),
+    expectedTrackBytes(track),
+  );
 }
 
 export async function deleteCachedTrackAsset(
@@ -1130,9 +1172,10 @@ export async function deleteCachedTrackAsset(
     return;
   }
   const cache = await caches.open(getOfflineCacheName(profileKey));
-  for (const url of getOfflineTrackCacheUrls(track, storageId)) {
-    await cache.delete(url);
-  }
+  await deleteWebOfflineAssets(
+    cache,
+    getOfflineTrackCacheUrls(track, storageId),
+  );
 }
 
 export async function clearOfflineAssets(profileKey: string): Promise<void> {

@@ -30,6 +30,11 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("parses overrides", func(t *testing.T) {
+		t.Setenv("DOMAIN", "example.test")
+		t.Setenv(
+			"CRATE_CORS_EXTRA_ORIGINS",
+			"https://preview.example.test, https://preview.example.test",
+		)
 		t.Setenv("READPLANE_ADDR", ":9999")
 		t.Setenv("READPLANE_ENABLED", "false")
 		t.Setenv("READPLANE_MAX_DB_CONNS", "3")
@@ -77,6 +82,19 @@ func TestLoad(t *testing.T) {
 		assert.True(t, cfg.LocalMediaEnabled)
 		assert.Equal(t, "/srv/music", cfg.MusicRoot)
 		assert.Equal(t, "/srv/cache", cfg.CacheRoot)
+		assert.ElementsMatch(t, []string{
+			"https://admin.example.test",
+			"https://listen.example.test",
+			"https://api.example.test",
+			"https://example.test",
+			"capacitor://localhost",
+			"https://localhost",
+			"tauri://localhost",
+			"http://tauri.localhost",
+			"https://tauri.localhost",
+			"https://docs.cratemusic.app",
+			"https://preview.example.test",
+		}, cfg.CORSAllowedOrigins)
 	})
 
 	t.Run("rejects relative media roots", func(t *testing.T) {

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2569C23E62FA62D4ECA9003D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98DE6ED76CEB3D5E120773DF /* Pods_App.framework */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -19,6 +20,10 @@
 		C0DEF0010000000000000003 /* CrateMediaSessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000004 /* CrateMediaSessionPlugin.swift */; };
 		C0DEF0010000000000000006 /* CrateCastPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000007 /* CrateCastPlugin.swift */; };
 		C0DEF0010000000000000008 /* CrateSocialSharePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000009 /* CrateSocialSharePlugin.swift */; };
+		C0DEF0010000000000000010 /* CrateSecureSessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000011 /* CrateSecureSessionPlugin.swift */; };
+		C0DEF0010000000000000012 /* CrateOfflineIntegrityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000013 /* CrateOfflineIntegrityPlugin.swift */; };
+		C0DEF0010000000000000014 /* ArtworkDownsampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000015 /* ArtworkDownsampler.swift */; };
+		C0DEF0010000000000000016 /* CrateSecureSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,12 +36,19 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		70D93972C325F4303F3B283C /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
+		7A89F4293FBD99B336AFEF9A /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
-		C0DEF0010000000000000005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		98DE6ED76CEB3D5E120773DF /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DEF0010000000000000002 /* BridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeViewController.swift; sourceTree = "<group>"; };
 		C0DEF0010000000000000004 /* CrateMediaSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateMediaSessionPlugin.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		C0DEF0010000000000000007 /* CrateCastPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateCastPlugin.swift; sourceTree = "<group>"; };
 		C0DEF0010000000000000009 /* CrateSocialSharePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateSocialSharePlugin.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000011 /* CrateSecureSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateSecureSessionPlugin.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000013 /* CrateOfflineIntegrityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateOfflineIntegrityPlugin.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000015 /* ArtworkDownsampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkDownsampler.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateSecureSessionStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +57,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+				2569C23E62FA62D4ECA9003D /* Pods_App.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,6 +70,8 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				691D09E24E725EB68E063E9E /* Pods */,
+				9E10B31C3201A97AB47EF3E9 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -77,6 +92,10 @@
 				C0DEF0010000000000000004 /* CrateMediaSessionPlugin.swift */,
 				C0DEF0010000000000000007 /* CrateCastPlugin.swift */,
 				C0DEF0010000000000000009 /* CrateSocialSharePlugin.swift */,
+				C0DEF0010000000000000011 /* CrateSecureSessionPlugin.swift */,
+				C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */,
+				C0DEF0010000000000000013 /* CrateOfflineIntegrityPlugin.swift */,
+				C0DEF0010000000000000015 /* ArtworkDownsampler.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -88,6 +107,24 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		691D09E24E725EB68E063E9E /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				70D93972C325F4303F3B283C /* Pods-App.debug.xcconfig */,
+				7A89F4293FBD99B336AFEF9A /* Pods-App.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		9E10B31C3201A97AB47EF3E9 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				98DE6ED76CEB3D5E120773DF /* Pods_App.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -95,9 +132,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
 			buildPhases = (
+				D3C99BCB99F668F4A13AC1E0 /* [CP] Check Pods Manifest.lock */,
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				9C4D66EF56B4F830693B7F64 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -164,6 +203,63 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		9C4D66EF56B4F830693B7F64 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-App/Pods-App-resources.sh",
+				"${PODS_ROOT}/google-cast-sdk/GoogleCastSDK-ios-4.8.4_static_xcframework/GoogleCast.xcframework/ios-arm64/GoogleCast.framework/GoogleCastCoreResources.bundle",
+				"${PODS_ROOT}/google-cast-sdk/GoogleCastSDK-ios-4.8.4_static_xcframework/GoogleCast.xcframework/ios-arm64/GoogleCast.framework/GoogleCastUIResources.bundle",
+				"${PODS_ROOT}/google-cast-sdk/GoogleCastSDK-ios-4.8.4_static_xcframework/GoogleCast.xcframework/ios-arm64/GoogleCast.framework/GoogleCastOptionalUIResources.bundle",
+				"${PODS_ROOT}/google-cast-sdk/GoogleCastSDK-ios-4.8.4_static_xcframework/GoogleCast.xcframework/ios-arm64/GoogleCast.framework/MaterialDialogs.bundle",
+				"${PODS_ROOT}/google-cast-sdk/GoogleCastSDK-ios-4.8.4_static_xcframework/GoogleCast.xcframework/ios-arm64/GoogleCast.framework/GoogleSansBold.bundle",
+				"${PODS_ROOT}/google-cast-sdk/GoogleCastSDK-ios-4.8.4_static_xcframework/GoogleCast.xcframework/ios-arm64/GoogleCast.framework/GoogleSansMedium.bundle",
+				"${PODS_ROOT}/google-cast-sdk/GoogleCastSDK-ios-4.8.4_static_xcframework/GoogleCast.xcframework/ios-arm64/GoogleCast.framework/GoogleSansRegular.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/google-cast-sdk/GoogleCast.bundle",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleCastCoreResources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleCastUIResources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleCastOptionalUIResources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/MaterialDialogs.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleSansBold.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleSansMedium.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleSansRegular.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleCast.bundle",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-App/Pods-App-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		D3C99BCB99F668F4A13AC1E0 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-App-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -174,6 +270,10 @@
 				C0DEF0010000000000000003 /* CrateMediaSessionPlugin.swift in Sources */,
 				C0DEF0010000000000000006 /* CrateCastPlugin.swift in Sources */,
 				C0DEF0010000000000000008 /* CrateSocialSharePlugin.swift in Sources */,
+				C0DEF0010000000000000010 /* CrateSecureSessionPlugin.swift in Sources */,
+				C0DEF0010000000000000012 /* CrateOfflineIntegrityPlugin.swift in Sources */,
+				C0DEF0010000000000000014 /* ArtworkDownsampler.swift in Sources */,
+				C0DEF0010000000000000016 /* CrateSecureSessionStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -334,6 +434,7 @@
 		};
 		504EC3181FED79650016851F /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7A89F4293FBD99B336AFEF9A /* Pods-App.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;

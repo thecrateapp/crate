@@ -8,6 +8,7 @@ import { isIosRuntime, isNative, platform } from "@/lib/capacitor-runtime";
 
 let viewportFallbackInitialized = false;
 let keyboardInitialized = false;
+let initializationPromise: Promise<string | null> | null = null;
 
 function setViewportHeightVar() {
   if (typeof window === "undefined") return;
@@ -84,7 +85,7 @@ async function initKeyboardHandling() {
   });
 }
 
-export async function initCapacitor(): Promise<string | null> {
+async function initializeCapacitor(): Promise<string | null> {
   initViewportHeightFallback();
   if (!isNative) return null;
   await initKeyboardHandling();
@@ -148,4 +149,11 @@ export async function initCapacitor(): Promise<string | null> {
   });
 
   return null;
+}
+
+export function initCapacitor(): Promise<string | null> {
+  if (!initializationPromise) {
+    initializationPromise = initializeCapacitor();
+  }
+  return initializationPromise;
 }

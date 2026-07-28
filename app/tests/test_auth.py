@@ -376,6 +376,114 @@ class TestOAuthStart:
         assert captured_state["mode"] == "login"
         assert captured_state["user_id"] is None
 
+    @pytest.mark.parametrize(
+        ("app_id", "return_to"),
+        [
+            ("listen-web", "cratemusic://oauth/callback"),
+            ("listen-android", "cratemusic://unexpected/callback"),
+            ("listen-ios", "cratemusic://oauth/other"),
+            ("listen-android", "https://unknown.example/auth/callback"),
+        ],
+    )
+    def test_native_oauth_start_rejects_untrusted_callback(
+        self, app_id: str, return_to: str
+    ):
+        from fastapi import HTTPException
+
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        request = self._request(headers=[(b"x-crate-app", app_id.encode())])
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch.dict(
+                "os.environ",
+                {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+                clear=False,
+            ),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            oauth_start(
+                request,
+                "google",
+                OAuthStartRequest(
+                    return_to=return_to,
+                    native_code_challenge="c" * 43,
+                    native_state="s" * 43,
+                ),
+            )
+
+        assert exc_info.value.status_code == 400
+
+    def test_native_oauth_start_requires_complete_pkce_binding(self):
+        from fastapi import HTTPException
+
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        request = self._request(headers=[(b"x-crate-app", b"listen-android")])
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch.dict(
+                "os.environ",
+                {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+                clear=False,
+            ),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            oauth_start(
+                request,
+                "google",
+                OAuthStartRequest(
+                    return_to="cratemusic://oauth/callback",
+                    native_state="s" * 43,
+                ),
+            )
+
+        assert exc_info.value.status_code == 400
+
+    def test_native_oauth_start_adds_app_binding_to_signed_state(self):
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        captured_state: dict[str, Any] = {}
+        request = self._request(headers=[(b"x-crate-app", b"listen-android")])
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "provider-verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="provider-challenge"),
+            patch.dict(
+                "os.environ",
+                {
+                    "GOOGLE_CLIENT_ID": "google-client",
+                    "NATIVE_OAUTH_EXCHANGE_ENABLED": "true",
+                },
+                clear=False,
+            ),
+        ):
+            oauth_start(
+                request,
+                "google",
+                OAuthStartRequest(
+                    return_to="cratemusic://oauth/callback",
+                    native_code_challenge="c" * 43,
+                    native_state="s" * 43,
+                ),
+            )
+
+        assert captured_state["native_code_challenge"] == "c" * 43
+        assert captured_state["native_state"] == "s" * 43
+        assert captured_state["app_id"] == "listen-android"
+
     def test_oauth_link_uses_link_mode_for_current_user(self):
         from crate.api.auth import oauth_link
         from crate.api.schemas.auth import OAuthStartRequest
@@ -721,6 +829,73 @@ class TestOAuthCallback:
         )
         mock_upsert.assert_called_once()
         mock_last_login.assert_called_once_with(legacy_user["id"])
+
+    def test_native_callback_redirects_with_code_only(self):
+        from crate.api.auth import oauth_callback
+
+        user = {
+            "id": 42,
+            "email": "native@test.com",
+            "role": "user",
+            "username": "native",
+            "name": "Native User",
+            "status": "active",
+        }
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "login",
+                    "verifier": "provider-verifier",
+                    "app_id": "listen-android",
+                    "native_code_challenge": "c" * 43,
+                    "native_state": "s" * 43,
+                },
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-native",
+                    "email": "native@test.com",
+                    "name": "Native User",
+                },
+            ),
+            patch(
+                "crate.api.auth.get_user_by_external_identity",
+                return_value=user,
+            ),
+            patch(
+                "crate.api.auth.issue_native_oauth_handoff",
+                return_value="one-time-code",
+            ) as issue_handoff,
+            patch("crate.api.auth.update_user_last_login") as update_last_login,
+            patch("crate.api.auth._create_login_session") as create_session,
+            patch.dict(
+                "os.environ",
+                {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+                clear=False,
+            ),
+        ):
+            response = _run(
+                oauth_callback(self._request(), "google", code="code", state="state")
+            )
+
+        assert (
+            response.headers["location"]
+            == f"cratemusic://oauth/callback?code=one-time-code&state={'s' * 43}"
+        )
+        assert "token=" not in response.headers["location"]
+        assert "refresh_token=" not in response.headers["location"]
+        issue_handoff.assert_called_once_with(
+            user_id=42,
+            app_id="listen-android",
+            state="s" * 43,
+            challenge="c" * 43,
+        )
+        update_last_login.assert_not_called()
+        create_session.assert_not_called()
 
     def test_google_callback_identity_conflict_returns_409(self):
         from fastapi import HTTPException
@@ -1485,6 +1660,7 @@ class TestAuthMiddleware:
                 "crate.api.auth_cache.get_cached_session",
                 return_value={
                     "id": "sess-123",
+                    "user_id": 1,
                     "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
                     "revoked_at": None,
                 },
@@ -1530,6 +1706,7 @@ class TestAuthMiddleware:
                 "crate.api.auth_cache.get_cached_session",
                 return_value={
                     "id": "sess-123",
+                    "user_id": 1,
                     "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
                     "revoked_at": None,
                 },
@@ -1583,6 +1760,7 @@ class TestAuthMiddleware:
             if session_id == "valid-session":
                 return {
                     "id": "valid-session",
+                    "user_id": 1,
                     "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
                     "revoked_at": None,
                 }

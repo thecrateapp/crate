@@ -36,7 +36,6 @@ from crate.api.schemas.jam import (
     JamRoomUpdateRequest,
 )
 from crate.auth import verify_jwt
-from crate.db.repositories.auth import get_session
 from crate.db.jam import (
     append_jam_room_event,
     consume_jam_room_invite,
@@ -55,6 +54,8 @@ from crate.db.jam import (
     update_jam_room_state,
     upsert_jam_room_member,
 )
+from crate.db.repositories.auth import get_session
+from crate.db.repositories.auth_shared import coerce_datetime
 
 log = logging.getLogger(__name__)
 
@@ -273,7 +274,35 @@ def _normalise_room_description(description: str | None) -> str | None:
     return value[:500] if value else None
 
 
+def _session_is_active_for_user(session: dict | None, user_id: int) -> bool:
+    if (
+        not session
+        or int(session.get("user_id") or 0) != user_id
+        or session.get("revoked_at") is not None
+    ):
+        return False
+    expires_at = coerce_datetime(session.get("expires_at"))
+    return expires_at is not None and expires_at > datetime.now(timezone.utc)
+
+
 def _auth_ws(websocket: WebSocket) -> dict:
+    media_ticket = websocket.query_params.get("media_ticket")
+    if media_ticket:
+        from crate.media_access import validate_media_access_ticket
+
+        validated = validate_media_access_ticket(
+            media_ticket,
+            audience="ws",
+            request_path=websocket.url.path,
+        )
+        if validated:
+            session = get_session(validated.session_id)
+            if _session_is_active_for_user(session, validated.user_id):
+                return {
+                    "user_id": validated.user_id,
+                    "sid": validated.session_id,
+                }
+
     token = websocket.query_params.get("token")
     if not token:
         auth_header = websocket.headers.get("authorization", "")
@@ -292,7 +321,11 @@ def _auth_ws(websocket: WebSocket) -> dict:
     session_id = payload.get("sid")
     if session_id:
         session = get_session(session_id)
-        if not session or session.get("revoked_at") is not None:
+        try:
+            user_id = int(payload["user_id"])
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(status_code=401, detail="Invalid token") from None
+        if not _session_is_active_for_user(session, user_id):
             raise HTTPException(status_code=401, detail="Session expired")
     return payload
 

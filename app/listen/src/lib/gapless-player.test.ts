@@ -178,8 +178,8 @@ describe("getCurrentBufferedAheadSeconds", () => {
 });
 
 describe("initPlayer", () => {
-  it("keeps the next HTML5 track preloaded for mobile auto-advance", () => {
-    expect(getPlaybackLoadLimit(true)).toBe(2);
+  it("keeps the previous HTML5 element alive across mobile auto-advance", () => {
+    expect(getPlaybackLoadLimit(true)).toBe(3);
   });
 
   it("creates a Gapless5 instance with expected options", () => {

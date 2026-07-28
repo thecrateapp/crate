@@ -4,6 +4,7 @@ import {
   buildShareText,
   buildTelegramShareUrl,
   buildWhatsAppShareUrl,
+  canvasToJpegBlob,
   openShareSheet,
   SHARE_REQUEST_EVENT,
   type SharePayload,
@@ -49,5 +50,30 @@ describe("social-share", () => {
       (listener.mock.calls[0]?.[0] as CustomEvent<SharePayload>).detail,
     ).toEqual(payload);
     window.removeEventListener(SHARE_REQUEST_EVENT, listener);
+  });
+
+  it("encodes story cards asynchronously without using toDataURL", async () => {
+    const blob = new Blob(["jpeg"], { type: "image/jpeg" });
+    const toDataURL = vi.fn();
+    const toBlob = vi.fn((callback: BlobCallback) => callback(blob));
+    const canvas = { toBlob, toDataURL } as unknown as HTMLCanvasElement;
+
+    await expect(canvasToJpegBlob(canvas)).resolves.toBe(blob);
+    expect(toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      "image/jpeg",
+      0.94,
+    );
+    expect(toDataURL).not.toHaveBeenCalled();
+  });
+
+  it("rejects when asynchronous story-card encoding fails", async () => {
+    const canvas = {
+      toBlob: (callback: BlobCallback) => callback(null),
+    } as HTMLCanvasElement;
+
+    await expect(canvasToJpegBlob(canvas)).rejects.toThrow(
+      "Story card encoding failed",
+    );
   });
 });

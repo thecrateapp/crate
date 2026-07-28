@@ -515,7 +515,12 @@ class TestJamWebSocketAuth:
         monkeypatch.setattr(
             jam,
             "get_session",
-            lambda session_id: {"id": session_id, "revoked_at": None},
+            lambda session_id: {
+                "id": session_id,
+                "user_id": 42,
+                "revoked_at": None,
+                "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            },
         )
 
         assert jam._auth_ws(FakeWebSocket())["user_id"] == 42
@@ -536,7 +541,12 @@ class TestJamWebSocketAuth:
         monkeypatch.setattr(
             jam,
             "get_session",
-            lambda session_id: {"id": session_id, "revoked_at": "now"},
+            lambda session_id: {
+                "id": session_id,
+                "user_id": 42,
+                "revoked_at": datetime.now(timezone.utc),
+                "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            },
         )
 
         with pytest.raises(HTTPException):

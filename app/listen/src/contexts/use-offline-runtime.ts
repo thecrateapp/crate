@@ -26,7 +26,7 @@ import {
   getOfflineItemKey,
   getOfflineTrackAssetKey,
   getOfflineTrackManifestPaths,
-  hasCachedTrackAsset,
+  hasCachedTrackAssets,
   hydrateOfflineProfileState,
   isOfflineBusy,
   isOfflineSupported,
@@ -35,6 +35,12 @@ import {
   summarizeOfflineSnapshot,
   syncOfflineProfileToServiceWorker,
 } from "@/lib/offline";
+import {
+  createCoalescedOfflineWriter,
+  runBoundedOfflineTasks,
+  waitForOfflineTransferPermission,
+  type CoalescedOfflineWriter,
+} from "@/lib/offline-scheduler";
 
 const EMPTY_SNAPSHOT: OfflineSnapshot = { items: {} };
 const EMPTY_SUMMARY: OfflineSummary = {
@@ -111,6 +117,11 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   const snapshotRef = useRef<OfflineSnapshot>(EMPTY_SNAPSHOT);
   const queueRef = useRef<Promise<unknown>>(Promise.resolve());
   const resumedProfileRef = useRef<string | null>(null);
+  const persistenceRef = useRef<{
+    profileKey: string | null;
+    writer: CoalescedOfflineWriter<OfflineSnapshot>;
+  } | null>(null);
+  const transferAbortRef = useRef<AbortController | null>(null);
 
   const profileKey = useMemo(() => {
     if (!user?.id || !supported) return null;
@@ -119,12 +130,25 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       : window.location.origin;
     return deriveOfflineProfileKey(user.id, origin);
   }, [supported, user?.id]);
+  const activeProfileRef = useRef(profileKey);
+  activeProfileRef.current = profileKey;
 
   const commitSnapshot = useCallback(
-    (next: OfflineSnapshot) => {
+    (next: OfflineSnapshot, flush = false) => {
+      if (activeProfileRef.current !== profileKey) return;
       snapshotRef.current = next;
       setSnapshot(next);
-      saveOfflineSnapshot(profileKey, next);
+      if (persistenceRef.current?.profileKey !== profileKey) {
+        persistenceRef.current?.writer.dispose();
+        persistenceRef.current = {
+          profileKey,
+          writer: createCoalescedOfflineWriter((snapshotToPersist) => {
+            saveOfflineSnapshot(profileKey, snapshotToPersist);
+          }),
+        };
+      }
+      persistenceRef.current.writer.schedule(next);
+      if (flush) persistenceRef.current.writer.flush();
     },
     [profileKey],
   );
@@ -142,6 +166,9 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     })();
     return () => {
       cancelled = true;
+      transferAbortRef.current?.abort();
+      persistenceRef.current?.writer.dispose();
+      persistenceRef.current = null;
       setActiveOfflineProfileKey(null);
       void syncOfflineProfileToServiceWorker(null);
     };
@@ -216,16 +243,12 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       let failureCount = 0;
       let failureMessage: string | null = null;
       const manifestTracks = manifest.tracks || [];
-      const readyAssetKeys: string[] = [];
-      for (const track of manifestTracks) {
-        const assetKey = getOfflineTrackAssetKey(track);
-        if (!assetKey) continue;
-        if (await hasCachedTrackAsset(profileKey, track)) {
-          readyCount += 1;
-          readyAssetKeys.push(assetKey);
-        }
-      }
-      await ensureOfflineStorageBudget(profileKey, manifestTracks);
+      const cachedAssetKeys = await hasCachedTrackAssets(
+        profileKey,
+        manifestTracks,
+      );
+      const readyAssetKeys = Array.from(cachedAssetKeys);
+      readyCount = readyAssetKeys.length;
       let midItem: OfflineItemRecord = {
         ...provisional,
         title: manifest.title,
@@ -253,49 +276,72 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         },
       });
 
-      for (const track of manifestTracks) {
+      const pendingTracks = manifestTracks.filter((track) => {
         const assetKey = getOfflineTrackAssetKey(track);
         if (!assetKey) {
           failureCount += 1;
           failureMessage = "One or more tracks are missing entity identifiers";
-          continue;
+          return false;
         }
-        if (midItem.readyAssetKeys?.includes(assetKey)) {
-          continue;
-        }
-        try {
-          await cacheTrackAsset(profileKey, track);
-        } catch (error) {
-          failureCount += 1;
-          failureMessage =
-            (error as Error).message || "Failed to cache one or more tracks";
-          midItem = {
-            ...midItem,
-            state: "error",
-            errorMessage: failureMessage,
-          };
-          commitSnapshot({
-            items: {
-              ...snapshotRef.current.items,
-              [itemKey]: midItem,
-            },
-          });
-          continue;
-        }
-        readyCount += 1;
-        midItem = {
-          ...midItem,
-          readyTrackCount: readyCount,
-          readyAssetKeys: Array.from(
-            new Set([...(midItem.readyAssetKeys || []), assetKey]),
-          ),
-        };
-        commitSnapshot({
-          items: {
-            ...snapshotRef.current.items,
-            [itemKey]: midItem,
+        return !midItem.readyAssetKeys?.includes(assetKey);
+      });
+      const readyKeys = new Set(midItem.readyAssetKeys || []);
+      transferAbortRef.current?.abort();
+      const transferController = new AbortController();
+      transferAbortRef.current = transferController;
+      try {
+        const runResult = await runBoundedOfflineTasks(
+          pendingTracks,
+          async (track) => {
+            const assetKey = getOfflineTrackAssetKey(track);
+            if (!assetKey) return;
+            try {
+              await waitForOfflineTransferPermission(transferController.signal);
+              if (transferController.signal.aborted) return;
+              await ensureOfflineStorageBudget(profileKey, [track], {
+                assumeMissing: true,
+              });
+              await cacheTrackAsset(profileKey, track);
+            } catch (error) {
+              if (transferController.signal.aborted) return;
+              failureCount += 1;
+              failureMessage =
+                (error as Error).message ||
+                "Failed to cache one or more tracks";
+              midItem = {
+                ...midItem,
+                state: "error",
+                errorMessage: failureMessage,
+              };
+              commitSnapshot({
+                items: {
+                  ...snapshotRef.current.items,
+                  [itemKey]: midItem,
+                },
+              });
+              return;
+            }
+            readyKeys.add(assetKey);
+            readyCount = readyKeys.size;
+            midItem = {
+              ...midItem,
+              readyTrackCount: readyCount,
+              readyAssetKeys: Array.from(readyKeys),
+            };
+            commitSnapshot({
+              items: {
+                ...snapshotRef.current.items,
+                [itemKey]: midItem,
+              },
+            });
           },
-        });
+          { concurrency: 2, signal: transferController.signal },
+        );
+        if (runResult.cancelled) return;
+      } finally {
+        if (transferAbortRef.current === transferController) {
+          transferAbortRef.current = null;
+        }
       }
 
       const nextItem: OfflineItemRecord = {
@@ -320,7 +366,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
           [itemKey]: nextItem,
         },
       };
-      commitSnapshot(nextSnapshot);
+      commitSnapshot(nextSnapshot, true);
 
       const oldAssetKeys = new Set(
         (existing?.tracks || [])
@@ -451,12 +497,21 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       handleOnline as EventListener,
     );
     const disposeResume = onAppResume(handleOnline);
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        transferAbortRef.current?.abort();
+      } else {
+        handleOnline();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener(
         "crate:network-restored",
         handleOnline as EventListener,
       );
+      document.removeEventListener("visibilitychange", handleVisibility);
       disposeResume();
     };
   }, [enqueue, profileKey, supported, syncAll]);
@@ -556,7 +611,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
 
   const clearActiveProfile = useCallback(async () => {
     if (!profileKey || !supported) return;
-    commitSnapshot(EMPTY_SNAPSHOT);
+    commitSnapshot(EMPTY_SNAPSHOT, true);
     await clearOfflineAssets(profileKey);
   }, [commitSnapshot, profileKey, supported]);
 
