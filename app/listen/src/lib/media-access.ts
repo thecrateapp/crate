@@ -18,7 +18,9 @@ const MAX_TARGETS_PER_SCOPE = 512;
 const ticketsByScope = new Map<string, Map<string, MediaAccessTicket>>();
 const targetsByScope = new Map<string, Map<string, MediaAccessTarget>>();
 const ticketListeners = new Set<() => void>();
+const resumeListeners = new Set<() => void>();
 let ticketVersion = 0;
+let resumeVersion = 0;
 
 function normalizedPath(path: string): string | null {
   try {
@@ -66,6 +68,20 @@ export function subscribeMediaAccessTickets(listener: () => void): () => void {
 
 export function getMediaAccessTicketsVersion(): number {
   return ticketVersion;
+}
+
+export function subscribeMediaAccessResumes(listener: () => void): () => void {
+  resumeListeners.add(listener);
+  return () => resumeListeners.delete(listener);
+}
+
+export function getMediaAccessResumeVersion(): number {
+  return resumeVersion;
+}
+
+export function signalMediaAccessResume(): void {
+  resumeVersion += 1;
+  for (const listener of resumeListeners) listener();
 }
 
 export function setMediaAccessTickets(
@@ -120,6 +136,17 @@ export function invalidateMediaAccessTicket(
   const normalized = normalizedPath(path);
   if (!normalized) return;
   ticketsByScope.get(scope)?.delete(ticketKey(audience, normalized));
+}
+
+export function invalidateMediaAccessAudience(
+  audience: MediaAccessAudience,
+  scope: string,
+): void {
+  const tickets = ticketsByScope.get(scope);
+  if (!tickets) return;
+  for (const [key, ticket] of tickets) {
+    if (ticket.audience === audience) tickets.delete(key);
+  }
 }
 
 export function getMediaAccessTargets(scope: string): MediaAccessTarget[] {

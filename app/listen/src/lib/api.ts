@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth-route-policy";
 import {
   getListenAppId,
+  isCapacitorRuntime,
   isTauriRuntime,
   usesConfigurableServer,
 } from "@/lib/platform";
@@ -27,7 +28,9 @@ import {
   clearMediaAccessTickets,
   getMediaAccessTicket,
   getMediaAccessTargets,
+  invalidateMediaAccessAudience,
   invalidateMediaAccessTicket,
+  signalMediaAccessResume,
   setMediaAccessTickets,
   type MediaAccessAudience,
   type MediaAccessTarget,
@@ -587,10 +590,15 @@ export async function ensureMediaAccessUrl(
 
 export function startMediaAccessTicketRefresh(): () => void {
   if (!usesConfigurableServer || typeof window === "undefined") return () => {};
-  const refresh = () => {
-    if (document.visibilityState === "visible") {
-      void refreshMediaAccessTickets();
-    }
+  const recoverAfterResume = () => {
+    const server = getCurrentServer();
+    if (server?.id) invalidateMediaAccessAudience("artwork", server.id);
+    signalMediaAccessResume();
+  };
+  const handleVisibilityChange = () => {
+    if (document.visibilityState !== "visible") return;
+    if (isCapacitorRuntime) return;
+    recoverAfterResume();
   };
   const interval = window.setInterval(
     () => void refreshMediaAccessTickets(),
@@ -600,11 +608,15 @@ export function startMediaAccessTicketRefresh(): () => void {
     clearMediaAccessTickets();
     void refreshMediaAccessTickets();
   };
-  document.addEventListener("visibilitychange", refresh);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("crate:app-resumed", recoverAfterResume);
+  window.addEventListener("crate:network-restored", recoverAfterResume);
   window.addEventListener(SERVER_STORE_EVENT, handleServerChange);
   return () => {
     window.clearInterval(interval);
-    document.removeEventListener("visibilitychange", refresh);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.removeEventListener("crate:app-resumed", recoverAfterResume);
+    window.removeEventListener("crate:network-restored", recoverAfterResume);
     window.removeEventListener(SERVER_STORE_EVENT, handleServerChange);
   };
 }
