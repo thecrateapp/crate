@@ -33,6 +33,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import {
   AppModal,
   ModalBody,
@@ -223,7 +224,7 @@ function AvatarBubble({
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
   if (avatarUrl) {
     return (
-      <img
+      <AuthenticatedMediaImage
         src={avatarUrl}
         alt=""
         onError={handleAvatarError}
@@ -1510,7 +1511,7 @@ export function JamSession() {
                       className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.05]"
                     >
                       {playable.albumCover ? (
-                        <img
+                        <AuthenticatedMediaImage
                           src={playable.albumCover}
                           alt=""
                           className="h-10 w-10 rounded-lg object-cover"
@@ -1547,7 +1548,7 @@ export function JamSession() {
                   {index + 1}
                 </div>
                 {track.albumCover ? (
-                  <img
+                  <AuthenticatedMediaImage
                     src={track.albumCover}
                     alt=""
                     className="h-10 w-10 rounded-lg object-cover"
@@ -1667,7 +1668,7 @@ export function JamSession() {
                         {track ? (
                           <div className="mt-2 flex items-center gap-2 rounded-xl bg-black/20 p-2">
                             {track.albumCover ? (
-                              <img
+                              <AuthenticatedMediaImage
                                 src={track.albumCover}
                                 alt=""
                                 className="h-9 w-9 rounded-lg object-cover"

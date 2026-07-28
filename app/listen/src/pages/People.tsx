@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { api } from "@/lib/api";
 
 interface SocialSummary {
@@ -45,7 +46,7 @@ function UserAvatar({
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
   if (avatarUrl) {
     return (
-      <img
+      <AuthenticatedMediaImage
         src={avatarUrl}
         alt={name}
         onError={handleAvatarError}

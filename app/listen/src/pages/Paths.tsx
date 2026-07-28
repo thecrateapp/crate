@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 
@@ -221,7 +222,7 @@ function EndpointPanel({
       {/* Background cover */}
       {coverUrl && (
         <div className="absolute inset-0">
-          <img
+          <AuthenticatedMediaImage
             src={coverUrl}
             alt=""
             className="h-full w-full object-cover opacity-20 blur-sm"
@@ -240,7 +241,7 @@ function EndpointPanel({
           <div>
             {coverUrl && (
               <div className="mb-3 h-24 w-24 overflow-hidden rounded-xl bg-white/5 shadow-lg">
-                <img
+                <AuthenticatedMediaImage
                   src={coverUrl}
                   alt=""
                   className="h-full w-full object-cover"
@@ -292,7 +293,7 @@ function EndpointPanel({
                     className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/5 hover:text-white"
                   >
                     {r.imageUrl ? (
-                      <img
+                      <AuthenticatedMediaImage
                         src={r.imageUrl}
                         alt=""
                         className={`h-8 w-8 flex-shrink-0 bg-white/5 object-cover ${

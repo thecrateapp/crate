@@ -23,6 +23,39 @@ vi.mock("@/components/playlists/PlaylistCard", () => ({
 }));
 
 describe("ArtistPageSections", () => {
+  it("uses authenticated responsive artwork for global album cards", () => {
+    render(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <ArtistAlbumsSection
+            artistName="Pearl Jam"
+            artistSlug="pearl-jam"
+            albums={[
+              {
+                id: "global-album-1",
+                entity_uid: "11111111-1111-4111-8111-111111111111",
+                global_album_uid: "global-album-1",
+                name: "Ten",
+                display_name: "Ten",
+                slug: "ten",
+                year: "1991",
+                tracks: 11,
+                formats: ["FLAC"],
+                size_mb: 420,
+                has_cover: true,
+              },
+            ]}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+
+    const artwork = screen.getByRole("img", { name: "Ten" });
+    expect(artwork.tagName).toBe("IMG");
+    expect(artwork).toHaveAttribute("sizes");
+    expect(artwork.getAttribute("srcset")).toContain("size=320");
+  });
+
   it("uses the API-provided canonical artist slug for album links", () => {
     render(
       <MemoryRouter>

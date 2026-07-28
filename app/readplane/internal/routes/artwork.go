@@ -45,12 +45,7 @@ func (s *Server) serveAlbumArtworkByID(w http.ResponseWriter, r *http.Request, i
 }
 
 func (s *Server) serveAlbumArtworkByEntityUID(w http.ResponseWriter, r *http.Request, uid string) {
-	if s.artworkCatalog == nil {
-		s.fallbackOrRouteMiss(w, r)
-		return
-	}
-	key, err := s.artworkCatalog.AlbumArtworkKeyByEntityUID(r.Context(), uid)
-	s.serveMaterializedArtwork(w, r, "album-cover", key, err)
+	s.serveMaterializedArtwork(w, r, "album-cover", uid, nil)
 }
 
 func (s *Server) serveArtistArtworkByID(w http.ResponseWriter, r *http.Request, id int64, action string) {

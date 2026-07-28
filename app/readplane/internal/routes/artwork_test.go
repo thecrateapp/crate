@@ -92,6 +92,31 @@ func TestServeMaterializedAlbumArtwork(t *testing.T) {
 	assert.Equal(t, "hit", rec.Header().Get("X-Crate-Readplane"))
 }
 
+func TestServeMaterializedAlbumArtworkByEntityUIDAvoidsCatalogLookup(t *testing.T) {
+	root := t.TempDir()
+	entityUID := "11111111-1111-4111-8111-111111111111"
+	writeRouteArtworkFixture(t, root, "album-cover", entityUID)
+	server := &Server{
+		artworkCatalog:  stubArtworkCatalog{err: assert.AnError},
+		artworkResolver: media.NewArtworkResolver(root),
+	}
+	rec := httptest.NewRecorder()
+
+	server.serveAlbumArtworkByEntityUID(
+		rec,
+		httptest.NewRequest(
+			http.MethodGet,
+			"/api/albums/by-entity/"+entityUID+"/cover?size=256",
+			nil,
+		),
+		entityUID,
+	)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "webp", rec.Body.String())
+	assert.Equal(t, "variant", rec.Header().Get("X-Crate-Artwork"))
+}
+
 func TestNewServerResolvesArtworkFromCacheRoot(t *testing.T) {
 	cacheRoot := t.TempDir()
 	writeRouteArtworkFixture(t, cacheRoot, "album-cover", "album-uid")

@@ -15,6 +15,7 @@ import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
@@ -194,7 +195,7 @@ export function ArtistCard({
           </span>
         </div>
         {renderedPhotoUrl ? (
-          <img
+          <AuthenticatedMediaImage
             src={renderedPhotoUrl}
             srcSet={photoSrcSet}
             sizes={photoSrcSet ? `${imageSize}px` : undefined}
@@ -208,7 +209,7 @@ export function ArtistCard({
                 "grayscale saturate-0 brightness-[0.52] contrast-125 transition duration-300 group-hover:brightness-[0.72]",
             )}
             onLoad={() => setLoadedPhotoUrl(renderedPhotoUrl ?? null)}
-            onError={(e) => {
+            onError={() => {
               setLoadedPhotoUrl(null);
               if (
                 isPendingExternalArtwork &&
@@ -222,7 +223,6 @@ export function ArtistCard({
                 }
                 return;
               }
-              (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         ) : null}

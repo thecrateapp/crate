@@ -181,9 +181,17 @@ export function buildArtistAlbumCover(
   albumId?: number | null,
   albumSlug?: string,
   globalAlbumUid?: string | null,
+  albumEntityUid?: string | null,
 ) {
   return albumCoverApiUrl(
-    { albumId, globalAlbumUid, albumSlug, artistName, albumName },
+    {
+      albumId,
+      albumEntityUid,
+      globalAlbumUid: albumEntityUid ? undefined : globalAlbumUid,
+      albumSlug,
+      artistName,
+      albumName,
+    },
     { size: 512 },
   );
 }

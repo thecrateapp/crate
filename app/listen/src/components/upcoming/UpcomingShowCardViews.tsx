@@ -13,6 +13,7 @@ import {
 } from "@crate/ui/icons";
 
 import { ItemActionMenuButton } from "@crate/ui/domain/actions";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import {
   artistBackgroundApiUrl,
   artistPagePath,
@@ -32,7 +33,7 @@ function PreloadBackground({ item }: { item: UpcomingItem }) {
     { size: 1280 },
   );
   if (!url) return null;
-  return <img src={url} alt="" className="hidden" />;
+  return <AuthenticatedMediaImage src={url} alt="" className="hidden" />;
 }
 
 import type { UpcomingItem } from "./upcoming-model";
@@ -186,7 +187,7 @@ export function UpcomingShowCollapsedView({
       {/* Artist photo */}
       <div className="h-full w-[88px] flex-shrink-0 bg-white/5">
         {artistImageUrl && (
-          <img
+          <AuthenticatedMediaImage
             src={artistImageUrl}
             alt=""
             loading="lazy"
@@ -335,7 +336,7 @@ export function UpcomingShowExpandedView({
       {/* Hero — artist background covers the entire card, gradient fades to black at bottom */}
       <div className="absolute inset-0 overflow-hidden">
         {backgroundUrl && (
-          <img
+          <AuthenticatedMediaImage
             src={backgroundUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover brightness-[0.4] saturate-[0.7]"
@@ -379,7 +380,7 @@ export function UpcomingShowExpandedView({
         <div className="absolute bottom-3 left-3 right-3 z-10">
           <div className="flex items-center gap-2">
             {artistPhotoUrl && (
-              <img
+              <AuthenticatedMediaImage
                 src={artistPhotoUrl}
                 alt=""
                 className="h-9 w-9 flex-shrink-0 rounded-full object-cover ring-2 ring-primary/25"

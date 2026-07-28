@@ -6,6 +6,7 @@ from crate.artwork_variants import ArtworkAsset
 from crate.db.repositories.tasks import create_task_dedup
 
 ARTWORK_BACKFILL_VERSION = "1"
+ARTWORK_MANIFEST_PERMISSIONS_VERSION = "1"
 
 
 def queue_artwork_materialization(asset: ArtworkAsset, *, reason: str) -> str | None:
@@ -16,4 +17,8 @@ def queue_artwork_materialization(asset: ArtworkAsset, *, reason: str) -> str | 
     )
 
 
-__all__ = ["ARTWORK_BACKFILL_VERSION", "queue_artwork_materialization"]
+__all__ = [
+    "ARTWORK_BACKFILL_VERSION",
+    "ARTWORK_MANIFEST_PERMISSIONS_VERSION",
+    "queue_artwork_materialization",
+]

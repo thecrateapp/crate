@@ -11,6 +11,7 @@ import {
 
 import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
@@ -219,7 +220,7 @@ export const AlbumCard = memo(function AlbumCard({
       }}
     >
       <div className="relative aspect-square rounded-lg overflow-hidden bg-white/5 mb-2">
-        <img
+        <AuthenticatedMediaImage
           src={coverUrl}
           srcSet={coverSrcSet}
           sizes={coverSrcSet ? coverSizes : undefined}
@@ -227,9 +228,6 @@ export const AlbumCard = memo(function AlbumCard({
           loading="lazy"
           decoding="async"
           className="w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
         />
         {(albumId != null || globalAlbumUid) && (
           <ActionIconButton

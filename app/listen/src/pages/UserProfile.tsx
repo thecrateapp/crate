@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
+import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { contributionSourceLabel } from "@/lib/contributions";
@@ -119,7 +120,7 @@ function UserAvatar({
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
   if (avatarUrl) {
     return (
-      <img
+      <AuthenticatedMediaImage
         src={avatarUrl}
         alt={name}
         onError={handleAvatarError}
@@ -246,7 +247,7 @@ function ContributionCard({
   const card = (
     <>
       {coverUrl ? (
-        <img
+        <AuthenticatedMediaImage
           src={coverUrl}
           alt=""
           className="h-14 w-14 rounded-xl object-cover"
@@ -640,7 +641,7 @@ export function UserProfile() {
                       className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
                     >
                       {coverUrl ? (
-                        <img
+                        <AuthenticatedMediaImage
                           src={coverUrl}
                           alt={playlist.name}
                           className="h-14 w-14 rounded-xl object-cover"

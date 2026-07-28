@@ -1001,6 +1001,7 @@ function BandcampSection() {
           <div className="flex min-w-0 items-center gap-3">
             {status?.image_url ? (
               <img
+                data-public-media="true"
                 src={status.image_url}
                 alt=""
                 className="h-11 w-11 rounded-full object-cover"

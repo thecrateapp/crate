@@ -122,6 +122,7 @@ def publish_manifest_atomically(asset: ArtworkAsset, manifest: dict) -> None:
     )
     temporary_path = Path(temporary_name)
     try:
+        os.fchmod(descriptor, 0o644)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump(manifest, handle, sort_keys=True, separators=(",", ":"))
             handle.flush()

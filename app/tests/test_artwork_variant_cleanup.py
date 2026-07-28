@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import time
 from io import BytesIO
 
@@ -56,6 +57,25 @@ def test_cleanup_removes_only_expired_temporary_directories(monkeypatch, tmp_pat
     assert result["temporary_removed"] == 1
 
 
+def test_repair_manifest_permissions_makes_existing_assets_readplane_readable(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import repair_artwork_manifest_permissions
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    root = artwork_asset_root(ArtworkAsset("album-cover", "album-entity"))
+    root.mkdir(parents=True)
+    manifest = root / "current.json"
+    manifest.write_text("{}")
+    manifest.chmod(0o600)
+
+    result = repair_artwork_manifest_permissions(max_assets=10)
+
+    assert result == {"assets_checked": 1, "permissions_repaired": 1}
+    assert stat.S_IMODE(manifest.stat().st_mode) == 0o644
+
+
 def test_integrity_sample_reports_invalid_manifests_and_missing_files(
     monkeypatch, tmp_path
 ):
@@ -108,6 +128,36 @@ def test_repair_handler_requeues_corrupt_assets(monkeypatch):
 
     assert result == {"assets_checked": 100, "requeued": 1}
     assert queued == [(ArtworkAsset("album-cover", "album-entity"), "integrity-repair")]
+
+
+def test_repair_handler_fixes_manifest_modes_and_marks_upgrade_complete(monkeypatch):
+    from crate.worker_handlers import artwork
+
+    completed = []
+    monkeypatch.setattr(artwork, "find_corrupt_artwork_assets", lambda **_kwargs: [])
+    monkeypatch.setattr(
+        artwork,
+        "repair_artwork_manifest_permissions",
+        lambda **_kwargs: {"assets_checked": 42, "permissions_repaired": 41},
+    )
+    monkeypatch.setattr(
+        "crate.db.cache_settings.set_setting",
+        lambda key, value: completed.append((key, value)),
+    )
+
+    result = artwork._handle_repair_artwork_variants(
+        "task-1",
+        {"max_assets": 100_000, "repair_manifest_permissions": True},
+        {},
+    )
+
+    assert result == {
+        "assets_checked": 100_000,
+        "requeued": 0,
+        "manifest_assets_checked": 42,
+        "permissions_repaired": 41,
+    }
+    assert completed == [("artwork_manifest_permissions_version", "1")]
 
 
 def test_normal_health_uses_a_bounded_artwork_integrity_sample(monkeypatch):

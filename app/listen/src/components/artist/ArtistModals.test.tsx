@@ -7,9 +7,15 @@ import { ArtistBioModal } from "./ArtistBioModal";
 import { ArtistSetlistModal } from "./ArtistSetlistSection";
 import { I18nProvider } from "@/i18n";
 
-vi.mock("@/lib/api", () => ({
-  api: vi.fn(() => Promise.reject(new Error("skip enrichment in modal tests"))),
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    api: vi.fn(() =>
+      Promise.reject(new Error("skip enrichment in modal tests")),
+    ),
+  };
+});
 
 describe("artist mobile modals", () => {
   it("renders probable setlist as a native bottom sheet instead of a floating panel", () => {

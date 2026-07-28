@@ -18,6 +18,16 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   resolveMaybeApiAssetUrl: apiMocks.resolveMaybeApiAssetUrl,
 }));
 
+vi.mock("@/components/player/AuthenticatedMediaImage", () => ({
+  AuthenticatedMediaImage: ({
+    src,
+    srcSet,
+    ...props
+  }: React.ImgHTMLAttributes<HTMLImageElement>) => (
+    <img {...props} src={src} srcSet={srcSet} data-authenticated-media="true" />
+  ),
+}));
+
 vi.mock("@/contexts/SavedAlbumsContext", () => ({
   useSavedAlbums: () => ({
     isSaved: () => false,
@@ -69,6 +79,10 @@ describe("AlbumCard", () => {
     expect(screen.getByAltText("Inlet")).toHaveAttribute(
       "src",
       "https://api.example.test/api/catalog/albums/album-global-1/cover?size=256&token=native-token",
+    );
+    expect(screen.getByAltText("Inlet")).toHaveAttribute(
+      "data-authenticated-media",
+      "true",
     );
   });
 

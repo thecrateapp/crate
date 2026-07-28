@@ -29,6 +29,8 @@ vi.mock("@/lib/api", () => ({
   api: apiMock,
   AUTH_TOKEN_EVENT: "crate:auth-token-updated",
   ensureMediaAccessUrl: vi.fn(async (url: string) => url),
+  isUsableMediaAssetUrl: (url: string | null | undefined) => Boolean(url),
+  requiresMediaAccessTicket: () => false,
   resolveMaybeApiAssetUrl: (url: string | null | undefined) => url ?? null,
 }));
 

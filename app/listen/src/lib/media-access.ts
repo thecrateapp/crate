@@ -112,6 +112,16 @@ export function getMediaAccessTicket(
   return current.ticket;
 }
 
+export function invalidateMediaAccessTicket(
+  audience: MediaAccessAudience,
+  path: string,
+  scope: string,
+): void {
+  const normalized = normalizedPath(path);
+  if (!normalized) return;
+  ticketsByScope.get(scope)?.delete(ticketKey(audience, normalized));
+}
+
 export function getMediaAccessTargets(scope: string): MediaAccessTarget[] {
   const scoped = targetsByScope.get(scope);
   if (!scoped) return [];
