@@ -28,6 +28,25 @@ export interface EngineTrack {
   eqGains?: number[];
 }
 
+export interface EngineTransitionPlan {
+  plannerVersion: number;
+  outgoingTrackId: string;
+  incomingTrackId: string;
+  mode: "gapless" | "adaptive" | "beatmatch";
+  durationMs: number;
+  outgoingCueMs?: number;
+  incomingCueMs?: number;
+  incomingTempoRatio?: number;
+  beatPhaseOffsetMs?: number;
+  handoffProgress: number;
+  outgoingGainDb: number;
+  incomingGainDb: number;
+  curve: "equal-power";
+  bassHandoff: "none" | "balanced";
+  confidence: number;
+  fallbackReason?: string;
+}
+
 export interface EngineQueueSnapshot {
   revision: string;
   tracks: EngineTrack[];
@@ -37,6 +56,7 @@ export interface EngineQueueSnapshot {
   repeat: EngineRepeatMode;
   crossfadeMs: number;
   volume: number;
+  transitionPlans?: EngineTransitionPlan[];
 }
 
 export interface EngineState {
@@ -89,6 +109,12 @@ export interface EngineErrorEvent {
   httpStatus?: number;
 }
 
+export interface EngineTransitionCancelledEvent {
+  revision: string;
+  reason: string;
+  afterHandoff: boolean;
+}
+
 export interface EngineEventMap {
   ready: EngineState;
   stateChanged: EngineState;
@@ -98,6 +124,7 @@ export interface EngineEventMap {
   transitionStarted: EngineTransitionEvent;
   transitionProgress: EngineTransitionEvent;
   transitionEnded: EngineTransitionEvent;
+  transitionCancelled: EngineTransitionCancelledEvent;
   bufferingChanged: { revision: string; isBuffering: boolean };
   queueEnded: { revision: string };
   nearQueueEnd: { revision: string; remainingTracks: number };

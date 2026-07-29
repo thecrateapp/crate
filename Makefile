@@ -911,6 +911,8 @@ CAP_DEBUG_SERVER_URL ?= https://listen.lespedants.org
 CAP_ANDROID_OUTPUT_DIR ?= artifacts/capacitor/android
 CAP_ANDROID_GRADLE_VARIANT ?= debug
 CAP_ANDROID_RELEASE_TAG ?= $(shell git describe --tags --exact-match 2>/dev/null)
+CAP_SMART_MIX_CROSSFADE_MS ?= 3000
+CAP_SMART_MIX_API_URL ?= https://api.dev.lespedants.org
 
 # Android Studio JBR + SDK paths (required for Gradle/emulator)
 export JAVA_HOME ?= $(HOME)/Applications/Android Studio.app/Contents/jbr/Contents/Home
@@ -970,6 +972,22 @@ cap-android-artifacts: ## Build Android APK and copy output to a local artifacts
 	cp "$$out" "$$dst"; \
 	echo "$(GREEN)Artifact copied to:$$dst$(NC)"
 
+.PHONY: cap-android-smart-mix-artifacts
+cap-android-smart-mix-artifacts: ## Build a local-only Android Smart Mix debug APK
+	@cd $(CAP_DIR) && \
+		VITE_API_URL="$(CAP_SMART_MIX_API_URL)" \
+		VITE_CRATE_SMART_MIX_LOCAL_TEST="true" \
+		VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS="$(CAP_SMART_MIX_CROSSFADE_MS)" \
+		npm run build:cap
+	@cd $(CAP_DIR)/android && ./gradlew assembleDebug
+	@mkdir -p "$(CAP_ANDROID_OUTPUT_DIR)"
+	@ts="$$(date +%Y%m%d-%H%M%S)"; \
+	sha="$$(git rev-parse --short HEAD 2>/dev/null || echo local)"; \
+	src="$(CAP_DIR)/android/app/build/outputs/apk/debug/app-debug.apk"; \
+	dst="$(CAP_ANDROID_OUTPUT_DIR)/crate-smart-mix-debug-$${ts}-$${sha}.apk"; \
+	cp "$$src" "$$dst"; \
+	echo "$(GREEN)Smart Mix debug APK copied to: $$dst$(NC)"
+
 .PHONY: cap-android-release
 cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact release tag
 	@test -n "$(CAP_ANDROID_RELEASE_TAG)" || { echo "$(RED)CAP_ANDROID_RELEASE_TAG or an exact git tag is required$(NC)"; exit 1; }
@@ -977,7 +995,7 @@ cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact releas
 	@test -n "$$CRATE_ANDROID_KEYSTORE_PASSWORD" || { echo "$(RED)CRATE_ANDROID_KEYSTORE_PASSWORD is required$(NC)"; exit 1; }
 	@test -n "$$CRATE_ANDROID_KEY_ALIAS" || { echo "$(RED)CRATE_ANDROID_KEY_ALIAS is required$(NC)"; exit 1; }
 	@test -n "$$CRATE_ANDROID_KEY_PASSWORD" || { echo "$(RED)CRATE_ANDROID_KEY_PASSWORD is required$(NC)"; exit 1; }
-	@cd $(CAP_DIR) && npm run build:cap
+	@cd $(CAP_DIR) && VITE_CRATE_SMART_MIX_LOCAL_TEST="false" npm run build:cap
 	@cd $(CAP_DIR) && eval "$$(node scripts/android-release-version.mjs "$(CAP_ANDROID_RELEASE_TAG)")"; \
 	export CRATE_ANDROID_VERSION_NAME CRATE_ANDROID_VERSION_CODE; \
 	cd android && ./gradlew bundleRelease assembleRelease lintRelease --no-daemon

@@ -22,6 +22,17 @@ const NATIVE_SMART_MIX_ROLLOUT_KEY = "crate-native-smart-mix-rollout-enabled";
 const NATIVE_SMART_MIX_KILL_SWITCH_KEY = "crate-native-smart-mix-kill-switch";
 const NATIVE_PLAYER_EQ_KEY = "crate-native-player-eq-enabled";
 const NATIVE_READY_PROBE_DELAYS_MS = [0, 100, 250] as const;
+const LOCAL_SMART_MIX_TEST_ENABLED =
+  import.meta.env.VITE_CRATE_SMART_MIX_LOCAL_TEST === "true";
+const LOCAL_SMART_MIX_CROSSFADE_MS = (() => {
+  const parsed = Number.parseInt(
+    import.meta.env.VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS ?? "",
+    10,
+  );
+  return Number.isFinite(parsed)
+    ? Math.max(250, Math.min(parsed, 12_000))
+    : 3000;
+})();
 
 export type AndroidNativeSmartMixCapabilities = {
   available: boolean;
@@ -179,6 +190,9 @@ function isAndroidNativeSmartMixKilled(): boolean {
 }
 
 function effectiveNativeCrossfadeMs(requestedMs: number): number {
+  if (LOCAL_SMART_MIX_TEST_ENABLED && !isAndroidNativeSmartMixKilled()) {
+    return LOCAL_SMART_MIX_CROSSFADE_MS;
+  }
   if (
     !smartMixCapabilities.available ||
     !smartMixCapabilities.androidNativeCrossfade ||

@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_EXPLORE_HOME_DISCOVERY_ENABLED?: string;
   readonly VITE_TAURI_OAUTH_WEB_BRIDGE?: string;
   readonly VITE_ALLOW_INSECURE_LOOPBACK?: string;
+  readonly VITE_CRATE_SMART_MIX_LOCAL_TEST?: string;
+  readonly VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS?: string;
 }
 
 interface ImportMeta {

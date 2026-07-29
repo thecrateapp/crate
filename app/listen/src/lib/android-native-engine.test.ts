@@ -32,6 +32,7 @@ describe("android native engine flags", () => {
     localStorage.clear();
     vi.clearAllMocks();
     vi.resetModules();
+    vi.unstubAllEnvs();
     vi.doUnmock("@/lib/capacitor-runtime");
   });
 
@@ -197,6 +198,42 @@ describe("android native engine flags", () => {
 
     expect(nativePlaybackMock.setQueue).toHaveBeenCalledWith(
       expect.objectContaining({ crossfadeMs: 4000 }),
+    );
+  });
+
+  it("allows an explicit local APK build to exercise native crossfade", async () => {
+    vi.stubEnv("VITE_CRATE_SMART_MIX_LOCAL_TEST", "true");
+    vi.stubEnv("VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS", "3000");
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "local-smart-mix",
+      playbackState: "playing",
+      isPlaying: true,
+      index: 0,
+      positionMs: 0,
+      durationMs: 180_000,
+      queueSize: 2,
+      crossfadeMs: 3000,
+      eqEnabled: true,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = new AndroidNativeEngine();
+
+    await engine.loadQueue({
+      revision: "local-smart-mix",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: true,
+      repeat: "off",
+      crossfadeMs: 0,
+      volume: 1,
+    });
+
+    expect(nativePlaybackMock.setQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ crossfadeMs: 3000 }),
     );
   });
 

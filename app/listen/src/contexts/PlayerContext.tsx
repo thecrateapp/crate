@@ -81,8 +81,10 @@ import type {
   EngineEventName,
   EnginePositionEvent,
   EngineState,
+  EngineTransitionEvent,
 } from "@/lib/playback-engine";
 import { createQueueRevision } from "@/lib/playback-engine";
+import { resolveNativeCrossfadeTransition } from "@/lib/native-transition-visual";
 import {
   getInfinitePlaybackPreference,
   getEffectivePlaybackDeliveryPolicy,
@@ -1305,6 +1307,38 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         );
         return;
       }
+      if (eventName === "transitionStarted") {
+        const transition = resolveNativeCrossfadeTransition(
+          payload as EngineTransitionEvent,
+          queueRef.current,
+          performance.now(),
+          durationRef.current,
+        );
+        if (!transition) return;
+        if (crossfadeTimerRef.current != null) {
+          window.clearTimeout(crossfadeTimerRef.current);
+        }
+        setCrossfadeTransition(transition);
+        crossfadeTimerRef.current = window.setTimeout(() => {
+          setCrossfadeTransition(null);
+          crossfadeTimerRef.current = null;
+        }, transition.durationMs);
+        return;
+      }
+      if (eventName === "transitionProgress") {
+        return;
+      }
+      if (
+        eventName === "transitionEnded" ||
+        eventName === "transitionCancelled"
+      ) {
+        if (crossfadeTimerRef.current != null) {
+          window.clearTimeout(crossfadeTimerRef.current);
+          crossfadeTimerRef.current = null;
+        }
+        setCrossfadeTransition(null);
+        return;
+      }
       if (eventName === "bufferingChanged") {
         const isNativeBuffering = (payload as { isBuffering: boolean })
           .isBuffering;
@@ -1378,12 +1412,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       clearNativeBufferingWatchdog,
       commitIsPlaying,
       commitIsBuffering,
+      crossfadeTimerRef,
       currentIndexRef,
+      durationRef,
       flushCurrentPlayEvent,
       queueRef,
       recoverNativeBuffering,
       retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
+      setCrossfadeTransition,
     ],
   );
 
@@ -1515,6 +1552,42 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         },
       );
       removers.push(trackRemove);
+
+      const transitionStartedRemove = await androidNativeEngine.on(
+        "transitionStarted",
+        (event) => {
+          if (disposed) return;
+          handleNativeEvent("transitionStarted", event);
+        },
+      );
+      removers.push(transitionStartedRemove);
+
+      const transitionProgressRemove = await androidNativeEngine.on(
+        "transitionProgress",
+        (event) => {
+          if (disposed) return;
+          handleNativeEvent("transitionProgress", event);
+        },
+      );
+      removers.push(transitionProgressRemove);
+
+      const transitionEndedRemove = await androidNativeEngine.on(
+        "transitionEnded",
+        (event) => {
+          if (disposed) return;
+          handleNativeEvent("transitionEnded", event);
+        },
+      );
+      removers.push(transitionEndedRemove);
+
+      const transitionCancelledRemove = await androidNativeEngine.on(
+        "transitionCancelled",
+        (event) => {
+          if (disposed) return;
+          handleNativeEvent("transitionCancelled", event);
+        },
+      );
+      removers.push(transitionCancelledRemove);
 
       const bufferingRemove = await androidNativeEngine.on(
         "bufferingChanged",
