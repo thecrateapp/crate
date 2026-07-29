@@ -628,6 +628,11 @@ export async function ensureMediaAccessUrl(
 
 export function startMediaAccessTicketRefresh(): () => void {
   if (!usesConfigurableServer || typeof window === "undefined") return () => {};
+  const serverIdentity = () => {
+    const server = getCurrentServer();
+    return server ? `${server.id}\u0000${server.url}` : "";
+  };
+  let activeServerIdentity = serverIdentity();
   const recoverAfterResume = () => {
     const server = getCurrentServer();
     if (server?.id) invalidateMediaAccessAudience("artwork", server.id);
@@ -643,7 +648,11 @@ export function startMediaAccessTicketRefresh(): () => void {
     45_000,
   );
   const handleServerChange = () => {
-    clearMediaAccessTickets();
+    const nextServerIdentity = serverIdentity();
+    if (nextServerIdentity !== activeServerIdentity) {
+      clearMediaAccessTickets();
+      activeServerIdentity = nextServerIdentity;
+    }
     void refreshMediaAccessTickets();
   };
   document.addEventListener("visibilitychange", handleVisibilityChange);

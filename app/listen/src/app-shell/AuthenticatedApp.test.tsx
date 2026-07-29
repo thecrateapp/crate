@@ -34,7 +34,7 @@ describe("AuthenticatedApp", () => {
     shellRender.mockClear();
   });
 
-  it("rebuilds protected media URLs after ticket refresh", () => {
+  it("does not rebuild the app shell after ticket refresh", () => {
     render(<AuthenticatedApp />);
     expect(shellRender).toHaveBeenCalledTimes(1);
 
@@ -42,6 +42,6 @@ describe("AuthenticatedApp", () => {
       setMediaAccessTickets([], "server-a");
     });
 
-    expect(shellRender).toHaveBeenCalledTimes(2);
+    expect(shellRender).toHaveBeenCalledTimes(1);
   });
 });
