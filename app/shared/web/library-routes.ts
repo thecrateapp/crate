@@ -338,7 +338,7 @@ export function artistApiPath(input: ArtistRouteInput) {
   return "";
 }
 
-export function artistPhotoApiUrl(
+export function artistPhotoAssetPath(
   input: ArtistRouteInput,
   options?: ImageAssetOptions,
 ) {
@@ -348,40 +348,82 @@ export function artistPhotoApiUrl(
       input.artistId != null
         ? artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion
         : globalArtistAssetVersion;
-    return resolveAssetUrl(
-      withAssetOptions(
-        `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/photo`,
-        {
-          ...options,
-          version: resolveAssetVersion(options?.version, runtimeVersion),
-        },
-      ),
+    return withAssetOptions(
+      `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/photo`,
+      {
+        ...options,
+        version: resolveAssetVersion(options?.version, runtimeVersion),
+      },
     );
   }
   if (input.artistId != null) {
     const runtimeVersion =
       artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
-    return resolveAssetUrl(
-      withAssetOptions(`/api/artists/${input.artistId}/photo`, {
-        ...options,
-        version: resolveAssetVersion(options?.version, runtimeVersion),
-      }),
-    );
+    return withAssetOptions(`/api/artists/${input.artistId}/photo`, {
+      ...options,
+      version: resolveAssetVersion(options?.version, runtimeVersion),
+    });
   }
   if (input.artistEntityUid) {
-    return resolveAssetUrl(
-      withAssetOptions(
-        `/api/artists/by-entity/${encodeEntityUid(
-          input.artistEntityUid,
-        )}/photo`,
-        {
-          ...options,
-          version: resolveAssetVersion(
-            options?.version,
-            globalArtistAssetVersion,
-          ),
-        },
-      ),
+    return withAssetOptions(
+      `/api/artists/by-entity/${encodeEntityUid(input.artistEntityUid)}/photo`,
+      {
+        ...options,
+        version: resolveAssetVersion(
+          options?.version,
+          globalArtistAssetVersion,
+        ),
+      },
+    );
+  }
+  return "";
+}
+
+export function artistPhotoApiUrl(
+  input: ArtistRouteInput,
+  options?: ImageAssetOptions,
+) {
+  return resolveAssetUrl(artistPhotoAssetPath(input, options));
+}
+
+export function artistBackgroundAssetPath(
+  input: ArtistRouteInput,
+  options?: ImageAssetOptions,
+) {
+  const globalArtistUid = input.globalArtistUid || input.global_artist_uid;
+  if (globalArtistUid) {
+    const runtimeVersion =
+      input.artistId != null
+        ? artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion
+        : globalArtistAssetVersion;
+    return withAssetOptions(
+      `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/background`,
+      {
+        ...options,
+        version: resolveAssetVersion(options?.version, runtimeVersion),
+      },
+    );
+  }
+  if (input.artistId != null) {
+    const runtimeVersion =
+      artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
+    return withAssetOptions(`/api/artists/${input.artistId}/background`, {
+      ...options,
+      version: resolveAssetVersion(options?.version, runtimeVersion),
+    });
+  }
+  if (input.artistEntityUid) {
+    return withAssetOptions(
+      `/api/artists/by-entity/${encodeEntityUid(
+        input.artistEntityUid,
+      )}/background`,
+      {
+        ...options,
+        version: resolveAssetVersion(
+          options?.version,
+          globalArtistAssetVersion,
+        ),
+      },
     );
   }
   return "";
@@ -391,49 +433,7 @@ export function artistBackgroundApiUrl(
   input: ArtistRouteInput,
   options?: ImageAssetOptions,
 ) {
-  const globalArtistUid = input.globalArtistUid || input.global_artist_uid;
-  if (globalArtistUid) {
-    const runtimeVersion =
-      input.artistId != null
-        ? artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion
-        : globalArtistAssetVersion;
-    return resolveAssetUrl(
-      withAssetOptions(
-        `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/background`,
-        {
-          ...options,
-          version: resolveAssetVersion(options?.version, runtimeVersion),
-        },
-      ),
-    );
-  }
-  if (input.artistId != null) {
-    const runtimeVersion =
-      artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
-    return resolveAssetUrl(
-      withAssetOptions(`/api/artists/${input.artistId}/background`, {
-        ...options,
-        version: resolveAssetVersion(options?.version, runtimeVersion),
-      }),
-    );
-  }
-  if (input.artistEntityUid) {
-    return resolveAssetUrl(
-      withAssetOptions(
-        `/api/artists/by-entity/${encodeEntityUid(
-          input.artistEntityUid,
-        )}/background`,
-        {
-          ...options,
-          version: resolveAssetVersion(
-            options?.version,
-            globalArtistAssetVersion,
-          ),
-        },
-      ),
-    );
-  }
-  return "";
+  return resolveAssetUrl(artistBackgroundAssetPath(input, options));
 }
 
 export function albumPagePath(input: AlbumRouteInput) {
@@ -684,7 +684,7 @@ export function trackSharePath(input: TrackRouteInput) {
   return ref ? `/share/track/${encodeURIComponent(ref)}/${slug}` : "/share";
 }
 
-export function albumCoverApiUrl(
+export function albumCoverAssetPath(
   input: AlbumRouteInput,
   options?: ImageAssetOptions,
 ) {
@@ -694,53 +694,53 @@ export function albumCoverApiUrl(
       input.albumId != null
         ? albumAssetVersions.get(input.albumId) ?? globalAlbumAssetVersion
         : globalAlbumAssetVersion;
-    return resolveAssetUrl(
-      withAssetOptions(
-        `/api/catalog/albums/${encodeEntityUid(globalAlbumUid)}/cover`,
-        {
-          ...options,
-          version: resolveAssetVersion(options?.version, runtimeVersion),
-        },
-      ),
+    return withAssetOptions(
+      `/api/catalog/albums/${encodeEntityUid(globalAlbumUid)}/cover`,
+      {
+        ...options,
+        version: resolveAssetVersion(options?.version, runtimeVersion),
+      },
     );
   }
   if (input.albumId != null) {
     const runtimeVersion =
       albumAssetVersions.get(input.albumId) ?? globalAlbumAssetVersion;
-    return resolveAssetUrl(
-      withAssetOptions(`/api/albums/${input.albumId}/cover`, {
-        ...options,
-        version: resolveAssetVersion(options?.version, runtimeVersion),
-      }),
-    );
+    return withAssetOptions(`/api/albums/${input.albumId}/cover`, {
+      ...options,
+      version: resolveAssetVersion(options?.version, runtimeVersion),
+    });
   }
   if (input.albumEntityUid) {
-    return resolveAssetUrl(
-      withAssetOptions(
-        `/api/albums/by-entity/${encodeEntityUid(input.albumEntityUid)}/cover`,
-        {
-          ...options,
-          version: resolveAssetVersion(
-            options?.version,
-            globalAlbumAssetVersion,
-          ),
-        },
-      ),
+    return withAssetOptions(
+      `/api/albums/by-entity/${encodeEntityUid(input.albumEntityUid)}/cover`,
+      {
+        ...options,
+        version: resolveAssetVersion(options?.version, globalAlbumAssetVersion),
+      },
     );
   }
   return "";
 }
 
-export function genreCoverApiUrl(slug: string, options?: ImageAssetOptions) {
+export function albumCoverApiUrl(
+  input: AlbumRouteInput,
+  options?: ImageAssetOptions,
+) {
+  return resolveAssetUrl(albumCoverAssetPath(input, options));
+}
+
+export function genreCoverAssetPath(slug: string, options?: ImageAssetOptions) {
   const normalizedSlug = slugifySegment(slug, "");
   if (!normalizedSlug) return "";
-  return resolveAssetUrl(
-    withAssetOptions(`/api/genres/${encPath(normalizedSlug)}/cover`, {
-      ...options,
-      version: resolveAssetVersion(
-        options?.version,
-        genreAssetVersions.get(normalizedSlug),
-      ),
-    }),
-  );
+  return withAssetOptions(`/api/genres/${encPath(normalizedSlug)}/cover`, {
+    ...options,
+    version: resolveAssetVersion(
+      options?.version,
+      genreAssetVersions.get(normalizedSlug),
+    ),
+  });
+}
+
+export function genreCoverApiUrl(slug: string, options?: ImageAssetOptions) {
+  return resolveAssetUrl(genreCoverAssetPath(slug, options));
 }

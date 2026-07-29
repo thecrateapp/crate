@@ -8,7 +8,7 @@ import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { cn } from "@crate/ui/lib/cn";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { api } from "@/lib/api";
 
 type AffinityBand = "low" | "medium" | "high" | "very_high" | string;
@@ -113,7 +113,7 @@ function ProfileAvatar({ card }: { card: ProfileCardPayload }) {
 
   if (avatarUrl) {
     return (
-      <AuthenticatedMediaImage
+      <CrateImage
         src={avatarUrl}
         alt=""
         onError={handleAvatarError}

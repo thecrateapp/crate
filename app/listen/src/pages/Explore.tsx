@@ -23,7 +23,7 @@ import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 
 export function Explore() {
@@ -327,7 +327,7 @@ function GenreExplorer({
               className="group relative min-h-36 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-primary/30 hover:bg-white/[0.06]"
             >
               {resolvedCoverUrl ? (
-                <AuthenticatedMediaImage
+                <CrateImage
                   src={resolvedCoverUrl}
                   alt=""
                   aria-hidden="true"

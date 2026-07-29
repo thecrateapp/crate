@@ -23,12 +23,12 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import {
   ContextMenu,
   type ContextMenuEntry,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
@@ -168,7 +168,7 @@ export function TopBarUserMenu() {
           {...actionMenu.longPressHandlers}
         >
           {avatarUrl ? (
-            <AuthenticatedMediaImage
+            <CrateImage
               src={avatarUrl}
               alt=""
               onError={handleAvatarError}

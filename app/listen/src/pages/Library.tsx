@@ -32,7 +32,7 @@ import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { AlbumCard } from "@/components/cards/AlbumCard";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { PlaylistListRow } from "@/components/playlists/PlaylistListRow";
 import {
@@ -944,7 +944,7 @@ function BandcampTab() {
               >
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
                   {contribution.album_id ? (
-                    <AuthenticatedMediaImage
+                    <CrateImage
                       src={albumCoverApiUrl(
                         {
                           albumId: contribution.album_id,
@@ -1016,7 +1016,7 @@ function BandcampTab() {
               >
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/8 bg-white/6">
                   {coverUrl ? (
-                    <AuthenticatedMediaImage
+                    <CrateImage
                       src={coverUrl}
                       alt=""
                       loading="lazy"
@@ -1124,7 +1124,7 @@ function ContributionArtwork({
   return (
     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
       {contribution.album_id ? (
-        <AuthenticatedMediaImage
+        <CrateImage
           src={albumCoverApiUrl(
             {
               albumId: contribution.album_id,

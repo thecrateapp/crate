@@ -1,4 +1,5 @@
 import { ListMusic } from "@crate/ui/icons";
+import type { ImgHTMLAttributes, Key, ReactNode } from "react";
 
 export interface PlaylistArtworkTrack {
   artist?: string;
@@ -13,6 +14,11 @@ export interface PlaylistArtworkTrack {
   album_slug?: string;
 }
 
+export interface PlaylistArtworkImageProps
+  extends ImgHTMLAttributes<HTMLImageElement> {
+  key?: Key;
+}
+
 interface PlaylistArtworkProps {
   name?: string;
   coverDataUrl?: string | null;
@@ -22,6 +28,7 @@ interface PlaylistArtworkProps {
   crateMarkClassName?: string;
   logoSrc?: string;
   buildCoverUrl: (track: PlaylistArtworkTrack) => string | null;
+  renderImage?: (props: PlaylistArtworkImageProps) => ReactNode;
 }
 
 function playlistGradient(name: string): string {
@@ -64,6 +71,7 @@ export function PlaylistArtwork({
   crateMarkClassName,
   logoSrc = "/icons/logo.svg",
   buildCoverUrl,
+  renderImage,
 }: PlaylistArtworkProps) {
   const collageSources: string[] = [];
   for (const track of tracks) {
@@ -77,15 +85,20 @@ export function PlaylistArtwork({
   const crateMark = showCrateMark ? (
     <CrateMark logoSrc={logoSrc} className={crateMarkClassName} />
   ) : null;
+  const artworkImage = (props: PlaylistArtworkImageProps) => {
+    if (renderImage) return renderImage(props);
+    const { key, ...imageProps } = props;
+    return <img key={key} {...imageProps} />;
+  };
 
   if (coverDataUrl) {
     return (
       <div className={`relative overflow-hidden bg-white/5 ${className}`}>
-        <img
-          src={coverDataUrl}
-          alt={name}
-          className="w-full h-full object-cover"
-        />
+        {artworkImage({
+          src: coverDataUrl,
+          alt: name,
+          className: "w-full h-full object-cover",
+        })}
         {crateMark}
       </div>
     );
@@ -95,11 +108,11 @@ export function PlaylistArtwork({
     if (collageSources.length === 1) {
       return (
         <div className={`relative overflow-hidden bg-white/5 ${className}`}>
-          <img
-            src={collageSources[0]}
-            alt={name}
-            className="w-full h-full object-cover"
-          />
+          {artworkImage({
+            src: collageSources[0],
+            alt: name,
+            className: "w-full h-full object-cover",
+          })}
           {crateMark}
         </div>
       );
@@ -113,16 +126,16 @@ export function PlaylistArtwork({
     return (
       <div className={`relative overflow-hidden bg-white/5 ${className}`}>
         <div className={`grid h-full w-full ${collageClassName} gap-[2px]`}>
-          {collageSources.map((source, index) => (
-            <img
-              key={`${source}-${index}`}
-              src={source}
-              alt=""
-              className={`w-full h-full object-cover ${
+          {collageSources.map((source, index) =>
+            artworkImage({
+              key: `${source}-${index}`,
+              src: source,
+              alt: "",
+              className: `w-full h-full object-cover ${
                 collageSources.length === 3 && index === 2 ? "col-span-2" : ""
-              }`}
-            />
-          ))}
+              }`,
+            }),
+          )}
         </div>
         {crateMark}
       </div>

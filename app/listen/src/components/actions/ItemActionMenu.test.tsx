@@ -4,9 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ContextMenu,
   ItemActionMenu,
   type ItemActionMenuEntry,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 
 let isDesktop = false;
 let canHover = true;
@@ -83,6 +84,62 @@ describe("ItemActionMenu mobile sheet", () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onOuterClick).not.toHaveBeenCalled();
+  });
+
+  it("renders media headers through the Listen artwork pipeline", () => {
+    render(
+      <ItemActionMenu
+        actions={[
+          {
+            key: "play",
+            label: "Play",
+            onSelect: vi.fn(),
+          },
+        ]}
+        header={{
+          type: "media",
+          title: "El Cielo",
+          imageUrl: "/api/albums/8/cover?size=96",
+        }}
+        open
+        position={null}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "El Cielo" })).toHaveAttribute(
+      "data-artwork-managed",
+      "true",
+    );
+  });
+
+  it("adapts direct context-menu media headers to the same pipeline", () => {
+    render(
+      <ContextMenu
+        items={[
+          {
+            key: "play",
+            label: "Play",
+            onSelect: vi.fn(),
+          },
+        ]}
+        header={{
+          type: "media",
+          title: "High Vis",
+          imageUrl: "/api/artists/9/photo?size=96",
+        }}
+        open
+        position={null}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "High Vis" })).toHaveAttribute(
+      "data-artwork-managed",
+      "true",
+    );
   });
 
   it("closes on overlay tap and swallows the underlying click", async () => {

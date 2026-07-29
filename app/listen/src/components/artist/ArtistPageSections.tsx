@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { useMemo } from "react";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -222,7 +222,7 @@ function ArtistAlbumItem({
       >
         <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
           {cover ? (
-            <AuthenticatedMediaImage
+            <CrateImage
               src={cover}
               srcSet={coverSrcSet}
               sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 20vw"

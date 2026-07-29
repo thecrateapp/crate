@@ -43,6 +43,30 @@ def test_deliver_artwork_prefers_materialized_variant(monkeypatch, tmp_path):
     assert queued == []
 
 
+def test_deliver_artwork_can_mark_authenticated_variants_private(
+    monkeypatch, tmp_path
+):
+    from crate.api import artwork_delivery
+    from crate.artwork_materializer import materialize_artwork
+    from crate.artwork_variants import ArtworkAsset
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    asset = ArtworkAsset("artist-photo", "artist-entity")
+    materialize_artwork(asset, _jpeg_bytes())
+
+    response = artwork_delivery.deliver_artwork(
+        asset,
+        requested_size=320,
+        local_original=None,
+        missing_response=Response(status_code=404),
+        cache_visibility="private",
+    )
+
+    assert response.headers["cache-control"] == (
+        "private, max-age=86400, stale-while-revalidate=604800"
+    )
+
+
 def test_deliver_artwork_serves_original_and_queues_variant(monkeypatch, tmp_path):
     from crate.api import artwork_delivery
     from crate.artwork_variants import ArtworkAsset
@@ -71,6 +95,23 @@ def test_deliver_artwork_serves_original_and_queues_variant(monkeypatch, tmp_pat
     assert response.background is not None
     asyncio.run(response.background())
     assert queued == [(asset, "variant-miss")]
+
+
+def test_deliver_original_artwork_has_shared_cache_and_revision_headers(tmp_path):
+    from crate.api.artwork_delivery import deliver_original_artwork
+
+    original = tmp_path / "artist.png"
+    original.write_bytes(b"png")
+
+    response = deliver_original_artwork(original)
+
+    assert response.status_code == 200
+    assert response.media_type == "image/png"
+    assert response.headers["etag"]
+    assert response.headers["cache-control"] == (
+        "public, max-age=300, stale-while-revalidate=86400"
+    )
+    assert response.headers["x-crate-artwork"] == "original"
 
 
 def test_deliver_artwork_returns_missing_response_when_queue_fails(

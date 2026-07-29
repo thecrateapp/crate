@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import type { ImgHTMLAttributes, ReactNode, RefObject } from "react";
 import type { CrateIcon } from "@crate/ui/icons";
 
 export interface ContextMenuMediaHeader {
@@ -14,6 +14,12 @@ export interface ContextMenuMediaHeader {
 }
 
 export type ContextMenuHeader = ContextMenuMediaHeader;
+export type ContextMenuMediaImageProps = ImgHTMLAttributes<HTMLImageElement> & {
+  src: string;
+};
+export type ContextMenuMediaImageRenderer = (
+  props: ContextMenuMediaImageProps,
+) => ReactNode;
 
 export type ContextMenuEntry =
   | {
@@ -47,6 +53,7 @@ export interface ContextMenuProps {
   menuRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   className?: string;
+  renderMediaImage?: ContextMenuMediaImageRenderer;
 }
 
 export interface MobileActionSheetProps {

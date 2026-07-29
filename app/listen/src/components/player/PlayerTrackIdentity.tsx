@@ -1,6 +1,6 @@
 import { cn } from "@crate/ui/lib/cn";
 
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 
@@ -119,7 +119,7 @@ export function PlayerTrackIdentity({
           )}
         >
           {artistAvatarUrl ? (
-            <AuthenticatedMediaImage
+            <CrateImage
               src={artistAvatarUrl}
               alt={currentTrack.artist}
               className="h-7 w-7 rounded-full object-cover"

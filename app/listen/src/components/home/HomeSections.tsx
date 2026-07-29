@@ -10,14 +10,17 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Clock3, Loader2, Play, Sparkles } from "@crate/ui/icons";
 
-import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import {
   EditorialPlaylistArtwork,
   editorialPlaylistLabel,
 } from "@/components/playlists/EditorialPlaylistArtwork";
-import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
+import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 

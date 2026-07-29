@@ -36,6 +36,8 @@ lcov.info
 **/lcov.info
 desktop-artifacts/
 artifacts/
+.artifacts/
+**/graphify-out/
 
 # Python
 __pycache__/

@@ -1,6 +1,6 @@
 import { PlaylistArtwork, type PlaylistArtworkTrack } from "./PlaylistArtwork";
 
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { cn } from "@/lib/utils";
 
 type EditorialVariant = "core" | "history" | "crate";
@@ -74,7 +74,7 @@ export function EditorialPlaylistArtwork({
     >
       <div className="absolute inset-0 z-0 opacity-55 transition duration-500 group-hover:scale-[1.035] group-hover:opacity-70">
         {backgroundImageUrl ? (
-          <AuthenticatedMediaImage
+          <CrateImage
             src={backgroundImageUrl}
             alt={title}
             loading="lazy"

@@ -9,6 +9,7 @@ import {
   shouldRenderDesktopContextMenu,
   type ContextMenuEntry,
   type ContextMenuMediaHeader,
+  type ContextMenuMediaImageProps,
 } from "./ContextMenu";
 
 let isDesktop = true;
@@ -117,6 +118,55 @@ describe("ContextMenu", () => {
     );
 
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
+  });
+
+  it("delegates media rendering when a consumer supplies an image pipeline", () => {
+    const renderMediaImage = vi.fn((props: ContextMenuMediaImageProps) => (
+      <span data-testid="managed-media-image" data-source={props.src} />
+    ));
+
+    render(
+      <ContextMenu
+        header={header}
+        items={actions()}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+        renderMediaImage={renderMediaImage}
+      />,
+    );
+
+    expect(renderMediaImage).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("managed-media-image")).toHaveAttribute(
+      "data-source",
+      "/cover.jpg",
+    );
+    expect(
+      screen.queryByRole("img", { name: "El Cielo cover" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a managed image mounted so it can recover after a failure", () => {
+    render(
+      <ContextMenu
+        header={header}
+        items={actions()}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+        renderMediaImage={(props) => <img {...props} />}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "El Cielo cover" });
+    fireEvent.error(image);
+    expect(image).toBeInTheDocument();
+    expect(image).toHaveClass("opacity-0");
+
+    fireEvent.load(image);
+    expect(image).not.toHaveClass("opacity-0");
   });
 
   it("hides a broken media header image instead of showing browser broken-image chrome", () => {

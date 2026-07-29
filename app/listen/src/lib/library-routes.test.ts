@@ -110,6 +110,38 @@ describe("library route asset helpers", () => {
     );
   });
 
+  it("builds canonical artwork paths without transport credentials", async () => {
+    (
+      window as Window &
+        typeof globalThis & {
+          __crateResolveApiAssetUrl?: (path: string) => string;
+        }
+    ).__crateResolveApiAssetUrl = (path: string) =>
+      `https://api.example.test${path}${
+        path.includes("?") ? "&" : "?"
+      }media_ticket=runtime-ticket`;
+
+    const {
+      albumCoverAssetPath,
+      artistBackgroundAssetPath,
+      artistPhotoAssetPath,
+      genreCoverAssetPath,
+    } = await import("@/lib/library-routes");
+
+    expect(artistPhotoAssetPath({ artistId: 9 }, { size: 320 })).toBe(
+      "/api/artists/9/photo?size=320&format=webp",
+    );
+    expect(artistBackgroundAssetPath({ artistId: 9 }, { size: 1280 })).toBe(
+      "/api/artists/9/background?size=1280&format=webp",
+    );
+    expect(albumCoverAssetPath({ albumId: 4 }, { size: 320 })).toBe(
+      "/api/albums/4/cover?size=320&format=webp",
+    );
+    expect(genreCoverAssetPath("post-metal", { size: 640 })).toBe(
+      "/api/genres/post-metal/cover?size=640&format=webp",
+    );
+  });
+
   it("falls back to entity UID artist assets when numeric ids are unavailable", () => {
     const url = artistPhotoApiUrl(
       { artistEntityUid: "artist-entity-9" },

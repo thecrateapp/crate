@@ -37,6 +37,7 @@ import {
 } from "@crate/ui/icons";
 import { toast } from "sonner";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
@@ -1000,9 +1001,9 @@ function BandcampSection() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             {status?.image_url ? (
-              <img
-                data-public-media="true"
+              <CrateImage
                 src={status.image_url}
+                retryPolicy="none"
                 alt=""
                 className="h-11 w-11 rounded-full object-cover"
               />

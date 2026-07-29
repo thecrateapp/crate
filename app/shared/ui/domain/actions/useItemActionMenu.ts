@@ -18,7 +18,11 @@ import {
   detectTouchDominant,
   shouldRenderDesktopContextMenu,
 } from "./ContextMenu";
-import type { ContextMenuEntry, ContextMenuHeader } from "./types";
+import type {
+  ContextMenuEntry,
+  ContextMenuHeader,
+  ContextMenuMediaImageRenderer,
+} from "./types";
 
 export type ItemActionMenuEntry = ContextMenuEntry;
 
@@ -217,6 +221,7 @@ export interface ItemActionMenuProps {
   position: { x: number; y: number } | null;
   menuRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
+  renderMediaImage?: ContextMenuMediaImageRenderer;
 }
 
 export interface ItemActionMenuButtonProps {

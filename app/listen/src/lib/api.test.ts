@@ -1300,6 +1300,41 @@ describe("native (configurable server) mode", () => {
       ).toBe("shared-artwork-ticket");
     });
 
+    it("preserves each caller query while sharing concurrent ticket acquisition", async () => {
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/42/cover",
+              ticket: "shared-responsive-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+
+      const [small, large] = await Promise.all([
+        apiMod.ensureMediaAccessUrl(
+          "/api/albums/42/cover?size=160&format=webp",
+          "artwork",
+        ),
+        apiMod.ensureMediaAccessUrl(
+          "/api/albums/42/cover?size=480&format=webp",
+          "artwork",
+        ),
+      ]);
+
+      expect(small).toContain("size=160");
+      expect(large).toContain("size=480");
+      expect(small).toContain("media_ticket=shared-responsive-ticket");
+      expect(large).toContain("media_ticket=shared-responsive-ticket");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("rejects instead of returning an unticketed protected URL", async () => {
       setupServer();
       mediaAccess.clearMediaAccessTickets();

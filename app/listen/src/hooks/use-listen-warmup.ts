@@ -6,8 +6,12 @@ import type {
   HomeGeneratedPlaylistSummary,
 } from "@/components/home/home-model";
 import { api, getApiBase } from "@/lib/api";
+import {
+  canonicalArtworkTransportIdentity,
+  preloadArtwork,
+} from "@/lib/artwork-manager";
+import { artworkFromUrl } from "@/lib/artwork-source";
 import { cacheSet } from "@/lib/cache";
-import { setImageFetchPriority } from "@/lib/image-loading";
 import {
   albumCoverApiUrl,
   artistBackgroundApiUrl,
@@ -292,15 +296,16 @@ export function collectHomeWarmupPlaylistUrls(
 }
 
 function warmImage(url: string, signal: AbortSignal): Promise<void> {
-  if (signal.aborted || typeof Image === "undefined") return Promise.resolve();
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.decoding = "async";
-    setImageFetchPriority(img, "low");
-    img.onload = () => resolve();
-    img.onerror = () => resolve();
-    img.src = url;
-  });
+  if (signal.aborted) return Promise.resolve();
+  return preloadArtwork(
+    artworkFromUrl(url, {
+      logicalKey: `warmup:${canonicalArtworkTransportIdentity(url)}`,
+    }),
+    { fetchPriority: "low", signal },
+  ).then(
+    () => undefined,
+    () => undefined,
+  );
 }
 
 export function useListenWarmup(user: AuthUser | null): void {

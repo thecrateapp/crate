@@ -75,7 +75,7 @@ import {
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { PlayerVolumeControl } from "@/components/player/bar/PlayerVolumeControl";
 import { WaveformCanvas } from "@/components/player/bar/WaveformCanvas";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
 import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
@@ -1135,7 +1135,7 @@ export function PlayerBar() {
                 {displayCrossfadeTransition ? (
                   <>
                     {displayCrossfadeTransition.outgoing.albumCover ? (
-                      <AuthenticatedMediaImage
+                      <CrateImage
                         src={displayCrossfadeTransition.outgoing.albumCover}
                         alt=""
                         className="absolute inset-0 w-full h-full object-cover"
@@ -1143,7 +1143,7 @@ export function PlayerBar() {
                       />
                     ) : null}
                     {displayCrossfadeTransition.incoming.albumCover ? (
-                      <AuthenticatedMediaImage
+                      <CrateImage
                         src={displayCrossfadeTransition.incoming.albumCover}
                         alt=""
                         className="absolute inset-0 w-full h-full object-cover"
@@ -1152,7 +1152,7 @@ export function PlayerBar() {
                     ) : null}
                   </>
                 ) : displayTrack.albumCover ? (
-                  <AuthenticatedMediaImage
+                  <CrateImage
                     src={displayTrack.albumCover}
                     alt=""
                     className="w-full h-full object-cover"

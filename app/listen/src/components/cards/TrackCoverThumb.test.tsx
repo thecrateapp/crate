@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
+import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
 
 describe("TrackCoverThumb", () => {
   it("renders fallback icon when no src", () => {
@@ -10,6 +10,10 @@ describe("TrackCoverThumb", () => {
 
   it("renders image when src is provided", () => {
     render(<TrackCoverThumb src="https://example.com/cover.jpg" alt="Cover" />);
+    expect(screen.getByAltText("Cover")).toHaveAttribute(
+      "data-artwork-managed",
+      "true",
+    );
     expect(screen.getByAltText("Cover")).toHaveAttribute(
       "src",
       "https://example.com/cover.jpg",

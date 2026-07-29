@@ -25,6 +25,8 @@ import type {
   ContextMenuEntry,
   ContextMenuHeader,
   ContextMenuMediaHeader,
+  ContextMenuMediaImageProps,
+  ContextMenuMediaImageRenderer,
   ContextMenuProps,
   DesktopMenuEnvironment,
 } from "./types";
@@ -33,6 +35,8 @@ export type {
   ContextMenuEntry,
   ContextMenuHeader,
   ContextMenuMediaHeader,
+  ContextMenuMediaImageProps,
+  ContextMenuMediaImageRenderer,
   ContextMenuProps,
 };
 
@@ -101,12 +105,15 @@ function isStructuredHeader(
 
 function ContextMenuMediaHeaderView({
   header,
+  renderMediaImage,
 }: {
   header: ContextMenuMediaHeader;
+  renderMediaImage?: ContextMenuMediaImageRenderer;
 }) {
   const FallbackIcon = header.fallbackIcon;
   const [imageFailed, setImageFailed] = useState(false);
-  const showImage = Boolean(header.imageUrl) && !imageFailed;
+  const hasImage = Boolean(header.imageUrl);
+  const showImage = hasImage && !imageFailed;
   const imageShape =
     header.imageShape === "circle" ? "rounded-full" : "rounded-lg";
 
@@ -118,11 +125,30 @@ function ContextMenuMediaHeaderView({
     <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
       <div
         className={cn(
-          "flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden bg-white/5",
+          "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden bg-white/5",
           imageShape,
         )}
       >
-        {showImage ? (
+        {hasImage && renderMediaImage ? (
+          renderMediaImage({
+            src: header.imageUrl || "",
+            alt: header.imageAlt ?? header.title,
+            width: 48,
+            height: 48,
+            loading: "lazy",
+            onLoad: () => {
+              setImageFailed(false);
+            },
+            onError: () => {
+              setImageFailed(true);
+              header.imageOnError?.();
+            },
+            className: cn(
+              "h-full w-full object-cover",
+              imageFailed ? "opacity-0" : undefined,
+            ),
+          })
+        ) : showImage ? (
           <img
             src={header.imageUrl || ""}
             alt={header.imageAlt ?? header.title}
@@ -137,6 +163,12 @@ function ContextMenuMediaHeaderView({
           />
         ) : FallbackIcon ? (
           <FallbackIcon size={CRATE_ICON_SIZE.xl} className="text-white/35" />
+        ) : null}
+        {hasImage && renderMediaImage && imageFailed && FallbackIcon ? (
+          <FallbackIcon
+            size={CRATE_ICON_SIZE.xl}
+            className="absolute text-white/35"
+          />
         ) : null}
       </div>
       <div className="min-w-0">
@@ -160,12 +192,19 @@ function ContextMenuMediaHeaderView({
 
 function ContextMenuHeaderView({
   header,
+  renderMediaImage,
 }: {
   header?: ContextMenuHeader | ReactNode;
+  renderMediaImage?: ContextMenuMediaImageRenderer;
 }) {
   if (!header) return null;
   if (isStructuredHeader(header)) {
-    return <ContextMenuMediaHeaderView header={header} />;
+    return (
+      <ContextMenuMediaHeaderView
+        header={header}
+        renderMediaImage={renderMediaImage}
+      />
+    );
   }
   return <>{header}</>;
 }
@@ -291,6 +330,7 @@ export function ContextMenu({
   menuRef,
   onClose,
   className,
+  renderMediaImage,
 }: ContextMenuProps) {
   const isDesktop = useIsDesktop();
   const canHover = useHoverCapability();
@@ -304,7 +344,10 @@ export function ContextMenu({
 
   const content = (
     <>
-      <ContextMenuHeaderView header={header} />
+      <ContextMenuHeaderView
+        header={header}
+        renderMediaImage={renderMediaImage}
+      />
       <div className="p-1.5">
         <ContextMenuItems items={items} onClose={onClose} />
       </div>

@@ -24,7 +24,7 @@ import {
   type ContextMenuHeader,
   type ItemActionMenuEntry,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
@@ -32,7 +32,12 @@ import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
+import {
+  canonicalArtworkTransportIdentity,
+  preloadArtwork,
+} from "@/lib/artwork-manager";
+import { artworkFromUrl } from "@/lib/artwork-source";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
@@ -333,6 +338,7 @@ function useHeroBackgroundPreloader(
     if (!sources.length || typeof window === "undefined") return;
 
     let cancelled = false;
+    const controller = new AbortController();
     const started = new Set<string>();
     const timeouts: number[] = [];
 
@@ -351,22 +357,19 @@ function useHeroBackgroundPreloader(
         return;
       inFlightRef.current.add(src);
       started.add(src);
-
-      const img = new Image();
-      img.decoding = "async";
-      if ("fetchPriority" in img) {
-        (
-          img as HTMLImageElement & { fetchPriority: "high" | "low" | "auto" }
-        ).fetchPriority = priority;
-      }
-      img.onload = () => {
-        inFlightRef.current.delete(src);
-        if (!cancelled) markReady(src);
-      };
-      img.onerror = () => {
-        inFlightRef.current.delete(src);
-      };
-      img.src = src;
+      void preloadArtwork(
+        artworkFromUrl(src, {
+          logicalKey: `home-hero:${canonicalArtworkTransportIdentity(src)}`,
+        }),
+        { fetchPriority: priority, signal: controller.signal },
+      )
+        .then(() => {
+          if (!cancelled) markReady(src);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          inFlightRef.current.delete(src);
+        });
     };
 
     const current =
@@ -394,6 +397,7 @@ function useHeroBackgroundPreloader(
 
     return () => {
       cancelled = true;
+      controller.abort();
       cancelBackgroundWork();
       timeouts.forEach((timeout) => window.clearTimeout(timeout));
       started.forEach((src) => inFlightRef.current.delete(src));
@@ -666,7 +670,7 @@ function HeroSlide({
     >
       <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(6,10,14,0.98)_0%,rgba(10,16,22,0.96)_52%,rgba(4,9,13,0.98)_100%)]" />
       {backgroundSrc ? (
-        <AuthenticatedMediaImage
+        <CrateImage
           src={backgroundSrc}
           alt=""
           aria-hidden="true"
@@ -923,7 +927,7 @@ function RecentEntityRowFrame({
             className="h-full w-full rounded-xl"
           />
         ) : artworkUrl ? (
-          <AuthenticatedMediaImage
+          <CrateImage
             src={artworkUrl}
             alt=""
             loading="lazy"
@@ -1363,7 +1367,7 @@ export function RadioStationCard({
       )}
     >
       {artworkUrl ? (
-        <AuthenticatedMediaImage
+        <CrateImage
           src={artworkUrl}
           alt=""
           className="aspect-square h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.04]"

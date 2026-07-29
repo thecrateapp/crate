@@ -9,26 +9,23 @@ import {
   Play,
 } from "@crate/ui/icons";
 
-import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
+import { albumCoverArtwork, artworkFromUrl } from "@/lib/artwork-source";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { cn } from "@/lib/utils";
-import {
-  albumApiPath,
-  albumCoverApiUrl,
-  albumPagePath,
-  responsiveImageSrcSet,
-} from "@/lib/library-routes";
-
-const ALBUM_CARD_IMAGE_WIDTHS = [160, 256, 320, 480] as const;
+import { albumApiPath, albumPagePath } from "@/lib/library-routes";
 
 interface AlbumCardProps {
   artist: string;
@@ -100,16 +97,18 @@ export const AlbumCard = memo(function AlbumCard({
     artistName: artist,
     albumName: album,
   };
-  const coverUrl =
-    resolveMaybeApiAssetUrl(cover) ||
-    albumCoverApiUrl(albumRouteInput, {
-      size: layout === "grid" ? 320 : compact ? 192 : 256,
-    });
-  const coverSrcSet = cover
-    ? undefined
-    : responsiveImageSrcSet(ALBUM_CARD_IMAGE_WIDTHS, (size) =>
-        albumCoverApiUrl(albumRouteInput, { size }),
-      );
+  const generatedArtwork = albumCoverArtwork(albumRouteInput, {
+    preset: "album-card",
+    size: layout === "grid" ? 320 : compact ? 192 : 256,
+  });
+  const coverArtwork = cover
+    ? artworkFromUrl(cover, {
+        kind: "album-cover",
+        logicalKey: generatedArtwork.logicalKey,
+        retryPolicy: "credentials",
+      })
+    : generatedArtwork;
+  const coverUrl = coverArtwork.src ?? "";
   const coverSizes =
     layout === "grid"
       ? "(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 17vw"
@@ -141,6 +140,9 @@ export const AlbumCard = memo(function AlbumCard({
     cover: coverUrl,
   });
   const actionMenu = useItemActionMenu(actions);
+  const menuCoverUrl = actionMenu.open
+    ? resolveMaybeApiAssetUrl(coverUrl) || coverUrl
+    : null;
 
   async function handlePlayOverlay(event: React.MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
@@ -219,16 +221,21 @@ export const AlbumCard = memo(function AlbumCard({
         }
       }}
     >
-      <div className="relative aspect-square rounded-lg overflow-hidden bg-white/5 mb-2">
-        <AuthenticatedMediaImage
-          src={coverUrl}
-          srcSet={coverSrcSet}
-          sizes={coverSrcSet ? coverSizes : undefined}
-          alt={album}
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover"
-        />
+      <ArtworkSurface
+        source={{
+          ...coverArtwork,
+          sizes: coverArtwork.srcSet ? coverSizes : undefined,
+        }}
+        alt={album}
+        className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5"
+        fallback={
+          <div className="grid h-full w-full place-items-center bg-[#171922] text-white/35">
+            <Disc3 size={CRATE_ICON_SIZE.xl} />
+          </div>
+        }
+        imageProps={{ loading: "lazy", decoding: "async" }}
+        imageClassName="object-cover"
+      >
         {(albumId != null || globalAlbumUid) && (
           <ActionIconButton
             variant="card"
@@ -281,7 +288,7 @@ export const AlbumCard = memo(function AlbumCard({
             )}
           </button>
         </div>
-      </div>
+      </ArtworkSurface>
       <div className="truncate text-sm font-medium text-foreground">
         {album}
       </div>
@@ -317,7 +324,7 @@ export const AlbumCard = memo(function AlbumCard({
           type: "media",
           title: album,
           subtitle: artist,
-          imageUrl: coverUrl,
+          imageUrl: menuCoverUrl,
           imageAlt: album,
           imageShape: "square",
           fallbackIcon: Disc3,

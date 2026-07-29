@@ -47,9 +47,12 @@ import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { QualityBadge } from "@/components/player/bar/QualityBadge";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { CrateLoader } from "@/components/ui/CrateLoader";
-import { ContextMenu, type ContextMenuEntry } from "@crate/ui/domain/actions";
+import {
+  ContextMenu,
+  type ContextMenuEntry,
+} from "@/components/actions/ItemActionMenu";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
 import { RemoteImportAction } from "@/components/imports/RemoteImportAction";
@@ -1263,7 +1266,7 @@ export function Album() {
       {/* Header */}
       <div className="relative min-h-[520px] overflow-hidden sm:h-[430px] sm:min-h-0 lg:h-[460px]">
         {data.has_cover || data.cover_url ? (
-          <AuthenticatedMediaImage
+          <CrateImage
             data-testid="album-hero-background"
             src={coverUrl}
             alt=""
@@ -1305,7 +1308,7 @@ export function Album() {
                 className="hidden aspect-square overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10 sm:block"
               >
                 {data.has_cover || data.cover_url ? (
-                  <AuthenticatedMediaImage
+                  <CrateImage
                     src={coverUrl}
                     alt={displayName}
                     className="h-full w-full object-cover"
@@ -1359,7 +1362,7 @@ export function Album() {
                 }
               >
                 <span className="h-6 w-6 flex-shrink-0 overflow-hidden rounded-full bg-white/5">
-                  <AuthenticatedMediaImage
+                  <CrateImage
                     src={artistPhotoUrl}
                     alt={data.artist}
                     className="h-full w-full object-cover"
@@ -1416,7 +1419,7 @@ export function Album() {
                 <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white/8 ring-1 ring-white/10">
                     {visibleContributor.user_avatar ? (
-                      <AuthenticatedMediaImage
+                      <CrateImage
                         src={visibleContributor.user_avatar}
                         alt=""
                         className="h-full w-full object-cover"

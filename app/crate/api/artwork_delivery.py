@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
+from typing import Literal
 
 from fastapi.responses import FileResponse, Response
 from starlette.background import BackgroundTask, BackgroundTasks
@@ -61,6 +62,22 @@ def _queue_after_response(
     return response
 
 
+def deliver_original_artwork(
+    path: Path,
+    *,
+    cache_control: str = "public, max-age=300, stale-while-revalidate=86400",
+) -> FileResponse:
+    return FileResponse(
+        path,
+        media_type=_MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream"),
+        headers={
+            "Cache-Control": cache_control,
+            "ETag": _file_etag(path),
+            "X-Crate-Artwork": "original",
+        },
+    )
+
+
 def deliver_artwork(
     asset: ArtworkAsset,
     *,
@@ -68,6 +85,7 @@ def deliver_artwork(
     local_original: Path | None,
     missing_response: Response,
     queue_on_miss: bool = True,
+    cache_visibility: Literal["public", "private"] = "public",
 ) -> Response:
     variant = resolve_materialized_variant(asset, requested_size)
     if variant is not None:
@@ -76,7 +94,9 @@ def deliver_artwork(
             variant.path,
             media_type=variant.media_type,
             headers={
-                "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+                "Cache-Control": (
+                    f"{cache_visibility}, max-age=86400, stale-while-revalidate=604800"
+                ),
                 "ETag": _file_etag(variant.path, variant.source_revision),
                 "X-Crate-Artwork": "variant",
                 "X-Crate-Artwork-Revision": variant.source_revision,
@@ -85,16 +105,11 @@ def deliver_artwork(
 
     if local_original is not None and local_original.is_file():
         _record_request(asset, "original")
-        response = FileResponse(
+        response = deliver_original_artwork(
             local_original,
-            media_type=_MEDIA_TYPES.get(
-                local_original.suffix.lower(), "application/octet-stream"
+            cache_control=(
+                f"{cache_visibility}, max-age=300, stale-while-revalidate=86400"
             ),
-            headers={
-                "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",
-                "ETag": _file_etag(local_original),
-                "X-Crate-Artwork": "original",
-            },
         )
         return (
             _queue_after_response(response, asset, reason="variant-miss")

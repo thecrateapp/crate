@@ -17,7 +17,7 @@ import {
   ItemActionMenu,
   type ItemActionMenuEntry,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { toast } from "sonner";
 
@@ -26,7 +26,7 @@ import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import {
   itemKey,
@@ -422,7 +422,7 @@ export function GenreDetailView({
       <div className="space-y-6">
         <section className="relative -mx-4 -mt-4 h-[420px] overflow-hidden sm:-mx-6 sm:-mt-6 sm:h-[400px] lg:-mx-8 lg:-mt-8">
           {heroCoverUrl ? (
-            <AuthenticatedMediaImage
+            <CrateImage
               key={heroCoverUrl}
               src={heroCoverUrl}
               alt={t("genre.coverAlt", { name: data.name })}
@@ -714,7 +714,7 @@ function RelatedGenreCard({
       className="group relative isolate min-h-[132px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.045] p-3 text-left shadow-[0_18px_46px_rgba(0,0,0,0.22)] transition-[border-color,filter,transform] hover:-translate-y-px hover:border-primary/35 hover:drop-shadow-[0_0_14px_rgba(34,211,238,0.18)]"
     >
       {coverUrl ? (
-        <AuthenticatedMediaImage
+        <CrateImage
           src={coverUrl}
           alt=""
           className="absolute inset-0 -z-10 h-full w-full scale-[1.04] object-cover opacity-35 saturate-125 transition duration-300 group-hover:opacity-45"

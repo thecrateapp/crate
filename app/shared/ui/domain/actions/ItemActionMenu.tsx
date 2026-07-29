@@ -27,6 +27,7 @@ export function ItemActionMenu({
   position,
   menuRef,
   onClose,
+  renderMediaImage,
 }: ItemActionMenuProps) {
   return (
     <ContextMenu
@@ -36,6 +37,7 @@ export function ItemActionMenu({
       onClose={onClose}
       open={open}
       position={position}
+      renderMediaImage={renderMediaImage}
     />
   );
 }

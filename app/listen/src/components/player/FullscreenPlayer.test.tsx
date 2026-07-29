@@ -163,7 +163,7 @@ vi.mock("@/components/player/player-gestures", () => ({
   getHorizontalPlayerSwipeAction: vi.fn(() => null),
 }));
 
-vi.mock("@crate/ui/domain/actions/ItemActionMenu", () => ({
+vi.mock("@/components/actions/ItemActionMenu", () => ({
   ItemActionMenu: () => <div data-testid="item-action-menu" />,
   ItemActionMenuButton: () => <div data-testid="item-action-menu-btn" />,
   useItemActionMenu: () => ({

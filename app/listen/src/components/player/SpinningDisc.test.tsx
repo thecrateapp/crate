@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/components/player/AuthenticatedMediaImage", () => ({
-  AuthenticatedMediaImage: ({
+vi.mock("@/components/artwork/CrateImage", () => ({
+  CrateImage: ({
     src,
     ...props
   }: React.ImgHTMLAttributes<HTMLImageElement>) => (
