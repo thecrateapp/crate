@@ -101,6 +101,4 @@ def test_artist_id_and_entity_routes_use_same_canonical_asset(monkeypatch, tmp_p
         "artist-background",
     ]
     assert all(kwargs["local_original"] == photo for _asset, kwargs in delivered)
-    assert all(
-        kwargs["cache_visibility"] == "private" for _asset, kwargs in delivered
-    )
+    assert all(kwargs["cache_visibility"] == "private" for _asset, kwargs in delivered)

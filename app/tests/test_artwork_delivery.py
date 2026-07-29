@@ -43,9 +43,7 @@ def test_deliver_artwork_prefers_materialized_variant(monkeypatch, tmp_path):
     assert queued == []
 
 
-def test_deliver_artwork_can_mark_authenticated_variants_private(
-    monkeypatch, tmp_path
-):
+def test_deliver_artwork_can_mark_authenticated_variants_private(monkeypatch, tmp_path):
     from crate.api import artwork_delivery
     from crate.artwork_materializer import materialize_artwork
     from crate.artwork_variants import ArtworkAsset
