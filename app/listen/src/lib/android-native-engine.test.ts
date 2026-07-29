@@ -139,6 +139,67 @@ describe("android native engine flags", () => {
     });
   });
 
+  it("only forwards crossfade after every Smart Mix rollout gate is enabled", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 2,
+      crossfadeMs: 4000,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    const nativeEngineModule = await import("@/lib/android-native-engine");
+
+    expect("setAndroidNativeSmartMixCapabilities" in nativeEngineModule).toBe(
+      true,
+    );
+    expect("setAndroidNativeSmartMixRolloutEnabled" in nativeEngineModule).toBe(
+      true,
+    );
+
+    const configureCapabilities = (
+      nativeEngineModule as typeof nativeEngineModule & {
+        setAndroidNativeSmartMixCapabilities: (capabilities: {
+          available: boolean;
+          androidNativeCrossfade: boolean;
+        }) => void;
+      }
+    ).setAndroidNativeSmartMixCapabilities;
+    const configureRollout = (
+      nativeEngineModule as typeof nativeEngineModule & {
+        setAndroidNativeSmartMixRolloutEnabled: (enabled: boolean) => void;
+      }
+    ).setAndroidNativeSmartMixRolloutEnabled;
+
+    configureCapabilities({
+      available: true,
+      androidNativeCrossfade: true,
+    });
+    configureRollout(true);
+
+    const engine = new nativeEngineModule.AndroidNativeEngine();
+    await engine.loadQueue({
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 4000,
+      volume: 1,
+    });
+
+    expect(nativePlaybackMock.setQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ crossfadeMs: 4000 }),
+    );
+  });
+
   it("retries readiness probes while the native service is binding", async () => {
     vi.useFakeTimers();
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));

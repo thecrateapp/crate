@@ -18,8 +18,26 @@ import type {
 
 const NATIVE_PLAYER_DISABLED_KEY = "crate-native-player-disabled";
 const NATIVE_PLAYER_CROSSFADE_KEY = "crate-native-player-crossfade-enabled";
+const NATIVE_SMART_MIX_ROLLOUT_KEY = "crate-native-smart-mix-rollout-enabled";
+const NATIVE_SMART_MIX_KILL_SWITCH_KEY = "crate-native-smart-mix-kill-switch";
 const NATIVE_PLAYER_EQ_KEY = "crate-native-player-eq-enabled";
 const NATIVE_READY_PROBE_DELAYS_MS = [0, 100, 250] as const;
+
+export type AndroidNativeSmartMixCapabilities = {
+  available: boolean;
+  androidNativeCrossfade: boolean;
+  androidBeatmatch: boolean;
+  plannerVersion?: string | null;
+};
+
+const DISABLED_SMART_MIX_CAPABILITIES: AndroidNativeSmartMixCapabilities = {
+  available: false,
+  androidNativeCrossfade: false,
+  androidBeatmatch: false,
+  plannerVersion: null,
+};
+
+let smartMixCapabilities = DISABLED_SMART_MIX_CAPABILITIES;
 
 type NativeEventEnvelope = {
   event?: EngineEventName;
@@ -109,6 +127,69 @@ export function setAndroidNativePlayerEnabled(enabled: boolean): void {
   }
 }
 
+export function setAndroidNativeSmartMixCapabilities(
+  capabilities: AndroidNativeSmartMixCapabilities,
+): void {
+  smartMixCapabilities = {
+    available: capabilities.available === true,
+    androidNativeCrossfade: capabilities.androidNativeCrossfade === true,
+    androidBeatmatch: capabilities.androidBeatmatch === true,
+    plannerVersion: capabilities.plannerVersion ?? null,
+  };
+}
+
+export function setAndroidNativeSmartMixRolloutEnabled(enabled: boolean): void {
+  try {
+    if (enabled) {
+      localStorage.setItem(NATIVE_SMART_MIX_ROLLOUT_KEY, "true");
+    } else {
+      localStorage.removeItem(NATIVE_SMART_MIX_ROLLOUT_KEY);
+    }
+  } catch {
+    // Local rollout is best-effort and defaults to disabled.
+  }
+}
+
+export function setAndroidNativeSmartMixKillSwitch(enabled: boolean): void {
+  try {
+    if (enabled) {
+      localStorage.setItem(NATIVE_SMART_MIX_KILL_SWITCH_KEY, "true");
+    } else {
+      localStorage.removeItem(NATIVE_SMART_MIX_KILL_SWITCH_KEY);
+    }
+  } catch {
+    // The kill switch fails closed through the other rollout gates.
+  }
+}
+
+function isAndroidNativeSmartMixRolloutEnabled(): boolean {
+  try {
+    return localStorage.getItem(NATIVE_SMART_MIX_ROLLOUT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function isAndroidNativeSmartMixKilled(): boolean {
+  try {
+    return localStorage.getItem(NATIVE_SMART_MIX_KILL_SWITCH_KEY) === "true";
+  } catch {
+    return true;
+  }
+}
+
+function effectiveNativeCrossfadeMs(requestedMs: number): number {
+  if (
+    !smartMixCapabilities.available ||
+    !smartMixCapabilities.androidNativeCrossfade ||
+    !isAndroidNativeSmartMixRolloutEnabled() ||
+    isAndroidNativeSmartMixKilled()
+  ) {
+    return 0;
+  }
+  return Math.max(0, requestedMs);
+}
+
 export function isAndroidNativeEqEnabled(): boolean {
   try {
     return localStorage.getItem(NATIVE_PLAYER_EQ_KEY) !== "false";
@@ -195,7 +276,10 @@ export class AndroidNativeEngine implements PlaybackEngine {
       await this.ensureNotificationPermission();
     }
     this.queueRevision = snapshot.revision;
-    return nativePlayback.setQueue({ ...snapshot, crossfadeMs: 0 });
+    return nativePlayback.setQueue({
+      ...snapshot,
+      crossfadeMs: effectiveNativeCrossfadeMs(snapshot.crossfadeMs),
+    });
   }
 
   async play(): Promise<EngineState> {
@@ -271,9 +355,10 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async setCrossfadeMs(crossfadeMs: number): Promise<EngineState> {
-    void crossfadeMs;
     await this.ensureReady();
-    return nativePlayback.setCrossfadeMs({ crossfadeMs: 0 });
+    return nativePlayback.setCrossfadeMs({
+      crossfadeMs: effectiveNativeCrossfadeMs(crossfadeMs),
+    });
   }
 
   async setVolume(volume: number): Promise<EngineState> {
