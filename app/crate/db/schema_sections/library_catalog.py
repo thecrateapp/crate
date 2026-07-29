@@ -279,6 +279,79 @@ def create_library_catalog_schema(cur) -> None:
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_album_id ON library_tracks(album_id)"
     )
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS track_mix_profiles (
+            track_id BIGINT PRIMARY KEY
+                REFERENCES library_tracks(id) ON DELETE CASCADE,
+            profile_version INTEGER NOT NULL CHECK (profile_version > 0),
+            profile_revision TEXT NOT NULL,
+            analyzer TEXT NOT NULL,
+            analyzer_version TEXT NOT NULL,
+            source_revision TEXT NOT NULL,
+            quality TEXT NOT NULL
+                CHECK (quality IN ('full', 'partial', 'legacy', 'unavailable')),
+            bpm DOUBLE PRECISION,
+            bpm_confidence DOUBLE PRECISION
+                CHECK (bpm_confidence IS NULL OR bpm_confidence BETWEEN 0 AND 1),
+            tempo_stability DOUBLE PRECISION
+                CHECK (tempo_stability IS NULL OR tempo_stability BETWEEN 0 AND 1),
+            beat_anchor_ms BIGINT
+                CHECK (beat_anchor_ms IS NULL OR beat_anchor_ms >= 0),
+            downbeat_anchor_ms BIGINT
+                CHECK (downbeat_anchor_ms IS NULL OR downbeat_anchor_ms >= 0),
+            time_signature SMALLINT,
+            beat_grid_format TEXT,
+            beat_grid_data BYTEA,
+            audio_key TEXT,
+            audio_scale TEXT,
+            key_camelot TEXT,
+            key_confidence DOUBLE PRECISION
+                CHECK (key_confidence IS NULL OR key_confidence BETWEEN 0 AND 1),
+            intro_cue_ms BIGINT
+                CHECK (intro_cue_ms IS NULL OR intro_cue_ms >= 0),
+            outro_cue_ms BIGINT
+                CHECK (outro_cue_ms IS NULL OR outro_cue_ms >= 0),
+            intro_lufs DOUBLE PRECISION,
+            outro_lufs DOUBLE PRECISION,
+            true_peak_dbfs DOUBLE PRECISION,
+            intro_energy DOUBLE PRECISION,
+            outro_energy DOUBLE PRECISION,
+            intro_spectral_density DOUBLE PRECISION,
+            outro_spectral_density DOUBLE PRECISION,
+            global_energy DOUBLE PRECISION,
+            danceability DOUBLE PRECISION,
+            valence DOUBLE PRECISION,
+            bliss_vector_revision TEXT,
+            analyzed_at TIMESTAMPTZ NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CHECK ((beat_grid_format IS NULL) = (beat_grid_data IS NULL))
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_quality
+        ON track_mix_profiles(quality)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_profile_revision
+        ON track_mix_profiles(profile_revision)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_analyzer_version
+        ON track_mix_profiles(analyzer_version)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_updated_at
+        ON track_mix_profiles(updated_at DESC)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_source_revision
+        ON track_mix_profiles(source_revision)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_pending
+        ON track_mix_profiles(updated_at DESC)
+        WHERE quality <> 'full'
+    """)
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_bpm ON library_tracks(bpm) WHERE bpm IS NOT NULL"
     )
