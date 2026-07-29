@@ -8,11 +8,11 @@ import {
   ItemActionMenuButton,
   type ItemActionMenuEntry,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { getPlaySourceLabel } from "@/components/player/player-source";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import {
   usePlayerActions,
   usePlayerState,
@@ -218,7 +218,7 @@ export function QueueTab() {
               {currentIndex + 1}
             </span>
             {currentTrack.albumCover ? (
-              <AuthenticatedMediaImage
+              <CrateImage
                 src={currentTrack.albumCover}
                 alt=""
                 loading="lazy"

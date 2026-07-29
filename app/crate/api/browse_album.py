@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from starlette.background import BackgroundTask
 
 from crate.api._deps import COVER_NAMES, extensions, library_path
-from crate.api.artwork_delivery import deliver_artwork
+from crate.api.artwork_delivery import deliver_artwork, deliver_original_artwork
 from crate.api.auth import _require_auth
 from crate.api.browse_shared import (
     build_genre_profile,
@@ -966,12 +966,7 @@ def api_cover(
             missing_response=_placeholder_cover(album or artist),
         )
     if cover is not None:
-        return FileResponse(
-            cover,
-            headers={
-                "Cache-Control": "public, max-age=300, stale-while-revalidate=86400"
-            },
-        )
+        return deliver_original_artwork(cover)
     return _placeholder_cover(album or artist)
 
 

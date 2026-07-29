@@ -14,8 +14,8 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-describe("authenticated media image coverage", () => {
-  it("keeps dynamic image URLs behind the credential-aware component", () => {
+describe("Crate image pipeline coverage", () => {
+  it("keeps dynamic image URLs behind the unified artwork component", () => {
     const root = join(process.cwd(), "src");
     const violations: string[] = [];
 
@@ -24,11 +24,21 @@ describe("authenticated media image coverage", () => {
       for (const match of source.matchAll(/<img\b[\s\S]*?\/>/g)) {
         const element = match[0];
         const isStaticAsset = /\bsrc\s*=\s*["']/.test(element);
-        const isCredentialAware = /\bdata-authenticated-media\b/.test(element);
-        const isExplicitlyPublic = /\bdata-public-media\b/.test(element);
-        if (!isStaticAsset && !isCredentialAware && !isExplicitlyPublic) {
+        const isManagedArtwork = /\bdata-artwork-managed\b/.test(element);
+        if (!isStaticAsset && !isManagedArtwork) {
           violations.push(relative(root, file));
         }
+      }
+      if (source.includes("AuthenticatedMediaImage")) {
+        violations.push(`${relative(root, file)}:legacy-renderer`);
+      }
+      if (
+        relative(root, file) !== "components/actions/ItemActionMenu.tsx" &&
+        (source.includes("ItemActionMenu") ||
+          source.includes("<ContextMenu")) &&
+        source.includes('from "@crate/ui/domain/actions"')
+      ) {
+        violations.push(`${relative(root, file)}:raw-item-action-menu`);
       }
     }
 

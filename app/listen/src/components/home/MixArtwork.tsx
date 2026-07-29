@@ -1,5 +1,5 @@
 import { artistPhotoApiUrl } from "@/lib/library-routes";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -50,7 +50,7 @@ export function MixArtwork({
               className="relative overflow-hidden bg-[linear-gradient(145deg,rgba(30,16,22,0.96),rgba(10,12,16,1))]"
             >
               {photoUrl ? (
-                <AuthenticatedMediaImage
+                <CrateImage
                   src={photoUrl}
                   alt={artist?.artist_name || ""}
                   className="h-full w-full object-cover"

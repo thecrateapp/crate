@@ -4,9 +4,9 @@ from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 
-from crate.api.artwork_delivery import deliver_artwork
+from crate.api.artwork_delivery import deliver_artwork, deliver_original_artwork
 from crate.api._deps import (
     artist_name_from_id,
     artist_name_from_ref,
@@ -1249,9 +1249,13 @@ def api_artist_background(
             requested_size=size,
             local_original=local_original,
             missing_response=Response(status_code=404),
+            cache_visibility="private",
         )
     if local_original is not None:
-        return FileResponse(local_original)
+        return deliver_original_artwork(
+            local_original,
+            cache_control="private, max-age=300, stale-while-revalidate=86400",
+        )
     return Response(status_code=404)
 
 
@@ -1288,9 +1292,13 @@ def api_artist_photo(
             requested_size=size,
             local_original=local_original,
             missing_response=Response(status_code=404),
+            cache_visibility="private",
         )
     if local_original is not None:
-        return FileResponse(local_original)
+        return deliver_original_artwork(
+            local_original,
+            cache_control="private, max-age=300, stale-while-revalidate=86400",
+        )
     return Response(status_code=404)
 
 

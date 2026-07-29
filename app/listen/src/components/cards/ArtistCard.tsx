@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import {
@@ -11,25 +11,24 @@ import {
 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { cn } from "@/lib/utils";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import {
-  artistPagePath,
-  artistPhotoApiUrl,
-  responsiveImageSrcSet,
-} from "@/lib/library-routes";
-
-const ARTIST_CARD_IMAGE_WIDTHS = [160, 256, 320] as const;
-
-const EXTERNAL_ARTWORK_RETRY_DELAYS_MS = [
-  2_000, 4_000, 8_000, 15_000, 30_000, 30_000, 30_000, 60_000, 60_000, 60_000,
-];
+  artistPhotoArtwork,
+  artworkFromUrl,
+  type ArtworkSource,
+} from "@/lib/artwork-source";
+import { cn } from "@/lib/utils";
+import { artistPagePath } from "@/lib/library-routes";
 
 function artistMonogram(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -82,64 +81,36 @@ export function ArtistCard({
   const canUseInlineHoverActions = useHoverCapability();
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
-  const [externalArtworkRetry, setExternalArtworkRetry] = useState(0);
-  const [loadedPhotoUrl, setLoadedPhotoUrl] = useState<string | null>(null);
-  const externalArtworkRetryTimer = useRef<number | null>(null);
+  const imageSize = compact ? 100 : large ? 156 : 140;
   const shouldResolvePhoto = hasPhoto !== false;
-  const photoUrl =
-    photo ||
-    (shouldResolvePhoto
-      ? artistPhotoApiUrl(
-          {
-            artistId,
-            artistEntityUid,
-            globalArtistUid,
-            artistSlug,
-            artistName: name,
-          },
-          { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
-        )
-      : "") ||
-    undefined;
-  const photoSrcSet = photo
-    ? undefined
-    : responsiveImageSrcSet(ARTIST_CARD_IMAGE_WIDTHS, (size) =>
-        artistPhotoApiUrl(
-          {
-            artistId,
-            artistEntityUid,
-            globalArtistUid,
-            artistSlug,
-            artistName: name,
-          },
-          { size },
-        ),
-      );
+  const artistRouteInput = {
+    artistId,
+    artistEntityUid,
+    globalArtistUid,
+    artistSlug,
+    artistName: name,
+  };
+  const generatedArtwork = artistPhotoArtwork(artistRouteInput, {
+    preset: "artist-card",
+    size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256,
+    ...(layout === "grid" ? {} : { sizes: `${imageSize}px` }),
+  });
   const isPendingExternalArtwork =
-    external &&
-    Boolean(photoUrl?.includes("/api/network/external-artist/photo"));
-  const renderedPhotoUrl = useMemo(() => {
-    if (!photoUrl || !externalArtworkRetry) return photoUrl;
-    const separator = photoUrl.includes("?") ? "&" : "?";
-    return `${photoUrl}${separator}retry=${externalArtworkRetry}`;
-  }, [externalArtworkRetry, photoUrl]);
-  const photoReady = Boolean(
-    renderedPhotoUrl && loadedPhotoUrl === renderedPhotoUrl,
-  );
-
-  useEffect(() => {
-    if (externalArtworkRetryTimer.current !== null) {
-      window.clearTimeout(externalArtworkRetryTimer.current);
-      externalArtworkRetryTimer.current = null;
-    }
-    setExternalArtworkRetry(0);
-    return () => {
-      if (externalArtworkRetryTimer.current !== null) {
-        window.clearTimeout(externalArtworkRetryTimer.current);
-        externalArtworkRetryTimer.current = null;
-      }
-    };
-  }, [photoUrl]);
+    external && Boolean(photo?.includes("/api/network/external-artist/photo"));
+  const photoArtwork: ArtworkSource | null = !shouldResolvePhoto
+    ? null
+    : photo
+      ? artworkFromUrl(photo, {
+          kind: external ? "external-artist" : "artist-photo",
+          logicalKey: generatedArtwork.logicalKey,
+          retryPolicy: isPendingExternalArtwork
+            ? "eventual"
+            : external
+              ? "none"
+              : "credentials",
+        })
+      : generatedArtwork;
+  const photoUrl = photoArtwork?.src ?? undefined;
   const targetHref =
     href ||
     artistPagePath({
@@ -162,7 +133,9 @@ export function ArtistCard({
   const actionMenu = useItemActionMenu(actions, {
     disabled: external,
   });
-  const imageSize = compact ? 100 : large ? 156 : 140;
+  const menuPhotoUrl = actionMenu.open
+    ? resolveMaybeApiAssetUrl(photoUrl)
+    : null;
   const monogram = artistMonogram(name).toUpperCase();
   const wrapperClassName = cn(
     "group snap-start cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
@@ -174,56 +147,37 @@ export function ArtistCard({
   );
   const content = (
     <>
-      <div
+      <ArtworkSurface
+        source={photoArtwork}
+        alt={name}
         className="relative mx-auto mb-2 aspect-square overflow-hidden rounded-full bg-white/5"
         style={{
           width: layout === "grid" ? "100%" : imageSize,
           maxWidth: layout === "grid" && fillGrid ? "none" : imageSize,
           height: layout === "grid" ? "auto" : imageSize,
         }}
+        fallback={
+          <div
+            aria-hidden="true"
+            data-testid="artist-artwork-placeholder"
+            data-placeholder-style="flat-disc"
+            className="grid h-full w-full place-items-center rounded-full bg-[#171922]"
+          >
+            <span className="text-sm font-semibold text-white/75">
+              {monogram}
+            </span>
+          </div>
+        }
+        imageProps={{
+          loading: "lazy",
+          decoding: "async",
+        }}
+        imageClassName={cn(
+          "object-cover",
+          imageTone === "muted" &&
+            "grayscale saturate-0 brightness-[0.52] contrast-125 transition duration-300 group-hover:brightness-[0.72]",
+        )}
       >
-        <div
-          aria-hidden="true"
-          data-testid="artist-artwork-placeholder"
-          data-placeholder-style="flat-disc"
-          className="absolute inset-0 grid place-items-center rounded-full bg-[#171922]"
-        >
-          <span className="text-sm font-semibold text-white/75">
-            {monogram}
-          </span>
-        </div>
-        {renderedPhotoUrl ? (
-          <AuthenticatedMediaImage
-            src={renderedPhotoUrl}
-            srcSet={photoSrcSet}
-            sizes={photoSrcSet ? `${imageSize}px` : undefined}
-            alt={name}
-            loading="lazy"
-            decoding="async"
-            className={cn(
-              "relative z-10 h-full w-full object-cover",
-              photoReady ? "visible" : "invisible",
-              imageTone === "muted" &&
-                "grayscale saturate-0 brightness-[0.52] contrast-125 transition duration-300 group-hover:brightness-[0.72]",
-            )}
-            onLoad={() => setLoadedPhotoUrl(renderedPhotoUrl ?? null)}
-            onError={() => {
-              setLoadedPhotoUrl(null);
-              if (
-                isPendingExternalArtwork &&
-                externalArtworkRetry < EXTERNAL_ARTWORK_RETRY_DELAYS_MS.length
-              ) {
-                if (externalArtworkRetryTimer.current === null) {
-                  externalArtworkRetryTimer.current = window.setTimeout(() => {
-                    externalArtworkRetryTimer.current = null;
-                    setExternalArtworkRetry((retry) => retry + 1);
-                  }, EXTERNAL_ARTWORK_RETRY_DELAYS_MS[externalArtworkRetry] ?? 60_000);
-                }
-                return;
-              }
-            }}
-          />
-        ) : null}
         {!external && hasPlayableArtist && canUseInlineHoverActions ? (
           <>
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/42">
@@ -320,7 +274,7 @@ export function ArtistCard({
             </div>
           </>
         ) : null}
-      </div>
+      </ArtworkSurface>
       <div className="truncate text-sm font-medium text-foreground text-center">
         {name}
       </div>
@@ -368,7 +322,7 @@ export function ArtistCard({
           type: "media",
           title: name,
           subtitle,
-          imageUrl: photoUrl,
+          imageUrl: menuPhotoUrl,
           imageAlt: name,
           imageShape: "circle",
           fallbackIcon: UserRound,

@@ -13,7 +13,7 @@ import {
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
 import { canOpenUpcomingRelease, type UpcomingItem } from "./upcoming-model";
@@ -87,7 +87,7 @@ export function UpcomingEventRow({
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_20%,rgba(6,182,212,0.22),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.06),transparent_58%)]" />
       {coverUrl ? (
-        <AuthenticatedMediaImage
+        <CrateImage
           src={coverUrl}
           alt=""
           loading="lazy"
@@ -103,7 +103,7 @@ export function UpcomingEventRow({
         <div className="flex min-w-0 items-center gap-4">
           <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
             {coverUrl ? (
-              <AuthenticatedMediaImage
+              <CrateImage
                 src={coverUrl}
                 alt=""
                 loading="lazy"

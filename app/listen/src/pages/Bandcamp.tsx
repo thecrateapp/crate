@@ -13,7 +13,8 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
-import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
+import { CrateImage } from "@/components/artwork/CrateImage";
+import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 
@@ -508,7 +509,7 @@ function Cover({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const coverUrl = resolveMaybeApiAssetUrl(item.cover_url);
+  const coverUrl = item.cover_url;
   const title = itemTitle(item, t("bandcamp.itemFallback"));
 
   return (
@@ -521,9 +522,9 @@ function Cover({
       )}
     >
       {coverUrl ? (
-        <img
-          data-public-media="true"
+        <CrateImage
           src={coverUrl}
+          retryPolicy="none"
           alt=""
           loading="lazy"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"

@@ -5,7 +5,7 @@ import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
@@ -14,7 +14,7 @@ import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 import { useResolvedPlayerArtist } from "@/components/player/useResolvedPlayerArtist";
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { InfoTab } from "@/components/player/extended/InfoTab";
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { api } from "@/lib/api";
@@ -130,7 +130,7 @@ function FullscreenQueueRow({
       className="flex items-center gap-3 w-full py-2 text-left active:bg-white/5 rounded-lg transition-colors focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       {track.albumCover ? (
-        <AuthenticatedMediaImage
+        <CrateImage
           src={track.albumCover}
           alt=""
           loading="lazy"
@@ -704,7 +704,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   {crossfadeTransition ? (
                     <>
                       {crossfadeTransition.outgoing.albumCover ? (
-                        <AuthenticatedMediaImage
+                        <CrateImage
                           src={crossfadeTransition.outgoing.albumCover}
                           alt=""
                           className="absolute inset-0 h-full w-full object-cover shadow-2xl shadow-black/60"
@@ -714,7 +714,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                         />
                       ) : null}
                       {crossfadeTransition.incoming.albumCover ? (
-                        <AuthenticatedMediaImage
+                        <CrateImage
                           src={crossfadeTransition.incoming.albumCover}
                           alt=""
                           className="absolute inset-0 h-full w-full object-cover shadow-2xl shadow-black/60"
@@ -725,7 +725,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                       ) : null}
                     </>
                   ) : currentTrack.albumCover ? (
-                    <AuthenticatedMediaImage
+                    <CrateImage
                       src={currentTrack.albumCover}
                       alt=""
                       className="h-full w-full object-cover shadow-2xl shadow-black/60"

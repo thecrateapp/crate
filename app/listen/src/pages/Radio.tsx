@@ -17,7 +17,7 @@ import {
   SectionRail,
 } from "@/components/home/HomeSections";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { useApi } from "@/hooks/use-api";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
@@ -118,7 +118,7 @@ function StationCard({
       className="group relative aspect-square snap-start overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] text-left shadow-[0_18px_70px_rgba(0,0,0,0.24)] transition duration-300 hover:border-primary/30 hover:shadow-[0_18px_80px_rgba(10,209,241,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {imageUrl ? (
-        <AuthenticatedMediaImage
+        <CrateImage
           src={imageUrl}
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-85 transition duration-500 group-hover:scale-[1.04] group-hover:opacity-100"
@@ -462,7 +462,7 @@ export function RadioPage() {
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/70 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
               >
                 {r.imageUrl ? (
-                  <AuthenticatedMediaImage
+                  <CrateImage
                     src={r.imageUrl}
                     alt=""
                     className={`h-9 w-9 flex-shrink-0 bg-white/5 object-cover ${

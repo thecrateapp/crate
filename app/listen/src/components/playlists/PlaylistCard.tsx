@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Heart, HeartBold, Loader2, Play, Sparkles } from "@crate/ui/icons";
 
-import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";

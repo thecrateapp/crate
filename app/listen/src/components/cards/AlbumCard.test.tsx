@@ -18,16 +18,6 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   resolveMaybeApiAssetUrl: apiMocks.resolveMaybeApiAssetUrl,
 }));
 
-vi.mock("@/components/player/AuthenticatedMediaImage", () => ({
-  AuthenticatedMediaImage: ({
-    src,
-    srcSet,
-    ...props
-  }: React.ImgHTMLAttributes<HTMLImageElement>) => (
-    <img {...props} src={src} srcSet={srcSet} data-authenticated-media="true" />
-  ),
-}));
-
 vi.mock("@/contexts/SavedAlbumsContext", () => ({
   useSavedAlbums: () => ({
     isSaved: () => false,
@@ -81,7 +71,7 @@ describe("AlbumCard", () => {
       "https://api.example.test/api/catalog/albums/album-global-1/cover?size=256&token=native-token",
     );
     expect(screen.getByAltText("Inlet")).toHaveAttribute(
-      "data-authenticated-media",
+      "data-artwork-managed",
       "true",
     );
   });
@@ -120,6 +110,10 @@ describe("AlbumCard", () => {
     expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-2xl");
     expect(within(menu).getByText("Inlet")).toBeInTheDocument();
     expect(within(menu).getByText("Hum")).toBeInTheDocument();
+    expect(within(menu).getByAltText("Inlet")).toHaveAttribute(
+      "src",
+      expect.stringContaining("https://api.example.test/api/"),
+    );
     expect(
       await within(menu).findByRole("menuitem", { name: "Share album" }),
     ).toBeInTheDocument();

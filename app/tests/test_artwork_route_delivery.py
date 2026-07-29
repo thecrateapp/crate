@@ -83,10 +83,22 @@ def test_artist_id_and_entity_routes_use_same_canonical_asset(monkeypatch, tmp_p
     browse_artist.api_artist_photo_by_entity_uid(
         SimpleNamespace(), "artist-entity", size=256
     )
+    browse_artist.api_artist_background_by_id(SimpleNamespace(), 5, size=512)
+    browse_artist.api_artist_background_by_entity_uid(
+        SimpleNamespace(), "artist-entity", size=512
+    )
 
     assert [asset.entity_key for asset, _kwargs in delivered] == [
         "artist-entity",
         "artist-entity",
+        "artist-entity",
+        "artist-entity",
     ]
-    assert all(asset.kind == "artist-photo" for asset, _kwargs in delivered)
+    assert [asset.kind for asset, _kwargs in delivered] == [
+        "artist-photo",
+        "artist-photo",
+        "artist-background",
+        "artist-background",
+    ]
     assert all(kwargs["local_original"] == photo for _asset, kwargs in delivered)
+    assert all(kwargs["cache_visibility"] == "private" for _asset, kwargs in delivered)

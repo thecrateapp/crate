@@ -1,16 +1,17 @@
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
-import { albumCoverApiUrl } from "@/lib/library-routes";
+import { albumCoverAssetPath } from "@/lib/library-routes";
 import {
   PlaylistArtwork as PlaylistArtworkBase,
+  type PlaylistArtworkImageProps,
   type PlaylistArtworkTrack,
 } from "@crate/ui/domain/playlists/PlaylistArtwork";
+import { CrateImage } from "@/components/artwork/CrateImage";
 
 export type { PlaylistArtworkTrack };
 
 function buildCoverUrl(track: PlaylistArtworkTrack): string | null {
   if (!track.artist || !track.album) return null;
   return (
-    albumCoverApiUrl(
+    albumCoverAssetPath(
       {
         albumId: track.album_id,
         globalAlbumUid: track.global_album_uid,
@@ -34,9 +35,16 @@ export function PlaylistArtwork(
   return (
     <PlaylistArtworkBase
       {...props}
-      coverDataUrl={resolveMaybeApiAssetUrl(props.coverDataUrl)}
+      coverDataUrl={props.coverDataUrl}
       buildCoverUrl={buildCoverUrl}
       logoSrc="/icons/logo.svg"
+      renderImage={({ key, src, ...imageProps }: PlaylistArtworkImageProps) => (
+        <CrateImage
+          key={key}
+          {...imageProps}
+          src={typeof src === "string" ? src : null}
+        />
+      )}
     />
   );
 }

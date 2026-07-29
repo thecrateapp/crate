@@ -5,7 +5,7 @@ import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Disc3, Loader2, Pause, Play } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 
 const DISC_DEGREES_PER_SECOND = 120;
 const JOG_SECONDS_PER_ROTATION = 2.5;
@@ -402,13 +402,13 @@ export function SpinningDisc({
         >
           {showCrossfade ? (
             <>
-              <AuthenticatedMediaImage
+              <CrateImage
                 src={crossfadeOutgoingCover!}
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
                 style={{ opacity: 1 - crossfadeProgress }}
               />
-              <AuthenticatedMediaImage
+              <CrateImage
                 src={crossfadeIncomingCover!}
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
@@ -416,7 +416,7 @@ export function SpinningDisc({
               />
             </>
           ) : albumCover ? (
-            <AuthenticatedMediaImage
+            <CrateImage
               src={albumCover}
               alt=""
               className="absolute inset-0 h-full w-full object-cover"

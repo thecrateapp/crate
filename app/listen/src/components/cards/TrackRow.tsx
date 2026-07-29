@@ -13,7 +13,7 @@ import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { buildTrackMenuPlayerTrack } from "@/components/actions/shared";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
@@ -32,7 +32,7 @@ import {
 } from "@/lib/playable-track";
 import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
+import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { cn, formatDuration } from "@/lib/utils";
 import { toast } from "sonner";

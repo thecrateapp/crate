@@ -9,7 +9,10 @@ import {
   Shuffle,
   type CrateIcon,
 } from "@crate/ui/icons";
-import { ContextMenu, type ContextMenuEntry } from "@crate/ui/domain/actions";
+import {
+  ContextMenu,
+  type ContextMenuEntry,
+} from "@/components/actions/ItemActionMenu";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";

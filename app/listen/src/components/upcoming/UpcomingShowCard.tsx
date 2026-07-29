@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Calendar } from "@crate/ui/icons";
 
-import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { useShowActionEntries } from "@/components/actions/show-actions";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";

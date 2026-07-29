@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { CrateLoader } from "@/components/ui/CrateLoader";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -236,7 +236,7 @@ export function PathDetail() {
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
             <div className="flex items-center gap-3">
               {path.tracks[activeStep]!.album_id && (
-                <AuthenticatedMediaImage
+                <CrateImage
                   src={albumCoverApiUrl(
                     {
                       albumId: path.tracks[activeStep]!.album_id!,
@@ -321,7 +321,7 @@ export function PathDetail() {
               </div>
 
               {t.album_id ? (
-                <AuthenticatedMediaImage
+                <CrateImage
                   src={albumCoverApiUrl(
                     {
                       albumId: t.album_id,

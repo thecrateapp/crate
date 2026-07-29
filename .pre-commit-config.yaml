@@ -2,13 +2,13 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: v0.15.22
     hooks:
       - id: ruff
         args: [--fix]
-        files: ^app/crate/.*\.py$
+        files: ^app/(crate|tests)/.*\.py$
       - id: ruff-format
-        files: ^app/crate/.*\.py$
+        files: ^app/(crate|tests)/.*\.py$
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0

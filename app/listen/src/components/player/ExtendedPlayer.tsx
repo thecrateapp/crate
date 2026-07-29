@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ChevronDown, Settings, SlidersHorizontal } from "@crate/ui/icons";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { PlayerSurfaceModeSwitch } from "@/components/player/PlayerSurfaceModeSwitch";
 import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
@@ -310,7 +310,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
               {crossfadeTransition ? (
                 <>
                   {crossfadeTransition.outgoing.albumCover ? (
-                    <AuthenticatedMediaImage
+                    <CrateImage
                       src={crossfadeTransition.outgoing.albumCover}
                       alt=""
                       className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
@@ -323,7 +323,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                     />
                   ) : null}
                   {crossfadeTransition.incoming.albumCover ? (
-                    <AuthenticatedMediaImage
+                    <CrateImage
                       src={crossfadeTransition.incoming.albumCover}
                       alt=""
                       className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
@@ -337,7 +337,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                   ) : null}
                 </>
               ) : currentTrack.albumCover ? (
-                <AuthenticatedMediaImage
+                <CrateImage
                   src={currentTrack.albumCover}
                   alt=""
                   className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"

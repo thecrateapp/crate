@@ -79,6 +79,14 @@ describe("ArtistCard", () => {
     );
   });
 
+  it("uses the rendered compact width when selecting responsive artwork", () => {
+    renderWithListenProviders(
+      <ArtistCard name="High Vis" artistId={9} compact />,
+    );
+
+    expect(screen.getByAltText("High Vis")).toHaveAttribute("sizes", "100px");
+  });
+
   it("shows a flat monogram disc while external artwork is pending", () => {
     renderWithListenProviders(
       <ArtistCard
@@ -103,7 +111,7 @@ describe("ArtistCard", () => {
     );
   });
 
-  it("keeps polling pending external artwork beyond the initial burst", () => {
+  it("keeps polling pending external artwork beyond the initial burst", async () => {
     vi.useFakeTimers();
     try {
       const { container } = renderWithListenProviders(
@@ -120,7 +128,9 @@ describe("ArtistCard", () => {
       expect(image).toHaveAttribute("decoding", "async");
 
       fireEvent.error(image);
-      act(() => vi.advanceTimersByTime(2_000));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
 
       expect(container.querySelector("img")).toHaveAttribute(
         "src",
@@ -128,21 +138,27 @@ describe("ArtistCard", () => {
       );
 
       fireEvent.error(screen.getByAltText("Poison The Well"));
-      act(() => vi.advanceTimersByTime(4_000));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
       expect(container.querySelector("img")).toHaveAttribute(
         "src",
         expect.stringContaining("retry=2"),
       );
 
       fireEvent.error(screen.getByAltText("Poison The Well"));
-      act(() => vi.advanceTimersByTime(8_000));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8_000);
+      });
       expect(container.querySelector("img")).toHaveAttribute(
         "src",
         expect.stringContaining("retry=3"),
       );
 
       fireEvent.error(screen.getByAltText("Poison The Well"));
-      act(() => vi.advanceTimersByTime(15_000));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
       expect(container.querySelector("img")).toHaveAttribute(
         "src",
         expect.stringContaining("retry=4"),
@@ -155,7 +171,7 @@ describe("ArtistCard", () => {
     }
   });
 
-  it("keeps failed artwork hidden until a retry loads", () => {
+  it("keeps failed artwork hidden until a retry loads", async () => {
     vi.useFakeTimers();
     try {
       renderWithListenProviders(
@@ -168,21 +184,25 @@ describe("ArtistCard", () => {
       );
 
       const image = screen.getByAltText("Le Temps Du Loup");
-      expect(image).toHaveClass("invisible");
+      expect(image).toHaveClass("opacity-0");
 
       fireEvent.error(image);
-      act(() => vi.advanceTimersByTime(2_000));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
 
       const retryImage = screen.getByAltText("Le Temps Du Loup");
       expect(retryImage).toHaveAttribute(
         "src",
         expect.stringContaining("retry=1"),
       );
-      expect(retryImage).toHaveClass("invisible");
+      expect(retryImage).toHaveClass("opacity-0");
 
       fireEvent.load(retryImage);
 
-      expect(screen.getByAltText("Le Temps Du Loup")).toHaveClass("visible");
+      expect(screen.getByAltText("Le Temps Du Loup")).toHaveClass(
+        "opacity-100",
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -283,15 +303,44 @@ describe("ArtistCard", () => {
       renderWithListenProviders(<CredentialRotationHarness />);
 
       fireEvent.load(screen.getByAltText(name));
-      expect(screen.getByAltText(name)).toHaveClass("visible");
+      expect(screen.getByAltText(name)).toHaveClass("opacity-100");
 
       fireEvent.click(
         screen.getByRole("button", { name: "Rotate credentials" }),
       );
 
-      expect(screen.getByAltText(name)).toHaveClass("visible");
+      expect(screen.getByAltText(name)).toHaveClass("opacity-100");
     },
   );
+
+  it("keeps related library artwork visible when its signed prop rotates", () => {
+    function SignedRelatedArtistHarness() {
+      const [token, setToken] = useState("token-1");
+      return (
+        <>
+          <button type="button" onClick={() => setToken("token-2")}>
+            Rotate signed photo
+          </button>
+          <ArtistCard
+            name="High Vis"
+            artistId={9}
+            photo={`/api/artists/9/photo?size=384&format=webp&token=${token}`}
+          />
+        </>
+      );
+    }
+
+    renderWithListenProviders(<SignedRelatedArtistHarness />);
+
+    fireEvent.load(screen.getByAltText("High Vis"));
+    expect(screen.getByAltText("High Vis")).toHaveClass("opacity-100");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Rotate signed photo" }),
+    );
+
+    expect(screen.getByAltText("High Vis")).toHaveClass("opacity-100");
+  });
 
   it("does not request a generated artist photo when catalog says none exists", () => {
     renderWithListenProviders(
@@ -307,6 +356,11 @@ describe("ArtistCard", () => {
 
   it("opens the desktop action menu when the artist only has stable route identifiers", async () => {
     mockPointerEnvironment(true);
+    resolveMaybeApiAssetUrlMock.mockImplementation((url) =>
+      url?.startsWith("/api/")
+        ? `https://api.example.test${url}&media_ticket=menu-ticket`
+        : url ?? null,
+    );
 
     renderWithListenProviders(
       <ArtistCard
@@ -324,6 +378,10 @@ describe("ArtistCard", () => {
     const menu = await screen.findByRole("menu");
     expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-2xl");
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
+    expect(within(menu).getByAltText("Dredg")).toHaveAttribute(
+      "src",
+      expect.stringContaining("https://api.example.test/api/"),
+    );
     expect(
       await within(menu).findByRole("menuitem", { name: "Share artist" }),
     ).toBeInTheDocument();

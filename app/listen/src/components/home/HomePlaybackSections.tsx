@@ -5,10 +5,10 @@ import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@crate/ui/domain/actions";
+} from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
-import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
+import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";

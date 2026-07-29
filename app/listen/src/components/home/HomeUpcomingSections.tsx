@@ -18,7 +18,7 @@ import {
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
-import { AuthenticatedMediaImage } from "@/components/player/AuthenticatedMediaImage";
+import { CrateImage } from "@/components/artwork/CrateImage";
 
 import type {
   HomeUpcomingInsight,
@@ -119,7 +119,7 @@ export function HomeUpcomingSection({
         <div className="relative min-h-[270px] overflow-hidden rounded-[28px] border border-white/10 bg-[#101218] p-5 sm:p-6">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(6,182,212,0.34),transparent_35%),linear-gradient(120deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
           {artistImage ? (
-            <AuthenticatedMediaImage
+            <CrateImage
               src={artistImage}
               alt=""
               loading="lazy"

@@ -597,30 +597,33 @@ export async function ensureMediaAccessUrl(
   const key = `${server.id}:${audience}:${parsed.pathname}:${
     options.forceRefresh ? "refresh" : "ensure"
   }`;
-  const existing = ensuredMediaAccessPromises.get(key);
-  if (existing) return existing;
-
-  const pending = (async () => {
-    const target = { audience, path: parsed.pathname };
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const refreshed = await refreshMediaAccessTickets([target]);
-      const currentServer = getCurrentServer();
-      const ticket =
-        refreshed && currentServer?.id === server.id
-          ? getMediaAccessTicket(audience, parsed.pathname, server.id)
-          : null;
-      if (ticket) {
-        parsed.searchParams.set("media_ticket", ticket);
-        return parsed.toString();
+  const path = parsed.pathname;
+  let ticketPromise = ensuredMediaAccessPromises.get(key);
+  if (!ticketPromise) {
+    const pending = (async () => {
+      const target = { audience, path };
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const refreshed = await refreshMediaAccessTickets([target]);
+        const currentServer = getCurrentServer();
+        const ticket =
+          refreshed && currentServer?.id === server.id
+            ? getMediaAccessTicket(audience, path, server.id)
+            : null;
+        if (ticket) return ticket;
+        if (!refreshed) break;
       }
-      if (!refreshed) break;
-    }
-    throw new MediaAccessTicketError(audience, parsed.pathname);
-  })().finally(() => {
-    ensuredMediaAccessPromises.delete(key);
-  });
-  ensuredMediaAccessPromises.set(key, pending);
-  return pending;
+      throw new MediaAccessTicketError(audience, path);
+    })();
+    ticketPromise = pending.finally(() => {
+      if (ensuredMediaAccessPromises.get(key) === ticketPromise) {
+        ensuredMediaAccessPromises.delete(key);
+      }
+    });
+    ensuredMediaAccessPromises.set(key, ticketPromise);
+  }
+  const ticket = await ticketPromise;
+  parsed.searchParams.set("media_ticket", ticket);
+  return parsed.toString();
 }
 
 export function startMediaAccessTicketRefresh(): () => void {

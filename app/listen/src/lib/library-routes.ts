@@ -5,8 +5,8 @@ import {
   artistSharePath as _artistSharePath,
   artistTopTracksPath as _artistTopTracksPath,
   artistApiPath as _artistApiPath,
-  artistPhotoApiUrl as _artistPhotoApiUrl,
-  artistBackgroundApiUrl as _artistBackgroundApiUrl,
+  artistPhotoAssetPath as _artistPhotoAssetPath,
+  artistBackgroundAssetPath as _artistBackgroundAssetPath,
   albumPagePath as _albumPagePath,
   globalAlbumPagePath as _globalAlbumPagePath,
   globalAlbumUidFromRouteRef as _globalAlbumUidFromRouteRef,
@@ -14,8 +14,8 @@ import {
   albumApiPath as _albumApiPath,
   albumDownloadApiPath as _albumDownloadApiPath,
   albumRelatedApiPath as _albumRelatedApiPath,
-  albumCoverApiUrl as _albumCoverApiUrl,
-  genreCoverApiUrl as _genreCoverApiUrl,
+  albumCoverAssetPath as _albumCoverAssetPath,
+  genreCoverAssetPath as _genreCoverAssetPath,
   trackDownloadApiPath as _trackDownloadApiPath,
   trackEffectiveEqApiPath as _trackEffectiveEqApiPath,
   trackEqFeaturesApiPath as _trackEqFeaturesApiPath,
@@ -35,7 +35,7 @@ export type {
   TrackRouteInput,
 } from "../../../shared/web/library-routes";
 
-import { getApiBase, getAuthToken } from "@/lib/api";
+import { apiAssetUrl, getApiBase, getAuthToken } from "@/lib/api";
 
 // Page routes — no prefix needed (local navigation)
 export const artistPagePath = _artistPagePath;
@@ -49,14 +49,10 @@ export const globalAlbumUidFromRouteRef = _globalAlbumUidFromRouteRef;
 export const albumSharePath = _albumSharePath;
 export const isReservedArtistChildSlug = _isReservedArtistChildSlug;
 
-// Image/media URLs — prefix with the active API base + append ?token=
-// for <img> elements that can't send headers.
-function authedUrl<F extends (...args: any[]) => string>(fn: F): F {
+function artworkUrl<F extends (...args: any[]) => string>(fn: F): F {
   return ((...args: Parameters<F>) => {
     const path = fn(...args);
-    if (!path) return path;
-    if (!path.startsWith("/api/")) return path;
-    return withAssetAuth(path);
+    return path ? apiAssetUrl(path) : path;
   }) as F;
 }
 
@@ -70,7 +66,7 @@ function withAssetAuth(path: string): string {
   return `${url}${separator}token=${encodeURIComponent(token)}`;
 }
 
-type ImageOptions = Parameters<typeof _albumCoverApiUrl>[1];
+type ImageOptions = Parameters<typeof _albumCoverAssetPath>[1];
 
 function preferModernImageFormat(options?: ImageOptions): ImageOptions {
   if (
@@ -110,26 +106,31 @@ export const trackEqPresetApiPath = _trackEqPresetApiPath;
 export const trackGenreApiPath = _trackGenreApiPath;
 export const trackOfflineManifestApiPath = _trackOfflineManifestApiPath;
 
-export const artistPhotoApiUrl = authedUrl(((input, options) =>
-  _artistPhotoApiUrl(
+export const artistPhotoAssetPath = ((input, options) =>
+  _artistPhotoAssetPath(
     input,
     preferModernImageFormat(options),
-  )) as typeof _artistPhotoApiUrl);
-export const artistBackgroundApiUrl = authedUrl(((input, options) =>
-  _artistBackgroundApiUrl(
+  )) as typeof _artistPhotoAssetPath;
+export const artistBackgroundAssetPath = ((input, options) =>
+  _artistBackgroundAssetPath(
     input,
     preferModernImageFormat(options),
-  )) as typeof _artistBackgroundApiUrl);
-export const albumCoverApiUrl = authedUrl(((input, options) =>
-  _albumCoverApiUrl(
+  )) as typeof _artistBackgroundAssetPath;
+export const albumCoverAssetPath = ((input, options) =>
+  _albumCoverAssetPath(
     input,
     preferModernImageFormat(options),
-  )) as typeof _albumCoverApiUrl);
-export const genreCoverApiUrl = authedUrl(((slug, options) =>
-  _genreCoverApiUrl(
+  )) as typeof _albumCoverAssetPath;
+export const genreCoverAssetPath = ((slug, options) =>
+  _genreCoverAssetPath(
     slug,
     preferModernImageFormat(options),
-  )) as typeof _genreCoverApiUrl);
+  )) as typeof _genreCoverAssetPath;
+
+export const artistPhotoApiUrl = artworkUrl(artistPhotoAssetPath);
+export const artistBackgroundApiUrl = artworkUrl(artistBackgroundAssetPath);
+export const albumCoverApiUrl = artworkUrl(albumCoverAssetPath);
+export const genreCoverApiUrl = artworkUrl(genreCoverAssetPath);
 
 export const trackStreamApiPath = _trackStreamApiPath;
 export const trackDownloadApiPath = _trackDownloadApiPath;
