@@ -20,6 +20,7 @@ const versions = vi.hoisted(() => ({
   requiresTicket: true,
   resume: 0,
   tickets: 1,
+  usable: true,
 }));
 
 vi.mock("@/lib/artwork-manager", async (importOriginal) => {
@@ -67,11 +68,14 @@ describe("CrateImage", () => {
     versions.resume = 0;
     versions.requiresTicket = true;
     versions.tickets = 1;
+    versions.usable = true;
     managerMocks.preloadArtwork.mockReset();
     managerMocks.preloadResolvedArtwork.mockReset();
     managerMocks.refreshArtworkCandidate.mockReset();
     managerMocks.resolveArtworkCandidate.mockReset();
-    managerMocks.resolveArtworkCandidate.mockImplementation(candidate);
+    managerMocks.resolveArtworkCandidate.mockImplementation((value) =>
+      versions.usable ? candidate(value) : null,
+    );
     managerMocks.preloadArtwork.mockImplementation(
       async (value: ArtworkSource) => candidate(value),
     );
@@ -104,6 +108,35 @@ describe("CrateImage", () => {
       "src",
       "/api/artists/high-vis/photo?v=one&media_ticket=1",
     );
+  });
+
+  it("keeps ready artwork visible while credentials are temporarily absent", async () => {
+    const artwork = source("high-vis", "one");
+    const { rerender } = render(<CrateImage source={artwork} alt="High Vis" />);
+    const image = screen.getByRole("img", { name: "High Vis" });
+    fireEvent.load(image);
+
+    versions.usable = false;
+    versions.tickets = 2;
+    rerender(<CrateImage source={artwork} alt="High Vis" />);
+
+    expect(screen.getByRole("img", { name: "High Vis" })).toBe(image);
+    expect(image).toHaveAttribute(
+      "src",
+      "/api/artists/high-vis/photo?v=one&media_ticket=1",
+    );
+    expect(image).toHaveAttribute("data-artwork-state", "ready");
+
+    versions.usable = true;
+    versions.tickets = 3;
+    rerender(<CrateImage source={artwork} alt="High Vis" />);
+
+    expect(screen.getByRole("img", { name: "High Vis" })).toBe(image);
+    expect(image).toHaveAttribute(
+      "src",
+      "/api/artists/high-vis/photo?v=one&media_ticket=1",
+    );
+    expect(image).toHaveAttribute("data-artwork-state", "ready");
   });
 
   it("updates responsive sizes without replacing the visible bitmap", () => {

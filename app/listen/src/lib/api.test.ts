@@ -1096,6 +1096,26 @@ describe("native (configurable server) mode", () => {
   });
 
   describe("media access refresh", () => {
+    it("keeps media tickets when only the current access token changes", () => {
+      setupServer();
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        mockJsonResponse({
+          tickets: [],
+        }),
+      );
+      const stop = apiMod.startMediaAccessTicketRefresh();
+      expect(apiMod.apiAssetUrl("/api/cover.jpg")).toContain(
+        "media_ticket=artwork-ticket",
+      );
+
+      serverStore.setCurrentServerToken("rotated-access-token");
+
+      expect(apiMod.apiAssetUrl("/api/cover.jpg")).toContain(
+        "media_ticket=artwork-ticket",
+      );
+      stop();
+    });
+
     it("starts immediate artwork recovery without refreshing historical targets", async () => {
       setupServer();
       const initialResumeVersion = mediaAccess.getMediaAccessResumeVersion();

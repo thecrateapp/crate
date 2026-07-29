@@ -154,6 +154,7 @@ export function CrateImage({
     desiredRef.current = desired;
     const current = activeRef.current;
     if (!resolved) {
+      if (current?.ready && artwork.retryPolicy === "credentials") return;
       commit(null);
       return;
     }
@@ -220,7 +221,9 @@ export function CrateImage({
   }, [artwork, loading, resumeVersion]);
 
   const displayed = !resolved
-    ? null
+    ? active?.ready && artwork.retryPolicy === "credentials"
+      ? active
+      : null
     : !active || active.candidate.logicalKey !== resolved.logicalKey
       ? { candidate: resolved, ready: false }
       : active;
