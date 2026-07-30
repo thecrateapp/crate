@@ -15,6 +15,11 @@ import type {
   EngineTrack,
   PlaybackEngine,
 } from "@/lib/playback-engine";
+import {
+  getSmartMixCapabilities,
+  setSmartMixCapabilities,
+  type SmartMixCapabilities,
+} from "@/lib/smart-mix";
 
 const NATIVE_PLAYER_DISABLED_KEY = "crate-native-player-disabled";
 const NATIVE_PLAYER_CROSSFADE_KEY = "crate-native-player-crossfade-enabled";
@@ -34,21 +39,7 @@ const LOCAL_SMART_MIX_CROSSFADE_MS = (() => {
     : 3000;
 })();
 
-export type AndroidNativeSmartMixCapabilities = {
-  available: boolean;
-  androidNativeCrossfade: boolean;
-  androidBeatmatch: boolean;
-  plannerVersion?: string | null;
-};
-
-const DISABLED_SMART_MIX_CAPABILITIES: AndroidNativeSmartMixCapabilities = {
-  available: false,
-  androidNativeCrossfade: false,
-  androidBeatmatch: false,
-  plannerVersion: null,
-};
-
-let smartMixCapabilities = DISABLED_SMART_MIX_CAPABILITIES;
+export type AndroidNativeSmartMixCapabilities = SmartMixCapabilities;
 
 type NativeEventEnvelope = {
   event?: EngineEventName;
@@ -141,12 +132,7 @@ export function setAndroidNativePlayerEnabled(enabled: boolean): void {
 export function setAndroidNativeSmartMixCapabilities(
   capabilities: AndroidNativeSmartMixCapabilities,
 ): void {
-  smartMixCapabilities = {
-    available: capabilities.available === true,
-    androidNativeCrossfade: capabilities.androidNativeCrossfade === true,
-    androidBeatmatch: capabilities.androidBeatmatch === true,
-    plannerVersion: capabilities.plannerVersion ?? null,
-  };
+  setSmartMixCapabilities(capabilities);
 }
 
 export function setAndroidNativeSmartMixRolloutEnabled(enabled: boolean): void {
@@ -193,9 +179,10 @@ function effectiveNativeCrossfadeMs(requestedMs: number): number {
   if (LOCAL_SMART_MIX_TEST_ENABLED && !isAndroidNativeSmartMixKilled()) {
     return LOCAL_SMART_MIX_CROSSFADE_MS;
   }
+  const capabilities = getSmartMixCapabilities();
   if (
-    !smartMixCapabilities.available ||
-    !smartMixCapabilities.androidNativeCrossfade ||
+    !capabilities.available ||
+    !capabilities.androidNativeCrossfade ||
     !isAndroidNativeSmartMixRolloutEnabled() ||
     isAndroidNativeSmartMixKilled()
   ) {

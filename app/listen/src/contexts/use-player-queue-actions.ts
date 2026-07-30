@@ -8,6 +8,7 @@ import {
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import {
   toFreshEngineTrack,
+  toStartupEngineQueueSnapshot,
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import {
@@ -260,22 +261,21 @@ export function usePlayerQueueActions({
           );
         });
         void (async () => {
-          const engineTracks = await toStartupEngineTracks(
+          const revision = createQueueRevision();
+          const snapshot = await toStartupEngineQueueSnapshot({
+            revision,
             tracks,
-            normalizedIndex,
-            undefined,
-            { target: "android-native" },
-          );
-          return nativeEngine.loadQueue({
-            revision: createQueueRevision(),
-            tracks: engineTracks,
             currentIndex: normalizedIndex,
             positionMs: 0,
             autoplay: true,
             repeat: toEngineRepeatMode(repeatRef.current),
             crossfadeMs: nativeCrossfadeMs(),
             volume: lastNonZeroVolumeRef.current,
+            playSource: nextSource,
+            shuffle: shuffleRef.current,
+            target: "android-native",
           });
+          return nativeEngine.loadQueue(snapshot);
         })().catch((error) => {
           console.error("[native-player] failed to load queue:", error);
           commitIsPlaying(false);
@@ -332,6 +332,8 @@ export function usePlayerQueueActions({
       playbackDeliveryPolicy,
       publishConnectState,
       queueRef,
+      repeatRef,
+      shuffleRef,
       startTrackerSession,
     ],
   );

@@ -38,6 +38,7 @@ import {
 import {
   toFreshEngineTrack,
   toFreshEngineTracks,
+  toStartupEngineQueueSnapshot,
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -557,27 +558,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     );
     const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
     const nativePlayerActive = shouldUseAndroidNativePlayer();
-    const engineTracks = await toStartupEngineTracks(
-      recoveryQueue,
-      recoveryIndex,
-      undefined,
-      nativePlayerActive ? { target: "android-native" } : undefined,
-    );
 
     if (nativePlayerActive) {
-      await androidNativeEngine.loadQueue({
-        revision: createQueueRevision(),
-        tracks: engineTracks,
+      const revision = createQueueRevision();
+      const snapshot = await toStartupEngineQueueSnapshot({
+        revision,
+        tracks: recoveryQueue,
         currentIndex: recoveryIndex,
         positionMs,
         autoplay: true,
         repeat: repeatRef.current,
         crossfadeMs: effectiveCrossfadeMsRef.current,
         volume: lastNonZeroVolumeRef.current,
+        playSource: playSourceRef.current,
+        shuffle: shuffleRef.current,
+        target: "android-native",
       });
+      await androidNativeEngine.loadQueue(snapshot);
       return true;
     }
 
+    const engineTracks = await toStartupEngineTracks(
+      recoveryQueue,
+      recoveryIndex,
+    );
     gpLoadQueue(
       buildEngineUrls(
         recoveryQueue,
@@ -875,22 +879,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const engineTracks = await toStartupEngineTracks(
-        queueSnapshot,
-        index,
-        undefined,
-        { target: "android-native" },
-      );
-      await androidNativeEngine.loadQueue({
-        revision: createQueueRevision(),
-        tracks: engineTracks,
+      const revision = createQueueRevision();
+      const snapshot = await toStartupEngineQueueSnapshot({
+        revision,
+        tracks: queueSnapshot,
         currentIndex: index,
         positionMs,
         autoplay: true,
         repeat: repeatRef.current,
         crossfadeMs: effectiveCrossfadeMsRef.current,
         volume: lastNonZeroVolumeRef.current,
+        playSource: playSourceRef.current,
+        shuffle: shuffleRef.current,
+        target: "android-native",
       });
+      await androidNativeEngine.loadQueue(snapshot);
       return true;
     },
     [
@@ -898,8 +901,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTimeRef,
       effectiveCrossfadeMsRef,
       lastNonZeroVolumeRef,
+      playSourceRef,
       queueRef,
       repeatRef,
+      shuffleRef,
     ],
   );
 
@@ -1041,22 +1046,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (!(await refreshAuthToken())) {
           throw new Error("Could not refresh the native playback token");
         }
-        const engineTracks = await toStartupEngineTracks(
-          queueSnapshot,
-          index,
-          undefined,
-          { target: "android-native" },
-        );
-        await androidNativeEngine.loadQueue({
-          revision: createQueueRevision(),
-          tracks: engineTracks,
+        const revision = createQueueRevision();
+        const snapshot = await toStartupEngineQueueSnapshot({
+          revision,
+          tracks: queueSnapshot,
           currentIndex: index,
           positionMs,
           autoplay: true,
           repeat: repeatRef.current,
           crossfadeMs: effectiveCrossfadeMsRef.current,
           volume: lastNonZeroVolumeRef.current,
+          playSource: playSourceRef.current,
+          shuffle: shuffleRef.current,
+          target: "android-native",
         });
+        await androidNativeEngine.loadQueue(snapshot);
       })().catch((error) => {
         const summary = nativePlaybackErrorMessage(nativeError);
         console.error("[native-player] failed to recover auth error:", error);
@@ -1087,8 +1091,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTimeRef,
       effectiveCrossfadeMsRef,
       lastNonZeroVolumeRef,
+      playSourceRef,
       queueRef,
       repeatRef,
+      shuffleRef,
     ],
   );
 
