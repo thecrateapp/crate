@@ -208,7 +208,7 @@ export function SearchResults() {
         <h1 className="text-2xl font-bold">
           {t("search.resultsFor", { query })}
         </h1>
-        <div className="mx-auto max-w-sm rounded-3xl border border-amber-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-amber-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/8 text-amber-100">
             <Search size={18} />
           </div>
@@ -388,7 +388,7 @@ export function SearchResults() {
       )}
 
       {noResults ? (
-        <div className="mx-auto max-w-sm rounded-3xl border border-cyan-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-cyan-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
             <Search size={18} />
           </div>

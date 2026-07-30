@@ -42,7 +42,7 @@ export function CoreTracksArtwork({
       tracks={item.artwork_tracks}
       backgroundImageUrl={photoUrl}
       variant="core"
-      className={cn("rounded-3xl bg-white/5", className)}
+      className={cn("rounded-xl bg-white/5", className)}
     />
   );
 }

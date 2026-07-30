@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from crate.db.repositories.global_user_library import list_global_collection_artists
+from crate.db.repositories.global_user_library import (
+    list_recent_global_collection_artists,
+)
 
 
 def _build_recent_global_artists(limit: int = 10) -> list[dict]:
@@ -16,7 +18,7 @@ def _build_recent_global_artists(limit: int = 10) -> list[dict]:
             "has_photo": bool(row.get("has_photo")),
             "photo_url": row.get("photo_url"),
         }
-        for row in list_global_collection_artists(limit)
+        for row in list_recent_global_collection_artists(limit)
         if row.get("artist_name")
     ]
 

@@ -241,6 +241,7 @@ describe("FullscreenPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
+    localStorage.removeItem("listen-eq-enabled");
     androidNativeEngineMock.shouldUseAndroidNativePlayer.mockReturnValue(false);
   });
 
@@ -645,6 +646,7 @@ describe("FullscreenPlayer", () => {
     });
 
     it("equalizer button toggles EqualizerPanel visibility", async () => {
+      localStorage.setItem("listen-eq-enabled", "true");
       const track = makeTrack();
       const user = userEvent.setup();
 
@@ -663,11 +665,32 @@ describe("FullscreenPlayer", () => {
       expect(screen.queryByTestId("equalizer-panel")).not.toBeInTheDocument();
 
       await user.click(screen.getByLabelText("Equalizer"));
-      expect(screen.getByTestId("equalizer-panel")).toBeInTheDocument();
+      const equalizerPanel = screen.getByTestId("equalizer-panel");
+      expect(equalizerPanel).toBeInTheDocument();
+      expect(equalizerPanel.parentElement).toHaveClass(
+        "listen-mobile-eq-glass",
+      );
 
       await user.click(screen.getByLabelText("Equalizer"));
       await waitFor(() => {
         expect(screen.queryByTestId("equalizer-panel")).not.toBeInTheDocument();
+      });
+    });
+
+    it("hides the mobile Equalizer access when it is globally disabled", async () => {
+      localStorage.setItem("listen-eq-enabled", "false");
+      const track = makeTrack();
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
       });
     });
 

@@ -89,7 +89,7 @@ export function ShareSheetHost() {
       open
       onClose={() => setPayload(null)}
       maxWidthClassName="sm:max-w-[420px]"
-      panelClassName="listen-glass-panel overflow-hidden rounded-[28px]"
+      panelClassName="listen-glass-panel overflow-hidden rounded-[12px]"
       overlayClassName="bg-black/58"
       mobileSafeArea
     >
@@ -198,7 +198,7 @@ function ShareAction({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-left transition",
+        "group flex w-full items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-3 text-left transition",
         "hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         disabled &&
           "cursor-not-allowed opacity-45 hover:border-white/10 hover:bg-black/20",

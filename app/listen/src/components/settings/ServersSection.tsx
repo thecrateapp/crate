@@ -68,7 +68,7 @@ export function ServersSection() {
   };
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+    <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
         <Server size={16} className="text-cyan-400" />
         <h2 className="text-sm font-semibold text-foreground">Servers</h2>

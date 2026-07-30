@@ -313,6 +313,38 @@ describe("Album page", () => {
     ).toBeNull();
   });
 
+  it("shows a countdown for a future pre-release", () => {
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-07-30T10:15:30.000Z"));
+      vi.mocked(useApi).mockReturnValue({
+        data: {
+          ...ALBUM_DATA,
+          is_pre_release: true,
+          release_date: "2026-08-02",
+        },
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      renderWithListenProviders(<Album />, {
+        route: "/artists/crossed/morir",
+        path: "/artists/:artistSlug/:albumSlug",
+      });
+
+      const countdown = screen.getByTestId("release-countdown");
+      expect(within(countdown).getByText("Days")).toBeInTheDocument();
+      expect(within(countdown).getByText("Hours")).toBeInTheDocument();
+      expect(within(countdown).getByText("Min")).toBeInTheDocument();
+      expect(within(countdown).getByText("Sec")).toBeInTheDocument();
+      expect(within(countdown).getByText("August 2, 2026")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("groups desktop hero actions into primary pills and secondary icon labels", () => {
     renderWithListenProviders(<Album />, {
       route: "/artists/crossed/morir",
@@ -486,7 +518,7 @@ describe("Album page", () => {
     expect(menu).toHaveClass(
       "listen-glass-panel",
       "w-72",
-      "rounded-2xl",
+      "rounded-[12px]",
       "z-app-context-menu",
     );
 
@@ -615,6 +647,17 @@ describe("Album page", () => {
     expect(screen.getByTestId("album-hero-info")).not.toHaveClass(
       "translate-y-12",
     );
+  });
+
+  it("aligns the desktop action rail with the hero and track list", () => {
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    const actionRow = screen.getByTestId("album-action-row");
+    expect(actionRow).toHaveClass("sm:px-0");
+    expect(actionRow.firstElementChild).toHaveClass("sm:px-6");
   });
 
   it("anchors mobile album metadata above the measured primary action buttons", async () => {

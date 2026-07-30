@@ -48,6 +48,7 @@ import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { triggerHaptic } from "@/lib/haptics";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { useAudioVisualizer } from "@/hooks/use-audio-visualizer";
+import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
@@ -177,10 +178,12 @@ export function PlayerBar() {
   const connectEnabled = useCrateConnectEnabled();
   const legacyConnectEnabled =
     connectEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED;
-  const allowEqualizer =
+  const equalizerEnabled = useEqualizerEnabled();
+  const equalizerRuntimeAvailable =
     canUseWebAudioEffects || shouldUseAndroidNativePlayer();
+  const allowEqualizer = equalizerEnabled && equalizerRuntimeAvailable;
   const showPlayerBarAnalyzer =
-    SHOW_PLAYER_BAR_ANALYZER && isDesktop && allowEqualizer;
+    SHOW_PLAYER_BAR_ANALYZER && isDesktop && equalizerRuntimeAvailable;
 
   const crossfadeProgress = useCrossfadeProgress(crossfadeTransition);
   // Crossfade still animates visual elements like artwork/title, but
@@ -566,6 +569,10 @@ export function PlayerBar() {
     useState(false);
   const [hasFloatingOverlayOpen, setHasFloatingOverlayOpen] = useState(false);
   const { isLiked, likeTrack, unlikeTrack } = useLikedTracks();
+
+  useEffect(() => {
+    if (!allowEqualizer) setShowEqualizer(false);
+  }, [allowEqualizer]);
 
   const setFsOpen = useCallback((open: boolean) => {
     setFsOpenRaw(open);
@@ -1058,7 +1065,7 @@ export function PlayerBar() {
             className={cn(
               "pointer-events-none absolute inset-0 z-0",
               isDesktop
-                ? "border border-white/10 md:rounded-2xl md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl"
+                ? "border border-white/10 md:rounded-[12px] md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl"
                 : "rounded-t-[2rem] rounded-b-none",
             )}
           />

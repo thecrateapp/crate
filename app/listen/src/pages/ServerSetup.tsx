@@ -124,10 +124,10 @@ export function ServerSetup() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(6,182,212,0.18),transparent_34%),radial-gradient(circle_at_12%_70%,rgba(20,184,166,0.08),transparent_28%)]" />
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-[560px] rounded-[26px] border border-white/10 bg-[#101118]/90 p-8 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-10"
+        className="relative w-full max-w-[560px] rounded-[12px] border border-white/10 bg-[#101118]/90 p-8 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-10"
       >
         <div className="flex flex-col items-center text-center">
-          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[24px] border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_50px_-24px_rgba(34,211,238,0.9)]">
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_50px_-24px_rgba(34,211,238,0.9)]">
             <img src="/icons/logo.svg" alt="Crate" className="h-14 w-14" />
           </div>
           <h1 className="text-balance text-3xl font-bold tracking-[-0.04em] text-white sm:text-4xl">
@@ -156,7 +156,7 @@ export function ServerSetup() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://api.your-crate.com"
-              className="h-14 w-full rounded-[16px] border border-white/10 bg-white/[0.04] pl-12 pr-4 text-base text-white outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300/70 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(34,211,238,0.08)]"
+              className="h-14 w-full rounded-lg border border-white/10 bg-white/[0.04] pl-12 pr-4 text-base text-white outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300/70 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(34,211,238,0.08)]"
               required
             />
           </div>
@@ -169,7 +169,7 @@ export function ServerSetup() {
           <button
             type="submit"
             disabled={probeState.status === "probing"}
-            className="group flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[16px] bg-cyan-300 px-5 text-sm font-semibold text-[#041217] shadow-[0_0_34px_-12px_rgba(34,211,238,0.75)] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="group flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-5 text-sm font-semibold text-[#041217] shadow-[0_0_34px_-12px_rgba(34,211,238,0.75)] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {probeState.status === "probing" ? (
               <>
@@ -189,7 +189,7 @@ export function ServerSetup() {
           <button
             type="button"
             onClick={() => setUrl("http://localhost:8585")}
-            className="min-h-12 rounded-[16px] border border-white/10 px-5 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white"
+            className="min-h-12 rounded-lg border border-white/10 px-5 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white"
           >
             {t("serverSetup.localDev")}
           </button>

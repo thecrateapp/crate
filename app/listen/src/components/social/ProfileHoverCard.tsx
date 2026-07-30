@@ -117,13 +117,13 @@ function ProfileAvatar({ card }: { card: ProfileCardPayload }) {
         src={avatarUrl}
         alt=""
         onError={handleAvatarError}
-        className="h-16 w-16 rounded-2xl object-cover shadow-[0_18px_44px_rgba(0,0,0,0.36)]"
+        className="h-16 w-16 rounded-xl object-cover shadow-[0_18px_44px_rgba(0,0,0,0.36)]"
       />
     );
   }
 
   return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-2xl font-black text-cyan-200">
+    <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-2xl font-black text-cyan-200">
       {label.trim().charAt(0).toUpperCase() || "U"}
     </div>
   );
@@ -150,7 +150,7 @@ function ProfileCardBody({
   const following = card.relationship_state.following;
 
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#080a10]/95 p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+    <div className="relative overflow-hidden rounded-[12px] border border-white/10 bg-[#080a10]/95 p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.20),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)]" />
       <div className="pointer-events-none absolute -right-8 -top-8 text-[8rem] font-black leading-none text-white/[0.035]">
         {card.affinity_score}
@@ -195,7 +195,7 @@ function ProfileCardBody({
         </div>
       </div>
 
-      <div className="relative mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-3">
+      <div className="relative mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3">
         <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
           Top sound
         </div>
@@ -287,7 +287,7 @@ function LoadingCard() {
     <div
       role="status"
       aria-label={t("profileHover.loading")}
-      className="flex h-40 w-[360px] items-center justify-center rounded-[24px] border border-white/10 bg-[#080a10]/95"
+      className="flex h-40 w-[360px] items-center justify-center rounded-[12px] border border-white/10 bg-[#080a10]/95"
     >
       <Loader2 size={18} className="animate-spin text-cyan-200" />
     </div>
@@ -297,7 +297,7 @@ function LoadingCard() {
 function ErrorCard() {
   const { t } = useTranslation();
   return (
-    <div className="w-[320px] rounded-[20px] border border-white/10 bg-[#080a10]/95 p-4 text-sm text-white/60">
+    <div className="w-[320px] rounded-[12px] border border-white/10 bg-[#080a10]/95 p-4 text-sm text-white/60">
       {t("profileHover.loadFailed")}
     </div>
   );

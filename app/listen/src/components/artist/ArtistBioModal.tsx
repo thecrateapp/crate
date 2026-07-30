@@ -132,7 +132,7 @@ export function ArtistBioModal({
       >
         <div className="flex items-start justify-between gap-4 px-5 py-5 sm:px-6">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-2xl bg-white/5 shadow-xl">
+            <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-white/5 shadow-xl">
               <CrateImage
                 src={photoUrl}
                 alt={artist.name}

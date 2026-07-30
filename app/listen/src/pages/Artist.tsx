@@ -270,7 +270,7 @@ export function Artist() {
     return (
       <div className="flex flex-col items-center gap-4 py-20 text-center">
         <p className="text-muted-foreground">{t("artist.unavailable")}</p>
-        <Button variant="outline" onClick={refetch}>
+        <Button className="rounded-lg" variant="outline" onClick={refetch}>
           {t("common.retry")}
         </Button>
       </div>

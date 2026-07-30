@@ -169,7 +169,7 @@ export function PathDetail() {
       </div>
 
       {/* Route visualization */}
-      <div className="mb-6 rounded-2xl border border-white/8 bg-black/20 p-4">
+      <div className="mb-6 rounded-xl border border-white/8 bg-black/20 p-4">
         <div className="mb-2 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.14em]">
           <span className="flex items-center gap-1 text-primary/60">
             <MapPin size={9} /> {path.origin.label}

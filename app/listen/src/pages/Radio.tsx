@@ -358,11 +358,11 @@ export function RadioPage() {
 
   return (
     <div className="animate-page-in space-y-7 px-4 py-6 sm:px-6">
-      <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.28)] sm:p-6">
+      <div className="relative overflow-hidden rounded-[12px] border border-white/8 bg-white/[0.03] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.28)] sm:p-6">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(10,209,241,0.2),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_52%)]" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-black shadow-[0_0_34px_rgba(10,209,241,0.32)]">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary text-black shadow-[0_0_34px_rgba(10,209,241,0.32)]">
               <RadioIcon size={24} />
             </div>
             <div className="min-w-0">
@@ -431,7 +431,7 @@ export function RadioPage() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
+      <div className="rounded-[12px] border border-white/8 bg-white/[0.03] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
           <RadioIcon size={16} className="text-primary" />
           {t("radio.seed.title")}
@@ -445,7 +445,7 @@ export function RadioPage() {
             void search(e.target.value);
           }}
           placeholder={t("radio.seed.placeholder")}
-          className="h-12 w-full rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/35 focus:outline-none"
+          className="h-12 w-full rounded-lg border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/35 focus:outline-none"
         />
 
         {searching && (

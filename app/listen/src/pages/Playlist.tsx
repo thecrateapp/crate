@@ -824,7 +824,7 @@ export function Playlist() {
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
           <button
             type="button"
-            className="rounded-xl px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
             onClick={() => setDeleteOpen(false)}
             disabled={deleting}
           >
@@ -832,7 +832,7 @@ export function Playlist() {
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500/90 transition-colors disabled:opacity-50"
             onClick={handleDeletePlaylist}
             disabled={deleting}
           >
@@ -862,7 +862,7 @@ export function Playlist() {
         </ModalHeader>
         <ModalBody className="space-y-5 px-5 py-5">
           {data.is_collaborative && isOwner ? (
-            <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4">
+            <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-foreground">
@@ -876,7 +876,7 @@ export function Playlist() {
                   type="button"
                   onClick={handleCreateCollaboratorInvite}
                   disabled={creatingInvite}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
                 >
                   {creatingInvite ? (
                     <Loader2 size={15} className="animate-spin" />
@@ -892,17 +892,17 @@ export function Playlist() {
                     <QrCodeImage
                       value={inviteLink}
                       size={160}
-                      className="rounded-2xl border border-white/10 bg-[#0f1116] p-3"
+                      className="rounded-xl border border-white/10 bg-[#0f1116] p-3"
                     />
                   </div>
                   <div className="space-y-3">
-                    <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-muted-foreground break-all">
+                    <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-xs text-muted-foreground break-all">
                       {inviteLink}
                     </div>
                     <button
                       type="button"
                       onClick={handleCopyInviteLink}
-                      className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                     >
                       <Copy size={15} />
                       {t("playlist.collaborators.copyInvite")}
@@ -923,7 +923,7 @@ export function Playlist() {
               return (
                 <div
                   key={`${member.playlist_id}-${member.user_id}`}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3"
                 >
                   <div className="min-w-0">
                     {member.username ? (

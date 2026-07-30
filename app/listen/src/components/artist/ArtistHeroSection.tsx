@@ -299,15 +299,15 @@ export function ArtistHeroSection({
         </div>
       </div>
 
-      <div className="px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
+      <div className="px-4 py-4 sm:px-0">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 sm:px-6 md:flex-row md:items-center md:justify-between md:gap-6">
           <div
             role="group"
             aria-label={t("artist.actions.primaryGroup")}
             className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
           >
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] md:px-7 md:text-[15px]"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] md:px-7 md:text-[15px]"
               onClick={onPlay}
               aria-label={t("player.play")}
             >
@@ -315,7 +315,7 @@ export function ArtistHeroSection({
               <span>{t("player.play")}</span>
             </button>
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
               onClick={onShuffle}
               aria-label={t("player.shuffle")}
             >

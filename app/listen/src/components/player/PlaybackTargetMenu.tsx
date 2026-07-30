@@ -229,7 +229,7 @@ export function PlaybackTargetMenu({
               ref={popoverRef}
               role="menu"
               aria-label={t("player.output.targets")}
-              className="fixed z-[1600] w-[min(calc(100vw-1rem),340px)] rounded-2xl p-2"
+              className="fixed z-[1600] w-[min(calc(100vw-1rem),340px)] rounded-[12px] p-2"
               style={{
                 right: popoverPosition.right,
                 bottom: popoverPosition.bottom,

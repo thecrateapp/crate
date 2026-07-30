@@ -779,7 +779,7 @@ export function JamSession() {
             void handleJoinRoom(listedRoom);
           }
         }}
-        className="rounded-2xl border border-white/10 bg-black/15 p-4 cursor-pointer transition-colors hover:border-cyan-400/25 hover:bg-white/[0.035] focus:outline-none focus-visible:border-cyan-400/50 focus-visible:ring-2 focus-visible:ring-cyan-400/20"
+        className="rounded-xl border border-white/10 bg-black/15 p-4 cursor-pointer transition-colors hover:border-cyan-400/25 hover:bg-white/[0.035] focus:outline-none focus-visible:border-cyan-400/50 focus-visible:ring-2 focus-visible:ring-cyan-400/20"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -913,7 +913,7 @@ export function JamSession() {
       </ModalHeader>
       <ModalBody className="px-5 py-5">
         <div className="space-y-4">
-          <div className="rounded-2xl border border-red-500/15 bg-red-500/10 px-4 py-3">
+          <div className="rounded-lg border border-red-500/15 bg-red-500/10 px-4 py-3">
             <div className="text-sm font-medium text-foreground">
               {deleteTargetRoom?.name || t("jam.delete.roomFallback")}
             </div>
@@ -926,7 +926,7 @@ export function JamSession() {
               type="button"
               onClick={() => setDeleteTargetRoom(null)}
               disabled={Boolean(deletingRoomId)}
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10 disabled:opacity-60"
+              className="rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10 disabled:opacity-60"
             >
               {t("common.cancel")}
             </button>
@@ -934,7 +934,7 @@ export function JamSession() {
               type="button"
               onClick={() => void confirmDeleteRoom()}
               disabled={Boolean(deletingRoomId)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/15 px-4 py-2.5 text-sm font-medium text-red-100 transition-colors hover:bg-red-500/20 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/15 px-4 py-2.5 text-sm font-medium text-red-100 transition-colors hover:bg-red-500/20 disabled:opacity-60"
             >
               {deletingRoomId ? (
                 <Loader2 size={15} className="animate-spin" />
@@ -953,7 +953,7 @@ export function JamSession() {
     return (
       <>
         <div className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
+          <div className="rounded-[12px] border border-white/10 bg-white/5 p-5 sm:p-6">
             <h1 className="text-3xl font-bold text-foreground">
               {t("jam.lobby.title")}
             </h1>
@@ -963,7 +963,7 @@ export function JamSession() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+            <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
               <h2 className="text-lg font-semibold text-foreground">
                 {t("jam.lobby.startTitle")}
               </h2>
@@ -975,26 +975,26 @@ export function JamSession() {
                   value={roomName}
                   onChange={(event) => setRoomName(event.target.value)}
                   placeholder={t("jam.lobby.namePlaceholder")}
-                  className="h-11 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-cyan-400/40"
+                  className="h-11 w-full rounded-lg border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-cyan-400/40"
                 />
                 <textarea
                   value={roomDescription}
                   onChange={(event) => setRoomDescription(event.target.value)}
                   placeholder={t("jam.lobby.descriptionPlaceholder")}
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
+                  className="w-full resize-none rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
                 />
                 <input
                   value={roomTagsInput}
                   onChange={(event) => setRoomTagsInput(event.target.value)}
                   placeholder={t("jam.lobby.tagsPlaceholder")}
-                  className="h-11 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
+                  className="h-11 w-full rounded-lg border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
                 />
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => setRoomVisibility("private")}
-                    className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
                       roomVisibility === "private"
                         ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-100"
                         : "border-white/10 bg-white/[0.02] text-muted-foreground hover:bg-white/[0.05]"
@@ -1006,7 +1006,7 @@ export function JamSession() {
                   <button
                     type="button"
                     onClick={() => setRoomVisibility("public")}
-                    className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition-colors ${
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
                       roomVisibility === "public"
                         ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-100"
                         : "border-white/10 bg-white/[0.02] text-muted-foreground hover:bg-white/[0.05]"
@@ -1016,7 +1016,7 @@ export function JamSession() {
                     {t("jam.visibility.public")}
                   </button>
                 </div>
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-foreground">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-foreground">
                   <span className="inline-flex items-center gap-2">
                     <Pin size={15} className="text-cyan-300" />
                     {t("jam.lobby.permanentRoom")}
@@ -1032,7 +1032,7 @@ export function JamSession() {
                   type="button"
                   onClick={handleCreateRoom}
                   disabled={creating}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
                 >
                   {creating ? (
                     <Loader2 size={15} className="animate-spin" />
@@ -1044,7 +1044,7 @@ export function JamSession() {
               </div>
             </section>
 
-            <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+            <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">
@@ -1059,7 +1059,7 @@ export function JamSession() {
                 ) : null}
               </div>
 
-              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+              <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
                 <Search size={15} className="text-muted-foreground" />
                 <input
                   value={roomSearch}
@@ -1084,7 +1084,7 @@ export function JamSession() {
                       renderRoomCard(listedRoom, "member"),
                     )}
                     {!roomsLoading && memberRooms.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-muted-foreground">
+                      <div className="rounded-lg border border-dashed border-white/10 p-5 text-sm text-muted-foreground">
                         {t("jam.lobby.emptyMemberRooms")}
                       </div>
                     ) : null}
@@ -1105,7 +1105,7 @@ export function JamSession() {
                       renderRoomCard(listedRoom, "public"),
                     )}
                     {!roomsLoading && publicRooms.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-muted-foreground">
+                      <div className="rounded-lg border border-dashed border-white/10 p-5 text-sm text-muted-foreground">
                         {t("jam.lobby.emptyPublicRooms")}
                       </div>
                     ) : null}
@@ -1115,7 +1115,7 @@ export function JamSession() {
             </section>
           </div>
 
-          <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-foreground">
               {t("jam.lobby.joinInviteTitle")}
             </h2>
@@ -1127,7 +1127,7 @@ export function JamSession() {
                 value={inviteInput}
                 onChange={(event) => setInviteInput(event.target.value)}
                 placeholder={t("jam.lobby.invitePlaceholder")}
-                className="h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-cyan-400/40"
+                className="h-11 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-cyan-400/40"
               />
               <button
                 type="button"
@@ -1139,7 +1139,7 @@ export function JamSession() {
                   }
                   navigate(`/jam/invite/${token}`);
                 }}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
               >
                 <Users size={15} />
                 {t("jam.lobby.joinRoom")}
@@ -1171,7 +1171,7 @@ export function JamSession() {
         </p>
         <Link
           to="/jam"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
         >
           {t("jam.room.backToJam")}
         </Link>
@@ -1185,7 +1185,7 @@ export function JamSession() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="rounded-[12px] border border-white/10 bg-white/5 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="text-xs uppercase tracking-wide text-cyan-300/75">
@@ -1247,7 +1247,7 @@ export function JamSession() {
                 </div>
               ))}
               {roomCurrentTrack ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
                   <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {t("jam.room.nowPlaying")}
                   </div>
@@ -1286,7 +1286,7 @@ export function JamSession() {
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
-            <div className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-black/20 p-1 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
+            <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
               <HeroActionButton
                 label={t("jam.room.actions.addCurrentTrack")}
                 onClick={shareCurrentTrack}
@@ -1336,7 +1336,7 @@ export function JamSession() {
             </div>
 
             {isHost ? (
-              <div className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-white/[0.025] p-1">
+              <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-white/[0.025] p-1">
                 <HeroActionButton
                   label={
                     room.visibility === "public"
@@ -1421,7 +1421,7 @@ export function JamSession() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.85fr_1.1fr_1.1fr]">
-        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+        <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-foreground">
             {t("jam.room.members")}
           </h2>
@@ -1431,7 +1431,7 @@ export function JamSession() {
                 key={`${member.room_id}-${member.user_id}`}
                 username={member.username}
                 hoverClassName="block"
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <AvatarBubble
@@ -1462,7 +1462,7 @@ export function JamSession() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+        <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
@@ -1478,7 +1478,7 @@ export function JamSession() {
           </div>
 
           <div className="mt-4 space-y-2">
-            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
               <Search size={15} className="text-muted-foreground" />
               <input
                 value={queueSearch}
@@ -1496,7 +1496,7 @@ export function JamSession() {
               ) : null}
             </div>
             {queueSearchResults.length > 0 ? (
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/25">
+              <div className="overflow-hidden rounded-xl border border-white/10 bg-black/25">
                 {queueSearchResults.map((track) => {
                   const playable = searchTrackToTrack(track);
                   return (
@@ -1542,7 +1542,7 @@ export function JamSession() {
             {sharedQueue.map((track, index) => (
               <div
                 key={`${track.id}-${index}`}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-3"
+                className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3"
               >
                 <div className="w-6 text-center text-xs text-white/40">
                   {index + 1}
@@ -1614,7 +1614,7 @@ export function JamSession() {
                 </p>
                 <Link
                   to="/search"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                 >
                   <Search size={15} />
                   {t("jam.room.browseLibrary")}
@@ -1624,7 +1624,7 @@ export function JamSession() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+        <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-foreground">
             {t("jam.room.recentActivity")}
           </h2>
@@ -1644,7 +1644,7 @@ export function JamSession() {
                 return (
                   <div
                     key={event.id}
-                    className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3"
+                    className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3"
                   >
                     <div className="flex items-start gap-3">
                       <AvatarBubble
@@ -1731,7 +1731,7 @@ export function JamSession() {
                 onChange={(event) => setMetadataDescription(event.target.value)}
                 rows={4}
                 placeholder={t("jam.room.descriptionPlaceholder")}
-                className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
+                className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
               />
             </label>
             <label className="block">
@@ -1742,14 +1742,14 @@ export function JamSession() {
                 value={metadataTagsInput}
                 onChange={(event) => setMetadataTagsInput(event.target.value)}
                 placeholder={t("jam.room.tagsPlaceholder")}
-                className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
+                className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
               />
             </label>
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setMetadataModalOpen(false)}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                className="rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
               >
                 {t("common.cancel")}
               </button>
@@ -1757,7 +1757,7 @@ export function JamSession() {
                 type="button"
                 onClick={() => void saveRoomMetadata()}
                 disabled={updatingRoomField === "metadata"}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
               >
                 {updatingRoomField === "metadata" ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -1794,17 +1794,17 @@ export function JamSession() {
                 <QrCodeImage
                   value={inviteLink}
                   size={210}
-                  className="rounded-2xl border border-white/10 bg-[#0f1116] p-3"
+                  className="rounded-xl border border-white/10 bg-[#0f1116] p-3"
                 />
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-muted-foreground break-all">
+              <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-xs text-muted-foreground break-all">
                 {inviteLink}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => copyInviteLink(inviteLink)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                   <Copy size={15} />
                   {t("jam.room.copyLink")}
@@ -1815,7 +1815,7 @@ export function JamSession() {
                     void copyInviteLink(inviteLink);
                     setInviteModalOpen(false);
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                 >
                   <QrCode size={15} />
                   {t("jam.room.done")}

@@ -25,6 +25,7 @@ def test_incremental_worker_claims_only_dirty_catalog_sources(monkeypatch):
     from crate.worker_handlers import global_catalog
 
     snapshot_refreshes: list[bool] = []
+    invalidations: list[tuple[str, ...]] = []
     monkeypatch.setattr(
         global_catalog,
         "refresh_global_catalog_genre_snapshots",
@@ -40,6 +41,10 @@ def test_incremental_worker_claims_only_dirty_catalog_sources(monkeypatch):
             "remaining": 0,
         },
     )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
 
     result = global_catalog._handle_reconcile_incremental(
         "task-1", {"batch_size": 123}, {}
@@ -54,11 +59,13 @@ def test_incremental_worker_claims_only_dirty_catalog_sources(monkeypatch):
         "remaining": 0,
     }
     assert snapshot_refreshes == [True]
+    assert invalidations == [("global_catalog",)]
 
 
 def test_incremental_worker_has_no_global_catalog_feature_gate(monkeypatch):
     from crate.worker_handlers import global_catalog
 
+    invalidations: list[tuple[str, ...]] = []
     monkeypatch.setattr(
         global_catalog, "refresh_global_catalog_genre_snapshots", lambda: None
     )
@@ -67,6 +74,10 @@ def test_incremental_worker_has_no_global_catalog_feature_gate(monkeypatch):
         "reconcile_dirty_catalog_sources",
         lambda limit: {"claimed": 0, "completed": 0, "failed": 0, "remaining": 0},
     )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
 
     result = global_catalog._handle_reconcile_incremental(
         "task-1", {"batch_size": 123}, {}
@@ -74,6 +85,7 @@ def test_incremental_worker_has_no_global_catalog_feature_gate(monkeypatch):
 
     assert result["status"] == "completed"
     assert result["mode"] == "incremental"
+    assert invalidations == []
 
 
 def test_full_worker_advances_from_local_to_prune_without_scanning_remote(monkeypatch):

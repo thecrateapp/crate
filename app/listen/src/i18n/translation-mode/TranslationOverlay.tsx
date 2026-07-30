@@ -106,6 +106,7 @@ export function TranslationOverlay() {
               <Button
                 type="button"
                 size="sm"
+                className="rounded-lg"
                 onClick={() => void saveSelected()}
                 disabled={saveStatus === "saving"}
               >

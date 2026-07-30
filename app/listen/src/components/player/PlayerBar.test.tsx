@@ -1,10 +1,11 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createMockTrack,
   renderWithListenProviders,
 } from "@/test/render-with-listen-providers";
+import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
 
 import { PlayerBar } from "./PlayerBar";
 
@@ -118,6 +119,7 @@ vi.mock("@/components/player/player-gestures", () => ({
 describe("PlayerBar mobile mini-player", () => {
   beforeEach(() => {
     useIsDesktopMock.mockReturnValue(false);
+    localStorage.removeItem("listen-eq-enabled");
     isLikedMock.mockReturnValue(false);
     likeTrackMock.mockClear();
     unlikeTrackMock.mockClear();
@@ -168,6 +170,27 @@ describe("PlayerBar mobile mini-player", () => {
     });
 
     expect(container.querySelector(".listen-mobile-player-glass")).toBeNull();
+  });
+
+  it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
+    useIsDesktopMock.mockReturnValue(true);
+    localStorage.setItem("listen-eq-enabled", "true");
+    const track = createMockTrack({
+      title: "Desktop EQ",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
+
+    setEqualizerEnabled(false);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+    });
   });
 
   it("likes the current track with a long press on the cover", async () => {

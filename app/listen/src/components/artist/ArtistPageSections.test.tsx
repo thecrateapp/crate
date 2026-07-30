@@ -7,6 +7,7 @@ import { I18nProvider } from "@/i18n";
 import {
   ArtistAlbumsSection,
   ArtistAppearsOnSection,
+  ArtistShowsSection,
   RelatedArtistsSection,
 } from "./ArtistPageSections";
 
@@ -20,6 +21,12 @@ vi.mock("@/components/cards/ArtistCard", () => ({
 
 vi.mock("@/components/playlists/PlaylistCard", () => ({
   PlaylistCard: ({ name }: { name: string }) => <div>{name}</div>,
+}));
+
+vi.mock("@/components/upcoming/UpcomingRows", () => ({
+  groupByMonth: () => [],
+  itemKey: () => "show-1",
+  UpcomingMonthGroup: () => null,
 }));
 
 describe("ArtistPageSections", () => {
@@ -137,6 +144,43 @@ describe("ArtistPageSections", () => {
     expect(
       screen.getByRole("heading", { name: "Artistas relacionados" }),
     ).toBeInTheDocument();
+  });
+
+  it("uses compact CTA corners for the attended show actions", () => {
+    render(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <ArtistShowsSection
+            shows={[
+              {
+                event_key: "show-1",
+                type: "show",
+                date: "2026-08-02",
+                artist: "Crossed",
+                title: "Wurlitzer Ballroom",
+                subtitle: "Madrid, Spain",
+                cover_url: null,
+                status: "onsale",
+                is_upcoming: true,
+                user_attending: true,
+                probable_setlist: [{ title: "Culpa" }],
+              },
+            ]}
+            expandedShowId={null}
+            artistHotNow={false}
+            onToggleExpand={vi.fn()}
+            onPlayProbableSetlist={vi.fn()}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Play probable setlist" }),
+    ).toHaveClass("rounded-lg");
+    expect(
+      screen.getByRole("button", { name: "View show details" }),
+    ).toHaveClass("rounded-lg");
   });
 
   it("groups albums, EPs, compilations, live albums, and other releases", () => {

@@ -273,7 +273,7 @@ function ContributionCard({
 
   if (!albumPath) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
+      <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
         {card}
       </div>
     );
@@ -282,7 +282,7 @@ function ContributionCard({
   return (
     <Link
       to={albumPath}
-      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 transition-colors hover:bg-white/[0.05]"
+      className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 transition-colors hover:bg-white/[0.05]"
     >
       {card}
     </Link>
@@ -370,7 +370,7 @@ export function UserProfile() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="rounded-[12px] border border-white/10 bg-white/5 p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             <UserAvatar
@@ -408,7 +408,7 @@ export function UserProfile() {
                   ? "/stats"
                   : `/users/${data.username || username}/stats`
               }
-              className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
             >
               <BarChart3 size={15} />
               {t("userProfile.actions.viewListeningDna")}
@@ -418,7 +418,7 @@ export function UserProfile() {
                 type="button"
                 onClick={handleFollowToggle}
                 disabled={busy}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                   data.relationship_state.following
                     ? "border border-white/15 bg-white/5 text-foreground hover:bg-white/10"
                     : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -438,7 +438,7 @@ export function UserProfile() {
             ) : (
               <Link
                 to="/settings"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
               >
                 {t("userProfile.actions.editAccount")}
               </Link>
@@ -447,7 +447,7 @@ export function UserProfile() {
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.followers")}
             </div>
@@ -460,7 +460,7 @@ export function UserProfile() {
               {data.followers_count}
             </Link>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.following")}
             </div>
@@ -473,7 +473,7 @@ export function UserProfile() {
               {data.following_count}
             </Link>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.friends")}
             </div>
@@ -482,7 +482,7 @@ export function UserProfile() {
             </div>
           </div>
           <div
-            className={`rounded-2xl border p-4 ${affinityTone(
+            className={`rounded-xl border p-4 ${affinityTone(
               data.affinity_band,
             )}`}
           >
@@ -499,7 +499,7 @@ export function UserProfile() {
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr]">
-          <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.06] p-4">
+          <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] p-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/80">
               {t("userProfile.topSound")}
             </div>
@@ -517,7 +517,7 @@ export function UserProfile() {
                 : t("userProfile.needsMoreSignal")}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
             <ProfileMiniStat
               label={t("userProfile.stats.plays30d")}
               value={String(stats.plays_30d)}
@@ -531,7 +531,7 @@ export function UserProfile() {
               value={String(stats.contributions)}
             />
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
               {t("userProfile.badges.title")}
             </div>
@@ -557,7 +557,7 @@ export function UserProfile() {
         </div>
       </div>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+      <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Users size={16} className="text-cyan-300" />
           <h2 className="text-lg font-semibold text-foreground">
@@ -588,7 +588,7 @@ export function UserProfile() {
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <PackagePlus size={16} className="text-cyan-300" />
               <h2 className="text-lg font-semibold text-foreground">
@@ -600,7 +600,7 @@ export function UserProfile() {
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {contributions.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground sm:col-span-2">
+                <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground sm:col-span-2">
                   {t("userProfile.contributions.empty")}
                 </div>
               ) : (
@@ -616,7 +616,7 @@ export function UserProfile() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <Music4 size={16} className="text-cyan-300" />
               <h2 className="text-lg font-semibold text-foreground">
@@ -625,7 +625,7 @@ export function UserProfile() {
             </div>
             <div className="mt-4 space-y-3">
               {data.public_playlists.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
                   {t("userProfile.playlists.empty")}
                 </div>
               ) : (
@@ -638,7 +638,7 @@ export function UserProfile() {
                     <Link
                       key={playlist.id}
                       to={`/playlist/${playlist.id}`}
-                      className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                      className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
                     >
                       {coverUrl ? (
                         <CrateImage
@@ -683,7 +683,7 @@ export function UserProfile() {
         </section>
 
         <section className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">
                 {t("people.followers")}
@@ -707,7 +707,7 @@ export function UserProfile() {
                     key={`follower-${item.id}`}
                     username={item.username}
                     hoverClassName="block"
-                    className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
+                    className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
                   >
                     <UserAvatar
                       name={label}
@@ -736,7 +736,7 @@ export function UserProfile() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">
                 {t("people.following")}
@@ -760,7 +760,7 @@ export function UserProfile() {
                     key={`following-${item.id}`}
                     username={item.username}
                     hoverClassName="block"
-                    className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
+                    className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
                   >
                     <UserAvatar
                       name={label}

@@ -530,7 +530,7 @@ export function Shell() {
 
       <div
         aria-hidden="true"
-        className="listen-glass-panel listen-mobile-dock-glass pointer-events-none fixed z-20 rounded-[2rem]"
+        className="listen-glass-panel listen-mobile-dock-glass pointer-events-none fixed z-20 rounded-[12px]"
         style={{
           height: hasTrack
             ? "calc(var(--listen-mobile-player-height) + var(--listen-mobile-bottom-nav-content-height))"
@@ -546,7 +546,7 @@ export function Shell() {
 
       <nav
         className={`z-app-player fixed isolate flex items-center justify-around overflow-visible bg-transparent px-1.5 ${
-          hasTrack ? "rounded-b-[2rem] border-t-0" : "rounded-[2rem]"
+          hasTrack ? "rounded-b-[12px] border-t-0" : "rounded-[12px]"
         }`}
         style={{
           bottom:

@@ -134,7 +134,7 @@ export function PlayerVolumeControl({
         ? createPortal(
             <AppPopover
               ref={volumeRef}
-              className="fixed w-10 rounded-2xl px-0 py-3 z-[1600]"
+              className="fixed w-10 rounded-[12px] px-0 py-3 z-[1600]"
               style={{
                 left: popoverPosition.left,
                 bottom: popoverPosition.bottom,

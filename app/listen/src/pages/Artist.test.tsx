@@ -58,6 +58,9 @@ describe("Artist page request policy", () => {
     expect(
       screen.getByText("Artist temporarily unavailable"),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toHaveClass(
+      "rounded-lg",
+    );
   });
 
   it("presents a genuine 404 as artist not found", () => {
