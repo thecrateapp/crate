@@ -178,7 +178,7 @@ def _tempo_features(
     if median_interval <= 0:
         return None, 0.0, 0.0
 
-    bpm = 60_000.0 / median_interval
+    bpm = 60_000.0 / float(np.mean(intervals))
     third = max(2, intervals.size // 3)
     early_interval = float(np.median(intervals[:third]))
     late_interval = float(np.median(intervals[-third:]))

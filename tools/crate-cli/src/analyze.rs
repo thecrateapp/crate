@@ -14,6 +14,7 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
+use crate::mix_profile::{to_camelot, SmartMixProfileResult};
 use crate::{collect_audio_files, parse_extensions};
 
 const TARGET_SAMPLE_RATE: u32 = 22050;
@@ -40,6 +41,8 @@ pub struct AnalysisResult {
     pub acousticness: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instrumentalness: Option<f32>,
+    #[serde(rename = "mixProfile", skip_serializing_if = "Option::is_none")]
+    pub mix_profile: Option<SmartMixProfileResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -150,6 +153,7 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
 
 /// Decode audio and return the original (pre-resample) mono samples + original sample rate.
 /// Used when we need to resample to 32kHz for PANNs (not 22050).
+#[cfg(feature = "ml")]
 fn decode_audio_original(path: &Path) -> Result<(Vec<f32>, u32), String> {
     let file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
@@ -311,14 +315,15 @@ fn compute_spectral_centroid_value(magnitudes: &[f32], sample_rate: f32, fft_siz
 }
 
 fn estimate_bpm(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    let onsets = compute_onset_envelope(samples);
+    estimate_bpm_from_onsets(&onsets, sample_rate)
+}
+
+fn compute_onset_envelope(samples: &[f32]) -> Vec<f32> {
     if samples.len() < FFT_SIZE * 4 {
-        return None;
+        return Vec::new();
     }
-
-    let sr = sample_rate as f32;
     let mut planner = RealFftPlanner::<f32>::new();
-
-    // Compute onset strength envelope (spectral flux)
     let mut onsets: Vec<f32> = Vec::new();
     let mut prev_spectrum: Vec<f32> = Vec::new();
 
@@ -339,14 +344,18 @@ fn estimate_bpm(samples: &[f32], sample_rate: u32) -> Option<f32> {
         prev_spectrum = spectrum;
         pos += HOP_SIZE;
     }
+    onsets
+}
 
+fn estimate_bpm_from_onsets(onsets: &[f32], sample_rate: u32) -> Option<f32> {
     if onsets.len() < 4 {
         return None;
     }
 
+    let sr = sample_rate as f32;
     // Autocorrelation of onset envelope
     let min_lag = (60.0 / 200.0 * sr / HOP_SIZE as f32) as usize; // 200 BPM
-    let max_lag = (60.0 / 60.0 * sr / HOP_SIZE as f32) as usize; // 60 BPM
+    let max_lag = (sr / HOP_SIZE as f32) as usize; // 60 BPM
     let max_lag = max_lag.min(onsets.len() / 2);
 
     if min_lag >= max_lag {
@@ -401,7 +410,7 @@ fn compute_chromagram(samples: &[f32], sample_rate: u32) -> [f32; 12] {
         // Map each frequency bin to a pitch class
         for (bin, &mag) in magnitudes.iter().enumerate() {
             let freq = bin as f32 * sr / FFT_SIZE as f32;
-            if freq < 20.0 || freq > 5000.0 {
+            if !(20.0..=5000.0).contains(&freq) {
                 continue;
             }
             // Convert frequency to MIDI note, then to pitch class
@@ -450,12 +459,13 @@ fn pearson_correlation(a: &[f32; 12], b: &[f32; 12]) -> f32 {
     }
 }
 
-fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String) {
+fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String, f32) {
     let chroma = compute_chromagram(samples, sample_rate);
 
     let mut best_key = 0usize;
     let mut best_scale = "major";
     let mut best_corr = f32::MIN;
+    let mut second_corr = f32::MIN;
 
     for shift in 0..12 {
         let mut rotated = [0.0f32; 12];
@@ -467,18 +477,357 @@ fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String) {
         let minor_corr = pearson_correlation(&rotated, &KRUMHANSL_MINOR);
 
         if major_corr > best_corr {
+            second_corr = best_corr;
             best_corr = major_corr;
             best_key = shift;
             best_scale = "major";
+        } else if major_corr > second_corr {
+            second_corr = major_corr;
         }
         if minor_corr > best_corr {
+            second_corr = best_corr;
             best_corr = minor_corr;
             best_key = shift;
             best_scale = "minor";
+        } else if minor_corr > second_corr {
+            second_corr = minor_corr;
         }
     }
 
-    (NOTE_NAMES[best_key].to_string(), best_scale.to_string())
+    let confidence =
+        (((best_corr + 1.0) * 0.35) + (best_corr - second_corr).max(0.0)).clamp(0.0, 1.0);
+    (
+        NOTE_NAMES[best_key].to_string(),
+        best_scale.to_string(),
+        confidence,
+    )
+}
+
+fn percentile(values: &[f32], quantile: f32) -> f32 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut ordered = values.to_vec();
+    ordered.sort_by(|left, right| left.total_cmp(right));
+    let index = ((ordered.len() - 1) as f32 * quantile.clamp(0.0, 1.0)).round() as usize;
+    ordered[index]
+}
+
+fn median(values: &[f32]) -> f32 {
+    percentile(values, 0.5)
+}
+
+fn detect_beat_frames(onsets: &[f32], sample_rate: u32, rough_bpm: Option<f32>) -> Vec<usize> {
+    if onsets.len() < 3 {
+        return Vec::new();
+    }
+    let mean = onsets.iter().sum::<f32>() / onsets.len() as f32;
+    let variance = onsets
+        .iter()
+        .map(|value| {
+            let delta = value - mean;
+            delta * delta
+        })
+        .sum::<f32>()
+        / onsets.len() as f32;
+    let threshold = mean + variance.sqrt() * 0.35;
+    let expected_frames = rough_bpm
+        .filter(|bpm| *bpm > 0.0)
+        .map(|bpm| 60.0 * sample_rate as f32 / (bpm * HOP_SIZE as f32))
+        .unwrap_or(1.0);
+    let minimum_distance = (expected_frames * 0.45).round().max(1.0) as usize;
+
+    let mut peaks = Vec::new();
+    for index in 1..onsets.len() - 1 {
+        let current = onsets[index];
+        if current < threshold || current < onsets[index - 1] || current <= onsets[index + 1] {
+            continue;
+        }
+        if let Some(previous) = peaks.last_mut() {
+            if index - *previous < minimum_distance {
+                if current > onsets[*previous] {
+                    *previous = index;
+                }
+                continue;
+            }
+        }
+        peaks.push(index);
+    }
+    peaks
+}
+
+fn tempo_features(
+    beat_frames: &[usize],
+    onsets: &[f32],
+    sample_rate: u32,
+) -> (Option<f32>, f32, f32) {
+    if beat_frames.len() < 4 {
+        return (None, 0.0, 0.0);
+    }
+    let intervals: Vec<f32> = beat_frames
+        .windows(2)
+        .map(|pair| (pair[1] - pair[0]) as f32 * HOP_SIZE as f32 * 1_000.0 / sample_rate as f32)
+        .collect();
+    let median_interval = median(&intervals);
+    if median_interval <= 0.0 {
+        return (None, 0.0, 0.0);
+    }
+    let third = (intervals.len() / 3).max(2).min(intervals.len());
+    let early_interval = median(&intervals[..third]);
+    let late_interval = median(&intervals[intervals.len() - third..]);
+    let drift_ratio = (late_interval - early_interval).abs() / median_interval;
+    let residuals: Vec<f32> = intervals
+        .iter()
+        .map(|interval| (interval - median_interval).abs())
+        .collect();
+    let jitter_ratio = median(&residuals) / median_interval;
+    let stability = (1.0 - drift_ratio / 0.25 - jitter_ratio / 0.20).clamp(0.0, 1.0);
+
+    let beat_strength = beat_frames
+        .iter()
+        .filter_map(|index| onsets.get(*index))
+        .sum::<f32>()
+        / beat_frames.len() as f32;
+    let reference = percentile(onsets, 0.95) + f32::EPSILON;
+    let strength_ratio = (beat_strength / reference).clamp(0.0, 1.0);
+    let coverage = (beat_frames.len() as f32 / 16.0).clamp(0.0, 1.0);
+    let confidence = (0.5 * stability + 0.35 * strength_ratio + 0.15 * coverage).clamp(0.0, 1.0);
+    let mean_interval = intervals.iter().sum::<f32>() / intervals.len() as f32;
+    let bpm = 60_000.0 / mean_interval;
+    (Some(bpm), confidence, stability)
+}
+
+fn downbeat_features(
+    beat_frames: &[usize],
+    beat_grid_ms: &[u64],
+    onsets: &[f32],
+    bpm_confidence: f32,
+) -> (Option<u64>, Option<u8>) {
+    if beat_frames.len() < 12 || bpm_confidence < 0.65 {
+        return (None, None);
+    }
+    let mean = onsets.iter().sum::<f32>() / onsets.len() as f32;
+    let variance = onsets
+        .iter()
+        .map(|value| {
+            let delta = value - mean;
+            delta * delta
+        })
+        .sum::<f32>()
+        / onsets.len() as f32;
+    if variance.sqrt() / (mean + f32::EPSILON) < 1.0 {
+        return (None, None);
+    }
+    let mut phase_scores = [0.0_f32; 4];
+    let mut phase_counts = [0_usize; 4];
+    for (index, frame) in beat_frames.iter().enumerate() {
+        phase_scores[index % 4] += onsets.get(*frame).copied().unwrap_or_default();
+        phase_counts[index % 4] += 1;
+    }
+    for phase in 0..4 {
+        phase_scores[phase] /= phase_counts[phase].max(1) as f32;
+    }
+    let mut ordered = phase_scores;
+    ordered.sort_by(f32::total_cmp);
+    if ordered[3] <= 0.0 || ordered[3] < ordered[2] * 1.2 {
+        return (None, None);
+    }
+    let phase = phase_scores
+        .iter()
+        .enumerate()
+        .max_by(|left, right| left.1.total_cmp(right.1))
+        .map(|(index, _)| index)
+        .unwrap_or_default();
+    (beat_grid_ms.get(phase).copied(), Some(4))
+}
+
+fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
+    let frame_length = ((sample_rate as f32 * 0.05).round() as usize).max(256);
+    let hop_length = (frame_length / 2).max(128);
+    if samples.is_empty() {
+        return (Vec::new(), frame_length, hop_length);
+    }
+    if samples.len() < frame_length {
+        return (vec![compute_rms(samples)], frame_length, hop_length);
+    }
+    let values = (0..=samples.len() - frame_length)
+        .step_by(hop_length)
+        .map(|start| compute_rms(&samples[start..start + frame_length]))
+        .collect();
+    (values, frame_length, hop_length)
+}
+
+fn detect_mix_cues(
+    samples: &[f32],
+    sample_rate: u32,
+    beat_grid_ms: &[u64],
+) -> (Option<u64>, Option<u64>, Option<u64>) {
+    let (rms_values, frame_length, hop_length) = frame_rms(samples, sample_rate);
+    if rms_values.is_empty() {
+        return (None, None, None);
+    }
+    let dbfs: Vec<f32> = rms_values
+        .iter()
+        .map(|rms| compute_loudness_db(*rms))
+        .collect();
+    let peak = dbfs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let threshold = (-55.0_f32).max(peak - 35.0);
+    let active_frames: Vec<usize> = dbfs
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| (*value >= threshold).then_some(index))
+        .collect();
+    let (Some(first), Some(last)) = (active_frames.first(), active_frames.last()) else {
+        return (None, None, None);
+    };
+    let duration_ms = samples.len() as u64 * 1_000 / u64::from(sample_rate);
+    let active_start_ms = *first as u64 * hop_length as u64 * 1_000 / u64::from(sample_rate);
+    let active_end_ms = duration_ms.min(
+        (*last as u64 * hop_length as u64 + frame_length as u64) * 1_000 / u64::from(sample_rate),
+    );
+    let intro = beat_grid_ms
+        .iter()
+        .find(|position| **position >= active_start_ms)
+        .copied()
+        .unwrap_or(active_start_ms);
+    let outro_target = intro.max(active_end_ms.saturating_sub(4_000));
+    let outro = beat_grid_ms
+        .iter()
+        .rev()
+        .find(|position| **position <= outro_target)
+        .copied()
+        .unwrap_or(outro_target);
+    (Some(intro), Some(outro.max(intro)), Some(active_end_ms))
+}
+
+fn spectral_density(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    if samples.is_empty() {
+        return None;
+    }
+    let mut planner = RealFftPlanner::<f32>::new();
+    let mut total = 0.0;
+    let mut count = 0;
+    for frame in samples
+        .chunks(FFT_SIZE)
+        .filter(|frame| frame.len() >= FFT_SIZE)
+    {
+        let magnitudes = compute_magnitude_spectrum(frame, FFT_SIZE, &mut planner);
+        total += compute_spectral_centroid_value(&magnitudes, sample_rate as f32, FFT_SIZE);
+        count += 1;
+    }
+    if count == 0 {
+        return None;
+    }
+    let centroid = total / count as f32;
+    Some(((1.0 + centroid).ln() / (1.0 + sample_rate as f32 / 2.0).ln()).clamp(0.0, 1.0))
+}
+
+fn signal_features(samples: &[f32], sample_rate: u32) -> (Option<f32>, Option<f32>, Option<f32>) {
+    if samples.is_empty() {
+        return (None, None, None);
+    }
+    let loudness = compute_loudness_db(compute_rms(samples));
+    let energy = ((loudness + 60.0) / 60.0).clamp(0.0, 1.0);
+    (
+        Some(loudness),
+        Some(energy),
+        spectral_density(samples, sample_rate),
+    )
+}
+
+fn window_samples(
+    samples: &[f32],
+    sample_rate: u32,
+    anchor_ms: Option<u64>,
+    backwards: bool,
+) -> &[f32] {
+    let Some(anchor_ms) = anchor_ms else {
+        return &[];
+    };
+    let anchor = (anchor_ms * u64::from(sample_rate) / 1_000) as usize;
+    let window = sample_rate as usize * 5;
+    let (start, end) = if backwards {
+        let end = anchor.min(samples.len());
+        (end.saturating_sub(window), end)
+    } else {
+        let start = anchor.min(samples.len());
+        (start, (start + window).min(samples.len()))
+    };
+    &samples[start..end]
+}
+
+pub fn analyze_smart_mix_samples(samples: &[f32], sample_rate: u32) -> SmartMixProfileResult {
+    let duration_ms = if sample_rate == 0 {
+        0
+    } else {
+        samples.len() as u64 * 1_000 / u64::from(sample_rate)
+    };
+    if sample_rate == 0 || samples.len() < sample_rate as usize * 2 {
+        return SmartMixProfileResult::unavailable(duration_ms);
+    }
+
+    let onsets = compute_onset_envelope(samples);
+    let rough_bpm = estimate_bpm_from_onsets(&onsets, sample_rate);
+    let beat_frames = detect_beat_frames(&onsets, sample_rate, rough_bpm);
+    let beat_grid_ms: Vec<u64> = beat_frames
+        .iter()
+        .map(|frame| (*frame + 1) as u64 * HOP_SIZE as u64 * 1_000 / u64::from(sample_rate))
+        .collect();
+    let (bpm, bpm_confidence, tempo_stability) = tempo_features(&beat_frames, &onsets, sample_rate);
+    let (downbeat_anchor_ms, time_signature) =
+        downbeat_features(&beat_frames, &beat_grid_ms, &onsets, bpm_confidence);
+    let (key, scale, key_confidence) = detect_key(samples, sample_rate);
+    let camelot = to_camelot(&key, &scale).map(str::to_owned);
+    let (intro_cue_ms, outro_cue_ms, active_end_ms) =
+        detect_mix_cues(samples, sample_rate, &beat_grid_ms);
+    let intro = signal_features(
+        window_samples(samples, sample_rate, intro_cue_ms, false),
+        sample_rate,
+    );
+    let outro = signal_features(
+        window_samples(samples, sample_rate, active_end_ms, true),
+        sample_rate,
+    );
+    let global = signal_features(samples, sample_rate);
+    let true_peak = samples.iter().copied().map(f32::abs).fold(0.0, f32::max);
+    let quality = if beat_grid_ms.len() >= 12
+        && bpm_confidence >= 0.75
+        && tempo_stability >= 0.8
+        && downbeat_anchor_ms.is_some()
+    {
+        "full"
+    } else {
+        "partial"
+    };
+
+    SmartMixProfileResult {
+        schema_version: 1,
+        analyzer: "crate-rust".to_string(),
+        analyzer_version: "smart-mix-v1".to_string(),
+        duration_ms,
+        quality: quality.to_string(),
+        bpm,
+        bpm_confidence: Some(bpm_confidence),
+        tempo_stability: Some(tempo_stability),
+        beat_anchor_ms: beat_grid_ms.first().copied(),
+        downbeat_anchor_ms,
+        time_signature,
+        beat_grid_ms,
+        key: Some(key),
+        scale: Some(scale),
+        camelot,
+        key_confidence: Some(key_confidence),
+        intro_cue_ms,
+        outro_cue_ms,
+        intro_lufs: intro.0,
+        outro_lufs: outro.0,
+        true_peak_dbfs: Some(compute_loudness_db(true_peak)),
+        intro_energy: intro.1,
+        outro_energy: outro.1,
+        intro_spectral_density: intro.2,
+        outro_spectral_density: outro.2,
+        global_energy: global.1,
+    }
 }
 
 /// Analyze a single track. If `panns` is provided, also compute ML features.
@@ -543,6 +892,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
                 valence: None,
                 acousticness: None,
                 instrumentalness: None,
+                mix_profile: None,
                 error: Some(e),
             }
         }
@@ -563,6 +913,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
             valence: None,
             acousticness: None,
             instrumentalness: None,
+            mix_profile: None,
             error: Some("empty audio".to_string()),
         };
     }
@@ -572,7 +923,8 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     let energy = compute_energy(rms);
     let dynamic_range = compute_dynamic_range(&samples);
     let bpm = estimate_bpm(&samples, sample_rate);
-    let (key, scale) = detect_key(&samples, sample_rate);
+    let (key, scale, _) = detect_key(&samples, sample_rate);
+    let mix_profile = Some(analyze_smart_mix_samples(&samples, sample_rate));
 
     // Average spectral centroid
     let mut planner = RealFftPlanner::<f32>::new();
@@ -606,6 +958,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
         valence: None,
         acousticness: None,
         instrumentalness: None,
+        mix_profile,
         error: None,
     }
 }

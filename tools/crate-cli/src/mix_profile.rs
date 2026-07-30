@@ -1,11 +1,107 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+use serde::Serialize;
+
 pub const FORMAT_NAME: &str = "delta-ms-v1";
 pub const FORMAT_VERSION: u8 = 1;
 pub const MAX_BEAT_COUNT: usize = 100_000;
 pub const MAX_GRID_DURATION_MS: u64 = 24 * 60 * 60 * 1_000;
 const MAX_VARINT_BYTES: usize = 10;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartMixProfileResult {
+    pub schema_version: u8,
+    pub analyzer: String,
+    pub analyzer_version: String,
+    pub duration_ms: u64,
+    pub quality: String,
+    pub bpm: Option<f32>,
+    pub bpm_confidence: Option<f32>,
+    pub tempo_stability: Option<f32>,
+    pub beat_anchor_ms: Option<u64>,
+    pub downbeat_anchor_ms: Option<u64>,
+    pub time_signature: Option<u8>,
+    pub beat_grid_ms: Vec<u64>,
+    pub key: Option<String>,
+    pub scale: Option<String>,
+    pub camelot: Option<String>,
+    pub key_confidence: Option<f32>,
+    pub intro_cue_ms: Option<u64>,
+    pub outro_cue_ms: Option<u64>,
+    pub intro_lufs: Option<f32>,
+    pub outro_lufs: Option<f32>,
+    pub true_peak_dbfs: Option<f32>,
+    pub intro_energy: Option<f32>,
+    pub outro_energy: Option<f32>,
+    pub intro_spectral_density: Option<f32>,
+    pub outro_spectral_density: Option<f32>,
+    pub global_energy: Option<f32>,
+}
+
+impl SmartMixProfileResult {
+    pub fn unavailable(duration_ms: u64) -> Self {
+        Self {
+            schema_version: 1,
+            analyzer: "crate-rust".to_string(),
+            analyzer_version: "smart-mix-v1".to_string(),
+            duration_ms,
+            quality: "unavailable".to_string(),
+            bpm: None,
+            bpm_confidence: Some(0.0),
+            tempo_stability: Some(0.0),
+            beat_anchor_ms: None,
+            downbeat_anchor_ms: None,
+            time_signature: None,
+            beat_grid_ms: Vec::new(),
+            key: None,
+            scale: None,
+            camelot: None,
+            key_confidence: Some(0.0),
+            intro_cue_ms: None,
+            outro_cue_ms: None,
+            intro_lufs: None,
+            outro_lufs: None,
+            true_peak_dbfs: None,
+            intro_energy: None,
+            outro_energy: None,
+            intro_spectral_density: None,
+            outro_spectral_density: None,
+            global_energy: None,
+        }
+    }
+}
+
+pub fn to_camelot(key: &str, scale: &str) -> Option<&'static str> {
+    match (key, scale) {
+        ("G#", "minor") => Some("1A"),
+        ("D#", "minor") => Some("2A"),
+        ("A#", "minor") => Some("3A"),
+        ("F", "minor") => Some("4A"),
+        ("C", "minor") => Some("5A"),
+        ("G", "minor") => Some("6A"),
+        ("D", "minor") => Some("7A"),
+        ("A", "minor") => Some("8A"),
+        ("E", "minor") => Some("9A"),
+        ("B", "minor") => Some("10A"),
+        ("F#", "minor") => Some("11A"),
+        ("C#", "minor") => Some("12A"),
+        ("B", "major") => Some("1B"),
+        ("F#", "major") => Some("2B"),
+        ("C#", "major") => Some("3B"),
+        ("G#", "major") => Some("4B"),
+        ("D#", "major") => Some("5B"),
+        ("A#", "major") => Some("6B"),
+        ("F", "major") => Some("7B"),
+        ("C", "major") => Some("8B"),
+        ("G", "major") => Some("9B"),
+        ("D", "major") => Some("10B"),
+        ("A", "major") => Some("11B"),
+        ("E", "major") => Some("12B"),
+        _ => None,
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MixProfileCodecError(&'static str);
