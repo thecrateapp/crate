@@ -481,6 +481,7 @@ def create_app() -> FastAPI:
     from crate.api.internal_federation import router as internal_federation_router
     from crate.api.catalog import router as catalog_router
     from crate.api.capabilities import router as capabilities_router
+    from crate.api.smart_mix import router as smart_mix_router
 
     # Public well-known (no auth required)
     app.include_router(federation_well_known)
@@ -524,6 +525,7 @@ def create_app() -> FastAPI:
     app.include_router(federation_router)
     app.include_router(internal_federation_router)
     app.include_router(federation_remote_router)
+    app.include_router(smart_mix_router)
     app.include_router(catalog_router)
     app.include_router(browse_router)
     app.include_router(tags_router)

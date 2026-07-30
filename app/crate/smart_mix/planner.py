@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from typing import Literal, cast
 
 from crate.smart_mix.camelot import CamelotRelationship, camelot_relationship
 from crate.smart_mix.models import (
@@ -15,6 +16,15 @@ from crate.smart_mix.models import (
 from crate.smart_mix.policy import PLANNER_POLICY_V1, PlannerPolicyV1
 
 
+HarmonicRelationshipValue = Literal[
+    "same",
+    "adjacent",
+    "relative",
+    "incompatible",
+    "unknown",
+]
+
+
 @dataclass(frozen=True, slots=True)
 class CompatibilityScore:
     planner_version: int
@@ -22,7 +32,7 @@ class CompatibilityScore:
     signal_confidence: float
     tempo: float
     harmonic: float
-    harmonic_relationship: str
+    harmonic_relationship: HarmonicRelationshipValue
     energy: float
     danceability: float
     valence: float
@@ -80,7 +90,7 @@ def score_compatibility(
         signal_confidence=_signal_confidence(outgoing, incoming),
         tempo=_round_score(tempo),
         harmonic=_round_score(harmonic),
-        harmonic_relationship=relationship.value,
+        harmonic_relationship=cast(HarmonicRelationshipValue, relationship.value),
         energy=_round_score(energy),
         danceability=_round_score(danceability),
         valence=_round_score(valence),

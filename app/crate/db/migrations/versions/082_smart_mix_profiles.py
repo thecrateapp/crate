@@ -126,6 +126,24 @@ def upgrade() -> None:
         ON track_mix_profiles(updated_at DESC)
         WHERE quality <> 'full'
         """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_compatible_bpm
+        ON track_mix_profiles(bpm, track_id)
+        INCLUDE (quality, key_camelot, global_energy)
+        WHERE quality <> 'unavailable' AND bpm IS NOT NULL
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_compatible_camelot
+        ON track_mix_profiles(key_camelot, bpm, track_id)
+        INCLUDE (quality, global_energy)
+        WHERE quality <> 'unavailable' AND key_camelot IS NOT NULL
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_compatible_energy
+        ON track_mix_profiles(global_energy, bpm, track_id)
+        INCLUDE (quality, key_camelot)
+        WHERE quality <> 'unavailable' AND global_energy IS NOT NULL
+        """,
     ):
         op.execute(statement)
 
