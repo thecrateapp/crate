@@ -36,6 +36,7 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "app.cratemusic.crate"
+        manifestPlaceholders = [crateOAuthScheme: "cratemusic"]
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode releaseVersionCode ? Integer.parseInt(releaseVersionCode) : 1
@@ -58,6 +59,15 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+            resValue "string", "app_name", "Crate DBG"
+            resValue "string", "title_activity_main", "Crate DBG"
+            resValue "string", "package_name", "app.cratemusic.crate.debug"
+            resValue "string", "custom_url_scheme", "cratemusic-dbg"
+            manifestPlaceholders = [crateOAuthScheme: "cratemusic-dbg"]
+        }
         release {
             minifyEnabled true
             shrinkResources true

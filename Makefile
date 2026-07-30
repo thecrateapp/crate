@@ -907,12 +907,11 @@ trust-local-ca: ## Trust Caddy's local CA for HTTPS (run after first 'make dev',
 
 CAP_DIR := app/listen
 CAP_IOS_TARGET ?= $(shell cd $(CAP_DIR) && npx cap run ios --list 2>/dev/null | grep "iPhone.*Pro " | head -1 | awk '{print $$NF}')
-CAP_DEBUG_SERVER_URL ?= https://listen.lespedants.org
+CAP_DEBUG_SERVER_URL := https://api.dev.lespedants.org
 CAP_ANDROID_OUTPUT_DIR ?= artifacts/capacitor/android
 CAP_ANDROID_GRADLE_VARIANT ?= debug
 CAP_ANDROID_RELEASE_TAG ?= $(shell git describe --tags --exact-match 2>/dev/null)
 CAP_SMART_MIX_CROSSFADE_MS ?= 3000
-CAP_SMART_MIX_API_URL ?= https://api.dev.lespedants.org
 
 # Android Studio JBR + SDK paths (required for Gradle/emulator)
 export JAVA_HOME ?= $(HOME)/Applications/Android Studio.app/Contents/jbr/Contents/Home
@@ -935,7 +934,10 @@ cap-ios-open: ## Open Listen iOS project in Xcode
 
 .PHONY: cap-android
 cap-android: ## Build and run Listen on Android Emulator
-	@cd $(CAP_DIR) && VITE_API_URL="$(CAP_DEBUG_SERVER_URL)" npm run build:cap
+	@cd $(CAP_DIR) && \
+		VITE_CRATE_FIXED_SERVER_URL="$(CAP_DEBUG_SERVER_URL)" \
+		VITE_CRATE_OAUTH_SCHEME="cratemusic-dbg" \
+		npm run build:cap
 	@echo "$(YELLOW)Launching Android Emulator...$(NC)"
 	@cd $(CAP_DIR) && npx cap run android
 
@@ -953,7 +955,10 @@ cap-android-list: ## List available Android Emulator targets
 
 .PHONY: cap-android-artifacts
 cap-android-artifacts: ## Build Android APK and copy output to a local artifacts folder
-	@cd $(CAP_DIR) && VITE_API_URL="$(CAP_DEBUG_SERVER_URL)" npm run build:cap
+	@cd $(CAP_DIR) && \
+		VITE_CRATE_FIXED_SERVER_URL="$(CAP_DEBUG_SERVER_URL)" \
+		VITE_CRATE_OAUTH_SCHEME="cratemusic-dbg" \
+		npm run build:cap
 	@cd $(CAP_DIR)/android && variant="$(CAP_ANDROID_GRADLE_VARIANT)"; \
 	task="assemble$$(printf '%s' "$$variant" | awk '{print toupper(substr($$0,1,1)) substr($$0,2)}')"; \
 	./gradlew "$$task"
@@ -975,7 +980,8 @@ cap-android-artifacts: ## Build Android APK and copy output to a local artifacts
 .PHONY: cap-android-smart-mix-artifacts
 cap-android-smart-mix-artifacts: ## Build a local-only Android Smart Mix debug APK
 	@cd $(CAP_DIR) && \
-		VITE_API_URL="$(CAP_SMART_MIX_API_URL)" \
+		VITE_CRATE_FIXED_SERVER_URL="$(CAP_DEBUG_SERVER_URL)" \
+		VITE_CRATE_OAUTH_SCHEME="cratemusic-dbg" \
 		VITE_CRATE_SMART_MIX_LOCAL_TEST="true" \
 		VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS="$(CAP_SMART_MIX_CROSSFADE_MS)" \
 		npm run build:cap
@@ -995,7 +1001,11 @@ cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact releas
 	@test -n "$$CRATE_ANDROID_KEYSTORE_PASSWORD" || { echo "$(RED)CRATE_ANDROID_KEYSTORE_PASSWORD is required$(NC)"; exit 1; }
 	@test -n "$$CRATE_ANDROID_KEY_ALIAS" || { echo "$(RED)CRATE_ANDROID_KEY_ALIAS is required$(NC)"; exit 1; }
 	@test -n "$$CRATE_ANDROID_KEY_PASSWORD" || { echo "$(RED)CRATE_ANDROID_KEY_PASSWORD is required$(NC)"; exit 1; }
-	@cd $(CAP_DIR) && VITE_CRATE_SMART_MIX_LOCAL_TEST="false" npm run build:cap
+	@cd $(CAP_DIR) && \
+		VITE_CRATE_FIXED_SERVER_URL="" \
+		VITE_CRATE_OAUTH_SCHEME="cratemusic" \
+		VITE_CRATE_SMART_MIX_LOCAL_TEST="false" \
+		npm run build:cap
 	@cd $(CAP_DIR) && eval "$$(node scripts/android-release-version.mjs "$(CAP_ANDROID_RELEASE_TAG)")"; \
 	export CRATE_ANDROID_VERSION_NAME CRATE_ANDROID_VERSION_CODE; \
 	cd android && ./gradlew bundleRelease assembleRelease lintRelease --no-daemon

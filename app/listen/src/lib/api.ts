@@ -36,6 +36,7 @@ import {
   type MediaAccessTarget,
   type MediaAccessTickets,
 } from "@/lib/media-access";
+import { FIXED_SERVER_URL } from "@/lib/mobile-build-config";
 
 export const AUTH_TOKEN_EVENT = "crate:auth-token-updated";
 const WEB_TOKEN_EXPIRES_AT_KEY = "listen-auth-token-expires-at";
@@ -46,7 +47,8 @@ const WEB_TOKEN_EXPIRES_AT_KEY = "listen-auth-token-expires-at";
  */
 const DEV_TAURI_DEFAULT_SERVER = "https://api.lespedants.org";
 const BUILD_TIME_DEFAULT =
-  import.meta.env.DEV && isTauriRuntime ? DEV_TAURI_DEFAULT_SERVER : "";
+  FIXED_SERVER_URL ||
+  (import.meta.env.DEV && isTauriRuntime ? DEV_TAURI_DEFAULT_SERVER : "");
 
 // Run the legacy-token migration once on module load. It's a no-op
 // after the first time and on fresh installs.
@@ -67,6 +69,7 @@ seedDefaultServer(BUILD_TIME_DEFAULT);
  */
 export function getApiBase(): string {
   if (!usesConfigurableServer) return "";
+  if (FIXED_SERVER_URL) return FIXED_SERVER_URL;
   const server = getCurrentServer();
   return server?.url || BUILD_TIME_DEFAULT;
 }

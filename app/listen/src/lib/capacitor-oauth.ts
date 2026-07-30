@@ -5,9 +5,12 @@ import {
   setSecureSessionValue,
 } from "@/lib/native-secure-session";
 import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
+import {
+  getNativeOAuthCallbackUrl,
+  getNativeOAuthScheme,
+} from "@/lib/mobile-build-config";
 
 const OAUTH_NEXT_KEY = "crate-oauth-next";
-const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
 
 type OAuthProvider = "google" | "apple";
@@ -71,7 +74,7 @@ export async function beginNativeOAuth(
       `/api/auth/oauth/${provider}/start`,
       "POST",
       {
-        return_to: NATIVE_CALLBACK_URL,
+        return_to: getNativeOAuthCallbackUrl(),
         invite_token: inviteToken,
         native_code_challenge: challenge,
         native_state: state,
@@ -147,7 +150,7 @@ export async function consumeOAuthCallbackUrl(
   try {
     const parsed = new URL(url);
     const isCustomSchemeCallback =
-      parsed.protocol === "cratemusic:" &&
+      parsed.protocol === `${getNativeOAuthScheme()}:` &&
       parsed.hostname === "oauth" &&
       parsed.pathname === "/callback";
 

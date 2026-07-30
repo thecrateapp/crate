@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_ALLOW_INSECURE_LOOPBACK?: string;
   readonly VITE_CRATE_SMART_MIX_LOCAL_TEST?: string;
   readonly VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS?: string;
+  readonly VITE_CRATE_FIXED_SERVER_URL?: string;
+  readonly VITE_CRATE_OAUTH_SCHEME?: string;
 }
 
 interface ImportMeta {

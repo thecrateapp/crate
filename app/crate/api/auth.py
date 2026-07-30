@@ -355,6 +355,8 @@ def _native_oauth_legacy_redirect_enabled() -> bool:
 
 
 _NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
+_NATIVE_DEBUG_CALLBACK_URL = "cratemusic-dbg://oauth/callback"
+_NATIVE_CALLBACK_URLS = frozenset({_NATIVE_CALLBACK_URL, _NATIVE_DEBUG_CALLBACK_URL})
 _NATIVE_CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 _NATIVE_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
 _NATIVE_VERIFIER_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
@@ -386,7 +388,7 @@ def _validate_native_oauth_start(
         )
     if mode != "login" or not _is_mobile_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
-    if return_to != _NATIVE_CALLBACK_URL:
+    if return_to not in _NATIVE_CALLBACK_URLS:
         raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
     if not challenge or not state:
         raise HTTPException(status_code=400, detail="Incomplete native OAuth binding")
@@ -402,7 +404,7 @@ def _validate_native_oauth_start(
 
 def _is_listen_return_to(return_to: str | None) -> bool:
     value = (return_to or "").strip()
-    if value.startswith("cratemusic://"):
+    if _is_native_mobile_callback_url(value):
         return True
     if not value.startswith(("http://", "https://")):
         return False
@@ -411,6 +413,17 @@ def _is_listen_return_to(return_to: str | None) -> bool:
     except Exception:
         return False
     return host == "listen" or host.startswith("listen.")
+
+
+def _is_native_mobile_callback_url(value: str | None) -> bool:
+    if not value:
+        return False
+    parsed = urlparse(value)
+    return (
+        parsed.scheme in {"cratemusic", "cratemusic-dbg"}
+        and parsed.netloc == "oauth"
+        and parsed.path == "/callback"
+    )
 
 
 def _is_tauri_loopback_return_to(return_to: str | None) -> bool:
@@ -492,7 +505,7 @@ def _infer_oauth_app_id(request: Request, return_to: str | None) -> str | None:
     if _is_listen_return_to(return_to):
         return (
             "listen-native"
-            if (return_to or "").startswith("cratemusic://")
+            if _is_native_mobile_callback_url(return_to)
             else "listen-web"
         )
     return None
@@ -913,7 +926,7 @@ def _allowed_redirect_origins() -> set[str]:
 def _callback_origin(return_to: str | None = None, *, app_id: str | None = None) -> str:
     allowed = _allowed_redirect_origins()
     if return_to and (
-        return_to.startswith("cratemusic://")
+        _is_native_mobile_callback_url(return_to)
         or _is_tauri_loopback_return_to(return_to)
         or _is_native_listen_app_id(app_id)
     ):
@@ -941,7 +954,7 @@ def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> 
     """Validate return_to against allowed origins. Returns safe URL or fallback."""
     if not return_to:
         return "/"
-    if return_to.startswith("cratemusic://"):
+    if _is_native_mobile_callback_url(return_to):
         return return_to
     if app_id == "listen-tauri" and _is_tauri_loopback_return_to(return_to):
         return return_to
@@ -2422,7 +2435,7 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
     return_to = parsed_state.get("return_to") or "/"
     safe_return = _validate_return_to(return_to, app_id=app_id)
 
-    if safe_return.startswith("cratemusic://"):
+    if _is_native_mobile_callback_url(safe_return):
         redirect_url = _append_query_param(safe_return, "token", token)
         access_expires_at = _access_expires_at_from_token(token)
         if access_expires_at:
