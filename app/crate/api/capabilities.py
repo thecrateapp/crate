@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from crate.api.schemas.capabilities import CapabilitiesResponse
+from crate.api.schemas.capabilities import CapabilitiesResponse, SmartMixCapabilities
 from crate.config import (
     android_beatmatch_enabled,
     android_native_crossfade_enabled,
@@ -20,10 +20,10 @@ def get_capabilities() -> CapabilitiesResponse:
     native_crossfade = available and android_native_crossfade_enabled()
     beatmatch = native_crossfade and android_beatmatch_enabled()
     return CapabilitiesResponse(
-        smart_mix={
-            "available": available,
-            "planner_version": "smart-mix-v1" if available else None,
-            "android_native_crossfade": native_crossfade,
-            "android_beatmatch": beatmatch,
-        }
+        smart_mix=SmartMixCapabilities(
+            available=available,
+            planner_version="smart-mix-v1" if available else None,
+            android_native_crossfade=native_crossfade,
+            android_beatmatch=beatmatch,
+        )
     )
