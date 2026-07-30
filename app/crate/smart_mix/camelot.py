@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from enum import StrEnum
+
 _PITCH_CLASSES = {
     "C": "C",
     "B#": "C",
@@ -52,6 +54,14 @@ _CAMELOT = {
 }
 
 
+class CamelotRelationship(StrEnum):
+    SAME = "same"
+    ADJACENT = "adjacent"
+    RELATIVE = "relative"
+    INCOMPATIBLE = "incompatible"
+    UNKNOWN = "unknown"
+
+
 def to_camelot(key: str, scale: str) -> str:
     normalized_key = _normalize_key(key)
     normalized_scale = scale.strip().lower()
@@ -61,6 +71,41 @@ def to_camelot(key: str, scale: str) -> str:
         return _CAMELOT[(normalized_key, normalized_scale)]
     except KeyError as exc:
         raise ValueError(f"Unsupported musical key: {key!r} {scale!r}") from exc
+
+
+def camelot_relationship(
+    left: str | None,
+    right: str | None,
+) -> CamelotRelationship:
+    parsed_left = _parse_camelot(left)
+    parsed_right = _parse_camelot(right)
+    if parsed_left is None or parsed_right is None:
+        return CamelotRelationship.UNKNOWN
+    if parsed_left == parsed_right:
+        return CamelotRelationship.SAME
+    left_number, left_letter = parsed_left
+    right_number, right_letter = parsed_right
+    if left_number == right_number and left_letter != right_letter:
+        return CamelotRelationship.RELATIVE
+    distance = abs(left_number - right_number)
+    if left_letter == right_letter and distance in {1, 11}:
+        return CamelotRelationship.ADJACENT
+    return CamelotRelationship.INCOMPATIBLE
+
+
+def _parse_camelot(value: str | None) -> tuple[int, str] | None:
+    if not value:
+        return None
+    normalized = value.strip().upper()
+    if len(normalized) not in {2, 3} or normalized[-1] not in {"A", "B"}:
+        return None
+    try:
+        number = int(normalized[:-1])
+    except ValueError:
+        return None
+    if not 1 <= number <= 12:
+        return None
+    return number, normalized[-1]
 
 
 def _normalize_key(key: str) -> str:
@@ -79,3 +124,10 @@ def _normalize_key(key: str) -> str:
         return _PITCH_CLASSES[normalized]
     except KeyError as exc:
         raise ValueError(f"Unsupported musical key: {key!r}") from exc
+
+
+__all__ = [
+    "CamelotRelationship",
+    "camelot_relationship",
+    "to_camelot",
+]
