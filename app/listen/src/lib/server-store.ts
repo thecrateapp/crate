@@ -505,6 +505,11 @@ export function migrateLegacyToken(defaultUrl: string): void {
 
 export function seedDefaultServer(defaultUrl: string): void {
   if (!usesConfigurableServer) return;
+  if (FIXED_SERVER_URL) {
+    const seeded = addServer(FIXED_SERVER_URL);
+    setCurrentServerId(seeded.id);
+    return;
+  }
   if (getServers().length > 0) return;
   const normalised = normaliseServerUrl(defaultUrl);
   if (!normalised) return;

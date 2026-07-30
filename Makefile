@@ -908,6 +908,7 @@ trust-local-ca: ## Trust Caddy's local CA for HTTPS (run after first 'make dev',
 CAP_DIR := app/listen
 CAP_IOS_TARGET ?= $(shell cd $(CAP_DIR) && npx cap run ios --list 2>/dev/null | grep "iPhone.*Pro " | head -1 | awk '{print $$NF}')
 CAP_DEBUG_SERVER_URL := https://api.dev.lespedants.org
+CAP_SMART_MIX_PROD_API_URL := https://api.lespedants.org
 CAP_ANDROID_OUTPUT_DIR ?= artifacts/capacitor/android
 CAP_ANDROID_GRADLE_VARIANT ?= debug
 CAP_ANDROID_RELEASE_TAG ?= $(shell git describe --tags --exact-match 2>/dev/null)
@@ -993,6 +994,23 @@ cap-android-smart-mix-artifacts: ## Build a local-only Android Smart Mix debug A
 	dst="$(CAP_ANDROID_OUTPUT_DIR)/crate-smart-mix-debug-$${ts}-$${sha}.apk"; \
 	cp "$$src" "$$dst"; \
 	echo "$(GREEN)Smart Mix debug APK copied to: $$dst$(NC)"
+
+.PHONY: cap-android-smart-mix-prod-artifacts
+cap-android-smart-mix-prod-artifacts: ## Build a production-pinned Android Smart Mix debug APK
+	@cd $(CAP_DIR) && \
+		VITE_CRATE_FIXED_SERVER_URL="$(CAP_SMART_MIX_PROD_API_URL)" \
+		VITE_CRATE_OAUTH_SCHEME="cratemusic-dbg" \
+		VITE_CRATE_SMART_MIX_LOCAL_TEST="true" \
+		VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS="$(CAP_SMART_MIX_CROSSFADE_MS)" \
+		npm run build:cap
+	@cd $(CAP_DIR)/android && ./gradlew assembleDebug
+	@mkdir -p "$(CAP_ANDROID_OUTPUT_DIR)"
+	@ts="$$(date +%Y%m%d-%H%M%S)"; \
+	sha="$$(git rev-parse --short HEAD 2>/dev/null || echo local)"; \
+	src="$(CAP_DIR)/android/app/build/outputs/apk/debug/app-debug.apk"; \
+	dst="$(CAP_ANDROID_OUTPUT_DIR)/crate-smart-mix-prod-debug-$${ts}-$${sha}.apk"; \
+	cp "$$src" "$$dst"; \
+	echo "$(GREEN)Production Smart Mix debug APK copied to: $$dst$(NC)"
 
 .PHONY: cap-android-release
 cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact release tag

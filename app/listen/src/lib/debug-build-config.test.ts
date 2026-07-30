@@ -32,4 +32,47 @@ describe("pinned Android debug server", () => {
       /fixed server/i,
     );
   });
+
+  it("accepts the production API for a prod-pinned Smart Mix build", async () => {
+    vi.stubEnv("VITE_CRATE_FIXED_SERVER_URL", "https://api.lespedants.org");
+    vi.resetModules();
+
+    const apiModule = await import("@/lib/api");
+    const serverStore = await import("@/lib/server-store");
+
+    expect(apiModule.getApiBase()).toBe("https://api.lespedants.org");
+    expect(serverStore.getCurrentServer()?.url).toBe(
+      "https://api.lespedants.org",
+    );
+  });
+
+  it("re-pins an existing DBG install from dev to production", async () => {
+    localStorage.setItem(
+      "crate-servers",
+      JSON.stringify([
+        {
+          id: "dev-server",
+          label: "dev.lespedants.org",
+          url: "https://api.dev.lespedants.org",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem("crate-current-server", "dev-server");
+    vi.stubEnv("VITE_CRATE_FIXED_SERVER_URL", "https://api.lespedants.org");
+    vi.resetModules();
+
+    const apiModule = await import("@/lib/api");
+    const serverStore = await import("@/lib/server-store");
+
+    expect(apiModule.getApiBase()).toBe("https://api.lespedants.org");
+    expect(serverStore.getCurrentServer()?.url).toBe(
+      "https://api.lespedants.org",
+    );
+    expect(
+      serverStore
+        .getServers()
+        .some((server) => server.url === "https://api.lespedants.org"),
+    ).toBe(true);
+  });
 });

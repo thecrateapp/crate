@@ -1,4 +1,7 @@
-const DEV_DOMAIN_SUFFIX = ".dev.lespedants.org";
+const ALLOWED_FIXED_SERVER_ORIGINS = new Set([
+  "https://api.dev.lespedants.org",
+  "https://api.lespedants.org",
+]);
 const DEFAULT_OAUTH_SCHEME = "cratemusic";
 const OAUTH_SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*$/;
 
@@ -8,13 +11,12 @@ function resolveFixedServerUrl(value: string | undefined): string {
 
   const parsed = new URL(raw);
   if (
-    parsed.protocol !== "https:" ||
-    !parsed.hostname.endsWith(DEV_DOMAIN_SUFFIX) ||
+    !ALLOWED_FIXED_SERVER_ORIGINS.has(parsed.origin) ||
     parsed.username ||
     parsed.password
   ) {
     throw new Error(
-      "VITE_CRATE_FIXED_SERVER_URL must use HTTPS on *.dev.lespedants.org",
+      "VITE_CRATE_FIXED_SERVER_URL must use an approved Crate API origin",
     );
   }
   return parsed.origin;
