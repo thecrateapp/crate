@@ -12,6 +12,10 @@ use walkdir::WalkDir;
 
 use crate::{collect_audio_files, parse_extensions};
 
+type AlbumTracks = (PathBuf, Vec<PathBuf>);
+type ArtistAlbums = BTreeMap<String, AlbumTracks>;
+type LibraryStructure = BTreeMap<String, (PathBuf, ArtistAlbums)>;
+
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ScanResult {
     pub artists: Vec<ArtistScan>,
@@ -97,10 +101,7 @@ fn ext_to_format(path: &Path) -> String {
 
 fn normalize_tag_key(raw: &str) -> String {
     let tail = raw.rsplit(':').next().unwrap_or(raw);
-    tail.trim()
-        .to_ascii_lowercase()
-        .replace(' ', "_")
-        .replace('-', "_")
+    tail.trim().to_ascii_lowercase().replace([' ', '-'], "_")
 }
 
 fn mapped_item_key(tag_type: TagType, key: &ItemKey) -> String {
@@ -201,14 +202,16 @@ pub fn read_tags(path: &Path) -> TrackTags {
     let tag = tagged.primary_tag().or_else(|| tagged.first_tag());
     let props = tagged.properties();
 
-    let mut tags = TrackTags::default();
-    tags.format = ext_to_format(path);
-    tags.duration_ms = Some(props.duration().as_millis() as u64);
-    tags.bitrate = props
-        .audio_bitrate()
-        .map(|bitrate| bitrate.saturating_mul(1000));
-    tags.sample_rate = props.sample_rate();
-    tags.bit_depth = props.bit_depth().map(u32::from);
+    let mut tags = TrackTags {
+        format: ext_to_format(path),
+        duration_ms: Some(props.duration().as_millis() as u64),
+        bitrate: props
+            .audio_bitrate()
+            .map(|bitrate| bitrate.saturating_mul(1000)),
+        sample_rate: props.sample_rate(),
+        bit_depth: props.bit_depth().map(u32::from),
+        ..Default::default()
+    };
 
     if let Some(t) = tag {
         tags.title = t.title().map(|s| s.to_string());
@@ -413,12 +416,8 @@ fn album_structure_for_file(dir: &Path, file: &Path) -> Option<(String, PathBuf,
 /// Detect library structure: root/Artist/[Year/]Album/tracks
 /// Returns a map of artist_name -> (artist_path, albums_map)
 /// where albums_map is album_name -> (album_path, track_paths)
-fn detect_structure(
-    dir: &Path,
-    extensions: &[String],
-) -> BTreeMap<String, (PathBuf, BTreeMap<String, (PathBuf, Vec<PathBuf>)>)> {
-    let mut artists: BTreeMap<String, (PathBuf, BTreeMap<String, (PathBuf, Vec<PathBuf>)>)> =
-        BTreeMap::new();
+fn detect_structure(dir: &Path, extensions: &[String]) -> LibraryStructure {
+    let mut artists = LibraryStructure::new();
 
     let files = collect_audio_files(dir, extensions);
     let mut albums_with_flac: BTreeSet<PathBuf> = BTreeSet::new();

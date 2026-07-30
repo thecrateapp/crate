@@ -502,7 +502,10 @@ mod tests {
         let probs = vec![0.1; 10];
         let index = audioset_label_index();
         let result = weighted_sum(&probs, &DANCE, &index);
-        assert_eq!(result, 0.0, "Label indices outside probs slice should be ignored");
+        assert_eq!(
+            result, 0.0,
+            "Label indices outside probs slice should be ignored"
+        );
     }
 
     #[test]
