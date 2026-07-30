@@ -561,6 +561,8 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sync_musicbrainz_genre_graph",
             "cleanup_invalid_genre_taxonomy",
             "compute_popularity",
+            "compute_smart_mix_profile",
+            "backfill_smart_mix_profiles",
             "backfill_track_audio_fingerprints",
             "analyze_tracks",
             "analyze_all",

@@ -30,6 +30,34 @@ def _create_sine_wav(
 
 
 class TestAnalyzeTrack:
+    def test_rust_result_preserves_embedded_smart_mix_profile(self, monkeypatch):
+        from crate import crate_cli
+        from crate.audio_analysis import analyze_track
+
+        mix_profile = {
+            "schemaVersion": 1,
+            "analyzerVersion": "smart-mix-v1",
+            "quality": "full",
+        }
+        monkeypatch.setattr(crate_cli, "is_available", lambda: True)
+        monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+        monkeypatch.setattr(
+            crate_cli,
+            "run_analyze",
+            lambda **_kwargs: {
+                "bpm": 120.0,
+                "key": "A",
+                "scale": "minor",
+                "energy": 0.7,
+                "danceability": 0.8,
+                "mixProfile": mix_profile,
+            },
+        )
+
+        result = analyze_track("/music/test.flac")
+
+        assert result["mix_profile"] == mix_profile
+
     def test_analyze_sine_wave(self):
         if not _librosa_available():
             pytest.skip("librosa not available")

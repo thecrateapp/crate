@@ -15,6 +15,15 @@ from crate.db.jobs.analysis import (
     store_track_audio_fingerprint,
     update_album_popularity as _db_update_album_popularity,
 )
+from crate.db.jobs.analysis_storage import (
+    record_smart_mix_failure,
+    resolve_smart_mix_track,
+    store_smart_mix_profile_result,
+)
+from crate.db.jobs.smart_mix_backfill import (
+    claim_smart_mix_backfill_batch,
+    release_smart_mix_claims,
+)
 from crate.db.events import emit_task_event
 from crate.db.repositories.library import (
     get_library_album,
@@ -1085,6 +1094,105 @@ def _handle_backfill_track_audio_fingerprints(
     }
 
 
+def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) -> dict:
+    del config
+    track = resolve_smart_mix_track(
+        track_id=int(params["track_id"]) if params.get("track_id") else None,
+        track_entity_uid=params.get("track_entity_uid"),
+    )
+    if track is None:
+        return {"error": "Smart Mix track not found"}
+
+    track_id = int(track["id"])
+    path = str(track["path"])
+    try:
+        from crate.audio_analysis import analyze_mix_profile
+
+        draft = analyze_mix_profile(path)
+        stored = store_smart_mix_profile_result(track_id, path, draft)
+    except Exception as exc:
+        record_smart_mix_failure(track_id, path, str(exc))
+        log.warning("Smart Mix analysis failed for %s", path, exc_info=True)
+        return {
+            "error": f"Smart Mix analysis failed: {exc}",
+            "track_id": track_id,
+        }
+
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": "Smart Mix profile ready",
+            "track_id": track_id,
+            "quality": str(draft.quality),
+            "stored": stored,
+        },
+    )
+    return {
+        "track_id": track_id,
+        "stored": stored,
+        "quality": str(draft.quality),
+    }
+
+
+def _handle_backfill_smart_mix_profiles(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del config
+    from crate.resource_governor import wait_while_pressured
+
+    if not wait_while_pressured(
+        label="Smart Mix profile backfill",
+        task_type="backfill_smart_mix_profiles",
+        is_cancelled_fn=is_cancelled,
+        task_id=task_id,
+        params=params,
+        emit_event_fn=emit_task_event,
+        max_sleep_seconds=_WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
+    ):
+        return {"claimed": 0, "queued": 0, "paused": True}
+
+    batch_size = max(1, min(int(params.get("batch_size") or 25), 100))
+    offline_ids = [
+        int(track_id)
+        for track_id in (params.get("offline_track_ids") or [])[:batch_size]
+        if track_id
+    ]
+    claimed = claim_smart_mix_backfill_batch(
+        limit=batch_size,
+        offline_track_ids=offline_ids,
+        max_attempts=int(params.get("max_attempts") or 3),
+        claimed_by=f"task:{task_id}",
+    )
+    queued = 0
+    released: list[int] = []
+    from crate.db.repositories.tasks import create_task_dedup
+
+    for track in claimed:
+        track_id = int(track["id"])
+        child_id = create_task_dedup(
+            "compute_smart_mix_profile",
+            {
+                "track_id": track_id,
+                "track_entity_uid": track.get("entity_uid"),
+            },
+            dedup_key=f"smart-mix-profile:{track_id}",
+        )
+        if child_id:
+            queued += 1
+        else:
+            released.append(track_id)
+    if released:
+        release_smart_mix_claims(released)
+
+    return {
+        "claimed": len(claimed),
+        "queued": queued,
+        "released": len(released),
+        "paused": False,
+    }
+
+
 # Populate finalizers now that handler functions are defined
 _PARENT_FINALIZERS["compute_popularity"] = _popularity_finalize
 
@@ -1100,6 +1208,8 @@ ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "sync_musicbrainz_genre_graph": _handle_sync_musicbrainz_genre_graph,
     "cleanup_invalid_genre_taxonomy": _handle_cleanup_invalid_genre_taxonomy,
     "compute_popularity": _handle_compute_popularity,
+    "compute_smart_mix_profile": _handle_compute_smart_mix_profile,
+    "backfill_smart_mix_profiles": _handle_backfill_smart_mix_profiles,
     "backfill_track_audio_fingerprints": _handle_backfill_track_audio_fingerprints,
     # Re-analysis: just resets state, background daemons pick up the work
     "analyze_tracks": _handle_requeue_analysis,
