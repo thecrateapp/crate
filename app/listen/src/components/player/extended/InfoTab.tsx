@@ -81,7 +81,7 @@ function StatCard({
   helper?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
+    <div className="rounded-lg border border-white/8 bg-white/[0.04] px-4 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
         {label}
       </p>
@@ -107,7 +107,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-[24px] border border-white/8 bg-white/[0.04] shadow-[0_12px_48px_rgba(0,0,0,0.24)]">
+    <section className="overflow-hidden rounded-[12px] border border-white/8 bg-white/[0.04] shadow-[0_12px_48px_rgba(0,0,0,0.24)]">
       <div className="flex items-start justify-between gap-4 border-b border-white/6 px-4 py-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/42">
@@ -311,7 +311,7 @@ export function InfoTab({ className }: { className?: string }) {
     >
       <div className="space-y-4 pb-2">
         <section
-          className="relative overflow-hidden rounded-[28px] border border-white/8 px-4 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:px-5"
+          className="relative overflow-hidden rounded-[12px] border border-white/8 px-4 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:px-5"
           style={{
             background: `linear-gradient(180deg, ${cssColor(
               primary,
@@ -329,7 +329,7 @@ export function InfoTab({ className }: { className?: string }) {
           />
 
           <div className="relative flex items-start gap-4">
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[22px] border border-white/10 bg-white/5 shadow-[0_12px_30px_rgba(0,0,0,0.4)] sm:h-28 sm:w-28">
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-[0_12px_30px_rgba(0,0,0,0.4)] sm:h-28 sm:w-28">
               {currentTrack.albumCover ? (
                 <CrateImage
                   src={currentTrack.albumCover}
@@ -445,7 +445,7 @@ export function InfoTab({ className }: { className?: string }) {
             </div>
 
             {info.rating != null && info.rating > 0 ? (
-              <div className="hidden shrink-0 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 sm:block">
+              <div className="hidden shrink-0 rounded-lg border border-white/10 bg-black/20 px-3 py-2 sm:block">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
                   {t("player.info.rating")}
                 </p>
@@ -491,7 +491,7 @@ export function InfoTab({ className }: { className?: string }) {
           </div>
 
           {info.rating != null && info.rating > 0 ? (
-            <div className="relative mt-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 sm:hidden">
+            <div className="relative mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 sm:hidden">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
                   {t("player.info.rating")}
@@ -695,7 +695,7 @@ export function InfoTab({ className }: { className?: string }) {
         {info.loudness != null || info.dynamic_range != null ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {info.loudness != null ? (
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+              <div className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
@@ -711,7 +711,7 @@ export function InfoTab({ className }: { className?: string }) {
             ) : null}
 
             {info.dynamic_range != null ? (
-              <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+              <div className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">

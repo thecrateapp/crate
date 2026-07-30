@@ -58,6 +58,7 @@ import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButt
 import { RemoteImportAction } from "@/components/imports/RemoteImportAction";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
+import { ReleaseCountdown } from "@/components/album/ReleaseCountdown";
 import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -1305,7 +1306,7 @@ export function Album() {
               />
               <div
                 data-testid="album-desktop-cover"
-                className="hidden aspect-square overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10 sm:block"
+                className="hidden aspect-square overflow-hidden rounded-xl bg-white/5 shadow-2xl ring-1 ring-white/10 sm:block"
               >
                 {data.has_cover || data.cover_url ? (
                   <CrateImage
@@ -1415,6 +1416,10 @@ export function Album() {
                 ))}
               </div>
 
+              {isPreRelease && data.release_date ? (
+                <ReleaseCountdown releaseDate={data.release_date} />
+              ) : null}
+
               {visibleContributor ? (
                 <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white/8 ring-1 ring-white/10">
@@ -1478,9 +1483,9 @@ export function Album() {
       {/* Action Row */}
       <div
         data-testid="album-action-row"
-        className="relative z-10 -mt-[var(--album-mobile-action-overlap)] px-4 pb-4 pt-0 sm:mt-0 sm:px-6 sm:py-4"
+        className="relative z-10 -mt-[var(--album-mobile-action-overlap)] px-4 pb-4 pt-0 sm:mt-0 sm:px-0 sm:py-4"
       >
-        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 sm:px-6 md:flex-row md:items-center md:justify-between md:gap-6">
           <div
             ref={albumPrimaryActionsRef}
             data-testid="album-primary-actions"
@@ -1652,7 +1657,7 @@ export function Album() {
 
       {isPreRelease ? (
         <div className="px-4 sm:px-6 pb-4">
-          <div className="mx-auto w-full max-w-[1480px] rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary/90">
+          <div className="mx-auto w-full max-w-[1480px] rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary/90">
             {t("album.prereleaseNotice")}
           </div>
         </div>
@@ -1663,7 +1668,7 @@ export function Album() {
         {isDesktop && selectedAlbumTracks.length > 0 ? (
           <div
             ref={selectionBarRef}
-            className="listen-glass-panel mb-3 flex flex-wrap items-center gap-2 rounded-2xl px-3 py-3"
+            className="listen-glass-panel mb-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-3"
           >
             <div className="mr-auto min-w-0 px-1">
               <p className="text-sm font-semibold text-foreground">
@@ -1684,7 +1689,7 @@ export function Album() {
                 {t("playlist.actions.addToPlaylist")}
               </button>
               {selectionPlaylistPickerOpen ? (
-                <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-2xl">
+                <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-[12px]">
                   <div className="p-1.5">
                     <button
                       className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-white/5"

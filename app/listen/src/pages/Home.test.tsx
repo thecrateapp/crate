@@ -103,10 +103,45 @@ function homeDiscoveryPayload(): HomeDiscoveryPayload {
   };
 }
 
+function homeDiscoveryPayloadWithDiscoveryRails(): HomeDiscoveryPayload {
+  return {
+    ...homeDiscoveryPayload(),
+    custom_mixes: [
+      {
+        id: "mix-1",
+        name: "Hardcore Rotation",
+        description: "A focused mix.",
+        artwork_tracks: [],
+        artwork_artists: [],
+        track_count: 18,
+        badge: "For you",
+        kind: "mix",
+      },
+    ],
+    recent_global_artists: [
+      {
+        id: 12,
+        name: "Rival Schools",
+        album_count: 2,
+        track_count: 20,
+        has_photo: false,
+      },
+    ],
+  };
+}
+
 describe("Home", () => {
   beforeEach(() => {
     viewportState.isDesktop = false;
     vi.stubGlobal("EventSource", MockEventSource);
+    vi.stubGlobal(
+      "ResizeObserver",
+      class ResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
     vi.mocked(useApi).mockReturnValue({
       data: homeDiscoveryPayload(),
       loading: false,
@@ -130,5 +165,33 @@ describe("Home", () => {
       screen.queryByRole("button", { name: /Play Radio/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^DNA$/i })).toBeNull();
+  });
+
+  it("keeps Custom mixes and Just landed out of the desktop home", () => {
+    viewportState.isDesktop = true;
+    vi.mocked(useApi).mockReturnValue({
+      data: homeDiscoveryPayloadWithDiscoveryRails(),
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Home />);
+
+    expect(screen.queryByText("Custom mixes")).toBeNull();
+    expect(screen.queryByText("Just landed")).toBeNull();
+  });
+
+  it("shows Just landed on the mobile home", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: homeDiscoveryPayloadWithDiscoveryRails(),
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Home />);
+
+    expect(screen.getByText("Just landed")).toBeInTheDocument();
   });
 });

@@ -376,7 +376,7 @@ describe("ArtistCard", () => {
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-2xl");
+    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-[12px]");
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(within(menu).getByAltText("Dredg")).toHaveAttribute(
       "src",

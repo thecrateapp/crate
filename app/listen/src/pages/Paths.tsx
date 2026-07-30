@@ -213,7 +213,7 @@ function EndpointPanel({
 
   return (
     <div
-      className={`relative flex-1 overflow-hidden rounded-2xl border transition-colors ${
+      className={`relative flex-1 overflow-hidden rounded-xl border transition-colors ${
         selected
           ? "border-primary/30 bg-primary/5"
           : "border-white/8 bg-white/[0.02]"
@@ -275,7 +275,7 @@ function EndpointPanel({
                 void search(e.target.value);
               }}
               placeholder={t("paths.endpoint.placeholder")}
-              className="h-11 w-full rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/30 focus:outline-none"
+              className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/30 focus:outline-none"
             />
             {searching && (
               <Loader2 size={14} className="mt-2 animate-spin text-primary" />
@@ -500,7 +500,7 @@ export function Paths() {
         <button
           onClick={create}
           disabled={!canCreate}
-          className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_rgba(6,182,212,0.3)] transition hover:bg-primary/90 disabled:opacity-25 disabled:shadow-none"
+          className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_rgba(6,182,212,0.3)] transition hover:bg-primary/90 disabled:opacity-25 disabled:shadow-none"
         >
           {creating ? (
             <Loader2 size={15} className="animate-spin" />

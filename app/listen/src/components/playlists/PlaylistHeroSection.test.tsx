@@ -272,7 +272,7 @@ describe("PlaylistHeroSection", () => {
     expect(menu).toHaveClass(
       "listen-glass-panel",
       "w-72",
-      "rounded-2xl",
+      "rounded-[12px]",
       "z-app-context-menu",
     );
     expect(within(menu).getByText("Friday Damage")).toBeInTheDocument();

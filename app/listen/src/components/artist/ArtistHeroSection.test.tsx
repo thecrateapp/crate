@@ -162,12 +162,19 @@ describe("ArtistHeroSection", () => {
     const primary = screen.getByRole("group", {
       name: "Primary artist actions",
     });
-    expect(
-      within(primary).getByRole("button", { name: "Play" }),
-    ).toHaveTextContent("Play");
-    expect(
-      within(primary).getByRole("button", { name: "Shuffle" }),
-    ).toHaveTextContent("Shuffle");
+    const playButton = within(primary).getByRole("button", { name: "Play" });
+    expect(playButton).toHaveTextContent("Play");
+    expect(playButton).toHaveClass("rounded-lg");
+    const shuffleButton = within(primary).getByRole("button", {
+      name: "Shuffle",
+    });
+    expect(shuffleButton).toHaveTextContent("Shuffle");
+    expect(shuffleButton).toHaveClass("rounded-lg");
+
+    const actionRail = primary.parentElement;
+    expect(actionRail).not.toBeNull();
+    expect(actionRail!).toHaveClass("sm:px-6");
+    expect(actionRail!.parentElement).toHaveClass("sm:px-0");
 
     const secondary = screen.getByRole("group", {
       name: "Secondary artist actions",
@@ -345,7 +352,7 @@ describe("ArtistHeroSection", () => {
     expect(menu).toHaveClass(
       "listen-glass-panel",
       "w-72",
-      "rounded-2xl",
+      "rounded-[12px]",
       "z-app-context-menu",
     );
 

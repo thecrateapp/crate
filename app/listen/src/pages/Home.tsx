@@ -12,7 +12,6 @@ import { toast } from "sonner";
 
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import {
-  CustomMixesSection,
   EssentialsSection,
   FavoriteArtistsSection,
   HomeTasteHero,
@@ -298,6 +297,7 @@ export function Home() {
       if (
         scope === "home" ||
         scope === "library" ||
+        scope === "global_catalog" ||
         scope === "upcoming" ||
         scope.startsWith("home:user:") ||
         scope.startsWith("artist:") ||
@@ -637,16 +637,6 @@ export function Home() {
           }}
           onPlay={(artist) => void playHeroArtist(artist)}
           onToggleFollow={(artist) => void toggleHeroFollow(artist)}
-          onInfo={(artist) => {
-            void recordHeroRecommendationAction(artist, "opened");
-            navigate(
-              artistPagePath({
-                artistId: artist.id,
-                artistSlug: artist.slug,
-                artistName: artist.name,
-              }),
-            );
-          }}
           onDismiss={(artist) => void dismissHeroArtist(artist)}
           onExpose={(artist) => void recordHeroExposure(artist)}
         />
@@ -658,14 +648,13 @@ export function Home() {
         onViewAll={openHomeSection}
       />
 
-      <CustomMixesSection
-        mixes={currentDiscovery?.custom_mixes || []}
-        onOpenMix={(mix) => navigate(homePlaylistPath(mix.id))}
-        onPlayMix={(mix) => void playHomePlaylist(mix)}
-        onShuffleMix={(mix) => void shuffleHomePlaylist(mix)}
-        onStartRadio={(mix) => void startHomePlaylistRadio(mix)}
-        onViewAll={openHomeSection}
-      />
+      {!isDesktop ? (
+        <JustLandedSection
+          artists={recentGlobalArtists}
+          loading={globalArtistsLoading}
+          onOpenExplore={() => navigate("/explore")}
+        />
+      ) : null}
 
       <SuggestedAlbumsSection
         albums={currentDiscovery?.suggested_albums || []}
@@ -721,12 +710,6 @@ export function Home() {
             onPlayTrack={(item) =>
               play(toPlayerTrack(item), { type: "track", name: item.title })
             }
-          />
-
-          <JustLandedSection
-            artists={recentGlobalArtists}
-            loading={globalArtistsLoading}
-            onOpenExplore={() => navigate("/explore")}
           />
         </>
       ) : null}

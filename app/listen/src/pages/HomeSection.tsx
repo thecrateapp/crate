@@ -207,7 +207,7 @@ export function HomeSection() {
       </div>
 
       {!data.items.length ? (
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-12 text-center">
+        <div className="rounded-[12px] border border-white/10 bg-white/[0.03] px-5 py-12 text-center">
           <p className="text-sm font-medium text-foreground">
             {t("home.section.empty.title")}
           </p>

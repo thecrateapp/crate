@@ -399,7 +399,7 @@ export function TopBarSearch() {
           <AppPopover
             ref={dropdownRef}
             className={cn(
-              "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-2xl py-1",
+              "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-[12px] py-1",
               showRecents ? "max-h-none" : undefined,
             )}
             style={{

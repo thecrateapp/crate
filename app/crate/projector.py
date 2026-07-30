@@ -57,6 +57,7 @@ _HOME_EVENT_TYPES = {
 
 _OPS_INVALIDATION_SCOPES = {
     "library",
+    "global_catalog",
     "shows",
     "upcoming",
     "curation",
@@ -66,6 +67,7 @@ _OPS_INVALIDATION_SCOPES = {
 _HOME_GLOBAL_INVALIDATION_SCOPES = {
     "home",
     "library",
+    "global_catalog",
     "shows",
     "upcoming",
     "curation",

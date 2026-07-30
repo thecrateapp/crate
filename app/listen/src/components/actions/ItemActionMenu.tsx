@@ -1,12 +1,12 @@
 import {
   ContextMenu as SharedContextMenu,
-  ItemActionMenu as SharedItemActionMenu,
   type ContextMenuProps,
   type ItemActionMenuProps,
   type ContextMenuMediaImageProps,
 } from "@crate/ui/domain/actions";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { cn } from "@/lib/utils";
 
 export {
   ItemActionMenuButton,
@@ -28,10 +28,23 @@ function renderMediaImage({ src, ...props }: ContextMenuMediaImageProps) {
 
 export function ItemActionMenu(props: ItemActionMenuProps) {
   return (
-    <SharedItemActionMenu {...props} renderMediaImage={renderMediaImage} />
+    <ContextMenu
+      header={props.header}
+      items={props.actions}
+      menuRef={props.menuRef}
+      onClose={props.onClose}
+      open={props.open}
+      position={props.position}
+    />
   );
 }
 
 export function ContextMenu(props: ContextMenuProps) {
-  return <SharedContextMenu {...props} renderMediaImage={renderMediaImage} />;
+  return (
+    <SharedContextMenu
+      {...props}
+      className={cn("rounded-[12px]", props.className)}
+      renderMediaImage={renderMediaImage}
+    />
+  );
 }

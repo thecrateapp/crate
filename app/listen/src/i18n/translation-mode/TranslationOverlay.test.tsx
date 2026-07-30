@@ -87,7 +87,11 @@ describe("TranslationOverlay", () => {
     const valueInput = screen.getByLabelText("Current value");
     await user.clear(valueInput);
     await user.type(valueInput, "Dale");
-    await user.click(screen.getByRole("button", { name: "Save translation" }));
+    const saveButton = screen.getByRole("button", {
+      name: "Save translation",
+    });
+    expect(saveButton).toHaveClass("rounded-lg");
+    await user.click(saveButton);
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith(

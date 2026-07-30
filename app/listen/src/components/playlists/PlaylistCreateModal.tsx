@@ -392,7 +392,7 @@ export function PlaylistCreateModal({
                 name={name || t("playlistComposer.newPlaylist")}
                 coverDataUrl={coverDataUrl}
                 tracks={tracks}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl shadow-2xl"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl shadow-2xl"
               />
               <button
                 type="button"
@@ -465,7 +465,7 @@ export function PlaylistCreateModal({
               {coverDataUrl ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
                   onClick={() => setCoverDataUrl(null)}
                 >
                   <ImagePlus size={14} />
@@ -527,7 +527,7 @@ export function PlaylistCreateModal({
             </div>
 
             {search.trim().length >= 2 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5">
+              <div className="rounded-xl border border-white/10 bg-white/5">
                 {results.length > 0 ? (
                   <div className="max-h-44 overflow-y-auto py-1.5">
                     {results.map((track) => (
@@ -576,7 +576,7 @@ export function PlaylistCreateModal({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5">
+            <div className="rounded-xl border border-white/10 bg-white/5">
               <div className="max-h-64 overflow-y-auto py-1.5">
                 {tracks.length > 0 ? (
                   <DndContext
@@ -610,7 +610,7 @@ export function PlaylistCreateModal({
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
           <button
             type="button"
-            className="rounded-xl px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
             onClick={onClose}
             disabled={submitting}
           >
@@ -619,7 +619,7 @@ export function PlaylistCreateModal({
           <button
             type="submit"
             disabled={submitting || !name.trim()}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
             {submitLabel}

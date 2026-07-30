@@ -217,7 +217,7 @@ describe("TopBarSearch", () => {
 
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
       "listen-glass-panel",
-      "rounded-2xl",
+      "rounded-[12px]",
     );
   });
 

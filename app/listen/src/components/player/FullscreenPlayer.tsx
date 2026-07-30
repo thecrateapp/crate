@@ -20,6 +20,7 @@ import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { api } from "@/lib/api";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
+import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import {
   getPlayerSurfaceModePreference,
   PLAYER_VIZ_PREFS_EVENT,
@@ -216,8 +217,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   );
   const navigate = useNavigate();
   const androidNativePlayerEnabled = shouldUseAndroidNativePlayer();
+  const equalizerEnabled = useEqualizerEnabled();
   const allowMobileEqualizer =
-    canUseWebAudioEffects || androidNativePlayerEnabled;
+    equalizerEnabled && (canUseWebAudioEffects || androidNativePlayerEnabled);
   const spinningDiscJogSeekMode = androidNativePlayerEnabled
     ? "commit"
     : "live";
@@ -259,6 +261,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   const equalizerRef = useRef<HTMLDivElement>(null);
   const equalizerButtonRef = useRef<HTMLButtonElement>(null);
   const isCdMode = surfaceMode === "cd";
+
+  useEffect(() => {
+    if (!allowMobileEqualizer) setShowEqualizer(false);
+  }, [allowMobileEqualizer]);
 
   function closeWithFeedback() {
     triggerHaptic("selection");
@@ -656,7 +662,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       {allowMobileEqualizer && showEqualizer && (
         <div
           ref={equalizerRef}
-          className="absolute left-4 right-4 z-40 overflow-y-auto rounded-xl bg-white/5 p-4 backdrop-blur-md animate-fade-slide-up"
+          className="listen-mobile-eq-glass absolute left-4 right-4 z-40 overflow-y-auto rounded-xl p-4 animate-fade-slide-up"
           style={{
             top: "var(--listen-mobile-fullscreen-eq-top)",
             maxHeight:
