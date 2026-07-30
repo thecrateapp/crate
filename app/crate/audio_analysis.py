@@ -56,6 +56,14 @@ PANNS_DURATION = 30  # seconds — enough for genre classification
 SIGNAL_DURATION = 120  # seconds — for BPM/key accuracy
 FRAME_STEP = 4  # analyze every Nth frame for spectral features
 
+
+def analyze_mix_profile(filepath: str | Path):
+    """Analyze full-track signals used by the versioned Smart Mix profile."""
+    from crate.smart_mix.analyzer import analyze_mix_profile as analyze
+
+    return analyze(filepath)
+
+
 # ── PANNs CNN14 (lazy singleton) ──────────────────────────────────
 
 _panns_tagger: Any | None = None

@@ -1,6 +1,7 @@
 from crate.smart_mix.models import (
     MixProfileQuality,
     TrackMixProfile,
+    TrackMixProfileDraft,
     TransitionContext,
     TransitionFallbackReason,
     TransitionMode,
@@ -10,6 +11,7 @@ from crate.smart_mix.models import (
 __all__ = [
     "MixProfileQuality",
     "TrackMixProfile",
+    "TrackMixProfileDraft",
     "TransitionContext",
     "TransitionFallbackReason",
     "TransitionMode",

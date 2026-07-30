@@ -31,6 +31,80 @@ class TransitionFallbackReason(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class TrackMixProfileDraft:
+    analyzer: str
+    analyzer_version: str
+    duration_ms: int
+    quality: MixProfileQuality | str
+    bpm: float | None = None
+    bpm_confidence: float | None = None
+    tempo_stability: float | None = None
+    beat_anchor_ms: int | None = None
+    downbeat_anchor_ms: int | None = None
+    time_signature: int | None = None
+    beat_grid_ms: tuple[int, ...] = ()
+    key: str | None = None
+    scale: str | None = None
+    camelot: str | None = None
+    key_confidence: float | None = None
+    intro_cue_ms: int | None = None
+    outro_cue_ms: int | None = None
+    intro_lufs: float | None = None
+    outro_lufs: float | None = None
+    true_peak_dbfs: float | None = None
+    intro_energy: float | None = None
+    outro_energy: float | None = None
+    intro_spectral_density: float | None = None
+    outro_spectral_density: float | None = None
+    global_energy: float | None = None
+    danceability: float | None = None
+    valence: float | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "quality", MixProfileQuality(self.quality))
+        _require_non_negative_ms("duration_ms", self.duration_ms)
+        for field_name in (
+            "beat_anchor_ms",
+            "downbeat_anchor_ms",
+            "intro_cue_ms",
+            "outro_cue_ms",
+        ):
+            _require_non_negative_ms(field_name, getattr(self, field_name))
+        object.__setattr__(
+            self,
+            "beat_grid_ms",
+            tuple(
+                _validated_ms("beat_grid_ms", position)
+                for position in self.beat_grid_ms
+            ),
+        )
+        if any(
+            current <= previous
+            for previous, current in zip(
+                self.beat_grid_ms,
+                self.beat_grid_ms[1:],
+                strict=False,
+            )
+        ):
+            raise ValueError("beat_grid_ms must be strictly increasing")
+        for field_name in (
+            "bpm_confidence",
+            "tempo_stability",
+            "key_confidence",
+            "intro_energy",
+            "outro_energy",
+            "intro_spectral_density",
+            "outro_spectral_density",
+            "global_energy",
+            "danceability",
+            "valence",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                object.__setattr__(self, field_name, _clamp_confidence(value))
+
+
+@dataclass(frozen=True, slots=True)
 class TrackMixProfile:
     track_entity_uid: str
     profile_version: int
