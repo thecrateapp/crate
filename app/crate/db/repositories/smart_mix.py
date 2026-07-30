@@ -10,6 +10,7 @@ from sqlalchemy.orm import defer
 
 from crate.db.orm.library import LibraryTrack
 from crate.db.orm.smart_mix import TrackMixProfileRow
+from crate.db.repositories.library_shared import coerce_uuid
 from crate.db.tx import optional_scope, read_scope
 from crate.smart_mix.beat_grid import (
     FORMAT_NAME,
@@ -91,6 +92,57 @@ def get_track_mix_profiles(
             for row, entity_uid, duration in rows
         }
     return [by_track_id.get(track_id) for track_id in requested_ids]
+
+
+def get_track_mix_profile_by_entity_uid(
+    entity_uid: str,
+    *,
+    include_beat_grid: bool = False,
+    session=None,
+) -> TrackMixProfile | None:
+    profiles = get_track_mix_profiles_by_entity_uids(
+        [entity_uid],
+        include_beat_grid=include_beat_grid,
+        session=session,
+    )
+    return profiles[0]
+
+
+def get_track_mix_profiles_by_entity_uids(
+    entity_uids: Sequence[str],
+    *,
+    include_beat_grid: bool = False,
+    session=None,
+) -> list[TrackMixProfile | None]:
+    requested_uids = [coerce_uuid(entity_uid) for entity_uid in entity_uids]
+    if not requested_uids:
+        return []
+
+    statement = (
+        select(
+            TrackMixProfileRow,
+            LibraryTrack.entity_uid,
+            LibraryTrack.duration,
+        )
+        .join(LibraryTrack, LibraryTrack.id == TrackMixProfileRow.track_id)
+        .where(LibraryTrack.entity_uid.in_(set(requested_uids)))
+    )
+    if not include_beat_grid:
+        statement = statement.options(defer(TrackMixProfileRow.beat_grid_data))
+
+    manager = nullcontext(session) if session is not None else read_scope()
+    with manager as active_session:
+        rows = active_session.execute(statement).all()
+        by_entity_uid = {
+            str(entity_uid): _row_to_profile(
+                row,
+                entity_uid,
+                duration,
+                include_beat_grid=include_beat_grid,
+            )
+            for row, entity_uid, duration in rows
+        }
+    return [by_entity_uid.get(str(entity_uid)) for entity_uid in requested_uids]
 
 
 def _encode_profile_grid(profile: TrackMixProfile) -> bytes | None:

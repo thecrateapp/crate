@@ -7,7 +7,9 @@ from sqlalchemy import text
 
 from crate.db.repositories.smart_mix import (
     get_track_mix_profile,
+    get_track_mix_profile_by_entity_uid,
     get_track_mix_profiles,
+    get_track_mix_profiles_by_entity_uids,
     upsert_track_mix_profile,
 )
 from crate.db.tx import transaction_scope
@@ -43,6 +45,30 @@ def test_batch_read_preserves_requested_order_and_missing_slots(pg_db) -> None:
         [second_id, 9_999_999, first_id], include_beat_grid=True
     )
 
+    assert [
+        item.profile_revision if item is not None else None for item in profiles
+    ] == ["second", None, "first"]
+
+
+def test_entity_uid_reads_preserve_order_and_missing_slots(pg_db) -> None:
+    del pg_db
+    first_id, first_uid = _create_track("entity-first")
+    second_id, second_uid = _create_track("entity-second")
+    missing_uid = str(uuid.uuid4())
+    upsert_track_mix_profile(first_id, _profile(first_uid, revision="first"))
+    upsert_track_mix_profile(second_id, _profile(second_uid, revision="second"))
+
+    single = get_track_mix_profile_by_entity_uid(
+        first_uid,
+        include_beat_grid=True,
+    )
+    profiles = get_track_mix_profiles_by_entity_uids(
+        [second_uid, missing_uid, first_uid],
+        include_beat_grid=True,
+    )
+
+    assert single is not None
+    assert single.beat_grid_ms == (500, 1_000, 1_500)
     assert [
         item.profile_revision if item is not None else None for item in profiles
     ] == ["second", None, "first"]

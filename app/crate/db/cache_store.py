@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import threading
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import text
@@ -19,6 +21,14 @@ from crate.db.cache_runtime import (
     _mem_set,
 )
 from crate.db.tx import read_scope, transaction_scope
+
+
+SMART_MIX_PLAN_CACHE_PREFIX = "smart-mix:transition-plan:v1:"
+SMART_MIX_PLAN_CACHE_TTL_SECONDS = 6 * 60 * 60
+_SMART_MIX_PLAN_PRUNE_INTERVAL_SECONDS = 5 * 60
+_SMART_MIX_PLAN_PRUNE_BATCH_SIZE = 500
+_smart_mix_plan_prune_lock = threading.Lock()
+_smart_mix_plan_last_prune_at = 0.0
 
 
 def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
@@ -115,6 +125,61 @@ def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
         pass
 
 
+def get_smart_mix_plan_cache(plan_key: str) -> dict[str, Any] | None:
+    value = get_cache(
+        f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+        max_age_seconds=SMART_MIX_PLAN_CACHE_TTL_SECONDS,
+    )
+    return value if isinstance(value, dict) else None
+
+
+def set_smart_mix_plan_cache(plan_key: str, value: dict[str, Any]) -> None:
+    set_cache(
+        f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+        value,
+        ttl=SMART_MIX_PLAN_CACHE_TTL_SECONDS,
+    )
+    _maybe_prune_smart_mix_plan_cache()
+
+
+def _maybe_prune_smart_mix_plan_cache() -> None:
+    global _smart_mix_plan_last_prune_at
+
+    now = time.monotonic()
+    with _smart_mix_plan_prune_lock:
+        if now - _smart_mix_plan_last_prune_at < _SMART_MIX_PLAN_PRUNE_INTERVAL_SECONDS:
+            return
+        _smart_mix_plan_last_prune_at = now
+
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        seconds=SMART_MIX_PLAN_CACHE_TTL_SECONDS
+    )
+    try:
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    DELETE FROM cache
+                    WHERE ctid IN (
+                        SELECT ctid
+                        FROM cache
+                        WHERE key LIKE :prefix
+                          AND updated_at < :cutoff
+                        ORDER BY updated_at
+                        LIMIT :batch_size
+                    )
+                    """
+                ),
+                {
+                    "prefix": f"{SMART_MIX_PLAN_CACHE_PREFIX}%",
+                    "cutoff": cutoff,
+                    "batch_size": _SMART_MIX_PLAN_PRUNE_BATCH_SIZE,
+                },
+            )
+    except Exception:
+        pass
+
+
 def delete_cache(key: str) -> None:
     _mem_delete(key)
 
@@ -202,10 +267,13 @@ def _remaining_l1_ttl(
 
 
 __all__ = [
+    "SMART_MIX_PLAN_CACHE_TTL_SECONDS",
     "clear_all_cache_tables",
     "delete_cache",
     "delete_cache_prefix",
     "get_cache",
     "get_cache_stats",
+    "get_smart_mix_plan_cache",
     "set_cache",
+    "set_smart_mix_plan_cache",
 ]
