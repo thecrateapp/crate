@@ -126,7 +126,6 @@ describe("HomeTasteHero", () => {
         onOpenArtist={vi.fn()}
         onPlay={vi.fn()}
         onToggleFollow={vi.fn()}
-        onInfo={vi.fn()}
       />,
     );
 
@@ -149,7 +148,6 @@ describe("HomeTasteHero", () => {
         onOpenArtist={vi.fn()}
         onPlay={vi.fn()}
         onToggleFollow={vi.fn()}
-        onInfo={vi.fn()}
         onDismiss={onDismiss}
         onExpose={onExpose}
       />,
@@ -157,12 +155,9 @@ describe("HomeTasteHero", () => {
 
     await waitFor(() => expect(onExpose).toHaveBeenCalledWith(hero));
 
-    const [, dismissButton] = screen.getAllByRole("button", {
+    const dismissButton = screen.getByRole("button", {
       name: /Not interested/i,
     });
-    if (!dismissButton) {
-      throw new Error("Expected the visible dismiss button to render");
-    }
     fireEvent.click(dismissButton);
 
     expect(onDismiss).toHaveBeenCalledWith(hero);
@@ -178,12 +173,44 @@ describe("HomeTasteHero", () => {
         onOpenArtist={vi.fn()}
         onPlay={vi.fn()}
         onToggleFollow={vi.fn()}
-        onInfo={vi.fn()}
       />,
     );
 
     expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+  });
+
+  it("uses compact accessible actions and a fixed hero viewport on mobile", () => {
+    mockMobilePointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture()]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    const playButton = screen.getByRole("button", { name: "Play" });
+    const followButton = screen.getByRole("button", { name: "Follow" });
+    const dismissButton = screen
+      .getAllByRole("button", { name: /Not interested/i })
+      .find((button) => button.getAttribute("aria-label") === "Not interested");
+
+    expect(playButton).toHaveAttribute("aria-label", "Play");
+    expect(within(playButton).queryByText("Play")).toBeNull();
+    expect(followButton).toHaveAttribute("aria-label", "Follow");
+    expect(within(followButton).queryByText("Follow")).toBeNull();
+    expect(dismissButton).toBeDefined();
+    expect(dismissButton).toHaveAttribute("aria-label", "Not interested");
+    expect(within(dismissButton!).queryByText(/Not interested/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: "About" })).toBeNull();
+    expect(screen.getByTestId("home-taste-hero-viewport").className).toMatch(
+      /\bh-(?:\[[^\]]+\]|\d+)/,
+    );
   });
 
   it("moves the mobile carousel with a natural horizontal swipe", () => {
@@ -199,7 +226,6 @@ describe("HomeTasteHero", () => {
           onOpenArtist={vi.fn()}
           onPlay={vi.fn()}
           onToggleFollow={vi.fn()}
-          onInfo={vi.fn()}
         />,
       );
 
@@ -216,9 +242,80 @@ describe("HomeTasteHero", () => {
       expect(
         screen.getByRole("heading", { name: "Botch" }),
       ).toBeInTheDocument();
+
+      vi.advanceTimersByTime(8_000);
+
+      expect(
+        screen.getByRole("heading", { name: "Botch" }),
+      ).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("keeps a horizontal hero swipe out of the pull-to-refresh container", () => {
+    mockMobilePointer();
+    const onParentTouchStart = vi.fn();
+    const onParentTouchMove = vi.fn();
+    const onParentTouchEnd = vi.fn();
+
+    renderWithListenProviders(
+      <div
+        onTouchStart={onParentTouchStart}
+        onTouchMove={onParentTouchMove}
+        onTouchEnd={onParentTouchEnd}
+      >
+        <HomeTasteHero
+          heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+          isFollowing={() => false}
+          onOpenArtist={vi.fn()}
+          onPlay={vi.fn()}
+          onToggleFollow={vi.fn()}
+        />
+      </div>,
+    );
+
+    const hero = screen.getByTestId("home-taste-hero-viewport");
+    fireEvent.touchStart(hero, {
+      touches: [{ clientX: 240, clientY: 180 }],
+    });
+    fireEvent.touchMove(hero, {
+      touches: [{ clientX: 238, clientY: 268 }],
+    });
+    fireEvent.touchMove(hero, {
+      touches: [{ clientX: 110, clientY: 194 }],
+    });
+    fireEvent.touchEnd(hero, {
+      changedTouches: [{ clientX: 100, clientY: 196 }],
+    });
+
+    expect(screen.getByRole("heading", { name: "Botch" })).toBeInTheDocument();
+    expect(onParentTouchStart).not.toHaveBeenCalled();
+    expect(onParentTouchMove).not.toHaveBeenCalled();
+    expect(onParentTouchEnd).not.toHaveBeenCalled();
+  });
+
+  it("mounts slide artwork before a mobile swipe makes it active", () => {
+    mockMobilePointer();
+
+    const { container } = renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[
+          heroFixture(),
+          heroFixture({ id: 8, name: "Botch" }),
+          heroFixture({ id: 9, name: "Cave In" }),
+          heroFixture({ id: 10, name: "Cult Leader" }),
+        ]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(
+      container.querySelectorAll('[data-artwork-managed="true"]'),
+    ).toHaveLength(3);
   });
 });
 
@@ -374,7 +471,7 @@ describe("RecentEntityRow", () => {
     });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-2xl");
+    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-[12px]");
     expect(within(menu).getByText("El Cielo")).toBeInTheDocument();
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(

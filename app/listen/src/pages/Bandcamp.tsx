@@ -157,7 +157,7 @@ export function Bandcamp() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-8 px-4 py-6 md:px-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/8 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.18),transparent_34%),linear-gradient(135deg,rgba(17,18,25,0.98),rgba(7,8,11,0.98))] p-6 md:p-8">
+      <section className="relative overflow-hidden rounded-[12px] border border-white/8 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.18),transparent_34%),linear-gradient(135deg,rgba(17,18,25,0.98),rgba(7,8,11,0.98))] p-6 md:p-8">
         <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.045))]" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -313,7 +313,7 @@ function StatCard({
   icon: LucideIcon | typeof BandcampLogo;
 }) {
   return (
-    <div className="rounded-3xl border border-white/8 bg-white/[0.035] p-5">
+    <div className="rounded-[12px] border border-white/8 bg-white/[0.035] p-5">
       <div className="flex items-center justify-between">
         <span className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
           {label}
@@ -337,7 +337,7 @@ function Rail({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[1.75rem] border border-white/8 bg-[#111117]/90 p-5">
+    <section className="rounded-[12px] border border-white/8 bg-[#111117]/90 p-5">
       <div className="mb-5">
         <h2 className="text-2xl font-black text-white">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
@@ -410,7 +410,7 @@ function BandcampCard({
 }) {
   const { t } = useTranslation();
   return (
-    <article className="group overflow-hidden rounded-3xl border border-white/8 bg-black/18">
+    <article className="group overflow-hidden rounded-[12px] border border-white/8 bg-black/18">
       <Cover item={item} />
       <div className="space-y-3 p-4">
         <div className="min-w-0">
@@ -436,7 +436,7 @@ function BandcampListItem({
 }) {
   const { t } = useTranslation();
   return (
-    <article className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/18 p-3">
+    <article className="flex items-center gap-3 rounded-xl border border-white/8 bg-black/18 p-3">
       <Cover item={item} compact />
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-sm font-black text-white">
@@ -540,7 +540,7 @@ function Cover({
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-white/10 bg-black/16 p-6 text-sm text-slate-500">
+    <div className="rounded-lg border border-dashed border-white/10 bg-black/16 p-6 text-sm text-slate-500">
       {label}
     </div>
   );

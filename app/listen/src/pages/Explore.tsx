@@ -206,7 +206,7 @@ function ExploreFeatureCard({
     <button
       type="button"
       onClick={onClick}
-      className="group relative min-h-36 overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.025))] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.24)] transition hover:border-primary/35 hover:bg-white/[0.07]"
+      className="group relative min-h-36 overflow-hidden rounded-[12px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.025))] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.24)] transition hover:border-primary/35 hover:bg-white/[0.07]"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(6,182,212,0.28),transparent_38%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.11),transparent_38%)] opacity-80 transition group-hover:opacity-100" />
       <div className="relative flex h-full flex-col justify-between gap-8">
@@ -324,7 +324,7 @@ function GenreExplorer({
               key={genre.slug || genre.name}
               type="button"
               onClick={() => onOpen(getGenreSlug(genre))}
-              className="group relative min-h-36 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-primary/30 hover:bg-white/[0.06]"
+              className="group relative min-h-36 overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-primary/30 hover:bg-white/[0.06]"
             >
               {resolvedCoverUrl ? (
                 <CrateImage
@@ -455,7 +455,7 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
             key={m.name}
             onClick={() => playMood(m.name)}
             disabled={loadingMood !== null}
-            className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+            className={`rounded-lg border px-4 py-3 text-left transition-colors ${
               MOOD_COLORS[m.name] || "bg-white/5 text-white/70 border-white/10"
             } active:scale-[0.98]`}
           >

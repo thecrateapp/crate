@@ -83,6 +83,7 @@ _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
     {
         "home",
         "library",
+        "global_catalog",
         "shows",
         "upcoming",
         "curation",
@@ -232,6 +233,7 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "saved_albums",
                 "history",
                 "library",
+                "global_catalog",
                 "curation",
                 "playlists",
                 "shows",
@@ -242,7 +244,15 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
         ):
             mark_ui_snapshots_stale(scope_prefix="home:")
         if any(
-            scope in {"library", "shows", "upcoming", "curation", "playlists"}
+            scope
+            in {
+                "library",
+                "global_catalog",
+                "shows",
+                "upcoming",
+                "curation",
+                "playlists",
+            }
             or scope.startswith(("artist:", "album:", "playlist:"))
             for scope in scopes
         ):

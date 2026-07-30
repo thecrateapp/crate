@@ -65,6 +65,63 @@ def list_global_collection_artists(limit: int = 500) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def list_recent_global_collection_artists(limit: int = 500) -> list[dict[str, Any]]:
+    capped = max(1, min(int(limit or 500), 2000))
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        a.global_artist_uid::text AS global_artist_uid,
+                        a.canonical_name AS artist_name,
+                        a.local_artist_id AS artist_id,
+                        a.local_artist_entity_uid::text AS artist_entity_uid,
+                        la.slug AS artist_slug,
+                        COALESCE(arrivals.landed_at, a.created_at) AS created_at,
+                        COALESCE(album_counts.album_count, 0) AS album_count,
+                        COALESCE(track_counts.track_count, 0) AS track_count,
+                        a.has_photo,
+                        CASE WHEN a.has_photo THEN
+                            '/api/catalog/artists/' || a.global_artist_uid::text || '/photo'
+                        ELSE NULL END AS photo_url,
+                        a.has_local,
+                        a.has_remote,
+                        a.availability_json
+                    FROM global_catalog_artists a
+                    LEFT JOIN library_artists la ON la.id = a.local_artist_id
+                    LEFT JOIN (
+                        SELECT global_entity_uid, MAX(created_at) AS landed_at
+                        FROM global_catalog_sources
+                        WHERE entity_type = 'artist'
+                          AND source_deleted_at IS NULL
+                          AND source_stale = FALSE
+                        GROUP BY global_entity_uid
+                    ) arrivals ON arrivals.global_entity_uid = a.global_artist_uid
+                    LEFT JOIN (
+                        SELECT global_artist_uid, COUNT(*) AS album_count
+                        FROM global_catalog_albums
+                        GROUP BY global_artist_uid
+                    ) album_counts ON album_counts.global_artist_uid = a.global_artist_uid
+                    LEFT JOIN (
+                        SELECT global_artist_uid, COUNT(*) AS track_count
+                        FROM global_catalog_tracks
+                        GROUP BY global_artist_uid
+                    ) track_counts ON track_counts.global_artist_uid = a.global_artist_uid
+                    ORDER BY
+                        COALESCE(arrivals.landed_at, a.created_at) DESC,
+                        a.canonical_name ASC
+                    LIMIT :limit
+                    """
+                ),
+                {"limit": capped},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
+
+
 def list_global_collection_albums(limit: int = 500) -> list[dict[str, Any]]:
     capped = max(1, min(int(limit or 500), 2000))
     with read_scope() as session:
@@ -1315,6 +1372,7 @@ __all__ = [
     "is_global_artist_followed",
     "list_global_collection_albums",
     "list_global_collection_artists",
+    "list_recent_global_collection_artists",
     "list_user_global_album_saves",
     "list_user_global_artist_follows",
     "mutate_global_track_like",

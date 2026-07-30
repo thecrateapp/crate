@@ -185,7 +185,7 @@ export function PlaylistHeroSection({
           <div className="flex w-full flex-col gap-5 sm:flex-row sm:items-end">
             <div className="hidden w-[200px] flex-shrink-0 sm:block lg:w-[240px]">
               {artwork(
-                "aspect-square rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10",
+                "aspect-square rounded-xl bg-white/5 shadow-2xl ring-1 ring-white/10",
               )}
             </div>
 

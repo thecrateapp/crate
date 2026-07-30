@@ -1036,7 +1036,7 @@ export function PlaylistCategoryView({
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-sm text-muted-foreground">
           {t("explore.playlistCategory.empty")}
         </div>
       )}

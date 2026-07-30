@@ -64,7 +64,7 @@ export function UserConnections() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="rounded-[12px] border border-white/10 bg-white/5 p-5 sm:p-6">
         <Link
           to={username ? `/users/${username}` : "/people"}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -83,7 +83,7 @@ export function UserConnections() {
         </div>
       </div>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+      <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 size={18} className="animate-spin" />
@@ -98,7 +98,7 @@ export function UserConnections() {
                   key={`${mode}-${item.id}`}
                   username={item.username}
                   hoverClassName="block"
-                  className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                  className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
                 >
                   <UserAvatar
                     name={label}
@@ -124,7 +124,7 @@ export function UserConnections() {
             })}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-white/10 px-4 py-10 text-center text-sm text-muted-foreground">
             {mode === "following"
               ? t("userConnections.empty.following")
               : t("userConnections.empty.followers")}

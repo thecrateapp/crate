@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -14,7 +13,8 @@ import {
   UserRound,
   ChevronLeft,
   ChevronRight,
-  Info,
+  Heart,
+  HeartBold,
   X,
 } from "@crate/ui/icons";
 
@@ -33,11 +33,6 @@ import { usePlaylistActionEntries } from "@/components/actions/playlist-actions"
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { CrateImage } from "@/components/artwork/CrateImage";
-import {
-  canonicalArtworkTransportIdentity,
-  preloadArtwork,
-} from "@/lib/artwork-manager";
-import { artworkFromUrl } from "@/lib/artwork-source";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
@@ -276,144 +271,12 @@ function heroBackgroundSrc(hero: HomeHeroArtist): string | undefined {
     : undefined;
 }
 
-function requestBackgroundWork(callback: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const idleWindow = window as Window & {
-    requestIdleCallback?: (
-      cb: () => void,
-      options?: { timeout: number },
-    ) => number;
-    cancelIdleCallback?: (handle: number) => void;
-  };
-
-  if (idleWindow.requestIdleCallback) {
-    const handle = idleWindow.requestIdleCallback(callback, { timeout: 1500 });
-    return () => idleWindow.cancelIdleCallback?.(handle);
-  }
-
-  const handle = window.setTimeout(callback, 600);
-  return () => window.clearTimeout(handle);
-}
-
-function sameSet(left: Set<string>, right: Set<string>): boolean {
-  if (left.size !== right.size) return false;
-  for (const value of left) {
-    if (!right.has(value)) return false;
-  }
-  return true;
-}
-
-function useHeroBackgroundPreloader(
-  heroes: HomeHeroArtist[],
-  activeIndex: number,
-): Set<string> {
-  const sources = useMemo(
-    () =>
-      heroes
-        .map(heroBackgroundSrc)
-        .filter((src): src is string => Boolean(src)),
-    [heroes],
-  );
-  const [readySources, setReadySources] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const readyRef = useRef<Set<string>>(new Set());
-  const inFlightRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    const allowed = new Set(sources);
-    readyRef.current = new Set(
-      [...readyRef.current].filter((src) => allowed.has(src)),
-    );
-    inFlightRef.current = new Set(
-      [...inFlightRef.current].filter((src) => allowed.has(src)),
-    );
-    setReadySources((prev) => {
-      const next = new Set([...prev].filter((src) => allowed.has(src)));
-      return sameSet(prev, next) ? prev : next;
-    });
-  }, [sources]);
-
-  useEffect(() => {
-    if (!sources.length || typeof window === "undefined") return;
-
-    let cancelled = false;
-    const controller = new AbortController();
-    const started = new Set<string>();
-    const timeouts: number[] = [];
-
-    const markReady = (src: string) => {
-      readyRef.current.add(src);
-      setReadySources((prev) => {
-        if (prev.has(src)) return prev;
-        const next = new Set(prev);
-        next.add(src);
-        return next;
-      });
-    };
-
-    const loadSource = (src: string | undefined, priority: "high" | "low") => {
-      if (!src || readyRef.current.has(src) || inFlightRef.current.has(src))
-        return;
-      inFlightRef.current.add(src);
-      started.add(src);
-      void preloadArtwork(
-        artworkFromUrl(src, {
-          logicalKey: `home-hero:${canonicalArtworkTransportIdentity(src)}`,
-        }),
-        { fetchPriority: priority, signal: controller.signal },
-      )
-        .then(() => {
-          if (!cancelled) markReady(src);
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          inFlightRef.current.delete(src);
-        });
-    };
-
-    const current =
-      sources[Math.max(0, Math.min(activeIndex, sources.length - 1))];
-    const next =
-      sources.length > 1
-        ? sources[(activeIndex + 1) % sources.length]
-        : undefined;
-    const immediate = new Set(
-      [current, next].filter((src): src is string => Boolean(src)),
-    );
-
-    immediate.forEach((src) => loadSource(src, "high"));
-
-    const cancelBackgroundWork = requestBackgroundWork(() => {
-      sources
-        .filter((src) => !immediate.has(src))
-        .forEach((src, index) => {
-          const timeout = window.setTimeout(() => {
-            if (!cancelled) loadSource(src, "low");
-          }, index * 220);
-          timeouts.push(timeout);
-        });
-    });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      cancelBackgroundWork();
-      timeouts.forEach((timeout) => window.clearTimeout(timeout));
-      started.forEach((src) => inFlightRef.current.delete(src));
-    };
-  }, [activeIndex, sources]);
-
-  return readySources;
-}
-
 export function HomeTasteHero({
   heroes,
   isFollowing,
   onOpenArtist,
   onPlay,
   onToggleFollow,
-  onInfo,
   onDismiss,
   onExpose,
 }: {
@@ -422,7 +285,6 @@ export function HomeTasteHero({
   onOpenArtist: (artist: HomeHeroArtist) => void;
   onPlay: (artist: HomeHeroArtist) => void;
   onToggleFollow: (artist: HomeHeroArtist) => void;
-  onInfo: (artist: HomeHeroArtist) => void;
   onDismiss?: (artist: HomeHeroArtist) => void;
   onExpose?: (artist: HomeHeroArtist) => void;
 }) {
@@ -434,18 +296,17 @@ export function HomeTasteHero({
   const visibleRef = useRef(false);
   const count = heroes.length;
   const isDesktop = useIsDesktop();
-  const readyBackgrounds = useHeroBackgroundPreloader(heroes, idx);
 
   const go = (to: number) => setIdx(((to % count) + count) % count);
 
   // Autoplay
   useEffect(() => {
-    if (count <= 1) return;
+    if (!isDesktop || count <= 1) return;
     autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
     return () => {
       if (autoRef.current) clearInterval(autoRef.current);
     };
-  }, [count]);
+  }, [count, isDesktop]);
 
   const pause = () => {
     if (autoRef.current) {
@@ -455,7 +316,7 @@ export function HomeTasteHero({
   };
   const resume = () => {
     pause();
-    if (count <= 1) return;
+    if (!isDesktop || count <= 1) return;
     autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
   };
 
@@ -494,6 +355,7 @@ export function HomeTasteHero({
 
   // Touch swipe
   const onTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
     pause();
     const touch = e.touches[0];
     if (touch) {
@@ -505,6 +367,7 @@ export function HomeTasteHero({
     }
   };
   const onTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation();
     const start = touchRef.current;
     if (!start) {
       resume();
@@ -530,40 +393,36 @@ export function HomeTasteHero({
     touchRef.current = null;
     resume();
   };
+  const onTouchMove = (e: React.TouchEvent) => e.stopPropagation();
+  const onTouchCancel = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    touchRef.current = null;
+    resume();
+  };
 
   if (!count) return null;
 
   const slides = heroes.map((hero, i) => {
-    const backgroundSrc = heroBackgroundSrc(hero);
-    const backgroundReady = Boolean(
-      backgroundSrc && readyBackgrounds.has(backgroundSrc),
-    );
-    const renderPreparedBackground =
+    const renderBackground =
       i === idx || i === (idx + 1) % count || i === (idx - 1 + count) % count;
 
     return (
       <div
         key={hero.id}
         className={cn(
-          "transition-opacity duration-500 ease-in-out",
-          i === idx
-            ? "relative z-10 opacity-100"
-            : "pointer-events-none absolute inset-0 z-0 opacity-0",
+          "absolute inset-0 transition-opacity duration-500 ease-in-out motion-reduce:transition-none",
+          i === idx ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
         )}
         aria-hidden={i !== idx}
       >
         <HeroSlide
           hero={hero}
-          backgroundSrc={
-            backgroundReady && renderPreparedBackground
-              ? backgroundSrc
-              : undefined
-          }
+          active={i === idx}
+          backgroundSrc={renderBackground ? heroBackgroundSrc(hero) : undefined}
           following={isFollowing(hero.id)}
           onOpenArtist={() => onOpenArtist(hero)}
           onPlay={() => onPlay(hero)}
           onToggleFollow={() => onToggleFollow(hero)}
-          onInfo={() => onInfo(hero)}
           onDismiss={onDismiss ? () => onDismiss(hero) : undefined}
         />
       </div>
@@ -573,11 +432,14 @@ export function HomeTasteHero({
   return (
     <div
       ref={rootRef}
-      className="relative touch-pan-y"
+      data-testid="home-taste-hero-viewport"
+      className="relative h-[264px] touch-pan-y sm:h-[280px]"
       onMouseEnter={pause}
       onMouseLeave={resume}
       onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
     >
       {/* Stack all slides — only active one is visible */}
       {slides}
@@ -614,6 +476,7 @@ export function HomeTasteHero({
           {heroes.map((_, i) => (
             <button
               key={i}
+              aria-label={`Show slide ${i + 1} of ${count}`}
               onClick={() => {
                 setIdx(i);
                 pause();
@@ -634,21 +497,21 @@ export function HomeTasteHero({
 
 function HeroSlide({
   hero,
+  active,
   backgroundSrc,
   following,
   onOpenArtist,
   onPlay,
   onToggleFollow,
-  onInfo,
   onDismiss,
 }: {
   hero: HomeHeroArtist;
+  active: boolean;
   backgroundSrc?: string;
   following: boolean;
   onOpenArtist: () => void;
   onPlay: () => void;
   onToggleFollow: () => void;
-  onInfo: () => void;
   onDismiss?: () => void;
 }) {
   const { t } = useTranslation();
@@ -656,65 +519,70 @@ function HeroSlide({
     hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
 
   return (
-    <section
-      className="group relative w-full overflow-hidden rounded-[34px] border border-white/10"
-      role="button"
-      tabIndex={0}
-      onClick={onOpenArtist}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpenArtist();
-        }
-      }}
-    >
-      <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(6,10,14,0.98)_0%,rgba(10,16,22,0.96)_52%,rgba(4,9,13,0.98)_100%)]" />
+    <section className="group relative h-full w-full overflow-hidden rounded-[12px] border border-white/10">
+      <button
+        type="button"
+        aria-label={hero.name}
+        tabIndex={active ? 0 : -1}
+        className="absolute inset-0 z-0 rounded-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+        onClick={onOpenArtist}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,rgba(6,10,14,0.98)_0%,rgba(10,16,22,0.96)_52%,rgba(4,9,13,0.98)_100%)]" />
       {backgroundSrc ? (
         <CrateImage
           src={backgroundSrc}
           alt=""
           aria-hidden="true"
           decoding="async"
-          className="absolute inset-0 h-full w-full object-cover object-top"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
         />
       ) : null}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.92)_0%,rgba(5,7,11,0.75)_45%,rgba(5,7,11,0.32)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.26),transparent_42%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.92)_0%,rgba(5,7,11,0.75)_45%,rgba(5,7,11,0.32)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.26),transparent_42%)]" />
       {onDismiss ? (
         <button
           type="button"
-          className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-black/35 px-3 text-[11px] font-semibold text-white/70 backdrop-blur-xl transition hover:bg-black/55 hover:text-white"
+          aria-label={t("home.hero.notInterested")}
+          tabIndex={active ? 0 : -1}
+          className="absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-black/35 text-white/70 backdrop-blur-xl transition-colors hover:bg-black/55 hover:text-white"
           onClick={(e) => {
             e.stopPropagation();
             onDismiss();
           }}
         >
           <X size={13} />
-          {t("home.hero.notInterested")}
         </button>
       ) : null}
 
-      <div className="relative z-10 flex min-h-[260px] flex-col justify-between px-4 py-5 pb-12 sm:min-h-[280px] sm:px-8 sm:py-8 lg:px-10">
+      <div className="pointer-events-none relative z-10 flex h-full flex-col justify-between px-4 py-5 pb-12 sm:px-8 sm:py-8 lg:px-10">
         <div>
           <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             {genres.length > 0 ? (
               <div className="flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
-                {genres.slice(0, 2).map((genre) => (
+                {genres.slice(0, 2).map((genre, index) => (
                   <GenrePill
                     key={genre.name}
                     item={genre}
-                    className="max-w-[42vw] sm:max-w-none"
+                    className={cn(
+                      "max-w-[42vw] sm:max-w-none",
+                      index > 0 && "hidden sm:inline-flex",
+                    )}
                   />
                 ))}
               </div>
             ) : null}
           </div>
 
-          <h1 className="mt-4 truncate text-3xl font-black tracking-tight text-white min-[380px]:text-4xl sm:text-5xl lg:text-6xl">
+          <h1
+            className={cn(
+              genres.length ? "mt-4" : "mt-0",
+              "truncate text-3xl font-black tracking-tight text-white min-[380px]:text-4xl sm:text-5xl lg:text-6xl",
+            )}
+          >
             {hero.name}
           </h1>
 
-          <div className="mt-3 flex min-w-0 flex-wrap gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:text-[11px] sm:tracking-[0.18em]">
+          <div className="mt-3 hidden min-w-0 flex-wrap gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:flex sm:text-[11px] sm:tracking-[0.18em]">
             <div className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
               {statValue(hero.listeners)} listeners
             </div>
@@ -724,20 +592,25 @@ function HeroSlide({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2.5">
+        <div className="pointer-events-auto flex gap-2.5">
           <button
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:min-h-0 sm:px-5 sm:py-2.5 sm:text-sm"
+            type="button"
+            aria-label={t("player.play")}
+            tabIndex={active ? 0 : -1}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
             onClick={(e) => {
               e.stopPropagation();
               onPlay();
             }}
           >
-            <Play size={15} fill="currentColor" />
-            {t("player.play")}
+            <Play size={17} fill="currentColor" />
           </button>
           <button
+            type="button"
+            aria-label={following ? t("common.following") : t("common.follow")}
+            tabIndex={active ? 0 : -1}
             className={cn(
-              "inline-flex min-h-11 items-center rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/[0.12] sm:min-h-0 sm:px-5 sm:py-2.5 sm:text-sm",
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white transition-colors hover:bg-white/[0.12]",
               following ? "text-primary" : "",
             )}
             onClick={(e) => {
@@ -745,17 +618,7 @@ function HeroSlide({
               onToggleFollow();
             }}
           >
-            {following ? t("common.following") : t("common.follow")}
-          </button>
-          <button
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white sm:min-h-0 sm:py-2.5 sm:text-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onInfo();
-            }}
-          >
-            <Info size={14} />
-            {t("common.about")}
+            {following ? <HeartBold size={18} /> : <Heart size={18} />}
           </button>
         </div>
       </div>
@@ -915,7 +778,7 @@ function RecentEntityRowFrame({
       onClick={onClick}
       onKeyDown={handleKeyDown}
       onContextMenu={actionMenu.handleContextMenu}
-      className="group flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition-colors hover:bg-white/[0.06]"
+      className="group flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition-colors hover:bg-white/[0.06]"
       {...actionMenu.longPressHandlers}
     >
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white/5">
@@ -1109,14 +972,14 @@ export function CustomMixCard({
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
       className={cn(
-        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl",
+        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
-      <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
+      <div className="relative mb-2 overflow-hidden rounded-xl bg-white/5">
         <MixArtwork
           item={item}
-          className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]"
+          className="aspect-square rounded-xl transition-transform group-hover:scale-[1.02]"
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
           <button
@@ -1220,7 +1083,7 @@ function ListeningHistoryCard({
         tracks={item.artwork_tracks}
         variant="history"
         className={cn(
-          "aspect-[1.12] rounded-2xl bg-gradient-to-br shadow-xl shadow-black/20 transition duration-300 group-hover:border-primary/30 group-hover:brightness-110",
+          "aspect-[1.12] rounded-xl bg-gradient-to-br shadow-xl shadow-black/20 transition duration-300 group-hover:border-primary/30 group-hover:brightness-110",
           HISTORY_TONES[index % HISTORY_TONES.length],
         )}
         textClassName={cn(
@@ -1362,7 +1225,7 @@ export function RadioStationCard({
     <button
       onClick={onPlay}
       className={cn(
-        "group relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] text-left",
+        "group relative overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.04] text-left",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
@@ -1517,14 +1380,14 @@ export function CoreTracksPlaylistCard({
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
       className={cn(
-        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl",
+        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
-      <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
+      <div className="relative mb-2 overflow-hidden rounded-xl bg-white/5">
         <CoreTracksArtwork
           item={item}
-          className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]"
+          className="aspect-square rounded-xl transition-transform group-hover:scale-[1.02]"
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
           <button

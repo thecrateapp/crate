@@ -64,9 +64,9 @@ describe("CoreTracksArtwork", () => {
     const { container } = render(
       <CoreTracksArtwork
         item={{ ...baseItem, name: "Mix" }}
-        className="rounded-2xl"
+        className="rounded-xl"
       />,
     );
-    expect(container.firstChild).toHaveClass("rounded-2xl");
+    expect(container.firstChild).toHaveClass("rounded-xl");
   });
 });

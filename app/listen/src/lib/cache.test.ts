@@ -80,6 +80,7 @@ describe("scopesForUrl", () => {
     expect(scopesForUrl("/api/me/home/discovery")).toEqual([
       "home",
       "library",
+      "global_catalog",
       "follows",
       "history",
       "likes",

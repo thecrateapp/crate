@@ -243,7 +243,7 @@ export function Stats() {
       </div>
 
       <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <div className="relative min-h-[520px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#101116] p-5 shadow-2xl shadow-black/35 sm:p-7">
+        <div className="relative min-h-[520px] overflow-hidden rounded-[12px] border border-white/10 bg-[#101116] p-5 shadow-2xl shadow-black/35 sm:p-7">
           <StatsCoverMosaic tracks={coverTracks} />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_68%_18%,rgba(34,211,238,0.28),transparent_24%),linear-gradient(90deg,rgba(9,10,15,0.92)_0%,rgba(9,10,15,0.58)_44%,rgba(9,10,15,0.18)_100%),linear-gradient(180deg,rgba(9,10,15,0.18),rgba(9,10,15,0.9))]" />
           <div className="relative z-10 flex min-h-[460px] flex-col justify-between">
@@ -341,7 +341,7 @@ export function Stats() {
             <NarrativeTile key={item.title} index={index} {...item} />
           ))
         ) : (
-          <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-muted-foreground lg:col-span-3">
+          <div className="rounded-[12px] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-muted-foreground lg:col-span-3">
             {t("stats.empty.recap")}
           </div>
         )}
@@ -384,7 +384,7 @@ export function Stats() {
       <TopAlbumsPanel items={topAlbumItems} loading={dashboardLoading} />
 
       {!dashboardLoading && !hasStats ? (
-        <div className="mt-8 rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+        <div className="mt-8 rounded-[12px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
           <h2 className="text-xl font-black text-foreground">
             {t("stats.empty.title")}
           </h2>
@@ -435,10 +435,10 @@ function AffinityCard({
   const bandKey = `stats.affinity.band.${affinity.affinity_band}`;
   const bandFallback = affinity.affinity_band.replace("_", " ");
   return (
-    <section className="mt-8 overflow-hidden rounded-[1.75rem] border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.13),rgba(255,255,255,0.035)_45%,rgba(244,114,182,0.1))] p-5 shadow-2xl shadow-black/20 sm:p-6">
+    <section className="mt-8 overflow-hidden rounded-[12px] border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.13),rgba(255,255,255,0.035)_45%,rgba(244,114,182,0.1))] p-5 shadow-2xl shadow-black/20 sm:p-6">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/15 text-primary">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/15 text-primary">
             <Users size={20} />
           </div>
           <div>
@@ -562,7 +562,7 @@ function StorySignalCard({
   body: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+    <div className="relative overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
       <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative">
         <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
@@ -579,7 +579,7 @@ function StorySignalCard({
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur">
+    <div className="rounded-lg border border-white/10 bg-black/35 px-4 py-3 backdrop-blur">
       <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
         {label}
       </div>
@@ -652,7 +652,7 @@ function ReplayCard({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-[1.75rem] border border-primary/20 bg-primary/[0.08] p-5 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
+    <div className="rounded-[12px] border border-primary/20 bg-primary/[0.08] p-5 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-black/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
@@ -688,7 +688,7 @@ function ReplayCard({
 
       <div className="mt-5 space-y-2">
         {loading ? (
-          <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
             {t("stats.replay.loading")}
           </div>
         ) : items.length ? (
@@ -696,7 +696,7 @@ function ReplayCard({
             <button
               key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
               onClick={() => onPlayTrack(item)}
-              className="flex w-full items-center gap-3 rounded-2xl border border-transparent bg-black/15 px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
+              className="flex w-full items-center gap-3 rounded-lg border border-transparent bg-black/15 px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
             >
               <TrackCover item={item} size="sm" />
               <div className="min-w-0 flex-1">
@@ -711,7 +711,7 @@ function ReplayCard({
             </button>
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
             {t("stats.replay.empty")}
           </div>
         )}
@@ -722,7 +722,7 @@ function ReplayCard({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+    <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3">
       <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
         {label}
       </div>
@@ -743,7 +743,7 @@ function SignalCard({
   body: string;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-5">
+    <div className="rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
         <Icon size={13} />
         {label}
@@ -775,7 +775,7 @@ function NarrativeTile({
   return (
     <div
       className={cn(
-        "rounded-[1.75rem] border border-white/10 bg-gradient-to-br p-5",
+        "rounded-[12px] border border-white/10 bg-gradient-to-br p-5",
         tones[index % tones.length],
       )}
     >
@@ -805,7 +805,7 @@ function SoundProfileCard({
   const genreLabels = normalizeGenreLabels(genres);
 
   return (
-    <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.035] p-5">
+    <div className="rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
@@ -894,7 +894,7 @@ function ListeningPulseCard({
   const rhythm = story?.rhythm;
 
   return (
-    <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.035] p-5">
+    <div className="rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
@@ -932,7 +932,7 @@ function ListeningPulseCard({
 
           <PulseConstellation points={points} />
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               {t("stats.rhythm.cadence")}
             </div>
@@ -976,7 +976,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
     .join(" ");
 
   return (
-    <div className="mt-5 rounded-[1.35rem] border border-white/10 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.18))] p-4">
+    <div className="mt-5 rounded-[12px] border border-white/10 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.18))] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
@@ -991,7 +991,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
         </div>
       </div>
 
-      <div className="relative h-36 rounded-2xl border border-white/[0.06] bg-black/20">
+      <div className="relative h-36 rounded-xl border border-white/[0.06] bg-black/20">
         <div className="pointer-events-none absolute inset-3 rounded-xl bg-[linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:28px_28px] opacity-50" />
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full"
@@ -1065,7 +1065,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
 
               <div
                 className={cn(
-                  "pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0d0f15]/95 p-3 text-left opacity-0 shadow-2xl shadow-black/45 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
+                  "pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-[12px] border border-white/10 bg-[#0d0f15]/95 p-3 text-left opacity-0 shadow-2xl shadow-black/45 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
                   index < 2
                     ? "left-0 translate-x-0"
                     : index > coordinates.length - 3
@@ -1249,7 +1249,7 @@ function TopTracksPanel({
             <button
               key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
               onClick={() => onPlayTrack(item)}
-              className="group flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
+              className="group flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
             >
               <div className="w-7 text-center text-xs font-black text-muted-foreground">
                 {index + 1}
@@ -1336,7 +1336,7 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
         artistSlug: item.artist_slug,
         artistName: item.artist_name,
       })}
-      className="group relative min-h-40 overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4 transition hover:border-primary/35"
+      className="group relative min-h-40 overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-primary/35"
     >
       {photo ? (
         <CrateImage
@@ -1402,7 +1402,7 @@ function TopAlbumsPanel({
               })}
               className="group min-w-0"
             >
-              <div className="relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
+              <div className="relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
                 {albumCoverApiUrl(
                   {
                     albumId: item.album_id,
@@ -1471,7 +1471,7 @@ function StatsPanel({
   return (
     <section
       className={cn(
-        "rounded-[1.75rem] border border-white/10 bg-white/[0.035] p-5",
+        "rounded-[12px] border border-white/10 bg-white/[0.035] p-5",
         className,
       )}
     >
@@ -1532,7 +1532,7 @@ function TrackCover({
 function PanelLoading() {
   const { t } = useTranslation();
   return (
-    <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+    <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
       {t("common.loadingShort")}
     </div>
   );
@@ -1540,7 +1540,7 @@ function PanelLoading() {
 
 function PanelEmpty({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+    <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
       {text}
     </div>
   );

@@ -119,7 +119,7 @@ export function scopesForUrl(url: string): string[] {
 
   // Home — per-section scopes
   if (url === "/api/me/home/discovery")
-    return ["home", "library", "follows", "history", "likes"];
+    return ["home", "library", "global_catalog", "follows", "history", "likes"];
   if (url === "/api/me/home/hero") return ["home", "library", "follows"];
   if (url === "/api/me/home/recently-played") return ["home", "history"];
   if (url === "/api/me/home/mixes") return ["home", "library"];

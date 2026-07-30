@@ -106,7 +106,7 @@ describe("TopBarUserMenu", () => {
     const menu = screen.getByRole("menu");
     expect(menu).toHaveClass(
       "listen-glass-panel",
-      "rounded-2xl",
+      "rounded-[12px]",
       "z-app-context-menu",
     );
     expect(screen.getByText("Diego")).toBeInTheDocument();
