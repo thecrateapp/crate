@@ -19,6 +19,37 @@ def test_dev_caddy_routes_canonical_catalog_reads_through_readplane():
     )
 
 
+def test_dev_caddy_routes_only_smart_mix_summaries_through_readplane():
+    caddyfile = (ROOT / "data/caddy/Caddyfile.readplane.dev").read_text()
+
+    assert "@smart_mix_full" in caddyfile
+    assert "path /api/tracks/by-entity/*/mix-profile" in caddyfile
+    assert "query detail=full" in caddyfile
+    full_route = caddyfile.split("handle @smart_mix_full", maxsplit=1)[1].split(
+        "}", maxsplit=1
+    )[0]
+    assert "reverse_proxy api:8585" in full_route
+    assert "method GET" in caddyfile
+
+
+def test_dynamic_and_admin_smart_mix_routes_stay_on_fastapi():
+    caddyfile = (ROOT / "data/caddy/Caddyfile.readplane.dev").read_text()
+
+    assert (
+        "/api/playback/transition-plans"
+        not in caddyfile.split("(readplane_listen)", maxsplit=1)[1].split(
+            "(auth_api)", maxsplit=1
+        )[0]
+    )
+    assert (
+        "/api/admin/smart-mix"
+        not in caddyfile.split("(readplane_listen)", maxsplit=1)[1].split(
+            "(auth_api)", maxsplit=1
+        )[0]
+    )
+    assert "method GET" in caddyfile
+
+
 def test_production_traefik_routes_canonical_catalog_gets_to_readplane():
     compose = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())
     readplane = compose["services"]["crate-readplane"]
