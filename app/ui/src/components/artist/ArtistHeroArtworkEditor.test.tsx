@@ -630,12 +630,24 @@ describe("ArtistHeroArtworkEditor", () => {
     );
   });
 
-  it("opens a clean preview with the active recipe before generation", async () => {
+  it("renders a clean preview through the canonical backend renderer", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.mocked(waitForTask).mockResolvedValue({
+      status: "completed",
+      result: {
+        preview_url: "/api/artwork/artists/7/hero-preview/clean-preview",
+      },
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         requests.push({ url: String(input), init });
+        if (init?.method === "POST") {
+          return Response.json({
+            status: "queued",
+            task_id: "clean-preview-task",
+          });
+        }
         return Response.json(derivedProfile());
       }),
     );
@@ -680,6 +692,20 @@ describe("ArtistHeroArtworkEditor", () => {
       within(dialog).getByTestId("hero-result-artist-name"),
     ).toHaveTextContent("Converge");
 
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url === "/api/artwork/artists/7/preview-hero" &&
+            request.init?.method === "POST",
+        ),
+      ).toBe(true),
+    );
+    expect(within(dialog).getByRole("img")).toHaveAttribute(
+      "src",
+      "/api/artwork/artists/7/hero-preview/clean-preview",
+    );
+
     await userEvent.click(
       within(dialog).getByRole("tab", {
         name: "Preview mobile composition",
@@ -706,9 +732,6 @@ describe("ArtistHeroArtworkEditor", () => {
     ).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("canvas-recipe-mode")).toHaveTextContent(
       "crop",
-    );
-    expect(requests.some((request) => request.init?.method === "POST")).toBe(
-      false,
     );
   });
 

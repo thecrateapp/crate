@@ -185,14 +185,6 @@ export function ArtistHeroArtworkEditor({
         }
       : profile?.revision ?? null,
   });
-  const persistedRecipe =
-    active === "desktop" ? profile?.desktop_recipe : profile?.mobile_recipe;
-  const draftDirty = Boolean(
-    sourceFiles[active] ||
-      (persistedRecipe &&
-        JSON.stringify(normalizeRecipe(persistedRecipe)) !==
-          JSON.stringify(normalizeRecipe(recipe))),
-  );
   const canonicalPreviewView =
     previewArtifact?.key === previewKey
       ? previewArtifact.view
@@ -228,7 +220,7 @@ export function ArtistHeroArtworkEditor({
   }
 
   async function openPreview() {
-    if (!canEdit || !draftDirty) {
+    if (!canEdit) {
       setPreviewOpen(true);
       return;
     }
