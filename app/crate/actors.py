@@ -813,6 +813,7 @@ def _execute_task(task_type: str, task_id: str):
                         "type": "task_done",
                         "status": "completed",
                         "task_type": task_type,
+                        "result": result or {},
                     },
                     "",
                 )

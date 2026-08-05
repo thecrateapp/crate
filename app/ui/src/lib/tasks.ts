@@ -89,8 +89,25 @@ export function waitForTask(
     source.addEventListener("task_done", (event: MessageEvent) => {
       try {
         const payload = JSON.parse(event.data) as TaskCompletion;
-        cleanup();
-        resolve(payload);
+        if (payload.result !== undefined || payload.status !== "completed") {
+          cleanup();
+          resolve(payload);
+          return;
+        }
+
+        // Older workers did not include the handler result in the SSE event.
+        // Read the committed task once so callers never fall back to stale data.
+        void fetchTaskCompletion(taskId, signal)
+          .then((completion) => {
+            if (settled) return;
+            cleanup();
+            resolve(completion ?? payload);
+          })
+          .catch(() => {
+            if (settled) return;
+            cleanup();
+            resolve(payload);
+          });
       } catch {
         cleanup();
         resolve({ status: "completed" });
