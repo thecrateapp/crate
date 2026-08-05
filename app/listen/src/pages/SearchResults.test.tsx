@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", async () => {
@@ -29,6 +30,29 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { SearchResults } from "./SearchResults";
 
 describe("SearchResults", () => {
+  it("offers a functional search form when opened without a query", async () => {
+    vi.mocked(api).mockResolvedValue({
+      artists: [],
+      albums: [],
+      tracks: [],
+    });
+    const user = userEvent.setup();
+    renderWithListenProviders(<SearchResults />, {
+      path: "/search",
+      route: "/search",
+    });
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    await user.type(input, "Converge");
+    await user.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Results for "Converge"')).toBeInTheDocument();
+    });
+  });
+
   it("shows a helpful empty state when no music matches the query", async () => {
     vi.mocked(api).mockResolvedValue({
       artists: [],

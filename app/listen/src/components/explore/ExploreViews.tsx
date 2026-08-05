@@ -420,7 +420,7 @@ export function GenreDetailView({
     <>
       {genreMenuTrigger}
       <div className="space-y-6">
-        <section className="relative -mx-4 -mt-4 h-[420px] overflow-hidden sm:-mx-6 sm:-mt-6 sm:h-[400px] lg:-mx-8 lg:-mt-8">
+        <section className="relative -mx-4 -mt-4 h-[420px] overflow-hidden sm:-mx-6 sm:-mt-6 sm:h-[400px] lg:-mt-8">
           {heroCoverUrl ? (
             <CrateImage
               key={heroCoverUrl}

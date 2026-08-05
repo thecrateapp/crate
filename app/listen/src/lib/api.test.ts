@@ -455,6 +455,25 @@ describe("refreshAuthToken", () => {
     expect(getAuthToken()).toBeNull();
   });
 
+  it("clears stale web cookies after refresh rejects the session", async () => {
+    localStorage.setItem("listen-auth-token", "old");
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(mockFetchResponse(401))
+      .mockResolvedValueOnce(mockFetchResponse(200));
+
+    expect(await refreshAuthToken()).toBe(false);
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      "/api/auth/logout",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+      }),
+    );
+  });
+
   it("returns false on 400 and clears token", async () => {
     localStorage.setItem("listen-auth-token", "old");
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(mockFetchResponse(400));

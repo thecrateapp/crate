@@ -1,9 +1,12 @@
 import base64
+import hashlib
 import io as _io
 import logging
 import time
 from pathlib import Path
 from typing import cast
+
+from PIL import ImageOps
 
 from crate.artwork_materializer import materialize_artwork
 from crate.artwork_maintenance import (
@@ -23,6 +26,14 @@ from crate.artwork_variants import (
     ArtworkKind,
     external_artist_asset,
 )
+from crate.artist_hero_artwork import (
+    DESKTOP_HERO_RENDER_SIZE,
+    MOBILE_HERO_RENDER_SIZE,
+    artist_hero_revision,
+    render_artist_hero_composition,
+    render_artist_hero_compositions,
+)
+from crate.artist_hero_candidates import load_candidate_content
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
 from crate.db.queries.artwork_backfill import (
@@ -34,6 +45,18 @@ from crate.db.repositories.library import (
     get_library_album,
     get_library_album_by_id,
     get_library_artist,
+)
+from crate.db.repositories.artist_hero_artwork import (
+    get_artist_hero_artwork,
+    list_artist_hero_backfill_candidates,
+    upsert_artist_hero_artwork,
+)
+from crate.db.repositories.artist_artwork_assets import (
+    ARTIST_ARTWORK_SLOTS,
+    assign_artist_artwork_slot,
+    create_or_get_artist_artwork_asset,
+    delete_artist_artwork_asset,
+    get_artist_artwork_asset,
 )
 from crate.db.repositories.tasks import create_task_dedup
 from crate.db.releases import update_new_release_cover
@@ -54,6 +77,28 @@ from crate.worker_handlers import (
 )
 
 log = logging.getLogger(__name__)
+
+ARTIST_HERO_WEBP_QUALITY = 95
+ARTIST_HERO_WEBP_METHOD = 6
+
+
+def _broadcast_artwork_invalidation(*scopes: str) -> None:
+    try:
+        from crate.api.cache_events import (
+            broadcast_invalidation,
+            wait_for_cache_invalidation,
+        )
+
+        broadcast_invalidation(*dict.fromkeys(scopes))
+        wait_for_cache_invalidation()
+    except Exception:
+        log.debug("Failed to broadcast artwork cache invalidation", exc_info=True)
+
+
+def _warm_recent_home_discovery_snapshots() -> None:
+    from crate.db.home_warming import warm_recent_home_discovery_snapshots
+
+    warm_recent_home_discovery_snapshots()
 
 
 def _handle_materialize_artwork_variants(
@@ -744,6 +789,230 @@ def _handle_apply_cover(task_id: str, params: dict, config: dict) -> dict:
     return {"applied": True, "path": album_path}
 
 
+def _handle_import_artist_artwork_asset(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Validate and persist one reusable source image in an artist gallery."""
+    del task_id
+    from PIL import Image, ImageOps
+
+    artist = str(params.get("artist") or "").strip()
+    if not artist:
+        return {"error": "Artist is required"}
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+    artist_id = int(artist_row["id"])
+    requested_artist_id = int(params.get("artist_id") or artist_id)
+    if requested_artist_id != artist_id:
+        return {"error": "Artist identity mismatch"}
+
+    lib = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist, existing_only=True
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"error": "Artist directory not found"}
+    artist_dir = artist_dir.resolve()
+    if not artist_dir.is_relative_to(lib):
+        return {"error": "Artist directory is outside the library"}
+
+    raw: bytes
+    resolved_origin = str(params.get("origin") or "manual-upload")
+    data_b64 = str(params.get("data_b64") or "")
+    candidate = str(params.get("candidate") or "")
+    if data_b64:
+        try:
+            raw = base64.b64decode(data_b64, validate=True)
+        except ValueError:
+            return {"error": "Invalid image data"}
+    elif candidate:
+        loaded = load_candidate_content(
+            candidate, artist_id=artist_id, artist_dir=artist_dir
+        )
+        if loaded is None:
+            return {"error": "Candidate not found"}
+        raw, candidate_origin = loaded
+        if not params.get("origin"):
+            resolved_origin = candidate_origin
+    else:
+        return {"error": "No image data"}
+
+    if not raw or len(raw) > 25 * 1024 * 1024:
+        return {"error": "Invalid image"}
+    try:
+        with Image.open(_io.BytesIO(raw)) as opened:
+            opened.load()
+            if (
+                opened.width <= 0
+                or opened.height <= 0
+                or opened.width * opened.height > 80_000_000
+            ):
+                return {"error": "Invalid image dimensions"}
+            image = ImageOps.exif_transpose(opened).convert("RGB")
+    except (Image.DecompressionBombError, OSError, ValueError):
+        return {"error": "Invalid image"}
+
+    normalized = _io.BytesIO()
+    image.save(normalized, "JPEG", quality=94, optimize=True)
+    content = normalized.getvalue()
+    checksum = hashlib.sha256(content).hexdigest()
+    relative_path = (
+        Path(".crate") / "artwork-gallery" / checksum[:2] / f"{checksum}.jpg"
+    )
+    destination = (artist_dir / relative_path).resolve()
+    if not destination.is_relative_to(artist_dir):
+        return {"error": "Artwork path is outside the artist directory"}
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if not destination.is_file():
+        temporary = destination.with_suffix(".tmp")
+        temporary.write_bytes(content)
+        temporary.replace(destination)
+
+    asset = create_or_get_artist_artwork_asset(
+        artist_id=artist_id,
+        checksum=checksum,
+        storage_path=relative_path.as_posix(),
+        origin=resolved_origin,
+        label=str(params.get("label") or params.get("filename") or "Curated artwork")[
+            :160
+        ],
+        mime_type="image/jpeg",
+        width=image.width,
+        height=image.height,
+    )
+    return {
+        "status": "imported",
+        "asset_id": int(asset["id"]),
+        "checksum": checksum,
+        "width": image.width,
+        "height": image.height,
+    }
+
+
+def _handle_assign_artist_artwork_slot(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Materialize a gallery asset into one public artist artwork slot."""
+    artist = str(params.get("artist") or "").strip()
+    slot = str(params.get("slot") or "")
+    if not artist:
+        return {"error": "Artist is required"}
+    if slot not in ARTIST_ARTWORK_SLOTS:
+        return {"error": "Unknown artist artwork slot"}
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+    artist_id = int(artist_row["id"])
+    if int(params.get("artist_id") or artist_id) != artist_id:
+        return {"error": "Artist identity mismatch"}
+    try:
+        asset_id = int(params.get("asset_id") or 0)
+    except (TypeError, ValueError):
+        return {"error": "Invalid artwork asset"}
+    asset = get_artist_artwork_asset(artist_id, asset_id)
+    if not asset:
+        return {"error": "Artwork asset not found"}
+
+    lib = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist, existing_only=True
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"error": "Artist directory not found"}
+    artist_dir = artist_dir.resolve()
+    source_path = (artist_dir / str(asset["storage_path"])).resolve()
+    if not source_path.is_relative_to(artist_dir) or not source_path.is_file():
+        return {"error": "Artwork asset file not found"}
+    raw = source_path.read_bytes()
+
+    upload_params: dict = {
+        "artist": artist,
+        "data_b64": base64.b64encode(raw).decode(),
+        "source_origin": f"gallery:{asset_id}",
+    }
+    if slot == "avatar":
+        upload_params["type"] = "artist_photo"
+    elif slot == "background":
+        upload_params["type"] = "background"
+    else:
+        from PIL import Image
+
+        with Image.open(_io.BytesIO(raw)) as source:
+            width, height = source.size
+        existing = get_artist_hero_artwork(artist_id) or {}
+        default_desktop, default_mobile = _derived_hero_recipes(width, height)
+        upload_params.update(
+            {
+                "type": "artist_hero",
+                "composition": "desktop" if slot == "hero_desktop" else "mobile",
+                "desktop_recipe": dict(
+                    existing.get("desktop_recipe") or default_desktop
+                ),
+                "mobile_recipe": dict(existing.get("mobile_recipe") or default_mobile),
+            }
+        )
+
+    result = _handle_upload_image(task_id, upload_params, config)
+    if result.get("error"):
+        return result
+    if not assign_artist_artwork_slot(
+        artist_id=artist_id, slot=slot, asset_id=asset_id
+    ):
+        return {"error": "Artwork slot assignment failed"}
+    return {
+        "status": "assigned",
+        "artist_id": artist_id,
+        "asset_id": asset_id,
+        "slot": slot,
+        "path": result.get("path"),
+    }
+
+
+def _handle_delete_artist_artwork_asset(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Delete one unassigned reusable artwork source and its file."""
+    del task_id
+    artist = str(params.get("artist") or "").strip()
+    if not artist:
+        return {"error": "Artist is required"}
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+    artist_id = int(artist_row["id"])
+    if int(params.get("artist_id") or artist_id) != artist_id:
+        return {"error": "Artist identity mismatch"}
+    try:
+        asset_id = int(params.get("asset_id") or 0)
+    except (TypeError, ValueError):
+        return {"error": "Invalid artwork asset"}
+
+    asset = get_artist_artwork_asset(artist_id, asset_id)
+    if not asset:
+        return {"error": "Artwork asset not found"}
+
+    lib = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist, existing_only=True
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"error": "Artist directory not found"}
+    artist_dir = artist_dir.resolve()
+    source_path = (artist_dir / str(asset["storage_path"])).resolve()
+    if not source_path.is_relative_to(artist_dir):
+        return {"error": "Artwork asset path is outside the artist directory"}
+
+    deleted = delete_artist_artwork_asset(artist_id=artist_id, asset_id=asset_id)
+    if not deleted:
+        return {"error": "Artwork asset is assigned to a slot"}
+
+    if source_path.is_file():
+        source_path.unlink()
+    _broadcast_artwork_invalidation(f"artist:{artist_id}", "library")
+    return {"status": "deleted", "artist_id": artist_id, "asset_id": asset_id}
+
+
 def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
     """Save uploaded image to the correct location in the library."""
     from PIL import Image
@@ -758,7 +1027,9 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         return {"error": "No image data"}
 
     raw = base64.b64decode(data_b64)
-    img = Image.open(_io.BytesIO(raw)).convert("RGB")
+    with Image.open(_io.BytesIO(raw)) as opened:
+        opened.load()
+        img = ImageOps.exif_transpose(opened).convert("RGB")
     lib = Path(config["library_path"]).resolve()
 
     def _safe_dest(path: Path) -> Path:
@@ -768,7 +1039,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         return resolved
 
     invalidation_scopes: list[str] = []
-    materialization_asset: ArtworkAsset | None = None
+    materialization_assets: list[ArtworkAsset] = []
 
     if img_type == "cover":
         album_data = get_library_album(artist, album)
@@ -780,8 +1051,8 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             set_album_has_cover(int(album_data["id"]))
             invalidation_scopes.append(f"album:{album_data['id']}")
         if album_data.get("entity_uid"):
-            materialization_asset = ArtworkAsset(
-                "album-cover", str(album_data["entity_uid"])
+            materialization_assets.append(
+                ArtworkAsset("album-cover", str(album_data["entity_uid"]))
             )
         invalidation_scopes.extend(["library", "home"])
     elif img_type == "release_cover":
@@ -795,7 +1066,9 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             cover_source="manual",
         ):
             return {"error": "Release not found"}
-        materialization_asset = ArtworkAsset("release-cover", str(int(release_id)))
+        materialization_assets.append(
+            ArtworkAsset("release-cover", str(int(release_id)))
+        )
         invalidation_scopes.extend(["library", "home", "upcoming"])
     elif img_type == "artist_photo":
         artist_row = get_library_artist(artist)
@@ -810,8 +1083,8 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         if artist_row and artist_row.get("id"):
             invalidation_scopes.append(f"artist:{artist_row['id']}")
         if artist_row and artist_row.get("entity_uid"):
-            materialization_asset = ArtworkAsset(
-                "artist-photo", str(artist_row["entity_uid"])
+            materialization_assets.append(
+                ArtworkAsset("artist-photo", str(artist_row["entity_uid"]))
             )
         invalidation_scopes.extend(["library", "home", "shows", "upcoming"])
     elif img_type == "background":
@@ -827,10 +1100,89 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         if artist_row and artist_row.get("id"):
             invalidation_scopes.append(f"artist:{artist_row['id']}")
         if artist_row and artist_row.get("entity_uid"):
-            materialization_asset = ArtworkAsset(
-                "artist-background", str(artist_row["entity_uid"])
+            materialization_assets.append(
+                ArtworkAsset("artist-background", str(artist_row["entity_uid"]))
             )
         invalidation_scopes.extend(["library", "home", "shows", "upcoming"])
+    elif img_type == "artist_hero":
+        artist_row = get_library_artist(artist)
+        found_dir = resolve_artist_dir(
+            lib, artist_row, fallback_name=artist, existing_only=True
+        )
+        if not artist_row or not found_dir or not found_dir.is_dir():
+            return {"error": "Artist directory not found"}
+        desktop_recipe = dict(params.get("desktop_recipe") or {})
+        mobile_recipe = dict(params.get("mobile_recipe") or {})
+        composition = str(params.get("composition") or "shared")
+        if composition not in {"shared", "desktop", "mobile"}:
+            return {"error": "Invalid artist hero composition"}
+        existing = get_artist_hero_artwork(int(artist_row["id"])) or {}
+        source_name = (
+            "artist-hero-source.jpg"
+            if composition == "shared"
+            else f"artist-hero-source-{composition}.jpg"
+        )
+        dest = _safe_dest(found_dir / source_name)
+        img.save(str(dest), "JPEG", quality=94)
+        targets = ("desktop", "mobile") if composition == "shared" else (composition,)
+        for target in targets:
+            recipe = desktop_recipe if target == "desktop" else mobile_recipe
+            output_size = (
+                DESKTOP_HERO_RENDER_SIZE
+                if target == "desktop"
+                else MOBILE_HERO_RENDER_SIZE
+            )
+            rendered = render_artist_hero_composition(img, recipe, output_size)
+            rendered.save(
+                _safe_dest(found_dir / f"artist-hero-{target}.webp"),
+                "WEBP",
+                quality=ARTIST_HERO_WEBP_QUALITY,
+                method=ARTIST_HERO_WEBP_METHOD,
+            )
+        legacy_width = int(existing.get("source_width") or img.width)
+        legacy_height = int(existing.get("source_height") or img.height)
+        desktop_width = existing.get("desktop_source_width")
+        desktop_height = existing.get("desktop_source_height")
+        desktop_origin = existing.get("desktop_source_origin")
+        mobile_width = existing.get("mobile_source_width")
+        mobile_height = existing.get("mobile_source_height")
+        mobile_origin = existing.get("mobile_source_origin")
+        if composition in {"shared", "desktop"}:
+            desktop_width, desktop_height = img.size
+            desktop_origin = str(params.get("source_origin") or "manual-upload")
+        if composition in {"shared", "mobile"}:
+            mobile_width, mobile_height = img.size
+            mobile_origin = str(params.get("source_origin") or "manual-upload")
+        if composition == "shared":
+            legacy_width, legacy_height = img.size
+        revision = artist_hero_revision(
+            raw,
+            repr(sorted(desktop_recipe.items())).encode(),
+            repr(sorted(mobile_recipe.items())).encode(),
+        )
+        upsert_artist_hero_artwork(
+            artist_id=int(artist_row["id"]),
+            provenance="manual",
+            review_status="approved",
+            source_width=legacy_width,
+            source_height=legacy_height,
+            desktop_recipe=desktop_recipe,
+            mobile_recipe=mobile_recipe,
+            revision=revision,
+            desktop_source_width=desktop_width,
+            desktop_source_height=desktop_height,
+            desktop_source_origin=desktop_origin,
+            mobile_source_width=mobile_width,
+            mobile_source_height=mobile_height,
+            mobile_source_origin=mobile_origin,
+        )
+        entity_uid = str(artist_row.get("entity_uid") or "")
+        if entity_uid:
+            materialization_assets.extend(
+                ArtworkAsset("artist-hero", f"{entity_uid}:{target}")
+                for target in targets
+            )
+        invalidation_scopes.extend([f"artist:{artist_row['id']}", "library", "home"])
     elif img_type == "genre_cover":
         from crate.db.repositories.genres_taxonomy_metadata import (
             update_genre_taxonomy_node_metadata,
@@ -852,7 +1204,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         if not update_genre_taxonomy_node_metadata(slug, cover_path=cover_path):
             return {"error": "Genre not found"}
         dest = Path(cover_path)
-        materialization_asset = ArtworkAsset("genre-cover", slug)
+        materialization_assets.append(ArtworkAsset("genre-cover", slug))
         invalidation_scopes.extend(["library", "home", f"genre:{slug}"])
     else:
         return {"error": f"Unknown image type: {img_type}"}
@@ -861,7 +1213,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         "Image uploaded: %s for %s (%dx%d)", img_type, artist, img.width, img.height
     )
 
-    if materialization_asset is not None:
+    for materialization_asset in materialization_assets:
         queue_artwork_materialization(materialization_asset, reason="source-write")
 
     if img_type == "cover":
@@ -870,22 +1222,396 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         except Exception:
             log.debug("Failed to start library scan after cover upload", exc_info=True)
 
-    try:
-        import requests as _req
-
-        _req.post(
-            "http://crate-api:8585/api/cache/invalidate",
-            json={"scopes": list(dict.fromkeys(invalidation_scopes))},
-            timeout=3,
-        )
-    except Exception:
-        log.debug("Failed to broadcast artwork cache invalidation", exc_info=True)
+    _broadcast_artwork_invalidation(*invalidation_scopes)
+    if img_type == "artist_hero":
+        _warm_recent_home_discovery_snapshots()
 
     return {
         "type": img_type,
         "path": str(dest),
         "width": img.width,
         "height": img.height,
+    }
+
+
+def _derived_hero_recipes(width: int, height: int) -> tuple[dict, dict]:
+    base = {
+        "crop": {"x": 0, "y": 0, "width": width, "height": height},
+        "position_x": 0.5,
+        "position_y": 0.5,
+        "scale": 1.0,
+        "flip_horizontal": False,
+        "rotation": 0,
+        "blur": 36,
+        "feather": 30,
+        "gradient": 0.5,
+        "grayscale": False,
+        "brightness": 1.0,
+        "contrast": 1.0,
+    }
+    return ({**base, "mode": "extend"}, {**base, "mode": "extend"})
+
+
+def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dict:
+    del task_id
+    from PIL import Image
+
+    artist = str(params.get("artist") or "").strip()
+    if not artist:
+        return {"error": "Artist is required"}
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+
+    lib = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist, existing_only=True
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"error": "Artist directory not found"}
+    artist_dir = artist_dir.resolve()
+    if not artist_dir.is_relative_to(lib):
+        return {"error": "Artist directory is outside the library"}
+
+    composition = str(params.get("composition") or "shared")
+    if composition not in {"shared", "desktop", "mobile"}:
+        return {"error": "Invalid artist hero composition"}
+
+    legacy_source_path = artist_dir / "artist-hero-source.jpg"
+    source_paths = {
+        "desktop": artist_dir / "artist-hero-source-desktop.jpg",
+        "mobile": artist_dir / "artist-hero-source-mobile.jpg",
+    }
+    targets = ("desktop", "mobile") if composition == "shared" else (composition,)
+    for target in targets:
+        if not source_paths[target].is_file():
+            source_paths[target] = legacy_source_path
+        if not source_paths[target].is_file():
+            return {"error": "Artist hero source not found"}
+
+    def _read_source(path: Path) -> tuple[bytes, Image.Image]:
+        raw_source = path.read_bytes()
+        with Image.open(_io.BytesIO(raw_source)) as opened:
+            opened.load()
+            return raw_source, ImageOps.exif_transpose(opened).convert("RGB")
+
+    try:
+        loaded_sources = {
+            target: _read_source(source_paths[target]) for target in targets
+        }
+    except (OSError, ValueError):
+        return {"error": "Invalid artist hero source"}
+
+    artist_id = int(artist_row["id"])
+    existing = get_artist_hero_artwork(artist_id) or {}
+    desktop_recipe = dict(params.get("desktop_recipe") or {})
+    mobile_recipe = dict(params.get("mobile_recipe") or {})
+    recipes = {"desktop": desktop_recipe, "mobile": mobile_recipe}
+    output_sizes = {
+        "desktop": DESKTOP_HERO_RENDER_SIZE,
+        "mobile": MOBILE_HERO_RENDER_SIZE,
+    }
+    output_names = {
+        "desktop": "artist-hero-desktop.webp",
+        "mobile": "artist-hero-mobile.webp",
+    }
+    for target, (_raw, image) in loaded_sources.items():
+        render_artist_hero_composition(
+            image, recipes[target], output_sizes[target]
+        ).save(
+            artist_dir / output_names[target],
+            "WEBP",
+            quality=ARTIST_HERO_WEBP_QUALITY,
+            method=ARTIST_HERO_WEBP_METHOD,
+        )
+
+    revision_parts: list[bytes] = []
+    for target in ("desktop", "mobile"):
+        raw = loaded_sources.get(target, (None, None))[0]
+        revision_parts.append(
+            raw if raw is not None else str(existing.get("revision") or "").encode()
+        )
+        revision_parts.append(repr(sorted(recipes[target].items())).encode())
+    revision = artist_hero_revision(*revision_parts)
+    fallback_image = next(iter(loaded_sources.values()))[1]
+    desktop_image = loaded_sources.get("desktop", (None, fallback_image))[1]
+    mobile_image = loaded_sources.get("mobile", (None, fallback_image))[1]
+    desktop_source_width = existing.get("desktop_source_width")
+    desktop_source_height = existing.get("desktop_source_height")
+    mobile_source_width = existing.get("mobile_source_width")
+    mobile_source_height = existing.get("mobile_source_height")
+    if "desktop" in loaded_sources:
+        desktop_source_width, desktop_source_height = desktop_image.size
+    if "mobile" in loaded_sources:
+        mobile_source_width, mobile_source_height = mobile_image.size
+    upsert_artist_hero_artwork(
+        artist_id=artist_id,
+        provenance="manual",
+        review_status="approved",
+        source_width=int(existing.get("source_width") or desktop_image.width),
+        source_height=int(existing.get("source_height") or desktop_image.height),
+        desktop_recipe=desktop_recipe,
+        mobile_recipe=mobile_recipe,
+        revision=revision,
+        desktop_source_width=desktop_source_width,
+        desktop_source_height=desktop_source_height,
+        desktop_source_origin=existing.get("desktop_source_origin") or "manual-upload",
+        mobile_source_width=mobile_source_width,
+        mobile_source_height=mobile_source_height,
+        mobile_source_origin=existing.get("mobile_source_origin") or "manual-upload",
+    )
+    entity_uid = str(artist_row.get("entity_uid") or "")
+    if entity_uid:
+        for target in targets:
+            queue_artwork_materialization(
+                ArtworkAsset("artist-hero", f"{entity_uid}:{target}"),
+                reason="source-write",
+            )
+    _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
+    _warm_recent_home_discovery_snapshots()
+    return {"status": "composed", "artist_id": artist_id, "revision": revision}
+
+
+def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> dict:
+    """Refresh persisted hero files after a renderer change.
+
+    This deliberately preserves the profile's provenance and review status. It
+    is used by delivery when it encounters a hero generated by an older
+    renderer, so a cache invalidation does not keep serving the old geometry.
+    """
+    del task_id
+    from PIL import Image
+
+    artist = str(params.get("artist") or "").strip()
+    if not artist:
+        return {"error": "Artist is required"}
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+    existing = get_artist_hero_artwork(int(artist_row["id"]))
+    if not existing:
+        return {"status": "skipped", "reason": "missing-profile"}
+
+    lib = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist, existing_only=True
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"status": "skipped", "reason": "missing-artist-directory"}
+    artist_dir = artist_dir.resolve()
+    if not artist_dir.is_relative_to(lib):
+        return {"error": "Artist directory is outside the library"}
+
+    legacy_source_path = artist_dir / "artist-hero-source.jpg"
+    source_paths = {
+        "desktop": artist_dir / "artist-hero-source-desktop.jpg",
+        "mobile": artist_dir / "artist-hero-source-mobile.jpg",
+    }
+    available_paths: dict[str, Path] = {}
+    for composition, specific_path in source_paths.items():
+        if specific_path.is_file():
+            available_paths[composition] = specific_path
+        elif legacy_source_path.is_file():
+            available_paths[composition] = legacy_source_path
+    if not available_paths:
+        return {"status": "skipped", "reason": "missing-hero-source"}
+
+    def _read_source(path: Path) -> tuple[bytes, Image.Image]:
+        raw_source = path.read_bytes()
+        with Image.open(_io.BytesIO(raw_source)) as opened:
+            opened.load()
+            return raw_source, ImageOps.exif_transpose(opened).convert("RGB")
+
+    try:
+        loaded_sources = {
+            composition: _read_source(path)
+            for composition, path in available_paths.items()
+        }
+    except (OSError, ValueError):
+        return {"status": "skipped", "reason": "invalid-hero-source"}
+
+    desktop_recipe = dict(existing.get("desktop_recipe") or {})
+    mobile_recipe = dict(existing.get("mobile_recipe") or {})
+    recipes = {"desktop": desktop_recipe, "mobile": mobile_recipe}
+    if any(not recipes[composition] for composition in loaded_sources):
+        return {"status": "skipped", "reason": "missing-hero-recipes"}
+
+    render_sizes = {
+        "desktop": DESKTOP_HERO_RENDER_SIZE,
+        "mobile": MOBILE_HERO_RENDER_SIZE,
+    }
+    output_names = {
+        "desktop": "artist-hero-desktop.webp",
+        "mobile": "artist-hero-mobile.webp",
+    }
+    for composition, (_raw, image) in loaded_sources.items():
+        render_artist_hero_composition(
+            image, recipes[composition], render_sizes[composition]
+        ).save(
+            artist_dir / output_names[composition],
+            "WEBP",
+            quality=ARTIST_HERO_WEBP_QUALITY,
+            method=ARTIST_HERO_WEBP_METHOD,
+        )
+
+    revision_parts: list[bytes] = []
+    for composition in ("desktop", "mobile"):
+        raw = loaded_sources.get(composition, (None, None))[0]
+        revision_parts.append(
+            raw if raw is not None else str(existing.get("revision") or "").encode()
+        )
+        revision_parts.append(repr(sorted(recipes[composition].items())).encode())
+    revision = artist_hero_revision(*revision_parts)
+    artist_id = int(artist_row["id"])
+    fallback_image = next(iter(loaded_sources.values()))[1]
+    desktop_image = loaded_sources.get("desktop", (None, fallback_image))[1]
+    mobile_image = loaded_sources.get("mobile", (None, fallback_image))[1]
+    desktop_source_width = existing.get("desktop_source_width")
+    desktop_source_height = existing.get("desktop_source_height")
+    mobile_source_width = existing.get("mobile_source_width")
+    mobile_source_height = existing.get("mobile_source_height")
+    if "desktop" in loaded_sources:
+        desktop_source_width, desktop_source_height = desktop_image.size
+    if "mobile" in loaded_sources:
+        mobile_source_width, mobile_source_height = mobile_image.size
+    upsert_artist_hero_artwork(
+        artist_id=artist_id,
+        provenance=str(existing["provenance"]),
+        review_status=str(existing["review_status"]),
+        source_width=int(existing.get("source_width") or desktop_image.width),
+        source_height=int(existing.get("source_height") or desktop_image.height),
+        desktop_recipe=desktop_recipe,
+        mobile_recipe=mobile_recipe,
+        revision=revision,
+        desktop_source_width=desktop_source_width,
+        desktop_source_height=desktop_source_height,
+        desktop_source_origin=existing.get("desktop_source_origin"),
+        mobile_source_width=mobile_source_width,
+        mobile_source_height=mobile_source_height,
+        mobile_source_origin=existing.get("mobile_source_origin"),
+    )
+    entity_uid = str(artist_row.get("entity_uid") or "")
+    if entity_uid:
+        for composition in loaded_sources:
+            queue_artwork_materialization(
+                ArtworkAsset("artist-hero", f"{entity_uid}:{composition}"),
+                reason="renderer-migration",
+            )
+    _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
+    _warm_recent_home_discovery_snapshots()
+    return {"status": "recomposed", "artist_id": artist_id, "revision": revision}
+
+
+def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict:
+    del task_id
+    from PIL import Image
+
+    artist = str(params.get("artist") or "").strip()
+    if not artist:
+        return {"error": "Artist is required"}
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+    artist_id = int(artist_row["id"])
+    existing = get_artist_hero_artwork(artist_id)
+    if existing and existing.get("provenance") == "manual":
+        return {"status": "skipped", "reason": "manual-artwork"}
+
+    lib = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist, existing_only=True
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"status": "skipped", "reason": "missing-background"}
+    artist_dir = artist_dir.resolve()
+    if not artist_dir.is_relative_to(lib):
+        return {"error": "Artist directory is outside the library"}
+    background_path = artist_dir / "background.jpg"
+    if not background_path.is_file():
+        return {"status": "skipped", "reason": "missing-background"}
+
+    try:
+        raw = background_path.read_bytes()
+        with Image.open(_io.BytesIO(raw)) as opened:
+            opened.load()
+            image = ImageOps.exif_transpose(opened).convert("RGB")
+    except (OSError, ValueError):
+        return {"status": "skipped", "reason": "invalid-background"}
+    if image.width < 1600 or image.height < 720:
+        return {"status": "skipped", "reason": "insufficient-resolution"}
+
+    desktop_recipe, mobile_recipe = _derived_hero_recipes(image.width, image.height)
+    rendered = render_artist_hero_compositions(
+        image,
+        desktop_recipe=desktop_recipe,
+        mobile_recipe=mobile_recipe,
+    )
+    image.save(artist_dir / "artist-hero-source.jpg", "JPEG", quality=94)
+    rendered["desktop"].save(
+        artist_dir / "artist-hero-desktop.webp",
+        "WEBP",
+        quality=ARTIST_HERO_WEBP_QUALITY,
+        method=ARTIST_HERO_WEBP_METHOD,
+    )
+    rendered["mobile"].save(
+        artist_dir / "artist-hero-mobile.webp",
+        "WEBP",
+        quality=ARTIST_HERO_WEBP_QUALITY,
+        method=ARTIST_HERO_WEBP_METHOD,
+    )
+    revision = artist_hero_revision(raw, b":derived-hero")
+    upsert_artist_hero_artwork(
+        artist_id=artist_id,
+        provenance="derived_background",
+        review_status="unreviewed",
+        source_width=image.width,
+        source_height=image.height,
+        desktop_recipe=desktop_recipe,
+        mobile_recipe=mobile_recipe,
+        revision=revision,
+    )
+    entity_uid = str(artist_row.get("entity_uid") or "")
+    if entity_uid:
+        for composition in ("desktop", "mobile"):
+            queue_artwork_materialization(
+                ArtworkAsset("artist-hero", f"{entity_uid}:{composition}"),
+                reason="source-write",
+            )
+    _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
+    _warm_recent_home_discovery_snapshots()
+    return {
+        "status": "derived",
+        "artist_id": artist_id,
+        "revision": revision,
+    }
+
+
+def _handle_backfill_artist_heroes(task_id: str, params: dict, config: dict) -> dict:
+    del task_id, config
+    after_id = max(0, int(params.get("after_artist_id") or 0))
+    batch_size = max(1, min(int(params.get("batch_size") or 25), 100))
+    candidates = list_artist_hero_backfill_candidates(
+        after_id=after_id, limit=batch_size
+    )
+    for candidate in candidates:
+        create_task_dedup(
+            "derive_artist_hero",
+            {"artist": candidate["name"]},
+            dedup_key=f"derive-artist-hero:{candidate['id']}",
+        )
+    next_queued = len(candidates) >= batch_size
+    next_after_id = int(candidates[-1]["id"]) if candidates else after_id
+    if next_queued:
+        create_task_dedup(
+            "backfill_artist_heroes",
+            {"after_artist_id": next_after_id, "batch_size": batch_size},
+            dedup_key=f"backfill-artist-heroes:{next_after_id}:{batch_size}",
+        )
+    return {
+        "status": "continued" if next_queued else "completed",
+        "queued": len(candidates),
+        "after_artist_id": next_after_id,
+        "next_queued": next_queued,
     }
 
 
@@ -985,6 +1711,10 @@ def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
 ARTWORK_TASK_HANDLERS: dict[str, TaskHandler] = {
     "materialize_artwork_variants": _handle_materialize_artwork_variants,
     "backfill_artwork_variants": _handle_backfill_artwork_variants,
+    "backfill_artist_heroes": _handle_backfill_artist_heroes,
+    "compose_artist_hero": _handle_compose_artist_hero,
+    "recompose_artist_hero": _handle_recompose_artist_hero,
+    "derive_artist_hero": _handle_derive_artist_hero,
     "cleanup_artwork_variants": _handle_cleanup_artwork_variants,
     "repair_artwork_variants": _handle_repair_artwork_variants,
     "resolve_external_artist_artwork": _handle_resolve_external_artist_artwork,
@@ -995,5 +1725,8 @@ ARTWORK_TASK_HANDLERS: dict[str, TaskHandler] = {
     "batch_covers": _handle_batch_covers,
     "scan_missing_covers": _handle_scan_missing_covers,
     "apply_cover": _handle_apply_cover,
+    "assign_artist_artwork_slot": _handle_assign_artist_artwork_slot,
+    "delete_artist_artwork_asset": _handle_delete_artist_artwork_asset,
+    "import_artist_artwork_asset": _handle_import_artist_artwork_asset,
     "upload_image": _handle_upload_image,
 }

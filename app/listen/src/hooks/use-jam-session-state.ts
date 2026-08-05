@@ -105,7 +105,7 @@ export function useJamSessionState() {
     [],
   );
   const setUpdatingRoomField = useCallback(
-    (payload: "visibility" | "permanent" | "metadata" | null) =>
+    (payload: "visibility" | "permanent" | "metadata" | "queue_mode" | null) =>
       dispatch({ type: "SET_UPDATING_ROOM_FIELD", payload }),
     [],
   );

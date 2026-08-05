@@ -14,6 +14,7 @@ import {
   Shuffle,
   Users,
 } from "@crate/ui/icons";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 
 import {
   type ArtistData,
@@ -346,27 +347,21 @@ export function ArtistHeroSection({
               <ListMusic size={CRATE_ICON_SIZE.lg} />
               <span>{t("artist.actions.setlist")}</span>
             </button>
-            <button
+            <FollowHeartButton
               className={`${SECONDARY_ACTION_CLASS} ${
                 following
                   ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
                   : "text-white/62"
               }`}
+              following={following}
+              iconSize={CRATE_ICON_SIZE.lg}
               onClick={onToggleFollow}
               aria-label={following ? t("common.unfollow") : t("common.follow")}
             >
-              {following ? (
-                <HeartBold
-                  size={CRATE_ICON_SIZE.lg}
-                  className="animate-crate-icon-active-pulse"
-                />
-              ) : (
-                <Heart size={CRATE_ICON_SIZE.lg} />
-              )}
               <span>
                 {following ? t("common.following") : t("common.follow")}
               </span>
-            </button>
+            </FollowHeartButton>
             <button
               className={SECONDARY_ACTION_CLASS}
               onClick={onShare}

@@ -198,7 +198,7 @@ export function Stats() {
   };
 
   return (
-    <div className="relative -mx-4 -mt-2 overflow-hidden px-4 pb-12 pt-3 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+    <div className="relative -mx-4 -mt-2 overflow-hidden px-4 pb-12 pt-3 sm:-mx-6 sm:px-6">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(244,114,182,0.13),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.035),transparent_34%)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:48px_48px]" />
 

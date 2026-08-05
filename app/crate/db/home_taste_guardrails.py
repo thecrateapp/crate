@@ -4,7 +4,8 @@ import hashlib
 import re
 import unicodedata
 
-from crate.track_versions import track_song_identity, track_variant_rank
+from crate.queue_engine import candidate_song_key
+from crate.track_versions import track_variant_rank
 
 _PUNCT_RE = re.compile(r"[^\w\s]")
 _WS_RE = re.compile(r"\s+")
@@ -65,13 +66,7 @@ def _has_audio_identity(row: dict) -> bool:
 
 
 def canonical_mix_song_key(row: dict) -> tuple[str, str] | None:
-    identity = track_song_identity(row)
-    if identity is None:
-        return None
-    artist_key, title_key = identity
-    if not title_key:
-        return None
-    return artist_key, title_key
+    return candidate_song_key(row)
 
 
 def track_version_penalty(row: dict) -> int:

@@ -62,6 +62,16 @@ def reset_jam_runtime_state():
 class TestJamRoomCRUD:
     """Basic CRUD operations on jam rooms still work with new architecture."""
 
+    def test_room_has_current_track_distinguishes_idle_from_explicit_pause(self):
+        from crate.api import jam
+
+        assert jam._room_has_current_track(None) is False
+        assert jam._room_has_current_track({"track": None, "playing": False}) is False
+        assert (
+            jam._room_has_current_track({"track": {"id": "track-1"}, "playing": False})
+            is True
+        )
+
     def test_create_and_get_room(self, pg_db):
         host = pg_db.create_user("jam-dj@test.com")
         room = pg_db.create_jam_room(host["id"], "Friday Night Spin")
@@ -69,11 +79,85 @@ class TestJamRoomCRUD:
         assert room["host_user_id"] == host["id"]
         assert room["name"] == "Friday Night Spin"
         assert room["status"] == "active"
+
+    def test_room_listing_counts_only_active_members(self, pg_db):
+        from sqlalchemy import text
+
+        from crate.db.tx import transaction_scope
+
+        host = pg_db.create_user("jam-active-host@test.com")
+        guest = pg_db.create_user("jam-stale-guest@test.com")
+        room = pg_db.create_jam_room(host["id"], "Presence Room")
+        pg_db.upsert_jam_room_member(room["id"], guest["id"], role="collab")
+
+        stale_seen_at = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE jam_room_members
+                    SET last_seen_at = :last_seen_at
+                    WHERE room_id = :room_id AND user_id = :user_id
+                    """
+                ),
+                {
+                    "last_seen_at": stale_seen_at,
+                    "room_id": room["id"],
+                    "user_id": guest["id"],
+                },
+            )
+
+        listed_room = next(
+            item
+            for item in pg_db.list_jam_rooms_for_user(host["id"])
+            if item["id"] == room["id"]
+        )
+        fetched_room = pg_db.get_jam_room(room["id"])
+
+        assert listed_room["is_member"] is True
+        assert listed_room["member_count"] == 1
+        assert fetched_room is not None
+        assert fetched_room["member_count"] == 1
         assert room["visibility"] == "private"
         assert room["is_permanent"] is False
 
         fetched = pg_db.get_jam_room(room["id"])
         assert fetched["id"] == room["id"]
+
+    def test_queue_mode_is_persisted_and_updated(self, pg_db):
+        host = pg_db.create_user("jam-mode-host@test.com")
+        room = pg_db.create_jam_room(host["id"], "Auto Room", queue_mode="auto")
+
+        assert room["queue_mode"] == "auto"
+        assert pg_db.get_jam_room(room["id"])["queue_mode"] == "auto"
+
+        updated = pg_db.update_jam_room_settings(room["id"], queue_mode="manual")
+        assert updated is not None
+        assert updated["queue_mode"] == "manual"
+
+    def test_auto_dj_prime_is_enqueued_instead_of_running_in_the_api(self, monkeypatch):
+        from crate.api import jam
+
+        room = {"id": "auto-room-1", "queue_mode": "auto_dj"}
+        scheduled: list[tuple[str, dict, str]] = []
+
+        monkeypatch.setattr(jam, "get_jam_room", lambda room_id: room)
+        monkeypatch.setattr(
+            jam,
+            "create_task_dedup",
+            lambda task_type, params, *, dedup_key: (
+                scheduled.append((task_type, params, dedup_key)) or "task-1"
+            ),
+        )
+
+        assert jam._prime_auto_dj_room(room) == room
+        assert scheduled == [
+            (
+                "prime_jam_auto_dj",
+                {"room_id": "auto-room-1"},
+                "jam-auto-dj:auto-room-1",
+            )
+        ]
 
     def test_visibility_and_permanence_are_listable(self, pg_db):
         host = pg_db.create_user("public-jam-host@test.com")
@@ -144,6 +228,38 @@ class TestJamRoomCRUD:
         roles = {m["role"] for m in members}
         assert roles == {"host", "collab"}
 
+    def test_disconnected_members_are_removed_from_room_presence_but_can_rejoin(
+        self, pg_db
+    ):
+        from crate.db.jam_members import (
+            mark_jam_room_member_offline,
+            touch_jam_room_member,
+        )
+
+        host = pg_db.create_user("jam-presence-host@test.com")
+        guest = pg_db.create_user("jam-presence-guest@test.com")
+        room = pg_db.create_jam_room(host["id"], "Presence Room")
+        pg_db.upsert_jam_room_member(room["id"], guest["id"], role="collab")
+
+        assert {
+            member["user_id"] for member in pg_db.get_jam_room_members(room["id"])
+        } == {
+            host["id"],
+            guest["id"],
+        }
+
+        assert mark_jam_room_member_offline(room["id"], guest["id"])
+        assert [
+            member["user_id"]
+            for member in pg_db.get_jam_room_members(room["id"], active_only=True)
+        ] == [host["id"]]
+
+        assert touch_jam_room_member(room["id"], guest["id"])
+        assert {
+            member["user_id"]
+            for member in pg_db.get_jam_room_members(room["id"], active_only=True)
+        } == {host["id"], guest["id"]}
+
     def test_invite_flow(self, pg_db):
         host = pg_db.create_user("invite-master@test.com")
         pg_db.create_user("invite-joiner@test.com")
@@ -161,6 +277,38 @@ class TestJamRoomCRUD:
 
 class TestJamSyncClock:
     """Server-side playback clock for synchronized listening."""
+
+    def test_sync_payload_projects_position_at_a_server_timestamp(self):
+        """A sync message must carry the server timestamp used for its position."""
+        from crate.api import jam
+
+        clock = {
+            "track": {"id": "track-1"},
+            "position_ms": 10000.0,
+            "playing": True,
+            "clock_started_at": 100.0,
+        }
+
+        payload = jam._build_sync_clock_payload(clock, now_ms=100250.0)
+
+        assert payload["server_time_ms"] == 100250.0
+        assert payload["position_ms"] == 10250.0
+
+    def test_sync_payload_does_not_advance_a_paused_clock(self):
+        """A paused sync remains exact even when it is sent later."""
+        from crate.api import jam
+
+        clock = {
+            "track": {"id": "track-1"},
+            "position_ms": 10000.0,
+            "playing": False,
+            "clock_started_at": 100.0,
+        }
+
+        payload = jam._build_sync_clock_payload(clock, now_ms=100250.0)
+
+        assert payload["server_time_ms"] == 100250.0
+        assert payload["position_ms"] == 10000.0
 
     def test_set_and_get_clock_roundtrips(self, monkeypatch):
         """Write a clock, read it back, verify compute_expected_position."""
@@ -634,6 +782,41 @@ class TestJamResilience:
             await jam._broadcast_to_room("room-fb", {"type": "test"})
 
         asyncio.run(_test())
+
+    def test_broadcast_to_room_does_not_duplicate_origin_delivery(self, monkeypatch):
+        """A Redis-backed event must not also be sent directly to its origin."""
+        import asyncio
+        from crate.api import jam
+
+        redis = _FakeRedis()
+        monkeypatch.setattr(jam, "get_async_redis", lambda: redis)
+
+        class WebSocket:
+            def __init__(self):
+                self.sent: list[dict] = []
+
+            async def send_json(self, payload):
+                self.sent.append(payload)
+
+            async def send_text(self, payload):
+                del payload
+
+            async def close(self, *, code, reason=""):
+                del code, reason
+
+        peer = jam._JamPeer(WebSocket())
+        peer.distributed = True
+
+        async def _test():
+            await jam._broadcast_to_room(
+                "room-direct",
+                {"type": "play_next"},
+            )
+
+        asyncio.run(_test())
+
+        assert len(redis.published) == 1
+        assert peer.websocket.sent == []
 
     def test_close_room_suppresses_peer_errors(self):
         """Closing a room must succeed even if individual peers are already dead."""

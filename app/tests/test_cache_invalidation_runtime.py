@@ -88,6 +88,26 @@ def test_broadcast_invalidation_uses_single_bounded_dispatcher(monkeypatch):
     assert after == before
 
 
+def test_wait_for_cache_invalidation_waits_for_existing_dispatcher(monkeypatch):
+    from crate.api import cache_events
+
+    timeouts: list[float] = []
+    fake_dispatcher = type(
+        "Dispatcher",
+        (),
+        {
+            "wait_until_idle": lambda self, *, timeout: (
+                timeouts.append(timeout),
+                True,
+            )[-1]
+        },
+    )()
+    monkeypatch.setattr(cache_events, "_invalidation_dispatcher", fake_dispatcher)
+
+    assert cache_events.wait_for_cache_invalidation(timeout=1.25) is True
+    assert timeouts == [1.25]
+
+
 def test_invalidation_subscriber_reconnects_after_transient_redis_failure(monkeypatch):
     from crate.db import cache_invalidation
 

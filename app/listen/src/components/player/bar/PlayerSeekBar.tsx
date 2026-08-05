@@ -12,6 +12,7 @@ interface PlayerSeekBarProps {
   showTimes?: boolean;
   className?: string;
   variant?: "default" | "glow";
+  disabled?: boolean;
 }
 
 export function PlayerSeekBar({
@@ -23,6 +24,7 @@ export function PlayerSeekBar({
   showTimes = false,
   className = "",
   variant = "default",
+  disabled = false,
 }: PlayerSeekBarProps) {
   const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -87,7 +89,9 @@ export function PlayerSeekBar({
   if (variant === "glow") {
     return (
       <div
-        className={`${className} ${showTimes ? "space-y-1.5" : ""}`}
+        className={`${className} ${showTimes ? "space-y-1.5" : ""} ${
+          disabled ? "grayscale opacity-50" : ""
+        }`}
         onClick={stopPropagation}
         onPointerDown={stopPropagation}
         onTouchStart={stopPropagation}
@@ -144,7 +148,7 @@ export function PlayerSeekBar({
             max={safeDuration || 1}
             step={0.1}
             value={safeDuration > 0 ? Math.min(displayedTime, safeDuration) : 0}
-            disabled={safeDuration <= 0}
+            disabled={disabled || safeDuration <= 0}
             aria-label={t("player.seek")}
             className="absolute inset-x-0 top-1/2 h-8 -translate-y-1/2 cursor-pointer opacity-0 disabled:cursor-default"
             onPointerDown={(event) => {
@@ -173,7 +177,9 @@ export function PlayerSeekBar({
 
   return (
     <div
-      className={`${className} ${showTimes ? "space-y-1.5" : ""}`}
+      className={`${className} ${showTimes ? "space-y-1.5" : ""} ${
+        disabled ? "grayscale opacity-50" : ""
+      }`}
       onClick={stopPropagation}
       onPointerDown={stopPropagation}
       onTouchStart={stopPropagation}
@@ -205,7 +211,7 @@ export function PlayerSeekBar({
           max={safeDuration || 1}
           step={0.1}
           value={safeDuration > 0 ? Math.min(displayedTime, safeDuration) : 0}
-          disabled={safeDuration <= 0}
+          disabled={disabled || safeDuration <= 0}
           aria-label={t("player.seek")}
           className={`block w-full appearance-none rounded-full border-0 outline-none ${
             thin ? "h-1" : compact ? "h-1.5" : "h-2"

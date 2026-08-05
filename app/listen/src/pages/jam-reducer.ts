@@ -1,6 +1,12 @@
 import type { Track } from "@/contexts/PlayerContext";
+import { albumCoverAssetPath } from "@/lib/library-routes";
+import {
+  hasPlayableTrackReference,
+  toPlayableTrack,
+} from "@/lib/playable-track";
 
 export type JamVisibility = "public" | "private";
+export type JamQueueMode = "manual" | "auto" | "auto_dj";
 
 export interface JamMember {
   room_id: string;
@@ -29,6 +35,31 @@ export interface JamRoomsResponse {
   rooms: JamRoom[];
 }
 
+export interface JamQueueItem {
+  id: string;
+  track: Track;
+  added_by?: number | null;
+  source?: string;
+  status?: "queued" | "playing" | string;
+  position?: number;
+  vote_count: number;
+  voted_by_me: boolean;
+  created_at?: string | null;
+}
+
+export interface JamTrackRequest {
+  id: string;
+  track: Track;
+  requested_by?: number | null;
+  status: "pending" | "approved" | "rejected" | string;
+  resolved_by?: number | null;
+  queue_item_id?: string | null;
+  created_at?: string | null;
+  resolved_at?: string | null;
+  requester_name?: string | null;
+  requester_username?: string | null;
+}
+
 export interface SearchData {
   tracks: SearchTrack[];
 }
@@ -40,15 +71,22 @@ export interface JamRoom {
   status: string;
   visibility: JamVisibility;
   is_permanent: boolean;
+  queue_mode?: JamQueueMode;
+  auto_dj_voting?: boolean;
+  genre_filters?: string[];
   description?: string | null;
   tags?: string[];
   current_track_payload?: Record<string, unknown> | null;
   created_at: string;
   ended_at?: string | null;
   member_count?: number | null;
+  is_member?: boolean | null;
   last_event_at?: string | null;
   members: JamMember[];
   events: JamEvent[];
+  queue?: JamQueueItem[];
+  requests?: JamTrackRequest[];
+  auto_dj_suggestions?: Record<string, unknown>[];
 }
 
 export interface JamInvite {
@@ -61,6 +99,9 @@ export interface JamInvite {
 export interface SearchTrack {
   id?: number;
   entity_uid?: string;
+  global_uid?: string;
+  global_track_uid?: string;
+  globalTrackUid?: string;
   title: string;
   artist: string;
   artist_id?: number;
@@ -69,6 +110,8 @@ export interface SearchTrack {
   album: string;
   album_id?: number;
   album_entity_uid?: string;
+  global_album_uid?: string;
+  globalAlbumUid?: string;
   album_slug?: string;
   path?: string;
 }
@@ -77,6 +120,8 @@ export interface JamSessionState {
   roomSearch: string;
   room: JamRoom | null;
   sharedQueue: Track[];
+  queueItems: JamQueueItem[];
+  pendingRequests: JamTrackRequest[];
   roomName: string;
   roomDescription: string;
   roomTagsInput: string;
@@ -94,7 +139,12 @@ export interface JamSessionState {
   endingRoom: boolean;
   deletingRoomId: string | null;
   deleteTargetRoom: JamRoom | null;
-  updatingRoomField: "visibility" | "permanent" | "metadata" | null;
+  updatingRoomField:
+    | "visibility"
+    | "permanent"
+    | "metadata"
+    | "queue_mode"
+    | null;
   queueSearch: string;
   queueSearchResults: SearchTrack[];
   queueSearchLoading: boolean;
@@ -107,6 +157,8 @@ export const initialJamSessionState: JamSessionState = {
   roomSearch: "",
   room: null,
   sharedQueue: [],
+  queueItems: [],
+  pendingRequests: [],
   roomName: "",
   roomDescription: "",
   roomTagsInput: "",
@@ -159,7 +211,7 @@ export type JamSessionAction =
   | { type: "SET_DELETE_TARGET_ROOM"; payload: JamRoom | null }
   | {
       type: "SET_UPDATING_ROOM_FIELD";
-      payload: "visibility" | "permanent" | "metadata" | null;
+      payload: "visibility" | "permanent" | "metadata" | "queue_mode" | null;
     }
   | { type: "SET_QUEUE_SEARCH"; payload: string }
   | { type: "SET_QUEUE_SEARCH_RESULTS"; payload: SearchTrack[] }
@@ -168,8 +220,15 @@ export type JamSessionAction =
   | { type: "SET_IS_CONNECTED"; payload: boolean }
   | { type: "SET_CONNECTION_PROBLEM"; payload: string | null }
   | { type: "APPLY_ROOM_DATA"; payload: JamRoom }
+  | { type: "QUEUE_SNAPSHOT"; payload: JamQueueItem[] }
+  | { type: "REQUESTS_SNAPSHOT"; payload: JamTrackRequest[] }
+  | {
+      type: "QUEUE_VOTE";
+      payload: { queueItemId: string; voted: boolean; voteCount: number };
+    }
   | { type: "QUEUE_ADD"; payload: Track }
   | { type: "QUEUE_REMOVE"; payload: number }
+  | { type: "QUEUE_REMOVE_ITEM"; payload: string }
   | { type: "QUEUE_REORDER"; payload: { fromIndex: number; toIndex: number } }
   | { type: "UPDATE_ROOM_MEMBERS"; payload: JamMember[] }
   | { type: "ROOM_ENDED"; payload: JamRoom }
@@ -179,11 +238,11 @@ export type JamSessionAction =
   | { type: "SEND_EVENT_FAIL"; payload: string }
   | { type: "RESET_STATE" };
 
-export function reorderTracks(
-  tracks: Track[],
+export function reorderTracks<T>(
+  tracks: T[],
   fromIndex: number,
   toIndex: number,
-) {
+): T[] {
   if (
     fromIndex === toIndex ||
     fromIndex < 0 ||
@@ -229,37 +288,128 @@ export function deriveSharedQueue(events: JamEvent[]) {
   return queue;
 }
 
+export function deriveLegacyQueueItems(events: JamEvent[]): JamQueueItem[] {
+  return deriveSharedQueue(events).map((track, index) => ({
+    id: `legacy-${index}`,
+    track,
+    vote_count: 0,
+    voted_by_me: false,
+    position: index,
+  }));
+}
+
+function normalizeQueueItems(items: JamQueueItem[]): JamQueueItem[] {
+  return items.flatMap((item) => {
+    const track = normalizeQueueTrack(item.track);
+    return track ? [{ ...item, track }] : [];
+  });
+}
+
+function normalizeTrackRequests(
+  requests: JamTrackRequest[],
+): JamTrackRequest[] {
+  return requests.flatMap((request) => {
+    const track = normalizeQueueTrack(request.track);
+    return track ? [{ ...request, track }] : [];
+  });
+}
+
+function normalizeQueueTrack(track: Track): Track | null {
+  const payload = track as unknown as Record<string, unknown>;
+  const normalized = payloadToTrack(payload);
+  if (!normalized) return null;
+  const hasGlobalTrackUid = Boolean(
+    payload.globalTrackUid ?? payload.global_track_uid,
+  );
+  if (!hasGlobalTrackUid && typeof payload.id === "string") {
+    return { ...normalized, id: payload.id };
+  }
+  return normalized;
+}
+
+function sortQueueItemsForVotes(items: JamQueueItem[]): JamQueueItem[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const leftPlaying = left.item.status === "playing" ? 0 : 1;
+      const rightPlaying = right.item.status === "playing" ? 0 : 1;
+      if (leftPlaying !== rightPlaying) return leftPlaying - rightPlaying;
+
+      const voteDifference = right.item.vote_count - left.item.vote_count;
+      if (voteDifference !== 0) return voteDifference;
+
+      const leftPosition = left.item.position ?? left.index;
+      const rightPosition = right.item.position ?? right.index;
+      return leftPosition - rightPosition || left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
+
+function inferAlbumIdentityFromCover(cover: string | null | undefined) {
+  if (!cover) return {};
+  const globalMatch = cover.match(
+    /\/api\/catalog\/albums\/([^/?#]+)\/cover(?:[/?#]|$)/,
+  );
+  if (globalMatch?.[1]) {
+    return { globalAlbumUid: decodeURIComponent(globalMatch[1]) };
+  }
+  const entityMatch = cover.match(
+    /\/api\/albums\/by-entity\/([^/?#]+)\/cover(?:[/?#]|$)/,
+  );
+  if (entityMatch?.[1]) {
+    return { albumEntityUid: decodeURIComponent(entityMatch[1]) };
+  }
+  const idMatch = cover.match(/\/api\/albums\/(\d+)\/cover(?:[/?#]|$)/);
+  if (idMatch?.[1]) return { albumId: Number(idMatch[1]) };
+  return {};
+}
+
 export function payloadToTrack(
   payload: Record<string, unknown> | null | undefined,
 ): Track | null {
   if (!payload) return null;
-  const id =
-    typeof payload.id === "string"
-      ? payload.id
-      : typeof payload.path === "string"
-        ? payload.path
-        : null;
-  if (!id) return null;
-  return {
-    id,
-    title: typeof payload.title === "string" ? payload.title : "Unknown",
+  const input = {
+    ...payload,
     artist: typeof payload.artist === "string" ? payload.artist : "",
-    artistId:
-      typeof payload.artistId === "number" ? payload.artistId : undefined,
-    artistSlug:
-      typeof payload.artistSlug === "string" ? payload.artistSlug : undefined,
-    album: typeof payload.album === "string" ? payload.album : undefined,
-    albumId: typeof payload.albumId === "number" ? payload.albumId : undefined,
-    albumSlug:
-      typeof payload.albumSlug === "string" ? payload.albumSlug : undefined,
-    albumCover:
-      typeof payload.albumCover === "string" ? payload.albumCover : undefined,
-    path: typeof payload.path === "string" ? payload.path : undefined,
-    libraryTrackId:
-      typeof payload.libraryTrackId === "number"
-        ? payload.libraryTrackId
-        : undefined,
+    title: typeof payload.title === "string" ? payload.title : "Unknown",
   };
+  const hasStringOrNumericId =
+    (typeof payload.id === "string" && payload.id.trim().length > 0) ||
+    (typeof payload.id === "number" && Number.isFinite(payload.id));
+  if (!hasStringOrNumericId && !hasPlayableTrackReference(input)) return null;
+  const coverIdentity = inferAlbumIdentityFromCover(
+    typeof payload.albumCover === "string"
+      ? payload.albumCover
+      : typeof payload.album_cover === "string"
+        ? payload.album_cover
+        : undefined,
+  );
+  const canonicalAlbumCover = albumCoverAssetPath(
+    {
+      globalAlbumUid:
+        typeof payload.globalAlbumUid === "string"
+          ? payload.globalAlbumUid
+          : typeof payload.global_album_uid === "string"
+            ? payload.global_album_uid
+            : coverIdentity.globalAlbumUid,
+      albumId:
+        typeof payload.albumId === "number"
+          ? payload.albumId
+          : typeof payload.album_id === "number"
+            ? payload.album_id
+            : coverIdentity.albumId,
+      albumEntityUid:
+        typeof payload.albumEntityUid === "string"
+          ? payload.albumEntityUid
+          : typeof payload.album_entity_uid === "string"
+            ? payload.album_entity_uid
+            : coverIdentity.albumEntityUid,
+    },
+    { size: 512 },
+  );
+  return toPlayableTrack(input, {
+    cover: canonicalAlbumCover || undefined,
+  });
 }
 
 export function jamSessionReducer(
@@ -328,26 +478,105 @@ export function jamSessionReducer(
       return { ...state, connectionProblem: action.payload };
     case "APPLY_ROOM_DATA": {
       const room = action.payload;
+      const queueItems = room.queue
+        ? normalizeQueueItems(room.queue)
+        : deriveLegacyQueueItems(room.events || []);
+      const requests = normalizeTrackRequests(room.requests || []);
       return {
         ...state,
         room,
-        sharedQueue: deriveSharedQueue(room.events || []),
+        queueItems,
+        pendingRequests: requests.filter(
+          (request) => request.status === "pending",
+        ),
+        sharedQueue: queueItems.map((item) => item.track),
+      };
+    }
+    case "QUEUE_SNAPSHOT": {
+      const currentVotes = new Map(
+        state.queueItems.map((item) => [item.id, item.voted_by_me]),
+      );
+      const queueItems = normalizeQueueItems(action.payload).map((item) => ({
+        ...item,
+        voted_by_me: currentVotes.get(item.id) ?? item.voted_by_me,
+      }));
+      return {
+        ...state,
+        queueItems,
+        sharedQueue: queueItems.map((item) => item.track),
+      };
+    }
+    case "REQUESTS_SNAPSHOT": {
+      const requests = normalizeTrackRequests(action.payload);
+      return {
+        ...state,
+        pendingRequests: requests.filter(
+          (request) => request.status === "pending",
+        ),
+      };
+    }
+    case "QUEUE_VOTE": {
+      const queueItems = sortQueueItemsForVotes(
+        state.queueItems.map((item) =>
+          item.id === action.payload.queueItemId
+            ? {
+                ...item,
+                voted_by_me: action.payload.voted,
+                vote_count: action.payload.voteCount,
+              }
+            : item,
+        ),
+      );
+      return {
+        ...state,
+        queueItems,
+        sharedQueue: queueItems.map((item) => item.track),
       };
     }
     case "QUEUE_ADD":
-      return { ...state, sharedQueue: [...state.sharedQueue, action.payload] };
+      return {
+        ...state,
+        sharedQueue: [...state.sharedQueue, action.payload],
+        queueItems: [
+          ...state.queueItems,
+          {
+            id: `legacy-${state.queueItems.length}`,
+            track: action.payload,
+            vote_count: 0,
+            voted_by_me: false,
+          },
+        ],
+      };
     case "QUEUE_REMOVE":
       return {
         ...state,
         sharedQueue: state.sharedQueue.filter(
           (_, index) => index !== action.payload,
         ),
+        queueItems: state.queueItems.filter(
+          (_, index) => index !== action.payload,
+        ),
       };
+    case "QUEUE_REMOVE_ITEM": {
+      const queueItems = state.queueItems.filter(
+        (item) => item.id !== action.payload,
+      );
+      return {
+        ...state,
+        queueItems,
+        sharedQueue: queueItems.map((item) => item.track),
+      };
+    }
     case "QUEUE_REORDER":
       return {
         ...state,
         sharedQueue: reorderTracks(
           state.sharedQueue,
+          action.payload.fromIndex,
+          action.payload.toIndex,
+        ),
+        queueItems: reorderTracks(
+          state.queueItems,
           action.payload.fromIndex,
           action.payload.toIndex,
         ),

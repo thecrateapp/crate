@@ -152,6 +152,17 @@ describe("playable track mapper", () => {
     ).toBe(true);
   });
 
+  it("accepts legacy snake_case artwork payloads when no album identity exists", () => {
+    const track = toPlayableTrack({
+      id: "track-2",
+      title: "Legacy Track",
+      artist: "Artist",
+      album_cover: "/api/albums/8/cover?size=512",
+    });
+
+    expect(track.albumCover).toBe("/api/albums/8/cover?size=512");
+  });
+
   it("does not treat remote-only global ids as local entity ids", () => {
     const globalUid = "123e4567-e89b-12d3-a456-426614174000";
     const track = toPlayableTrack({

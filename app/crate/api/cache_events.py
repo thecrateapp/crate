@@ -126,6 +126,18 @@ def broadcast_invalidation(*scopes: str):
     _get_invalidation_dispatcher().submit(normalized)
 
 
+def wait_for_cache_invalidation(*, timeout: float = 2.0) -> bool:
+    """Wait until this process has applied queued cache invalidations."""
+    dispatcher = _invalidation_dispatcher
+    if dispatcher is None:
+        return True
+    try:
+        return dispatcher.wait_until_idle(timeout=max(0.0, timeout))
+    except Exception:
+        log.warning("Failed to wait for cache invalidation", exc_info=True)
+        return False
+
+
 def _persist_invalidation_events(scopes: tuple[str, ...]) -> None:
     from crate.db.cache_invalidation import persist_invalidation_events
 

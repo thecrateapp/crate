@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 
@@ -24,14 +24,27 @@ _MEMBER_SELECT_SQL = text(
     """
 )
 
+_PRESENCE_TTL_SECONDS = 90
 
-def get_jam_room_members(room_id: str) -> list[dict]:
+
+def get_jam_room_members(room_id: str, *, active_only: bool = False) -> list[dict]:
+    active_clause = ""
+    params: dict[str, object] = {"room_id": room_id}
+    if active_only:
+        active_since = datetime.now(timezone.utc) - timedelta(
+            seconds=_PRESENCE_TTL_SECONDS
+        )
+        active_clause = " AND jrm.last_seen_at >= :active_since"
+        params["active_since"] = active_since.isoformat()
     with transaction_scope() as session:
         rows = (
             session.execute(
                 # SQL_SAFE: _MEMBER_SELECT_SQL is a constant SQL construct.
-                text(f"{_MEMBER_SELECT_SQL.text} ORDER BY jrm.joined_at ASC"),
-                {"room_id": room_id},
+                text(
+                    f"{_MEMBER_SELECT_SQL.text}{active_clause} "
+                    "ORDER BY jrm.joined_at ASC"
+                ),
+                params,
             )
             .mappings()
             .all()
@@ -104,10 +117,27 @@ def touch_jam_room_member(room_id: str, user_id: int) -> bool:
     return int(getattr(result, "rowcount", 0) or 0) > 0
 
 
+def mark_jam_room_member_offline(room_id: str, user_id: int) -> bool:
+    """Mark a member offline without removing their room membership."""
+    with transaction_scope() as session:
+        result = session.execute(
+            text(
+                """
+                UPDATE jam_room_members
+                SET last_seen_at = NULL
+                WHERE room_id = :room_id AND user_id = :user_id
+                """
+            ),
+            {"room_id": room_id, "user_id": user_id},
+        )
+    return int(getattr(result, "rowcount", 0) or 0) > 0
+
+
 __all__ = [
     "get_jam_room_member",
     "get_jam_room_members",
     "is_jam_room_member",
+    "mark_jam_room_member_offline",
     "touch_jam_room_member",
     "upsert_jam_room_member",
 ]

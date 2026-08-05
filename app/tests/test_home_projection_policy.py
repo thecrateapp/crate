@@ -84,6 +84,34 @@ def test_cold_home_request_returns_schema_valid_minimal_payload(monkeypatch):
     assert queued == [7]
 
 
+def test_home_request_rotates_cached_hero_candidates_for_the_user(monkeypatch):
+    from crate.db import home_discovery_surface as surface
+
+    calls: list[int] = []
+
+    def rotate(rows, *, user_id):
+        calls.append(user_id)
+        return [rows[1], rows[0]]
+
+    def get_snapshot(scope, *_args, **_kwargs):
+        if scope == "home:recently-played":
+            return None
+        return _snapshot(
+            {
+                "hero": [{"name": "First"}, {"name": "Second"}],
+                "recently_played": [],
+            }
+        )
+
+    monkeypatch.setattr(surface, "get_ui_snapshot", get_snapshot)
+    monkeypatch.setattr(surface, "rotate_home_hero_rows", rotate)
+
+    payload = surface.get_cached_home_discovery(7)
+
+    assert payload["hero"][0]["name"] == "Second"
+    assert calls == [7]
+
+
 def test_home_refresh_worker_builds_full_snapshot(monkeypatch):
     from crate.worker_handlers import analysis
 

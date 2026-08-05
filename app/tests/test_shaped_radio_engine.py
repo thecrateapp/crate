@@ -100,6 +100,40 @@ def test_start_radio_releases_database_sessions_before_scoring(monkeypatch):
     assert seen_sessions == [None, None, None]
 
 
+def test_radio_track_identity_matches_shared_queue_identity() -> None:
+    from crate.radio_engine import _artist_key, _song_key
+
+    candidate = {
+        "track": {
+            "title": "Concubine (Live)",
+            "artist": "Converge",
+        }
+    }
+
+    assert _artist_key(candidate) == "converge"
+    assert _song_key(candidate) == "converge::concubine"
+
+
+def test_queue_intent_round_trip_preserves_bpm_and_mood_constraints() -> None:
+    from crate import radio_engine
+    from crate.queue_engine import QueueIntent
+
+    intent = QueueIntent(
+        profile="discovery",
+        listener_id=7,
+        genres=("hardcore",),
+        bpm_min=105,
+        bpm_max=145,
+        mood="energetic",
+    )
+
+    restored = radio_engine._session_queue_intent(
+        {"queue_intent": radio_engine._queue_intent_payload(intent)}
+    )
+
+    assert restored == intent
+
+
 def test_start_radio_falls_back_to_global_catalog_seed_queue(monkeypatch):
     from crate import radio_engine
 
@@ -163,6 +197,20 @@ def test_start_radio_falls_back_to_global_catalog_seed_queue(monkeypatch):
     ]
     assert saved_sessions[0]["radio_profile"] == "global_catalog"
     assert saved_sessions[0]["global_cursor"] == 1
+    assert saved_sessions[0]["queue_intent"] == {
+        "profile": "global_catalog",
+        "listener_id": 7,
+        "seed_type": "artist",
+        "seed_value": "global-high-vis",
+        "genres": [],
+        "bpm_min": None,
+        "bpm_max": None,
+        "mood": None,
+        "target_size": radio_engine._BATCH_SIZE,
+        "low_water_mark": 0,
+        "max_per_artist": None,
+        "avoid_variants": True,
+    }
 
 
 def test_global_radio_batch_reloads_when_initial_queue_is_exhausted(monkeypatch):
@@ -259,6 +307,49 @@ def test_global_radio_like_uses_the_canonical_track_vector(monkeypatch):
     }
     assert session["liked_vectors"] == [vector]
     assert saved
+
+
+def test_radio_feedback_delegates_target_shaping_to_queue_engine(monkeypatch):
+    from crate import radio_engine
+
+    vector = _vector(0.7)
+    session = {
+        "id": "session",
+        "user_id": 1,
+        "initial_target": _vector(0.1),
+        "current_target": _vector(0.1),
+        "liked_vectors": [],
+        "disliked_vectors": [],
+    }
+    captured: dict = {}
+
+    monkeypatch.setattr(radio_engine, "_load_session", lambda _session_id: session)
+    monkeypatch.setattr(radio_engine, "_save_session", lambda _session: None)
+    monkeypatch.setattr(
+        radio_engine, "get_track_bliss_vector", lambda _track_id: vector
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "blend_target_towards",
+        lambda current, feedback, *, feedback_count: (
+            captured.update(
+                current=current,
+                feedback=feedback,
+                feedback_count=feedback_count,
+            )
+            or [0.25] * len(current)
+        ),
+    )
+
+    result = radio_engine.radio_feedback("session", 42, "like")
+
+    assert result is not None
+    assert captured == {
+        "current": _vector(0.1),
+        "feedback": vector,
+        "feedback_count": 1,
+    }
+    assert session["current_target"] == [0.25] * 20
 
 
 def test_global_radio_dislike_excludes_a_remote_track_without_local_vector(monkeypatch):

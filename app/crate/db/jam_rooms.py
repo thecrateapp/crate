@@ -17,9 +17,18 @@ _ROOM_GROUP_BY = """
     jr.is_permanent,
     jr.description,
     jr.tags,
+    jr.queue_mode,
+    jr.auto_dj_voting,
+    jr.genre_filters,
     jr.current_track_payload,
     jr.created_at,
     jr.ended_at
+"""
+
+_ACTIVE_MEMBER_COUNT_SQL = """
+    COUNT(DISTINCT jrm.user_id) FILTER (
+        WHERE jrm.last_seen_at >= NOW() - INTERVAL '90 seconds'
+    )::int
 """
 
 
@@ -36,6 +45,9 @@ def create_jam_room(
     is_permanent: bool = False,
     description: str | None = None,
     tags: list[str] | None = None,
+    queue_mode: str = "manual",
+    auto_dj_voting: bool = True,
+    genre_filters: list[str] | None = None,
 ) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     room_id = str(uuid.uuid4())
@@ -44,8 +56,15 @@ def create_jam_room(
             session.execute(
                 text(
                     """
-                INSERT INTO jam_rooms (id, host_user_id, name, visibility, is_permanent, description, tags, created_at)
-                VALUES (:id, :host_user_id, :name, :visibility, :is_permanent, :description, CAST(:tags AS jsonb), :created_at)
+                    INSERT INTO jam_rooms (
+                        id, host_user_id, name, visibility, is_permanent, description,
+                        tags, queue_mode, auto_dj_voting, genre_filters, created_at
+                    )
+                VALUES (
+                    :id, :host_user_id, :name, :visibility, :is_permanent, :description,
+                    CAST(:tags AS jsonb), :queue_mode, :auto_dj_voting,
+                    CAST(:genre_filters AS jsonb), :created_at
+                )
                 RETURNING *
                 """
                 ),
@@ -57,6 +76,9 @@ def create_jam_room(
                     "is_permanent": is_permanent,
                     "description": description,
                     "tags": json.dumps(tags or []),
+                    "queue_mode": queue_mode,
+                    "auto_dj_voting": auto_dj_voting,
+                    "genre_filters": json.dumps(genre_filters or []),
                     "created_at": now,
                 },
             )
@@ -90,10 +112,10 @@ def get_jam_room(room_id: str) -> dict | None:
         row = (
             session.execute(
                 text(
-                    """
+                    f"""
                 SELECT
                     jr.*,
-                    COUNT(DISTINCT jrm.user_id)::int AS member_count,
+                    {_ACTIVE_MEMBER_COUNT_SQL} AS member_count,
                     MAX(jre.created_at) AS last_event_at
                 FROM jam_rooms jr
                 LEFT JOIN jam_room_members jrm ON jrm.room_id = jr.id
@@ -108,6 +130,9 @@ def get_jam_room(room_id: str) -> dict | None:
                     jr.is_permanent,
                     jr.description,
                     jr.tags,
+                    jr.queue_mode,
+                    jr.auto_dj_voting,
+                    jr.genre_filters,
                     jr.current_track_payload,
                     jr.created_at,
                     jr.ended_at
@@ -147,7 +172,13 @@ def list_jam_rooms_for_user(
                     f"""
                 SELECT
                     jr.*,
-                    COUNT(DISTINCT jrm.user_id)::int AS member_count,
+                    {_ACTIVE_MEMBER_COUNT_SQL} AS member_count,
+                    EXISTS (
+                        SELECT 1
+                        FROM jam_room_members mine
+                        WHERE mine.room_id = jr.id
+                          AND mine.user_id = :user_id
+                    ) AS is_member,
                     MAX(jre.created_at) AS last_event_at
                 FROM jam_rooms jr
                 LEFT JOIN jam_room_members jrm ON jrm.room_id = jr.id
@@ -185,6 +216,9 @@ def update_jam_room_settings(
     description: str | None = None,
     description_provided: bool = False,
     tags: list[str] | None = None,
+    queue_mode: str | None = None,
+    auto_dj_voting: bool | None = None,
+    genre_filters: list[str] | None = None,
 ) -> dict | None:
     fields: list[str] = []
     params: dict[str, object] = {"room_id": room_id}
@@ -208,6 +242,18 @@ def update_jam_room_settings(
     if tags is not None:
         fields.append(f"tags = CAST(:val{idx} AS jsonb)")
         params[f"val{idx}"] = json.dumps(tags)
+        idx += 1
+    if queue_mode is not None:
+        fields.append(f"queue_mode = :val{idx}")
+        params[f"val{idx}"] = queue_mode
+        idx += 1
+    if auto_dj_voting is not None:
+        fields.append(f"auto_dj_voting = :val{idx}")
+        params[f"val{idx}"] = auto_dj_voting
+        idx += 1
+    if genre_filters is not None:
+        fields.append(f"genre_filters = CAST(:val{idx} AS jsonb)")
+        params[f"val{idx}"] = json.dumps(genre_filters)
         idx += 1
     if not fields:
         return get_jam_room(room_id)

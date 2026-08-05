@@ -64,175 +64,154 @@ def get_home_hero_rows(
     top_genres_lower: list[str],
     limit: int = 40,
 ) -> list[dict]:
-    row_limit = min(max(limit, 1), 80)
+    _ = (
+        user_id,
+        followed_names_lower,
+        similar_target_names_lower,
+        top_genres_lower,
+    )
+    row_limit = min(max(limit, 1), 40)
+    candidate_limit = max(30, row_limit * 3)
     with read_scope() as session:
         rows_result = (
             session.execute(
                 text(
                     """
-                SELECT
-                    la.id,
-                    la.slug,
-                    la.name,
-                    COALESCE(la.listeners, 0) AS listeners,
-                    COALESCE(la.lastfm_playcount, 0) AS scrobbles,
-                    COALESCE(la.album_count, 0) AS album_count,
-                    COALESCE(la.track_count, 0) AS track_count,
-                    COALESCE(la.bio, '') AS bio,
-                    COUNT(DISTINCT CASE WHEN LOWER(g.name) = ANY(:top_genres) THEN g.name END) AS genre_hits,
-                    MAX(CASE WHEN LOWER(sim.similar_name) = ANY(:similar_targets) THEN 1 ELSE 0 END) AS similar_hits,
-                    COALESCE((
-                        SELECT SUM(ure.shown_count)
-                        FROM user_recommendation_exposures ure
-                        WHERE ure.user_id = :user_id
-                          AND ure.surface = 'home.hero'
-                          AND ure.entity_type = 'artist'
-                          AND ure.entity_key = 'artist:' || la.slug
-                          AND ure.shown_on >= CURRENT_DATE - INTERVAL '14 days'
-                          AND (ure.expires_at IS NULL OR ure.expires_at > NOW())
-                    ), 0)::INTEGER AS recent_exposure_count,
-                    COALESCE((
-                        SELECT COUNT(*)
-                        FROM user_recommendation_feedback urf_positive
-                        WHERE urf_positive.user_id = :user_id
-                          AND urf_positive.surface = 'home.hero'
-                          AND urf_positive.entity_type = 'artist'
-                          AND urf_positive.entity_key = 'artist:' || la.slug
-                          AND urf_positive.action = ANY(:positive_actions)
-                          AND (urf_positive.expires_at IS NULL OR urf_positive.expires_at > NOW())
-                    ), 0)::INTEGER AS positive_feedback_count
-                FROM library_artists la
-                LEFT JOIN artist_genres ag ON ag.artist_name = la.name
-                LEFT JOIN genres g ON g.id = ag.genre_id
-                LEFT JOIN artist_similarities sim ON sim.artist_name = la.name AND sim.in_library = TRUE
-                WHERE la.has_photo = 1
-                  AND la.name NOT LIKE '.%'
-                  AND COALESCE(la.folder_name, '') NOT LIKE '.%'
-                  AND COALESCE(la.bio, '') <> ''
-                  AND NOT (LOWER(la.name) = ANY(:followed))
-                  AND (
-                    :user_id IS NULL
-                    OR NOT EXISTS (
-                        SELECT 1
-                        FROM user_recommendation_feedback urf
-                        WHERE urf.user_id = :user_id
-                          AND urf.surface = 'home.hero'
-                          AND urf.entity_type = 'artist'
-                          AND urf.entity_key = 'artist:' || la.slug
-                          AND urf.action = ANY(:negative_actions)
-                          AND (urf.expires_at IS NULL OR urf.expires_at > NOW())
+                WITH recent AS (
+                    SELECT
+                        la.id,
+                        la.entity_uid,
+                        la.slug,
+                        la.name,
+                        COALESCE(la.listeners, 0) AS listeners,
+                        COALESCE(la.lastfm_playcount, 0) AS scrobbles,
+                        COALESCE(la.album_count, 0) AS album_count,
+                        COALESCE(la.track_count, 0) AS track_count,
+                        COALESCE(la.bio, '') AS bio,
+                        COALESCE(
+                            MIN(
+                                COALESCE(
+                                    alb.dir_mtime,
+                                    EXTRACT(EPOCH FROM alb.updated_at)::double precision
+                                )
+                            ),
+                            COALESCE(
+                                la.dir_mtime,
+                                EXTRACT(EPOCH FROM la.updated_at)::double precision
+                            ),
+                            0
+                        ) AS first_added_sort
+                    FROM library_artists la
+                    LEFT JOIN library_albums alb ON alb.artist = la.name
+                    LEFT JOIN artist_hero_artwork candidate_hero
+                      ON candidate_hero.artist_id = la.id
+                    WHERE (
+                        la.has_photo = 1
+                        OR (
+                            candidate_hero.artist_id IS NOT NULL
+                            AND candidate_hero.review_status <> 'rejected'
+                        )
                     )
-                  )
-                GROUP BY la.id, la.slug, la.name, la.listeners, la.lastfm_playcount, la.album_count, la.track_count, la.bio
-                HAVING COUNT(DISTINCT CASE WHEN LOWER(g.name) = ANY(:top_genres) THEN g.name END) > 0
+                      AND la.name NOT LIKE '.%'
+                      AND COALESCE(la.folder_name, '') NOT LIKE '.%'
+                    GROUP BY
+                        la.id, la.entity_uid, la.slug, la.name, la.listeners,
+                        la.lastfm_playcount, la.album_count, la.track_count,
+                        la.bio, la.dir_mtime, la.updated_at,
+                        candidate_hero.provenance,
+                        candidate_hero.review_status
+                    ORDER BY
+                        CASE
+                            WHEN candidate_hero.provenance = 'manual'
+                             AND candidate_hero.review_status = 'approved' THEN 0
+                            WHEN candidate_hero.provenance = 'derived_background'
+                             AND candidate_hero.review_status <> 'rejected' THEN 1
+                            ELSE 2
+                        END,
+                        first_added_sort DESC,
+                        la.name ASC
+                    LIMIT :candidate_limit
+                )
+                SELECT
+                    recent.*,
+                    COALESCE(user_stats.play_count, 0) AS user_play_count,
+                    COALESCE(user_stats.complete_play_count, 0) AS user_complete_play_count,
+                    COALESCE(user_stats.minutes_listened, 0) AS user_minutes_listened,
+                    user_stats.last_played_at AS user_last_played_at,
+                    CASE
+                        WHEN LOWER(recent.name) = ANY(:followed_names_lower)
+                        THEN TRUE
+                        ELSE FALSE
+                    END AS is_followed,
+                    CASE
+                        WHEN LOWER(recent.name) = ANY(:similar_target_names_lower)
+                        THEN 1
+                        ELSE 0
+                    END AS similar_hits,
+                    COALESCE(genre_matches.genre_hits, 0) AS genre_hits,
+                    COALESCE(recent_exposure.recent_exposure_count, 0)
+                        AS recent_exposure_count,
+                    CASE
+                        WHEN hero.provenance = 'manual'
+                         AND hero.review_status = 'approved' THEN 'specific'
+                        WHEN hero.provenance = 'derived_background'
+                         AND hero.review_status <> 'rejected' THEN 'derived'
+                        ELSE 'fallback'
+                    END AS artwork_provenance,
+                    hero.revision AS artwork_revision,
+                    hero.source_width AS _hero_source_width,
+                    hero.source_height AS _hero_source_height,
+                    hero.desktop_source_width AS _hero_desktop_source_width,
+                    hero.desktop_source_height AS _hero_desktop_source_height,
+                    hero.mobile_source_width AS _hero_mobile_source_width,
+                    hero.mobile_source_height AS _hero_mobile_source_height,
+                    hero.desktop_recipe AS _hero_desktop_recipe,
+                    hero.mobile_recipe AS _hero_mobile_recipe
+                FROM recent
+                LEFT JOIN artist_hero_artwork hero ON hero.artist_id = recent.id
+                LEFT JOIN user_artist_stats user_stats
+                  ON user_stats.user_id = :user_id
+                 AND user_stats.stat_window = '90d'
+                 AND LOWER(user_stats.artist_name) = LOWER(recent.name)
+                LEFT JOIN LATERAL (
+                    SELECT COUNT(*)::integer AS genre_hits
+                    FROM artist_genres ag
+                    JOIN genres g ON g.id = ag.genre_id
+                    WHERE LOWER(ag.artist_name) = LOWER(recent.name)
+                      AND LOWER(g.name) = ANY(:top_genres_lower)
+                ) genre_matches ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT COUNT(*)::integer AS recent_exposure_count
+                    FROM user_play_events upe
+                    WHERE upe.user_id = :user_id
+                      AND LOWER(COALESCE(upe.artist, '')) = LOWER(recent.name)
+                      AND upe.ended_at >= NOW() - INTERVAL '14 days'
+                ) recent_exposure ON TRUE
                 ORDER BY
-                    MAX(CASE WHEN LOWER(sim.similar_name) = ANY(:similar_targets) THEN 1 ELSE 0 END) DESC,
-                    COUNT(DISTINCT CASE WHEN LOWER(g.name) = ANY(:top_genres) THEN g.name END) DESC,
-                    COALESCE(la.listeners, 0) DESC,
-                    COALESCE(la.lastfm_playcount, 0) DESC
+                    CASE
+                        WHEN hero.provenance = 'manual'
+                         AND hero.review_status = 'approved' THEN 0
+                        WHEN hero.provenance = 'derived_background'
+                         AND hero.review_status <> 'rejected' THEN 1
+                        ELSE 2
+                    END,
+                    recent.first_added_sort DESC,
+                    recent.name ASC
                 LIMIT :limit
                 """
                 ),
                 {
-                    "top_genres": top_genres_lower,
-                    "similar_targets": similar_target_names_lower,
-                    "followed": followed_names_lower,
-                    "user_id": user_id,
-                    "negative_actions": [
-                        "dismiss",
-                        "not_interested",
-                        "ignored_cooldown",
-                    ],
-                    "positive_actions": [
-                        "opened",
-                        "played",
-                        "followed",
-                    ],
                     "limit": row_limit,
+                    "candidate_limit": candidate_limit,
+                    "user_id": user_id,
+                    "followed_names_lower": followed_names_lower,
+                    "similar_target_names_lower": similar_target_names_lower,
+                    "top_genres_lower": top_genres_lower,
                 },
             )
             .mappings()
             .all()
         )
-
-        if not rows_result:
-            rows_result = (
-                session.execute(
-                    text(
-                        """
-                    SELECT
-                        id,
-                        slug,
-                        name,
-                        COALESCE(listeners, 0) AS listeners,
-                        COALESCE(lastfm_playcount, 0) AS scrobbles,
-                        COALESCE(album_count, 0) AS album_count,
-                        COALESCE(track_count, 0) AS track_count,
-                        COALESCE(bio, '') AS bio,
-                        0::INTEGER AS genre_hits,
-                        0::INTEGER AS similar_hits,
-                        COALESCE((
-                            SELECT SUM(ure.shown_count)
-                            FROM user_recommendation_exposures ure
-                            WHERE ure.user_id = :user_id
-                              AND ure.surface = 'home.hero'
-                              AND ure.entity_type = 'artist'
-                              AND ure.entity_key = 'artist:' || library_artists.slug
-                              AND ure.shown_on >= CURRENT_DATE - INTERVAL '14 days'
-                              AND (ure.expires_at IS NULL OR ure.expires_at > NOW())
-                        ), 0)::INTEGER AS recent_exposure_count,
-                        COALESCE((
-                            SELECT COUNT(*)
-                            FROM user_recommendation_feedback urf_positive
-                            WHERE urf_positive.user_id = :user_id
-                              AND urf_positive.surface = 'home.hero'
-                              AND urf_positive.entity_type = 'artist'
-                              AND urf_positive.entity_key = 'artist:' || library_artists.slug
-                              AND urf_positive.action = ANY(:positive_actions)
-                              AND (urf_positive.expires_at IS NULL OR urf_positive.expires_at > NOW())
-                        ), 0)::INTEGER AS positive_feedback_count
-                    FROM library_artists
-                    WHERE has_photo = 1
-                      AND name NOT LIKE '.%'
-                      AND COALESCE(folder_name, '') NOT LIKE '.%'
-                      AND COALESCE(bio, '') <> ''
-                      AND NOT (LOWER(name) = ANY(:followed))
-                      AND (
-                        :user_id IS NULL
-                        OR NOT EXISTS (
-                            SELECT 1
-                            FROM user_recommendation_feedback urf
-                            WHERE urf.user_id = :user_id
-                              AND urf.surface = 'home.hero'
-                              AND urf.entity_type = 'artist'
-                              AND urf.entity_key = 'artist:' || library_artists.slug
-                              AND urf.action = ANY(:negative_actions)
-                              AND (urf.expires_at IS NULL OR urf.expires_at > NOW())
-                        )
-                      )
-                    ORDER BY COALESCE(listeners, 0) DESC, COALESCE(lastfm_playcount, 0) DESC
-                    LIMIT :limit
-                    """
-                    ),
-                    {
-                        "followed": followed_names_lower,
-                        "user_id": user_id,
-                        "negative_actions": [
-                            "dismiss",
-                            "not_interested",
-                            "ignored_cooldown",
-                        ],
-                        "positive_actions": [
-                            "opened",
-                            "played",
-                            "followed",
-                        ],
-                        "limit": row_limit,
-                    },
-                )
-                .mappings()
-                .all()
-            )
 
     return [dict(item) for item in rows_result]
 

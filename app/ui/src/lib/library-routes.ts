@@ -1,6 +1,7 @@
 import {
   artistApiPath as _artistApiPath,
   artistBackgroundApiUrl as _artistBackgroundApiUrl,
+  artistHeroApiUrl as _artistHeroApiUrl,
   artistPagePath as _artistPagePath,
   artistPhotoApiUrl as _artistPhotoApiUrl,
   artistTopTracksPath as _artistTopTracksPath,
@@ -133,6 +134,14 @@ export function artistBackgroundApiUrl(
         )}/background`;
   }
   return _artistBackgroundApiUrl(input, options);
+}
+
+export function artistHeroApiUrl(
+  input: AdminArtistRouteInput,
+  composition: "desktop" | "mobile",
+  options?: Parameters<typeof _artistHeroApiUrl>[2],
+) {
+  return _artistHeroApiUrl(input, composition, options);
 }
 
 export function albumCoverApiUrl(

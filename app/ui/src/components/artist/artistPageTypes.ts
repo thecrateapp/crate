@@ -55,6 +55,7 @@ export type TabKey =
   | "shows"
   | "similar"
   | "stats"
+  | "artwork"
   | "about";
 
 export interface ArtistExternalLink {

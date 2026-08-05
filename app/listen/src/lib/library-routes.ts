@@ -7,6 +7,7 @@ import {
   artistApiPath as _artistApiPath,
   artistPhotoAssetPath as _artistPhotoAssetPath,
   artistBackgroundAssetPath as _artistBackgroundAssetPath,
+  artistHeroAssetPath as _artistHeroAssetPath,
   albumPagePath as _albumPagePath,
   globalAlbumPagePath as _globalAlbumPagePath,
   globalAlbumUidFromRouteRef as _globalAlbumUidFromRouteRef,
@@ -116,6 +117,12 @@ export const artistBackgroundAssetPath = ((input, options) =>
     input,
     preferModernImageFormat(options),
   )) as typeof _artistBackgroundAssetPath;
+export const artistHeroAssetPath = ((input, composition, options) =>
+  _artistHeroAssetPath(
+    input,
+    composition,
+    preferModernImageFormat(options),
+  )) as typeof _artistHeroAssetPath;
 export const albumCoverAssetPath = ((input, options) =>
   _albumCoverAssetPath(
     input,
@@ -129,6 +136,7 @@ export const genreCoverAssetPath = ((slug, options) =>
 
 export const artistPhotoApiUrl = artworkUrl(artistPhotoAssetPath);
 export const artistBackgroundApiUrl = artworkUrl(artistBackgroundAssetPath);
+export const artistHeroApiUrl = artworkUrl(artistHeroAssetPath);
 export const albumCoverApiUrl = artworkUrl(albumCoverAssetPath);
 export const genreCoverApiUrl = artworkUrl(genreCoverAssetPath);
 

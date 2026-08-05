@@ -18,6 +18,7 @@ import {
   PlayerProgressContext,
   PlayerStateContext,
   type PlayerActionsValue,
+  type JamTransportControls,
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
@@ -91,6 +92,8 @@ export function createMockPlayerActions(
   return {
     queue: currentTrack ? [currentTrack] : [],
     currentIndex: 0,
+    jamQueueLocked: false,
+    jamTransport: null as JamTransportControls | null,
     shuffle: false,
     repeat: "off",
     playSource: null,
@@ -113,6 +116,21 @@ export function createMockPlayerActions(
     addToQueue: vi.fn(),
     removeFromQueue: vi.fn(),
     reorderQueue: vi.fn(),
+    enterJamSession: vi.fn(),
+    leaveJamSession: vi.fn(),
+    setJamTransport: vi.fn(),
+    syncJamQueue: vi.fn(),
+    captureQueueSnapshot: vi.fn(() => ({
+      queue: [],
+      currentIndex: 0,
+      currentTime: 0,
+      isPlaying: false,
+      shuffle: false,
+      repeat: "off" as const,
+      playSource: null,
+      unshuffledQueue: null,
+    })),
+    restoreQueueSnapshot: vi.fn(),
     publishConnectState: vi.fn(async () => undefined),
     connect: {
       activeInstanceId: null,

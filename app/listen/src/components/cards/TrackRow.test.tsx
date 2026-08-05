@@ -96,6 +96,32 @@ describe("TrackRow playback behavior", () => {
     );
   });
 
+  it("animates the heart when adding a track to the collection", async () => {
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(<TrackRow track={track} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTitle("Like"));
+
+    expect(screen.getByTestId("track-like-particles")).toBeInTheDocument();
+    expect(screen.getByTestId("track-like-heart")).toHaveClass(
+      "crate-follow-heart-in",
+    );
+    expect(toggleTrackLikeMock).toHaveBeenCalledWith(
+      1,
+      "entity-1",
+      "",
+      undefined,
+    );
+  });
+
   it("does not activate the row when selecting queue actions from the menu", async () => {
     const playAll = vi.fn();
     const playNext = vi.fn();

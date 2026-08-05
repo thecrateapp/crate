@@ -17,7 +17,6 @@ import {
   CRATE_ICON_SIZE,
   Disc,
   Heart,
-  HeartBold,
   ListPlus,
   Loader2,
   MoreHorizontal,
@@ -32,6 +31,7 @@ import {
 import { toast } from "sonner";
 
 import { AppPopover, AppPopoverDivider } from "@crate/ui/primitives/AppPopover";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import {
   GenrePillRow,
   type GenreProfileItem,
@@ -698,13 +698,11 @@ export function Album() {
     try {
       if (saved) {
         await unsaveAlbum(albumId, globalAlbumUid);
-        toast.success(t("album.toasts.removedCollection"));
       } else {
         await saveAlbum(albumId, globalAlbumUid);
-        toast.success(t("album.toasts.addedCollection"));
       }
     } catch {
-      toast.error(t("album.toasts.updateCollectionFailed"));
+      // Saved state remains unchanged when the request fails.
     }
   }
 
@@ -1561,7 +1559,7 @@ export function Album() {
               </button>
             ) : null}
             {canSaveAlbum ? (
-              <button
+              <FollowHeartButton
                 className={`${SECONDARY_ACTION_CLASS} ${
                   saved
                     ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
@@ -1573,17 +1571,11 @@ export function Album() {
                     ? t("album.actions.removeFromCollection")
                     : t("album.actions.addToCollection")
                 }
+                following={saved}
+                iconSize={CRATE_ICON_SIZE.lg}
               >
-                {saved ? (
-                  <HeartBold
-                    size={CRATE_ICON_SIZE.lg}
-                    className="animate-crate-icon-active-pulse"
-                  />
-                ) : (
-                  <Heart size={CRATE_ICON_SIZE.lg} />
-                )}
                 <span>{saved ? t("common.added") : t("common.add")}</span>
-              </button>
+              </FollowHeartButton>
             ) : null}
             <button
               className={SECONDARY_ACTION_CLASS}

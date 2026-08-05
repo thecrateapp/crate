@@ -34,6 +34,28 @@ describe("AppModal", () => {
     expect(screen.getByText("Content")).toBeInTheDocument();
   });
 
+  it("does not steal focus from a field focused before the initial focus frame", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+
+    render(
+      <AppModal open onClose={() => {}}>
+        <button type="button">First action</button>
+        <input aria-label="Room tags" />
+      </AppModal>,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Room tags" });
+    input.focus();
+    frames[0]?.(0);
+
+    expect(document.activeElement).toBe(input);
+  });
+
   it("portals the overlay to document.body", () => {
     const { container } = render(
       <div className="stacking-context">

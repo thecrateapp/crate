@@ -151,6 +151,80 @@ class TestHomeCatalog:
         )
         assert rows == []
 
+    def test_get_home_hero_rows_includes_user_taste_and_history_signals(self, pg_db):
+        from crate.db.queries.home_catalog import get_home_hero_rows
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        user = pg_db.create_user("hero-personalization-query@test.com")
+        pg_db.upsert_artist({"name": "Followed Hero"})
+        pg_db.upsert_artist({"name": "Listened Hero"})
+        pg_db.set_artist_genres("Followed Hero", [("post-hardcore", 0.9, "test")])
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET has_photo = 1
+                    WHERE name IN ('Followed Hero', 'Listened Hero')
+                    """
+                )
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_follows (user_id, artist_name, created_at)
+                    VALUES (:user_id, 'Followed Hero', NOW())
+                    """
+                ),
+                {"user_id": user["id"]},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_artist_stats (
+                        user_id, stat_window, artist_name,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '90d', 'Listened Hero',
+                        9, 7, 27.0, NOW() - INTERVAL '20 days', NOW()
+                    )
+                    """
+                ),
+                {"user_id": user["id"]},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_play_events (
+                        user_id, artist, started_at, ended_at, created_at
+                    )
+                    VALUES (
+                        :user_id, 'Listened Hero', NOW(), NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": user["id"]},
+            )
+
+        rows = get_home_hero_rows(
+            user_id=user["id"],
+            followed_names_lower=["followed hero"],
+            similar_target_names_lower=["listened hero"],
+            top_genres_lower=["post-hardcore"],
+            limit=5,
+        )
+
+        followed = next(row for row in rows if row["name"] == "Followed Hero")
+        listened = next(row for row in rows if row["name"] == "Listened Hero")
+        assert followed["is_followed"] is True
+        assert followed["genre_hits"] == 1
+        assert listened["similar_hits"] == 1
+        assert listened["user_play_count"] == 9
+        assert listened["recent_exposure_count"] == 1
+
     def test_get_home_hero_rows_fallback_no_genre(self, pg_db):
         from crate.db.queries.home_catalog import get_home_hero_rows
         from crate.db.tx import transaction_scope
@@ -172,7 +246,53 @@ class TestHomeCatalog:
         assert len(rows) >= 1
         assert rows[0]["name"] == "Hero Artist"
 
-    def test_get_home_hero_rows_excludes_active_negative_feedback(self, pg_db):
+    def test_get_home_hero_rows_accepts_approved_specific_artwork_without_photo(
+        self, pg_db
+    ):
+        from crate.db.queries.home_catalog import get_home_hero_rows
+        from crate.db.repositories.artist_hero_artwork import (
+            upsert_artist_hero_artwork,
+        )
+        from crate.db.tx import read_scope
+        from sqlalchemy import text
+
+        pg_db.upsert_artist({"name": "Hero Artwork Only"})
+        with read_scope() as session:
+            artist_id = session.execute(
+                text("SELECT id FROM library_artists WHERE name = 'Hero Artwork Only'")
+            ).scalar_one()
+        recipe = {
+            "mode": "crop",
+            "crop": {"x": 0, "y": 0, "width": 1800, "height": 1000},
+            "position_x": 0.5,
+            "position_y": 0.5,
+            "scale": 1,
+            "flip_horizontal": False,
+            "blur": 32,
+            "feather": 28,
+            "gradient": 0.45,
+        }
+        upsert_artist_hero_artwork(
+            artist_id=artist_id,
+            provenance="manual",
+            review_status="approved",
+            source_width=1800,
+            source_height=1000,
+            desktop_recipe=recipe,
+            mobile_recipe=recipe,
+            revision="hero-only-revision",
+        )
+
+        rows = get_home_hero_rows(
+            followed_names_lower=[],
+            similar_target_names_lower=[],
+            top_genres_lower=[],
+        )
+
+        hero = next(row for row in rows if row["name"] == "Hero Artwork Only")
+        assert hero["artwork_provenance"] == "specific"
+
+    def test_get_home_hero_rows_ignores_recommendation_feedback(self, pg_db):
         from crate.db.queries.home_catalog import get_home_hero_rows
         from crate.db.repositories.recommendations import record_recommendation_feedback
         from crate.db.tx import transaction_scope
@@ -207,7 +327,217 @@ class TestHomeCatalog:
             top_genres_lower=["post-punk"],
         )
 
-        assert all(row["name"] != "Dismissed Hero" for row in rows)
+        assert any(row["name"] == "Dismissed Hero" for row in rows)
+
+    def test_get_home_hero_rows_orders_by_first_library_arrival(self, pg_db):
+        from crate.db.queries.home_catalog import get_home_hero_rows
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        for name, album, added_at in (
+            ("Older Popular Hero", "Old Album", 100),
+            ("Newest Quiet Hero", "New Album", 900),
+        ):
+            pg_db.upsert_artist({"name": name})
+            pg_db.upsert_album(
+                {
+                    "artist": name,
+                    "name": album,
+                    "path": f"/music/{name.lower().replace(' ', '-')}/{album.lower().replace(' ', '-')}",
+                    "dir_mtime": added_at,
+                    "track_count": 1,
+                }
+            )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET has_photo = 1,
+                        bio = 'Eligible hero',
+                        listeners = CASE
+                            WHEN name = 'Older Popular Hero' THEN 9999999
+                            ELSE 10
+                        END
+                    WHERE name IN ('Older Popular Hero', 'Newest Quiet Hero')
+                    """
+                )
+            )
+
+        rows = get_home_hero_rows(
+            followed_names_lower=["newest quiet hero"],
+            similar_target_names_lower=["older popular hero"],
+            top_genres_lower=[],
+            limit=2,
+        )
+
+        assert [row["name"] for row in rows] == [
+            "Newest Quiet Hero",
+            "Older Popular Hero",
+        ]
+
+    def test_get_home_hero_rows_weights_specific_artwork_inside_recent_window(
+        self, pg_db
+    ):
+        from crate.db.queries.home_catalog import get_home_hero_rows
+        from crate.db.repositories.artist_hero_artwork import (
+            upsert_artist_hero_artwork,
+        )
+        from crate.db.tx import read_scope, transaction_scope
+        from sqlalchemy import text
+
+        for name, album, added_at in (
+            ("Specific Older Hero", "Specific Album", 100),
+            ("Fallback Newer Hero", "Fallback Album", 900),
+        ):
+            pg_db.upsert_artist({"name": name})
+            pg_db.upsert_album(
+                {
+                    "artist": name,
+                    "name": album,
+                    "path": f"/music/{name}/{album}",
+                    "dir_mtime": added_at,
+                    "track_count": 1,
+                }
+            )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET has_photo = 1
+                    WHERE name IN ('Specific Older Hero', 'Fallback Newer Hero')
+                    """
+                )
+            )
+        with read_scope() as session:
+            artist_id = session.execute(
+                text(
+                    """
+                    SELECT id FROM library_artists
+                    WHERE name = 'Specific Older Hero'
+                    """
+                )
+            ).scalar_one()
+        recipe = {
+            "mode": "crop",
+            "crop": {"x": 0, "y": 0, "width": 1800, "height": 1000},
+            "position_x": 0.5,
+            "position_y": 0.5,
+            "scale": 1,
+            "flip_horizontal": False,
+            "blur": 32,
+            "feather": 28,
+            "gradient": 0.45,
+        }
+        upsert_artist_hero_artwork(
+            artist_id=artist_id,
+            provenance="manual",
+            review_status="approved",
+            source_width=1800,
+            source_height=1000,
+            desktop_recipe=recipe,
+            mobile_recipe=recipe,
+            revision="specific-priority",
+        )
+
+        rows = get_home_hero_rows(
+            followed_names_lower=[],
+            similar_target_names_lower=[],
+            top_genres_lower=[],
+            limit=2,
+        )
+
+        assert [row["name"] for row in rows] == [
+            "Specific Older Hero",
+            "Fallback Newer Hero",
+        ]
+
+    def test_get_home_hero_rows_prioritizes_specific_artwork_before_candidate_limit(
+        self, pg_db
+    ):
+        from crate.db.queries.home_catalog import get_home_hero_rows
+        from crate.db.repositories.artist_hero_artwork import (
+            upsert_artist_hero_artwork,
+        )
+        from crate.db.tx import read_scope, transaction_scope
+        from sqlalchemy import text
+
+        artist_names = ["Specific Candidate Hero"]
+        for index in range(15):
+            name = f"Newer Fallback Hero {index:02d}"
+            artist_names.append(name)
+            pg_db.upsert_artist({"name": name})
+            pg_db.upsert_album(
+                {
+                    "artist": name,
+                    "name": f"Fallback Album {index:02d}",
+                    "path": f"/music/{name}/album",
+                    "dir_mtime": 200 + index,
+                    "track_count": 1,
+                }
+            )
+
+        pg_db.upsert_artist({"name": "Specific Candidate Hero"})
+        pg_db.upsert_album(
+            {
+                "artist": "Specific Candidate Hero",
+                "name": "Specific Candidate Album",
+                "path": "/music/Specific Candidate Hero/album",
+                "dir_mtime": 100,
+                "track_count": 1,
+            }
+        )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET has_photo = 1
+                    WHERE name = ANY(:artist_names)
+                    """
+                ),
+                {"artist_names": artist_names},
+            )
+        with read_scope() as session:
+            artist_id = session.execute(
+                text(
+                    """
+                    SELECT id FROM library_artists
+                    WHERE name = 'Specific Candidate Hero'
+                    """
+                )
+            ).scalar_one()
+        recipe = {
+            "mode": "crop",
+            "crop": {"x": 0, "y": 0, "width": 1800, "height": 1000},
+            "position_x": 0.5,
+            "position_y": 0.5,
+            "scale": 1,
+            "flip_horizontal": False,
+            "blur": 32,
+            "feather": 28,
+            "gradient": 0.45,
+        }
+        upsert_artist_hero_artwork(
+            artist_id=artist_id,
+            provenance="manual",
+            review_status="approved",
+            source_width=1800,
+            source_height=1000,
+            desktop_recipe=recipe,
+            mobile_recipe=recipe,
+            revision="specific-candidate-priority",
+        )
+
+        rows = get_home_hero_rows(
+            followed_names_lower=[],
+            similar_target_names_lower=[],
+            top_genres_lower=[],
+            limit=5,
+        )
+
+        assert rows[0]["name"] == "Specific Candidate Hero"
 
 
 class TestHomeTrackArtistCore:

@@ -119,4 +119,53 @@ describe("Shell", () => {
       "true",
     );
   });
+
+  it("overlays a transparent scrim header on desktop Home without hiding actions", () => {
+    viewportState.isDesktop = true;
+
+    const { container } = renderWithListenProviders(<Shell />, { route: "/" });
+
+    expect(screen.getByTestId("topbar")).toHaveAttribute(
+      "data-hide-mobile-actions",
+      "false",
+    );
+    expect(screen.getByTestId("listen-header")).toHaveAttribute(
+      "data-home-overlay",
+      "true",
+    );
+    expect(
+      container.querySelector(".listen-home-top-scrim"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("listen-content")).toHaveClass(
+      "max-w-[1480px]",
+      "px-0",
+      "pt-0",
+    );
+  });
+
+  it("uses the same 1480px desktop viewport on regular pages", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />, { route: "/artists/7/converge" });
+
+    expect(screen.getByTestId("listen-content")).toHaveClass(
+      "max-w-[1480px]",
+      "px-6",
+    );
+    expect(screen.getByTestId("listen-content")).not.toHaveClass(
+      "max-w-[1560px]",
+      "px-10",
+    );
+  });
+
+  it("keeps the existing mobile Home header chrome", () => {
+    const { container } = renderWithListenProviders(<Shell />, { route: "/" });
+
+    expect(screen.getByTestId("listen-header")).toHaveAttribute(
+      "data-home-overlay",
+      "false",
+    );
+    expect(container.querySelector(".listen-home-top-scrim")).toBeNull();
+    expect(screen.getByTestId("listen-content")).not.toHaveClass("pt-0");
+  });
 });

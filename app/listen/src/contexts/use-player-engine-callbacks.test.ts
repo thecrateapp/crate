@@ -5,6 +5,7 @@ import type { MutableRefObject } from "react";
 import type { GaplessPlayerCallbacks } from "@/lib/gapless-player";
 import { seekTo as gaplessSeekTo } from "@/lib/gapless-player";
 import type { PlaySource, Track } from "@/contexts/player-types";
+import { PLAYER_TRACK_FINISHED_EVENT } from "@/contexts/player-events";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 
 vi.mock("@/contexts/player-utils", () => ({
@@ -129,6 +130,21 @@ describe("usePlayerEngineCallbacks", () => {
     options.callbacksRef.current.onPlay?.("/stream/a");
 
     expect(options.onActivePlaybackStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("publishes the track that the engine finished", () => {
+    const options = createOptions();
+    const listener = vi.fn();
+    window.addEventListener(PLAYER_TRACK_FINISHED_EVENT, listener);
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.engineTrackMapRef.current.set("/stream/a", [TRACK_A]);
+    options.callbacksRef.current.onTrackFinished?.("/stream/a");
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: { track: TRACK_A } }),
+    );
+    window.removeEventListener(PLAYER_TRACK_FINISHED_EVENT, listener);
   });
 
   it("reports elapsed startup time after a play request is fulfilled", () => {

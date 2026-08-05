@@ -1,14 +1,7 @@
 import { memo, useId, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import {
-  CRATE_ICON_SIZE,
-  Disc3,
-  Play,
-  Pause,
-  Heart,
-  HeartBold,
-} from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc3, Play, Pause } from "@crate/ui/icons";
 import {
   ItemActionMenu,
   ItemActionMenuButton,
@@ -31,7 +24,7 @@ import {
   toPlayableTrack,
 } from "@/lib/playable-track";
 import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { cn, formatDuration } from "@/lib/utils";
@@ -575,13 +568,14 @@ export const TrackRow = memo(function TrackRow({
 
       {/* Like + Actions */}
       {hasTrackRef ? (
-        <ActionIconButton
-          variant="row"
-          active={liked}
-          className={`h-9 w-9 flex-shrink-0 transition-opacity ${
+        <FollowHeartButton
+          className={`h-9 w-9 flex-shrink-0 rounded-full transition-opacity ${
             liked ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100"
           }`}
           title={liked ? "Unlike" : "Like"}
+          following={liked}
+          heartTestId="track-like-heart"
+          particlesTestId="track-like-particles"
           onClick={async (e) => {
             e.stopPropagation();
             const path = track.path || "";
@@ -601,16 +595,8 @@ export const TrackRow = memo(function TrackRow({
               // Keep row interaction non-blocking; caller surfaces persistence elsewhere.
             }
           }}
-        >
-          {liked ? (
-            <HeartBold
-              size={CRATE_ICON_SIZE.md}
-              className="animate-crate-icon-active-pulse"
-            />
-          ) : (
-            <Heart size={CRATE_ICON_SIZE.md} />
-          )}
-        </ActionIconButton>
+          iconSize={CRATE_ICON_SIZE.md}
+        />
       ) : (
         <div className="h-9 w-9 flex-shrink-0" />
       )}

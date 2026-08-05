@@ -4,6 +4,7 @@ import type { Track } from "@/contexts/PlayerContext";
 import {
   initialJamSessionState,
   jamSessionReducer,
+  payloadToTrack,
   type JamRoom,
 } from "@/pages/jam-reducer";
 
@@ -63,6 +64,35 @@ describe("jamSessionReducer", () => {
     });
     expect(next.sharedQueue).toHaveLength(1);
     expect(next.sharedQueue[0]).toEqual(track);
+  });
+
+  it("rehydrates Jam artwork from canonical album identity", () => {
+    const track = payloadToTrack({
+      id: "track-1",
+      global_album_uid: "global-album-1",
+      title: "Song",
+      artist: "Artist",
+      album: "Album",
+      albumCover:
+        "https://old-session.example/api/catalog/albums/global-album-1/cover?media_ticket=expired",
+    });
+
+    expect(track?.albumCover).toBe(
+      "/api/catalog/albums/global-album-1/cover?size=512&format=webp",
+    );
+  });
+
+  it("rehydrates legacy artwork URLs even when the payload has no album id", () => {
+    const track = payloadToTrack({
+      id: "track-legacy",
+      title: "Legacy song",
+      artist: "Artist",
+      album: "Album",
+      albumCover:
+        "https://listen.example/api/albums/42/cover?media_ticket=expired",
+    });
+
+    expect(track?.albumCover).toBe("/api/albums/42/cover?size=512&format=webp");
   });
 
   it("removes track from shared queue by index", () => {

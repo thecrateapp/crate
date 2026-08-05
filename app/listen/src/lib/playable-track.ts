@@ -40,6 +40,7 @@ export interface PlayableTrackInput {
   album_slug?: string | null;
   albumSlug?: string | null;
   albumCover?: string | null;
+  album_cover?: string | null;
   path?: string | null;
   track_path?: string | null;
   library_track_id?: number | null;
@@ -177,7 +178,9 @@ export function toPlayableTrack(
   options: { cover?: string } = {},
 ): Track {
   const albumCover =
-    resolveMaybeApiAssetUrl(options.cover || input.albumCover) || undefined;
+    resolveMaybeApiAssetUrl(
+      options.cover || input.albumCover || input.album_cover,
+    ) || undefined;
   const canonicalGlobalTrackUid = globalTrackUid(input) ?? undefined;
   const inferredLocalEntityUid =
     !canonicalGlobalTrackUid &&

@@ -25,6 +25,14 @@ TASK_TYPE_LABELS: dict[str, str] = {
     "write_portable_metadata": "Portable Metadata",
     "rehydrate_portable_metadata": "Portable Metadata Rehydrate",
     "export_rich_metadata": "Rich Metadata Export",
+    "backfill_artist_heroes": "Artist Hero Backfill",
+    "compose_artist_hero": "Artist Hero Composition",
+    "recompose_artist_hero": "Artist Hero Renderer Migration",
+    "derive_artist_hero": "Artist Hero Composition",
+    "import_artist_artwork_asset": "Artist Artwork Gallery",
+    "assign_artist_artwork_slot": "Artist Artwork Assignment",
+    "delete_artist_artwork_asset": "Artist Artwork Deletion",
+    "prime_jam_auto_dj": "Jam Room Auto DJ",
     # Enrichment
     "enrich_artists": "Artist Enrichment",
     "enrich_artist": "Artist Enrichment",
@@ -62,6 +70,7 @@ TASK_TYPE_LABELS: dict[str, str] = {
 }
 
 TASK_TYPE_ICONS: dict[str, str] = {
+    "prime_jam_auto_dj": "🎵",
     "library_sync": "\U0001f4c2",
     "import_queue_item": "\U0001f4e5",
     "import_queue_all": "\U0001f4e5",

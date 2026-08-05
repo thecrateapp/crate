@@ -1,7 +1,8 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import type { HomeDiscoveryPayload } from "@/components/home/home-model";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
@@ -71,6 +72,7 @@ function homeDiscoveryPayload(): HomeDiscoveryPayload {
         album_count: 9,
         track_count: 118,
         bio: "Converge are a Massachusetts hardcore band.",
+        artwork_provenance: "fallback",
       },
     ],
     recently_played: [],
@@ -167,6 +169,21 @@ describe("Home", () => {
     expect(screen.queryByRole("button", { name: /^DNA$/i })).toBeNull();
   });
 
+  it("does not show an infinite loader when discovery fails", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "401 Unauthorized",
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Home />);
+
+    expect(screen.queryByText("Loading home.")).toBeNull();
+    expect(screen.getByText("Try again in a moment.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+  });
+
   it("keeps Custom mixes and Just landed out of the desktop home", () => {
     viewportState.isDesktop = true;
     vi.mocked(useApi).mockReturnValue({
@@ -179,7 +196,37 @@ describe("Home", () => {
     renderWithListenProviders(<Home />);
 
     expect(screen.queryByText("Custom mixes")).toBeNull();
-    expect(screen.queryByText("Just landed")).toBeNull();
+    expect(screen.getAllByText("Just landed")).toHaveLength(1);
+  });
+
+  it("composes the desktop greeting inside the hero without overlapping the rails", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Home />);
+
+    expect(
+      within(screen.getByTestId("desktop-hero-intro")).getByRole("heading", {
+        name: /Good (morning|afternoon|evening)/,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("home-discovery-content")).toHaveClass(
+      "max-w-[1480px]",
+      "relative",
+      "z-30",
+      "mt-0",
+      "pt-8",
+      "2xl:-mt-16",
+      "2xl:pt-0",
+    );
+    expect(screen.getByTestId("home-discovery-content")).not.toHaveClass(
+      "absolute",
+    );
+    expect(
+      within(screen.getByTestId("home-discovery-content")).queryByRole(
+        "heading",
+        { name: /Good (morning|afternoon|evening)/ },
+      ),
+    ).toBeNull();
   });
 
   it("shows Just landed on the mobile home", () => {
@@ -192,6 +239,16 @@ describe("Home", () => {
 
     renderWithListenProviders(<Home />);
 
-    expect(screen.getByText("Just landed")).toBeInTheDocument();
+    expect(screen.getAllByText("Just landed")).toHaveLength(2);
+  });
+
+  it("does not treat the featured artist as a recommendation surface", () => {
+    renderWithListenProviders(<Home />);
+
+    expect(vi.mocked(api)).not.toHaveBeenCalledWith(
+      expect.stringMatching(/recommendations\/(feedback|exposures)/),
+      expect.anything(),
+      expect.anything(),
+    );
   });
 });

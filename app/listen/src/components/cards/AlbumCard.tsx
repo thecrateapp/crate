@@ -1,13 +1,7 @@
 import { memo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import {
-  CRATE_ICON_SIZE,
-  Disc3,
-  Heart,
-  HeartBold,
-  Loader2,
-  Play,
-} from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc3, Loader2, Play } from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
@@ -19,7 +13,7 @@ import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverArtwork, artworkFromUrl } from "@/lib/artwork-source";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
@@ -82,6 +76,7 @@ export const AlbumCard = memo(function AlbumCard({
   compact,
   layout = "rail",
 }: AlbumCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { isSaved, toggleAlbumSaved } = useSavedAlbums();
@@ -237,12 +232,17 @@ export const AlbumCard = memo(function AlbumCard({
         imageClassName="object-cover"
       >
         {(albumId != null || globalAlbumUid) && (
-          <ActionIconButton
-            variant="card"
-            active={saved}
-            className={`absolute top-2 right-2 z-10 ${
+          <FollowHeartButton
+            className={`absolute top-2 right-2 z-10 flex h-9 min-h-11 w-9 min-w-11 items-center justify-center rounded-full border border-[var(--idle-border)] bg-black/55 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-[color,filter,transform] hover:-translate-y-px md:min-h-0 md:min-w-0 ${
               saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
+            following={saved}
+            iconSize={CRATE_ICON_SIZE.md}
+            aria-label={
+              saved
+                ? t("album.actions.removeFromCollection")
+                : t("album.actions.addToCollection")
+            }
             onClick={async (event) => {
               event.stopPropagation();
               try {
@@ -251,13 +251,7 @@ export const AlbumCard = memo(function AlbumCard({
                 // no-op; page-level toasts can be added later
               }
             }}
-          >
-            {saved ? (
-              <HeartBold size={CRATE_ICON_SIZE.md} />
-            ) : (
-              <Heart size={CRATE_ICON_SIZE.md} />
-            )}
-          </ActionIconButton>
+          />
         )}
         <OfflineBadge
           state={offlineState}

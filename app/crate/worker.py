@@ -269,9 +269,21 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     last_metrics_flush = 0
     last_shadow_backfill = 0
     last_media_worker_bridge = 0
+    last_jam_auto_dj = 0
 
     while not stop_event.is_set():
         now = _time.time()
+
+        # Detached Auto DJ rooms are driven by the worker, so playback keeps
+        # advancing even when the host has disconnected.
+        if now - last_jam_auto_dj > 3:
+            last_jam_auto_dj = now
+            try:
+                from crate.jam_auto_dj import run_auto_dj_once
+
+                run_auto_dj_once()
+            except Exception:
+                log.debug("Detached Jam Auto DJ tick failed", exc_info=True)
 
         # Scheduled tasks every 60s
         if now - last_schedule_check > 60:
@@ -573,6 +585,10 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "ARTWORK_TASK_HANDLERS",
         (
             "materialize_artwork_variants",
+            "compose_artist_hero",
+            "recompose_artist_hero",
+            "derive_artist_hero",
+            "backfill_artist_heroes",
             "backfill_artwork_variants",
             "cleanup_artwork_variants",
             "repair_artwork_variants",
@@ -584,6 +600,9 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "batch_covers",
             "scan_missing_covers",
             "apply_cover",
+            "assign_artist_artwork_slot",
+            "delete_artist_artwork_asset",
+            "import_artist_artwork_asset",
             "upload_image",
         ),
     ),
@@ -600,6 +619,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "compute_completeness",
             "refresh_probable_setlist",
         ),
+    ),
+    (
+        "crate.worker_handlers.jam",
+        "JAM_TASK_HANDLERS",
+        ("prime_jam_auto_dj",),
     ),
     (
         "crate.worker_handlers.integrations",

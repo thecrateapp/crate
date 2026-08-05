@@ -109,28 +109,6 @@ def test_process_domain_events_isolates_poison_projection(monkeypatch):
     assert failed == [("1-0", "poison projection")]
 
 
-def test_warm_recent_home_discovery_snapshots_refreshes_recent_users(monkeypatch):
-    from crate import projector
-
-    calls = []
-
-    monkeypatch.setattr(
-        projector,
-        "list_recent_home_user_ids",
-        lambda window_minutes=30, limit=10: [7, 9],
-    )
-    monkeypatch.setattr(
-        projector,
-        "get_cached_home_discovery",
-        lambda user_id, fresh=False: calls.append((user_id, fresh)) or {},
-    )
-
-    warmed = projector.warm_recent_home_discovery_snapshots()
-
-    assert warmed == 2
-    assert calls == [(7, True), (9, True)]
-
-
 def test_process_domain_events_refreshes_home_for_semantic_user_event(monkeypatch):
     from crate import projector
 
@@ -312,8 +290,8 @@ def test_process_domain_events_refreshes_ops_and_recent_home_for_catalog_invalid
     )
     monkeypatch.setattr(
         projector,
-        "list_recent_home_user_ids",
-        lambda window_minutes=30, limit=10: [5],
+        "warm_recent_home_discovery_snapshots",
+        lambda: calls["home"].append((5, True)) or 1,
     )
     monkeypatch.setattr(
         projector,
@@ -361,8 +339,8 @@ def test_process_domain_events_refreshes_recent_home_for_global_home_invalidatio
     )
     monkeypatch.setattr(
         projector,
-        "list_recent_home_user_ids",
-        lambda window_minutes=30, limit=10: [7, 9],
+        "warm_recent_home_discovery_snapshots",
+        lambda: calls["home"].extend([(7, True), (9, True)]) or 2,
     )
     monkeypatch.setattr(
         projector,
@@ -429,8 +407,8 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
     )
     monkeypatch.setattr(
         projector,
-        "list_recent_home_user_ids",
-        lambda window_minutes=30, limit=10: [7],
+        "warm_recent_home_discovery_snapshots",
+        lambda: calls["home"].append((7, True)) or 1,
     )
     monkeypatch.setattr(
         projector,

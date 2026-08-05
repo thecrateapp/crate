@@ -21,6 +21,12 @@ body {
   background: #0a0a0f;
 }
 
+@media (min-width: 768px) {
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
 /* Prevent iOS WebView auto-zoom on input focus (requires font-size >= 16px) */
 @media screen and (max-width: 767px) {
   input[type="text"],
