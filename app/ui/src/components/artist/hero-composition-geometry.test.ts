@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import fixtures from "../../../../shared/ui/domain/artist-hero-fixtures.json";
+
 import {
   centeredCropForAspect,
   constrainCoverFrame,
@@ -11,6 +13,17 @@ import {
 } from "./hero-composition-geometry";
 
 describe("hero composition geometry", () => {
+  it("matches the shared canonical geometry fixtures", () => {
+    for (const fixture of fixtures) {
+      const frame = fillSubjectFrame(fixture.source, fixture.target, {
+        positionX: fixture.recipe.position_x,
+        positionY: fixture.recipe.position_y,
+        scale: fixture.recipe.scale,
+      });
+      expect(frame, fixture.name).toEqual(fixture.expected_frame);
+    }
+  });
+
   it("creates a centered crop for the requested artboard ratio", () => {
     expect(
       centeredCropForAspect({ width: 2400, height: 1200 }, 21 / 9),

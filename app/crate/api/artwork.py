@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from crate.api._deps import (
     album_names_from_entity_uid,
@@ -48,6 +48,7 @@ from crate.artist_hero_candidates import (
     discover_artist_hero_candidates,
     load_candidate_content,
 )
+from crate.artist_hero_contract import artist_hero_profile_contract
 from crate.db.repositories.library import get_albums_missing_covers, get_library_artist
 from crate.db.repositories.artist_artwork_assets import (
     get_artist_artwork_asset,
@@ -60,6 +61,7 @@ from crate.db.repositories.artist_hero_artwork import (
 from crate.db.releases import get_release_by_virtual_album_id
 from crate.db.repositories.tasks import create_task
 from crate.storage_layout import resolve_artist_dir
+from crate.streaming.paths import cache_root
 
 log = logging.getLogger(__name__)
 
@@ -494,8 +496,12 @@ def api_artist_hero_profile(request: Request, artist_id: int):
     profile = get_artist_hero_artwork(artist_id)
     if not profile:
         return JSONResponse({"error": "Artist hero not found"}, status_code=404)
+    payload = {
+        **profile,
+        **artist_hero_profile_contract(artist_id=artist_id, profile=profile),
+    }
     return JSONResponse(
-        jsonable_encoder(profile), headers={"Cache-Control": "no-store"}
+        jsonable_encoder(payload), headers={"Cache-Control": "no-store"}
     )
 
 
@@ -537,6 +543,79 @@ def api_artist_hero_source(
     return deliver_original_artwork(
         source_path,
         cache_control="private, max-age=300, stale-while-revalidate=3600",
+    )
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/preview-hero",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Render an unsaved artist-hero preview with the canonical worker",
+)
+async def api_preview_artist_hero(
+    request: Request,
+    artist_id: int,
+    recipe: str = Form(...),
+    composition: str = Form(...),
+    file: UploadFile | None = File(None),
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    if composition not in {"desktop", "mobile"}:
+        return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    try:
+        normalized_recipe = ArtistHeroRecipe.model_validate_json(recipe)
+    except ValueError as exc:
+        return JSONResponse({"error": f"Invalid hero recipe: {exc}"}, status_code=422)
+
+    params: dict[str, object] = {
+        "artist": artist_name,
+        "artist_id": artist_id,
+        "composition": composition,
+        "recipe": normalized_recipe.model_dump(),
+    }
+    if file is not None:
+        data = await file.read()
+        if not data or len(data) > 25 * 1024 * 1024:
+            return JSONResponse({"error": "Invalid image"}, status_code=400)
+        try:
+            from PIL import Image
+
+            with Image.open(io.BytesIO(data)) as source:
+                width, height = source.size
+                if width <= 0 or height <= 0 or width * height > 80_000_000:
+                    raise ValueError("unsafe image dimensions")
+                source.verify()
+        except (Image.DecompressionBombError, OSError, ValueError):
+            return JSONResponse({"error": "Invalid image"}, status_code=400)
+        params["data_b64"] = base64.b64encode(data).decode()
+
+    task_id = create_task("preview_artist_hero", params)
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/hero-preview/{preview_id}",
+    responses=_ARTWORK_RESPONSES,
+    summary="Read a temporary canonical artist-hero preview",
+)
+def api_artist_hero_preview(request: Request, artist_id: int, preview_id: str):
+    _require_artwork_editor(request)
+    if not artist_name_from_id(artist_id) or not preview_id.isalnum():
+        return JSONResponse({"error": "Preview not found"}, status_code=404)
+    preview_path = (
+        cache_root() / "artist-hero-previews" / f"{preview_id}.webp"
+    ).resolve()
+    preview_root = (cache_root() / "artist-hero-previews").resolve()
+    if not preview_path.is_relative_to(preview_root) or not preview_path.is_file():
+        return JSONResponse({"error": "Preview not found"}, status_code=404)
+    return FileResponse(
+        preview_path,
+        media_type="image/webp",
+        headers={"Cache-Control": "private, max-age=300"},
     )
 
 

@@ -2,11 +2,13 @@ import base64
 import hashlib
 import io as _io
 import logging
+import tempfile
 import time
 from pathlib import Path
 from typing import cast
 
 from PIL import ImageOps
+from PIL.Image import Image as PILImage
 
 from crate.artwork_materializer import materialize_artwork
 from crate.artwork_maintenance import (
@@ -69,6 +71,7 @@ from crate.db.jobs.artwork import (
     touch_artist_artwork,
 )
 from crate.storage_layout import resolve_artist_dir
+from crate.streaming.paths import cache_root
 from crate.worker_handlers import (
     DEFAULT_AUDIO_EXTENSIONS,
     TaskHandler,
@@ -80,6 +83,32 @@ log = logging.getLogger(__name__)
 
 ARTIST_HERO_WEBP_QUALITY = 95
 ARTIST_HERO_WEBP_METHOD = 6
+
+
+def _save_artist_hero_webp_atomic(image: PILImage, destination: Path) -> None:
+    """Publish a complete Hero render without exposing a partial WebP."""
+
+    destination = destination.resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+        image.save(
+            temporary_path,
+            "WEBP",
+            quality=ARTIST_HERO_WEBP_QUALITY,
+            method=ARTIST_HERO_WEBP_METHOD,
+        )
+        temporary_path.replace(destination)
+    finally:
+        if temporary_path and temporary_path.exists():
+            temporary_path.unlink()
 
 
 def _broadcast_artwork_invalidation(*scopes: str) -> None:
@@ -1133,11 +1162,8 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
                 else MOBILE_HERO_RENDER_SIZE
             )
             rendered = render_artist_hero_composition(img, recipe, output_size)
-            rendered.save(
-                _safe_dest(found_dir / f"artist-hero-{target}.webp"),
-                "WEBP",
-                quality=ARTIST_HERO_WEBP_QUALITY,
-                method=ARTIST_HERO_WEBP_METHOD,
+            _save_artist_hero_webp_atomic(
+                rendered, _safe_dest(found_dir / f"artist-hero-{target}.webp")
             )
         legacy_width = int(existing.get("source_width") or img.width)
         legacy_height = int(existing.get("source_height") or img.height)
@@ -1316,13 +1342,11 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         "mobile": "artist-hero-mobile.webp",
     }
     for target, (_raw, image) in loaded_sources.items():
-        render_artist_hero_composition(
-            image, recipes[target], output_sizes[target]
-        ).save(
+        _save_artist_hero_webp_atomic(
+            render_artist_hero_composition(
+                image, recipes[target], output_sizes[target]
+            ),
             artist_dir / output_names[target],
-            "WEBP",
-            quality=ARTIST_HERO_WEBP_QUALITY,
-            method=ARTIST_HERO_WEBP_METHOD,
         )
 
     revision_parts: list[bytes] = []
@@ -1370,6 +1394,86 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
     _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
     _warm_recent_home_discovery_snapshots()
     return {"status": "composed", "artist_id": artist_id, "revision": revision}
+
+
+def _handle_preview_artist_hero(task_id: str, params: dict, config: dict) -> dict:
+    """Render a temporary preview without mutating the persisted hero profile."""
+
+    from PIL import Image
+
+    artist = str(params.get("artist") or "").strip()
+    composition = str(params.get("composition") or "")
+    recipe = params.get("recipe")
+    if not artist or composition not in {"desktop", "mobile"}:
+        return {"error": "Invalid artist hero preview parameters"}
+    if not isinstance(recipe, dict):
+        return {"error": "Invalid artist hero recipe"}
+
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+    raw_data = params.get("data_b64")
+    if raw_data:
+        try:
+            raw = base64.b64decode(str(raw_data), validate=True)
+            with Image.open(_io.BytesIO(raw)) as opened:
+                opened.load()
+                image = ImageOps.exif_transpose(opened).convert("RGB")
+        except (ValueError, OSError):
+            return {"error": "Invalid artist hero source"}
+    else:
+        lib = Path(config["library_path"]).resolve()
+        artist_dir = resolve_artist_dir(
+            lib, artist_row, fallback_name=artist, existing_only=True
+        )
+        if not artist_dir or not artist_dir.is_dir():
+            return {"error": "Artist directory not found"}
+        source_path = artist_dir / f"artist-hero-source-{composition}.jpg"
+        if not source_path.is_file():
+            source_path = artist_dir / "artist-hero-source.jpg"
+        if not source_path.is_file():
+            return {"error": "Artist hero source not found"}
+        try:
+            raw = source_path.read_bytes()
+            with Image.open(_io.BytesIO(raw)) as opened:
+                opened.load()
+                image = ImageOps.exif_transpose(opened).convert("RGB")
+        except (OSError, ValueError):
+            return {"error": "Invalid artist hero source"}
+
+    output_size = (
+        DESKTOP_HERO_RENDER_SIZE
+        if composition == "desktop"
+        else MOBILE_HERO_RENDER_SIZE
+    )
+    rendered = render_artist_hero_composition(image, recipe, output_size)
+    preview_id = hashlib.sha256(f"{task_id}:{composition}".encode("utf-8")).hexdigest()
+    preview_dir = cache_root() / "artist-hero-previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    preview_path = preview_dir / f"{preview_id}.webp"
+    _save_artist_hero_webp_atomic(rendered, preview_path)
+    revision = artist_hero_revision(raw, repr(sorted(recipe.items())).encode("utf-8"))
+    artist_id = int(artist_row["id"])
+    size = (1480, 600) if composition == "desktop" else (1080, 1350)
+    from crate.artist_hero_contract import artist_hero_composition_view
+
+    view = artist_hero_composition_view(
+        artist_id=artist_id,
+        composition=composition,
+        recipe=recipe,
+        source_size=image.size,
+        render_revision=revision,
+    )
+    view["asset_path"] = f"/api/artwork/artists/{artist_id}/hero-preview/{preview_id}"
+    view["width"], view["height"] = size
+    return {
+        "status": "previewed",
+        "artist_id": artist_id,
+        "preview_id": preview_id,
+        "preview_url": view["asset_path"],
+        "composition": composition,
+        "view": view,
+    }
 
 
 def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> dict:
@@ -1445,13 +1549,11 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
         "mobile": "artist-hero-mobile.webp",
     }
     for composition, (_raw, image) in loaded_sources.items():
-        render_artist_hero_composition(
-            image, recipes[composition], render_sizes[composition]
-        ).save(
+        _save_artist_hero_webp_atomic(
+            render_artist_hero_composition(
+                image, recipes[composition], render_sizes[composition]
+            ),
             artist_dir / output_names[composition],
-            "WEBP",
-            quality=ARTIST_HERO_WEBP_QUALITY,
-            method=ARTIST_HERO_WEBP_METHOD,
         )
 
     revision_parts: list[bytes] = []
@@ -1547,17 +1649,11 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
         mobile_recipe=mobile_recipe,
     )
     image.save(artist_dir / "artist-hero-source.jpg", "JPEG", quality=94)
-    rendered["desktop"].save(
-        artist_dir / "artist-hero-desktop.webp",
-        "WEBP",
-        quality=ARTIST_HERO_WEBP_QUALITY,
-        method=ARTIST_HERO_WEBP_METHOD,
+    _save_artist_hero_webp_atomic(
+        rendered["desktop"], artist_dir / "artist-hero-desktop.webp"
     )
-    rendered["mobile"].save(
-        artist_dir / "artist-hero-mobile.webp",
-        "WEBP",
-        quality=ARTIST_HERO_WEBP_QUALITY,
-        method=ARTIST_HERO_WEBP_METHOD,
+    _save_artist_hero_webp_atomic(
+        rendered["mobile"], artist_dir / "artist-hero-mobile.webp"
     )
     revision = artist_hero_revision(raw, b":derived-hero")
     upsert_artist_hero_artwork(
@@ -1713,6 +1809,7 @@ ARTWORK_TASK_HANDLERS: dict[str, TaskHandler] = {
     "backfill_artwork_variants": _handle_backfill_artwork_variants,
     "backfill_artist_heroes": _handle_backfill_artist_heroes,
     "compose_artist_hero": _handle_compose_artist_hero,
+    "preview_artist_hero": _handle_preview_artist_hero,
     "recompose_artist_hero": _handle_recompose_artist_hero,
     "derive_artist_hero": _handle_derive_artist_hero,
     "cleanup_artwork_variants": _handle_cleanup_artwork_variants,

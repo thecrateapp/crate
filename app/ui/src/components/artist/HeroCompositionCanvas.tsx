@@ -29,6 +29,7 @@ import {
 import {
   ARTIST_HERO_DESKTOP_SIZE,
   ArtistHeroFrame,
+  type ArtistHeroArtworkBounds,
 } from "@crate/ui/domain/ArtistHeroFrame";
 
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ interface HeroCompositionCanvasProps {
   recipe: HeroRecipe;
   editable?: boolean;
   previewOnly?: boolean;
+  previewArtworkBounds?: ArtistHeroArtworkBounds;
   children?: ReactNode;
   onRecipeChange: (recipe: HeroRecipe) => void;
 }
@@ -172,6 +174,7 @@ export function HeroCompositionCanvas({
   recipe,
   editable = true,
   previewOnly = false,
+  previewArtworkBounds,
   children,
   onRecipeChange,
 }: HeroCompositionCanvasProps) {
@@ -325,7 +328,7 @@ export function HeroCompositionCanvas({
           scale: recipe.scale,
         })
       : null;
-  const artworkBounds = subjectFrame
+  const computedArtworkBounds = subjectFrame
     ? {
         left: subjectFrame.x / canvas.width,
         top: subjectFrame.y / canvas.height,
@@ -333,6 +336,10 @@ export function HeroCompositionCanvas({
         bottom: (subjectFrame.y + subjectFrame.height) / canvas.height,
       }
     : undefined;
+  const artworkBounds =
+    previewOnly && previewUrl && previewArtworkBounds
+      ? previewArtworkBounds
+      : computedArtworkBounds;
   const presentationViewport =
     composition === "desktop"
       ? ARTIST_HERO_DESKTOP_SIZE
@@ -360,7 +367,7 @@ export function HeroCompositionCanvas({
           contentClassName="pointer-events-none"
           artwork={
             <div className="absolute inset-0">
-              {renderedImage && imageSize ? (
+              {renderedImage && imageSize && !(previewOnly && previewUrl) ? (
                 <Stage
                   width={canvas.width}
                   height={canvas.height}

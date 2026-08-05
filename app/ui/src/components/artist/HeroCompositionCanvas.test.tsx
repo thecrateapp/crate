@@ -258,6 +258,27 @@ describe("HeroCompositionCanvas", () => {
     expect(screen.queryByText(/Fill preview/)).toBeNull();
   });
 
+  it("uses the canonical rendered artifact for preview-only output", () => {
+    render(
+      <HeroCompositionCanvas
+        sourceUrl="data:image/jpeg;base64,source"
+        previewUrl="/api/artwork/artists/7/hero-preview/preview-1"
+        artistName="Converge"
+        composition="desktop"
+        aspect={21 / 9}
+        recipe={initialRecipe}
+        previewOnly
+        onRecipeChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("konva-stage")).toBeNull();
+    expect(screen.getByRole("img")).toHaveAttribute(
+      "src",
+      "/api/artwork/artists/7/hero-preview/preview-1",
+    );
+  });
+
   it("renders the final shared edge fades and presentation over the editable artboard", async () => {
     render(
       <HeroCompositionCanvas

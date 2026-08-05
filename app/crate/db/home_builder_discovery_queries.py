@@ -7,6 +7,7 @@ from crate.artist_hero_artwork import (
     MOBILE_HERO_SIZE,
     get_artist_hero_artwork_bounds,
 )
+from crate.artist_hero_contract import artist_hero_recipe_hash
 from crate.db.home_builder_shared import _trim_bio
 from crate.db.home_hero_scoring import (
     HOME_HERO_SCORE_VERSION,
@@ -42,6 +43,7 @@ def _dedupe_home_hero_rows(rows: list[dict]) -> list[dict]:
 def _add_hero_artwork_bounds(item: dict) -> None:
     generic_width = item.pop("_hero_source_width", None)
     generic_height = item.pop("_hero_source_height", None)
+    compositions: dict[str, dict] = {}
     for composition, output_size in (
         ("desktop", DESKTOP_HERO_SIZE),
         ("mobile", MOBILE_HERO_SIZE),
@@ -51,9 +53,26 @@ def _add_hero_artwork_bounds(item: dict) -> None:
         recipe = item.pop(f"_hero_{composition}_recipe", None)
         if not width or not height or not isinstance(recipe, Mapping):
             continue
-        item[f"{composition}_artwork_bounds"] = get_artist_hero_artwork_bounds(
+        bounds = get_artist_hero_artwork_bounds(
             (int(width), int(height)), recipe, output_size
         )
+        item[f"{composition}_artwork_bounds"] = bounds
+        if item.get("artwork_revision"):
+            compositions[composition] = {
+                "schema_version": 1,
+                "composition": composition,
+                "render_revision": str(item["artwork_revision"]),
+                "recipe_hash": artist_hero_recipe_hash(recipe),
+                "width": output_size[0],
+                "height": output_size[1],
+                "bounds": bounds,
+                "asset_path": (
+                    f"/api/artists/{int(item['id'])}/hero?composition={composition}"
+                    f"&size={output_size[0]}&v={item['artwork_revision']}"
+                ),
+            }
+    if compositions:
+        item["hero_compositions"] = compositions
 
 
 def get_home_hero(

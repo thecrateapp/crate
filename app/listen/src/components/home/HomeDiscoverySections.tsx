@@ -271,6 +271,7 @@ function heroBackgroundSrc(
   hero: HomeHeroArtist,
   composition: "desktop" | "mobile",
 ): string | undefined {
+  const canonical = hero.hero_compositions?.[composition];
   const backgroundUrl = artistHeroApiUrl(
     {
       artistId: hero.id,
@@ -281,13 +282,29 @@ function heroBackgroundSrc(
     composition,
     {
       size:
-        composition === "desktop"
+        canonical?.width ??
+        (composition === "desktop"
           ? ARTIST_HERO_DESKTOP_SIZE.width
-          : ARTIST_HERO_MOBILE_SIZE.width,
-      version: hero.artwork_revision || HERO_BACKGROUND_VERSION,
+          : ARTIST_HERO_MOBILE_SIZE.width),
+      version:
+        canonical?.render_revision ||
+        hero.artwork_revision ||
+        HERO_BACKGROUND_VERSION,
     },
   );
   return backgroundUrl || undefined;
+}
+
+function heroArtworkBounds(
+  hero: HomeHeroArtist,
+  composition: "desktop" | "mobile",
+): ArtistHeroArtworkBounds | undefined {
+  return (
+    hero.hero_compositions?.[composition]?.bounds ||
+    (composition === "desktop"
+      ? hero.desktop_artwork_bounds
+      : hero.mobile_artwork_bounds)
+  );
 }
 
 function requestBackgroundWork(callback: () => void): () => void {
@@ -670,14 +687,14 @@ function MobileFeaturedArtist({
     <section className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden bg-app-surface">
       <ArtistHeroFrame
         composition="mobile"
-        artworkBounds={hero.mobile_artwork_bounds}
+        artworkBounds={heroArtworkBounds(hero, "mobile")}
         className="absolute inset-0 h-full"
         artwork={
           <HeroBackdrop
             hero={hero}
             backgroundSrc={backgroundSrc}
             composition="mobile"
-            artworkBounds={hero.mobile_artwork_bounds}
+            artworkBounds={heroArtworkBounds(hero, "mobile")}
           />
         }
       >
@@ -738,14 +755,14 @@ function DesktopFeaturedArtist({
     >
       <ArtistHeroFrame
         composition="desktop"
-        artworkBounds={hero.desktop_artwork_bounds}
+        artworkBounds={heroArtworkBounds(hero, "desktop")}
         className="h-full"
         artwork={
           <HeroBackdrop
             hero={hero}
             backgroundSrc={backgroundSrc}
             composition="desktop"
-            artworkBounds={hero.desktop_artwork_bounds}
+            artworkBounds={heroArtworkBounds(hero, "desktop")}
             ready={backgroundReady}
           />
         }

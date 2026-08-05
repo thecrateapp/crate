@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ArtistHeroArtworkEditor } from "./ArtistHeroArtworkEditor";
 import type { HeroRecipe } from "./hero-composition-geometry";
+import { waitForTask } from "@/lib/tasks";
 
 vi.mock("./HeroCompositionCanvas", async () => {
   const { ArtistHeroFrame } = await import("@crate/ui/domain/ArtistHeroFrame");
@@ -708,6 +709,60 @@ describe("ArtistHeroArtworkEditor", () => {
     );
     expect(requests.some((request) => request.init?.method === "POST")).toBe(
       false,
+    );
+  });
+
+  it("renders a changed draft with the canonical backend preview", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.mocked(waitForTask).mockResolvedValue({
+      status: "completed",
+      result: {
+        preview_url: "/api/artwork/artists/7/hero-preview/preview-1",
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        requests.push({ url: String(input), init });
+        if (init?.method === "POST") {
+          return Response.json({ status: "queued", task_id: "preview-task" });
+        }
+        return Response.json(manualProfile());
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Simulate adjusted framing" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Preview result" }));
+
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url === "/api/artwork/artists/7/preview-hero" &&
+            request.init?.method === "POST",
+        ),
+      ).toBe(true),
+    );
+    const previewRequest = requests.find(
+      (request) => request.url === "/api/artwork/artists/7/preview-hero",
+    );
+    const form = previewRequest?.init?.body as FormData;
+    expect(form.get("composition")).toBe("desktop");
+    expect(JSON.parse(String(form.get("recipe")))).toMatchObject({
+      scale: 1.37,
+      position_x: 0.21,
+      position_y: 0.77,
+    });
+    expect(within(screen.getByRole("dialog")).getByRole("img")).toHaveAttribute(
+      "src",
+      "/api/artwork/artists/7/hero-preview/preview-1",
     );
   });
 });

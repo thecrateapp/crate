@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { artistArtworkApiPath, artistHeroApiUrl } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
+import type { ArtistHeroCompositionView } from "../../../../shared/web/artist-hero-contract";
 
 import { HeroCompositionCanvas } from "./HeroCompositionCanvas";
 import type { HeroRecipe } from "./hero-composition-geometry";
@@ -31,6 +32,13 @@ interface HeroProfile {
   mobile_recipe: HeroRecipe;
   revision: string;
   updated_at: string;
+  compositions?: Partial<Record<HeroComposition, ArtistHeroCompositionView>>;
+}
+
+interface HeroPreviewArtifact {
+  key: string;
+  url: string;
+  view?: ArtistHeroCompositionView;
 }
 
 interface ArtistHeroArtworkEditorProps {
@@ -109,6 +117,9 @@ export function ArtistHeroArtworkEditor({
   const [recipes, setRecipes] =
     useState<Record<HeroComposition, HeroRecipe>>(createRecipes);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewArtifact, setPreviewArtifact] =
+    useState<HeroPreviewArtifact | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const profileEndpoint = artistArtworkApiPath({ artistId }, "hero-profile");
@@ -163,6 +174,29 @@ export function ArtistHeroArtworkEditor({
       )}?composition=${active}&v=${encodeURIComponent(profile.revision)}`
     : null;
   const activeSource = sourceUrls[active] ?? persistedSource;
+  const previewKey = JSON.stringify({
+    composition: active,
+    recipe,
+    source: sourceFiles[active]
+      ? {
+          name: sourceFiles[active]?.name,
+          size: sourceFiles[active]?.size,
+          lastModified: sourceFiles[active]?.lastModified,
+        }
+      : profile?.revision ?? null,
+  });
+  const persistedRecipe =
+    active === "desktop" ? profile?.desktop_recipe : profile?.mobile_recipe;
+  const draftDirty = Boolean(
+    sourceFiles[active] ||
+      (persistedRecipe &&
+        JSON.stringify(normalizeRecipe(persistedRecipe)) !==
+          JSON.stringify(normalizeRecipe(recipe))),
+  );
+  const canonicalPreviewView =
+    previewArtifact?.key === previewKey
+      ? previewArtifact.view
+      : profile?.compositions?.[active];
   const treatment = {
     grayscale: recipes.desktop.grayscale ?? false,
     brightness: recipes.desktop.brightness ?? 1,
@@ -191,6 +225,53 @@ export function ArtistHeroArtworkEditor({
         [active]: String(reader.result),
       }));
     reader.readAsDataURL(file);
+  }
+
+  async function openPreview() {
+    if (!canEdit || !draftDirty) {
+      setPreviewOpen(true);
+      return;
+    }
+
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    try {
+      const form = new FormData();
+      form.append("recipe", JSON.stringify(recipe));
+      form.append("composition", active);
+      const sourceFile = sourceFiles[active];
+      if (sourceFile) form.append("file", sourceFile);
+      const response = await fetch(
+        artistArtworkApiPath({ artistId }, "preview-hero"),
+        { method: "POST", body: form, credentials: "include" },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      const queued = (await response.json()) as { task_id?: string };
+      if (!queued.task_id) throw new Error("Hero preview task was not queued");
+      const task = await waitForTask(queued.task_id, 120_000);
+      if (task.status === "failed") {
+        throw new Error(task.error || "Hero artwork preview failed");
+      }
+      const result = task.result ?? {};
+      const previewUrl =
+        typeof result.preview_url === "string" ? result.preview_url : null;
+      if (!previewUrl)
+        throw new Error("Hero preview did not return an artifact");
+      setPreviewArtifact({
+        key: previewKey,
+        url: previewUrl,
+        view:
+          result.view && typeof result.view === "object"
+            ? (result.view as ArtistHeroCompositionView)
+            : undefined,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Hero artwork preview failed",
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
   }
 
   async function generate() {
@@ -496,7 +577,7 @@ export function ArtistHeroArtworkEditor({
                   variant="outline"
                   className="w-full"
                   disabled={!activeSource}
-                  onClick={() => setPreviewOpen(true)}
+                  onClick={() => void openPreview()}
                 >
                   <Eye className="h-4 w-4" />
                   Preview result
@@ -523,7 +604,7 @@ export function ArtistHeroArtworkEditor({
                   variant="outline"
                   className="w-full"
                   disabled={!activeSource}
-                  onClick={() => setPreviewOpen(true)}
+                  onClick={() => void openPreview()}
                 >
                   <Eye className="h-4 w-4" />
                   Preview result
@@ -580,15 +661,30 @@ export function ArtistHeroArtworkEditor({
             ))}
           </div>
 
-          <HeroResultPreview
-            sourceUrl={activeSource}
-            previewUrl={persistedPreview}
-            artistName={artistName}
-            genres={genres}
-            composition={active}
-            aspect={aspect}
-            recipe={recipe}
-          />
+          {previewLoading ? (
+            <div
+              className="flex min-h-48 items-center justify-center rounded-md border border-border bg-background/40 text-sm text-muted-foreground"
+              role="status"
+            >
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Rendering canonical preview…
+            </div>
+          ) : (
+            <HeroResultPreview
+              sourceUrl={activeSource}
+              previewUrl={
+                previewArtifact?.key === previewKey
+                  ? previewArtifact.url
+                  : persistedPreview
+              }
+              previewArtworkBounds={canonicalPreviewView?.bounds}
+              artistName={artistName}
+              genres={genres}
+              composition={active}
+              aspect={aspect}
+              recipe={recipe}
+            />
+          )}
 
           <p className="text-xs text-muted-foreground">
             This preview uses the current composition. Nothing is generated or
@@ -648,6 +744,7 @@ function TreatmentSlider({
 function HeroResultPreview({
   sourceUrl,
   previewUrl,
+  previewArtworkBounds,
   artistName,
   genres,
   composition,
@@ -656,6 +753,7 @@ function HeroResultPreview({
 }: {
   sourceUrl: string | null;
   previewUrl?: string;
+  previewArtworkBounds?: ArtistHeroCompositionView["bounds"];
   artistName: string;
   genres: string[];
   composition: HeroComposition;
@@ -675,6 +773,7 @@ function HeroResultPreview({
       <HeroCompositionCanvas
         sourceUrl={sourceUrl}
         previewUrl={previewUrl}
+        previewArtworkBounds={previewArtworkBounds}
         artistName={artistName}
         composition={composition}
         aspect={aspect}

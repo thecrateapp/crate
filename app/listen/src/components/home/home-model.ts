@@ -1,5 +1,6 @@
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import type { ArtistHeroArtworkBounds } from "@crate/ui/domain/ArtistHeroFrame";
+import type { ArtistHeroCompositionView } from "../../../../shared/web/artist-hero-contract";
 
 export interface SavedAlbum {
   id: number;
@@ -222,6 +223,9 @@ export interface HomeHeroArtist {
   artwork_revision?: string | null;
   desktop_artwork_bounds?: ArtistHeroArtworkBounds;
   mobile_artwork_bounds?: ArtistHeroArtworkBounds;
+  hero_compositions?: Partial<
+    Record<"desktop" | "mobile", ArtistHeroCompositionView>
+  >;
 }
 
 export interface HomeRecentPlaylistItem {

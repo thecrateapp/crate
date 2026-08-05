@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -53,6 +54,34 @@ def test_artist_hero_revision_identifies_the_current_renderer():
     )
 
     assert artist_hero_revision(b"source").startswith(f"{ARTIST_HERO_RENDER_VERSION}:")
+
+
+def test_artist_hero_preview_renders_without_mutating_the_profile(
+    monkeypatch, tmp_path
+):
+    from crate.worker_handlers.artwork import _handle_preview_artist_hero
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_library_artist",
+        lambda _artist: {"id": 7, "name": "Converge"},
+    )
+    raw = _image_bytes((1600, 1000))
+    result = _handle_preview_artist_hero(
+        "preview-task",
+        {
+            "artist": "Converge",
+            "composition": "desktop",
+            "data_b64": base64.b64encode(raw).decode(),
+            "recipe": _crop_recipe(1400, 600),
+        },
+        {"library_path": str(tmp_path / "library")},
+    )
+
+    assert result["status"] == "previewed"
+    assert result["view"]["composition"] == "desktop"
+    preview_path = tmp_path / "cache" / "artist-hero-previews"
+    assert list(preview_path.glob("*.webp"))
 
 
 def test_crop_composition_renders_exact_desktop_and_mobile_sizes():
@@ -116,6 +145,38 @@ def test_extend_composition_uses_cover_fit_like_the_editor_fill_mode():
     assert result.getpixel((0, 360)) == (230, 50, 70)
     assert result.getpixel((840, 360)) == (230, 50, 70)
     assert result.getpixel((1679, 360)) == (230, 50, 70)
+
+
+def test_shared_geometry_fixtures_match_the_backend_bounds():
+    from crate.artist_hero_artwork import get_artist_hero_artwork_bounds
+
+    fixtures_path = (
+        Path(__file__).parents[1]
+        / "shared"
+        / "ui"
+        / "domain"
+        / "artist-hero-fixtures.json"
+    )
+    fixtures = json.loads(fixtures_path.read_text())
+    for fixture in fixtures:
+        expected = fixture["expected_frame"]
+        target = fixture["target"]
+        bounds = get_artist_hero_artwork_bounds(
+            (
+                fixture["source"]["width"],
+                fixture["source"]["height"],
+            ),
+            fixture["recipe"],
+            (target["width"], target["height"]),
+        )
+        assert bounds == pytest.approx(
+            {
+                "left": expected["x"] / target["width"],
+                "top": expected["y"] / target["height"],
+                "right": (expected["x"] + expected["width"]) / target["width"],
+                "bottom": (expected["y"] + expected["height"]) / target["height"],
+            }
+        )
 
 
 def test_extend_artwork_bounds_follow_the_real_subject_rectangle():

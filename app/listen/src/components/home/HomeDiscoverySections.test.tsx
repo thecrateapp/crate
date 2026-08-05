@@ -396,6 +396,45 @@ describe("HomeTasteHero", () => {
     expect(screen.getByTestId("desktop-hero-right-scrim")).toBeInTheDocument();
   });
 
+  it("uses the canonical composition view for the asset and bounds", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[
+          heroFixture({
+            artwork_revision: "legacy-revision",
+            hero_compositions: {
+              desktop: {
+                schema_version: 1,
+                composition: "desktop",
+                render_revision: "canonical-revision",
+                recipe_hash: "recipe-hash",
+                width: 1480,
+                height: 600,
+                bounds: { left: 0.12, top: 0, right: 0.8, bottom: 1 },
+                asset_path: "/api/artists/7/hero",
+              },
+            },
+          }),
+        ]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(artistHeroApiUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ artistId: 7 }),
+      "desktop",
+      { size: 1480, version: "canonical-revision" },
+    );
+    expect(screen.getByTestId("desktop-hero-left-edge-scrim")).toHaveStyle({
+      left: "12%",
+    });
+  });
+
   it("renders only the newest artist and no carousel interaction on mobile", () => {
     mockMobilePointer();
 
