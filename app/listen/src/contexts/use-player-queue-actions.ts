@@ -70,6 +70,7 @@ import {
 
 const SOFT_PAUSE_FADE_MS = 220;
 const PREV_DOUBLE_TAP_WINDOW_MS = 1500;
+const JAM_EXPLICIT_SYNC_TOLERANCE_SECONDS = 0.005;
 function shouldUseImmediateTransportAction(): boolean {
   return (
     typeof document !== "undefined" && document.visibilityState === "hidden"
@@ -1202,7 +1203,9 @@ export function usePlayerQueueActions({
         playing: options?.playing,
       });
       const currentTrack =
-        options?.currentTrack || queueRef.current[currentIndexRef.current];
+        options?.currentTrack !== undefined
+          ? options.currentTrack
+          : queueRef.current[currentIndexRef.current];
       const nextTrack = tracks[plan.currentIndex];
       const queueOrderMatches =
         tracks.length === queueRef.current.length &&
@@ -1210,7 +1213,7 @@ export function usePlayerQueueActions({
           tracksMatch(track, queueRef.current[index]),
         );
       const activeTrackMatches =
-        nextTrack === undefined && currentTrack === undefined
+        nextTrack === undefined && currentTrack == null
           ? true
           : tracksMatch(nextTrack, currentTrack);
       const currentIndexMatches = currentIndexRef.current === plan.currentIndex;
@@ -1301,7 +1304,10 @@ export function usePlayerQueueActions({
         const drift = Math.abs(
           options.positionSeconds - currentTimeRef.current,
         );
-        if (drift > (options.forcePosition ? 0.1 : 1)) {
+        if (
+          drift >
+          (options.forcePosition ? JAM_EXPLICIT_SYNC_TOLERANCE_SECONDS : 1)
+        ) {
           seek(plan.positionSeconds);
         }
       }

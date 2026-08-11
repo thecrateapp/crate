@@ -77,13 +77,21 @@ export function getJamQueueSyncPlan({
   positionSeconds?: number;
   playing?: boolean;
 }): JamQueueSyncPlan {
-  const activeTrack = currentTrack || currentQueue[currentIndex];
+  const hasExplicitCurrentTrack = currentTrack !== undefined;
+  const activeTrack = hasExplicitCurrentTrack
+    ? currentTrack
+    : currentQueue[currentIndex];
   const requestedIndex = findTrackIndex(nextQueue, activeTrack);
   const activeTrackStillExists = requestedIndex >= 0;
   const nextIndex =
     requestedIndex >= 0
       ? requestedIndex
-      : Math.min(Math.max(currentIndex, 0), Math.max(nextQueue.length - 1, 0));
+      : hasExplicitCurrentTrack && activeTrack === null
+        ? 0
+        : Math.min(
+            Math.max(currentIndex, 0),
+            Math.max(nextQueue.length - 1, 0),
+          );
 
   return {
     currentIndex: nextIndex,

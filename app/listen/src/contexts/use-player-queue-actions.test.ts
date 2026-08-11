@@ -455,6 +455,26 @@ describe("usePlayerQueueActions", () => {
     expect(gaplessPlayer.seekTo).toHaveBeenCalledWith(42_250);
   });
 
+  it("honors an explicit Jam sync for a small audible drift", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK], {
+      currentTrack: TRACK,
+      positionSeconds: 42.03,
+      playing: true,
+      forcePosition: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(gaplessPlayer.seekTo).toHaveBeenCalledWith(42_030);
+  });
+
   it("does not reload an empty Jam queue when the room has no active track", () => {
     const params = createParams();
     params.queueRef.current = [];

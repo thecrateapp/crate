@@ -90,6 +90,28 @@ describe("player Jam session helpers", () => {
     });
   });
 
+  it("starts an idle Jam queue at its first room item", () => {
+    expect(
+      getJamQueueSyncPlan({
+        currentQueue: [firstTrack, secondTrack],
+        currentIndex: 1,
+        currentTime: 18,
+        isPlaying: false,
+        nextQueue: [
+          { ...firstTrack, id: "room-first", globalTrackUid: "room:first" },
+          { ...secondTrack, id: "room-second", globalTrackUid: "room:second" },
+        ],
+        currentTrack: null,
+        positionSeconds: 0,
+        playing: false,
+      }),
+    ).toEqual({
+      currentIndex: 0,
+      positionSeconds: 0,
+      playing: false,
+    });
+  });
+
   it("captures a copy of the local queue before entering a Jam", () => {
     const queue = [firstTrack, secondTrack];
     const snapshot = createPlayerQueueSnapshot({

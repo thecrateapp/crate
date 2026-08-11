@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 import secrets
 from datetime import datetime, timezone
 
@@ -299,6 +300,27 @@ def _build_sync_clock_payload(
     if force_sync:
         payload["force_sync"] = True
     return payload
+
+
+def _room_sync_clock_seed(room: dict) -> tuple[dict, float, bool] | None:
+    """Return a safe clock seed when the persisted room has no live clock."""
+    current_payload = room.get("current_track_payload")
+    if not isinstance(current_payload, dict):
+        return None
+    current_track = current_payload.get("track")
+    if not isinstance(current_track, dict):
+        return None
+    try:
+        position_seconds = float(current_payload.get("position", 0))
+    except (TypeError, ValueError):
+        position_seconds = 0
+    if not math.isfinite(position_seconds):
+        position_seconds = 0
+    return (
+        current_track,
+        max(0, position_seconds) * 1000,
+        current_payload.get("playing") is True,
+    )
 
 
 def _serialize_room(
@@ -942,8 +964,18 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
 
     try:
         clock = await _get_sync_clock(room_id)
+        if clock is None:
+            seed = _room_sync_clock_seed(room)
+            if seed is not None:
+                current_track, position_ms, playing = seed
+                clock = await _set_sync_clock(
+                    room_id,
+                    track=current_track,
+                    position_ms=position_ms,
+                    playing=playing,
+                )
         if clock:
-            await peer.send_json(_build_sync_clock_payload(clock))
+            await peer.send_json(_build_sync_clock_payload(clock, force_sync=True))
     except (RuntimeError, ConnectionResetError, BrokenPipeError):
         log.exception("Failed to send sync clock for room %s", room_id)
 
@@ -1053,6 +1085,49 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
                     )
                     continue
                 clock = await _get_sync_clock(room_id)
+                if data.get("scope") == "room":
+                    current_payload = current_room.get("current_track_payload")
+                    current_track = (
+                        current_payload.get("track")
+                        if isinstance(current_payload, dict)
+                        and isinstance(current_payload.get("track"), dict)
+                        else None
+                    )
+                    requested_track = data.get("track")
+                    sync_track = current_track or (
+                        requested_track if isinstance(requested_track, dict) else None
+                    )
+                    if sync_track is not None:
+                        requested_position = data.get("position")
+                        try:
+                            position_seconds = float(requested_position)
+                        except (TypeError, ValueError):
+                            position_seconds = float("nan")
+                        if not math.isfinite(position_seconds):
+                            if clock is not None:
+                                position_seconds = (
+                                    _clock_position_at(
+                                        clock,
+                                        datetime.now(timezone.utc).timestamp() * 1000,
+                                    )
+                                    / 1000
+                                )
+                            elif isinstance(current_payload, dict):
+                                try:
+                                    position_seconds = float(
+                                        current_payload.get("position", 0)
+                                    )
+                                except (TypeError, ValueError):
+                                    position_seconds = 0
+                            else:
+                                position_seconds = 0
+                        position_seconds = max(0, position_seconds)
+                        clock = await _set_sync_clock(
+                            room_id,
+                            track=sync_track,
+                            position_ms=position_seconds * 1000,
+                            playing=bool(data.get("playing")) and bool(sync_track),
+                        )
                 if clock:
                     payload = _build_sync_clock_payload(clock, force_sync=True)
                     if data.get("scope") == "room":

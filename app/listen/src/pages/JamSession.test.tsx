@@ -1495,12 +1495,101 @@ describe("JamSession current track", () => {
     expect(mockSendEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "play",
-        track: expect.objectContaining({ id: "ct1" }),
+        track: expect.objectContaining({ id: "track-1" }),
         position: 34,
         playing: true,
       }),
     );
     expect(resume).toHaveBeenCalled();
+  });
+
+  it("uses the room track when the host's local player is stale", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const roomTrack = createMockTrack({
+      id: "room-track",
+      entityUid: "room-track",
+      title: "Room Song",
+    });
+    const staleTrack = createMockTrack({
+      id: "stale-track",
+      entityUid: "stale-track",
+      title: "Old Song",
+    });
+    mockUseApiData.value = makeRoom({
+      current_track_payload: {
+        track: roomTrack,
+        position: 12,
+        playing: false,
+      },
+      queue: [
+        {
+          id: "queue-room-track",
+          track: roomTrack,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: staleTrack },
+      playerProgress: { currentTime: 12, duration: 180 },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Play room" }));
+
+    expect(mockSendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "play",
+        track: expect.objectContaining({ id: "room-track" }),
+      }),
+    );
+  });
+
+  it("anchors a room sync to the host's actual playback position", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const roomTrack = createMockTrack({
+      id: "room-track",
+      entityUid: "room-track",
+      title: "Room Song",
+    });
+    mockUseApiData.value = makeRoom({
+      current_track_payload: {
+        track: roomTrack,
+        position: 12,
+        playing: true,
+      },
+      queue: [
+        {
+          id: "queue-room-track",
+          track: roomTrack,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: roomTrack },
+      playerState: { isPlaying: true },
+      playerProgress: { currentTime: 12.34, duration: 180 },
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sync playback" }),
+    );
+
+    expect(mockSendEvent).toHaveBeenCalledWith({
+      type: "sync",
+      scope: "room",
+      track: expect.objectContaining({ entityUid: "room-track" }),
+      position: 12.34,
+      playing: true,
+    });
   });
 
   it("shows an empty now-playing state when no track is set", () => {
@@ -1846,7 +1935,7 @@ describe("JamSession player actions", () => {
     ).toBeDisabled();
   });
 
-  it("starts the first room track from the add action", async () => {
+  it("lets the authoritative room event start the first track", async () => {
     mockParams.roomId = "room-1";
     mockJamConnected.value = true;
     mockUseApiLoading.value = false;
@@ -1856,25 +1945,22 @@ describe("JamSession player actions", () => {
       title: "Now Playing",
       artist: "Artist",
     });
-    const playAll = vi.fn();
-
     renderWithListenProviders(<JamSession />, {
-      playerActions: { currentTrack: track, playAll },
+      playerActions: { currentTrack: track },
     });
 
     await userEvent.click(
       screen.getByRole("button", { name: /add current track/i }),
     );
 
-    expect(playAll).toHaveBeenCalledWith(
-      [expect.objectContaining({ id: "current" })],
-      0,
-      expect.objectContaining({ type: "queue" }),
+    expect(mockSendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "queue_add" }),
     );
   });
 
-  it("plays room queue when button is clicked", async () => {
+  it("asks the host to play the room queue when the button is clicked", async () => {
     mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
     mockUseApiLoading.value = false;
     mockUseApiData.value = makeRoom({
       events: [
@@ -1891,19 +1977,16 @@ describe("JamSession player actions", () => {
       ],
     });
 
-    const playAll = vi.fn();
-    renderWithListenProviders(<JamSession />, {
-      playerActions: { playAll },
-    });
+    renderWithListenProviders(<JamSession />);
 
     await userEvent.click(
       screen.getByRole("button", { name: /play room queue/i }),
     );
 
-    expect(playAll).toHaveBeenCalled();
+    expect(mockSendEvent).toHaveBeenCalledWith({ type: "queue_play" });
   });
 
-  it("loads the full room queue locally before syncing the host playback", async () => {
+  it("lets the authoritative queue event load the room queue", async () => {
     mockParams.roomId = "room-1";
     mockJamConnected.value = true;
     mockUseApiLoading.value = false;
@@ -1936,21 +2019,12 @@ describe("JamSession player actions", () => {
       ],
     });
 
-    const playAll = vi.fn();
-    renderWithListenProviders(<JamSession />, { playerActions: { playAll } });
+    renderWithListenProviders(<JamSession />);
 
     await userEvent.click(
       screen.getByRole("button", { name: /play room queue/i }),
     );
 
-    expect(playAll).toHaveBeenCalledWith(
-      [
-        expect.objectContaining({ id: "t1" }),
-        expect.objectContaining({ id: "t2" }),
-      ],
-      0,
-      expect.objectContaining({ type: "queue" }),
-    );
     expect(mockSendEvent).toHaveBeenCalledWith({ type: "queue_play" });
   });
 

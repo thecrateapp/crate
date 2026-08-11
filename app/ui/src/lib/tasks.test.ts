@@ -62,4 +62,31 @@ describe("waitForTask", () => {
     });
     expect(fetchCalls).toBe(2);
   });
+
+  it("accepts task_done results wrapped by the SSE envelope", async () => {
+    vi.stubGlobal("EventSource", MockEventSource);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ status: "running" })),
+    );
+
+    const completion = waitForTask("preview-task");
+    await vi.waitFor(() => expect(MockEventSource.latest).not.toBeNull());
+
+    MockEventSource.latest?.emit("task_done", {
+      task_id: "preview-task",
+      event_type: "task_done",
+      data: {
+        type: "task_done",
+        status: "completed",
+        result: { preview_url: "/preview.webp" },
+      },
+    });
+
+    await expect(completion).resolves.toEqual({
+      type: "task_done",
+      status: "completed",
+      result: { preview_url: "/preview.webp" },
+    });
+  });
 });

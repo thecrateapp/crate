@@ -69,6 +69,7 @@ export function projectJamClockPosition({
 }
 
 const JAM_HARD_CORRECTION_THRESHOLD_MS = 180;
+const JAM_FORCED_CORRECTION_TOLERANCE_MS = 5;
 const JAM_HARD_CORRECTION_COOLDOWN_MS = 1_500;
 
 interface UseJamWebSocketOptions {
@@ -119,6 +120,7 @@ export function useJamWebSocket({
     identity: string;
     requestedAt: number;
   } | null>(null);
+  const awaitingInitialClockRef = useRef(false);
   const jamRateCorrectionRef = useRef(false);
   const authoritativeQueueRef = useRef<Track[]>([]);
   const serverClockOffsetMsRef = useRef(0);
@@ -156,7 +158,10 @@ export function useJamWebSocket({
         // this into a seek loop.
         const nowMs = Date.now();
         const hardCorrectionRequested =
-          drift > (forcePosition ? 100 : JAM_HARD_CORRECTION_THRESHOLD_MS);
+          drift >
+          (forcePosition
+            ? JAM_FORCED_CORRECTION_TOLERANCE_MS
+            : JAM_HARD_CORRECTION_THRESHOLD_MS);
         const hardCorrection =
           hardCorrectionRequested &&
           (forcePosition ||
@@ -283,9 +288,11 @@ export function useJamWebSocket({
   useEffect(() => {
     if (!roomId || !userId) return;
     pendingSyncTrackRef.current = null;
+    awaitingInitialClockRef.current = false;
     authoritativeQueueRef.current = [];
     serverClockOffsetMsRef.current = 0;
     hasServerClockOffsetRef.current = false;
+    lastHardCorrectionAtRef.current = 0;
     let cancelled = false;
     let retries = 0;
     let reconnectTimer: number | undefined;
@@ -382,15 +389,41 @@ export function useJamWebSocket({
             typeof payload.position_ms === "number"
           ) {
             const playing = payload.playing !== false;
+            const projectedPositionMs = projectJamClockPosition({
+              positionMs: payload.position_ms,
+              serverTimeMs: payload.server_time_ms,
+              clientNowMs: Date.now(),
+              clockOffsetMs: serverClockOffsetMsRef.current,
+              playing,
+            });
+            const initialTrack = payloadToTrack(payload.track);
+            if (awaitingInitialClockRef.current && initialTrack) {
+              awaitingInitialClockRef.current = false;
+              const authoritativeQueue = authoritativeQueueRef.current;
+              playerActionsRef.current.syncJamQueue(
+                authoritativeQueue.length > 0
+                  ? authoritativeQueue
+                  : [initialTrack],
+                {
+                  currentTrack: initialTrack,
+                  positionSeconds: projectedPositionMs / 1000,
+                  playing,
+                  forcePosition: true,
+                  source: {
+                    type: "queue",
+                    name: `Jam: ${roomNameRef.current}`,
+                  },
+                },
+              );
+              dispatch({
+                type: "SET_SYNC_STATUS",
+                payload: playing ? "synced" : "idle",
+              });
+              return;
+            }
             syncSeek(
               payload.track,
-              projectJamClockPosition({
-                positionMs: payload.position_ms,
-                serverTimeMs: payload.server_time_ms,
-                clientNowMs: Date.now(),
-                clockOffsetMs: serverClockOffsetMsRef.current,
-                playing,
-              }),
+              projectedPositionMs,
               playing,
               payload.force_sync === true,
             );
@@ -411,29 +444,31 @@ export function useJamWebSocket({
             const currentTrack = payloadToTrack(
               current?.track as Record<string, unknown> | undefined,
             );
+            const roomHasCurrentTrack = !!currentTrack;
+            // A room with a current track must be hydrated from its
+            // authoritative clock, not from the persisted room position.
+            // Starting the async queue load here would also allow the
+            // following sync_clock message to seek the old engine and then be
+            // overwritten by this load at the stale position.
+            awaitingInitialClockRef.current = roomHasCurrentTrack;
+            if (roomHasCurrentTrack) {
+              if (playerActionsRef.current.isPlaying) {
+                playerActionsRef.current.pause();
+              }
+              return;
+            }
             // Always hand the authoritative room queue to the player,
             // including an empty queue. This is what switches a newly-created
             // room from the user's local queue into Jam/readonly mode.
             playerActionsRef.current.syncJamQueue(roomQueue, {
               currentTrack,
               positionSeconds: Number(current?.position || 0),
-              playing: current ? current.playing !== false : false,
+              playing: false,
               source: {
                 type: "queue",
                 name: `Jam: ${roomNameRef.current}`,
               },
             });
-            // syncJamQueue already applies the active track when the room
-            // queue is present. Calling syncSeek afterwards would observe the
-            // previous React currentTrack ref and replace the shared queue
-            // with a single-track local playback queue.
-            if (current?.track && roomQueue.length === 0) {
-              syncSeek(
-                current.track as Record<string, unknown>,
-                Number(current.position || 0) * 1000,
-                current.playing !== false,
-              );
-            }
             return;
           }
 
@@ -512,6 +547,26 @@ export function useJamWebSocket({
             : undefined;
           if (queueSnapshot) {
             authoritativeQueueRef.current = queueSnapshotTracks(queueSnapshot);
+          }
+          const roomTracksForTransport = queueSnapshot
+            ? queueSnapshotTracks(queueSnapshot)
+            : authoritativeQueueRef.current;
+          const isTransportEvent =
+            (payload.type === "play" ||
+              payload.type === "pause" ||
+              payload.type === "seek") &&
+            eventTrack;
+          if (
+            isTransportEvent &&
+            roomTracksForTransport.length > 0 &&
+            !roomTracksForTransport.some((candidate) =>
+              tracksMatch(candidate, eventTrack),
+            )
+          ) {
+            // A stale or forged transport event must not replace the room's
+            // current track or make a member play outside the authoritative
+            // queue.
+            return;
           }
           if (queueSnapshot) {
             dispatch({ type: "QUEUE_SNAPSHOT", payload: queueSnapshot });
@@ -844,6 +899,7 @@ export function useJamWebSocket({
       }
       heartbeatTimers.clear();
       pendingSyncTrackRef.current = null;
+      awaitingInitialClockRef.current = false;
       authoritativeQueueRef.current = [];
       roomRevisionRef.current = 0;
       if (jamRateCorrectionRef.current) {

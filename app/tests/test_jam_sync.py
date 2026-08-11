@@ -278,6 +278,22 @@ class TestJamRoomCRUD:
 class TestJamSyncClock:
     """Server-side playback clock for synchronized listening."""
 
+    def test_room_clock_seed_uses_a_safe_persisted_position(self):
+        from crate.api import jam
+
+        track = {"id": "track-1"}
+
+        assert jam._room_sync_clock_seed(
+            {
+                "current_track_payload": {
+                    "track": track,
+                    "position": "not-a-number",
+                    "playing": True,
+                }
+            }
+        ) == (track, 0, True)
+        assert jam._room_sync_clock_seed({}) is None
+
     def test_sync_payload_projects_position_at_a_server_timestamp(self):
         """A sync message must carry the server timestamp used for its position."""
         from crate.api import jam

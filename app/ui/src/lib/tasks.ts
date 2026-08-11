@@ -88,7 +88,15 @@ export function waitForTask(
 
     source.addEventListener("task_done", (event: MessageEvent) => {
       try {
-        const payload = JSON.parse(event.data) as TaskCompletion;
+        const rawPayload = JSON.parse(event.data) as TaskCompletion & {
+          data?: TaskCompletion;
+        };
+        const payload =
+          rawPayload.result !== undefined || rawPayload.status !== undefined
+            ? rawPayload
+            : rawPayload.data && typeof rawPayload.data === "object"
+              ? rawPayload.data
+              : rawPayload;
         if (payload.result !== undefined || payload.status !== "completed") {
           cleanup();
           resolve(payload);

@@ -150,7 +150,7 @@ describe("useJamWebSocket", () => {
     expect(result.current.sendEvent({ type: "ping" })).toBe(false);
   });
 
-  it("starts the current room track when a member joins", () => {
+  it("waits for the authoritative clock before starting a current room track", () => {
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const track = { id: "track-1", title: "Track 1", artist: "Artist" };
     const play = vi.fn();
@@ -214,10 +214,7 @@ describe("useJamWebSocket", () => {
         }),
     );
 
-    expect(play).toHaveBeenCalledWith(expect.objectContaining(track), {
-      type: "queue",
-      name: "Jam: Jam",
-    });
+    expect(play).not.toHaveBeenCalled();
     expect(result.current.state.room?.current_track_payload).toEqual(
       expect.objectContaining({ position: 12 }),
     );
@@ -380,11 +377,11 @@ describe("useJamWebSocket", () => {
         }),
     );
 
-    expect(syncJamQueue).toHaveBeenCalledTimes(1);
+    expect(syncJamQueue).not.toHaveBeenCalled();
     expect(play).not.toHaveBeenCalled();
   });
 
-  it("keeps the full room queue when the initial sync clock races the queue load", () => {
+  it("defers the initial room queue until its sync clock is available", () => {
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const play = vi.fn();
     const syncJamQueue = vi.fn();
@@ -460,6 +457,8 @@ describe("useJamWebSocket", () => {
         }),
     );
 
+    expect(syncJamQueue).not.toHaveBeenCalled();
+
     act(
       () =>
         socket?.message({
@@ -470,6 +469,7 @@ describe("useJamWebSocket", () => {
         }),
     );
 
+    expect(syncJamQueue).toHaveBeenCalledTimes(1);
     expect(play).not.toHaveBeenCalled();
     expect(syncJamQueue).toHaveBeenLastCalledWith(
       [
@@ -480,6 +480,89 @@ describe("useJamWebSocket", () => {
         currentTrack: expect.objectContaining({ id: "room-track-1" }),
         positionSeconds: 0.5,
         playing: true,
+      }),
+    );
+  });
+
+  it("also waits for the authoritative clock when a room is paused", () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const syncJamQueue = vi.fn();
+    const track = { id: "paused-track", title: "Paused", artist: "Artist" };
+
+    renderHook(
+      () => {
+        const [, dispatch] = useReducer(
+          jamSessionReducer,
+          initialJamSessionState,
+        );
+        const playerActionsRef = useRef({
+          play: vi.fn(),
+          playAll: vi.fn(),
+          pause: vi.fn(),
+          resume: vi.fn(),
+          seek: vi.fn(),
+          syncJamQueue,
+          currentTrack: undefined,
+          isPlaying: false,
+        });
+        const currentTimeRef = useRef(0);
+        const roomNameRef = useRef("Jam");
+        return useJamWebSocket({
+          roomId: "room-1",
+          userId: 1,
+          dispatch,
+          playerActionsRef,
+          currentTimeRef,
+          roomNameRef,
+        });
+      },
+      { wrapper },
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    act(() => socket?.open());
+    act(
+      () =>
+        socket?.message({
+          type: "state_sync",
+          room: {
+            id: "room-1",
+            host_user_id: 1,
+            name: "Jam",
+            status: "active",
+            visibility: "private",
+            is_permanent: false,
+            created_at: "2026-01-01T00:00:00Z",
+            members: [],
+            events: [],
+            queue: [
+              { id: "queue-1", track, vote_count: 0, voted_by_me: false },
+            ],
+            current_track_payload: { track, position: 10, playing: false },
+          },
+        }),
+    );
+
+    expect(syncJamQueue).not.toHaveBeenCalled();
+
+    act(
+      () =>
+        socket?.message({
+          type: "sync_clock",
+          track,
+          position_ms: 10_030,
+          playing: false,
+          force_sync: true,
+        }),
+    );
+
+    expect(syncJamQueue).toHaveBeenCalledWith(
+      [expect.objectContaining(track)],
+      expect.objectContaining({
+        currentTrack: expect.objectContaining(track),
+        positionSeconds: 10.03,
+        playing: false,
+        forcePosition: true,
       }),
     );
   });
@@ -563,6 +646,78 @@ describe("useJamWebSocket", () => {
     );
   });
 
+  it("ignores a transport event for a track outside the room queue", () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const play = vi.fn();
+    const syncJamQueue = vi.fn();
+    const roomTrack = { id: "room-track", title: "Room", artist: "Artist" };
+    const staleTrack = { id: "stale-track", title: "Stale", artist: "Artist" };
+
+    renderHook(
+      () => {
+        const [, dispatch] = useReducer(
+          jamSessionReducer,
+          initialJamSessionState,
+        );
+        const playerActionsRef = useRef({
+          play,
+          playAll: vi.fn(),
+          pause: vi.fn(),
+          resume: vi.fn(),
+          seek: vi.fn(),
+          syncJamQueue,
+          currentTrack: undefined,
+        });
+        const currentTimeRef = useRef(0);
+        const roomNameRef = useRef("Jam");
+        return useJamWebSocket({
+          roomId: "room-1",
+          userId: 2,
+          dispatch,
+          playerActionsRef,
+          currentTimeRef,
+          roomNameRef,
+        });
+      },
+      { wrapper },
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    act(() => socket?.open());
+    act(
+      () =>
+        socket?.message({
+          type: "play",
+          event: {
+            id: 8,
+            room_id: "room-1",
+            user_id: 1,
+            event_type: "play",
+            payload_json: { track: staleTrack, position: 2, playing: true },
+            created_at: "2026-01-01T00:00:00Z",
+          },
+          queue: [
+            {
+              id: "queue-1",
+              track: roomTrack,
+              vote_count: 0,
+              voted_by_me: false,
+            },
+          ],
+          requests: [],
+          members: [],
+        }),
+    );
+
+    expect(play).not.toHaveBeenCalled();
+    expect(syncJamQueue).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        currentTrack: expect.objectContaining(staleTrack),
+      }),
+    );
+  });
+
   it("does not restart or seek active playback for a small clock drift", () => {
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const play = vi.fn();
@@ -618,6 +773,60 @@ describe("useJamWebSocket", () => {
     expect(seek).not.toHaveBeenCalled();
     expect(play).not.toHaveBeenCalled();
     expect(setPlaybackRate).toHaveBeenCalledWith(1.024);
+  });
+
+  it("hard-corrects a small drift when the host explicitly syncs the room", () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const seek = vi.fn();
+    const setPlaybackRate = vi.fn();
+    const track = { id: "track-1", title: "Track 1", artist: "Artist" };
+
+    renderHook(
+      () => {
+        const [, dispatch] = useReducer(
+          jamSessionReducer,
+          initialJamSessionState,
+        );
+        const playerActionsRef = useRef({
+          play: vi.fn(),
+          playAll: vi.fn(),
+          pause: vi.fn(),
+          resume: vi.fn(),
+          seek,
+          setPlaybackRate,
+          syncJamQueue: vi.fn(),
+          currentTrack: track,
+          isPlaying: true,
+        });
+        const currentTimeRef = useRef(10);
+        const roomNameRef = useRef("Jam");
+        return useJamWebSocket({
+          roomId: "room-1",
+          userId: 2,
+          dispatch,
+          playerActionsRef,
+          currentTimeRef,
+          roomNameRef,
+        });
+      },
+      { wrapper },
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    act(() => socket?.open());
+    act(
+      () =>
+        socket?.message({
+          type: "sync_clock",
+          track,
+          position_ms: 10_030,
+          playing: true,
+          force_sync: true,
+        }),
+    );
+
+    expect(seek).toHaveBeenCalledWith(10.03);
+    expect(setPlaybackRate).not.toHaveBeenCalledWith(expect.any(Number));
   });
 
   it("hard-corrects a large phase gap without seeking on every heartbeat", () => {

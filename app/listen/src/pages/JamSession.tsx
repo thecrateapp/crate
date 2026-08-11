@@ -774,12 +774,23 @@ export function JamSession() {
     );
     const position = Number(currentPayload?.position);
 
+    if (currentPayload?.playing === true && currentTrack) {
+      // Do not start an async queue load from the stale REST snapshot. The
+      // WebSocket clock will perform the authoritative load at the projected
+      // position; loading here would race that first sync and reset it to 0.
+      pause();
+      return;
+    }
+
     syncJamQueue(
       queueItems.map((item) => item.track),
       {
         currentTrack,
         positionSeconds: Number.isFinite(position) ? Math.max(0, position) : 0,
-        playing: currentPayload?.playing === true,
+        // REST stores the last transport position, but the live playback
+        // clock arrives over WebSocket. Keep the player paused until that
+        // clock hydrates a playing room, otherwise it audibly starts at 0.
+        playing: false,
         source: { type: "queue", name: `Jam: ${syncRoom.name}` },
       },
     );
@@ -791,6 +802,7 @@ export function JamSession() {
     room,
     roomId,
     roomIsActive,
+    pause,
     syncJamQueue,
   ]);
 
@@ -861,16 +873,12 @@ export function JamSession() {
       togglePlayPause: () => {
         if (!isHost) return;
         const actions = playerActionsRef.current;
-        const activeTrack = actions.currentTrack;
+        const activeTrack = roomCurrentTrack || actions.currentTrack;
         const position = currentTimeRef.current;
 
         if (!activeTrack) {
           const tracks = queueItems.map((item) => item.track);
           if (tracks.length === 0) return;
-          actions.playAll(tracks, 0, {
-            type: "queue",
-            name: `Jam: ${roomNameRef.current}`,
-          });
           sendEvent({ type: "queue_play" });
           return;
         }
@@ -901,7 +909,8 @@ export function JamSession() {
       },
       seek: (time: number) => {
         if (!isHost) return;
-        const activeTrack = playerActionsRef.current.currentTrack;
+        const activeTrack =
+          roomCurrentTrack || playerActionsRef.current.currentTrack;
         if (!activeTrack) return;
         const position = Math.max(0, time);
         if (
@@ -924,6 +933,7 @@ export function JamSession() {
     isHost,
     queueItems,
     roomId,
+    roomCurrentTrack,
     roomIsActive,
     sendEvent,
     setJamTransport,
@@ -1247,12 +1257,6 @@ export function JamSession() {
       source: "current_track",
     });
     if (sent) {
-      if (canAddToQueue && queueItems.length === 0) {
-        playAll([currentTrack], 0, {
-          type: "queue",
-          name: `Jam: ${room?.name || t("jam.room.sessionFallback")}`,
-        });
-      }
       toast.success(
         t(
           canAddToQueue
@@ -1282,12 +1286,6 @@ export function JamSession() {
       source: "search",
     });
     if (sent) {
-      if (canAddToQueue && queueItems.length === 0) {
-        playAll([playable], 0, {
-          type: "queue",
-          name: `Jam: ${room?.name || t("jam.room.sessionFallback")}`,
-        });
-      }
       toast.success(
         t(
           canAddToQueue ? "jam.toasts.addedTrack" : "jam.toasts.requestedTrack",
@@ -1302,7 +1300,8 @@ export function JamSession() {
   }
 
   function syncPlaybackState() {
-    if (!currentTrack && !roomNowPlaying) {
+    const activeTrack = roomCurrentTrack || currentTrack;
+    if (!activeTrack) {
       toast.info(t("jam.toasts.noCurrentTrackToSync"));
       return;
     }
@@ -1310,6 +1309,9 @@ export function JamSession() {
       sendEvent({
         type: "sync",
         scope: "room",
+        track: trackToPayload(activeTrack),
+        position: Math.max(0, currentTime),
+        playing: isPlaying,
       })
     ) {
       setSyncStatus(isPlaying ? "synced" : "idle");
@@ -1323,7 +1325,7 @@ export function JamSession() {
 
   function toggleRoomPlayback() {
     if (!isHost || !roomIsActive || !isConnected) return;
-    const activeTrack = currentTrack || roomCurrentTrack;
+    const activeTrack = roomCurrentTrack || currentTrack;
     if (!activeTrack) {
       handlePlayRoomQueue();
       return;
@@ -1346,19 +1348,15 @@ export function JamSession() {
   }
 
   function handlePlayRoomQueue() {
+    if (!isHost || !isConnected) return;
     const tracks = queueItems.map((item) => item.track);
     if (tracks.length === 0) {
       toast.info(t("jam.toasts.roomQueueEmpty"));
       return;
     }
-    playAll(tracks, 0, {
-      type: "queue",
-      name: `Jam: ${room?.name || t("jam.room.sessionFallback")}`,
-    });
-    if (isHost && isConnected) {
-      sendEvent({ type: "queue_play" });
+    if (sendEvent({ type: "queue_play" })) {
+      toast.success(t("jam.toasts.roomQueueLoaded"));
     }
-    toast.success(t("jam.toasts.roomQueueLoaded"));
   }
 
   function focusQueueSearch() {
@@ -2165,7 +2163,7 @@ export function JamSession() {
               <HeroPrimaryButton
                 label={t("jam.room.actions.playRoomQueue")}
                 onClick={handlePlayRoomQueue}
-                disabled={queueItems.length === 0}
+                disabled={queueItems.length === 0 || !isHost || !isConnected}
               >
                 <ListMusic size={17} />
               </HeroPrimaryButton>
