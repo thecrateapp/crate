@@ -1337,7 +1337,7 @@ def api_artist_hero(
     has_eligible_profile = bool(
         entity_uid and profile and profile.get("review_status") != "rejected"
     )
-    if has_eligible_profile:
+    if has_eligible_profile and profile is not None:
         revision = str(profile.get("revision") or "")
         renderer_is_current = revision.startswith(f"{ARTIST_HERO_RENDER_VERSION}:")
         if (

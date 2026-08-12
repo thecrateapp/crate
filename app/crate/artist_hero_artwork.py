@@ -7,6 +7,8 @@ from collections.abc import Mapping
 
 from PIL import Image, ImageEnhance, ImageOps
 
+from crate.utils import coerce_float, coerce_int
+
 DESKTOP_HERO_SIZE = (1480, 600)
 MOBILE_HERO_SIZE = (1080, 1350)
 # Keep the public canvas dimensions above stable, but render the persisted
@@ -34,7 +36,7 @@ def _transform_source(source: Image.Image, recipe: Mapping[str, object]) -> Imag
     if recipe.get("flip_horizontal"):
         transformed = transformed.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
 
-    rotation = int(recipe.get("rotation", 0)) % 360
+    rotation = coerce_int(recipe.get("rotation", 0)) % 360
     transpose = {
         90: Image.Transpose.ROTATE_270,
         180: Image.Transpose.ROTATE_180,
@@ -46,10 +48,21 @@ def _transform_source(source: Image.Image, recipe: Mapping[str, object]) -> Imag
 def _clamped_crop(image: Image.Image, raw_crop: object) -> Image.Image:
     if not isinstance(raw_crop, Mapping):
         return image.copy()
-    x = max(0, min(int(raw_crop.get("x", 0)), image.width - 1))
-    y = max(0, min(int(raw_crop.get("y", 0)), image.height - 1))
-    width = max(1, min(int(raw_crop.get("width", image.width)), image.width - x))
-    height = max(1, min(int(raw_crop.get("height", image.height)), image.height - y))
+    x = max(0, min(coerce_int(raw_crop.get("x", 0)), image.width - 1))
+    y = max(0, min(coerce_int(raw_crop.get("y", 0)), image.height - 1))
+    width = max(
+        1,
+        min(
+            coerce_int(raw_crop.get("width", image.width), image.width), image.width - x
+        ),
+    )
+    height = max(
+        1,
+        min(
+            coerce_int(raw_crop.get("height", image.height), image.height),
+            image.height - y,
+        ),
+    )
     return image.crop((x, y, x + width, y + height))
 
 
@@ -62,11 +75,11 @@ def _apply_image_treatment(
 
     brightness = max(
         MIN_IMAGE_TREATMENT,
-        min(float(recipe.get("brightness", 1.0)), MAX_IMAGE_TREATMENT),
+        min(coerce_float(recipe.get("brightness", 1.0), 1.0), MAX_IMAGE_TREATMENT),
     )
     contrast = max(
         MIN_IMAGE_TREATMENT,
-        min(float(recipe.get("contrast", 1.0)), MAX_IMAGE_TREATMENT),
+        min(coerce_float(recipe.get("contrast", 1.0), 1.0), MAX_IMAGE_TREATMENT),
     )
     if brightness != 1.0:
         treated = ImageEnhance.Brightness(treated).enhance(brightness)
@@ -95,13 +108,13 @@ def _extended_subject_frame(
     source_width, source_height = source_size
     position_x = max(
         MIN_FILL_POSITION,
-        min(float(recipe.get("position_x", 0.5)), MAX_FILL_POSITION),
+        min(coerce_float(recipe.get("position_x", 0.5), 0.5), MAX_FILL_POSITION),
     )
     position_y = max(
         MIN_FILL_POSITION,
-        min(float(recipe.get("position_y", 0.5)), MAX_FILL_POSITION),
+        min(coerce_float(recipe.get("position_y", 0.5), 0.5), MAX_FILL_POSITION),
     )
-    scale = max(0.25, min(float(recipe.get("scale", 1.0)), 2.0))
+    scale = max(0.25, min(coerce_float(recipe.get("scale", 1.0), 1.0), 2.0))
     fit_scale = max(
         output_size[0] / max(source_width, 1),
         output_size[1] / max(source_height, 1),
@@ -122,7 +135,7 @@ def get_artist_hero_artwork_bounds(
         return {"left": 0.0, "top": 0.0, "right": 1.0, "bottom": 1.0}
 
     source_width, source_height = source_size
-    if int(recipe.get("rotation", 0)) % 360 in {90, 270}:
+    if coerce_int(recipe.get("rotation", 0)) % 360 in {90, 270}:
         source_width, source_height = source_height, source_width
     left, top, width, height = _extended_subject_frame(
         (source_width, source_height), recipe, output_size

@@ -24,6 +24,7 @@ from crate.db.queries.home import (
     get_track_candidates_for_album_ids,
 )
 from crate.genre_taxonomy import expand_genre_terms_with_aliases
+from crate.utils import coerce_int
 
 HOME_JUST_LANDED_VERSION = "home_just_landed_v2"
 HOME_HERO_CANDIDATE_LIMIT = 15
@@ -56,7 +57,7 @@ def _add_hero_artwork_bounds(item: dict) -> None:
         if not width or not height or not isinstance(recipe, Mapping):
             continue
         bounds = get_artist_hero_artwork_bounds(
-            (int(width), int(height)), recipe, output_size
+            (coerce_int(width), coerce_int(height)), recipe, output_size
         )
         item[f"{composition}_artwork_bounds"] = bounds
         if item.get("artwork_revision"):
@@ -97,8 +98,8 @@ def _canonical_surface_ready(item: Mapping[str, object], composition: str) -> bo
     return bool(
         width
         and height
-        and int(width) > 0
-        and int(height) > 0
+        and coerce_int(width) > 0
+        and coerce_int(height) > 0
         and isinstance(recipe, Mapping)
     )
 

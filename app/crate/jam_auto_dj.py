@@ -5,7 +5,7 @@ import random
 import json
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,6 +21,7 @@ from crate.queue_engine import (
     generation_seed,
     needs_refill,
 )
+from crate.utils import coerce_float, coerce_int
 
 
 def _normalise_text(value: object) -> str:
@@ -60,8 +61,8 @@ def _cosine_similarity(left: object, right: object) -> float:
 
 def _bpm_similarity(current_bpm: object, candidate_bpm: object) -> float:
     try:
-        current = float(current_bpm)
-        candidate = float(candidate_bpm)
+        current = coerce_float(current_bpm)
+        candidate = coerce_float(candidate_bpm)
     except (TypeError, ValueError):
         return 0.5
     if current <= 0 or candidate <= 0:
@@ -116,8 +117,8 @@ def choose_auto_dj_candidate(
     intent: QueueIntent | None = None,
     genre_filters: Sequence[str] = (),
     recent_artists: Sequence[str] = (),
-    excluded_artists: Sequence[str] = (),
-    excluded_track_families: Sequence[str] = (),
+    excluded_artists: Collection[str] = (),
+    excluded_track_families: Collection[str] = (),
     target_vector: Sequence[float] | None = None,
     random_value: float | None = None,
 ) -> dict[str, Any] | None:
@@ -444,11 +445,10 @@ def _fill_auto_dj_queue(room: dict, redis: Any) -> list[dict]:
     )
 
     room_id = str(room["id"])
+    host_user_id = coerce_int(room.get("host_user_id")) or None
     intent = QueueIntent(
         profile="jam_auto_dj",
-        listener_id=int(room.get("host_user_id"))
-        if room.get("host_user_id") is not None
-        else None,
+        listener_id=host_user_id,
         seed_type="room",
         seed_value=room_id,
         genres=tuple(str(value) for value in room.get("genre_filters") or []),
@@ -461,9 +461,7 @@ def _fill_auto_dj_queue(room: dict, redis: Any) -> list[dict]:
     current_track, _ = _current_track_payload(room)
     target_vector: list[float] | None = None
     generation = generation_seed(
-        listener_id=int(room.get("host_user_id"))
-        if room.get("host_user_id") is not None
-        else None,
+        listener_id=host_user_id,
         context=f"jam:{room_id}",
         session_id=room_id,
     )
@@ -637,6 +635,8 @@ def ensure_auto_dj_room(room: dict) -> bool:
                 queue = list_jam_queue_items(room_id)
 
         if not changed:
+            return False
+        if not isinstance(current_track, dict):
             return False
 
         now = _iso_now()

@@ -56,6 +56,27 @@ def test_artist_hero_revision_identifies_the_current_renderer():
     assert artist_hero_revision(b"source").startswith(f"{ARTIST_HERO_RENDER_VERSION}:")
 
 
+def test_artist_hero_render_tolerates_untyped_recipe_values():
+    from crate.artist_hero_artwork import render_artist_hero_composition
+
+    source = Image.open(io.BytesIO(_image_bytes()))
+    result = render_artist_hero_composition(
+        source,
+        {
+            **_crop_recipe(1400, 600),
+            "rotation": object(),
+            "brightness": object(),
+            "contrast": None,
+            "position_x": object(),
+            "position_y": object(),
+            "scale": object(),
+        },
+        (100, 50),
+    )
+
+    assert result.size == (100, 50)
+
+
 def test_artist_hero_preview_renders_without_mutating_the_profile(
     monkeypatch, tmp_path
 ):

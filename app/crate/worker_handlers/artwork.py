@@ -5,7 +5,7 @@ import logging
 import tempfile
 import time
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 from PIL import ImageOps
 from PIL.Image import Image as PILImage
@@ -1459,7 +1459,7 @@ def _handle_preview_artist_hero(task_id: str, params: dict, config: dict) -> dic
 
     view = artist_hero_composition_view(
         artist_id=artist_id,
-        composition=composition,
+        composition=cast(Literal["desktop", "mobile"], composition),
         recipe=recipe,
         source_size=image.size,
         render_revision=revision,

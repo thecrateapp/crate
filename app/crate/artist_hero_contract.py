@@ -13,6 +13,7 @@ from crate.artist_hero_artwork import (
     MOBILE_HERO_SIZE,
     get_artist_hero_artwork_bounds,
 )
+from crate.utils import coerce_int
 
 ARTIST_HERO_CONTRACT_VERSION = 1
 
@@ -91,16 +92,16 @@ def artist_hero_profile_compositions(
     """Build canonical views from the persisted profile row."""
 
     generic_size = (
-        int(profile.get("source_width") or 0),
-        int(profile.get("source_height") or 0),
+        coerce_int(profile.get("source_width")),
+        coerce_int(profile.get("source_height")),
     )
     desktop_size = (
-        int(profile.get("desktop_source_width") or generic_size[0]),
-        int(profile.get("desktop_source_height") or generic_size[1]),
+        coerce_int(profile.get("desktop_source_width") or generic_size[0]),
+        coerce_int(profile.get("desktop_source_height") or generic_size[1]),
     )
     mobile_size = (
-        int(profile.get("mobile_source_width") or generic_size[0]),
-        int(profile.get("mobile_source_height") or generic_size[1]),
+        coerce_int(profile.get("mobile_source_width") or generic_size[0]),
+        coerce_int(profile.get("mobile_source_height") or generic_size[1]),
     )
     if not all(value > 0 for value in (*desktop_size, *mobile_size)):
         return {}

@@ -1354,7 +1354,7 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
                 position_ms = position_seconds * 1000
                 playing = (
                     event_type in {"play", "play_next", "queue_play"} and bool(track)
-                ) or (event_type == "seek" and data.get("playing"))
+                ) or (event_type == "seek" and bool(data.get("playing")))
                 transport_clock = await _set_sync_clock(
                     room_id,
                     track=track,
