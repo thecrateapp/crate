@@ -91,7 +91,7 @@ describe("AppRouter mobile bundle boundary", () => {
     ) as { dependencies?: Record<string, string> };
     expect(listenPackage.dependencies).not.toHaveProperty("lucide-react");
     expect(listenPackage.dependencies).not.toHaveProperty("iconoir-react");
-    expect(listenPackage.dependencies).not.toHaveProperty("lodash-es");
+    expect(listenPackage.dependencies).toHaveProperty("lodash-es", "^4.17.21");
 
     const viteConfig = readFileSync(
       path.join(process.cwd(), "vite.config.ts"),
