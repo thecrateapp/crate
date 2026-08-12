@@ -48,9 +48,16 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      {
+        find: /^lodash\/(.+)\.js$/,
+        replacement: "lodash-es/$1.js",
+      },
+      {
+        find: "@",
+        replacement: path.resolve(__dirname, "./src"),
+      },
+    ],
   },
   optimizeDeps: {
     include: ["@capacitor/browser"],

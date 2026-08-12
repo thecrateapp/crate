@@ -13,6 +13,7 @@ import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
 import {
   usePlayerActions,
   usePlayerState,
@@ -26,12 +27,14 @@ function QueueTabRow({
   onJump,
   onRemove,
   faded = false,
+  locked = false,
 }: {
   track: Track;
   indexLabel: string;
   onJump: () => void;
   onRemove?: () => void;
   faded?: boolean;
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
   const menuTrack = useMemo(() => trackToMenuData(track), [track]);
@@ -41,6 +44,7 @@ function QueueTabRow({
     onPlayNowOverride: onJump,
   });
   const actions = useMemo<ItemActionMenuEntry[]>(() => {
+    if (locked) return [];
     if (!onRemove) return baseActions;
     return [
       ...baseActions,
@@ -56,37 +60,52 @@ function QueueTabRow({
         onSelect: onRemove,
       },
     ];
-  }, [baseActions, indexLabel, onRemove, t, track.id]);
+  }, [baseActions, indexLabel, locked, onRemove, t, track.id]);
   const actionMenu = useItemActionMenu(actions);
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onJump}
+      role={locked ? undefined : "button"}
+      tabIndex={locked ? -1 : 0}
+      aria-disabled={locked}
+      onClick={locked ? undefined : onJump}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
+        if (!locked && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
           onJump();
         }
       }}
-      onContextMenu={actionMenu.handleContextMenu}
-      className={`group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-        faded ? "opacity-50" : ""
-      }`}
+      onContextMenu={locked ? undefined : actionMenu.handleContextMenu}
+      className={`group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${
+        locked
+          ? "cursor-not-allowed opacity-55"
+          : "hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      } ${faded && !locked ? "opacity-50" : ""}`}
     >
       <span
         className={`w-4 shrink-0 text-right text-[10px] tabular-nums ${
-          faded ? "text-white/15" : "text-white/20"
+          faded || locked ? "text-white/15" : "text-white/20"
         }`}
       >
         {indexLabel}
       </span>
+      {track.albumCover ? (
+        <CrateImage
+          src={track.albumCover}
+          alt=""
+          loading="lazy"
+          className={`h-8 w-8 shrink-0 rounded object-cover ${
+            locked ? "grayscale" : ""
+          }`}
+        />
+      ) : (
+        <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p
             className={`min-w-0 flex-1 truncate text-[12px] ${
-              faded ? "text-white/50" : "text-white/80"
+              faded || locked ? "text-white/50" : "text-white/80"
             }`}
           >
             {track.title}
@@ -99,7 +118,7 @@ function QueueTabRow({
         </div>
         <p
           className={`truncate text-[10px] ${
-            faded ? "text-white/40" : "text-muted-foreground"
+            faded || locked ? "text-white/40" : "text-muted-foreground"
           }`}
         >
           {track.artist}
@@ -144,6 +163,7 @@ export function QueueTab() {
     currentTrack,
     jumpTo,
     removeFromQueue,
+    jamQueueLocked,
   } = usePlayerActions();
 
   const history = queue.slice(0, currentIndex).reverse();
@@ -176,6 +196,7 @@ export function QueueTab() {
 
   return (
     <div className="flex-1 overflow-y-auto pr-1">
+      {jamQueueLocked ? <JamQueueLockedNotice /> : null}
       {history.length > 0 && (
         <div className="mb-4">
           <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
@@ -190,6 +211,7 @@ export function QueueTab() {
                 indexLabel={String(realIdx + 1)}
                 onJump={() => jumpTo(realIdx)}
                 faded
+                locked={jamQueueLocked}
               />
             );
           })}
@@ -271,7 +293,10 @@ export function QueueTab() {
                 track={track}
                 indexLabel={String(i + 1)}
                 onJump={() => jumpTo(idx)}
-                onRemove={() => removeFromQueue(idx)}
+                onRemove={
+                  jamQueueLocked ? undefined : () => removeFromQueue(idx)
+                }
+                locked={jamQueueLocked}
               />
             );
           })}

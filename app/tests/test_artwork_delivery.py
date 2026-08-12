@@ -7,9 +7,9 @@ from fastapi.responses import Response
 from PIL import Image
 
 
-def _jpeg_bytes() -> bytes:
+def _jpeg_bytes(color="navy") -> bytes:
     output = BytesIO()
-    Image.new("RGB", (640, 480), color="navy").save(output, format="JPEG")
+    Image.new("RGB", (640, 480), color=color).save(output, format="JPEG")
     return output.getvalue()
 
 
@@ -90,6 +90,41 @@ def test_deliver_artwork_serves_original_and_queues_variant(monkeypatch, tmp_pat
     assert response.media_type == "image/jpeg"
     assert response.headers["x-crate-artwork"] == "original"
     assert queued == []
+    assert response.background is not None
+    asyncio.run(response.background())
+    assert queued == [(asset, "variant-miss")]
+
+
+def test_deliver_artwork_does_not_serve_a_stale_variant_for_a_changed_source(
+    monkeypatch, tmp_path
+):
+    from crate.api import artwork_delivery
+    from crate.artwork_materializer import materialize_artwork
+    from crate.artwork_variants import ArtworkAsset
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    asset = ArtworkAsset("artist-hero", "artist-entity:desktop")
+    materialize_artwork(asset, _jpeg_bytes("navy"))
+    original = tmp_path / "artist-hero-desktop.webp"
+    original.write_bytes(_jpeg_bytes("red"))
+    queued: list[tuple[ArtworkAsset, str]] = []
+    monkeypatch.setattr(
+        artwork_delivery,
+        "queue_artwork_materialization",
+        lambda queued_asset, *, reason: queued.append((queued_asset, reason)),
+    )
+
+    response = artwork_delivery.deliver_artwork(
+        asset,
+        requested_size=1280,
+        local_original=original,
+        missing_response=Response(status_code=404),
+        validate_source_revision=True,
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-crate-artwork"] == "original"
+    assert response.path == original
     assert response.background is not None
     asyncio.run(response.background())
     assert queued == [(asset, "variant-miss")]

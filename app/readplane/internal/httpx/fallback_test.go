@@ -173,6 +173,15 @@ func TestFallbackProxyUsesIndependentArtworkDeadline(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	assert.Equal(t, uint64(0), proxy.Stats().Timeouts)
+
+	heroRecorder := httptest.NewRecorder()
+	proxy.ServeHTTP(
+		heroRecorder,
+		httptest.NewRequest(http.MethodGet, "/api/artists/5/hero?composition=desktop", nil),
+	)
+
+	assert.Equal(t, http.StatusOK, heroRecorder.Code)
+	assert.Equal(t, uint64(0), proxy.Stats().Timeouts)
 }
 
 func TestFallbackProxyBoundsStreamingResponseHeaders(t *testing.T) {

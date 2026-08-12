@@ -32,12 +32,11 @@ describe("Crate image pipeline coverage", () => {
       if (source.includes("AuthenticatedMediaImage")) {
         violations.push(`${relative(root, file)}:legacy-renderer`);
       }
-      if (
-        relative(root, file) !== "components/actions/ItemActionMenu.tsx" &&
-        (source.includes("ItemActionMenu") ||
-          source.includes("<ContextMenu")) &&
-        source.includes('from "@crate/ui/domain/actions"')
-      ) {
+      const importsSharedMenuComponent =
+        /import\s*\{[^}]*\b(?:ContextMenu|ItemActionMenu)\s*[,}][^}]*\}\s*from\s*["']@crate\/ui\/domain\/actions["']/s.test(
+          source,
+        );
+      if (importsSharedMenuComponent) {
         violations.push(`${relative(root, file)}:raw-item-action-menu`);
       }
     }

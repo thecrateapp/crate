@@ -1,6 +1,7 @@
 def test_projector_loop_runs_bounded_outbox_retention(monkeypatch):
     from crate import domain_event_relay, projector, projector_daemon
     from crate.db import domain_event_outbox
+    from crate.db import home_warming
 
     cleaned: list[tuple[int, int]] = []
     monkeypatch.setattr(
@@ -14,7 +15,7 @@ def test_projector_loop_runs_bounded_outbox_retention(monkeypatch):
         lambda **_kwargs: {"processed": 0},
     )
     monkeypatch.setattr(
-        projector,
+        home_warming,
         "warm_recent_home_discovery_snapshots",
         lambda: 0,
     )

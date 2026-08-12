@@ -300,6 +300,7 @@ cmd_release_preflight() {
   fi
 
   assert_required_env REDIS_PASSWORD 16
+  assert_required_env JWT_SECRET 32
   assert_required_env CRATE_POSTGRES_USER
   assert_required_env CRATE_POSTGRES_PASSWORD 16
   assert_required_env CRATE_POSTGRES_DB

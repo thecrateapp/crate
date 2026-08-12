@@ -2,6 +2,10 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  androidLoadQueueMock,
+  androidInsertTrackMock,
+  androidRemoveTrackMock,
+  shouldUseAndroidNativePlayerMock,
   castPauseMock,
   castPlayMock,
   castSeekMock,
@@ -9,6 +13,10 @@ const {
   isCastSessionActiveMock,
   startCastSessionMock,
 } = vi.hoisted(() => ({
+  androidLoadQueueMock: vi.fn(),
+  androidInsertTrackMock: vi.fn(),
+  androidRemoveTrackMock: vi.fn(),
+  shouldUseAndroidNativePlayerMock: vi.fn(() => false),
   castPauseMock: vi.fn(),
   castPlayMock: vi.fn(),
   castSeekMock: vi.fn(),
@@ -20,6 +28,26 @@ const {
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import type { Track } from "@/contexts/player-types";
 import * as gaplessPlayer from "@/lib/gapless-player";
+
+vi.mock("@/contexts/player-engine-adapter", () => ({
+  toFreshEngineTrack: vi.fn(async (track: Track) => ({
+    url: track.path || track.id,
+  })),
+  toStartupEngineTracks: vi.fn(async (tracks: Track[]) =>
+    tracks.map((track) => ({ url: track.path || track.id })),
+  ),
+}));
+
+vi.mock("@/lib/android-native-engine", () => ({
+  androidNativeEngine: {
+    insertTrack: androidInsertTrackMock,
+    loadQueue: androidLoadQueueMock,
+    removeTrack: androidRemoveTrackMock,
+    stop: vi.fn(),
+  },
+  isAndroidNativePlayerAvailable: vi.fn(() => false),
+  shouldUseAndroidNativePlayer: shouldUseAndroidNativePlayerMock,
+}));
 
 vi.mock("@/lib/gapless-player", () => ({
   addTrack: vi.fn(),
@@ -63,6 +91,7 @@ const TRACK: Track = {
 function createParams() {
   return {
     queueRef: { current: [] as Track[] },
+    jamQueueLockedRef: { current: false },
     currentIndexRef: { current: 0 },
     currentTimeRef: { current: 0 },
     isPlayingRef: { current: false },
@@ -96,6 +125,7 @@ function createParams() {
     resetPlaybackIntelligence: vi.fn(),
     continueInfinitePlayback: vi.fn(() => false),
     clearPrevRestartLatch: vi.fn(),
+    ensureJamQueueLocked: vi.fn(),
     commitQueue: vi.fn(),
     commitCurrentIndex: vi.fn(),
     commitCurrentTime: vi.fn(),
@@ -119,6 +149,10 @@ describe("usePlayerQueueActions", () => {
     castSetVolumeMock.mockResolvedValue({ ok: true });
     isCastSessionActiveMock.mockReturnValue(false);
     startCastSessionMock.mockResolvedValue({ ok: true });
+    shouldUseAndroidNativePlayerMock.mockReturnValue(false);
+    androidLoadQueueMock.mockResolvedValue(undefined);
+    androidInsertTrackMock.mockResolvedValue(undefined);
+    androidRemoveTrackMock.mockResolvedValue(undefined);
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
       value: "visible",
@@ -144,6 +178,347 @@ describe("usePlayerQueueActions", () => {
     expect(gaplessPlayer.play).toHaveBeenCalledTimes(1);
     expect(params.publishConnectState).toHaveBeenCalledWith({
       claimActive: true,
+    });
+  });
+
+  it("keeps local queue mutations disabled while a Jam session owns playback", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.jamQueueLockedRef.current = true;
+    const queuedTrack = { ...TRACK, id: "track-queued", title: "Queued" };
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.playAll([TRACK, queuedTrack], 0, {
+      type: "album",
+      name: "Album",
+    });
+    result.current.addToQueue(queuedTrack);
+    result.current.removeFromQueue(0);
+    result.current.reorderQueue(0, 1);
+    result.current.playNext(queuedTrack);
+    result.current.jumpTo(0);
+    result.current.next();
+
+    expect(params.commitQueue).not.toHaveBeenCalled();
+    expect(params.pushToEngine).not.toHaveBeenCalled();
+    expect(gaplessPlayer.loadQueue).not.toHaveBeenCalled();
+    expect(gaplessPlayer.addTrack).not.toHaveBeenCalled();
+    expect(gaplessPlayer.removeTrack).not.toHaveBeenCalled();
+  });
+
+  it("pushes authoritative Jam queue updates into the local player", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.jamQueueLockedRef.current = true;
+    const queuedTrack = { ...TRACK, id: "track-queued", title: "Queued" };
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK, queuedTrack], {
+      currentTrack: TRACK,
+      playing: false,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(params.pushToEngine).toHaveBeenCalledWith([TRACK, queuedTrack], 0, {
+      autoplay: false,
+      positionMs: 0,
+      preservePlayback: true,
+    });
+    expect(params.setPlaySource).toHaveBeenCalledWith({
+      type: "queue",
+      name: "Jam: Test",
+    });
+  });
+
+  it("updates a room queue in place without rebuilding the active track", () => {
+    const params = createParams();
+    const queuedTrack = { ...TRACK, id: "track-queued", title: "Queued" };
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK, queuedTrack], {
+      currentTrack: TRACK,
+      positionSeconds: 42,
+      playing: true,
+      queueOnly: true,
+      source: { type: "queue", name: "Jam: Test" },
+    } as Parameters<typeof result.current.syncJamQueue>[1]);
+
+    expect(params.pushToEngine).not.toHaveBeenCalled();
+    expect(gaplessPlayer.loadQueue).not.toHaveBeenCalled();
+    expect(gaplessPlayer.insertTrack).toHaveBeenCalledTimes(1);
+    expect(params.commitQueue).toHaveBeenCalledWith([TRACK, queuedTrack]);
+  });
+
+  it("applies transport position after updating a Jam queue in place", () => {
+    const queuedTrack = { ...TRACK, id: "track-queued", title: "Queued" };
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK, queuedTrack], {
+      currentTrack: TRACK,
+      positionSeconds: 42.25,
+      playing: true,
+      queueOnly: true,
+      forcePosition: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(params.pushToEngine).not.toHaveBeenCalled();
+    expect(gaplessPlayer.insertTrack).toHaveBeenCalledTimes(1);
+    expect(gaplessPlayer.seekTo).toHaveBeenCalledWith(42_250);
+  });
+
+  it("does not let an older native Jam queue mutation append after a newer snapshot", async () => {
+    shouldUseAndroidNativePlayerMock.mockReturnValue(true);
+    const params = createParams();
+    const queuedTrack = {
+      ...TRACK,
+      id: "track-queued",
+      title: "Queued",
+      path: "/music/Artist/Album/02-queued.flac",
+    };
+    const newerTrack = {
+      ...TRACK,
+      id: "track-newer",
+      title: "Newer",
+      path: "/music/Artist/Album/03-newer.flac",
+    };
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    params.commitQueue.mockImplementation((queue: Track[]) => {
+      params.queueRef.current = queue;
+    });
+    let releaseFirstInsert!: () => void;
+    const firstInsert = new Promise<void>((resolve) => {
+      releaseFirstInsert = resolve;
+    });
+    androidInsertTrackMock
+      .mockImplementationOnce(() => firstInsert)
+      .mockResolvedValue(undefined);
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK, queuedTrack], {
+      currentTrack: TRACK,
+      playing: true,
+      queueOnly: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    await waitFor(() =>
+      expect(androidInsertTrackMock).toHaveBeenCalledTimes(1),
+    );
+
+    result.current.syncJamQueue([TRACK, newerTrack], {
+      currentTrack: TRACK,
+      playing: true,
+      queueOnly: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    releaseFirstInsert();
+    await waitFor(() => expect(androidRemoveTrackMock).toHaveBeenCalledWith(1));
+    await waitFor(() =>
+      expect(androidInsertTrackMock).toHaveBeenCalledTimes(2),
+    );
+    expect(androidRemoveTrackMock).toHaveBeenCalledWith(1);
+  });
+
+  it("does not rebuild an unchanged Jam queue on repeated room state syncs", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 0;
+    params.isPlayingRef.current = false;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+    result.current.syncJamQueue([TRACK], {
+      currentTrack: TRACK,
+      positionSeconds: 0,
+      playing: false,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+    result.current.syncJamQueue([{ ...TRACK }], {
+      currentTrack: TRACK,
+      positionSeconds: 0,
+      playing: false,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(params.pushToEngine).not.toHaveBeenCalled();
+    expect(gaplessPlayer.loadQueue).not.toHaveBeenCalled();
+    expect(params.commitQueue).not.toHaveBeenCalled();
+    expect(params.commitCurrentIndex).not.toHaveBeenCalled();
+    expect(params.setPlaySource).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not rebuild a Jam queue when the snapshot uses another stable track id", () => {
+    const localCurrent = {
+      ...TRACK,
+      id: "local-track-1",
+      entityUid: "track-1",
+      path: "/music/local-current.flac",
+    };
+    const localNext = {
+      ...TRACK,
+      id: "local-track-2",
+      entityUid: "track-2",
+      path: "/music/local-next.flac",
+      title: "Next",
+    };
+    const roomCurrent = {
+      ...localCurrent,
+      id: "room-track-1",
+      path: "/music/room-current.flac",
+    };
+    const roomNext = {
+      ...localNext,
+      id: "room-track-2",
+      path: "/music/room-next.flac",
+    };
+    const params = createParams();
+    params.queueRef.current = [localCurrent, localNext];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([roomCurrent, roomNext], {
+      currentTrack: roomCurrent,
+      playing: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(params.pushToEngine).not.toHaveBeenCalled();
+    expect(gaplessPlayer.loadQueue).not.toHaveBeenCalled();
+  });
+
+  it("preserves the active playback position when a Jam queue is reordered", () => {
+    const queuedTrack = {
+      ...TRACK,
+      id: "track-queued",
+      title: "Queued",
+      entityUid: "queued-entity",
+      path: "/music/Artist/Album/02-queued.flac",
+    };
+    const params = createParams();
+    params.queueRef.current = [TRACK, queuedTrack];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([queuedTrack, TRACK], {
+      currentTrack: TRACK,
+      playing: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(params.pushToEngine).toHaveBeenCalledWith([queuedTrack, TRACK], 1, {
+      autoplay: true,
+      positionMs: 42_000,
+      preservePlayback: true,
+    });
+  });
+
+  it("honors an explicit Jam sync for sub-second drift", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK], {
+      currentTrack: TRACK,
+      positionSeconds: 42.25,
+      playing: true,
+      forcePosition: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(gaplessPlayer.seekTo).toHaveBeenCalledWith(42_250);
+  });
+
+  it("honors an explicit Jam sync for a small audible drift", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK], {
+      currentTrack: TRACK,
+      positionSeconds: 42.03,
+      playing: true,
+      forcePosition: true,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(gaplessPlayer.seekTo).toHaveBeenCalledWith(42_030);
+  });
+
+  it("does not reload an empty Jam queue when the room has no active track", () => {
+    const params = createParams();
+    params.queueRef.current = [];
+    params.currentIndexRef.current = 0;
+    params.currentTimeRef.current = 0;
+    params.isPlayingRef.current = false;
+    params.jamQueueLockedRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([], {
+      currentTrack: null,
+      positionSeconds: 0,
+      playing: false,
+      source: { type: "queue", name: "Jam: Empty" },
+    });
+    result.current.syncJamQueue([], {
+      currentTrack: null,
+      positionSeconds: 0,
+      playing: false,
+      source: { type: "queue", name: "Jam: Empty" },
+    });
+
+    expect(params.pushToEngine).not.toHaveBeenCalled();
+    expect(params.commitQueue).not.toHaveBeenCalled();
+    expect(params.setPlaySource).toHaveBeenCalledTimes(1);
+  });
+
+  it("activates the Jam lock before applying an inbound room queue", () => {
+    const params = createParams();
+    params.ensureJamQueueLocked.mockImplementation(() => {
+      params.jamQueueLockedRef.current = true;
+    });
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.syncJamQueue([TRACK], {
+      currentTrack: TRACK,
+      source: { type: "queue", name: "Jam: Test" },
+    });
+
+    expect(params.ensureJamQueueLocked).toHaveBeenCalledTimes(1);
+    expect(params.pushToEngine).toHaveBeenCalledWith([TRACK], 0, {
+      autoplay: false,
+      positionMs: 0,
+      preservePlayback: true,
     });
   });
 

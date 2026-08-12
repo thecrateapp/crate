@@ -1,6 +1,7 @@
 import { createContext } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import type { PlayerQueueSnapshot } from "@/contexts/player-session";
 import type { ConnectedPlaybackInstance } from "@/hooks/use-crate-connect-ws";
 import type { RemotePlaybackState } from "@/lib/remote-playback-state";
 
@@ -25,9 +26,19 @@ export interface PlayerProgressValue {
   duration: number;
 }
 
+export interface JamTransportControls {
+  canControl: boolean;
+  togglePlayPause: () => void;
+  next: () => void;
+  previous: () => void;
+  seek: (time: number) => void;
+}
+
 export interface PlayerActionsValue {
   queue: Track[];
   currentIndex: number;
+  jamQueueLocked: boolean;
+  jamTransport: JamTransportControls | null;
   shuffle: boolean;
   repeat: RepeatMode;
   playSource: PlaySource | null;
@@ -50,6 +61,22 @@ export interface PlayerActionsValue {
   addToQueue: (track: Track) => void;
   removeFromQueue: (index: number) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
+  enterJamSession: () => void;
+  leaveJamSession: () => void;
+  setJamTransport: (controls: JamTransportControls | null) => void;
+  syncJamQueue: (
+    tracks: Track[],
+    options?: {
+      currentTrack?: Track | null;
+      positionSeconds?: number;
+      playing?: boolean;
+      queueOnly?: boolean;
+      forcePosition?: boolean;
+      source?: PlaySource;
+    },
+  ) => void;
+  captureQueueSnapshot: () => PlayerQueueSnapshot;
+  restoreQueueSnapshot: (snapshot: PlayerQueueSnapshot) => void;
   publishConnectState: (options?: { claimActive?: boolean }) => Promise<void>;
   connect: PlayerConnectValue;
 }

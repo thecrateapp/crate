@@ -436,6 +436,36 @@ export function artistBackgroundApiUrl(
   return resolveAssetUrl(artistBackgroundAssetPath(input, options));
 }
 
+export function artistHeroAssetPath(
+  input: ArtistRouteInput,
+  composition: "desktop" | "mobile",
+  options?: ImageAssetOptions,
+) {
+  let path = "";
+  if (input.artistId != null) {
+    path = `/api/artists/${input.artistId}/hero`;
+  } else if (input.artistEntityUid) {
+    path = `/api/artists/by-entity/${encodeEntityUid(
+      input.artistEntityUid,
+    )}/hero`;
+  }
+  if (!path) return "";
+  const params = new URLSearchParams({ composition });
+  if (options?.size != null) params.set("size", String(options.size));
+  if (options?.version != null && String(options.version).trim())
+    params.set("v", String(options.version));
+  if (options?.format) params.set("format", options.format);
+  return `${path}?${params.toString()}`;
+}
+
+export function artistHeroApiUrl(
+  input: ArtistRouteInput,
+  composition: "desktop" | "mobile",
+  options?: ImageAssetOptions,
+) {
+  return resolveAssetUrl(artistHeroAssetPath(input, composition, options));
+}
+
 export function albumPagePath(input: AlbumRouteInput) {
   const artistSlug = publicArtistSlug({
     artistId: null,

@@ -191,7 +191,7 @@ export function ArtistHeroSection({
           )}
           aspect={21 / 9}
           onUploaded={onBackgroundUploaded}
-          label="Edit hero"
+          label="Edit background"
           className="absolute bottom-6 right-4 z-30 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-black/65 px-3 py-2 text-xs font-medium text-white/85 shadow-lg shadow-black/30 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white md:bottom-8 md:right-8"
         />
       ) : null}

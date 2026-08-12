@@ -202,6 +202,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     resume,
     next,
     prev,
+    jamQueueLocked,
     setPlaybackRate,
     toggleShuffle,
     cycleRepeat,
@@ -249,6 +250,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         currentTrack.globalTrackUid ?? null,
       )
     : false;
+  const jamTransportDisabled = jamQueueLocked;
 
   const swipeStartRef = useRef<number | null>(null);
   const horizontalSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -273,6 +275,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
 
   function togglePlaybackWithFeedback() {
     triggerHaptic("light");
+    if (jamQueueLocked) return;
     if (isPlaying) {
       pause();
     } else {
@@ -302,20 +305,29 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
 
   function goNextWithFeedback() {
     triggerHaptic("selection");
+    if (jamQueueLocked) return;
     next();
   }
 
   function goPrevWithFeedback() {
     triggerHaptic("selection");
+    if (jamQueueLocked) return;
     prev();
   }
 
+  function seekWithFeedback(time: number) {
+    if (jamQueueLocked) return;
+    seek(time);
+  }
+
   function toggleShuffleWithFeedback() {
+    if (jamQueueLocked) return;
     triggerHaptic("selection");
     toggleShuffle();
   }
 
   function cycleRepeatWithFeedback() {
+    if (jamQueueLocked) return;
     triggerHaptic("selection");
     cycleRepeat();
   }
@@ -696,13 +708,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   duration={displayedDuration}
                   isBuffering={isBuffering}
                   isPlaying={isPlaying}
+                  disabled={jamQueueLocked}
                   jogEnabled
                   jogSeekMode={spinningDiscJogSeekMode}
                   onJoggingChange={(jogging) => {
                     draggingRef.current = jogging;
                   }}
                   onPlaybackRateChange={setPlaybackRate}
-                  onSeek={seek}
+                  onSeek={seekWithFeedback}
                   onTogglePlay={togglePlaybackWithFeedback}
                 />
               ) : (
@@ -768,7 +781,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               <PlayerSeekBar
                 currentTime={displayedTime}
                 duration={displayedDuration}
-                onSeek={seek}
+                onSeek={seekWithFeedback}
+                disabled={jamQueueLocked}
                 thin
                 variant="glow"
               />
@@ -777,12 +791,13 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
             <div className="mx-auto mt-5 flex w-full max-w-[360px] items-center justify-center gap-3">
               <button
                 onClick={toggleShuffleWithFeedback}
+                disabled={jamQueueLocked}
                 aria-label={
                   shuffle
                     ? t("player.disableShuffle")
                     : t("player.enableShuffle")
                 }
-                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
+                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                   shuffle
                     ? "text-primary"
                     : "text-white/35 active:text-white/70"
@@ -792,17 +807,19 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               </button>
               <button
                 onClick={goPrevWithFeedback}
+                disabled={jamQueueLocked}
                 aria-label={t("player.previous")}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
               >
                 <SkipBack size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
               <SpectrumPlayButton
                 onClick={togglePlaybackWithFeedback}
+                disabled={jamTransportDisabled}
                 aria-label={isPlaying ? t("player.pause") : t("player.play")}
                 size="lg"
                 active={isPlaying}
-                className="touch-manipulation"
+                className="touch-manipulation disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:scale-100"
               >
                 {isBuffering ? (
                   <Loader2
@@ -821,15 +838,17 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               </SpectrumPlayButton>
               <button
                 onClick={goNextWithFeedback}
+                disabled={jamTransportDisabled}
                 aria-label={t("player.next")}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
               >
                 <SkipForward size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
               <button
                 onClick={cycleRepeatWithFeedback}
+                disabled={jamQueueLocked}
                 aria-label={t("player.repeat", { mode: repeat })}
-                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
+                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                   repeat !== "off"
                     ? "text-primary"
                     : "text-white/35 active:text-white/70"

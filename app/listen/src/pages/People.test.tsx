@@ -59,6 +59,6 @@ describe("People", () => {
     expect(
       screen.getByPlaceholderText("Busca por usuario o nombre visible"),
     ).toBeVisible();
-    expect(screen.getByText("Sesiones Jam")).toBeVisible();
+    expect(screen.queryByText("Sesiones Jam")).toBeNull();
   });
 });

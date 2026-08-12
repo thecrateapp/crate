@@ -93,3 +93,14 @@ if (typeof window !== "undefined") {
     });
   }
 }
+
+// Radix UI's pointer interactions use these APIs, which jsdom does not expose.
+const pointerCapturePrototype = HTMLElement.prototype as HTMLElement & {
+  hasPointerCapture?: (pointerId: number) => boolean;
+  setPointerCapture?: (pointerId: number) => void;
+  releasePointerCapture?: (pointerId: number) => void;
+};
+pointerCapturePrototype.hasPointerCapture ??= () => false;
+pointerCapturePrototype.setPointerCapture ??= () => undefined;
+pointerCapturePrototype.releasePointerCapture ??= () => undefined;
+HTMLElement.prototype.scrollIntoView ??= () => undefined;

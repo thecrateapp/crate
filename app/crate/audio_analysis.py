@@ -1072,7 +1072,7 @@ def _analyze_librosa(filepath: str) -> dict:
         energy_norm = max(0.0, min(1.0, (db + 30) / 24))
 
         try:
-            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+            tempo, _ = librosa.beat.beat_track(y=np.asarray(y, dtype=np.float32), sr=sr)
             if isinstance(tempo, np.ndarray):
                 tempo = float(tempo[0])
             result["bpm"] = round(float(tempo), 1) if tempo and tempo > 0 else None

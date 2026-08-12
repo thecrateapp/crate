@@ -10,4 +10,15 @@ describe("protected app routes", () => {
 
     expect(paths.filter((path) => path.startsWith("remote/"))).toEqual([]);
   });
+
+  it("keeps Jam Rooms behind the temporary disabled-access route", () => {
+    const paths = protectedAppRoutes
+      .map((route) => route.path)
+      .filter((path): path is string => Boolean(path));
+
+    expect(paths).not.toContain("jam");
+    expect(paths).not.toContain("jam/rooms/:roomId");
+    expect(paths).not.toContain("jam/invite/:token");
+    expect(paths).toContain("jam/*");
+  });
 });

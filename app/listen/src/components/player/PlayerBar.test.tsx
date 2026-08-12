@@ -276,4 +276,86 @@ describe("PlayerBar mobile mini-player", () => {
     expect(mobileControls).toHaveClass("self-stretch");
     expect(mobileControls).not.toHaveClass("translate-y-1");
   });
+
+  it("locks local transport controls for Jam members", () => {
+    const pause = vi.fn();
+    const resume = vi.fn();
+    const next = vi.fn();
+    const track = createMockTrack({ title: "Jam track", artist: "Crate" });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack: track,
+        queue: [track],
+        jamQueueLocked: true,
+        pause,
+        resume,
+        next,
+        jamTransport: {
+          canControl: false,
+          togglePlayPause: vi.fn(),
+          next: vi.fn(),
+          previous: vi.fn(),
+          seek: vi.fn(),
+        },
+      },
+    });
+
+    const playButton = screen
+      .getAllByRole("button", { name: "Play" })
+      .find((button) => button.className.includes("h-12"));
+    const nextButton = screen
+      .getAllByRole("button", { name: "Next track" })
+      .find((button) => button.className.includes("h-12"));
+
+    expect(playButton).toBeDefined();
+    expect(nextButton).toBeDefined();
+    fireEvent.click(playButton!);
+    fireEvent.click(nextButton!);
+
+    expect(pause).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+    expect(playButton).toBeDisabled();
+    expect(nextButton).toBeDisabled();
+  });
+
+  it("keeps the global transport controls read-only for Jam hosts", () => {
+    const togglePlayPause = vi.fn();
+    const next = vi.fn();
+    const track = createMockTrack({
+      title: "Jam owner track",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack: track,
+        queue: [track],
+        jamQueueLocked: true,
+        jamTransport: {
+          canControl: true,
+          togglePlayPause,
+          next,
+          previous: vi.fn(),
+          seek: vi.fn(),
+        },
+      },
+    });
+
+    const playButton = screen
+      .getAllByRole("button", { name: "Play" })
+      .find((button) => button.className.includes("h-12"));
+    const nextButton = screen
+      .getAllByRole("button", { name: "Next track" })
+      .find((button) => button.className.includes("h-12"));
+
+    fireEvent.click(playButton!);
+    fireEvent.click(nextButton!);
+
+    expect(playButton).toBeDisabled();
+    expect(nextButton).toBeDisabled();
+    expect(togglePlayPause).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
 });

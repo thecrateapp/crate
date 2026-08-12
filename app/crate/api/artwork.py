@@ -1,7 +1,10 @@
+import base64
+import io
 import logging
 
-from fastapi import APIRouter, File, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from crate.api._deps import (
     album_names_from_entity_uid,
@@ -13,6 +16,7 @@ from crate.api._deps import (
     safe_path,
 )
 from crate.api.auth import _require_auth
+from crate.api.artwork_delivery import deliver_original_artwork
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -26,14 +30,38 @@ from crate.api.schemas.artwork import (
     ArtworkFetchRequest,
     ArtworkMissingResponse,
     ArtworkQueuedResponse,
+    ArtistArtworkAssetAssignRequest,
+    ArtistArtworkCandidateImportRequest,
+    ArtistArtworkSlot,
+    ArtistHeroComposeRequest,
     ArtworkScanRequest,
+    ArtistHeroArtworkResponse,
+    ArtistHeroCandidateAnalysisRequest,
+    ArtistHeroRecipe,
+    ArtistHeroReviewRequest,
 )
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
 from crate.artwork import extract_embedded_cover, save_cover
-from crate.db.repositories.library import get_albums_missing_covers
+from crate.artist_hero_candidates import (
+    analyze_candidate_image,
+    discover_artist_hero_candidates,
+    load_candidate_content,
+)
+from crate.artist_hero_contract import artist_hero_profile_contract
+from crate.db.repositories.library import get_albums_missing_covers, get_library_artist
+from crate.db.repositories.artist_artwork_assets import (
+    get_artist_artwork_asset,
+    list_artist_artwork_assets,
+)
+from crate.db.repositories.artist_hero_artwork import (
+    get_artist_hero_artwork,
+    update_artist_hero_review_status,
+)
 from crate.db.releases import get_release_by_virtual_album_id
 from crate.db.repositories.tasks import create_task
+from crate.storage_layout import resolve_artist_dir
+from crate.streaming.paths import cache_root
 
 log = logging.getLogger(__name__)
 
@@ -364,3 +392,581 @@ async def api_upload_background_by_entity_uid(
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
     return await api_upload_background(request, artist_name, file)
+
+
+async def api_upload_artist_hero(
+    request: Request,
+    name: str,
+    file: UploadFile,
+    desktop_recipe: str,
+    mobile_recipe: str,
+    composition: str = "shared",
+):
+    """Queue worker-owned rendering of both artist-hero compositions."""
+    _require_artwork_editor(request)
+    import base64
+
+    desktop = ArtistHeroRecipe.model_validate_json(desktop_recipe)
+    mobile = ArtistHeroRecipe.model_validate_json(mobile_recipe)
+    if composition not in {"shared", "desktop", "mobile"}:
+        return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    data = await file.read()
+    if not data or len(data) > 25 * 1024 * 1024:
+        return JSONResponse({"error": "Invalid image"}, status_code=400)
+    try:
+        from PIL import Image
+
+        with Image.open(io.BytesIO(data)) as source:
+            width, height = source.size
+            if width <= 0 or height <= 0 or width * height > 80_000_000:
+                raise ValueError("unsafe image dimensions")
+            source.verify()
+    except (Image.DecompressionBombError, OSError, ValueError):
+        return JSONResponse({"error": "Invalid image"}, status_code=400)
+    task_id = create_task(
+        "upload_image",
+        {
+            "type": "artist_hero",
+            "artist": name,
+            "data_b64": base64.b64encode(data).decode(),
+            "desktop_recipe": desktop.model_dump(),
+            "mobile_recipe": mobile.model_dump(),
+            "composition": composition,
+        },
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/upload-hero",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Upload and compose editorial artist-hero artwork",
+)
+async def api_upload_artist_hero_by_id(
+    request: Request,
+    artist_id: int,
+    file: UploadFile = File(...),
+    desktop_recipe: str = Form(...),
+    mobile_recipe: str = Form(...),
+    composition: str = Form("shared"),
+):
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    return await api_upload_artist_hero(
+        request, artist_name, file, desktop_recipe, mobile_recipe, composition
+    )
+
+
+@router.post(
+    "/api/artwork/artists/by-entity/{artist_entity_uid}/upload-hero",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Upload artist-hero artwork by entity UID",
+)
+async def api_upload_artist_hero_by_entity_uid(
+    request: Request,
+    artist_entity_uid: str,
+    file: UploadFile = File(...),
+    desktop_recipe: str = Form(...),
+    mobile_recipe: str = Form(...),
+    composition: str = Form("shared"),
+):
+    artist_name = artist_name_from_entity_uid(artist_entity_uid)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    return await api_upload_artist_hero(
+        request, artist_name, file, desktop_recipe, mobile_recipe, composition
+    )
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/hero-profile",
+    response_model=ArtistHeroArtworkResponse,
+    responses=_ARTWORK_RESPONSES,
+    summary="Read an artist-hero artwork profile",
+)
+def api_artist_hero_profile(request: Request, artist_id: int):
+    _require_auth(request)
+    if not artist_name_from_id(artist_id):
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    profile = get_artist_hero_artwork(artist_id)
+    if not profile:
+        return JSONResponse({"error": "Artist hero not found"}, status_code=404)
+    payload = {
+        **profile,
+        **artist_hero_profile_contract(artist_id=artist_id, profile=profile),
+    }
+    return JSONResponse(
+        jsonable_encoder(payload), headers={"Cache-Control": "no-store"}
+    )
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/hero-source",
+    responses=_ARTWORK_RESPONSES,
+    summary="Read the editable source for an artist-hero composition",
+)
+def api_artist_hero_source(
+    request: Request, artist_id: int, composition: str | None = None
+):
+    _require_auth(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+
+    root = library_path().resolve()
+    artist_dir = resolve_artist_dir(
+        root,
+        get_library_artist(artist_name),
+        fallback_name=artist_name,
+        existing_only=True,
+    )
+    if not artist_dir:
+        return JSONResponse({"error": "Artist hero source not found"}, status_code=404)
+
+    if composition not in {None, "desktop", "mobile"}:
+        return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    composition_path = (
+        artist_dir / f"artist-hero-source-{composition}.jpg"
+        if composition
+        else artist_dir / "artist-hero-source.jpg"
+    )
+    source_path = composition_path.resolve()
+    if composition and not source_path.is_file():
+        source_path = (artist_dir / "artist-hero-source.jpg").resolve()
+    if not source_path.is_relative_to(root) or not source_path.is_file():
+        return JSONResponse({"error": "Artist hero source not found"}, status_code=404)
+    return deliver_original_artwork(
+        source_path,
+        cache_control="private, max-age=300, stale-while-revalidate=3600",
+    )
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/preview-hero",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Render an unsaved artist-hero preview with the canonical worker",
+)
+async def api_preview_artist_hero(
+    request: Request,
+    artist_id: int,
+    recipe: str = Form(...),
+    composition: str = Form(...),
+    file: UploadFile | None = File(None),
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    if composition not in {"desktop", "mobile"}:
+        return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    try:
+        normalized_recipe = ArtistHeroRecipe.model_validate_json(recipe)
+    except ValueError as exc:
+        return JSONResponse({"error": f"Invalid hero recipe: {exc}"}, status_code=422)
+
+    params: dict[str, object] = {
+        "artist": artist_name,
+        "artist_id": artist_id,
+        "composition": composition,
+        "recipe": normalized_recipe.model_dump(),
+    }
+    if file is not None:
+        data = await file.read()
+        if not data or len(data) > 25 * 1024 * 1024:
+            return JSONResponse({"error": "Invalid image"}, status_code=400)
+        try:
+            from PIL import Image
+
+            with Image.open(io.BytesIO(data)) as source:
+                width, height = source.size
+                if width <= 0 or height <= 0 or width * height > 80_000_000:
+                    raise ValueError("unsafe image dimensions")
+                source.verify()
+        except (Image.DecompressionBombError, OSError, ValueError):
+            return JSONResponse({"error": "Invalid image"}, status_code=400)
+        params["data_b64"] = base64.b64encode(data).decode()
+
+    task_id = create_task("preview_artist_hero", params)
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/hero-preview/{preview_id}",
+    responses=_ARTWORK_RESPONSES,
+    summary="Read a temporary canonical artist-hero preview",
+)
+def api_artist_hero_preview(request: Request, artist_id: int, preview_id: str):
+    _require_artwork_editor(request)
+    if not artist_name_from_id(artist_id) or not preview_id.isalnum():
+        return JSONResponse({"error": "Preview not found"}, status_code=404)
+    preview_path = (
+        cache_root() / "artist-hero-previews" / f"{preview_id}.webp"
+    ).resolve()
+    preview_root = (cache_root() / "artist-hero-previews").resolve()
+    if not preview_path.is_relative_to(preview_root) or not preview_path.is_file():
+        return JSONResponse({"error": "Preview not found"}, status_code=404)
+    return FileResponse(
+        preview_path,
+        media_type="image/webp",
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/hero-candidates",
+    responses=_ARTWORK_RESPONSES,
+    summary="Discover ranked source images for an artist hero",
+)
+def api_artist_hero_candidates(request: Request, artist_id: int):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    root = library_path().resolve()
+    artist_dir = resolve_artist_dir(
+        root,
+        get_library_artist(artist_name),
+        fallback_name=artist_name,
+        existing_only=True,
+    )
+    if not artist_dir:
+        return JSONResponse({"error": "Artist directory not found"}, status_code=404)
+    candidates = discover_artist_hero_candidates(
+        artist_id=artist_id,
+        artist_name=artist_name,
+        artist_dir=artist_dir,
+    )
+    return {"candidates": [candidate.to_dict() for candidate in candidates]}
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/assets",
+    responses=_ARTWORK_RESPONSES,
+    summary="List curated artwork assets for an artist",
+)
+def api_artist_artwork_assets(request: Request, artist_id: int):
+    _require_artwork_editor(request)
+    if not artist_name_from_id(artist_id):
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+
+    assets = []
+    for stored_asset in list_artist_artwork_assets(artist_id):
+        asset = {
+            key: value for key, value in stored_asset.items() if key != "storage_path"
+        }
+        asset["preview_url"] = (
+            f"/api/artwork/artists/{artist_id}/assets/{asset['id']}/preview"
+        )
+        assets.append(asset)
+    return {"assets": assets}
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/assets/{asset_id}/preview",
+    responses=_ARTWORK_RESPONSES,
+    summary="Preview a curated artist artwork asset",
+)
+def api_artist_artwork_asset_preview(request: Request, artist_id: int, asset_id: int):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    asset = get_artist_artwork_asset(artist_id, asset_id)
+    if not asset:
+        return JSONResponse({"error": "Artwork asset not found"}, status_code=404)
+
+    root = library_path().resolve()
+    artist_dir = resolve_artist_dir(
+        root,
+        get_library_artist(artist_name),
+        fallback_name=artist_name,
+        existing_only=True,
+    )
+    if not artist_dir:
+        return JSONResponse({"error": "Artist directory not found"}, status_code=404)
+    source_path = (artist_dir / str(asset["storage_path"])).resolve()
+    if (
+        not source_path.is_relative_to(artist_dir.resolve())
+        or not source_path.is_file()
+    ):
+        return JSONResponse({"error": "Artwork asset not found"}, status_code=404)
+    return Response(
+        source_path.read_bytes(),
+        media_type=str(asset["mime_type"]),
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+@router.delete(
+    "/api/artwork/artists/{artist_id}/assets/{asset_id}",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Delete an unassigned artist artwork asset",
+)
+def api_delete_artist_artwork_asset(request: Request, artist_id: int, asset_id: int):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    if not get_artist_artwork_asset(artist_id, asset_id):
+        return JSONResponse({"error": "Artwork asset not found"}, status_code=404)
+    task_id = create_task(
+        "delete_artist_artwork_asset",
+        {"artist": artist_name, "artist_id": artist_id, "asset_id": asset_id},
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/assets/upload",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Upload an image into an artist artwork gallery",
+)
+async def api_upload_artist_artwork_asset(
+    request: Request, artist_id: int, file: UploadFile = File(...)
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    data = await file.read()
+    if not data or len(data) > 25 * 1024 * 1024:
+        return JSONResponse({"error": "Invalid image"}, status_code=400)
+    try:
+        from PIL import Image
+
+        with Image.open(io.BytesIO(data)) as source:
+            width, height = source.size
+            if width <= 0 or height <= 0 or width * height > 80_000_000:
+                raise ValueError("unsafe image dimensions")
+            source.verify()
+    except (Image.DecompressionBombError, OSError, ValueError):
+        return JSONResponse({"error": "Invalid image"}, status_code=400)
+
+    task_id = create_task(
+        "import_artist_artwork_asset",
+        {
+            "artist": artist_name,
+            "artist_id": artist_id,
+            "data_b64": base64.b64encode(data).decode(),
+            "filename": file.filename or "artwork",
+            "content_type": file.content_type,
+            "origin": "manual-upload",
+            "label": file.filename or "Uploaded artwork",
+        },
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/assets/import-candidate",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Import a trusted candidate into an artist artwork gallery",
+)
+def api_import_artist_artwork_candidate(
+    request: Request, artist_id: int, body: ArtistArtworkCandidateImportRequest
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    task_id = create_task(
+        "import_artist_artwork_asset",
+        {
+            "artist": artist_name,
+            "artist_id": artist_id,
+            "candidate": body.candidate,
+            "origin": "curated-candidate",
+            "label": body.label or "Imported candidate",
+        },
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/slots/{slot}",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Assign a curated image to an artist artwork slot",
+)
+def api_assign_artist_artwork_slot(
+    request: Request,
+    artist_id: int,
+    slot: ArtistArtworkSlot,
+    body: ArtistArtworkAssetAssignRequest,
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    task_id = create_task(
+        "assign_artist_artwork_slot",
+        {
+            "artist": artist_name,
+            "artist_id": artist_id,
+            "slot": slot,
+            "asset_id": body.asset_id,
+        },
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.get(
+    "/api/artwork/artists/{artist_id}/hero-candidates/preview",
+    responses=_ARTWORK_RESPONSES,
+    summary="Preview a trusted artist-hero candidate",
+)
+def api_artist_hero_candidate_preview(request: Request, artist_id: int, candidate: str):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    root = library_path().resolve()
+    artist_dir = resolve_artist_dir(
+        root,
+        get_library_artist(artist_name),
+        fallback_name=artist_name,
+        existing_only=True,
+    )
+    if not artist_dir:
+        return JSONResponse({"error": "Artist directory not found"}, status_code=404)
+    loaded = load_candidate_content(
+        candidate, artist_id=artist_id, artist_dir=artist_dir
+    )
+    if loaded is None:
+        return JSONResponse({"error": "Candidate not found"}, status_code=404)
+    content, _origin = loaded
+    return Response(
+        content,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/hero-candidates/analyze",
+    responses=_ARTWORK_RESPONSES,
+    summary="Analyze one artist-hero candidate with the configured vision model",
+)
+def api_analyze_artist_hero_candidate(
+    request: Request, artist_id: int, body: ArtistHeroCandidateAnalysisRequest
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    root = library_path().resolve()
+    artist_dir = resolve_artist_dir(
+        root,
+        get_library_artist(artist_name),
+        fallback_name=artist_name,
+        existing_only=True,
+    )
+    if not artist_dir:
+        return JSONResponse({"error": "Artist directory not found"}, status_code=404)
+    loaded = load_candidate_content(
+        body.candidate, artist_id=artist_id, artist_dir=artist_dir
+    )
+    if loaded is None:
+        return JSONResponse({"error": "Candidate not found"}, status_code=404)
+    analysis = analyze_candidate_image(loaded[0])
+    if analysis is None:
+        return JSONResponse(
+            {"error": "The configured model cannot analyze images"}, status_code=409
+        )
+    return analysis.model_dump()
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/compose-hero",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Recompose artist-hero artwork from its persisted source",
+)
+def api_compose_artist_hero(
+    request: Request, artist_id: int, body: ArtistHeroComposeRequest
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    task_id = create_task(
+        "compose_artist_hero",
+        {
+            "artist": artist_name,
+            "desktop_recipe": body.desktop_recipe.model_dump(),
+            "mobile_recipe": body.mobile_recipe.model_dump(),
+            "composition": body.composition,
+        },
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.patch(
+    "/api/artwork/artists/{artist_id}/hero-profile",
+    responses=_ARTWORK_RESPONSES,
+    summary="Review an artist-hero artwork profile",
+)
+def api_review_artist_hero(
+    request: Request, artist_id: int, body: ArtistHeroReviewRequest
+):
+    _require_artwork_editor(request)
+    if not artist_name_from_id(artist_id):
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    if not update_artist_hero_review_status(artist_id, body.review_status):
+        return JSONResponse({"error": "Artist hero not found"}, status_code=404)
+    from crate.api.cache_events import (
+        broadcast_invalidation,
+        wait_for_cache_invalidation,
+    )
+    from crate.db.home_warming import warm_recent_home_discovery_snapshots
+
+    broadcast_invalidation("home", "library", f"artist:{artist_id}")
+    wait_for_cache_invalidation()
+    warm_recent_home_discovery_snapshots()
+    return {"status": body.review_status}
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/derive-hero",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Derive artist-hero artwork from the current background",
+)
+def api_derive_artist_hero(request: Request, artist_id: int):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    task_id = create_task("derive_artist_hero", {"artist": artist_name})
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.post(
+    "/api/artwork/artist-heroes/backfill",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Backfill eligible artist-hero artwork",
+)
+def api_backfill_artist_heroes(request: Request):
+    _require_artwork_editor(request)
+    task_id = create_task(
+        "backfill_artist_heroes", {"after_artist_id": 0, "batch_size": 25}
+    )
+    return {"status": "queued", "task_id": task_id}

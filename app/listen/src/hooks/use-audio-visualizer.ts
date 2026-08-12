@@ -65,8 +65,16 @@ export function useAudioVisualizer(
   }, []);
 
   useEffect(() => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = 0;
+    analyserRef.current = null;
+    dataRef.current = null;
+    waveRef.current = null;
+    frameCountRef.current = 0;
+    setFrequenciesDb([]);
+    setWaveform([]);
+
     if (!enabled) {
-      setFrequenciesDb([]);
       return;
     }
 
@@ -85,6 +93,10 @@ export function useAudioVisualizer(
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+      analyserRef.current = null;
+      dataRef.current = null;
+      waveRef.current = null;
     };
   }, [analyserNode, enabled, tick, trackKey]);
 

@@ -115,15 +115,9 @@ export function Artist() {
       routeGlobalArtistUid ?? data?.global_artist_uid ?? data?.global_uid;
     if (!data?.id && !globalArtistUid) return;
     try {
-      const following = isFollowing(data?.id, globalArtistUid);
       await toggleArtistFollow(data?.id, globalArtistUid, data?.name);
-      toast.success(
-        following
-          ? t("artist.toasts.unfollowed", { name: data?.name })
-          : t("artist.toasts.following", { name: data?.name }),
-      );
     } catch {
-      toast.error(t("artist.toasts.followFailed"));
+      // Follow state rolls back in ArtistFollowsContext.
     }
   }
 

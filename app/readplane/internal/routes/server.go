@@ -411,7 +411,12 @@ func (s *Server) homeDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.MarkReadplane(w, "hit")
-	if err := httpx.WriteJSON(w, http.StatusOK, homeDiscoveryHTTPPayload(row)); err != nil {
+	payload := rotateHomeHeroPayload(
+		homeDiscoveryHTTPPayload(row),
+		user.ID,
+		time.Now().UTC(),
+	)
+	if err := httpx.WriteJSON(w, http.StatusOK, payload); err != nil {
 		s.logger.Warn("failed to write home discovery JSON", "error", err)
 		_ = httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
 	}
@@ -464,7 +469,7 @@ func (s *Server) homeDiscoveryStream(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if r.URL.Query().Get("initial") != "0" {
-		s.writeSnapshotEvent(r.Context(), w, subjectKey, false)
+		s.writeSnapshotEvent(r.Context(), w, subjectKey, user.ID, false)
 		flusher.Flush()
 	}
 
@@ -484,13 +489,13 @@ func (s *Server) homeDiscoveryStream(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			s.writeSnapshotEvent(r.Context(), w, subjectKey, true)
+			s.writeSnapshotEvent(r.Context(), w, subjectKey, user.ID, true)
 			flusher.Flush()
 		}
 	}
 }
 
-func (s *Server) writeSnapshotEvent(ctx context.Context, w http.ResponseWriter, subjectKey string, fresh bool) {
+func (s *Server) writeSnapshotEvent(ctx context.Context, w http.ResponseWriter, subjectKey string, userID int64, fresh bool) {
 	getSnapshot := s.snapshots.Get
 	if fresh {
 		getSnapshot = s.snapshots.GetFresh
@@ -500,7 +505,13 @@ func (s *Server) writeSnapshotEvent(ctx context.Context, w http.ResponseWriter, 
 		s.logger.Warn("failed to reload home discovery snapshot", "error", err, "subject_key", subjectKey)
 		return
 	}
-	payload, err := json.Marshal(row.DecoratedPayload())
+	payload, err := json.Marshal(
+		rotateHomeHeroPayload(
+			homeDiscoveryHTTPPayload(row),
+			userID,
+			time.Now().UTC(),
+		),
+	)
 	if err != nil {
 		s.logger.Warn("failed to encode home discovery snapshot", "error", err, "subject_key", subjectKey)
 		return

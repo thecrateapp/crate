@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -17,7 +17,11 @@ import type {
   HomeRadioStation,
   HomeRecentItem,
 } from "@/components/home/home-model";
-import { artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  artistBackgroundApiUrl,
+  artistHeroApiUrl,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 vi.mock("@/lib/library-routes", async (importOriginal) => {
@@ -25,6 +29,8 @@ vi.mock("@/lib/library-routes", async (importOriginal) => {
   return {
     ...actual,
     artistPhotoApiUrl: vi.fn(actual.artistPhotoApiUrl),
+    artistHeroApiUrl: vi.fn(actual.artistHeroApiUrl),
+    artistBackgroundApiUrl: vi.fn(actual.artistBackgroundApiUrl),
   };
 });
 
@@ -114,12 +120,44 @@ function heroFixture(overrides: Partial<HomeHeroArtist> = {}): HomeHeroArtist {
 }
 
 describe("HomeTasteHero", () => {
-  it("uses shared genre pills and omits the recommended badge", () => {
+  it("uses the legacy background when the surface is not canonically ready", () => {
+    mockDesktopPointer();
+
     renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture({ artwork_revision: "stale-revision" })]}
+        heroSurfaces={{
+          desktop: {
+            mode: "legacy",
+            artists: [heroFixture({ artwork_revision: "stale-revision" })],
+          },
+          mobile: {
+            mode: "legacy",
+            artists: [heroFixture({ artwork_revision: "stale-revision" })],
+          },
+        }}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(artistBackgroundApiUrl).toHaveBeenCalled();
+    expect(artistHeroApiUrl).not.toHaveBeenCalled();
+    expect(screen.getByTestId("desktop-legacy-hero")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("desktop-legacy-hero-artwork"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the editorial Just Landed content without recommendation controls", () => {
+    const { container } = renderWithListenProviders(
       <HomeTasteHero
         heroes={[
           heroFixture({
             genres: ["Hardcore", "Mathcore", "Metalcore"],
+            artwork_provenance: "fallback",
           }),
         ]}
         isFollowing={() => false}
@@ -129,42 +167,19 @@ describe("HomeTasteHero", () => {
       />,
     );
 
+    expect(screen.getByText("Just landed")).toBeInTheDocument();
     expect(screen.queryByText("Recommended")).toBeNull();
     expect(screen.getByTitle("Hardcore")).toHaveClass("rounded-md");
     expect(screen.getByText("hardcore")).toBeInTheDocument();
     expect(screen.getByText("mathcore")).toBeInTheDocument();
     expect(screen.queryByText("metalcore")).toBeNull();
+    expect(screen.queryByText("About")).toBeNull();
+    expect(screen.queryByText("Not interested")).toBeNull();
+    expect(container.querySelector("img.grayscale")).toBeInTheDocument();
   });
 
-  it("records hero exposure and dismisses the current artist", async () => {
-    const hero = heroFixture();
-    const onExpose = vi.fn();
-    const onDismiss = vi.fn();
-
-    renderWithListenProviders(
-      <HomeTasteHero
-        heroes={[hero]}
-        isFollowing={() => false}
-        onOpenArtist={vi.fn()}
-        onPlay={vi.fn()}
-        onToggleFollow={vi.fn()}
-        onDismiss={onDismiss}
-        onExpose={onExpose}
-      />,
-    );
-
-    await waitFor(() => expect(onExpose).toHaveBeenCalledWith(hero));
-
-    const dismissButton = screen.getByRole("button", {
-      name: /Not interested/i,
-    });
-    fireEvent.click(dismissButton);
-
-    expect(onDismiss).toHaveBeenCalledWith(hero);
-  });
-
-  it("hides carousel arrow buttons on mobile", () => {
-    mockMobilePointer();
+  it("uses a manual vertical carousel on desktop", () => {
+    mockDesktopPointer();
 
     renderWithListenProviders(
       <HomeTasteHero
@@ -176,12 +191,86 @@ describe("HomeTasteHero", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Converge" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous artist" })).toHaveClass(
+      "bg-transparent",
+      "border-0",
+    );
+    expect(screen.getByRole("button", { name: "Next artist" })).toHaveClass(
+      "bg-transparent",
+      "border-0",
+    );
+    expect(screen.getByRole("button", { name: "Show Botch" })).toHaveClass(
+      "rounded-full",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Next artist" }));
+
+    expect(screen.getByRole("heading", { name: "Botch" })).toBeInTheDocument();
   });
 
-  it("uses compact accessible actions and a fixed hero viewport on mobile", () => {
-    mockMobilePointer();
+  it("does not repeat the same artist in the desktop carousel", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[
+          heroFixture({ id: 7, slug: "dredg", name: "Dredg" }),
+          heroFixture({ id: 8, slug: "dredg-copy", name: "dredg" }),
+          heroFixture({ id: 9, slug: "botch", name: "Botch" }),
+        ]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: /Show Dredg/i })).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getByRole("button", { name: "Show Botch" }),
+    ).toBeInTheDocument();
+  });
+
+  it("aligns the desktop hero content to the central Home grid", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[
+          heroFixture({
+            desktop_artwork_bounds: {
+              left: 0.2,
+              top: 0,
+              right: 0.8,
+              bottom: 1,
+            },
+          }),
+        ]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-hero-content")).toHaveClass(
+      "mx-auto",
+      "w-full",
+      "max-w-[1480px]",
+      "px-6",
+    );
+    expect(screen.getByTestId("desktop-hero-artwork")).toHaveClass(
+      "object-fill",
+    );
+  });
+
+  it("keeps the Just landed kicker tight to the artist name", () => {
+    mockDesktopPointer();
 
     renderWithListenProviders(
       <HomeTasteHero
@@ -190,35 +279,283 @@ describe("HomeTasteHero", () => {
         onOpenArtist={vi.fn()}
         onPlay={vi.fn()}
         onToggleFollow={vi.fn()}
-        onDismiss={vi.fn()}
       />,
     );
 
-    const playButton = screen.getByRole("button", { name: "Play" });
-    const followButton = screen.getByRole("button", { name: "Follow" });
-    const dismissButton = screen
-      .getAllByRole("button", { name: /Not interested/i })
-      .find((button) => button.getAttribute("aria-label") === "Not interested");
-
-    expect(playButton).toHaveAttribute("aria-label", "Play");
-    expect(within(playButton).queryByText("Play")).toBeNull();
-    expect(followButton).toHaveAttribute("aria-label", "Follow");
-    expect(within(followButton).queryByText("Follow")).toBeNull();
-    expect(dismissButton).toBeDefined();
-    expect(dismissButton).toHaveAttribute("aria-label", "Not interested");
-    expect(within(dismissButton!).queryByText(/Not interested/i)).toBeNull();
-    expect(screen.queryByRole("button", { name: "About" })).toBeNull();
-    expect(screen.getByTestId("home-taste-hero-viewport").className).toMatch(
-      /\bh-(?:\[[^\]]+\]|\d+)/,
+    expect(screen.getByText("Just landed")).toHaveClass("leading-none");
+    expect(screen.getByRole("heading", { name: "Converge" })).toHaveClass(
+      "mt-1",
     );
   });
 
-  it("moves the mobile carousel with a natural horizontal swipe", () => {
+  it("shows the active heart glow and reversible particle transition", () => {
     mockMobilePointer();
+    let following = false;
+    const onToggleFollow = vi.fn();
+    const props = {
+      heroes: [heroFixture()],
+      isFollowing: () => following,
+      onOpenArtist: vi.fn(),
+      onPlay: vi.fn(),
+      onToggleFollow,
+    };
+    const { rerender } = renderWithListenProviders(
+      <HomeTasteHero {...props} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Follow Converge" }));
+
+    expect(screen.getByTestId("hero-follow-particles")).not.toHaveClass(
+      "crate-follow-particles--unfollow",
+    );
+    expect(screen.getByTestId("hero-follow-heart")).toHaveClass(
+      "animate-crate-icon-active-pulse",
+      "crate-follow-heart-in",
+    );
+    expect(onToggleFollow).toHaveBeenCalledTimes(1);
+
+    following = true;
+    rerender(<HomeTasteHero {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Unfollow Converge" }));
+
+    expect(screen.getByTestId("hero-follow-particles")).toHaveClass(
+      "crate-follow-particles--unfollow",
+    );
+    expect(screen.getByTestId("hero-follow-heart")).toHaveClass(
+      "crate-follow-heart-out",
+    );
+    expect(onToggleFollow).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the desktop greeting stable above the artist copy inside the editorial header", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+        desktopIntro={
+          <div>
+            <h1>Good morning</h1>
+            <p>Saturday, August 1</p>
+          </div>
+        }
+      />,
+    );
+
+    const hero = screen.getByTestId("desktop-editorial-hero");
+    expect(hero).toHaveClass(
+      "mx-auto",
+      "w-full",
+      "max-w-[1480px]",
+      "aspect-[1480/600]",
+      "min-h-[clamp(480px,38dvh,600px)]",
+    );
+    expect(
+      within(screen.getByTestId("desktop-hero-intro")).getByRole("heading", {
+        name: "Good morning",
+      }),
+    ).toBeInTheDocument();
+    for (const layer of screen.getAllByTestId("desktop-hero-copy-layer")) {
+      expect(layer).toHaveClass("top-[39%]");
+      expect(layer).not.toHaveClass("bottom-0");
+    }
+  });
+
+  it("uses long side and bottom fades for desktop surface integration", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture()]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-artist-hero-frame")).toBeInTheDocument();
+
+    expect(
+      screen.getByTestId("desktop-hero-left-edge-scrim"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-hero-right-scrim")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-hero-bottom-scrim")).toHaveClass(
+      "h-[58%]",
+    );
+  });
+
+  it("requests the dedicated hero composition for desktop", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[
+          heroFixture({
+            entity_uid: "artist-entity",
+            artwork_revision: "hero-revision-2",
+          }),
+        ]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(artistHeroApiUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ artistEntityUid: "artist-entity" }),
+      "desktop",
+      { size: 1480, version: "hero-revision-2" },
+    );
+    expect(screen.getByTestId("desktop-hero-artwork")).toHaveClass(
+      "inset-0",
+      "h-full",
+      "w-full",
+    );
+    expect(screen.getByTestId("desktop-hero-artwork")).not.toHaveClass(
+      "max-w-[1480px]",
+      "w-auto",
+      "max-w-none",
+      "aspect-[21/9]",
+    );
+    expect(screen.getByTestId("desktop-hero-artwork")).not.toHaveClass(
+      "grayscale",
+    );
+    expect(
+      screen.getByTestId("desktop-hero-left-edge-scrim"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-hero-right-scrim")).toBeInTheDocument();
+  });
+
+  it("keeps the active hero artwork visible while the preload warms up", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture()]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-hero-artwork")).not.toHaveClass(
+      "opacity-0",
+    );
+  });
+
+  it("uses the canonical composition view for the asset and bounds", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[
+          heroFixture({
+            artwork_revision: "legacy-revision",
+            hero_compositions: {
+              desktop: {
+                schema_version: 1,
+                composition: "desktop",
+                render_revision: "canonical-revision",
+                recipe_hash: "recipe-hash",
+                width: 1480,
+                height: 600,
+                bounds: { left: 0.12, top: 0, right: 0.8, bottom: 1 },
+                asset_path: "/api/artists/7/hero",
+              },
+            },
+          }),
+        ]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(artistHeroApiUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ artistId: 7 }),
+      "desktop",
+      { size: 1480, version: "canonical-revision" },
+    );
+    expect(screen.getByTestId("desktop-hero-left-edge-scrim")).toHaveStyle({
+      left: "12%",
+    });
+  });
+
+  it("renders only the newest artist and no carousel interaction on mobile", () => {
+    mockMobilePointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[
+          heroFixture({
+            entity_uid: "artist-entity",
+            artwork_revision: "hero-revision-2",
+            mobile_artwork_bounds: {
+              left: 0.2,
+              top: 0.1,
+              right: 0.8,
+              bottom: 0.75,
+            },
+          }),
+          heroFixture({ id: 8, name: "Botch" }),
+        ]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+        mobileIntro={
+          <div>
+            <h1>Good morning</h1>
+            <p>Saturday, August 1</p>
+          </div>
+        }
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Converge" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Botch")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Previous artist" }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next artist" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show Botch" })).toBeNull();
+    expect(screen.getByTestId("mobile-hero-artwork")).toHaveClass(
+      "inset-0",
+      "h-full",
+      "w-full",
+      "object-fill",
+    );
+    expect(screen.getByTestId("mobile-hero-artwork-mask")).toHaveStyle({
+      maskImage: "none",
+    });
+    expect(screen.getByTestId("mobile-hero-scrim")).toHaveClass("h-[82%]");
+    expect(screen.getByTestId("mobile-hero-intro-layout")).toHaveClass("top-0");
+    expect(screen.getByText("Good morning")).toBeInTheDocument();
+    expect(artistHeroApiUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ artistEntityUid: "artist-entity" }),
+      "mobile",
+      { size: 1080, version: "hero-revision-2" },
+    );
+    expect(
+      screen.queryByTestId("mobile-hero-edge-scrim"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not autoplay the desktop carousel", () => {
+    mockDesktopPointer();
     vi.useFakeTimers();
 
     try {
-      vi.setSystemTime(new Date("2026-06-18T10:00:00.000Z"));
       renderWithListenProviders(
         <HomeTasteHero
           heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
@@ -229,44 +566,78 @@ describe("HomeTasteHero", () => {
         />,
       );
 
-      const activeSlide = screen.getByRole("button", { name: /Converge/i });
-
-      fireEvent.touchStart(activeSlide, {
-        touches: [{ clientX: 240, clientY: 180 }],
-      });
-      vi.setSystemTime(new Date("2026-06-18T10:00:00.720Z"));
-      fireEvent.touchEnd(activeSlide, {
-        changedTouches: [{ clientX: 132, clientY: 194 }],
+      act(() => {
+        vi.advanceTimersByTime(24_000);
       });
 
       expect(
-        screen.getByRole("heading", { name: "Botch" }),
-      ).toBeInTheDocument();
-
-      vi.advanceTimersByTime(8_000);
-
-      expect(
-        screen.getByRole("heading", { name: "Botch" }),
+        screen.getByRole("heading", { name: "Converge" }),
       ).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("keeps a horizontal hero swipe out of the pull-to-refresh container", () => {
-    mockMobilePointer();
-    const onParentTouchStart = vi.fn();
-    const onParentTouchMove = vi.fn();
-    const onParentTouchEnd = vi.fn();
+  it("crossfades desktop hero copy without vertical movement", () => {
+    mockDesktopPointer();
 
     renderWithListenProviders(
-      <div
-        onTouchStart={onParentTouchStart}
-        onTouchMove={onParentTouchMove}
-        onTouchEnd={onParentTouchEnd}
-      >
+      <HomeTasteHero
+        heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    for (const layer of screen.getAllByTestId("desktop-hero-copy-layer")) {
+      expect(layer).not.toHaveClass("translate-y-0", "translate-y-6");
+      expect(layer).toHaveClass("transition-opacity");
+    }
+  });
+
+  it("keeps artist navigation separate from Play and Follow actions", () => {
+    mockMobilePointer();
+    const onOpenArtist = vi.fn();
+    const onPlay = vi.fn();
+    const onToggleFollow = vi.fn();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture()]}
+        isFollowing={() => false}
+        onOpenArtist={onOpenArtist}
+        onPlay={onPlay}
+        onToggleFollow={onToggleFollow}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Play Converge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Follow Converge" }));
+
+    expect(
+      screen.getByRole("button", { name: "Play Converge" }),
+    ).toHaveTextContent("Play artist");
+    const followButton = screen.getByRole("button", {
+      name: "Follow Converge",
+    });
+    expect(followButton).not.toHaveClass("border");
+    expect(followButton).not.toHaveClass("bg-black/30");
+
+    expect(onPlay).toHaveBeenCalledWith(heroFixture());
+    expect(onToggleFollow).toHaveBeenCalledWith(heroFixture());
+    expect(onOpenArtist).not.toHaveBeenCalled();
+  });
+
+  it("does not bubble hero actions to an enclosing click surface", () => {
+    mockMobilePointer();
+    const onEnclosingClick = vi.fn();
+
+    renderWithListenProviders(
+      <div onClick={onEnclosingClick}>
         <HomeTasteHero
-          heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+          heroes={[heroFixture()]}
           isFollowing={() => false}
           onOpenArtist={vi.fn()}
           onPlay={vi.fn()}
@@ -275,47 +646,10 @@ describe("HomeTasteHero", () => {
       </div>,
     );
 
-    const hero = screen.getByTestId("home-taste-hero-viewport");
-    fireEvent.touchStart(hero, {
-      touches: [{ clientX: 240, clientY: 180 }],
-    });
-    fireEvent.touchMove(hero, {
-      touches: [{ clientX: 238, clientY: 268 }],
-    });
-    fireEvent.touchMove(hero, {
-      touches: [{ clientX: 110, clientY: 194 }],
-    });
-    fireEvent.touchEnd(hero, {
-      changedTouches: [{ clientX: 100, clientY: 196 }],
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Play Converge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Follow Converge" }));
 
-    expect(screen.getByRole("heading", { name: "Botch" })).toBeInTheDocument();
-    expect(onParentTouchStart).not.toHaveBeenCalled();
-    expect(onParentTouchMove).not.toHaveBeenCalled();
-    expect(onParentTouchEnd).not.toHaveBeenCalled();
-  });
-
-  it("mounts slide artwork before a mobile swipe makes it active", () => {
-    mockMobilePointer();
-
-    const { container } = renderWithListenProviders(
-      <HomeTasteHero
-        heroes={[
-          heroFixture(),
-          heroFixture({ id: 8, name: "Botch" }),
-          heroFixture({ id: 9, name: "Cave In" }),
-          heroFixture({ id: 10, name: "Cult Leader" }),
-        ]}
-        isFollowing={() => false}
-        onOpenArtist={vi.fn()}
-        onPlay={vi.fn()}
-        onToggleFollow={vi.fn()}
-      />,
-    );
-
-    expect(
-      container.querySelectorAll('[data-artwork-managed="true"]'),
-    ).toHaveLength(3);
+    expect(onEnclosingClick).not.toHaveBeenCalled();
   });
 });
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Loader2, Search, UserRoundPlus, Users } from "@crate/ui/icons";
+import { Loader2, Search, UserRoundPlus } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -126,13 +126,6 @@ export function People() {
               {t("people.subtitle")}
             </p>
           </div>
-          <Link
-            to="/jam"
-            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
-          >
-            <Users size={16} />
-            {t("people.jamSessions")}
-          </Link>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-4">

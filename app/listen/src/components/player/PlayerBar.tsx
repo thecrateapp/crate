@@ -26,6 +26,7 @@ import {
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { getTrackCacheKey } from "@/contexts/player-utils";
 import type { PlaySource } from "@/contexts/player-types";
 import { artistPagePath, albumPagePath } from "@/lib/library-routes";
 import {
@@ -158,6 +159,7 @@ export function PlayerBar() {
   } = usePlayer();
   const {
     currentTrack,
+    jamQueueLocked,
     shuffle,
     repeat,
     playSource,
@@ -184,6 +186,7 @@ export function PlayerBar() {
   const allowEqualizer = equalizerEnabled && equalizerRuntimeAvailable;
   const showPlayerBarAnalyzer =
     SHOW_PLAYER_BAR_ANALYZER && isDesktop && equalizerRuntimeAvailable;
+  const jamTransportDisabled = jamQueueLocked;
 
   const crossfadeProgress = useCrossfadeProgress(crossfadeTransition);
   // Crossfade still animates visual elements like artwork/title, but
@@ -235,7 +238,9 @@ export function PlayerBar() {
     : activeConnectState;
   const { frequenciesDb, sampleRate } = useAudioVisualizer(
     showPlayerBarAnalyzer && isPlaying && !isRemoteConnectActive,
-    `${currentTrack?.id ?? "none"}:${analyserVersion}`,
+    `${
+      currentTrack ? getTrackCacheKey(currentTrack) : "none"
+    }:${analyserVersion}`,
   );
   const activeConnectInstance =
     connect.transport === "ws"
@@ -472,6 +477,7 @@ export function PlayerBar() {
 
   const handlePlayPause = useCallback(() => {
     triggerHaptic("light");
+    if (jamQueueLocked) return;
     if (isRemoteConnectActive) {
       void sendRemoteTransportCommand(effectiveIsPlaying ? "pause" : "resume");
       return;
@@ -481,6 +487,7 @@ export function PlayerBar() {
   }, [
     effectiveIsPlaying,
     isPlaying,
+    jamQueueLocked,
     isRemoteConnectActive,
     pause,
     resume,
@@ -489,24 +496,27 @@ export function PlayerBar() {
 
   const handlePreviousTrack = useCallback(() => {
     triggerHaptic("selection");
+    if (jamQueueLocked) return;
     if (isRemoteConnectActive) {
       void sendRemoteTransportCommand("previous");
       return;
     }
     prev();
-  }, [isRemoteConnectActive, prev, sendRemoteTransportCommand]);
+  }, [isRemoteConnectActive, jamQueueLocked, prev, sendRemoteTransportCommand]);
 
   const handleNextTrack = useCallback(() => {
     triggerHaptic("selection");
+    if (jamQueueLocked) return;
     if (isRemoteConnectActive) {
       void sendRemoteTransportCommand("next");
       return;
     }
     next();
-  }, [isRemoteConnectActive, next, sendRemoteTransportCommand]);
+  }, [isRemoteConnectActive, jamQueueLocked, next, sendRemoteTransportCommand]);
 
   const handleSeek = useCallback(
     (time: number) => {
+      if (jamQueueLocked) return;
       if (isRemoteConnectActive) {
         const nextTime =
           effectiveDisplayedDuration > 0
@@ -524,6 +534,7 @@ export function PlayerBar() {
     },
     [
       effectiveDisplayedDuration,
+      jamQueueLocked,
       isRemoteConnectActive,
       seek,
       sendRemoteTransportCommand,
@@ -929,11 +940,13 @@ export function PlayerBar() {
   }
 
   function handleToggleShuffle() {
+    if (jamQueueLocked) return;
     triggerHaptic("selection");
     toggleShuffle();
   }
 
   function handleCycleRepeat() {
+    if (jamQueueLocked) return;
     triggerHaptic("selection");
     cycleRepeat();
   }
@@ -1366,12 +1379,13 @@ export function PlayerBar() {
                 <div className="relative flex items-center justify-center gap-3 lg:gap-5">
                   <button
                     onClick={handleToggleShuffle}
+                    disabled={jamQueueLocked}
                     aria-label={
                       shuffle
                         ? t("player.disableShuffle")
                         : t("player.enableShuffle")
                     }
-                    className={`transition-colors ${
+                    className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       shuffle
                         ? "text-primary"
                         : "text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
@@ -1381,18 +1395,21 @@ export function PlayerBar() {
                   </button>
                   <button
                     onClick={handlePreviousTrack}
+                    disabled={jamQueueLocked}
                     aria-label={t("player.previous")}
-                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-white/50"
                   >
                     <SkipBack size={CRATE_ICON_SIZE.lg} fill="currentColor" />
                   </button>
                   <SpectrumPlayButton
                     onClick={handlePlayPause}
+                    disabled={jamTransportDisabled}
                     aria-label={
                       effectiveIsPlaying ? t("player.pause") : t("player.play")
                     }
                     size="sm"
                     active={effectiveIsPlaying}
+                    className="disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:scale-100"
                   >
                     {effectiveIsBuffering ? (
                       <Loader2 size={17} className="animate-spin text-white" />
@@ -1408,8 +1425,9 @@ export function PlayerBar() {
                   </SpectrumPlayButton>
                   <button
                     onClick={handleNextTrack}
+                    disabled={jamTransportDisabled}
                     aria-label={t("player.next")}
-                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-white/50"
                   >
                     <SkipForward
                       size={CRATE_ICON_SIZE.lg}
@@ -1418,8 +1436,9 @@ export function PlayerBar() {
                   </button>
                   <button
                     onClick={handleCycleRepeat}
+                    disabled={jamQueueLocked}
                     aria-label={t("player.repeat", { mode: repeat })}
-                    className={`transition-colors ${
+                    className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       repeat !== "off"
                         ? "text-primary"
                         : "text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
@@ -1438,7 +1457,12 @@ export function PlayerBar() {
                     {formatPlayerTime(effectiveDisplayedTime)}
                   </span>
                   <div
-                    className="group relative flex-1 cursor-pointer py-2"
+                    className={`group relative flex-1 py-2 ${
+                      jamQueueLocked
+                        ? "pointer-events-none grayscale opacity-40"
+                        : "cursor-pointer"
+                    }`}
+                    aria-disabled={jamQueueLocked}
                     onClick={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
                       const pct = Math.max(
@@ -1505,12 +1529,13 @@ export function PlayerBar() {
             <div className="flex items-center gap-1 self-stretch md:hidden">
               <SpectrumPlayButton
                 onClick={handlePlayPause}
+                disabled={jamTransportDisabled}
                 aria-label={
                   effectiveIsPlaying ? t("player.pause") : t("player.play")
                 }
                 size="md"
                 active={effectiveIsPlaying}
-                className="touch-manipulation"
+                className="touch-manipulation disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:scale-100"
               >
                 {effectiveIsBuffering ? (
                   <Loader2
@@ -1529,8 +1554,9 @@ export function PlayerBar() {
               </SpectrumPlayButton>
               <button
                 onClick={handleNextTrack}
+                disabled={jamTransportDisabled}
                 aria-label={t("player.next")}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center text-white/50 transition-[color,filter,transform] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] active:scale-[0.96] active:text-primary"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center text-white/50 transition-[color,filter,transform] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] active:scale-[0.96] active:text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:text-white/50 disabled:active:scale-100"
               >
                 <SkipForward
                   size={CRATE_ICON_SIZE.navMobile}

@@ -1,7 +1,7 @@
 """Schema models for personal-library and stats endpoints."""
 
 from datetime import date as date_type, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -665,11 +665,21 @@ class HomeCardResponse(BaseModel):
     items: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class HomeHeroSurfaceResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    mode: Literal["canonical", "legacy"]
+    artists: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class HomeDiscoveryResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     snapshot: SnapshotMetadataResponse | None = None
     hero: dict[str, Any] | list[dict[str, Any]] | None = None
+    hero_surfaces: (
+        dict[Literal["desktop", "mobile"], HomeHeroSurfaceResponse] | None
+    ) = None
     recently_played: list[dict[str, Any]] = Field(default_factory=list)
     custom_mixes: list[HomeCardResponse] = Field(default_factory=list)
     suggested_albums: list[dict[str, Any]] = Field(default_factory=list)

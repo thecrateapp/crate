@@ -314,7 +314,7 @@ describe("Gapless5 mobile background auto-advance", () => {
 });
 
 describe("Gapless5 WebAudio promotion", () => {
-  it("keeps an active HTML5 source playing when its WebAudio buffer finishes decoding", async () => {
+  it("promotes an active HTML5 source when its WebAudio buffer finishes decoding", async () => {
     vi.useFakeTimers();
     let resolveDecode: ((buffer: { duration: number }) => void) | undefined;
     const decodePromise = new Promise<{ duration: number }>((resolve) => {
@@ -407,8 +407,10 @@ describe("Gapless5 WebAudio promotion", () => {
       tracks: ["one"],
       useHTML5Audio: true,
       useWebAudio: true,
-      switchToWebAudioDuringPlayback: false,
+      switchToWebAudioDuringPlayback: true,
     });
+    const onSwitchToWebAudio = vi.fn();
+    player.onswitchtowebaudio = onSwitchToWebAudio;
     const first = instances.find((audio) => audio.src === "one");
     expect(first).toBeDefined();
     first!.dispatchEvent(new Event("loadedmetadata"));
@@ -426,8 +428,9 @@ describe("Gapless5 WebAudio promotion", () => {
       await Promise.resolve();
     }
 
-    expect(first!.pauseCalls).toBe(0);
-    expect(context.createBufferSource).not.toHaveBeenCalled();
+    expect(first!.pauseCalls).toBeGreaterThan(0);
+    expect(context.createBufferSource).toHaveBeenCalledTimes(1);
+    expect(onSwitchToWebAudio).toHaveBeenCalledWith("one", expect.any(Object));
 
     player.removeAllTracks();
     Reflect.deleteProperty(window, "gapless5AudioContext");

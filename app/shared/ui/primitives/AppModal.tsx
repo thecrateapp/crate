@@ -153,6 +153,13 @@ export function AppModal({
     const frame = window.requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel) return;
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        panel.contains(activeElement)
+      ) {
+        return;
+      }
       const firstFocusable =
         panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
       (firstFocusable ?? panel).focus();

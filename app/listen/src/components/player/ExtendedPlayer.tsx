@@ -24,6 +24,7 @@ import { VisualizerSettingsPanel } from "@/components/player/visualizer/Visualiz
 import type { MusicVisualizer } from "@/components/player/visualizer/MusicVisualizer";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
@@ -61,7 +62,13 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     analyserVersion,
     crossfadeTransition,
   } = usePlayer();
-  const { pause, resume, playSource, queue, seek } = usePlayerActions();
+  const { pause, resume, playSource, queue, seek, jamQueueLocked } =
+    usePlayerActions();
+  function toggleDiscPlay() {
+    if (jamQueueLocked) return;
+    if (isPlaying) pause();
+    else resume();
+  }
   const crossfadeProgress = useCrossfadeProgress(crossfadeTransition);
   const { displayedTime, displayedDuration } = useCrossfadeAwareProgress(
     crossfadeTransition,
@@ -110,7 +117,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   } | null>(null);
   useMusicVisualizer(
     canvasRef,
-    `${currentTrack?.id ?? "none"}:${analyserVersion}`,
+    `${
+      currentTrack ? getTrackCacheKey(currentTrack) : "none"
+    }:${analyserVersion}`,
     open && isDesktop && isVisualizerMode && canvasRect != null,
     playbackState,
     "spheres",
@@ -310,7 +319,8 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
               duration={displayedDuration}
               isBuffering={isBuffering}
               isPlaying={isPlaying}
-              onTogglePlay={isPlaying ? pause : resume}
+              disabled={jamQueueLocked}
+              onTogglePlay={toggleDiscPlay}
             />
           ) : (
             <>
@@ -414,6 +424,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
             currentTime={displayedTime}
             duration={displayedDuration}
             onSeek={seek}
+            disabled={jamQueueLocked}
             showTimes
             variant="glow"
           />

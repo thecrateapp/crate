@@ -8,6 +8,7 @@ interface UseDismissibleLayerOptions {
   onDismiss: () => void;
   closeOnEscape?: boolean;
   closeOnPointerDownOutside?: boolean;
+  closeOnScroll?: boolean;
 }
 
 export function useDismissibleLayer({
@@ -16,16 +17,41 @@ export function useDismissibleLayer({
   onDismiss,
   closeOnEscape = true,
   closeOnPointerDownOutside = true,
+  closeOnScroll = false,
 }: UseDismissibleLayerOptions) {
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
   const refsRef = useRef(refs);
   refsRef.current = refs;
+  const suppressClickRef = useRef(false);
+  const suppressClickTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (!suppressClickRef.current) return;
+      suppressClickRef.current = false;
+      if (suppressClickTimerRef.current !== undefined) {
+        window.clearTimeout(suppressClickTimerRef.current);
+        suppressClickTimerRef.current = undefined;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+    };
+
+    document.addEventListener("click", handleClick, true);
+
+    return () => {
+      document.removeEventListener("click", handleClick, true);
+      if (suppressClickTimerRef.current !== undefined) {
+        window.clearTimeout(suppressClickTimerRef.current);
+        suppressClickTimerRef.current = undefined;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!active) return;
-    let suppressClick = false;
-    let suppressClickTimer: number | undefined;
 
     const isInside = (target: Node | null) =>
       refsRef.current.some(
@@ -41,24 +67,22 @@ export function useDismissibleLayer({
     const handlePointerDown = (event: PointerEvent) => {
       if (!closeOnPointerDownOutside) return;
       if (isInside(event.target as Node | null)) return;
-      suppressClick = true;
-      if (suppressClickTimer) window.clearTimeout(suppressClickTimer);
-      suppressClickTimer = window.setTimeout(() => {
-        suppressClick = false;
-        suppressClickTimer = undefined;
+      suppressClickRef.current = true;
+      if (suppressClickTimerRef.current !== undefined) {
+        window.clearTimeout(suppressClickTimerRef.current);
+      }
+      suppressClickTimerRef.current = window.setTimeout(() => {
+        suppressClickRef.current = false;
+        suppressClickTimerRef.current = undefined;
       }, 400);
       stopOutsideEvent(event);
       onDismissRef.current();
     };
 
-    const handleClick = (event: MouseEvent) => {
-      if (!suppressClick) return;
-      suppressClick = false;
-      if (suppressClickTimer) {
-        window.clearTimeout(suppressClickTimer);
-        suppressClickTimer = undefined;
-      }
-      stopOutsideEvent(event);
+    const handleScroll = (event: Event) => {
+      if (!closeOnScroll) return;
+      if (isInside(event.target as Node | null)) return;
+      onDismissRef.current();
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -69,14 +93,15 @@ export function useDismissibleLayer({
     };
 
     document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("click", handleClick, true);
+    document.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleScroll);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      if (suppressClickTimer) window.clearTimeout(suppressClickTimer);
       document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("click", handleClick, true);
+      document.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleScroll);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [active, closeOnEscape, closeOnPointerDownOutside]);
+  }, [active, closeOnEscape, closeOnPointerDownOutside, closeOnScroll]);
 }

@@ -8,6 +8,7 @@ in real time by like/dislike feedback.
 
 import json
 import logging
+import random
 import time
 import uuid
 from datetime import datetime, timezone
@@ -62,8 +63,14 @@ from crate.db.repositories.radio import (
 from crate.track_versions import (
     canonical_track_title_key,
     dedupe_track_variants,
-    track_song_identity,
     track_variant_rank,
+)
+from crate.queue_engine import (
+    QueueIntent,
+    blend_target_towards,
+    candidate_artist_key as shared_candidate_artist_key,
+    candidate_song_key as shared_candidate_song_key,
+    generation_seed,
 )
 
 log = logging.getLogger(__name__)
@@ -173,6 +180,54 @@ def _load_session(session_id: str) -> dict | None:
 def _delete_session(session_id: str) -> bool:
     r = _redis()
     return r.delete(_session_key(session_id)) > 0
+
+
+def _queue_intent_payload(intent: QueueIntent) -> dict:
+    """Serialize the shared queue contract without storing a Python object."""
+
+    return {
+        "profile": intent.profile,
+        "listener_id": intent.listener_id,
+        "seed_type": intent.seed_type,
+        "seed_value": intent.seed_value,
+        "genres": list(intent.genres),
+        "bpm_min": intent.bpm_min,
+        "bpm_max": intent.bpm_max,
+        "mood": intent.mood,
+        "target_size": intent.target_size,
+        "low_water_mark": intent.low_water_mark,
+        "max_per_artist": intent.max_per_artist,
+        "avoid_variants": intent.avoid_variants,
+    }
+
+
+def _session_queue_intent(session: dict) -> QueueIntent:
+    raw = session.get("queue_intent")
+    if isinstance(raw, dict) and raw.get("profile"):
+        return QueueIntent(
+            profile=str(raw["profile"]),
+            listener_id=raw.get("listener_id"),
+            seed_type=raw.get("seed_type"),
+            seed_value=raw.get("seed_value"),
+            genres=tuple(str(value) for value in raw.get("genres") or []),
+            bpm_min=raw.get("bpm_min"),
+            bpm_max=raw.get("bpm_max"),
+            mood=raw.get("mood"),
+            target_size=int(raw.get("target_size") or _BATCH_SIZE),
+            low_water_mark=int(raw.get("low_water_mark") or 0),
+            max_per_artist=raw.get("max_per_artist"),
+            avoid_variants=bool(raw.get("avoid_variants", True)),
+        )
+    return QueueIntent(
+        profile=_radio_profile(session.get("seed_type")),
+        listener_id=session.get("user_id"),
+        seed_type=session.get("seed_type"),
+        seed_value=session.get("seed_value"),
+        genres=tuple(str(value) for value in session.get("seed_genres") or []),
+        target_size=_BATCH_SIZE,
+        low_water_mark=0,
+        avoid_variants=True,
+    )
 
 
 # ── Discovery seed resolution ─────────────────────────────────────
@@ -504,6 +559,21 @@ def start_radio(
                     "seed_value": seed_value,
                     "seed_label": global_seed["seed_label"],
                     "radio_profile": "global_catalog",
+                    "generation_seed": generation_seed(
+                        listener_id=user_id,
+                        context=f"radio:{mode}:{seed_type}",
+                        session_id=session_id,
+                    ),
+                    "queue_intent": _queue_intent_payload(
+                        QueueIntent(
+                            profile="global_catalog",
+                            listener_id=user_id,
+                            seed_type=seed_type,
+                            seed_value=seed_value,
+                            target_size=_BATCH_SIZE,
+                            low_water_mark=0,
+                        )
+                    ),
                     "global_tracks": global_tracks,
                     "global_cursor": 0,
                     "global_source_exhausted": len(global_tracks) < initial_limit,
@@ -548,12 +618,31 @@ def start_radio(
         initial_target = _lerp(seed_vec, hist_centroid, blend)
 
     session_id = str(uuid.uuid4())
+    radio_profile = _radio_profile(seed_type)
     session = {
         "id": session_id,
         "user_id": user_id,
         "mode": mode,
         "seed_type": seed_type,
         "seed_value": seed_value,
+        "generation_seed": generation_seed(
+            listener_id=user_id,
+            context=f"radio:{mode}:{seed_type}",
+            session_id=session_id,
+        ),
+        "queue_intent": _queue_intent_payload(
+            QueueIntent(
+                profile=radio_profile,
+                listener_id=user_id,
+                seed_type=seed_type,
+                seed_value=seed_value,
+                genres=tuple(seed_context.get("seed_genres") or []),
+                target_size=_BATCH_SIZE,
+                low_water_mark=0,
+                max_per_artist=_radio_artist_batch_limit(radio_profile),
+                avoid_variants=True,
+            )
+        ),
         "seed_label": seed_label,
         "seed_vector": seed_vec,
         "seed_artists": seed_context.get("seed_artists") or [],
@@ -649,10 +738,13 @@ def radio_feedback(
         session.setdefault("liked_vectors", []).append(vec)
         liked = session["liked_vectors"]
         like_centroid = _centroid(liked)
-        blend = min(0.4, 0.08 * len(liked))
         initial_target = session.get("initial_target") or vec
         session.setdefault("initial_target", initial_target)
-        session["current_target"] = _lerp(initial_target, like_centroid, blend)
+        session["current_target"] = blend_target_towards(
+            initial_target,
+            like_centroid,
+            feedback_count=len(liked),
+        )
         effect = "target_shifted"
     elif action == "dislike":
         session.setdefault("disliked_vectors", []).append(vec)
@@ -737,16 +829,12 @@ def _title_key(candidate: dict) -> str:
 
 
 def _artist_key(candidate: dict) -> str:
-    return (
-        str(candidate.get("artist") or candidate.get("artist_name") or "")
-        .strip()
-        .casefold()
-    )
+    return shared_candidate_artist_key(candidate)
 
 
 def _song_key(candidate: dict) -> str | None:
-    identity = track_song_identity(candidate)
-    if identity is not None and identity[0] and identity[1]:
+    identity = shared_candidate_song_key(candidate)
+    if identity is not None:
         return f"{identity[0]}::{identity[1]}"
     title_key = _title_key(candidate)
     return title_key or None
@@ -1120,7 +1208,14 @@ def _generate_batch(
     """Generate a batch of tracks for the radio session."""
     sim_graph, genre_map, member_graph = _load_radio_graphs(session=db_session)
 
+    intent = _session_queue_intent(session)
     target = session["current_target"]
+    generation = session.get("generation_seed")
+    rng = (
+        random.Random(f"{generation}:{session.get('track_count', 0)}")
+        if generation
+        else random
+    )
     used_track_ids = list(session["used_track_ids"])
     seed_track_ids = [int(track_id) for track_id in session.get("seed_track_ids") or []]
     used_ids = set(used_track_ids) | set(seed_track_ids)
@@ -1147,7 +1242,7 @@ def _generate_batch(
     if not seed_artists and session.get("seed_type") == "artist":
         seed_artists = [session["seed_label"]]
     target_artists = list(seed_artists)
-    seed_genres = [genre for genre in (session.get("seed_genres") or []) if genre]
+    seed_genres = [genre for genre in intent.genres if genre]
     if seed_genres:
         genre_map = dict(genre_map)
         genre_context_key = "__radio_seed_genres__"
@@ -1195,15 +1290,13 @@ def _generate_batch(
 
     while len(tracks) < count and attempts < max_attempts:
         attempts += 1
-        import random
-
         if radio_profile == "track":
             drift_sigma = _TRACK_RADIO_DRIFT_SIGMA
         elif radio_profile == "contextual":
             drift_sigma = _CONTEXTUAL_RADIO_DRIFT_SIGMA
         else:
             drift_sigma = _RADIO_DRIFT_SIGMA
-        drift = [target[d] + random.gauss(0, drift_sigma) for d in range(len(target))]
+        drift = [target[d] + rng.gauss(0, drift_sigma) for d in range(len(target))]
         rows_for_selection = candidate_rows
         if radio_profile == "discovery":
             if discovery_fresh_count < discovery_fresh_target:

@@ -23,6 +23,7 @@ import {
   albumSharePath,
   artistApiPath,
   artistBackgroundApiUrl,
+  artistHeroApiUrl,
   genreCoverApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
@@ -107,6 +108,18 @@ describe("library route asset helpers", () => {
 
     expect(url).toBe(
       "https://api.example.test/api/artists/9/photo?size=128&format=webp&token=listen-token",
+    );
+  });
+
+  it("builds artist hero URLs for each composition", () => {
+    const url = artistHeroApiUrl(
+      { artistEntityUid: "artist-entity" },
+      "mobile",
+      { size: 1280 },
+    );
+
+    expect(url).toBe(
+      "https://api.example.test/api/artists/by-entity/artist-entity/hero?composition=mobile&size=1280&format=webp&token=listen-token",
     );
   });
 

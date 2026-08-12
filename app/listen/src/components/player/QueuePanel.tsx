@@ -15,6 +15,7 @@ import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
 
 interface QueuePanelProps {
   open: boolean;
@@ -27,12 +28,14 @@ function QueuePanelRow({
   onJump,
   onRemove,
   faded = false,
+  locked = false,
 }: {
   track: Track;
   indexLabel: string;
   onJump: () => void;
   onRemove?: () => void;
   faded?: boolean;
+  locked?: boolean;
 }) {
   const menuTrack = useMemo(() => trackToMenuData(track), [track]);
   const baseActions = useTrackActionEntries({
@@ -42,6 +45,7 @@ function QueuePanelRow({
     onPlayNowOverride: onJump,
   });
   const actions = useMemo<ItemActionMenuEntry[]>(() => {
+    if (locked) return [];
     if (!onRemove) return baseActions;
     return [
       ...baseActions,
@@ -57,28 +61,31 @@ function QueuePanelRow({
         onSelect: onRemove,
       },
     ];
-  }, [baseActions, indexLabel, onRemove, track.id]);
+  }, [baseActions, indexLabel, locked, onRemove, track.id]);
   const actionMenu = useItemActionMenu(actions);
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={onJump}
+      role={locked ? undefined : "button"}
+      tabIndex={locked ? -1 : 0}
+      aria-disabled={locked}
+      onClick={locked ? undefined : onJump}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
+        if (!locked && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
           onJump();
         }
       }}
-      onContextMenu={actionMenu.handleContextMenu}
-      className={`group flex w-full items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-        faded ? "opacity-50" : ""
-      }`}
+      onContextMenu={locked ? undefined : actionMenu.handleContextMenu}
+      className={`group flex w-full items-center gap-3 px-4 py-2 text-left transition-colors ${
+        locked
+          ? "cursor-not-allowed opacity-55"
+          : "hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      } ${faded && !locked ? "opacity-50" : ""}`}
     >
       <span
         className={`w-5 shrink-0 text-right text-[11px] tabular-nums ${
-          faded ? "text-white/15" : "text-white/20"
+          faded || locked ? "text-white/15" : "text-white/20"
         }`}
       >
         {indexLabel}
@@ -88,7 +95,9 @@ function QueuePanelRow({
           src={track.albumCover}
           alt=""
           loading="lazy"
-          className="h-8 w-8 shrink-0 rounded object-cover"
+          className={`h-8 w-8 shrink-0 rounded object-cover ${
+            locked ? "grayscale" : ""
+          }`}
         />
       ) : (
         <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
@@ -97,7 +106,7 @@ function QueuePanelRow({
         <div className="flex items-center gap-2">
           <p
             className={`min-w-0 flex-1 truncate text-[12px] ${
-              faded ? "text-white/50" : "text-white/80"
+              faded || locked ? "text-white/50" : "text-white/80"
             }`}
           >
             {track.title}
@@ -110,7 +119,7 @@ function QueuePanelRow({
         </div>
         <p
           className={`truncate text-[10px] ${
-            faded ? "text-white/40" : "text-muted-foreground"
+            faded || locked ? "text-white/40" : "text-muted-foreground"
           }`}
         >
           {track.artist}
@@ -147,8 +156,14 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const { isPlaying } = usePlayerState();
-  const { queue, currentIndex, jumpTo, removeFromQueue, currentTrack } =
-    usePlayerActions();
+  const {
+    queue,
+    currentIndex,
+    jumpTo,
+    removeFromQueue,
+    currentTrack,
+    jamQueueLocked,
+  } = usePlayerActions();
 
   if (!open) return null;
 
@@ -168,6 +183,8 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
           <X size={CRATE_ICON_SIZE.xl} />
         </button>
       </div>
+
+      {jamQueueLocked ? <JamQueueLockedNotice /> : null}
 
       {/* Now Playing */}
       {currentTrack && (
@@ -230,7 +247,8 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
               track={track}
               indexLabel={String(i + 1)}
               onJump={() => jumpTo(idx)}
-              onRemove={() => removeFromQueue(idx)}
+              onRemove={jamQueueLocked ? undefined : () => removeFromQueue(idx)}
+              locked={jamQueueLocked}
             />
           );
         })}
@@ -256,6 +274,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                 indexLabel={String(i + 1)}
                 onJump={() => jumpTo(i)}
                 faded
+                locked={jamQueueLocked}
               />
             ))}
           </>

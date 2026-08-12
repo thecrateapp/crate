@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Navigate } from "react-router";
 
 import { DeferredRoute } from "@/app-shell/AppFallbacks";
+import { JAM_ROOMS_ENABLED } from "@/app-shell/feature-flags";
 import {
   ArtistChildRoute,
   LegacyArtistTopTracksRedirect,
@@ -136,9 +137,13 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   { path: "users/:username/stats", element: deferred(<Stats />) },
   { path: "users/:username/followers", element: deferred(<UserConnections />) },
   { path: "users/:username/following", element: deferred(<UserConnections />) },
-  { path: "jam", element: deferred(<JamSession />) },
-  { path: "jam/rooms/:roomId", element: deferred(<JamSession />) },
-  { path: "jam/invite/:token", element: deferred(<JamInvite />) },
+  ...(JAM_ROOMS_ENABLED
+    ? [
+        { path: "jam", element: deferred(<JamSession />) },
+        { path: "jam/rooms/:roomId", element: deferred(<JamSession />) },
+        { path: "jam/invite/:token", element: deferred(<JamInvite />) },
+      ]
+    : [{ path: "jam/*", element: <Navigate to="/" replace /> }]),
   { path: "playlist/invite/:token", element: deferred(<PlaylistInvite />) },
   { path: "shows", element: <Navigate to="/upcoming" replace /> },
   { path: "upcoming", element: deferred(<Shows />) },

@@ -1,10 +1,20 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  ARTIST_HERO_DESKTOP_SIZE,
+  ARTIST_HERO_MOBILE_SIZE,
+  ArtistHeroFrame,
+  type ArtistHeroArtworkBounds,
+} from "@crate/ui/domain/ArtistHeroFrame";
+import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import {
   Play,
   Sparkles,
@@ -13,9 +23,8 @@ import {
   UserRound,
   ChevronLeft,
   ChevronRight,
-  Heart,
-  HeartBold,
-  X,
+  ChevronUp,
+  ChevronDown,
 } from "@crate/ui/icons";
 
 import {
@@ -33,6 +42,11 @@ import { usePlaylistActionEntries } from "@/components/actions/playlist-actions"
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import {
+  canonicalArtworkTransportIdentity,
+  preloadArtwork,
+} from "@/lib/artwork-manager";
+import { artworkFromUrl } from "@/lib/artwork-source";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
@@ -47,6 +61,7 @@ import {
   albumCoverApiUrl,
   albumPagePath,
   artistBackgroundApiUrl,
+  artistHeroApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
@@ -55,6 +70,7 @@ import { cn } from "@/lib/utils";
 
 import type {
   HomeDiscoveryPayload,
+  HomeDiscoveryHeroSurfaces,
   HomeGeneratedPlaylistSummary,
   HomeHeroArtist,
   HomeListeningHistoryCard,
@@ -64,18 +80,7 @@ import type {
   HomeSuggestedAlbum,
 } from "./home-model";
 
-const numberFormatter = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const HERO_BACKGROUND_VERSION = "home-hero-bg-v2";
-const HERO_SWIPE_MIN_DISTANCE_PX = 44;
-const HERO_SWIPE_MAX_DURATION_MS = 1_200;
-const HERO_SWIPE_AXIS_DOMINANCE = 1.2;
-
-function statValue(value: number): string {
-  return numberFormatter.format(value || 0);
-}
+const HERO_BACKGROUND_VERSION = "home-just-landed-v1";
 
 function chunkItems<T>(items: T[], size: number): T[][] {
   if (size <= 0) return [items];
@@ -84,6 +89,17 @@ function chunkItems<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function dedupeHeroArtists(heroes: HomeHeroArtist[]): HomeHeroArtist[] {
+  const seen = new Set<string>();
+  return heroes.filter((hero) => {
+    const name = hero.name?.trim().replace(/\s+/g, " ").toLowerCase();
+    const key = name || hero.entity_uid || String(hero.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
@@ -255,247 +271,715 @@ function radioSeedSubtitle(station: HomeRadioStation): string | null {
   );
 }
 
-function heroBackgroundSrc(hero: HomeHeroArtist): string | undefined {
-  const backgroundUrl = artistBackgroundApiUrl(
+function heroBackgroundSrc(
+  hero: HomeHeroArtist,
+  composition: "desktop" | "mobile",
+): string | undefined {
+  const canonical = hero.hero_compositions?.[composition];
+  const backgroundUrl = artistHeroApiUrl(
     {
       artistId: hero.id,
+      artistEntityUid: hero.entity_uid,
       artistSlug: hero.slug,
       artistName: hero.name,
     },
-    { size: 1280 },
+    composition,
+    {
+      size:
+        canonical?.width ??
+        (composition === "desktop"
+          ? ARTIST_HERO_DESKTOP_SIZE.width
+          : ARTIST_HERO_MOBILE_SIZE.width),
+      version:
+        canonical?.render_revision ||
+        hero.artwork_revision ||
+        HERO_BACKGROUND_VERSION,
+    },
   );
-  return backgroundUrl
-    ? `${backgroundUrl}${
-        backgroundUrl.includes("?") ? "&" : "?"
-      }v=${HERO_BACKGROUND_VERSION}`
-    : undefined;
+  return backgroundUrl || undefined;
+}
+
+function legacyHeroBackgroundSrc(
+  hero: HomeHeroArtist,
+  composition: "desktop" | "mobile",
+): string | undefined {
+  const backgroundUrl = artistBackgroundApiUrl(
+    {
+      artistId: hero.id,
+      artistEntityUid: hero.entity_uid,
+      artistSlug: hero.slug,
+      artistName: hero.name,
+    },
+    {
+      size:
+        composition === "desktop"
+          ? ARTIST_HERO_DESKTOP_SIZE.width
+          : ARTIST_HERO_MOBILE_SIZE.width,
+      version: HERO_BACKGROUND_VERSION,
+    },
+  );
+  return backgroundUrl || undefined;
+}
+
+function heroArtworkBounds(
+  hero: HomeHeroArtist,
+  composition: "desktop" | "mobile",
+): ArtistHeroArtworkBounds | undefined {
+  return (
+    hero.hero_compositions?.[composition]?.bounds ||
+    (composition === "desktop"
+      ? hero.desktop_artwork_bounds
+      : hero.mobile_artwork_bounds)
+  );
+}
+
+function requestBackgroundWork(callback: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (
+      cb: () => void,
+      options?: { timeout: number },
+    ) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+
+  if (idleWindow.requestIdleCallback) {
+    const handle = idleWindow.requestIdleCallback(callback, { timeout: 1500 });
+    return () => idleWindow.cancelIdleCallback?.(handle);
+  }
+
+  const handle = window.setTimeout(callback, 600);
+  return () => window.clearTimeout(handle);
+}
+
+function useHeroBackgroundPreloader(
+  heroes: HomeHeroArtist[],
+  activeIndex: number,
+  composition: "desktop" | "mobile",
+  mode: "canonical" | "legacy" = "canonical",
+): void {
+  const sources = useMemo(
+    () =>
+      heroes
+        .map((hero) =>
+          mode === "canonical"
+            ? heroBackgroundSrc(hero, composition)
+            : undefined,
+        )
+        .filter((src): src is string => Boolean(src)),
+    [composition, heroes, mode],
+  );
+  const readyRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const allowed = new Set(sources);
+    readyRef.current = new Set(
+      [...readyRef.current].filter((src) => allowed.has(src)),
+    );
+    inFlightRef.current = new Set(
+      [...inFlightRef.current].filter((src) => allowed.has(src)),
+    );
+  }, [sources]);
+
+  useEffect(() => {
+    if (!sources.length || typeof window === "undefined") return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const started = new Set<string>();
+    const timeouts: number[] = [];
+
+    const markReady = (src: string) => {
+      readyRef.current.add(src);
+    };
+
+    const loadSource = (src: string | undefined, priority: "high" | "low") => {
+      if (!src || readyRef.current.has(src) || inFlightRef.current.has(src))
+        return;
+      inFlightRef.current.add(src);
+      started.add(src);
+      void preloadArtwork(
+        artworkFromUrl(src, {
+          logicalKey: `home-hero:${canonicalArtworkTransportIdentity(src)}`,
+        }),
+        { fetchPriority: priority, signal: controller.signal },
+      )
+        .then(() => {
+          if (!cancelled) markReady(src);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          inFlightRef.current.delete(src);
+        });
+    };
+
+    const current =
+      sources[Math.max(0, Math.min(activeIndex, sources.length - 1))];
+    const next =
+      sources.length > 1
+        ? sources[(activeIndex + 1) % sources.length]
+        : undefined;
+    const immediate = new Set(
+      [current, next].filter((src): src is string => Boolean(src)),
+    );
+
+    immediate.forEach((src) => loadSource(src, "high"));
+
+    const cancelBackgroundWork = requestBackgroundWork(() => {
+      sources
+        .filter((src) => !immediate.has(src))
+        .forEach((src, index) => {
+          const timeout = window.setTimeout(() => {
+            if (!cancelled) loadSource(src, "low");
+          }, index * 220);
+          timeouts.push(timeout);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      cancelBackgroundWork();
+      timeouts.forEach((timeout) => window.clearTimeout(timeout));
+      started.forEach((src) => inFlightRef.current.delete(src));
+    };
+  }, [activeIndex, sources]);
 }
 
 export function HomeTasteHero({
   heroes,
+  heroSurfaces,
   isFollowing,
   onOpenArtist,
   onPlay,
   onToggleFollow,
-  onDismiss,
-  onExpose,
+  desktopIntro,
+  mobileIntro,
 }: {
   heroes: HomeHeroArtist[];
+  heroSurfaces?: HomeDiscoveryHeroSurfaces | null;
   isFollowing: (id?: number) => boolean;
   onOpenArtist: (artist: HomeHeroArtist) => void;
   onPlay: (artist: HomeHeroArtist) => void;
   onToggleFollow: (artist: HomeHeroArtist) => void;
-  onDismiss?: (artist: HomeHeroArtist) => void;
-  onExpose?: (artist: HomeHeroArtist) => void;
+  desktopIntro?: ReactNode;
+  mobileIntro?: ReactNode;
 }) {
   const [idx, setIdx] = useState(0);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
-  const exposedRef = useRef<Set<string>>(new Set());
-  const visibleRef = useRef(false);
-  const count = heroes.length;
   const isDesktop = useIsDesktop();
-
-  const go = (to: number) => setIdx(((to % count) + count) % count);
-
-  // Autoplay
-  useEffect(() => {
-    if (!isDesktop || count <= 1) return;
-    autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
-    return () => {
-      if (autoRef.current) clearInterval(autoRef.current);
-    };
-  }, [count, isDesktop]);
-
-  const pause = () => {
-    if (autoRef.current) {
-      clearInterval(autoRef.current);
-      autoRef.current = null;
-    }
-  };
-  const resume = () => {
-    pause();
-    if (!isDesktop || count <= 1) return;
-    autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
-  };
-
-  const exposeCurrent = () => {
-    if (!onExpose || !visibleRef.current || !count) return;
-    const hero = heroes[idx];
-    if (!hero) return;
-    const key = `${hero.id || hero.slug || hero.name}:${idx}`;
-    if (exposedRef.current.has(key)) return;
-    exposedRef.current.add(key);
-    onExpose(hero);
-  };
+  const composition = isDesktop ? "desktop" : "mobile";
+  const surface = heroSurfaces?.[composition];
+  const mode = surface?.mode ?? "canonical";
+  const surfaceHeroes = useMemo(
+    () => dedupeHeroArtists(surface?.artists ?? heroes),
+    [heroes, surface?.artists],
+  );
+  const count = surfaceHeroes.length;
+  const activeIndex = Math.min(idx, Math.max(count - 1, 0));
+  useHeroBackgroundPreloader(surfaceHeroes, activeIndex, composition, mode);
 
   useEffect(() => {
-    if (!onExpose) return;
-    const node = rootRef.current;
-    if (!node || typeof IntersectionObserver === "undefined") {
-      visibleRef.current = true;
-      exposeCurrent();
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        visibleRef.current = Boolean(entry?.isIntersecting);
-        exposeCurrent();
-      },
-      { threshold: 0.45 },
+    setIdx((current) =>
+      Math.min(current, Math.max(surfaceHeroes.length - 1, 0)),
     );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [onExpose]);
-
-  useEffect(() => {
-    exposeCurrent();
-  }, [idx, heroes, onExpose]);
-
-  // Touch swipe
-  const onTouchStart = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    pause();
-    const touch = e.touches[0];
-    if (touch) {
-      touchRef.current = {
-        x: touch.clientX,
-        y: touch.clientY,
-        t: Date.now(),
-      };
-    }
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    const start = touchRef.current;
-    if (!start) {
-      resume();
-      return;
-    }
-    const endTouch = e.changedTouches[0];
-    if (!endTouch) {
-      resume();
-      return;
-    }
-    const dx = endTouch.clientX - start.x;
-    const dy = endTouch.clientY - start.y;
-    const dt = Date.now() - start.t;
-    const horizontal = Math.abs(dx);
-    const vertical = Math.abs(dy);
-    if (
-      horizontal > HERO_SWIPE_MIN_DISTANCE_PX &&
-      horizontal > vertical * HERO_SWIPE_AXIS_DOMINANCE &&
-      dt <= HERO_SWIPE_MAX_DURATION_MS
-    ) {
-      go(idx + (dx < 0 ? 1 : -1));
-    }
-    touchRef.current = null;
-    resume();
-  };
-  const onTouchMove = (e: React.TouchEvent) => e.stopPropagation();
-  const onTouchCancel = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    touchRef.current = null;
-    resume();
-  };
+  }, [surfaceHeroes.length]);
 
   if (!count) return null;
 
-  const slides = heroes.map((hero, i) => {
-    const renderBackground =
-      i === idx || i === (idx + 1) % count || i === (idx - 1 + count) % count;
-
-    return (
-      <div
-        key={hero.id}
-        className={cn(
-          "absolute inset-0 transition-opacity duration-500 ease-in-out motion-reduce:transition-none",
-          i === idx ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
-        )}
-        aria-hidden={i !== idx}
-      >
-        <HeroSlide
+  if (!isDesktop) {
+    const hero = surfaceHeroes[0];
+    if (!hero) return null;
+    if (mode === "legacy") {
+      return (
+        <LegacyMobileFeaturedArtist
           hero={hero}
-          active={i === idx}
-          backgroundSrc={renderBackground ? heroBackgroundSrc(hero) : undefined}
+          backgroundSrc={legacyHeroBackgroundSrc(hero, "mobile")}
           following={isFollowing(hero.id)}
+          intro={mobileIntro}
           onOpenArtist={() => onOpenArtist(hero)}
           onPlay={() => onPlay(hero)}
           onToggleFollow={() => onToggleFollow(hero)}
-          onDismiss={onDismiss ? () => onDismiss(hero) : undefined}
         />
-      </div>
+      );
+    }
+    return (
+      <MobileFeaturedArtist
+        hero={hero}
+        backgroundSrc={heroBackgroundSrc(hero, "mobile")}
+        following={isFollowing(hero.id)}
+        intro={mobileIntro}
+        onOpenArtist={() => onOpenArtist(hero)}
+        onPlay={() => onPlay(hero)}
+        onToggleFollow={() => onToggleFollow(hero)}
+      />
     );
-  });
+  }
+
+  const go = (offset: number) => {
+    setIdx((current) => (current + offset + count) % count);
+  };
 
   return (
     <div
-      ref={rootRef}
-      data-testid="home-taste-hero-viewport"
-      className="relative h-[264px] touch-pan-y sm:h-[280px]"
-      onMouseEnter={pause}
-      onMouseLeave={resume}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={onTouchCancel}
+      data-testid="desktop-editorial-hero"
+      className="relative mx-auto aspect-[1480/600] min-h-[clamp(480px,38dvh,600px)] w-full max-w-[1480px] overflow-hidden bg-app-surface"
     >
-      {/* Stack all slides — only active one is visible */}
-      {slides}
+      {surfaceHeroes.map((hero, index) => {
+        const source =
+          mode === "canonical"
+            ? heroBackgroundSrc(hero, "desktop")
+            : legacyHeroBackgroundSrc(hero, "desktop");
+        const isPrepared =
+          index === activeIndex ||
+          index === (activeIndex + 1) % count ||
+          index === (activeIndex - 1 + count) % count;
+        return mode === "canonical" ? (
+          <DesktopFeaturedArtist
+            key={hero.entity_uid || hero.id}
+            hero={hero}
+            active={index === activeIndex}
+            backgroundSrc={isPrepared ? source : undefined}
+            following={isFollowing(hero.id)}
+            onOpenArtist={() => onOpenArtist(hero)}
+            onPlay={() => onPlay(hero)}
+            onToggleFollow={() => onToggleFollow(hero)}
+          />
+        ) : (
+          <LegacyDesktopFeaturedArtist
+            key={hero.entity_uid || hero.id}
+            hero={hero}
+            active={index === activeIndex}
+            backgroundSrc={isPrepared ? source : undefined}
+            following={isFollowing(hero.id)}
+            intro={index === activeIndex ? desktopIntro : undefined}
+            onOpenArtist={() => onOpenArtist(hero)}
+            onPlay={() => onPlay(hero)}
+            onToggleFollow={() => onToggleFollow(hero)}
+          />
+        );
+      })}
 
-      {/* Nav arrows */}
-      {isDesktop && count > 1 && (
-        <>
-          <button
-            onClick={() => {
-              go(idx - 1);
-              pause();
-            }}
-            className="absolute left-3 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/60 backdrop-blur-sm transition hover:bg-black/60 hover:text-white sm:top-1/2 sm:h-8 sm:w-8 sm:-translate-y-1/2"
-            aria-label="Previous"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            onClick={() => {
-              go(idx + 1);
-              pause();
-            }}
-            className="absolute right-3 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/60 backdrop-blur-sm transition hover:bg-black/60 hover:text-white sm:top-1/2 sm:h-8 sm:w-8 sm:-translate-y-1/2"
-            aria-label="Next"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </>
-      )}
+      {count > 1 ? (
+        mode === "canonical" ? (
+          <DesktopHeroNavigation
+            heroes={surfaceHeroes}
+            activeIndex={activeIndex}
+            onPrevious={() => go(-1)}
+            onNext={() => go(1)}
+            onSelect={setIdx}
+          />
+        ) : (
+          <LegacyDesktopHeroNavigation
+            heroes={surfaceHeroes}
+            activeIndex={activeIndex}
+            onPrevious={() => go(-1)}
+            onNext={() => go(1)}
+            onSelect={setIdx}
+          />
+        )
+      ) : null}
 
-      {/* Dots */}
-      {count > 1 && (
-        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-1.5 sm:bottom-4">
-          {heroes.map((_, i) => (
-            <button
-              key={i}
-              aria-label={`Show slide ${i + 1} of ${count}`}
-              onClick={() => {
-                setIdx(i);
-                pause();
-              }}
-              className={cn(
-                "h-1.5 rounded-full transition-all duration-300",
-                i === idx
-                  ? "w-6 bg-primary"
-                  : "w-1.5 bg-white/25 hover:bg-white/40",
-              )}
-            />
-          ))}
+      {mode === "canonical" && desktopIntro ? (
+        <div
+          data-testid="desktop-hero-intro"
+          className="pointer-events-none absolute inset-x-0 top-0 z-20"
+        >
+          <div className="mx-auto w-full max-w-[1480px] px-6 pt-[92px]">
+            {desktopIntro}
+          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function HeroSlide({
+function LegacyMobileFeaturedArtist({
+  hero,
+  backgroundSrc,
+  following,
+  intro,
+  onOpenArtist,
+  onPlay,
+  onToggleFollow,
+}: {
+  hero: HomeHeroArtist;
+  backgroundSrc?: string;
+  following: boolean;
+  intro?: ReactNode;
+  onOpenArtist: () => void;
+  onPlay: () => void;
+  onToggleFollow: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section
+      data-testid="mobile-legacy-hero"
+      className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-white/10 bg-app-surface"
+    >
+      <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="mobile" />
+      <button
+        type="button"
+        aria-label={t("home.hero.openArtist", { name: hero.name })}
+        className="absolute inset-0 z-10 cursor-pointer"
+        onClick={onOpenArtist}
+      />
+      <div className="pointer-events-none relative z-20 flex h-full flex-col justify-between px-6 py-8">
+        <div className="pointer-events-none">{intro}</div>
+        <LegacyHeroCopy
+          hero={hero}
+          following={following}
+          onPlay={onPlay}
+          onToggleFollow={onToggleFollow}
+        />
+      </div>
+    </section>
+  );
+}
+
+function LegacyDesktopFeaturedArtist({
+  hero,
+  active,
+  backgroundSrc,
+  following,
+  intro,
+  onOpenArtist,
+  onPlay,
+  onToggleFollow,
+}: {
+  hero: HomeHeroArtist;
+  active: boolean;
+  backgroundSrc?: string;
+  following: boolean;
+  intro?: ReactNode;
+  onOpenArtist: () => void;
+  onPlay: () => void;
+  onToggleFollow: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section
+      data-testid="desktop-legacy-hero"
+      aria-hidden={!active}
+      className={cn(
+        "absolute inset-0 overflow-hidden rounded-[12px] border border-white/10 transition-opacity duration-500 ease-out",
+        active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
+      )}
+    >
+      <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="desktop" />
+      <button
+        type="button"
+        aria-label={t("home.hero.openArtist", { name: hero.name })}
+        tabIndex={active ? 0 : -1}
+        className="absolute inset-0 z-10 cursor-pointer"
+        onClick={onOpenArtist}
+      />
+      <div className="pointer-events-none relative z-20 flex h-full flex-col justify-between px-10 py-10">
+        <div className="pointer-events-none">{intro}</div>
+        <div className="max-w-[44%]">
+          <LegacyHeroCopy
+            hero={hero}
+            following={following}
+            onPlay={onPlay}
+            onToggleFollow={onToggleFollow}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LegacyHeroArtwork({
+  backgroundSrc,
+  composition,
+}: {
+  backgroundSrc?: string;
+  composition: "desktop" | "mobile";
+}) {
+  return (
+    <>
+      {backgroundSrc ? (
+        <CrateImage
+          data-testid={`${composition}-legacy-hero-artwork`}
+          src={backgroundSrc}
+          retryPolicy="eventual"
+          alt=""
+          aria-hidden="true"
+          decoding="async"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
+        />
+      ) : null}
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.96)_0%,rgba(5,7,11,0.78)_42%,rgba(5,7,11,0.2)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(0deg,rgba(5,7,11,0.98)_0%,rgba(5,7,11,0.18)_60%,rgba(5,7,11,0.45)_100%)]" />
+    </>
+  );
+}
+
+function LegacyHeroCopy({
+  hero,
+  following,
+  onPlay,
+  onToggleFollow,
+}: {
+  hero: HomeHeroArtist;
+  following: boolean;
+  onPlay: () => void;
+  onToggleFollow: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="pointer-events-auto">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
+        {t("home.library.justLanded.title")}
+      </p>
+      <h1 className="mt-2 truncate text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
+        {hero.name}
+      </h1>
+      <HeroGenres hero={hero} />
+      <HeroActions
+        hero={hero}
+        following={following}
+        onPlay={onPlay}
+        onToggleFollow={onToggleFollow}
+      />
+    </div>
+  );
+}
+
+function LegacyDesktopHeroNavigation({
+  heroes,
+  activeIndex,
+  onPrevious,
+  onNext,
+  onSelect,
+}: {
+  heroes: HomeHeroArtist[];
+  activeIndex: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSelect: (index: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="absolute inset-x-0 bottom-5 z-30 flex items-center justify-center gap-3">
+      <button
+        type="button"
+        aria-label={t("home.hero.previousArtist")}
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/75 backdrop-blur-sm hover:text-white"
+        onClick={onPrevious}
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <div className="flex items-center gap-1.5">
+        {heroes.map((hero, index) => (
+          <button
+            key={hero.entity_uid || hero.id}
+            type="button"
+            aria-label={t("home.hero.showArtist", { name: hero.name })}
+            aria-current={index === activeIndex ? "true" : undefined}
+            className="flex h-6 items-center bg-transparent px-1"
+            onClick={() => onSelect(index)}
+          >
+            <span
+              className={cn(
+                "block h-1.5 rounded-full transition-all duration-300",
+                index === activeIndex
+                  ? "w-6 bg-primary"
+                  : "w-1.5 bg-white/35 hover:bg-white/60",
+              )}
+            />
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        aria-label={t("home.hero.nextArtist")}
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/75 backdrop-blur-sm hover:text-white"
+        onClick={onNext}
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
+function HeroBackdrop({
+  hero,
+  backgroundSrc,
+  composition,
+  artworkBounds,
+}: {
+  hero: HomeHeroArtist;
+  backgroundSrc?: string;
+  composition: "desktop" | "mobile";
+  artworkBounds?: ArtistHeroArtworkBounds;
+}) {
+  // A persisted hero already contains the worker's treatment. Applying a
+  // second browser filter here would make Admin and Home render different
+  // pixels, especially for derived compositions.
+  const grayscale =
+    !hero.artwork_revision && hero.artwork_provenance !== "specific";
+  const usesExtendedCanvas =
+    artworkBounds &&
+    (artworkBounds.left !== 0 ||
+      artworkBounds.top !== 0 ||
+      artworkBounds.right !== 1 ||
+      artworkBounds.bottom !== 1);
+
+  if (!backgroundSrc) return null;
+
+  return (
+    <CrateImage
+      data-testid={`${composition}-hero-artwork`}
+      src={backgroundSrc}
+      retryPolicy="eventual"
+      alt=""
+      aria-hidden="true"
+      decoding="async"
+      className={cn(
+        "absolute inset-0 h-full w-full transition-opacity duration-500",
+        usesExtendedCanvas ? "object-fill" : "object-cover object-center",
+        grayscale ? "grayscale" : "",
+      )}
+    />
+  );
+}
+
+function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
+  const genres =
+    hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
+
+  if (genres.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
+      {genres.slice(0, 2).map((genre) => (
+        <GenrePill
+          key={genre.name}
+          item={genre}
+          className="max-w-[42vw] border-white/10 bg-black/30 text-white/80 backdrop-blur-sm sm:max-w-none"
+        />
+      ))}
+    </div>
+  );
+}
+
+function HeroActions({
+  hero,
+  following,
+  onPlay,
+  onToggleFollow,
+}: {
+  hero: HomeHeroArtist;
+  following: boolean;
+  onPlay: () => void;
+  onToggleFollow: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const playLabel = t("home.hero.playArtist", { name: hero.name });
+  const followLabel = t(
+    following ? "actions.artist.unfollowNamed" : "actions.artist.followNamed",
+    { name: hero.name },
+  );
+
+  return (
+    <div className="mt-6 flex items-center gap-2.5">
+      <button
+        type="button"
+        aria-label={playLabel}
+        className={cn(
+          "inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground shadow-[0_10px_28px_rgba(6,182,212,0.2)] transition-colors hover:bg-primary/90",
+          "px-5",
+        )}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onPlay();
+        }}
+      >
+        <Play size={17} fill="currentColor" />
+        <span>{t("home.hero.playCta")}</span>
+      </button>
+      <FollowHeartButton
+        aria-label={followLabel}
+        className={cn(
+          "inline-flex h-11 w-11 items-center justify-center rounded-md border-0 bg-transparent text-white/80 transition-colors hover:bg-transparent hover:text-white",
+        )}
+        following={following}
+        heartTestId="hero-follow-heart"
+        particlesTestId="hero-follow-particles"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onToggleFollow();
+        }}
+      />
+    </div>
+  );
+}
+
+function MobileFeaturedArtist({
+  hero,
+  backgroundSrc,
+  following,
+  intro,
+  onOpenArtist,
+  onPlay,
+  onToggleFollow,
+}: {
+  hero: HomeHeroArtist;
+  backgroundSrc?: string;
+  following: boolean;
+  intro?: ReactNode;
+  onOpenArtist: () => void;
+  onPlay: () => void;
+  onToggleFollow: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden bg-app-surface">
+      <ArtistHeroFrame
+        composition="mobile"
+        artworkBounds={heroArtworkBounds(hero, "mobile")}
+        className="absolute inset-0 h-full"
+        artwork={
+          <HeroBackdrop
+            hero={hero}
+            backgroundSrc={backgroundSrc}
+            composition="mobile"
+            artworkBounds={heroArtworkBounds(hero, "mobile")}
+          />
+        }
+      >
+        <button
+          type="button"
+          aria-label={t("home.hero.openArtist", { name: hero.name })}
+          className="absolute inset-0 z-10 cursor-pointer"
+          onClick={onOpenArtist}
+        />
+        <ArtistHeroPresentation
+          composition="mobile"
+          kicker={t("home.library.justLanded.title")}
+          artistName={hero.name}
+          intro={intro}
+          genres={<HeroGenres hero={hero} />}
+          actions={
+            <HeroActions
+              hero={hero}
+              following={following}
+              onPlay={onPlay}
+              onToggleFollow={onToggleFollow}
+            />
+          }
+          actionsClassName="pointer-events-auto"
+        />
+      </ArtistHeroFrame>
+    </section>
+  );
+}
+
+function DesktopFeaturedArtist({
   hero,
   active,
   backgroundSrc,
@@ -503,7 +987,6 @@ function HeroSlide({
   onOpenArtist,
   onPlay,
   onToggleFollow,
-  onDismiss,
 }: {
   hero: HomeHeroArtist;
   active: boolean;
@@ -512,117 +995,116 @@ function HeroSlide({
   onOpenArtist: () => void;
   onPlay: () => void;
   onToggleFollow: () => void;
-  onDismiss?: () => void;
 }) {
   const { t } = useTranslation();
-  const genres =
-    hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
-
   return (
-    <section className="group relative h-full w-full overflow-hidden rounded-[12px] border border-white/10">
-      <button
-        type="button"
-        aria-label={hero.name}
-        tabIndex={active ? 0 : -1}
-        className="absolute inset-0 z-0 rounded-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-        onClick={onOpenArtist}
-      />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(140deg,rgba(6,10,14,0.98)_0%,rgba(10,16,22,0.96)_52%,rgba(4,9,13,0.98)_100%)]" />
-      {backgroundSrc ? (
-        <CrateImage
-          src={backgroundSrc}
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
-        />
-      ) : null}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.92)_0%,rgba(5,7,11,0.75)_45%,rgba(5,7,11,0.32)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.26),transparent_42%)]" />
-      {onDismiss ? (
+    <section
+      aria-hidden={!active}
+      className={cn(
+        "absolute inset-0 transition-opacity duration-500 ease-out motion-reduce:transition-opacity",
+        active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
+      )}
+    >
+      <ArtistHeroFrame
+        composition="desktop"
+        artworkBounds={heroArtworkBounds(hero, "desktop")}
+        className="h-full"
+        artwork={
+          <HeroBackdrop
+            hero={hero}
+            backgroundSrc={backgroundSrc}
+            composition="desktop"
+            artworkBounds={heroArtworkBounds(hero, "desktop")}
+          />
+        }
+      >
         <button
           type="button"
-          aria-label={t("home.hero.notInterested")}
+          aria-label={t("home.hero.openArtist", { name: hero.name })}
           tabIndex={active ? 0 : -1}
-          className="absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-black/35 text-white/70 backdrop-blur-xl transition-colors hover:bg-black/55 hover:text-white"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDismiss();
-          }}
-        >
-          <X size={13} />
-        </button>
-      ) : null}
-
-      <div className="pointer-events-none relative z-10 flex h-full flex-col justify-between px-4 py-5 pb-12 sm:px-8 sm:py-8 lg:px-10">
-        <div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-            {genres.length > 0 ? (
-              <div className="flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
-                {genres.slice(0, 2).map((genre, index) => (
-                  <GenrePill
-                    key={genre.name}
-                    item={genre}
-                    className={cn(
-                      "max-w-[42vw] sm:max-w-none",
-                      index > 0 && "hidden sm:inline-flex",
-                    )}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <h1
-            className={cn(
-              genres.length ? "mt-4" : "mt-0",
-              "truncate text-3xl font-black tracking-tight text-white min-[380px]:text-4xl sm:text-5xl lg:text-6xl",
-            )}
-          >
-            {hero.name}
-          </h1>
-
-          <div className="mt-3 hidden min-w-0 flex-wrap gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:flex sm:text-[11px] sm:tracking-[0.18em]">
-            <div className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-              {statValue(hero.listeners)} listeners
-            </div>
-            <div className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-              {hero.album_count} albums · {hero.track_count} tracks
-            </div>
-          </div>
-        </div>
-
-        <div className="pointer-events-auto flex gap-2.5">
-          <button
-            type="button"
-            aria-label={t("player.play")}
-            tabIndex={active ? 0 : -1}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay();
-            }}
-          >
-            <Play size={17} fill="currentColor" />
-          </button>
-          <button
-            type="button"
-            aria-label={following ? t("common.following") : t("common.follow")}
-            tabIndex={active ? 0 : -1}
-            className={cn(
-              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white transition-colors hover:bg-white/[0.12]",
-              following ? "text-primary" : "",
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFollow();
-            }}
-          >
-            {following ? <HeartBold size={18} /> : <Heart size={18} />}
-          </button>
-        </div>
-      </div>
+          className="absolute inset-0 z-10 cursor-pointer"
+          onClick={onOpenArtist}
+        />
+        <ArtistHeroPresentation
+          composition="desktop"
+          kicker={t("home.library.justLanded.title")}
+          artistName={hero.name}
+          genres={<HeroGenres hero={hero} />}
+          actions={
+            <HeroActions
+              hero={hero}
+              following={following}
+              onPlay={onPlay}
+              onToggleFollow={onToggleFollow}
+            />
+          }
+          actionsClassName="pointer-events-auto"
+          copyClassName={cn(
+            "transition-opacity duration-500 ease-out motion-reduce:transition-none",
+            active ? "opacity-100" : "opacity-0",
+          )}
+        />
+      </ArtistHeroFrame>
     </section>
+  );
+}
+
+function DesktopHeroNavigation({
+  heroes,
+  activeIndex,
+  onPrevious,
+  onNext,
+  onSelect,
+}: {
+  heroes: HomeHeroArtist[];
+  activeIndex: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSelect: (index: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="absolute right-6 top-[200px] z-30 flex h-[190px] w-8 flex-col items-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-1">
+        {heroes.map((hero, index) => (
+          <button
+            key={hero.entity_uid || hero.id}
+            type="button"
+            aria-label={t("home.hero.showArtist", { name: hero.name })}
+            aria-current={index === activeIndex ? "true" : undefined}
+            className="group flex h-6 w-8 items-center justify-center rounded-full bg-transparent"
+            onClick={() => onSelect(index)}
+          >
+            <span
+              className={cn(
+                "block w-1 rounded-full transition-[height,background-color] duration-300",
+                index === activeIndex
+                  ? "h-6 bg-primary"
+                  : "h-1.5 bg-white/35 group-hover:bg-white/60",
+              )}
+            />
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col items-center gap-0.5">
+        <button
+          type="button"
+          aria-label={t("home.hero.previousArtist")}
+          className="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-white/55 shadow-none transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          onClick={onPrevious}
+        >
+          <ChevronUp size={20} />
+        </button>
+        <button
+          type="button"
+          aria-label={t("home.hero.nextArtist")}
+          className="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-white/55 shadow-none transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          onClick={onNext}
+        >
+          <ChevronDown size={20} />
+        </button>
+      </div>
+    </div>
   );
 }
 

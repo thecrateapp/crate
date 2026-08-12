@@ -201,6 +201,24 @@ def _artist_source(
     return ArtworkSource(*provider, "provider") if provider else None
 
 
+def _artist_hero_source(asset: ArtworkAsset) -> ArtworkSource | None:
+    entity_uid, separator, composition = asset.entity_key.rpartition(":")
+    if not separator or composition not in {"desktop", "mobile"}:
+        return None
+    artist = get_library_artist_by_entity_uid(entity_uid)
+    if not artist:
+        return None
+    artist_dir = resolve_artist_dir(
+        library_path(),
+        artist,
+        fallback_name=str(artist.get("name") or ""),
+        existing_only=True,
+    )
+    if artist_dir is None or not artist_dir.is_dir():
+        return None
+    return _file_source(artist_dir / f"artist-hero-{composition}.webp")
+
+
 def _release_source(
     asset: ArtworkAsset, *, allow_provider: bool
 ) -> ArtworkSource | None:
@@ -245,6 +263,8 @@ def resolve_artwork_source(
         source = _album_source(asset)
     elif asset.kind in {"artist-photo", "artist-background"}:
         source = _artist_source(asset, allow_provider=allow_provider)
+    elif asset.kind == "artist-hero":
+        source = _artist_hero_source(asset)
     elif asset.kind == "genre-cover":
         cover_path = get_genre_taxonomy_cover_path(asset.entity_key)
         absolute = genre_cover_abspath(cover_path)
