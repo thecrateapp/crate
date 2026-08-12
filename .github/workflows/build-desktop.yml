@@ -109,9 +109,25 @@ jobs:
             chmod +x "$destination"
           }
 
-          download \
+          download_github_asset() {
+            local asset_id="$1"
+            local destination="$2"
+            curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+              --connect-timeout 20 --max-time 300 \
+              -H "Accept: application/octet-stream" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/tauri-apps/binary-releases/releases/assets/$asset_id" \
+              --output "$destination"
+            test -s "$destination"
+            chmod +x "$destination"
+          }
+
+          if ! download \
             "https://github.com/tauri-apps/binary-releases/releases/download/apprun-old/AppRun-x86_64" \
-            "$tools_dir/AppRun-x86_64"
+            "$tools_dir/AppRun-x86_64"; then
+            rm -f "$tools_dir/AppRun-x86_64"
+            download_github_asset 274691722 "$tools_dir/AppRun-x86_64"
+          fi
           download \
             "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage" \
             "$tools_dir/linuxdeploy-x86_64.AppImage"
