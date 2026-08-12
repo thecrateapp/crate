@@ -55,6 +55,7 @@ class TestHandlerRegistration:
             "backfill_artwork_variants",
             "cleanup_artwork_variants",
             "compose_artist_hero",
+            "preview_artist_hero",
             "recompose_artist_hero",
             "derive_artist_hero",
             "materialize_artwork_variants",
