@@ -122,6 +122,95 @@ jobs:
             "https://raw.githubusercontent.com/tauri-apps/linuxdeploy-plugin-gstreamer/master/linuxdeploy-plugin-gstreamer.sh" \
             "$tools_dir/linuxdeploy-plugin-gstreamer.sh"
 
+      - name: Pre-cache Tauri Windows bundler tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $toolsDir = Join-Path $env:LOCALAPPDATA 'tauri'
+          $nsisDir = Join-Path $toolsDir 'NSIS'
+          $pluginDir = Join-Path $nsisDir 'Plugins\x86-unicode\additional'
+          $nsisZip = Join-Path $env:RUNNER_TEMP 'nsis-3.11.zip'
+          $nsisUrl = 'https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip'
+          $utilsUrl = 'https://github.com/tauri-apps/nsis-tauri-utils/releases/download/nsis_tauri_utils-v0.5.3/nsis_tauri_utils.dll'
+          $utilsDll = Join-Path $pluginDir 'nsis_tauri_utils.dll'
+          $expectedNsisHash = 'EF7FF767E5CBD9EDD22ADD3A32C9B8F4500BB10D'
+          $expectedUtilsHash = '75197FEE3C6A814FE035788D1C34EAD39349B860'
+
+          function Download-Retry([string] $Url, [string] $Destination) {
+            for ($attempt = 1; $attempt -le 5; $attempt++) {
+              try {
+                curl.exe --fail --location --retry 5 --retry-all-errors --retry-delay 2 `
+                  --connect-timeout 20 --max-time 300 --output $Destination $Url
+                if ($LASTEXITCODE -eq 0 -and (Test-Path $Destination) -and
+                    (Get-Item $Destination).Length -gt 0) {
+                  return
+                }
+              } catch {
+                if ($attempt -eq 5) {
+                  throw
+                }
+              }
+              Remove-Item -Force -ErrorAction SilentlyContinue $Destination
+              if ($attempt -eq 5) {
+                throw "Failed to download $Url"
+              }
+              Start-Sleep -Seconds (2 * $attempt)
+            }
+          }
+
+          $requiredFiles = @(
+            (Join-Path $nsisDir 'makensis.exe'),
+            (Join-Path $nsisDir 'Bin\makensis.exe'),
+            (Join-Path $nsisDir 'Stubs\lzma-x86-unicode'),
+            (Join-Path $nsisDir 'Stubs\lzma_solid-x86-unicode'),
+            (Join-Path $nsisDir 'Include\MUI2.nsh'),
+            (Join-Path $nsisDir 'Include\FileFunc.nsh'),
+            (Join-Path $nsisDir 'Include\x64.nsh'),
+            (Join-Path $nsisDir 'Include\nsDialogs.nsh'),
+            (Join-Path $nsisDir 'Include\WinMessages.nsh'),
+            (Join-Path $nsisDir 'Include\Win\COM.nsh'),
+            (Join-Path $nsisDir 'Include\Win\Propkey.nsh'),
+            (Join-Path $nsisDir 'Include\Win\RestartManager.nsh'),
+            $utilsDll
+          )
+
+          $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path $_) })
+          if ($missingFiles.Count -gt 0) {
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $nsisDir
+            New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+            Remove-Item -Force -ErrorAction SilentlyContinue $nsisZip
+            Download-Retry $nsisUrl $nsisZip
+            if ((Get-FileHash $nsisZip -Algorithm SHA1).Hash -ne $expectedNsisHash) {
+              throw "Unexpected NSIS archive checksum: $nsisZip"
+            }
+            Expand-Archive -Path $nsisZip -DestinationPath $toolsDir -Force
+            $extractedDir = Join-Path $toolsDir 'nsis-3.11'
+            if (-not (Test-Path $extractedDir)) {
+              throw "NSIS archive did not contain the expected directory: $extractedDir"
+            }
+            Move-Item -Force $extractedDir $nsisDir
+            New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
+          }
+
+          if (-not (Test-Path $utilsDll) -or
+              (Get-FileHash $utilsDll -Algorithm SHA1).Hash -ne $expectedUtilsHash) {
+            New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
+            Remove-Item -Force -ErrorAction SilentlyContinue $utilsDll
+            Download-Retry $utilsUrl $utilsDll
+          }
+
+          if ((Get-FileHash $utilsDll -Algorithm SHA1).Hash -ne $expectedUtilsHash) {
+            throw "Unexpected NSIS Tauri utils checksum: $utilsDll"
+          }
+
+          foreach ($requiredFile in $requiredFiles) {
+            if (-not (Test-Path $requiredFile)) {
+              throw "Missing Tauri Windows bundler tool: $requiredFile"
+            }
+          }
+
       - name: Install dependencies
         run: npm ci
 
