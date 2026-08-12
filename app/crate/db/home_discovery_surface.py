@@ -37,20 +37,40 @@ def _merge_recently_played(user_id: int, payload: dict) -> dict:
 
 
 def _rotate_home_hero_payload(user_id: int, payload: dict) -> dict:
-    hero = payload.get("hero")
-    if not isinstance(hero, list) or len(hero) <= 1:
-        return payload
-    rotated = rotate_home_hero_rows(hero, user_id=user_id)
-    if rotated == hero:
-        return payload
     result = dict(payload)
-    result["hero"] = rotated
-    return result
+    changed = False
+
+    hero = payload.get("hero")
+    if isinstance(hero, list) and len(hero) > 1:
+        rotated = rotate_home_hero_rows(hero, user_id=user_id)
+        if rotated != hero:
+            result["hero"] = rotated
+            changed = True
+
+    surfaces = payload.get("hero_surfaces")
+    if isinstance(surfaces, dict):
+        rotated_surfaces = dict(surfaces)
+        for composition in ("desktop", "mobile"):
+            surface = surfaces.get(composition)
+            if not isinstance(surface, dict):
+                continue
+            artists = surface.get("artists")
+            if not isinstance(artists, list) or len(artists) <= 1:
+                continue
+            rotated_artists = rotate_home_hero_rows(artists, user_id=user_id)
+            if rotated_artists != artists:
+                rotated_surfaces[composition] = {**surface, "artists": rotated_artists}
+                changed = True
+        if changed:
+            result["hero_surfaces"] = rotated_surfaces
+
+    return result if changed else payload
 
 
 def _cold_home_payload(user_id: int) -> dict:
     return {
         "hero": None,
+        "hero_surfaces": None,
         "recently_played": [],
         "custom_mixes": [],
         "suggested_albums": [],

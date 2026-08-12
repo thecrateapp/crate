@@ -158,6 +158,12 @@ def test_preflight_validates_candidate_compose_with_production_environment() -> 
     assert '"$DEPLOY_CANDIDATE_DIR/docker-compose.yaml"' in remote_script
 
 
+def test_preflight_requires_a_persistent_jwt_secret() -> None:
+    remote_script = (ROOT / "scripts/deploy-remote.sh").read_text()
+
+    assert "assert_required_env JWT_SECRET 32" in remote_script
+
+
 def test_deploy_cannot_bypass_remote_release_preflight() -> None:
     script = (ROOT / "scripts/deploy.sh").read_text()
     deploy_body = script[

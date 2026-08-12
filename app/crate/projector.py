@@ -13,7 +13,7 @@ from crate.db.domain_events import (
 )
 from crate.db.home import get_cached_home_discovery
 from crate.db.home_discovery_surface import refresh_home_recently_played_snapshot
-from crate.db.home_warming import list_recent_home_user_ids
+import crate.db.home_warming as home_warming
 from crate.db.ops_snapshot import get_cached_ops_snapshot
 from crate.db.queries.tasks import has_inflight_acquisition_for_artist
 from crate.db.user_stats_dashboard_surface import (
@@ -112,30 +112,6 @@ def _queue_post_acquisition_processing(payload: Mapping[str, Any]) -> bool:
 
     queue_process_new_content_if_needed(artist_name, force=True)
     return True
-
-
-def _warm_recent_home_discovery_snapshots() -> int:
-    """Warm active users while keeping projection failures isolated per user."""
-
-    try:
-        user_ids = list_recent_home_user_ids(window_minutes=30, limit=10)
-    except Exception:
-        log.warning("Failed to list recent home users for warming", exc_info=True)
-        return 0
-
-    warmed = 0
-    for user_id in user_ids:
-        try:
-            get_cached_home_discovery(user_id, fresh=True)
-        except Exception:
-            log.warning(
-                "Failed to warm home discovery snapshot",
-                extra={"user_id": user_id},
-                exc_info=True,
-            )
-            continue
-        warmed += 1
-    return warmed
 
 
 def process_domain_events(*, limit: int = 100) -> dict[str, int]:
@@ -275,7 +251,7 @@ def _execute_projection_action(action: tuple[str, int | None]) -> tuple[int, int
         get_cached_ops_snapshot(fresh=True)
         return 1, 0
     if name == "recent-global":
-        return 0, _warm_recent_home_discovery_snapshots()
+        return 0, home_warming.warm_recent_home_discovery_snapshots()
     if subject is None:
         raise ValueError(f"Projection {name} requires a user ID")
     if name == "home-user":

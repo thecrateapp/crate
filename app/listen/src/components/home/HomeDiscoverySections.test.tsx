@@ -17,7 +17,11 @@ import type {
   HomeRadioStation,
   HomeRecentItem,
 } from "@/components/home/home-model";
-import { artistHeroApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  artistBackgroundApiUrl,
+  artistHeroApiUrl,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 vi.mock("@/lib/library-routes", async (importOriginal) => {
@@ -26,6 +30,7 @@ vi.mock("@/lib/library-routes", async (importOriginal) => {
     ...actual,
     artistPhotoApiUrl: vi.fn(actual.artistPhotoApiUrl),
     artistHeroApiUrl: vi.fn(actual.artistHeroApiUrl),
+    artistBackgroundApiUrl: vi.fn(actual.artistBackgroundApiUrl),
   };
 });
 
@@ -115,6 +120,37 @@ function heroFixture(overrides: Partial<HomeHeroArtist> = {}): HomeHeroArtist {
 }
 
 describe("HomeTasteHero", () => {
+  it("uses the legacy background when the surface is not canonically ready", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture({ artwork_revision: "stale-revision" })]}
+        heroSurfaces={{
+          desktop: {
+            mode: "legacy",
+            artists: [heroFixture({ artwork_revision: "stale-revision" })],
+          },
+          mobile: {
+            mode: "legacy",
+            artists: [heroFixture({ artwork_revision: "stale-revision" })],
+          },
+        }}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(artistBackgroundApiUrl).toHaveBeenCalled();
+    expect(artistHeroApiUrl).not.toHaveBeenCalled();
+    expect(screen.getByTestId("desktop-legacy-hero")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("desktop-legacy-hero-artwork"),
+    ).toBeInTheDocument();
+  });
+
   it("renders the editorial Just Landed content without recommendation controls", () => {
     const { container } = renderWithListenProviders(
       <HomeTasteHero

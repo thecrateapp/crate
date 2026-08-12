@@ -262,6 +262,7 @@ def test_process_domain_events_refreshes_ops_and_recent_home_for_catalog_invalid
     monkeypatch,
 ):
     from crate import projector
+    from crate.db import home_warming
 
     calls = {"ops": [], "home": [], "processed": []}
 
@@ -289,7 +290,7 @@ def test_process_domain_events_refreshes_ops_and_recent_home_for_catalog_invalid
         lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
     )
     monkeypatch.setattr(
-        projector,
+        home_warming,
         "warm_recent_home_discovery_snapshots",
         lambda: calls["home"].append((5, True)) or 1,
     )
@@ -311,6 +312,7 @@ def test_process_domain_events_refreshes_recent_home_for_global_home_invalidatio
     monkeypatch,
 ):
     from crate import projector
+    from crate.db import home_warming
 
     calls = {"ops": [], "home": [], "processed": []}
 
@@ -338,7 +340,7 @@ def test_process_domain_events_refreshes_recent_home_for_global_home_invalidatio
         lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
     )
     monkeypatch.setattr(
-        projector,
+        home_warming,
         "warm_recent_home_discovery_snapshots",
         lambda: calls["home"].extend([(7, True), (9, True)]) or 2,
     )
@@ -360,6 +362,7 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
     monkeypatch,
 ):
     from crate import projector
+    from crate.db import home_warming
 
     calls = {"ops": [], "home": []}
     queued: list[tuple[str, bool]] = []
@@ -406,7 +409,7 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
         lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
     )
     monkeypatch.setattr(
-        projector,
+        home_warming,
         "warm_recent_home_discovery_snapshots",
         lambda: calls["home"].append((7, True)) or 1,
     )

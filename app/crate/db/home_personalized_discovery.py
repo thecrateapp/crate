@@ -13,7 +13,7 @@ from crate.db.home_builders import (
     _build_recent_global_artists,
     _build_suggested_albums,
     _fallback_recent_interest_tracks,
-    _get_home_hero,
+    _get_home_hero_bundle,
     _query_discovery_tracks,
     _track_payload,
 )
@@ -197,9 +197,10 @@ def build_home_discovery_payload(user_id: int) -> dict:
     mix_seed_genres = context["mix_seed_genres"]
     interest_artists_lower = context["interest_artists_lower"]
 
-    hero = _get_home_hero(
+    hero_bundle = _get_home_hero_bundle(
         user_id, followed_names_lower, top_artist_names_lower[:8], top_genres_lower[:4]
     )
+    hero = hero_bundle["hero"] if hero_bundle else None
     recent_releases = recent_releases_from_context(context)
 
     precomputed_mixes: dict[str, tuple[str, str, list[dict]]] = {}
@@ -245,6 +246,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
 
     return {
         "hero": hero,
+        "hero_surfaces": hero_bundle["hero_surfaces"] if hero_bundle else None,
         "recently_played": get_home_recently_played(user_id),
         "custom_mixes": custom_mixes,
         "suggested_albums": suggested_albums,

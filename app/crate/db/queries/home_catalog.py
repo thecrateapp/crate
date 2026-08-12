@@ -166,7 +166,9 @@ def get_home_hero_rows(
                     hero.mobile_source_width AS _hero_mobile_source_width,
                     hero.mobile_source_height AS _hero_mobile_source_height,
                     hero.desktop_recipe AS _hero_desktop_recipe,
-                    hero.mobile_recipe AS _hero_mobile_recipe
+                    hero.mobile_recipe AS _hero_mobile_recipe,
+                    hero.provenance AS _hero_provenance,
+                    hero.review_status AS _hero_review_status
                 FROM recent
                 LEFT JOIN artist_hero_artwork hero ON hero.artist_id = recent.id
                 LEFT JOIN user_artist_stats user_stats

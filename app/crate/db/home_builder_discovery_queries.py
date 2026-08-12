@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from crate.artist_hero_artwork import (
+    ARTIST_HERO_RENDER_VERSION,
     DESKTOP_HERO_SIZE,
     MOBILE_HERO_SIZE,
     get_artist_hero_artwork_bounds,
@@ -26,6 +27,7 @@ from crate.genre_taxonomy import expand_genre_terms_with_aliases
 
 HOME_JUST_LANDED_VERSION = "home_just_landed_v2"
 HOME_HERO_CANDIDATE_LIMIT = 15
+_CANONICAL_SURFACES = ("desktop", "mobile")
 
 
 def _dedupe_home_hero_rows(rows: list[dict]) -> list[dict]:
@@ -75,12 +77,38 @@ def _add_hero_artwork_bounds(item: dict) -> None:
         item["hero_compositions"] = compositions
 
 
-def get_home_hero(
+def _canonical_surface_ready(item: Mapping[str, object], composition: str) -> bool:
+    """Return whether a profile can safely use the canonical Home surface."""
+
+    if item.get("_hero_provenance") != "manual":
+        return False
+    if item.get("_hero_review_status") != "approved":
+        return False
+    if not str(item.get("artwork_revision") or "").startswith(
+        f"{ARTIST_HERO_RENDER_VERSION}:"
+    ):
+        return False
+
+    generic_width = item.get("_hero_source_width")
+    generic_height = item.get("_hero_source_height")
+    width = item.get(f"_hero_{composition}_source_width") or generic_width
+    height = item.get(f"_hero_{composition}_source_height") or generic_height
+    recipe = item.get(f"_hero_{composition}_recipe")
+    return bool(
+        width
+        and height
+        and int(width) > 0
+        and int(height) > 0
+        and isinstance(recipe, Mapping)
+    )
+
+
+def _rank_home_hero_rows(
     user_id: int,
     followed_names_lower: list[str],
     similar_target_names_lower: list[str],
     top_genres_lower: list[str],
-) -> list[dict] | None:
+) -> tuple[list[dict], dict[str, set[str]]] | None:
     rows = get_home_hero_rows(
         user_id=user_id,
         followed_names_lower=followed_names_lower,
@@ -136,13 +164,73 @@ def get_home_hero(
     artist_names = [row["name"] for row in selected_rows]
     genre_map = get_artist_genres_map(artist_names)
 
-    for item in selected_rows:
+    public_rows: list[dict] = []
+    ready_by_surface = {composition: set() for composition in _CANONICAL_SURFACES}
+    for source_item in selected_rows:
+        item = dict(source_item)
+        for composition in _CANONICAL_SURFACES:
+            if _canonical_surface_ready(source_item, composition):
+                ready_by_surface[composition].add(str(source_item["name"]))
         _add_hero_artwork_bounds(item)
         item["bio"] = _trim_bio(item.get("bio") or "")
         item["genres"] = genre_map.get(item["name"], [])[:4]
         item.setdefault("artwork_provenance", "fallback")
+        for key in (
+            "_hero_provenance",
+            "_hero_review_status",
+        ):
+            item.pop(key, None)
+        public_rows.append(strip_home_hero_score(item))
 
-    return [strip_home_hero_score(item) for item in selected_rows]
+    return public_rows, ready_by_surface
+
+
+def get_home_hero_bundle(
+    user_id: int,
+    followed_names_lower: list[str],
+    similar_target_names_lower: list[str],
+    top_genres_lower: list[str],
+) -> dict | None:
+    ranked = _rank_home_hero_rows(
+        user_id,
+        followed_names_lower,
+        similar_target_names_lower,
+        top_genres_lower,
+    )
+    if ranked is None:
+        return None
+
+    hero, ready_by_surface = ranked
+    surfaces = {}
+    for composition in _CANONICAL_SURFACES:
+        ready_names = ready_by_surface[composition]
+        if ready_names:
+            artists = [item for item in hero if item["name"] in ready_names]
+            mode = "canonical"
+        else:
+            artists = list(hero)
+            mode = "legacy"
+        surfaces[composition] = {"mode": mode, "artists": artists}
+
+    return {"hero": hero, "hero_surfaces": surfaces}
+
+
+def get_home_hero(
+    user_id: int,
+    followed_names_lower: list[str],
+    similar_target_names_lower: list[str],
+    top_genres_lower: list[str],
+) -> list[dict] | None:
+    bundle = get_home_hero_bundle(
+        user_id,
+        followed_names_lower,
+        similar_target_names_lower,
+        top_genres_lower,
+    )
+    if bundle is None:
+        return None
+
+    return bundle["hero"]
 
 
 def track_candidates_for_album_ids(
@@ -182,6 +270,7 @@ def fallback_recent_interest_tracks(
 __all__ = [
     "fallback_recent_interest_tracks",
     "get_home_hero",
+    "get_home_hero_bundle",
     "query_discovery_tracks",
     "track_candidates_for_album_ids",
 ]

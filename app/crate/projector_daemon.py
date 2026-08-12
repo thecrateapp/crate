@@ -21,10 +21,8 @@ def run_projector_loop(
     outbox_cleanup_interval_seconds: float = 3600.0,
 ) -> None:
     """Consume domain events and warm UI snapshots until stopped."""
-    from crate.projector import (
-        process_domain_events,
-        warm_recent_home_discovery_snapshots,
-    )
+    from crate.db.home_warming import warm_recent_home_discovery_snapshots
+    from crate.projector import process_domain_events
 
     interval = max(0.5, float(interval_seconds))
     batch_limit = max(1, min(int(limit), 1000))

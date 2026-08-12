@@ -263,3 +263,123 @@ def test_home_hero_builder_exposes_fill_bounds_without_internal_recipe(monkeypat
         "bottom": 1.0,
     }
     assert not any(key.startswith("_hero_") for key in heroes[0])
+
+
+def _prepared_hero_row(
+    name: str,
+    *,
+    desktop: bool = True,
+    mobile: bool = True,
+    review_status: str = "approved",
+    provenance: str = "manual",
+) -> dict:
+    row = _hero_row(name, listeners=1_000)
+    row.update(
+        {
+            "_hero_provenance": provenance,
+            "_hero_review_status": review_status,
+            "artwork_provenance": "specific" if provenance == "manual" else "derived",
+            "artwork_revision": "cover-fit-v4:prepared",
+            "_hero_source_width": 1480,
+            "_hero_source_height": 600,
+        }
+    )
+    if desktop:
+        row["_hero_desktop_recipe"] = {
+            "mode": "extend",
+            "position_x": 0.5,
+            "position_y": 0.5,
+            "scale": 1.0,
+            "rotation": 0,
+        }
+    if mobile:
+        row["_hero_mobile_recipe"] = {
+            "mode": "crop",
+            "rotation": 0,
+        }
+    return row
+
+
+def test_home_hero_bundle_selects_ready_artists_per_surface(monkeypatch):
+    from crate.db import home_builder_discovery_queries as queries
+
+    desktop_only = _prepared_hero_row("Desktop Ready", mobile=False)
+    mobile_only = _prepared_hero_row("Mobile Ready", desktop=False)
+    legacy = _hero_row("Legacy Fallback", listeners=900)
+    monkeypatch.setattr(
+        queries,
+        "get_home_hero_rows",
+        lambda **_: [desktop_only, mobile_only, legacy],
+    )
+    monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
+
+    bundle = queries.get_home_hero_bundle(7, [], [], [])
+
+    assert bundle is not None
+    assert bundle["hero_surfaces"]["desktop"]["mode"] == "canonical"
+    assert [
+        artist["name"] for artist in bundle["hero_surfaces"]["desktop"]["artists"]
+    ] == ["Desktop Ready"]
+    assert bundle["hero_surfaces"]["mobile"]["mode"] == "canonical"
+    assert [
+        artist["name"] for artist in bundle["hero_surfaces"]["mobile"]["artists"]
+    ] == ["Mobile Ready"]
+
+
+def test_home_hero_bundle_uses_legacy_surface_until_manual_approved_artwork_is_ready(
+    monkeypatch,
+):
+    from crate.db import home_builder_discovery_queries as queries
+
+    derived = _prepared_hero_row("Derived Candidate", provenance="derived_background")
+    pending = _prepared_hero_row("Pending Candidate", review_status="pending")
+    monkeypatch.setattr(
+        queries,
+        "get_home_hero_rows",
+        lambda **_: [derived, pending],
+    )
+    monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
+
+    bundle = queries.get_home_hero_bundle(7, [], [], [])
+
+    assert bundle is not None
+    for surface in ("desktop", "mobile"):
+        assert bundle["hero_surfaces"][surface]["mode"] == "legacy"
+        assert [
+            artist["name"] for artist in bundle["hero_surfaces"][surface]["artists"]
+        ] == ["Derived Candidate", "Pending Candidate"]
+
+
+def test_home_hero_surface_rotation_keeps_surface_modes(monkeypatch):
+    from crate.db import home_discovery_surface as surface
+
+    payload = {
+        "hero": [{"id": 1, "name": "Legacy"}],
+        "hero_surfaces": {
+            "desktop": {
+                "mode": "canonical",
+                "artists": [
+                    {"id": 1, "name": "One"},
+                    {"id": 2, "name": "Two"},
+                ],
+            },
+            "mobile": {
+                "mode": "legacy",
+                "artists": [{"id": 3, "name": "Three"}],
+            },
+        },
+    }
+
+    monkeypatch.setattr(
+        surface,
+        "rotate_home_hero_rows",
+        lambda rows, **_: list(reversed(rows)),
+    )
+
+    rotated = surface._rotate_home_hero_payload(7, payload)
+
+    assert rotated["hero_surfaces"]["desktop"]["mode"] == "canonical"
+    assert [
+        artist["name"] for artist in rotated["hero_surfaces"]["desktop"]["artists"]
+    ] == ["Two", "One"]
+    assert rotated["hero_surfaces"]["mobile"]["mode"] == "legacy"

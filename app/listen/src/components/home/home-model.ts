@@ -1,6 +1,9 @@
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import type { ArtistHeroArtworkBounds } from "@crate/ui/domain/ArtistHeroFrame";
-import type { ArtistHeroCompositionView } from "../../../../shared/web/artist-hero-contract";
+import type {
+  ArtistHeroCompositionView,
+  HomeHeroSurfaces,
+} from "../../../../shared/web/artist-hero-contract";
 
 export interface SavedAlbum {
   id: number;
@@ -228,6 +231,8 @@ export interface HomeHeroArtist {
   >;
 }
 
+export type HomeDiscoveryHeroSurfaces = HomeHeroSurfaces<HomeHeroArtist>;
+
 export interface HomeRecentPlaylistItem {
   type: "playlist";
   playlist_id: number;
@@ -405,6 +410,7 @@ export interface SnapshotMetadata {
 export interface HomeDiscoveryPayload {
   snapshot?: SnapshotMetadata;
   hero: HomeHeroArtist | HomeHeroArtist[] | null;
+  hero_surfaces?: HomeDiscoveryHeroSurfaces | null;
   recently_played: HomeRecentItem[];
   custom_mixes: HomeGeneratedPlaylistSummary[];
   suggested_albums: HomeSuggestedAlbum[];

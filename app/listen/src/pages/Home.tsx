@@ -575,6 +575,7 @@ export function Home() {
 
       <HomeTasteHero
         heroes={heroes}
+        heroSurfaces={currentDiscovery?.hero_surfaces}
         isFollowing={isFollowing}
         onOpenArtist={(artist) => {
           navigate(
