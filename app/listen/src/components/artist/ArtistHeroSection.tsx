@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,8 +26,8 @@ import {
   ContextMenu,
   type ContextMenuEntry,
 } from "@/components/actions/ItemActionMenu";
-import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+import { useContextMenuController } from "@crate/ui/domain/actions";
 import { formatCompact } from "@/lib/utils";
 
 interface ArtistHeroSectionProps {
@@ -67,49 +67,17 @@ export function ArtistHeroSection({
 }: ArtistHeroSectionProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [desktopMenuPosition, setDesktopMenuPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const desktopMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const menuController = useContextMenuController<HTMLButtonElement>({
+    placement: "bottom-end",
+  });
   const bio = artistInfo?.bio ?? "";
   const heroBackgroundSrc = backgroundUrl
     ? `${backgroundUrl}${
         backgroundUrl.includes("?") ? "&" : "?"
       }v=artist-hero-bg-v1`
     : undefined;
-  const closeMenu = () => {
-    setMenuOpen(false);
-    setDesktopMenuPosition(null);
-  };
-
-  useDismissibleLayer({
-    active: menuOpen && isDesktop,
-    refs: [menuRef, desktopMenuRef],
-    onDismiss: closeMenu,
-  });
-
   function handleToggleMenu(event: MouseEvent<HTMLButtonElement>) {
-    if (menuOpen) {
-      closeMenu();
-      return;
-    }
-
-    if (isDesktop) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const width = 288;
-      const padding = 12;
-      const maxX = Math.max(padding, window.innerWidth - width - padding);
-      setDesktopMenuPosition({
-        x: Math.min(Math.max(padding, rect.right - width), maxX),
-        y: rect.bottom + 8,
-      });
-    }
-
-    setMenuOpen(true);
+    menuController.openFromTrigger(event);
   }
 
   const menuItems: ContextMenuEntry[] = [
@@ -164,9 +132,9 @@ export function ArtistHeroSection({
           top: "calc(var(--listen-safe-top) + 0.625rem)",
           right: "max(1rem, var(--listen-safe-right))",
         }}
-        ref={menuRef}
       >
         <button
+          ref={menuController.anchorRef}
           data-testid="artist-mobile-hero-menu"
           className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleMenu}
@@ -193,10 +161,10 @@ export function ArtistHeroSection({
             fallbackIcon: Users,
           }}
           items={menuItems}
-          menuRef={mobileMenuRef}
-          onClose={closeMenu}
-          open={menuOpen}
-          position={desktopMenuPosition}
+          menuRef={menuController.menuRef}
+          onClose={menuController.close}
+          open={menuController.open}
+          position={menuController.position}
         />
       </div>
     ) : null;
@@ -376,8 +344,9 @@ export function ArtistHeroSection({
               presentation="secondary-action"
             />
             {isDesktop ? (
-              <div className="relative shrink-0" ref={menuRef}>
+              <div className="relative shrink-0">
                 <button
+                  ref={menuController.anchorRef}
                   className={SECONDARY_ACTION_CLASS}
                   onClick={handleToggleMenu}
                   aria-label={t("common.more")}
@@ -400,10 +369,10 @@ export function ArtistHeroSection({
                     fallbackIcon: Users,
                   }}
                   items={menuItems}
-                  menuRef={isDesktop ? desktopMenuRef : mobileMenuRef}
-                  onClose={closeMenu}
-                  open={menuOpen}
-                  position={desktopMenuPosition}
+                  menuRef={menuController.menuRef}
+                  onClose={menuController.close}
+                  open={menuController.open}
+                  position={menuController.position}
                 />
               </div>
             ) : null}

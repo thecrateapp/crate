@@ -345,6 +345,31 @@ describe("Album page", () => {
     }
   });
 
+  it("places the pre-release badge above the album title", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        ...ALBUM_DATA,
+        is_pre_release: true,
+        release_date: "2026-08-20",
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    const badge = screen.getByText("Pre-release");
+    const title = screen.getByRole("heading", { name: "MORIR" });
+    expect(badge.parentElement).toHaveClass("flex", "flex-col");
+    expect(badge.compareDocumentPosition(title)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it("groups desktop hero actions into primary pills and secondary icon labels", () => {
     renderWithListenProviders(<Album />, {
       route: "/artists/crossed/morir",

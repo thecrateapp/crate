@@ -432,6 +432,24 @@ describe("HomeTasteHero", () => {
     expect(screen.getByTestId("desktop-hero-right-scrim")).toBeInTheDocument();
   });
 
+  it("keeps the active hero artwork visible while the preload warms up", () => {
+    mockDesktopPointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture()]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-hero-artwork")).not.toHaveClass(
+      "opacity-0",
+    );
+  });
+
   it("uses the canonical composition view for the asset and bounds", () => {
     mockDesktopPointer();
 

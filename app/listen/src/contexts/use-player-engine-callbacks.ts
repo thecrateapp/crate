@@ -302,6 +302,9 @@ export function usePlayerEngineCallbacks({
     onAnalyserReady: () => {
       setAnalyserVersion((version) => version + 1);
     },
+    onAnalyserInvalidated: () => {
+      setAnalyserVersion((version) => version + 1);
+    },
   };
 
   useEffect(

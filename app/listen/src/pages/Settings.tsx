@@ -27,7 +27,6 @@ import {
   MapPin,
   Moon,
   Navigation,
-  Radio,
   RefreshCw,
   Shield,
   Smartphone,
@@ -609,13 +608,6 @@ export function Settings() {
           >
             <Users size={18} className="text-muted-foreground" />{" "}
             {t("settings.links.people")}
-          </Link>
-          <Link
-            to="/jam"
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
-          >
-            <Radio size={18} className="text-muted-foreground" />{" "}
-            {t("settings.links.jam")}
           </Link>
           <Link
             to="/upload"

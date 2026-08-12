@@ -484,6 +484,69 @@ describe("useJamWebSocket", () => {
     );
   });
 
+  it("does not pause a Jam player while hydrating a playing room", () => {
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    const pause = vi.fn();
+    const track = { id: "jam-track", title: "Jam track", artist: "Artist" };
+
+    renderHook(
+      () => {
+        const [, dispatch] = useReducer(
+          jamSessionReducer,
+          initialJamSessionState,
+        );
+        const playerActionsRef = useRef({
+          play: vi.fn(),
+          playAll: vi.fn(),
+          pause,
+          resume: vi.fn(),
+          seek: vi.fn(),
+          syncJamQueue: vi.fn(),
+          currentTrack: track,
+          isPlaying: true,
+          playSource: { type: "queue" as const, name: "Jam: Test" },
+        });
+        const currentTimeRef = useRef(0);
+        const roomNameRef = useRef("Test");
+        return useJamWebSocket({
+          roomId: "room-1",
+          userId: 1,
+          dispatch,
+          playerActionsRef,
+          currentTimeRef,
+          roomNameRef,
+        });
+      },
+      { wrapper },
+    );
+
+    const socket = FakeWebSocket.instances[0];
+    act(() => socket?.open());
+    act(
+      () =>
+        socket?.message({
+          type: "state_sync",
+          room: {
+            id: "room-1",
+            host_user_id: 1,
+            name: "Test",
+            status: "active",
+            visibility: "private",
+            is_permanent: false,
+            created_at: "2026-01-01T00:00:00Z",
+            members: [],
+            events: [],
+            queue: [
+              { id: "queue-1", track, vote_count: 0, voted_by_me: false },
+            ],
+            current_track_payload: { track, position: 0, playing: true },
+          },
+        }),
+    );
+
+    expect(pause).not.toHaveBeenCalled();
+  });
+
   it("also waits for the authoritative clock when a room is paused", () => {
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const syncJamQueue = vi.fn();

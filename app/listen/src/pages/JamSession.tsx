@@ -488,6 +488,7 @@ export function JamSession() {
     leaveJamSession,
     setJamTransport,
     syncJamQueue,
+    playSource,
   } = usePlayerActions();
   const {
     state,
@@ -641,6 +642,7 @@ export function JamSession() {
     syncJamQueue,
     currentTrack,
     isPlaying,
+    playSource,
   });
   playerActionsRef.current = {
     play,
@@ -652,6 +654,7 @@ export function JamSession() {
     syncJamQueue,
     currentTrack,
     isPlaying,
+    playSource,
   };
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;

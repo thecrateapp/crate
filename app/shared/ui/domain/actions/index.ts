@@ -3,6 +3,12 @@ export * from "./shared";
 export { MobileActionSheet } from "./MobileActionSheet";
 export { ContextMenu, shouldRenderDesktopContextMenu } from "./ContextMenu";
 export {
+  useContextMenuController,
+  type ContextMenuPlacement,
+  type UseContextMenuControllerOptions,
+  type UseContextMenuControllerReturn,
+} from "./useContextMenuController";
+export {
   useItemActionMenu,
   ItemActionMenu,
   ItemActionMenuButton,

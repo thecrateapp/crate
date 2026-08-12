@@ -92,6 +92,44 @@ describe("useItemActionMenu", () => {
     expect(result.current.position).toEqual({ x: 92, y: 48 });
   });
 
+  it("aligns a right-edge menu to the trigger without overflowing the viewport", () => {
+    isDesktop = true;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1024,
+    });
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 768,
+    });
+    const { result } = renderHook(() =>
+      useItemActionMenu([{ key: "a", label: "A", onSelect: vi.fn() }], {
+        placement: "bottom-end",
+      }),
+    );
+    const menu = document.createElement("div");
+    menu.getBoundingClientRect = () => ({ width: 288, height: 200 }) as DOMRect;
+    result.current.menuRef.current = menu;
+
+    act(() => {
+      result.current.openFromTrigger(
+        createButtonMouseEvent({
+          x: 0,
+          y: 0,
+          width: 40,
+          height: 40,
+          top: 120,
+          right: 1000,
+          bottom: 160,
+          left: 960,
+          toJSON: () => {},
+        }),
+      );
+    });
+
+    expect(result.current.position).toEqual({ x: 712, y: 168 });
+  });
+
   it("toggles closed when trigger is clicked while open", () => {
     const { result } = renderHook(() =>
       useItemActionMenu([{ key: "a", label: "A", onSelect: vi.fn() }]),

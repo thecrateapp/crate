@@ -71,7 +71,7 @@ describe("TrackRow playback behavior", () => {
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByText("Track One"));
+    await user.click(screen.getAllByText("Track One")[0]!);
 
     expect(playAll).toHaveBeenCalledWith(
       [
@@ -172,6 +172,26 @@ describe("TrackRow playback behavior", () => {
       expect.objectContaining({ title: "Track One" }),
     );
     expect(playAll).not.toHaveBeenCalled();
+  });
+
+  it("opens the normal track menu on right click without selecting the row", () => {
+    const onSelect = vi.fn();
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(
+      <TrackRow track={track} selectable onSelect={onSelect} />,
+    );
+
+    fireEvent.contextMenu(screen.getByText("Track One"));
+
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("selects instead of playing on single click when selectable", async () => {
@@ -330,6 +350,23 @@ describe("TrackRow playback behavior", () => {
       expect.any(Object),
     );
     expect(playAll).not.toHaveBeenCalled();
+  });
+
+  it("opens the track menu instead of selecting on right click", () => {
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(<TrackRow track={track} selectable />);
+
+    fireEvent.contextMenu(screen.getByText("Track One"));
+
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(screen.queryByText("1 selected")).not.toBeInTheDocument();
   });
 
   it("keeps circular progress and global play glow on the active playing row", () => {

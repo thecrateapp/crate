@@ -1,9 +1,36 @@
-import { renderHook } from "@testing-library/react";
+import { fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { createElement, Fragment, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { useDismissibleLayer } from "./use-dismissible-layer";
 
 describe("useDismissibleLayer", () => {
+  function DismissibleFixture({
+    onUnderlyingClick,
+  }: {
+    onUnderlyingClick: () => void;
+  }) {
+    const [active, setActive] = useState(true);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useDismissibleLayer({
+      active,
+      refs: [ref],
+      onDismiss: () => setActive(false),
+    });
+
+    return createElement(
+      Fragment,
+      null,
+      active ? createElement("div", { ref }, "Menu") : null,
+      createElement(
+        "button",
+        { type: "button", onClick: onUnderlyingClick },
+        "Underlying action",
+      ),
+    );
+  }
+
   it("calls onDismiss when clicking outside", () => {
     const onDismiss = vi.fn();
     const ref = { current: document.createElement("div") };
@@ -75,5 +102,38 @@ describe("useDismissibleLayer", () => {
 
     document.body.removeChild(ref.current);
     document.body.removeChild(target);
+  });
+
+  it("suppresses a React click when the outside dismiss unmounts the layer", () => {
+    const onUnderlyingClick = vi.fn();
+
+    render(createElement(DismissibleFixture, { onUnderlyingClick }));
+
+    const target = screen.getByRole("button", { name: "Underlying action" });
+    fireEvent.pointerDown(target);
+    fireEvent.click(target);
+
+    expect(onUnderlyingClick).not.toHaveBeenCalled();
+    expect(screen.queryByText("Menu")).not.toBeInTheDocument();
+  });
+
+  it("dismisses on scroll when configured", () => {
+    const onDismiss = vi.fn();
+    const ref = { current: document.createElement("div") };
+    document.body.appendChild(ref.current);
+
+    renderHook(() =>
+      useDismissibleLayer({
+        active: true,
+        refs: [ref],
+        onDismiss,
+        closeOnScroll: true,
+      }),
+    );
+
+    document.dispatchEvent(new Event("scroll"));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    document.body.removeChild(ref.current);
   });
 });

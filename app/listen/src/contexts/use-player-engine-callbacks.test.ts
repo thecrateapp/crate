@@ -132,6 +132,15 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.onActivePlaybackStarted).toHaveBeenCalledTimes(1);
   });
 
+  it("refreshes visualizer consumers when the active analyser is invalidated", () => {
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onAnalyserInvalidated?.();
+
+    expect(options.setAnalyserVersion).toHaveBeenCalledTimes(1);
+  });
+
   it("publishes the track that the engine finished", () => {
     const options = createOptions();
     const listener = vi.fn();

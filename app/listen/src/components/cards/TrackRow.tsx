@@ -104,10 +104,6 @@ interface TrackRowProps {
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (track: TrackRowData, event: MouseEvent<HTMLDivElement>) => void;
-  onSelectionContextMenu?: (
-    track: TrackRowData,
-    event: MouseEvent<HTMLDivElement>,
-  ) => boolean | void;
   onSelectionActionMenuOpen?: (
     track: TrackRowData,
     event: MouseEvent<HTMLButtonElement>,
@@ -223,7 +219,6 @@ export const TrackRow = memo(function TrackRow({
   selectable = false,
   selected = false,
   onSelect,
-  onSelectionContextMenu,
   onSelectionActionMenuOpen,
   queueTracks,
 }: TrackRowProps) {
@@ -296,7 +291,9 @@ export const TrackRow = memo(function TrackRow({
     onCreatePlaylist,
     onPlayNowOverride: onPlayOverride,
   });
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(actions, {
+    placement: "bottom-end",
+  });
 
   async function handleRemotePlayback() {
     if (resolvingRemote) return;
@@ -369,7 +366,6 @@ export const TrackRow = memo(function TrackRow({
       onContextMenu={(event) => {
         if (disabled) return;
         if (!showLocalActions) return;
-        if (selectable && onSelectionContextMenu?.(track, event)) return;
         onActionMenuOpen?.();
         actionMenu.handleContextMenu(event);
       }}

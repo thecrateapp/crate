@@ -71,6 +71,7 @@ export interface GaplessPlayerCallbacks {
   onError?: (trackPath: string, error: unknown) => void;
   onBuffering?: (trackPath: string) => void;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
+  onAnalyserInvalidated?: () => void;
 }
 
 export interface PlaybackGestureRequiredError {
@@ -147,9 +148,19 @@ export function isPlaybackGestureRequiredError(error: unknown): boolean {
 }
 
 function setAnalyser(analyser: AnalyserNode | null) {
-  if (!analyser || analyser === currentAnalyser) return;
+  if (!analyser) {
+    invalidateAnalyser();
+    return;
+  }
+  if (analyser === currentAnalyser) return;
   currentAnalyser = analyser;
   currentCallbacks.onAnalyserReady?.(analyser);
+}
+
+function invalidateAnalyser() {
+  if (!currentAnalyser) return;
+  currentAnalyser = null;
+  currentCallbacks.onAnalyserInvalidated?.();
 }
 
 function stopFade() {
@@ -253,10 +264,11 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
       ? MOBILE_HTML5_TRACK_LIMIT
       : getPlaybackLoadLimit(preferHtml5Audio),
     deferAdjacentLoadsUntilBufferedSeconds: ADJACENT_LOAD_BUFFER_SECONDS,
-    // Switching an audible source from HTML5 to WebAudio mid-track can click
-    // even when both clocks are aligned. Decoded buffers remain available for
-    // tracks that have not started yet.
-    switchToWebAudioDuringPlayback: false,
+    // Desktop may start through HTML5 while WebAudio is still decoding. Once
+    // the active buffer is ready, promote it so the analyser-backed
+    // visualizers attach to the first track as well. Mobile keeps its stable
+    // HTML5-only path above.
+    switchToWebAudioDuringPlayback: !preferHtml5Audio,
   });
   appliedVolume = lastVolume;
 
@@ -284,6 +296,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   instance.onprev = (from, to) => {
     currentTrackFullyBuffered = false;
+    invalidateAnalyser();
     currentCallbacks.onPrev?.(from, to);
   };
 
@@ -298,6 +311,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   instance.onnext = (from, to) => {
     currentTrackFullyBuffered = false;
+    invalidateAnalyser();
     currentCallbacks.onNext?.(from, to);
   };
 

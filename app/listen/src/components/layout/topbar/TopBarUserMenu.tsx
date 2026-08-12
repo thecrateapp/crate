@@ -4,7 +4,6 @@ import {
   BarChart3,
   CRATE_ICON_SIZE,
   LogOut,
-  Radio,
   Send,
   Settings,
   Upload,
@@ -105,12 +104,6 @@ export function TopBarUserMenu() {
       label: t("userMenu.people"),
       icon: Users,
       onSelect: () => go("/people"),
-    },
-    {
-      key: "jam",
-      label: t("userMenu.jamSessions"),
-      icon: Radio,
-      onSelect: () => go("/jam"),
     },
     {
       key: "upload",

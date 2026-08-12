@@ -352,20 +352,12 @@ function requestBackgroundWork(callback: () => void): () => void {
   return () => window.clearTimeout(handle);
 }
 
-function sameSet(left: Set<string>, right: Set<string>): boolean {
-  if (left.size !== right.size) return false;
-  for (const value of left) {
-    if (!right.has(value)) return false;
-  }
-  return true;
-}
-
 function useHeroBackgroundPreloader(
   heroes: HomeHeroArtist[],
   activeIndex: number,
   composition: "desktop" | "mobile",
   mode: "canonical" | "legacy" = "canonical",
-): Set<string> {
+): void {
   const sources = useMemo(
     () =>
       heroes
@@ -376,9 +368,6 @@ function useHeroBackgroundPreloader(
         )
         .filter((src): src is string => Boolean(src)),
     [composition, heroes, mode],
-  );
-  const [readySources, setReadySources] = useState<Set<string>>(
-    () => new Set(),
   );
   const readyRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -391,10 +380,6 @@ function useHeroBackgroundPreloader(
     inFlightRef.current = new Set(
       [...inFlightRef.current].filter((src) => allowed.has(src)),
     );
-    setReadySources((prev) => {
-      const next = new Set([...prev].filter((src) => allowed.has(src)));
-      return sameSet(prev, next) ? prev : next;
-    });
   }, [sources]);
 
   useEffect(() => {
@@ -407,12 +392,6 @@ function useHeroBackgroundPreloader(
 
     const markReady = (src: string) => {
       readyRef.current.add(src);
-      setReadySources((prev) => {
-        if (prev.has(src)) return prev;
-        const next = new Set(prev);
-        next.add(src);
-        return next;
-      });
     };
 
     const loadSource = (src: string | undefined, priority: "high" | "low") => {
@@ -466,8 +445,6 @@ function useHeroBackgroundPreloader(
       started.forEach((src) => inFlightRef.current.delete(src));
     };
   }, [activeIndex, sources]);
-
-  return readySources;
 }
 
 export function HomeTasteHero({
@@ -500,12 +477,7 @@ export function HomeTasteHero({
   );
   const count = surfaceHeroes.length;
   const activeIndex = Math.min(idx, Math.max(count - 1, 0));
-  const readyBackgrounds = useHeroBackgroundPreloader(
-    surfaceHeroes,
-    activeIndex,
-    composition,
-    mode,
-  );
+  useHeroBackgroundPreloader(surfaceHeroes, activeIndex, composition, mode);
 
   useEffect(() => {
     setIdx((current) =>
@@ -568,7 +540,6 @@ export function HomeTasteHero({
             hero={hero}
             active={index === activeIndex}
             backgroundSrc={isPrepared ? source : undefined}
-            backgroundReady={Boolean(source && readyBackgrounds.has(source))}
             following={isFollowing(hero.id)}
             onOpenArtist={() => onOpenArtist(hero)}
             onPlay={() => onPlay(hero)}
@@ -837,13 +808,11 @@ function HeroBackdrop({
   backgroundSrc,
   composition,
   artworkBounds,
-  ready = true,
 }: {
   hero: HomeHeroArtist;
   backgroundSrc?: string;
   composition: "desktop" | "mobile";
   artworkBounds?: ArtistHeroArtworkBounds;
-  ready?: boolean;
 }) {
   // A persisted hero already contains the worker's treatment. Applying a
   // second browser filter here would make Admin and Home render different
@@ -870,7 +839,6 @@ function HeroBackdrop({
       className={cn(
         "absolute inset-0 h-full w-full transition-opacity duration-500",
         usesExtendedCanvas ? "object-fill" : "object-cover object-center",
-        ready ? "opacity-100" : "opacity-0",
         grayscale ? "grayscale" : "",
       )}
     />
@@ -1015,7 +983,6 @@ function DesktopFeaturedArtist({
   hero,
   active,
   backgroundSrc,
-  backgroundReady,
   following,
   onOpenArtist,
   onPlay,
@@ -1024,7 +991,6 @@ function DesktopFeaturedArtist({
   hero: HomeHeroArtist;
   active: boolean;
   backgroundSrc?: string;
-  backgroundReady: boolean;
   following: boolean;
   onOpenArtist: () => void;
   onPlay: () => void;
@@ -1049,7 +1015,6 @@ function DesktopFeaturedArtist({
             backgroundSrc={backgroundSrc}
             composition="desktop"
             artworkBounds={heroArtworkBounds(hero, "desktop")}
-            ready={backgroundReady}
           />
         }
       >

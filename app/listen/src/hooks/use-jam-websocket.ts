@@ -42,6 +42,10 @@ function trackIdentity(track: Track | null | undefined) {
   );
 }
 
+function isJamPlaybackSource(source: PlaySource | null | undefined) {
+  return source?.type === "queue" && source.name.startsWith("Jam:");
+}
+
 function queueSnapshotTracks(queue: JamQueueItem[] | undefined) {
   if (!queue) return [];
   return queue
@@ -100,6 +104,7 @@ interface UseJamWebSocketOptions {
     setPlaybackRate?: (rate: number) => void;
     currentTrack: Track | undefined;
     isPlaying?: boolean;
+    playSource?: PlaySource | null;
   }>;
   currentTimeRef: React.MutableRefObject<number>;
   roomNameRef: React.MutableRefObject<string>;
@@ -452,7 +457,10 @@ export function useJamWebSocket({
             // overwritten by this load at the stale position.
             awaitingInitialClockRef.current = roomHasCurrentTrack;
             if (roomHasCurrentTrack) {
-              if (playerActionsRef.current.isPlaying) {
+              if (
+                playerActionsRef.current.isPlaying &&
+                !isJamPlaybackSource(playerActionsRef.current.playSource)
+              ) {
                 playerActionsRef.current.pause();
               }
               return;

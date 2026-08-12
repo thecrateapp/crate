@@ -101,6 +101,8 @@ export function usePlayerRuntimeState() {
       onBuffering: (path) => callbacksRef.current.onBuffering?.(path),
       onAnalyserReady: (analyser) =>
         callbacksRef.current.onAnalyserReady?.(analyser),
+      onAnalyserInvalidated: () =>
+        callbacksRef.current.onAnalyserInvalidated?.(),
     });
   }
 
