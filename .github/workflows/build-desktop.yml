@@ -92,6 +92,36 @@ jobs:
             pkg-config \
             rpm
 
+      - name: Pre-cache Tauri Linux bundler tools
+        if: runner.os == 'Linux'
+        run: |
+          set -Eeuo pipefail
+          tools_dir="${XDG_CACHE_HOME:-$HOME/.cache}/tauri"
+          mkdir -p "$tools_dir"
+
+          download() {
+            local url="$1"
+            local destination="$2"
+            curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+              --connect-timeout 20 --max-time 300 \
+              "$url" --output "$destination"
+            test -s "$destination"
+            chmod +x "$destination"
+          }
+
+          download \
+            "https://github.com/tauri-apps/binary-releases/releases/download/apprun-old/AppRun-x86_64" \
+            "$tools_dir/AppRun-x86_64"
+          download \
+            "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage" \
+            "$tools_dir/linuxdeploy-x86_64.AppImage"
+          download \
+            "https://raw.githubusercontent.com/tauri-apps/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh" \
+            "$tools_dir/linuxdeploy-plugin-gtk.sh"
+          download \
+            "https://raw.githubusercontent.com/tauri-apps/linuxdeploy-plugin-gstreamer/master/linuxdeploy-plugin-gstreamer.sh" \
+            "$tools_dir/linuxdeploy-plugin-gstreamer.sh"
+
       - name: Install dependencies
         run: npm ci
 
