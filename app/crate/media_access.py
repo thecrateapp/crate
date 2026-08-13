@@ -126,6 +126,7 @@ def media_audience_for_path(path: str) -> MediaAudience | None:
         "/avatar",
         "/photo",
         "/background",
+        "/hero",
         "/image",
         "/images/",
         "/export",
