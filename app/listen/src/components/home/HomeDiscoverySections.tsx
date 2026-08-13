@@ -21,8 +21,6 @@ import {
   Radio,
   Disc3,
   UserRound,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   ChevronDown,
 } from "@crate/ui/icons";
@@ -60,7 +58,6 @@ import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
 import {
   albumCoverApiUrl,
   albumPagePath,
-  artistBackgroundApiUrl,
   artistHeroApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
@@ -299,28 +296,6 @@ function heroBackgroundSrc(
   return backgroundUrl || undefined;
 }
 
-function legacyHeroBackgroundSrc(
-  hero: HomeHeroArtist,
-  composition: "desktop" | "mobile",
-): string | undefined {
-  const backgroundUrl = artistBackgroundApiUrl(
-    {
-      artistId: hero.id,
-      artistEntityUid: hero.entity_uid,
-      artistSlug: hero.slug,
-      artistName: hero.name,
-    },
-    {
-      size:
-        composition === "desktop"
-          ? ARTIST_HERO_DESKTOP_SIZE.width
-          : ARTIST_HERO_MOBILE_SIZE.width,
-      version: HERO_BACKGROUND_VERSION,
-    },
-  );
-  return backgroundUrl || undefined;
-}
-
 function heroArtworkBounds(
   hero: HomeHeroArtist,
   composition: "desktop" | "mobile",
@@ -356,18 +331,13 @@ function useHeroBackgroundPreloader(
   heroes: HomeHeroArtist[],
   activeIndex: number,
   composition: "desktop" | "mobile",
-  mode: "canonical" | "legacy" = "canonical",
 ): void {
   const sources = useMemo(
     () =>
       heroes
-        .map((hero) =>
-          mode === "canonical"
-            ? heroBackgroundSrc(hero, composition)
-            : undefined,
-        )
+        .map((hero) => heroBackgroundSrc(hero, composition))
         .filter((src): src is string => Boolean(src)),
-    [composition, heroes, mode],
+    [composition, heroes],
   );
   const readyRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -470,14 +440,14 @@ export function HomeTasteHero({
   const isDesktop = useIsDesktop();
   const composition = isDesktop ? "desktop" : "mobile";
   const surface = heroSurfaces?.[composition];
-  const mode = surface?.mode ?? "canonical";
+  const surfaceArtists = heroSurfaces ? surface?.artists ?? [] : heroes;
   const surfaceHeroes = useMemo(
-    () => dedupeHeroArtists(surface?.artists ?? heroes),
-    [heroes, surface?.artists],
+    () => dedupeHeroArtists(surfaceArtists),
+    [surfaceArtists],
   );
   const count = surfaceHeroes.length;
   const activeIndex = Math.min(idx, Math.max(count - 1, 0));
-  useHeroBackgroundPreloader(surfaceHeroes, activeIndex, composition, mode);
+  useHeroBackgroundPreloader(surfaceHeroes, activeIndex, composition);
 
   useEffect(() => {
     setIdx((current) =>
@@ -490,19 +460,6 @@ export function HomeTasteHero({
   if (!isDesktop) {
     const hero = surfaceHeroes[0];
     if (!hero) return null;
-    if (mode === "legacy") {
-      return (
-        <LegacyMobileFeaturedArtist
-          hero={hero}
-          backgroundSrc={legacyHeroBackgroundSrc(hero, "mobile")}
-          following={isFollowing(hero.id)}
-          intro={mobileIntro}
-          onOpenArtist={() => onOpenArtist(hero)}
-          onPlay={() => onPlay(hero)}
-          onToggleFollow={() => onToggleFollow(hero)}
-        />
-      );
-    }
     return (
       <MobileFeaturedArtist
         hero={hero}
@@ -526,15 +483,12 @@ export function HomeTasteHero({
       className="relative mx-auto aspect-[1480/600] min-h-[clamp(480px,38dvh,600px)] w-full max-w-[1480px] overflow-hidden bg-app-surface"
     >
       {surfaceHeroes.map((hero, index) => {
-        const source =
-          mode === "canonical"
-            ? heroBackgroundSrc(hero, "desktop")
-            : legacyHeroBackgroundSrc(hero, "desktop");
+        const source = heroBackgroundSrc(hero, "desktop");
         const isPrepared =
           index === activeIndex ||
           index === (activeIndex + 1) % count ||
           index === (activeIndex - 1 + count) % count;
-        return mode === "canonical" ? (
+        return (
           <DesktopFeaturedArtist
             key={hero.entity_uid || hero.id}
             hero={hero}
@@ -545,42 +499,20 @@ export function HomeTasteHero({
             onPlay={() => onPlay(hero)}
             onToggleFollow={() => onToggleFollow(hero)}
           />
-        ) : (
-          <LegacyDesktopFeaturedArtist
-            key={hero.entity_uid || hero.id}
-            hero={hero}
-            active={index === activeIndex}
-            backgroundSrc={isPrepared ? source : undefined}
-            following={isFollowing(hero.id)}
-            intro={index === activeIndex ? desktopIntro : undefined}
-            onOpenArtist={() => onOpenArtist(hero)}
-            onPlay={() => onPlay(hero)}
-            onToggleFollow={() => onToggleFollow(hero)}
-          />
         );
       })}
 
       {count > 1 ? (
-        mode === "canonical" ? (
-          <DesktopHeroNavigation
-            heroes={surfaceHeroes}
-            activeIndex={activeIndex}
-            onPrevious={() => go(-1)}
-            onNext={() => go(1)}
-            onSelect={setIdx}
-          />
-        ) : (
-          <LegacyDesktopHeroNavigation
-            heroes={surfaceHeroes}
-            activeIndex={activeIndex}
-            onPrevious={() => go(-1)}
-            onNext={() => go(1)}
-            onSelect={setIdx}
-          />
-        )
+        <DesktopHeroNavigation
+          heroes={surfaceHeroes}
+          activeIndex={activeIndex}
+          onPrevious={() => go(-1)}
+          onNext={() => go(1)}
+          onSelect={setIdx}
+        />
       ) : null}
 
-      {mode === "canonical" && desktopIntro ? (
+      {desktopIntro ? (
         <div
           data-testid="desktop-hero-intro"
           className="pointer-events-none absolute inset-x-0 top-0 z-20"
@@ -590,215 +522,6 @@ export function HomeTasteHero({
           </div>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function LegacyMobileFeaturedArtist({
-  hero,
-  backgroundSrc,
-  following,
-  intro,
-  onOpenArtist,
-  onPlay,
-  onToggleFollow,
-}: {
-  hero: HomeHeroArtist;
-  backgroundSrc?: string;
-  following: boolean;
-  intro?: ReactNode;
-  onOpenArtist: () => void;
-  onPlay: () => void;
-  onToggleFollow: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <section
-      data-testid="mobile-legacy-hero"
-      className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-white/10 bg-app-surface"
-    >
-      <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="mobile" />
-      <button
-        type="button"
-        aria-label={t("home.hero.openArtist", { name: hero.name })}
-        className="absolute inset-0 z-10 cursor-pointer"
-        onClick={onOpenArtist}
-      />
-      <div className="pointer-events-none relative z-20 flex h-full flex-col justify-between px-6 py-8">
-        <div className="pointer-events-none">{intro}</div>
-        <LegacyHeroCopy
-          hero={hero}
-          following={following}
-          onPlay={onPlay}
-          onToggleFollow={onToggleFollow}
-        />
-      </div>
-    </section>
-  );
-}
-
-function LegacyDesktopFeaturedArtist({
-  hero,
-  active,
-  backgroundSrc,
-  following,
-  intro,
-  onOpenArtist,
-  onPlay,
-  onToggleFollow,
-}: {
-  hero: HomeHeroArtist;
-  active: boolean;
-  backgroundSrc?: string;
-  following: boolean;
-  intro?: ReactNode;
-  onOpenArtist: () => void;
-  onPlay: () => void;
-  onToggleFollow: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <section
-      data-testid="desktop-legacy-hero"
-      aria-hidden={!active}
-      className={cn(
-        "absolute inset-0 overflow-hidden rounded-[12px] border border-white/10 transition-opacity duration-500 ease-out",
-        active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
-      )}
-    >
-      <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="desktop" />
-      <button
-        type="button"
-        aria-label={t("home.hero.openArtist", { name: hero.name })}
-        tabIndex={active ? 0 : -1}
-        className="absolute inset-0 z-10 cursor-pointer"
-        onClick={onOpenArtist}
-      />
-      <div className="pointer-events-none relative z-20 flex h-full flex-col justify-between px-10 py-10">
-        <div className="pointer-events-none">{intro}</div>
-        <div className="max-w-[44%]">
-          <LegacyHeroCopy
-            hero={hero}
-            following={following}
-            onPlay={onPlay}
-            onToggleFollow={onToggleFollow}
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LegacyHeroArtwork({
-  backgroundSrc,
-  composition,
-}: {
-  backgroundSrc?: string;
-  composition: "desktop" | "mobile";
-}) {
-  return (
-    <>
-      {backgroundSrc ? (
-        <CrateImage
-          data-testid={`${composition}-legacy-hero-artwork`}
-          src={backgroundSrc}
-          retryPolicy="eventual"
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
-        />
-      ) : null}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.96)_0%,rgba(5,7,11,0.78)_42%,rgba(5,7,11,0.2)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(0deg,rgba(5,7,11,0.98)_0%,rgba(5,7,11,0.18)_60%,rgba(5,7,11,0.45)_100%)]" />
-    </>
-  );
-}
-
-function LegacyHeroCopy({
-  hero,
-  following,
-  onPlay,
-  onToggleFollow,
-}: {
-  hero: HomeHeroArtist;
-  following: boolean;
-  onPlay: () => void;
-  onToggleFollow: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="pointer-events-auto">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-        {t("home.library.justLanded.title")}
-      </p>
-      <h1 className="mt-2 truncate text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
-        {hero.name}
-      </h1>
-      <HeroGenres hero={hero} />
-      <HeroActions
-        hero={hero}
-        following={following}
-        onPlay={onPlay}
-        onToggleFollow={onToggleFollow}
-      />
-    </div>
-  );
-}
-
-function LegacyDesktopHeroNavigation({
-  heroes,
-  activeIndex,
-  onPrevious,
-  onNext,
-  onSelect,
-}: {
-  heroes: HomeHeroArtist[];
-  activeIndex: number;
-  onPrevious: () => void;
-  onNext: () => void;
-  onSelect: (index: number) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="absolute inset-x-0 bottom-5 z-30 flex items-center justify-center gap-3">
-      <button
-        type="button"
-        aria-label={t("home.hero.previousArtist")}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/75 backdrop-blur-sm hover:text-white"
-        onClick={onPrevious}
-      >
-        <ChevronLeft size={18} />
-      </button>
-      <div className="flex items-center gap-1.5">
-        {heroes.map((hero, index) => (
-          <button
-            key={hero.entity_uid || hero.id}
-            type="button"
-            aria-label={t("home.hero.showArtist", { name: hero.name })}
-            aria-current={index === activeIndex ? "true" : undefined}
-            className="flex h-6 items-center bg-transparent px-1"
-            onClick={() => onSelect(index)}
-          >
-            <span
-              className={cn(
-                "block h-1.5 rounded-full transition-all duration-300",
-                index === activeIndex
-                  ? "w-6 bg-primary"
-                  : "w-1.5 bg-white/35 hover:bg-white/60",
-              )}
-            />
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        aria-label={t("home.hero.nextArtist")}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/75 backdrop-blur-sm hover:text-white"
-        onClick={onNext}
-      >
-        <ChevronRight size={18} />
-      </button>
     </div>
   );
 }

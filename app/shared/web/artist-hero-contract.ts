@@ -1,7 +1,7 @@
 export const ARTIST_HERO_CONTRACT_VERSION = 1 as const;
 
 export type ArtistHeroComposition = "desktop" | "mobile";
-export type HomeHeroMode = "canonical" | "legacy";
+export type HomeHeroMode = "canonical";
 
 export interface HomeHeroSurface<TArtist = unknown> {
   mode: HomeHeroMode;

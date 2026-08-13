@@ -668,7 +668,7 @@ class HomeCardResponse(BaseModel):
 class HomeHeroSurfaceResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    mode: Literal["canonical", "legacy"]
+    mode: Literal["canonical"]
     artists: list[dict[str, Any]] = Field(default_factory=list)
 
 
