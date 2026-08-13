@@ -589,7 +589,6 @@ export function Home() {
         onPlay={(artist) => void playHeroArtist(artist)}
         onToggleFollow={(artist) => void toggleHeroFollow(artist)}
         desktopIntro={isDesktop ? homeIntro : undefined}
-        mobileIntro={!isDesktop ? homeIntro : undefined}
       />
 
       <div

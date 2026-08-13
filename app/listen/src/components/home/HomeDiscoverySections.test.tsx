@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import {
   afterEach,
   beforeAll,
@@ -125,6 +126,31 @@ function heroFixture(overrides: Partial<HomeHeroArtist> = {}): HomeHeroArtist {
     bio: "Converge are a Massachusetts hardcore band.",
     ...overrides,
   };
+}
+
+function StableMobileHeroHarness({
+  initialHeroes,
+  refreshedHeroes,
+}: {
+  initialHeroes: HomeHeroArtist[];
+  refreshedHeroes: HomeHeroArtist[];
+}) {
+  const [heroes, setHeroes] = useState(initialHeroes);
+
+  return (
+    <>
+      <HomeTasteHero
+        heroes={heroes}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />
+      <button type="button" onClick={() => setHeroes(refreshedHeroes)}>
+        Refresh hero data
+      </button>
+    </>
+  );
 }
 
 describe("HomeTasteHero", () => {
@@ -548,7 +574,7 @@ describe("HomeTasteHero", () => {
     });
   });
 
-  it("renders the initial artist without carousel controls on mobile", () => {
+  it("renders one selected mobile artist without carousel controls", () => {
     mockMobilePointer();
 
     renderWithListenProviders(
@@ -570,12 +596,6 @@ describe("HomeTasteHero", () => {
         onOpenArtist={vi.fn()}
         onPlay={vi.fn()}
         onToggleFollow={vi.fn()}
-        mobileIntro={
-          <div>
-            <h1>Good morning</h1>
-            <p>Saturday, August 1</p>
-          </div>
-        }
       />,
     );
 
@@ -598,11 +618,7 @@ describe("HomeTasteHero", () => {
       maskImage: "none",
     });
     expect(screen.getByTestId("mobile-hero-scrim")).toHaveClass("h-[82%]");
-    expect(screen.getByTestId("mobile-hero-intro-layout")).toHaveClass(
-      "top-0",
-      "pt-[calc(var(--listen-mobile-header-height)+0.5rem)]",
-    );
-    expect(screen.getByText("Good morning")).toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-hero-intro-layout")).toBeNull();
     expect(artistHeroApiUrl).toHaveBeenCalledWith(
       expect.objectContaining({ artistEntityUid: "artist-entity" }),
       "mobile",
@@ -613,27 +629,36 @@ describe("HomeTasteHero", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("rotates through the available mobile artists", () => {
+  it("selects a mobile artist once and keeps it stable while Home remains mounted", () => {
     mockMobilePointer();
     vi.useFakeTimers();
 
     try {
+      vi.mocked(Math.random).mockReturnValue(0.99);
       renderWithListenProviders(
-        <HomeTasteHero
-          heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
-          isFollowing={() => false}
-          onOpenArtist={vi.fn()}
-          onPlay={vi.fn()}
-          onToggleFollow={vi.fn()}
+        <StableMobileHeroHarness
+          initialHeroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+          refreshedHeroes={[
+            heroFixture({ bio: "Refreshed Converge" }),
+            heroFixture({ id: 8, name: "Botch", bio: "Refreshed Botch" }),
+          ].reverse()}
         />,
       );
 
       expect(
-        screen.getByRole("heading", { name: "Converge" }),
+        screen.getByRole("heading", { name: "Botch" }),
+      ).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Refresh hero data" }),
+      );
+
+      expect(
+        screen.getByRole("heading", { name: "Botch" }),
       ).toBeInTheDocument();
 
       act(() => {
-        vi.advanceTimersByTime(8_000);
+        vi.advanceTimersByTime(24_000);
       });
 
       expect(
@@ -642,6 +667,39 @@ describe("HomeTasteHero", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("can select a different mobile artist after Home is mounted again", () => {
+    mockMobilePointer();
+
+    vi.mocked(Math.random).mockReturnValue(0);
+    const firstMount = renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Converge" }),
+    ).toBeInTheDocument();
+
+    firstMount.unmount();
+    vi.mocked(Math.random).mockReturnValue(0.99);
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Botch" })).toBeInTheDocument();
   });
 
   it("does not autoplay the desktop carousel", () => {
