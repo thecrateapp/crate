@@ -557,7 +557,10 @@ describe("HomeTasteHero", () => {
       maskImage: "none",
     });
     expect(screen.getByTestId("mobile-hero-scrim")).toHaveClass("h-[82%]");
-    expect(screen.getByTestId("mobile-hero-intro-layout")).toHaveClass("top-0");
+    expect(screen.getByTestId("mobile-hero-intro-layout")).toHaveClass(
+      "top-0",
+      "pt-[calc(var(--listen-mobile-header-height)+0.5rem)]",
+    );
     expect(screen.getByText("Good morning")).toBeInTheDocument();
     expect(artistHeroApiUrl).toHaveBeenCalledWith(
       expect.objectContaining({ artistEntityUid: "artist-entity" }),

@@ -13,6 +13,7 @@ interface ArtistHeroPresentationProps {
   className?: string;
   copyClassName?: string;
   actionsClassName?: string;
+  mobileIntroClassName?: string;
 }
 
 export function ArtistHeroPresentation({
@@ -25,6 +26,7 @@ export function ArtistHeroPresentation({
   className,
   copyClassName,
   actionsClassName,
+  mobileIntroClassName,
 }: ArtistHeroPresentationProps) {
   const mobile = composition === "mobile";
   const copy = (
@@ -70,7 +72,10 @@ export function ArtistHeroPresentation({
       {mobile && intro ? (
         <div
           data-testid="mobile-hero-intro-layout"
-          className="absolute inset-x-0 top-0 px-5 pt-4"
+          className={cn(
+            "absolute inset-x-0 top-0 px-5",
+            mobileIntroClassName ?? "pt-4",
+          )}
         >
           {intro}
         </div>

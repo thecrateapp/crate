@@ -686,6 +686,7 @@ function MobileFeaturedArtist({
           kicker={t("home.library.justLanded.title")}
           artistName={hero.name}
           intro={intro}
+          mobileIntroClassName="pt-[calc(var(--listen-mobile-header-height)+0.5rem)]"
           genres={<HeroGenres hero={hero} />}
           actions={
             <HeroActions
