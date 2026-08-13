@@ -286,6 +286,7 @@
   "explore.moods.subtitle": "Zure liburutegiaren audio-analisiak bultzatuta.",
   "explore.moods.mixName": "{mood} mixa",
   "home.hero.notInterested": "Ez zait interesatzen",
+  "home.hero.featuredArtist": "Artista nabarmendua",
   "home.hero.previousArtist": "Aurreko artista",
   "home.hero.nextArtist": "Hurrengo artista",
   "home.hero.showArtist": "Erakutsi {name}",

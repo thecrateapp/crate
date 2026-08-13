@@ -286,6 +286,7 @@
   "explore.moods.subtitle": "Basato sull'analisi audio della tua libreria.",
   "explore.moods.mixName": "Mix {mood}",
   "home.hero.notInterested": "Non mi interessa",
+  "home.hero.featuredArtist": "Artista in evidenza",
   "home.hero.previousArtist": "Artista precedente",
   "home.hero.nextArtist": "Artista successivo",
   "home.hero.showArtist": "Mostra {name}",

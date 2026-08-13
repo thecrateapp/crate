@@ -436,7 +436,6 @@ export function HomeTasteHero({
   desktopIntro?: ReactNode;
   mobileIntro?: ReactNode;
 }) {
-  const [idx, setIdx] = useState(0);
   const isDesktop = useIsDesktop();
   const composition = isDesktop ? "desktop" : "mobile";
   const surface = heroSurfaces?.[composition];
@@ -446,7 +445,11 @@ export function HomeTasteHero({
     [surfaceArtists],
   );
   const count = surfaceHeroes.length;
+  const [idx, setIdx] = useState(() =>
+    isDesktop && count > 1 ? Math.floor(Math.random() * count) : 0,
+  );
   const activeIndex = Math.min(idx, Math.max(count - 1, 0));
+  const desktopInitialIndexSet = useRef(isDesktop && count > 1);
   useHeroBackgroundPreloader(surfaceHeroes, activeIndex, composition);
 
   useEffect(() => {
@@ -455,10 +458,24 @@ export function HomeTasteHero({
     );
   }, [surfaceHeroes.length]);
 
+  useEffect(() => {
+    if (!isDesktop || count <= 1 || desktopInitialIndexSet.current) return;
+    desktopInitialIndexSet.current = true;
+    setIdx(Math.floor(Math.random() * count));
+  }, [count, isDesktop]);
+
+  useEffect(() => {
+    if (isDesktop || count <= 1) return;
+    const interval = window.setInterval(() => {
+      setIdx((current) => (current + 1) % count);
+    }, 8_000);
+    return () => window.clearInterval(interval);
+  }, [count, isDesktop]);
+
   if (!count) return null;
 
   if (!isDesktop) {
-    const hero = surfaceHeroes[0];
+    const hero = surfaceHeroes[activeIndex];
     if (!hero) return null;
     return (
       <MobileFeaturedArtist
@@ -683,7 +700,7 @@ function MobileFeaturedArtist({
         />
         <ArtistHeroPresentation
           composition="mobile"
-          kicker={t("home.library.justLanded.title")}
+          kicker={t("home.hero.featuredArtist")}
           artistName={hero.name}
           intro={intro}
           mobileIntroClassName="pt-[calc(var(--listen-mobile-header-height)+0.5rem)]"
@@ -751,7 +768,7 @@ function DesktopFeaturedArtist({
         />
         <ArtistHeroPresentation
           composition="desktop"
-          kicker={t("home.library.justLanded.title")}
+          kicker={t("home.hero.featuredArtist")}
           artistName={hero.name}
           genres={<HeroGenres hero={hero} />}
           actions={

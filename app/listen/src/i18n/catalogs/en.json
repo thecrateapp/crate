@@ -286,6 +286,7 @@
   "explore.moods.subtitle": "Powered by audio analysis of your library.",
   "explore.moods.mixName": "{mood} Mix",
   "home.hero.notInterested": "Not interested",
+  "home.hero.featuredArtist": "Featured Artist",
   "home.hero.previousArtist": "Previous artist",
   "home.hero.nextArtist": "Next artist",
   "home.hero.showArtist": "Show {name}",

@@ -139,6 +139,24 @@ describe("CrateImage", () => {
     expect(image).toHaveAttribute("data-artwork-state", "ready");
   });
 
+  it("keeps ready protected artwork visible during a ticket gap with eventual retries", () => {
+    const artwork = source("high-vis", "one", "eventual");
+    const { rerender } = render(<CrateImage source={artwork} alt="High Vis" />);
+    const image = screen.getByRole("img", { name: "High Vis" });
+    fireEvent.load(image);
+
+    versions.usable = false;
+    versions.tickets = 2;
+    rerender(<CrateImage source={artwork} alt="High Vis" />);
+
+    expect(screen.getByRole("img", { name: "High Vis" })).toBe(image);
+    expect(image).toHaveAttribute(
+      "src",
+      "/api/artists/high-vis/photo?v=one&media_ticket=1",
+    );
+    expect(image).toHaveAttribute("data-artwork-state", "ready");
+  });
+
   it("updates responsive sizes without replacing the visible bitmap", () => {
     const artwork = { ...source("high-vis", "one"), sizes: "100px" };
     const { rerender } = render(<CrateImage source={artwork} alt="High Vis" />);

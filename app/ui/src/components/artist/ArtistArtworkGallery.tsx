@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { waitForTask } from "@/lib/tasks";
 
 type ArtworkSlot = "avatar" | "background" | "hero_desktop" | "hero_mobile";
+type HeroComposition = "desktop" | "mobile";
 
 export interface ArtistArtworkAsset {
   id: number;
@@ -81,11 +82,13 @@ export function ArtistArtworkGallery({
   artistName,
   canEdit,
   onChanged,
+  onHeroChanged,
 }: {
   artistId: number;
   artistName: string;
   canEdit: boolean;
   onChanged: () => void;
+  onHeroChanged?: (composition: HeroComposition) => void;
 }) {
   const uploadRef = useRef<HTMLInputElement>(null);
   const [assets, setAssets] = useState<ArtistArtworkAsset[]>([]);
@@ -170,6 +173,9 @@ export function ArtistArtworkGallery({
       await loadAssets();
       toast.success(`${slotLabel(slot)} updated`);
       onChanged();
+      if (slot === "hero_desktop" || slot === "hero_mobile") {
+        onHeroChanged?.(slot === "hero_desktop" ? "desktop" : "mobile");
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Artwork assignment failed",

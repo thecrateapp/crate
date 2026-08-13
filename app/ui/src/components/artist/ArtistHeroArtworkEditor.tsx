@@ -13,14 +13,23 @@ import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { Eye, Heart, ImagePlus, Loader2, Play } from "lucide-react";
 import { toast } from "sonner";
 
-import { artistArtworkApiPath, artistHeroApiUrl } from "@/lib/library-routes";
+import {
+  artistArtworkApiPath,
+  artistBackgroundApiUrl,
+  artistHeroApiUrl,
+} from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 import type { ArtistHeroCompositionView } from "../../../../shared/web/artist-hero-contract";
 
 import { HeroCompositionCanvas } from "./HeroCompositionCanvas";
 import type { HeroRecipe } from "./hero-composition-geometry";
 
-type HeroComposition = "desktop" | "mobile";
+export type HeroComposition = "desktop" | "mobile";
+
+export interface HeroArtworkReload {
+  token: number;
+  composition: HeroComposition;
+}
 
 interface HeroProfile {
   artist_id: number;
@@ -46,6 +55,8 @@ interface ArtistHeroArtworkEditorProps {
   artistName: string;
   genres?: string[];
   canEdit: boolean;
+  fallbackSourceUrl?: string | null;
+  reload?: HeroArtworkReload | null;
   onUploaded?: () => void;
 }
 
@@ -102,6 +113,8 @@ export function ArtistHeroArtworkEditor({
   artistName,
   genres = [],
   canEdit,
+  fallbackSourceUrl,
+  reload,
   onUploaded,
 }: ArtistHeroArtworkEditorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -161,6 +174,12 @@ export function ArtistHeroArtworkEditor({
     void loadProfile();
   }, [loadProfile]);
 
+  useEffect(() => {
+    if (!reload) return;
+    setActive(reload.composition);
+    void loadProfile();
+  }, [loadProfile, reload]);
+
   const recipe = recipes[active];
   const aspect = active === "desktop" ? 1480 / 600 : 4 / 5;
   const persistedPreview = artistHeroApiUrl({ artistId }, active, {
@@ -173,7 +192,9 @@ export function ArtistHeroArtworkEditor({
         "hero-source",
       )}?composition=${active}&v=${encodeURIComponent(profile.revision)}`
     : null;
-  const activeSource = sourceUrls[active] ?? persistedSource;
+  const fallbackSource =
+    fallbackSourceUrl ?? artistBackgroundApiUrl({ artistId }, { size: 1280 });
+  const activeSource = sourceUrls[active] ?? persistedSource ?? fallbackSource;
   const previewKey = JSON.stringify({
     composition: active,
     recipe,
@@ -183,7 +204,7 @@ export function ArtistHeroArtworkEditor({
           size: sourceFiles[active]?.size,
           lastModified: sourceFiles[active]?.lastModified,
         }
-      : profile?.revision ?? null,
+      : profile?.revision ?? fallbackSource,
   });
   const canonicalPreviewView =
     previewArtifact?.key === previewKey
@@ -219,6 +240,21 @@ export function ArtistHeroArtworkEditor({
     reader.readAsDataURL(file);
   }
 
+  async function loadFallbackSourceFile() {
+    if (!fallbackSource) return null;
+    const response = await fetch(fallbackSource, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await response.text());
+    const blob = await response.blob();
+    return new File(
+      [blob],
+      `artist-background-${active}.${blob.type.split("/")[1] || "jpg"}`,
+      { type: blob.type || "image/jpeg" },
+    );
+  }
+
   async function openPreview() {
     if (!canEdit) {
       setPreviewOpen(true);
@@ -231,7 +267,9 @@ export function ArtistHeroArtworkEditor({
       const form = new FormData();
       form.append("recipe", JSON.stringify(recipe));
       form.append("composition", active);
-      const sourceFile = sourceFiles[active];
+      const sourceFile =
+        sourceFiles[active] ??
+        (!profile ? await loadFallbackSourceFile() : null);
       if (sourceFile) form.append("file", sourceFile);
       const response = await fetch(
         artistArtworkApiPath({ artistId }, "preview-hero"),
@@ -271,7 +309,9 @@ export function ArtistHeroArtworkEditor({
     setUploading(true);
     try {
       let response: Response;
-      const sourceFile = sourceFiles[active];
+      const sourceFile =
+        sourceFiles[active] ??
+        (!profile ? await loadFallbackSourceFile() : null);
       if (sourceFile) {
         const form = new FormData();
         form.append("file", sourceFile);

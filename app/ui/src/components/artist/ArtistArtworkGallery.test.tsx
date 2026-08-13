@@ -75,6 +75,37 @@ describe("ArtistArtworkGallery", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("notifies the editor when a gallery hero source is assigned", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          return Response.json({ status: "queued", task_id: "assign-hero" });
+        }
+        return Response.json({ assets: [asset] });
+      }),
+    );
+    const onHeroChanged = vi.fn();
+
+    render(
+      <ArtistArtworkGallery
+        artistId={7}
+        artistName="Converge"
+        canEdit
+        onChanged={vi.fn()}
+        onHeroChanged={onHeroChanged}
+      />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Use Press photo as hero mobile",
+      }),
+    );
+
+    await waitFor(() => expect(onHeroChanged).toHaveBeenCalledWith("mobile"));
+  });
+
   it("deletes an unassigned asset after confirmation", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     let listed = true;

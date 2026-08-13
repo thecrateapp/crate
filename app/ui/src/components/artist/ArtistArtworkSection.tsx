@@ -10,7 +10,10 @@ import {
 } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 
-import { ArtistHeroArtworkEditor } from "./ArtistHeroArtworkEditor";
+import {
+  ArtistHeroArtworkEditor,
+  type HeroArtworkReload,
+} from "./ArtistHeroArtworkEditor";
 import { ArtistArtworkGallery } from "./ArtistArtworkGallery";
 
 interface ArtistArtworkSectionProps {
@@ -31,6 +34,7 @@ export function ArtistArtworkSection({
   canEdit,
 }: ArtistArtworkSectionProps) {
   const [refresh, setRefresh] = useState(0);
+  const [heroReload, setHeroReload] = useState<HeroArtworkReload | null>(null);
   const [backfilling, setBackfilling] = useState(false);
   const route = { artistId, artistEntityUid, artistName };
   const version = `${imageVersion || "artwork"}-${refresh}`;
@@ -88,6 +92,12 @@ export function ArtistArtworkSection({
         artistName={artistName}
         canEdit={canEdit}
         onChanged={() => setRefresh((value) => value + 1)}
+        onHeroChanged={(composition) =>
+          setHeroReload((current) => ({
+            token: (current?.token ?? 0) + 1,
+            composition,
+          }))
+        }
       />
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -118,6 +128,11 @@ export function ArtistArtworkSection({
         artistName={artistName}
         genres={genres}
         canEdit={canEdit}
+        fallbackSourceUrl={artistBackgroundApiUrl(route, {
+          size: 1280,
+          version,
+        })}
+        reload={heroReload}
         onUploaded={() => setRefresh((value) => value + 1)}
       />
     </div>

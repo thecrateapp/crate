@@ -28,6 +28,7 @@ from crate.utils import coerce_int
 
 HOME_JUST_LANDED_VERSION = "home_just_landed_v2"
 HOME_HERO_CANDIDATE_LIMIT = 15
+HOME_HERO_SELECTED_LIMIT = 8
 _CANONICAL_SURFACES = ("desktop", "mobile")
 
 
@@ -159,7 +160,7 @@ def _rank_home_hero_rows(
     )
     ranked_rows = score_home_hero_rows(rows) if personalized else rows
     ranked_rows = _dedupe_home_hero_rows(ranked_rows)
-    selected_rows = ranked_rows[:5]
+    selected_rows = ranked_rows[:HOME_HERO_SELECTED_LIMIT]
 
     record_home_hero_debug(
         {
