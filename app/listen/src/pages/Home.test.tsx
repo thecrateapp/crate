@@ -169,6 +169,17 @@ describe("Home", () => {
     expect(screen.queryByRole("button", { name: /^DNA$/i })).toBeNull();
   });
 
+  it("does not render the greeting or date on mobile", () => {
+    renderWithListenProviders(<Home />);
+
+    expect(
+      screen.queryByRole("heading", {
+        name: /Good (morning|afternoon|evening)/,
+      }),
+    ).toBeNull();
+    expect(screen.queryByTestId("mobile-hero-intro-layout")).toBeNull();
+  });
+
   it("does not show an infinite loader when discovery fails", () => {
     vi.mocked(useApi).mockReturnValue({
       data: null,

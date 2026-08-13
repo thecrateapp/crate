@@ -99,6 +99,10 @@ function dedupeHeroArtists(heroes: HomeHeroArtist[]): HomeHeroArtist[] {
   });
 }
 
+function heroSelectionKey(hero: HomeHeroArtist): string {
+  return hero.entity_uid || String(hero.id);
+}
+
 function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
   const names = (item.artwork_artists || [])
     .map((artist) => artist.artist_name?.trim())
@@ -425,7 +429,6 @@ export function HomeTasteHero({
   onPlay,
   onToggleFollow,
   desktopIntro,
-  mobileIntro,
 }: {
   heroes: HomeHeroArtist[];
   heroSurfaces?: HomeDiscoveryHeroSurfaces | null;
@@ -434,7 +437,6 @@ export function HomeTasteHero({
   onPlay: (artist: HomeHeroArtist) => void;
   onToggleFollow: (artist: HomeHeroArtist) => void;
   desktopIntro?: ReactNode;
-  mobileIntro?: ReactNode;
 }) {
   const isDesktop = useIsDesktop();
   const composition = isDesktop ? "desktop" : "mobile";
@@ -448,7 +450,20 @@ export function HomeTasteHero({
   const [idx, setIdx] = useState(() =>
     isDesktop && count > 1 ? Math.floor(Math.random() * count) : 0,
   );
-  const activeIndex = Math.min(idx, Math.max(count - 1, 0));
+  const [mobileHeroKey, setMobileHeroKey] = useState<string | null>(() => {
+    if (isDesktop || !count) return null;
+    return heroSelectionKey(
+      surfaceHeroes[Math.floor(Math.random() * count)] || surfaceHeroes[0]!,
+    );
+  });
+  const desktopActiveIndex = Math.min(idx, Math.max(count - 1, 0));
+  const mobileHero = surfaceHeroes.find(
+    (hero) => heroSelectionKey(hero) === mobileHeroKey,
+  );
+  const mobileActiveIndex = mobileHero
+    ? Math.max(0, surfaceHeroes.indexOf(mobileHero))
+    : 0;
+  const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
   const desktopInitialIndexSet = useRef(isDesktop && count > 1);
   useHeroBackgroundPreloader(surfaceHeroes, activeIndex, composition);
 
@@ -465,24 +480,30 @@ export function HomeTasteHero({
   }, [count, isDesktop]);
 
   useEffect(() => {
-    if (isDesktop || count <= 1) return;
-    const interval = window.setInterval(() => {
-      setIdx((current) => (current + 1) % count);
-    }, 8_000);
-    return () => window.clearInterval(interval);
-  }, [count, isDesktop]);
+    if (isDesktop || !count) return;
+    setMobileHeroKey((current) => {
+      if (
+        current &&
+        surfaceHeroes.some((hero) => heroSelectionKey(hero) === current)
+      ) {
+        return current;
+      }
+      return heroSelectionKey(
+        surfaceHeroes[Math.floor(Math.random() * count)] || surfaceHeroes[0]!,
+      );
+    });
+  }, [count, isDesktop, surfaceHeroes]);
 
   if (!count) return null;
 
   if (!isDesktop) {
-    const hero = surfaceHeroes[activeIndex];
-    if (!hero) return null;
+    if (!mobileHero) return null;
+    const hero = mobileHero;
     return (
       <MobileFeaturedArtist
         hero={hero}
         backgroundSrc={heroBackgroundSrc(hero, "mobile")}
         following={isFollowing(hero.id)}
-        intro={mobileIntro}
         onOpenArtist={() => onOpenArtist(hero)}
         onPlay={() => onPlay(hero)}
         onToggleFollow={() => onToggleFollow(hero)}
@@ -502,14 +523,14 @@ export function HomeTasteHero({
       {surfaceHeroes.map((hero, index) => {
         const source = heroBackgroundSrc(hero, "desktop");
         const isPrepared =
-          index === activeIndex ||
-          index === (activeIndex + 1) % count ||
-          index === (activeIndex - 1 + count) % count;
+          index === desktopActiveIndex ||
+          index === (desktopActiveIndex + 1) % count ||
+          index === (desktopActiveIndex - 1 + count) % count;
         return (
           <DesktopFeaturedArtist
             key={hero.entity_uid || hero.id}
             hero={hero}
-            active={index === activeIndex}
+            active={index === desktopActiveIndex}
             backgroundSrc={isPrepared ? source : undefined}
             following={isFollowing(hero.id)}
             onOpenArtist={() => onOpenArtist(hero)}
@@ -522,7 +543,7 @@ export function HomeTasteHero({
       {count > 1 ? (
         <DesktopHeroNavigation
           heroes={surfaceHeroes}
-          activeIndex={activeIndex}
+          activeIndex={desktopActiveIndex}
           onPrevious={() => go(-1)}
           onNext={() => go(1)}
           onSelect={setIdx}
@@ -663,7 +684,6 @@ function MobileFeaturedArtist({
   hero,
   backgroundSrc,
   following,
-  intro,
   onOpenArtist,
   onPlay,
   onToggleFollow,
@@ -671,7 +691,6 @@ function MobileFeaturedArtist({
   hero: HomeHeroArtist;
   backgroundSrc?: string;
   following: boolean;
-  intro?: ReactNode;
   onOpenArtist: () => void;
   onPlay: () => void;
   onToggleFollow: () => void;
@@ -702,8 +721,6 @@ function MobileFeaturedArtist({
           composition="mobile"
           kicker={t("home.hero.featuredArtist")}
           artistName={hero.name}
-          intro={intro}
-          mobileIntroClassName="pt-[calc(var(--listen-mobile-header-height)+0.5rem)]"
           genres={<HeroGenres hero={hero} />}
           actions={
             <HeroActions
