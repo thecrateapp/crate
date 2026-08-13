@@ -43,6 +43,19 @@ REDIS_CHANNEL_GLOBAL = "crate:sse:global"
 REDIS_CHANNEL_TASK_PREFIX = "crate:sse:task:"
 
 
+def _task_done_payload(payload: object) -> dict:
+    """Return the flat payload expected by per-task SSE consumers."""
+
+    if not isinstance(payload, dict):
+        return {}
+    nested = payload.get("data")
+    if isinstance(nested, dict) and (
+        nested.get("status") is not None or nested.get("type") == "task_done"
+    ):
+        return nested
+    return payload
+
+
 def _get_status_snapshot() -> dict:
     """Build the global status payload from the ops/task snapshots."""
     ops_snapshot = get_cached_ops_snapshot()
@@ -118,7 +131,12 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
                 "data": event["data"],
                 "timestamp": event["created_at"],
             }
-            yield f"event: {event['event_type']}\ndata: {json_dumps(payload)}\n\n"
+            event_payload = (
+                _task_done_payload(payload["data"])
+                if event["event_type"] == "task_done"
+                else payload
+            )
+            yield f"event: {event['event_type']}\ndata: {json_dumps(event_payload)}\n\n"
             last_event_id = event["id"]
 
         # Check if already done
@@ -137,8 +155,11 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
                 except (json.JSONDecodeError, TypeError):
                     continue
 
-                if data.get("type") == "task_done":
-                    yield f"event: task_done\ndata: {json_dumps(data)}\n\n"
+                if (
+                    data.get("event_type") == "task_done"
+                    or data.get("type") == "task_done"
+                ):
+                    yield f"event: task_done\ndata: {json_dumps(_task_done_payload(data))}\n\n"
                     break
                 else:
                     yield f"event: {data.get('event_type', 'info')}\ndata: {json_dumps(data)}\n\n"
@@ -157,7 +178,12 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
                     "data": event["data"],
                     "timestamp": event["created_at"],
                 }
-                yield f"event: {event['event_type']}\ndata: {json_dumps(payload)}\n\n"
+                event_payload = (
+                    _task_done_payload(payload["data"])
+                    if event["event_type"] == "task_done"
+                    else payload
+                )
+                yield f"event: {event['event_type']}\ndata: {json_dumps(event_payload)}\n\n"
                 last_event_id = event["id"]
 
             task = get_task(task_id)

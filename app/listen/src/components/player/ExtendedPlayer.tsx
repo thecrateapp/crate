@@ -24,10 +24,12 @@ import { VisualizerSettingsPanel } from "@/components/player/visualizer/Visualiz
 import type { MusicVisualizer } from "@/components/player/visualizer/MusicVisualizer";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
 } from "@/hooks/use-crossfade-progress";
+import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
@@ -60,7 +62,13 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     analyserVersion,
     crossfadeTransition,
   } = usePlayer();
-  const { pause, resume, playSource, queue, seek } = usePlayerActions();
+  const { pause, resume, playSource, queue, seek, jamQueueLocked } =
+    usePlayerActions();
+  function toggleDiscPlay() {
+    if (jamQueueLocked) return;
+    if (isPlaying) pause();
+    else resume();
+  }
   const crossfadeProgress = useCrossfadeProgress(crossfadeTransition);
   const { displayedTime, displayedDuration } = useCrossfadeAwareProgress(
     crossfadeTransition,
@@ -70,6 +78,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const [tab, setTab] = useState<TabId>("queue");
   const [showVizSettings, setShowVizSettings] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
+  const equalizerEnabled = useEqualizerEnabled();
   const { resolvedArtist, artistAvatarUrl, markArtistPhotoFailed } =
     useResolvedPlayerArtist(currentTrack, queue);
   const sourceLabel = getPlaySourceLabel(playSource);
@@ -94,6 +103,11 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   );
   const isCdMode = vizCfg.surfaceMode === "cd";
   const isVisualizerMode = vizCfg.surfaceMode === "visualizer";
+
+  useEffect(() => {
+    if (!equalizerEnabled) setShowEqualizer(false);
+  }, [equalizerEnabled]);
+
   const [canvasRect, setCanvasRect] = useState<{
     top: number;
     left: number;
@@ -103,7 +117,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   } | null>(null);
   useMusicVisualizer(
     canvasRef,
-    `${currentTrack?.id ?? "none"}:${analyserVersion}`,
+    `${
+      currentTrack ? getTrackCacheKey(currentTrack) : "none"
+    }:${analyserVersion}`,
     open && isDesktop && isVisualizerMode && canvasRect != null,
     playbackState,
     "spheres",
@@ -235,21 +251,23 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                 if (mode !== "visualizer") setShowVizSettings(false);
               }}
             />
-            <button
-              ref={equalizerButtonRef}
-              onClick={() => {
-                setShowEqualizer((value) => !value);
-                setShowVizSettings(false);
-              }}
-              aria-label={t("player.equalizer")}
-              className={`rounded-full p-2 backdrop-blur-sm transition-colors ${
-                showEqualizer
-                  ? "bg-primary/20 text-primary"
-                  : "bg-black/30 text-white/40 hover:bg-black/50 hover:text-white/70"
-              }`}
-            >
-              <SlidersHorizontal size={18} />
-            </button>
+            {equalizerEnabled ? (
+              <button
+                ref={equalizerButtonRef}
+                onClick={() => {
+                  setShowEqualizer((value) => !value);
+                  setShowVizSettings(false);
+                }}
+                aria-label={t("player.equalizer")}
+                className={`rounded-full p-2 backdrop-blur-sm transition-colors ${
+                  showEqualizer
+                    ? "bg-primary/20 text-primary"
+                    : "bg-black/30 text-white/40 hover:bg-black/50 hover:text-white/70"
+                }`}
+              >
+                <SlidersHorizontal size={18} />
+              </button>
+            ) : null}
             <button
               ref={vizSettingsButtonRef}
               onClick={() => setShowVizSettings(!showVizSettings)}
@@ -277,7 +295,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
           </AppPopover>
         ) : null}
 
-        {showEqualizer ? (
+        {equalizerEnabled && showEqualizer ? (
           <AppPopover
             ref={equalizerRef}
             className="absolute top-14 right-4 w-[480px] max-w-[min(480px,calc(100%-2rem))] p-4"
@@ -301,12 +319,13 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
               duration={displayedDuration}
               isBuffering={isBuffering}
               isPlaying={isPlaying}
-              onTogglePlay={isPlaying ? pause : resume}
+              disabled={jamQueueLocked}
+              onTogglePlay={toggleDiscPlay}
             />
           ) : (
             <>
-              <div className="absolute inset-6 rounded-[28px] bg-primary/10 opacity-70 blur-3xl" />
-              <div className="absolute inset-2 rounded-[26px] border border-white/10 bg-white/[0.02]" />
+              <div className="absolute inset-6 rounded-xl bg-primary/10 opacity-70 blur-3xl" />
+              <div className="absolute inset-2 rounded-xl border border-white/10 bg-white/[0.02]" />
               {crossfadeTransition ? (
                 <>
                   {crossfadeTransition.outgoing.albumCover ? (
@@ -405,6 +424,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
             currentTime={displayedTime}
             duration={displayedDuration}
             onSeek={seek}
+            disabled={jamQueueLocked}
             showTimes
             variant="glow"
           />

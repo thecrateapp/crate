@@ -1,4 +1,5 @@
 import { cn } from "@crate/ui/lib/cn";
+import { X } from "@crate/ui/icons";
 
 export interface GenreProfileItem {
   name: string;
@@ -22,10 +23,14 @@ export function resolveGenrePercent(item: GenreProfileItem) {
 export function GenrePill({
   item,
   onClick,
+  onRemove,
+  removeLabel,
   className,
 }: {
   item: GenreProfileItem;
   onClick?: () => void;
+  onRemove?: () => void;
+  removeLabel?: string;
   className?: string;
 }) {
   const percent = resolveGenrePercent(item);
@@ -44,6 +49,34 @@ export function GenrePill({
   if (percent != null) titleParts.push(`${percent}%`);
   if (item.source) titleParts.push(item.source);
   const title = titleParts.join(" · ");
+  const pillClassName =
+    "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)]";
+
+  if (onRemove) {
+    return (
+      <span className={cn(pillClassName, "pr-1", className)} title={title}>
+        {onClick ? (
+          <button
+            type="button"
+            onClick={onClick}
+            className="inline-flex min-w-0 items-center gap-1.5 transition-colors hover:text-[var(--active-text)]"
+          >
+            {content}
+          </button>
+        ) : (
+          content
+        )}
+        <button
+          type="button"
+          aria-label={removeLabel ?? `Remove ${item.name}`}
+          onClick={onRemove}
+          className="shrink-0 rounded-full p-0.5 text-[var(--active-text)]/70 transition-colors hover:bg-[var(--pill-active-bg)] hover:text-[var(--active-text)]"
+        >
+          <X size={12} />
+        </button>
+      </span>
+    );
+  }
 
   if (onClick) {
     return (
@@ -52,7 +85,8 @@ export function GenrePill({
         onClick={onClick}
         title={title}
         className={cn(
-          "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)] transition-colors hover:border-[var(--pill-active-border)] hover:bg-[var(--pill-active-bg)]",
+          pillClassName,
+          "transition-colors hover:border-[var(--pill-active-border)] hover:bg-[var(--pill-active-bg)]",
           className,
         )}
       >
@@ -62,13 +96,7 @@ export function GenrePill({
   }
 
   return (
-    <span
-      title={title}
-      className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)]",
-        className,
-      )}
-    >
+    <span title={title} className={cn(pillClassName, className)}>
       {content}
     </span>
   );

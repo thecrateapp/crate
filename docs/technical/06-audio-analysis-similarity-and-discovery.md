@@ -131,6 +131,19 @@ Crate then wraps that with additional musical and editorial heuristics to make r
 
 Radio uses seed-aware similarity plus curation logic to avoid bad transitions and poor candidates.
 
+### Unified queue planning
+
+Candidate retrieval remains surface-specific, but queue semantics are shared in
+`crate.queue_engine`: flat SQL rows and nested Listen payloads use the same
+`candidate_song_key`/`candidate_family_key`, variant and diversity guardrails,
+feedback blending, and deterministic generation seeds. Discovery Radio remains
+batch-driven; Jam Auto DJ is buffer-driven and uses the shared low-water state.
+
+Votes in an Auto DJ Jam continue to order the active room queue immediately and
+also shape future generation through a capped Bliss centroid blend equivalent to
+Radio feedback. Active votes are the source of truth; no second persisted target
+is maintained.
+
 ### Home intelligence
 
 Discovery sections in the Listen home surface use listening history, library signals, and recommendation heuristics assembled in backend DB helpers such as `db/home.py`.

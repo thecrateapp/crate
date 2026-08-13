@@ -399,7 +399,7 @@ export function TopBarSearch() {
           <AppPopover
             ref={dropdownRef}
             className={cn(
-              "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-2xl py-1",
+              "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-[12px] py-1",
               showRecents ? "max-h-none" : undefined,
             )}
             style={{
@@ -534,12 +534,9 @@ export function TopBarSearch() {
         className={cn(
           "relative overflow-visible rounded-xl transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
           isDesktop
-            ? cn(
-                "focus-within:border focus-within:border-cyan-400/25 focus-within:bg-app-surface/78 focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_18px_42px_rgba(0,0,0,0.22)]",
-                searchOpen
-                  ? "border border-white/8 bg-app-surface/68 shadow-[0_18px_42px_rgba(0,0,0,0.22)]"
-                  : "border border-cyan-200/16 bg-black/28 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_14px_34px_rgba(0,0,0,0.24)] backdrop-blur-md md:border-0 md:bg-transparent md:shadow-none md:backdrop-blur-0",
-              )
+            ? searchOpen
+              ? "border border-white/8 bg-app-surface/68 shadow-[0_18px_42px_rgba(0,0,0,0.22)]"
+              : "border-0 bg-transparent shadow-none backdrop-blur-0"
             : "listen-glass-panel listen-search-glass",
           searchOpen ? "md:scale-x-[1.01]" : "md:scale-x-100",
         )}
@@ -556,7 +553,7 @@ export function TopBarSearch() {
               focusInputSoon();
             }}
             className={cn(
-              "absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0",
+              "absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl border-0 bg-transparent shadow-none backdrop-blur-0 transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0",
               searchOpen
                 ? "w-12 justify-center px-0 text-white/42"
                 : "w-full justify-start gap-2 px-4 text-white/72 group-hover:scale-[1.03] group-hover:text-white/88",

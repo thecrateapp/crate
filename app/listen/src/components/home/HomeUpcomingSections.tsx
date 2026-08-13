@@ -116,7 +116,7 @@ export function HomeUpcomingSection({
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-        <div className="relative min-h-[270px] overflow-hidden rounded-[28px] border border-white/10 bg-[#101218] p-5 sm:p-6">
+        <div className="relative min-h-[270px] overflow-hidden rounded-[12px] border border-white/10 bg-[#101218] p-5 sm:p-6">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(6,182,212,0.34),transparent_35%),linear-gradient(120deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
           {artistImage ? (
             <CrateImage
@@ -153,7 +153,7 @@ export function HomeUpcomingSection({
             <div>
               <div className="mb-4 flex flex-wrap gap-2">
                 {nextUpcomingDate ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
                       {t("home.radar.meta.date")}
                     </div>
@@ -163,7 +163,7 @@ export function HomeUpcomingSection({
                   </div>
                 ) : null}
                 {isShow && nextUpcoming.venue ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
                       {t("home.radar.meta.venue")}
                     </div>
@@ -174,7 +174,7 @@ export function HomeUpcomingSection({
                   </div>
                 ) : null}
                 {!isShow && nextUpcoming.status ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
                       {t("home.radar.meta.state")}
                     </div>
@@ -184,7 +184,7 @@ export function HomeUpcomingSection({
                   </div>
                 ) : null}
                 {nextUpcoming.user_attending && isShow ? (
-                  <div className="rounded-2xl border border-primary/20 bg-primary/12 px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
+                  <div className="rounded-lg border border-primary/20 bg-primary/12 px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
                     {t("radar.show.going")}
                   </div>
                 ) : null}
@@ -241,7 +241,7 @@ export function HomeUpcomingSection({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
+        <div className="overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.03] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40">
               <Calendar size={12} />
@@ -296,7 +296,7 @@ export function HomeShowPrepSection({
         {insights.map((insight) => (
           <div
             key={`${insight.type}:${insight.show_id}`}
-            className="rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.16),transparent_42%),rgba(255,255,255,0.03)] p-5"
+            className="rounded-[12px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.16),transparent_42%),rgba(255,255,255,0.03)] p-5"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

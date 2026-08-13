@@ -17,7 +17,6 @@ import {
   CRATE_ICON_SIZE,
   Disc,
   Heart,
-  HeartBold,
   ListPlus,
   Loader2,
   MoreHorizontal,
@@ -32,6 +31,7 @@ import {
 import { toast } from "sonner";
 
 import { AppPopover, AppPopoverDivider } from "@crate/ui/primitives/AppPopover";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import {
   GenrePillRow,
   type GenreProfileItem,
@@ -40,6 +40,7 @@ import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
+import { useContextMenuController } from "@crate/ui/domain/actions";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -58,6 +59,7 @@ import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButt
 import { RemoteImportAction } from "@/components/imports/RemoteImportAction";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
+import { ReleaseCountdown } from "@/components/album/ReleaseCountdown";
 import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -227,30 +229,21 @@ export function Album() {
     getAlbumRecord,
     toggleAlbumOffline,
   } = useOffline();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [desktopMenuPosition, setDesktopMenuPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
   const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<number[]>([]);
   const [selectionPlaylistPickerOpen, setSelectionPlaylistPickerOpen] =
     useState(false);
-  const [selectionMenuPosition, setSelectionMenuPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
   const [selectionMenuPlaylistOpen, setSelectionMenuPlaylistOpen] =
     useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const desktopMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
-  const selectionMenuRef = useRef<HTMLDivElement>(null);
   const selectionAnchorTrackIdRef = useRef<number | null>(null);
   const albumHeroInfoRef = useRef<HTMLDivElement>(null);
   const albumPrimaryActionsRef = useRef<HTMLDivElement>(null);
   const [mobileHeroInfoOffset, setMobileHeroInfoOffset] = useState(0);
+  const albumMenuController = useContextMenuController<HTMLButtonElement>({
+    placement: "bottom-end",
+  });
+  const selectionMenuController = useContextMenuController<HTMLButtonElement>();
 
   function clearTrackSelection() {
     selectionAnchorTrackIdRef.current = null;
@@ -278,36 +271,30 @@ export function Album() {
     useLazyPlaylistOptions();
 
   function closeAlbumMenu() {
-    setMenuOpen(false);
-    setDesktopMenuPosition(null);
+    albumMenuController.close();
     setPlaylistPickerOpen(false);
   }
 
   useDismissibleLayer({
-    active:
-      menuOpen ||
-      playlistPickerOpen ||
-      selectionPlaylistPickerOpen ||
-      Boolean(selectionMenuPosition),
+    active: playlistPickerOpen || selectionPlaylistPickerOpen,
     refs: [
-      menuRef,
-      desktopMenuRef,
-      mobileMenuRef,
+      albumMenuController.menuRef,
       selectionBarRef,
-      selectionMenuRef,
+      selectionMenuController.menuRef,
     ],
     onDismiss: () => {
       closeAlbumMenu();
       setSelectionPlaylistPickerOpen(false);
-      setSelectionMenuPosition(null);
+      selectionMenuController.close();
       setSelectionMenuPlaylistOpen(false);
     },
+    closeOnScroll: true,
   });
 
   useEffect(() => {
     clearTrackSelection();
     setSelectionPlaylistPickerOpen(false);
-    setSelectionMenuPosition(null);
+    selectionMenuController.close();
     setSelectionMenuPlaylistOpen(false);
   }, [data?.id]);
 
@@ -616,7 +603,7 @@ export function Album() {
   const handlePlayNextAlbum = () => {
     [...playerTracks].reverse().forEach((track) => playNext(track));
     toast.success(t("album.toasts.queuedNext"));
-    setMenuOpen(false);
+    closeAlbumMenu();
   };
 
   const shareUrl = publicShareUrl(
@@ -697,13 +684,11 @@ export function Album() {
     try {
       if (saved) {
         await unsaveAlbum(albumId, globalAlbumUid);
-        toast.success(t("album.toasts.removedCollection"));
       } else {
         await saveAlbum(albumId, globalAlbumUid);
-        toast.success(t("album.toasts.addedCollection"));
       }
     } catch {
-      toast.error(t("album.toasts.updateCollectionFailed"));
+      // Saved state remains unchanged when the request fails.
     }
   }
 
@@ -783,7 +768,7 @@ export function Album() {
         tracks: playlistTracksPayload,
       });
       toast.success(t("album.toasts.addedToPlaylist"));
-      setMenuOpen(false);
+      closeAlbumMenu();
       setPlaylistPickerOpen(false);
     } catch {
       toast.error(t("album.toasts.addToPlaylistFailed"));
@@ -810,7 +795,7 @@ export function Album() {
   }
 
   function handleCloseSelectionMenu() {
-    setSelectionMenuPosition(null);
+    selectionMenuController.close();
     setSelectionMenuPlaylistOpen(false);
   }
 
@@ -923,7 +908,7 @@ export function Album() {
         }),
       ),
     });
-    setMenuOpen(false);
+    closeAlbumMenu();
     setPlaylistPickerOpen(false);
   }
 
@@ -958,23 +943,7 @@ export function Album() {
   }
 
   function handleToggleAlbumMenu(event: MouseEvent<HTMLButtonElement>) {
-    if (menuOpen) {
-      closeAlbumMenu();
-      return;
-    }
-
-    if (isDesktop) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const width = 288;
-      const padding = 12;
-      const maxX = Math.max(padding, window.innerWidth - width - padding);
-      setDesktopMenuPosition({
-        x: Math.min(Math.max(padding, rect.right - width), maxX),
-        y: rect.bottom + 8,
-      });
-    }
-
-    setMenuOpen(true);
+    albumMenuController.openFromTrigger(event);
   }
 
   function handleToggleSelectionPlaylistPicker() {
@@ -1028,17 +997,8 @@ export function Album() {
     ensurePlaylistOptionsLoaded();
     setSelectionPlaylistPickerOpen(false);
     setSelectionMenuPlaylistOpen(false);
-    setSelectionMenuPosition({ x, y });
+    selectionMenuController.openAtPoint(x, y);
     return true;
-  }
-
-  function handleSelectionContextMenu(
-    trackId: number,
-    event: MouseEvent<HTMLDivElement>,
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    return openSelectionMenu(trackId, event.clientX + 4, event.clientY + 4);
   }
 
   function handleSelectionActionMenuOpen(
@@ -1217,9 +1177,9 @@ export function Album() {
           top: "calc(var(--listen-safe-top) + 0.625rem)",
           right: "max(1rem, var(--listen-safe-right))",
         }}
-        ref={menuRef}
       >
         <button
+          ref={albumMenuController.anchorRef}
           data-testid="album-mobile-hero-menu"
           className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleAlbumMenu}
@@ -1242,10 +1202,10 @@ export function Album() {
             fallbackIcon: Disc,
           }}
           items={albumMenuItems}
-          menuRef={mobileMenuRef}
+          menuRef={albumMenuController.menuRef}
           onClose={closeAlbumMenu}
-          open={menuOpen}
-          position={desktopMenuPosition}
+          open={albumMenuController.open}
+          position={albumMenuController.position}
         />
       </div>
     ) : null;
@@ -1305,7 +1265,7 @@ export function Album() {
               />
               <div
                 data-testid="album-desktop-cover"
-                className="hidden aspect-square overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10 sm:block"
+                className="hidden aspect-square overflow-hidden rounded-xl bg-white/5 shadow-2xl ring-1 ring-white/10 sm:block"
               >
                 {data.has_cover || data.cover_url ? (
                   <CrateImage
@@ -1330,16 +1290,20 @@ export function Album() {
               data-testid="album-hero-info"
               className="flex min-w-0 translate-y-[var(--album-mobile-info-y)] flex-col justify-end text-left sm:translate-y-0"
             >
-              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <div className="mb-1.5 flex flex-col items-start gap-2">
                 {isPreRelease ? (
                   <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
                     Pre-release
                   </span>
                 ) : null}
-                <h1 className="max-w-4xl text-2xl font-bold text-foreground sm:text-4xl">
-                  {displayName}
-                </h1>
-                {canPersistAlbum ? <OfflineBadge state={offlineState} /> : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="max-w-4xl text-2xl font-bold text-foreground sm:text-4xl">
+                    {displayName}
+                  </h1>
+                  {canPersistAlbum ? (
+                    <OfflineBadge state={offlineState} />
+                  ) : null}
+                </div>
               </div>
               <button
                 className="mb-3 inline-flex items-center gap-2 self-start text-sm text-muted-foreground transition-colors hover:text-primary"
@@ -1415,6 +1379,10 @@ export function Album() {
                 ))}
               </div>
 
+              {isPreRelease && data.release_date ? (
+                <ReleaseCountdown releaseDate={data.release_date} />
+              ) : null}
+
               {visibleContributor ? (
                 <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white/8 ring-1 ring-white/10">
@@ -1478,9 +1446,9 @@ export function Album() {
       {/* Action Row */}
       <div
         data-testid="album-action-row"
-        className="relative z-10 -mt-[var(--album-mobile-action-overlap)] px-4 pb-4 pt-0 sm:mt-0 sm:px-6 sm:py-4"
+        className="relative z-10 -mt-[var(--album-mobile-action-overlap)] px-4 pb-4 pt-0 sm:mt-0 sm:px-0 sm:py-4"
       >
-        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 sm:px-6 md:flex-row md:items-center md:justify-between md:gap-6">
           <div
             ref={albumPrimaryActionsRef}
             data-testid="album-primary-actions"
@@ -1556,7 +1524,7 @@ export function Album() {
               </button>
             ) : null}
             {canSaveAlbum ? (
-              <button
+              <FollowHeartButton
                 className={`${SECONDARY_ACTION_CLASS} ${
                   saved
                     ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
@@ -1568,17 +1536,11 @@ export function Album() {
                     ? t("album.actions.removeFromCollection")
                     : t("album.actions.addToCollection")
                 }
+                following={saved}
+                iconSize={CRATE_ICON_SIZE.lg}
               >
-                {saved ? (
-                  <HeartBold
-                    size={CRATE_ICON_SIZE.lg}
-                    className="animate-crate-icon-active-pulse"
-                  />
-                ) : (
-                  <Heart size={CRATE_ICON_SIZE.lg} />
-                )}
                 <span>{saved ? t("common.added") : t("common.add")}</span>
-              </button>
+              </FollowHeartButton>
             ) : null}
             <button
               className={SECONDARY_ACTION_CLASS}
@@ -1595,8 +1557,9 @@ export function Album() {
               presentation="secondary-action"
             />
             {isDesktop ? (
-              <div className="relative shrink-0" ref={menuRef}>
+              <div className="relative shrink-0">
                 <button
+                  ref={albumMenuController.anchorRef}
                   className={SECONDARY_ACTION_CLASS}
                   onClick={handleToggleAlbumMenu}
                   aria-label={t("common.more")}
@@ -1615,10 +1578,10 @@ export function Album() {
                     fallbackIcon: Disc,
                   }}
                   items={albumMenuItems}
-                  menuRef={isDesktop ? desktopMenuRef : mobileMenuRef}
+                  menuRef={albumMenuController.menuRef}
                   onClose={closeAlbumMenu}
-                  open={menuOpen}
-                  position={desktopMenuPosition}
+                  open={albumMenuController.open}
+                  position={albumMenuController.position}
                 />
               </div>
             ) : null}
@@ -1652,7 +1615,7 @@ export function Album() {
 
       {isPreRelease ? (
         <div className="px-4 sm:px-6 pb-4">
-          <div className="mx-auto w-full max-w-[1480px] rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary/90">
+          <div className="mx-auto w-full max-w-[1480px] rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary/90">
             {t("album.prereleaseNotice")}
           </div>
         </div>
@@ -1663,7 +1626,7 @@ export function Album() {
         {isDesktop && selectedAlbumTracks.length > 0 ? (
           <div
             ref={selectionBarRef}
-            className="listen-glass-panel mb-3 flex flex-wrap items-center gap-2 rounded-2xl px-3 py-3"
+            className="listen-glass-panel mb-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-3"
           >
             <div className="mr-auto min-w-0 px-1">
               <p className="text-sm font-semibold text-foreground">
@@ -1684,7 +1647,7 @@ export function Album() {
                 {t("playlist.actions.addToPlaylist")}
               </button>
               {selectionPlaylistPickerOpen ? (
-                <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-2xl">
+                <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-[12px]">
                   <div className="p-1.5">
                     <button
                       className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-white/5"
@@ -1727,12 +1690,10 @@ export function Album() {
         ) : null}
         <ContextMenu
           items={selectionMenuItems}
-          menuRef={selectionMenuRef}
+          menuRef={selectionMenuController.menuRef}
           onClose={handleCloseSelectionMenu}
-          open={
-            Boolean(selectionMenuPosition) && selectedAlbumTracks.length > 0
-          }
-          position={selectionMenuPosition}
+          open={selectionMenuController.open && selectedAlbumTracks.length > 0}
+          position={selectionMenuController.position}
         />
         {hasMultipleDiscs
           ? [...tracksByDisc.entries()]
@@ -1769,11 +1730,6 @@ export function Album() {
                             if (typeof t.id === "number")
                               handleTrackSelection(t.id, event);
                           }}
-                          onSelectionContextMenu={(_, event) =>
-                            typeof t.id === "number"
-                              ? handleSelectionContextMenu(t.id, event)
-                              : false
-                          }
                           onSelectionActionMenuOpen={(_, event) =>
                             typeof t.id === "number"
                               ? handleSelectionActionMenuOpen(t.id, event)
@@ -1810,11 +1766,6 @@ export function Album() {
                       if (typeof t.id === "number")
                         handleTrackSelection(t.id, event);
                     }}
-                    onSelectionContextMenu={(_, event) =>
-                      typeof t.id === "number"
-                        ? handleSelectionContextMenu(t.id, event)
-                        : false
-                    }
                     onSelectionActionMenuOpen={(_, event) =>
                       typeof t.id === "number"
                         ? handleSelectionActionMenuOpen(t.id, event)

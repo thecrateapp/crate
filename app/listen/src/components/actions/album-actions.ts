@@ -141,11 +141,6 @@ export function useAlbumActionEntries(
             input.albumId ?? null,
             input.globalAlbumUid ?? null,
           );
-          toast.success(
-            saved
-              ? t("actions.album.toasts.unsaved")
-              : t("actions.album.toasts.saved"),
-          );
         },
       }),
       action({

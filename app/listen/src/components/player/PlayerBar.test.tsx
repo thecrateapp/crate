@@ -1,10 +1,11 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createMockTrack,
   renderWithListenProviders,
 } from "@/test/render-with-listen-providers";
+import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
 
 import { PlayerBar } from "./PlayerBar";
 
@@ -118,6 +119,7 @@ vi.mock("@/components/player/player-gestures", () => ({
 describe("PlayerBar mobile mini-player", () => {
   beforeEach(() => {
     useIsDesktopMock.mockReturnValue(false);
+    localStorage.removeItem("listen-eq-enabled");
     isLikedMock.mockReturnValue(false);
     likeTrackMock.mockClear();
     unlikeTrackMock.mockClear();
@@ -168,6 +170,27 @@ describe("PlayerBar mobile mini-player", () => {
     });
 
     expect(container.querySelector(".listen-mobile-player-glass")).toBeNull();
+  });
+
+  it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
+    useIsDesktopMock.mockReturnValue(true);
+    localStorage.setItem("listen-eq-enabled", "true");
+    const track = createMockTrack({
+      title: "Desktop EQ",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
+
+    setEqualizerEnabled(false);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+    });
   });
 
   it("likes the current track with a long press on the cover", async () => {
@@ -252,5 +275,87 @@ describe("PlayerBar mobile mini-player", () => {
     expect(mobileRow).toHaveClass("px-4", "pt-3", "pb-0.5");
     expect(mobileControls).toHaveClass("self-stretch");
     expect(mobileControls).not.toHaveClass("translate-y-1");
+  });
+
+  it("locks local transport controls for Jam members", () => {
+    const pause = vi.fn();
+    const resume = vi.fn();
+    const next = vi.fn();
+    const track = createMockTrack({ title: "Jam track", artist: "Crate" });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack: track,
+        queue: [track],
+        jamQueueLocked: true,
+        pause,
+        resume,
+        next,
+        jamTransport: {
+          canControl: false,
+          togglePlayPause: vi.fn(),
+          next: vi.fn(),
+          previous: vi.fn(),
+          seek: vi.fn(),
+        },
+      },
+    });
+
+    const playButton = screen
+      .getAllByRole("button", { name: "Play" })
+      .find((button) => button.className.includes("h-12"));
+    const nextButton = screen
+      .getAllByRole("button", { name: "Next track" })
+      .find((button) => button.className.includes("h-12"));
+
+    expect(playButton).toBeDefined();
+    expect(nextButton).toBeDefined();
+    fireEvent.click(playButton!);
+    fireEvent.click(nextButton!);
+
+    expect(pause).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+    expect(playButton).toBeDisabled();
+    expect(nextButton).toBeDisabled();
+  });
+
+  it("keeps the global transport controls read-only for Jam hosts", () => {
+    const togglePlayPause = vi.fn();
+    const next = vi.fn();
+    const track = createMockTrack({
+      title: "Jam owner track",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack: track,
+        queue: [track],
+        jamQueueLocked: true,
+        jamTransport: {
+          canControl: true,
+          togglePlayPause,
+          next,
+          previous: vi.fn(),
+          seek: vi.fn(),
+        },
+      },
+    });
+
+    const playButton = screen
+      .getAllByRole("button", { name: "Play" })
+      .find((button) => button.className.includes("h-12"));
+    const nextButton = screen
+      .getAllByRole("button", { name: "Next track" })
+      .find((button) => button.className.includes("h-12"));
+
+    fireEvent.click(playButton!);
+    fireEvent.click(nextButton!);
+
+    expect(playButton).toBeDisabled();
+    expect(nextButton).toBeDisabled();
+    expect(togglePlayPause).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
   });
 });

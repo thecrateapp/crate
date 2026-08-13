@@ -4,12 +4,15 @@ import { toast } from "sonner";
 
 import type { Track } from "@/contexts/PlayerContext";
 import type { PlaySource } from "@/contexts/player-types";
+import { tracksMatch } from "@/contexts/player-session";
 import { apiWsUrl } from "@/lib/api";
 import type {
   JamEvent,
   JamMember,
+  JamQueueItem,
   JamRoom,
   JamSessionAction,
+  JamTrackRequest,
 } from "@/pages/jam-reducer";
 import { payloadToTrack } from "@/pages/jam-reducer";
 
@@ -27,6 +30,52 @@ function shouldReconnectJamClose(code: number) {
   return ![4401, 4403, 4409].includes(code);
 }
 
+function trackIdentity(track: Track | null | undefined) {
+  if (!track) return null;
+  return (
+    track.globalTrackUid ||
+    track.entityUid ||
+    (track.libraryTrackId != null ? `library:${track.libraryTrackId}` : null) ||
+    track.id ||
+    track.path ||
+    null
+  );
+}
+
+function isJamPlaybackSource(source: PlaySource | null | undefined) {
+  return source?.type === "queue" && source.name.startsWith("Jam:");
+}
+
+function queueSnapshotTracks(queue: JamQueueItem[] | undefined) {
+  if (!queue) return [];
+  return queue
+    .map((item) =>
+      payloadToTrack(item.track as unknown as Record<string, unknown>),
+    )
+    .filter((track): track is Track => track !== null);
+}
+
+export function projectJamClockPosition({
+  positionMs,
+  serverTimeMs,
+  clientNowMs,
+  clockOffsetMs,
+  playing,
+}: {
+  positionMs: number;
+  serverTimeMs?: number;
+  clientNowMs: number;
+  clockOffsetMs: number;
+  playing: boolean;
+}) {
+  if (!playing || typeof serverTimeMs !== "number") return positionMs;
+  return positionMs + Math.max(0, clientNowMs + clockOffsetMs - serverTimeMs);
+}
+
+const JAM_HARD_CORRECTION_THRESHOLD_MS = 180;
+const JAM_FORCED_CORRECTION_TOLERANCE_MS = 5;
+const JAM_HARD_CORRECTION_COOLDOWN_MS = 1_500;
+
 interface UseJamWebSocketOptions {
   roomId: string | undefined;
   userId: number | undefined;
@@ -41,7 +90,21 @@ interface UseJamWebSocketOptions {
     pause: () => void;
     resume: () => void;
     seek: (time: number) => void;
+    syncJamQueue: (
+      tracks: Track[],
+      options?: {
+        currentTrack?: Track | null;
+        positionSeconds?: number;
+        playing?: boolean;
+        queueOnly?: boolean;
+        forcePosition?: boolean;
+        source?: PlaySource;
+      },
+    ) => void;
+    setPlaybackRate?: (rate: number) => void;
     currentTrack: Track | undefined;
+    isPlaying?: boolean;
+    playSource?: PlaySource | null;
   }>;
   currentTimeRef: React.MutableRefObject<number>;
   roomNameRef: React.MutableRefObject<string>;
@@ -57,33 +120,159 @@ export function useJamWebSocket({
 }: UseJamWebSocketOptions) {
   const socketRef = useRef<WebSocket | null>(null);
   const seenEventIdsRef = useRef<Set<number>>(new Set());
+  const roomRevisionRef = useRef(0);
+  const pendingSyncTrackRef = useRef<{
+    identity: string;
+    requestedAt: number;
+  } | null>(null);
+  const awaitingInitialClockRef = useRef(false);
+  const jamRateCorrectionRef = useRef(false);
+  const authoritativeQueueRef = useRef<Track[]>([]);
+  const serverClockOffsetMsRef = useRef(0);
+  const hasServerClockOffsetRef = useRef(false);
+  const lastHardCorrectionAtRef = useRef(0);
   const navigate = useNavigate();
 
   const syncSeek = useCallback(
-    (track: Record<string, unknown> | null | undefined, positionMs: number) => {
+    (
+      track: Record<string, unknown> | null | undefined,
+      positionMs: number,
+      playing = true,
+      forcePosition = false,
+    ) => {
       const targetTrack = payloadToTrack(track);
-      const { currentTrack: ct, seek: sk } = playerActionsRef.current;
+      const {
+        currentTrack: ct,
+        seek: sk,
+        play: pl,
+        pause: pa,
+        resume: re,
+        syncJamQueue,
+        setPlaybackRate,
+      } = playerActionsRef.current;
       const currentPositionMs = currentTimeRef.current * 1000;
+      const localIsPlaying = playerActionsRef.current.isPlaying === true;
 
-      if (
-        targetTrack &&
-        ct &&
-        (targetTrack.id === ct.id || targetTrack.path === ct.path)
-      ) {
-        const drift = Math.abs(positionMs - currentPositionMs);
-        if (drift > 200) {
+      if (targetTrack && ct && tracksMatch(targetTrack, ct)) {
+        pendingSyncTrackRef.current = null;
+        const signedDriftSeconds = (positionMs - currentPositionMs) / 1000;
+        const drift = Math.abs(signedDriftSeconds) * 1000;
+        // Keep small drift corrections smooth, but close a large phase gap
+        // quickly enough to avoid audible echo between room members. The
+        // cooldown prevents a slow/stale media position update from turning
+        // this into a seek loop.
+        const nowMs = Date.now();
+        const hardCorrectionRequested =
+          drift >
+          (forcePosition
+            ? JAM_FORCED_CORRECTION_TOLERANCE_MS
+            : JAM_HARD_CORRECTION_THRESHOLD_MS);
+        const hardCorrection =
+          hardCorrectionRequested &&
+          (forcePosition ||
+            nowMs - lastHardCorrectionAtRef.current >=
+              JAM_HARD_CORRECTION_COOLDOWN_MS);
+        if (hardCorrection) {
           sk(positionMs / 1000);
+          lastHardCorrectionAtRef.current = nowMs;
+        }
+        if (
+          setPlaybackRate &&
+          playing &&
+          localIsPlaying &&
+          drift >= 35 &&
+          !hardCorrection
+        ) {
+          // Close normal clock drift without repeatedly seeking the media
+          // element. A short, bounded rate adjustment avoids the audible
+          // restart/echo caused by hard-seeking on every room interaction.
+          const correction = Math.max(
+            0.95,
+            Math.min(1.05, 1 + signedDriftSeconds * 0.2),
+          );
+          setPlaybackRate(correction);
+          jamRateCorrectionRef.current = correction !== 1;
+        } else if (setPlaybackRate && jamRateCorrectionRef.current) {
+          setPlaybackRate(1);
+          jamRateCorrectionRef.current = false;
         }
         if (drift < 100) {
           dispatch({ type: "SET_SYNC_STATUS", payload: "synced" });
         } else {
           dispatch({ type: "SET_SYNC_STATUS", payload: "drifting" });
         }
+        if (playing && !localIsPlaying) re();
+        else if (!playing && localIsPlaying) pa();
       } else if (targetTrack) {
-        dispatch({ type: "SET_SYNC_STATUS", payload: "idle" });
+        if (setPlaybackRate && jamRateCorrectionRef.current) {
+          setPlaybackRate(1);
+          jamRateCorrectionRef.current = false;
+        }
+        const identity = trackIdentity(targetTrack);
+        const pendingSync = pendingSyncTrackRef.current;
+        if (
+          identity &&
+          pendingSync?.identity === identity &&
+          Date.now() - pendingSync.requestedAt < 2_500
+        ) {
+          // The room sends a clock immediately and then on a heartbeat. While
+          // the first async queue load is pending, those messages must not
+          // restart the same track from the beginning.
+          dispatch({
+            type: "SET_SYNC_STATUS",
+            payload: playing ? "drifting" : "idle",
+          });
+          return;
+        }
+        pendingSyncTrackRef.current = identity
+          ? { identity, requestedAt: Date.now() }
+          : null;
+        const authoritativeQueue = authoritativeQueueRef.current;
+        if (
+          authoritativeQueue.length > 0 &&
+          authoritativeQueue.some((candidate) =>
+            tracksMatch(candidate, targetTrack),
+          )
+        ) {
+          syncJamQueue(authoritativeQueue, {
+            currentTrack: targetTrack,
+            positionSeconds: positionMs / 1000,
+            playing,
+            source: {
+              type: "queue",
+              name: `Jam: ${roomNameRef.current}`,
+            },
+          });
+          dispatch({
+            type: "SET_SYNC_STATUS",
+            payload: playing ? "synced" : "idle",
+          });
+          return;
+        }
+        pl(targetTrack, { type: "queue", name: `Jam: ${roomNameRef.current}` });
+        window.setTimeout(() => {
+          if (identity && pendingSyncTrackRef.current?.identity !== identity) {
+            return;
+          }
+          sk(positionMs / 1000);
+          if (!playing) pa();
+        }, 160);
+        dispatch({
+          type: "SET_SYNC_STATUS",
+          payload: playing ? "synced" : "idle",
+        });
+      } else if (setPlaybackRate && jamRateCorrectionRef.current) {
+        setPlaybackRate(1);
+        jamRateCorrectionRef.current = false;
       }
     },
-    [dispatch, playerActionsRef, currentTimeRef],
+    [
+      dispatch,
+      playerActionsRef,
+      currentTimeRef,
+      roomNameRef,
+      authoritativeQueueRef,
+    ],
   );
 
   const sendEvent = useCallback(
@@ -103,6 +292,12 @@ export function useJamWebSocket({
 
   useEffect(() => {
     if (!roomId || !userId) return;
+    pendingSyncTrackRef.current = null;
+    awaitingInitialClockRef.current = false;
+    authoritativeQueueRef.current = [];
+    serverClockOffsetMsRef.current = 0;
+    hasServerClockOffsetRef.current = false;
+    lastHardCorrectionAtRef.current = 0;
     let cancelled = false;
     let retries = 0;
     let reconnectTimer: number | undefined;
@@ -129,11 +324,19 @@ export function useJamWebSocket({
         }
         retries = 0;
         dispatch({ type: "WEBSOCKET_OPEN" });
+        const sendClockPing = () => {
+          if (socket.readyState !== WebSocket.OPEN) return;
+          socket.send(
+            JSON.stringify({
+              type: "ping",
+              client_sent_at_ms: Date.now(),
+            }),
+          );
+        };
+        sendClockPing();
         socketHeartbeatTimer = window.setInterval(() => {
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: "ping" }));
-          }
-        }, 30_000);
+          sendClockPing();
+        }, 10_000);
         heartbeatTimers.add(socketHeartbeatTimer);
       };
 
@@ -145,16 +348,44 @@ export function useJamWebSocket({
             room?: JamRoom;
             event?: JamEvent;
             members?: JamMember[];
+            queue?: JamQueueItem[];
+            requests?: JamTrackRequest[];
             track?: Record<string, unknown>;
             position_ms?: number;
+            server_time_ms?: number;
+            client_sent_at_ms?: number;
             playing?: boolean;
+            force_sync?: boolean;
             detail?: string;
           };
 
-          if (payload.type === "pong") return;
+          if (payload.type === "pong") {
+            if (
+              typeof payload.server_time_ms === "number" &&
+              typeof payload.client_sent_at_ms === "number"
+            ) {
+              const receivedAtMs = Date.now();
+              const roundTripMs = receivedAtMs - payload.client_sent_at_ms;
+              if (roundTripMs >= 0 && roundTripMs <= 5_000) {
+                const sampleOffsetMs =
+                  payload.server_time_ms -
+                  (payload.client_sent_at_ms + roundTripMs / 2);
+                serverClockOffsetMsRef.current = hasServerClockOffsetRef.current
+                  ? serverClockOffsetMsRef.current * 0.8 + sampleOffsetMs * 0.2
+                  : sampleOffsetMs;
+                hasServerClockOffsetRef.current = true;
+              }
+            }
+            return;
+          }
 
           if (payload.type === "warning") {
             if (payload.detail) toast.info(payload.detail);
+            return;
+          }
+
+          if (payload.type === "error") {
+            if (payload.detail) toast.error(payload.detail);
             return;
           }
 
@@ -162,18 +393,90 @@ export function useJamWebSocket({
             payload.type === "sync_clock" &&
             typeof payload.position_ms === "number"
           ) {
-            syncSeek(payload.track, payload.position_ms);
+            const playing = payload.playing !== false;
+            const projectedPositionMs = projectJamClockPosition({
+              positionMs: payload.position_ms,
+              serverTimeMs: payload.server_time_ms,
+              clientNowMs: Date.now(),
+              clockOffsetMs: serverClockOffsetMsRef.current,
+              playing,
+            });
+            const initialTrack = payloadToTrack(payload.track);
+            if (awaitingInitialClockRef.current && initialTrack) {
+              awaitingInitialClockRef.current = false;
+              const authoritativeQueue = authoritativeQueueRef.current;
+              playerActionsRef.current.syncJamQueue(
+                authoritativeQueue.length > 0
+                  ? authoritativeQueue
+                  : [initialTrack],
+                {
+                  currentTrack: initialTrack,
+                  positionSeconds: projectedPositionMs / 1000,
+                  playing,
+                  forcePosition: true,
+                  source: {
+                    type: "queue",
+                    name: `Jam: ${roomNameRef.current}`,
+                  },
+                },
+              );
+              dispatch({
+                type: "SET_SYNC_STATUS",
+                payload: playing ? "synced" : "idle",
+              });
+              return;
+            }
+            syncSeek(
+              payload.track,
+              projectedPositionMs,
+              playing,
+              payload.force_sync === true,
+            );
             return;
           }
 
           if (payload.type === "state_sync" && payload.room) {
             dispatch({ type: "APPLY_ROOM_DATA", payload: payload.room });
-            seenEventIdsRef.current = new Set(
-              (payload.room.events || [])
-                .map((roomEvent) => roomEvent.id)
-                .filter(Boolean),
-            );
+            const eventIds = (payload.room.events || [])
+              .map((roomEvent) => Number(roomEvent.id))
+              .filter((eventId) => Number.isFinite(eventId) && eventId > 0);
+            roomRevisionRef.current = Math.max(0, ...eventIds);
+            seenEventIdsRef.current = new Set(eventIds);
             roomNameRef.current = payload.room.name;
+            const current = payload.room.current_track_payload;
+            const roomQueue = queueSnapshotTracks(payload.room.queue);
+            authoritativeQueueRef.current = roomQueue;
+            const currentTrack = payloadToTrack(
+              current?.track as Record<string, unknown> | undefined,
+            );
+            const roomHasCurrentTrack = !!currentTrack;
+            // A room with a current track must be hydrated from its
+            // authoritative clock, not from the persisted room position.
+            // Starting the async queue load here would also allow the
+            // following sync_clock message to seek the old engine and then be
+            // overwritten by this load at the stale position.
+            awaitingInitialClockRef.current = roomHasCurrentTrack;
+            if (roomHasCurrentTrack) {
+              if (
+                playerActionsRef.current.isPlaying &&
+                !isJamPlaybackSource(playerActionsRef.current.playSource)
+              ) {
+                playerActionsRef.current.pause();
+              }
+              return;
+            }
+            // Always hand the authoritative room queue to the player,
+            // including an empty queue. This is what switches a newly-created
+            // room from the user's local queue into Jam/readonly mode.
+            playerActionsRef.current.syncJamQueue(roomQueue, {
+              currentTrack,
+              positionSeconds: Number(current?.position || 0),
+              playing: false,
+              source: {
+                type: "queue",
+                name: `Jam: ${roomNameRef.current}`,
+              },
+            });
             return;
           }
 
@@ -201,8 +504,29 @@ export function useJamWebSocket({
           if (!payload.event) return;
 
           const eventRow = payload.event;
-          if (eventRow.id && seenEventIdsRef.current.has(eventRow.id)) return;
-          if (eventRow.id) seenEventIdsRef.current.add(eventRow.id);
+          const eventId = Number(eventRow.id);
+          if (
+            Number.isFinite(eventId) &&
+            eventId > 0 &&
+            eventId < roomRevisionRef.current
+          ) {
+            return;
+          }
+          if (Number.isFinite(eventId) && eventId > 0) {
+            roomRevisionRef.current = Math.max(
+              roomRevisionRef.current,
+              eventId,
+            );
+          }
+          if (
+            Number.isFinite(eventId) &&
+            seenEventIdsRef.current.has(eventId)
+          ) {
+            return;
+          }
+          if (Number.isFinite(eventId) && eventId > 0) {
+            seenEventIdsRef.current.add(eventId);
+          }
 
           if (payload.type === "room_updated" && payload.room) {
             dispatch({ type: "APPLY_ROOM_DATA", payload: payload.room });
@@ -218,6 +542,83 @@ export function useJamWebSocket({
           const eventTrack = payloadToTrack(
             eventPayload.track as Record<string, unknown> | undefined,
           );
+          const eventCurrentTrack = payloadToTrack(
+            eventPayload.current_track as Record<string, unknown> | undefined,
+          );
+          const queueAddStartsPlayback =
+            payload.type === "queue_add" &&
+            eventCurrentTrack !== null &&
+            eventPayload.playing === true;
+
+          const queueSnapshot = Array.isArray(payload.queue)
+            ? (payload.queue as JamQueueItem[])
+            : undefined;
+          if (queueSnapshot) {
+            authoritativeQueueRef.current = queueSnapshotTracks(queueSnapshot);
+          }
+          const roomTracksForTransport = queueSnapshot
+            ? queueSnapshotTracks(queueSnapshot)
+            : authoritativeQueueRef.current;
+          const isTransportEvent =
+            (payload.type === "play" ||
+              payload.type === "pause" ||
+              payload.type === "seek") &&
+            eventTrack;
+          if (
+            isTransportEvent &&
+            roomTracksForTransport.length > 0 &&
+            !roomTracksForTransport.some((candidate) =>
+              tracksMatch(candidate, eventTrack),
+            )
+          ) {
+            // A stale or forged transport event must not replace the room's
+            // current track or make a member play outside the authoritative
+            // queue.
+            return;
+          }
+          if (queueSnapshot) {
+            dispatch({ type: "QUEUE_SNAPSHOT", payload: queueSnapshot });
+            const transportEventHasTrack =
+              (payload.type === "play" ||
+                payload.type === "pause" ||
+                payload.type === "seek") &&
+              eventTrack;
+            if (
+              payload.type !== "play_next" &&
+              payload.type !== "queue_play" &&
+              !queueAddStartsPlayback &&
+              !transportEventHasTrack
+            ) {
+              playerActionsRef.current.syncJamQueue(
+                queueSnapshotTracks(queueSnapshot),
+                {
+                  queueOnly: true,
+                  source: {
+                    type: "queue",
+                    name: `Jam: ${roomNameRef.current}`,
+                  },
+                },
+              );
+            }
+          }
+          if (payload.requests) {
+            dispatch({ type: "REQUESTS_SNAPSHOT", payload: payload.requests });
+          }
+          if (
+            payload.type === "queue_vote" &&
+            typeof eventPayload.queue_item_id === "string" &&
+            typeof eventPayload.vote_count === "number" &&
+            Number(eventRow.user_id) === userId
+          ) {
+            dispatch({
+              type: "QUEUE_VOTE",
+              payload: {
+                queueItemId: eventPayload.queue_item_id,
+                voted: eventPayload.voted === true,
+                voteCount: eventPayload.vote_count,
+              },
+            });
+          }
 
           dispatch({
             type: "SET_ROOM",
@@ -231,10 +632,13 @@ export function useJamWebSocket({
               if (
                 payload.type === "play" ||
                 payload.type === "pause" ||
-                payload.type === "seek"
+                payload.type === "seek" ||
+                payload.type === "play_next" ||
+                payload.type === "queue_play" ||
+                queueAddStartsPlayback
               ) {
                 nextRoom.current_track_payload = {
-                  track: eventPayload.track,
+                  track: eventPayload.current_track ?? eventPayload.track,
                   position: eventPayload.position,
                   playing: eventPayload.playing,
                 };
@@ -243,31 +647,39 @@ export function useJamWebSocket({
             },
           });
 
-          if (payload.type === "queue_add" && eventTrack) {
-            dispatch({ type: "QUEUE_ADD", payload: eventTrack });
-          } else if (
-            payload.type === "queue_remove" &&
-            typeof eventPayload.index === "number"
-          ) {
-            dispatch({
-              type: "QUEUE_REMOVE",
-              payload: eventPayload.index as number,
-            });
-          } else if (
-            payload.type === "queue_reorder" &&
-            typeof eventPayload.fromIndex === "number" &&
-            typeof eventPayload.toIndex === "number"
-          ) {
-            dispatch({
-              type: "QUEUE_REORDER",
-              payload: {
-                fromIndex: eventPayload.fromIndex as number,
-                toIndex: eventPayload.toIndex as number,
-              },
-            });
+          if (!queueSnapshot) {
+            if (payload.type === "queue_add" && eventTrack) {
+              dispatch({ type: "QUEUE_ADD", payload: eventTrack });
+            } else if (
+              payload.type === "queue_remove" &&
+              typeof eventPayload.index === "number"
+            ) {
+              dispatch({
+                type: "QUEUE_REMOVE",
+                payload: eventPayload.index as number,
+              });
+            } else if (
+              payload.type === "queue_reorder" &&
+              typeof eventPayload.fromIndex === "number" &&
+              typeof eventPayload.toIndex === "number"
+            ) {
+              dispatch({
+                type: "QUEUE_REORDER",
+                payload: {
+                  fromIndex: eventPayload.fromIndex as number,
+                  toIndex: eventPayload.toIndex as number,
+                },
+              });
+            }
           }
 
-          if (eventRow.user_id === userId) return;
+          if (
+            eventRow.user_id === userId &&
+            payload.type !== "play_next" &&
+            payload.type !== "queue_play" &&
+            !queueAddStartsPlayback
+          )
+            return;
 
           const {
             play: pl,
@@ -276,7 +688,125 @@ export function useJamWebSocket({
             seek: sk,
           } = playerActionsRef.current;
 
-          if (payload.type === "play") {
+          if (queueAddStartsPlayback && eventCurrentTrack) {
+            const roomTracks = queueSnapshot
+              ? queueSnapshotTracks(queueSnapshot)
+              : authoritativeQueueRef.current;
+            const positionSeconds =
+              typeof eventPayload.position === "number"
+                ? projectJamClockPosition({
+                    positionMs: eventPayload.position * 1000,
+                    serverTimeMs:
+                      typeof eventPayload.server_time_ms === "number"
+                        ? eventPayload.server_time_ms
+                        : undefined,
+                    clientNowMs: Date.now(),
+                    clockOffsetMs: serverClockOffsetMsRef.current,
+                    playing: true,
+                  }) / 1000
+                : 0;
+            playerActionsRef.current.syncJamQueue(
+              roomTracks.length > 0 ? roomTracks : [eventCurrentTrack],
+              {
+                currentTrack: eventCurrentTrack,
+                positionSeconds,
+                playing: true,
+                source: {
+                  type: "queue",
+                  name: `Jam: ${roomNameRef.current}`,
+                },
+              },
+            );
+            return;
+          }
+
+          if (
+            (payload.type === "play" ||
+              payload.type === "pause" ||
+              payload.type === "seek") &&
+            eventTrack
+          ) {
+            const roomTracks = queueSnapshot
+              ? queueSnapshotTracks(queueSnapshot)
+              : authoritativeQueueRef.current;
+            const trackIsInRoomQueue = roomTracks.some((candidate) =>
+              tracksMatch(candidate, eventTrack),
+            );
+            if (trackIsInRoomQueue) {
+              const playing =
+                payload.type === "play"
+                  ? true
+                  : payload.type === "pause"
+                    ? false
+                    : typeof eventPayload.playing === "boolean"
+                      ? eventPayload.playing
+                      : undefined;
+              const positionSeconds =
+                typeof eventPayload.position === "number"
+                  ? projectJamClockPosition({
+                      positionMs: eventPayload.position * 1000,
+                      serverTimeMs:
+                        typeof eventPayload.server_time_ms === "number"
+                          ? eventPayload.server_time_ms
+                          : undefined,
+                      clientNowMs: Date.now(),
+                      clockOffsetMs: serverClockOffsetMsRef.current,
+                      playing: playing === true,
+                    }) / 1000
+                  : undefined;
+              playerActionsRef.current.syncJamQueue(roomTracks, {
+                currentTrack: eventTrack,
+                positionSeconds,
+                playing,
+                queueOnly: true,
+                // A transport command is a user-visible discontinuity. Apply
+                // its position even when the network delta is below the
+                // periodic-heartbeat threshold; heartbeats use rate matching
+                // instead and do not need this hard correction.
+                forcePosition: true,
+                source: {
+                  type: "queue",
+                  name: `Jam: ${roomNameRef.current}`,
+                },
+              });
+              return;
+            }
+          }
+
+          if (payload.type === "play_next" || payload.type === "queue_play") {
+            const tracks = queueSnapshot
+              ? queueSnapshotTracks(queueSnapshot)
+              : authoritativeQueueRef.current;
+            const transportTrack = eventTrack;
+            const targetTrack = transportTrack || tracks[0];
+            if (targetTrack) {
+              const startPositionSeconds =
+                projectJamClockPosition({
+                  positionMs: 0,
+                  serverTimeMs:
+                    typeof eventPayload.server_time_ms === "number"
+                      ? eventPayload.server_time_ms
+                      : undefined,
+                  clientNowMs: Date.now(),
+                  clockOffsetMs: serverClockOffsetMsRef.current,
+                  playing: true,
+                }) / 1000;
+              playerActionsRef.current.syncJamQueue(
+                tracks.length > 0 ? tracks : [targetTrack],
+                {
+                  currentTrack: targetTrack,
+                  positionSeconds: startPositionSeconds,
+                  playing: true,
+                  source: {
+                    type: "queue",
+                    name: `Jam: ${roomNameRef.current}`,
+                  },
+                },
+              );
+            } else {
+              pa();
+            }
+          } else if (payload.type === "play") {
             if (eventTrack) {
               pl(eventTrack, {
                 type: "queue",
@@ -285,8 +815,22 @@ export function useJamWebSocket({
             } else {
               re();
             }
-            if (typeof eventPayload.position === "number") {
-              window.setTimeout(() => sk(eventPayload.position as number), 120);
+            const eventPosition = eventPayload.position;
+            if (typeof eventPosition === "number") {
+              window.setTimeout(() => {
+                const positionSeconds =
+                  projectJamClockPosition({
+                    positionMs: eventPosition * 1000,
+                    serverTimeMs:
+                      typeof eventPayload.server_time_ms === "number"
+                        ? eventPayload.server_time_ms
+                        : undefined,
+                    clientNowMs: Date.now(),
+                    clockOffsetMs: serverClockOffsetMsRef.current,
+                    playing: true,
+                  }) / 1000;
+                sk(positionSeconds);
+              }, 120);
             }
           } else if (payload.type === "pause") {
             if (typeof eventPayload.position === "number") {
@@ -297,7 +841,18 @@ export function useJamWebSocket({
             payload.type === "seek" &&
             typeof eventPayload.position === "number"
           ) {
-            sk(eventPayload.position as number);
+            sk(
+              projectJamClockPosition({
+                positionMs: eventPayload.position * 1000,
+                serverTimeMs:
+                  typeof eventPayload.server_time_ms === "number"
+                    ? eventPayload.server_time_ms
+                    : undefined,
+                clientNowMs: Date.now(),
+                clockOffsetMs: serverClockOffsetMsRef.current,
+                playing: eventPayload.playing === true,
+              }) / 1000,
+            );
           }
         } catch {
           // ignore malformed payloads
@@ -351,7 +906,26 @@ export function useJamWebSocket({
         window.clearInterval(timer);
       }
       heartbeatTimers.clear();
-      socketRef.current?.close();
+      pendingSyncTrackRef.current = null;
+      awaitingInitialClockRef.current = false;
+      authoritativeQueueRef.current = [];
+      roomRevisionRef.current = 0;
+      if (jamRateCorrectionRef.current) {
+        playerActionsRef.current.setPlaybackRate?.(1);
+        jamRateCorrectionRef.current = false;
+      }
+      const socket = socketRef.current;
+      if (socket?.readyState === WebSocket.OPEN) {
+        try {
+          // Tell the room before closing. This avoids waiting for the server
+          // to infer a disconnect from the TCP connection.
+          socket.send(JSON.stringify({ type: "leave" }));
+        } catch {
+          // The close path is best-effort; server-side disconnect/TTL cleanup
+          // remains the fallback for an already broken socket.
+        }
+      }
+      socket?.close();
       socketRef.current = null;
     };
   }, [

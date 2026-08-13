@@ -27,7 +27,6 @@ import {
   MapPin,
   Moon,
   Navigation,
-  Radio,
   RefreshCw,
   Shield,
   Smartphone,
@@ -145,7 +144,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+    <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         {description ? (
@@ -373,7 +372,7 @@ export function Settings() {
                     setPlaybackDeliveryPolicy(option.value);
                     setPlaybackDeliveryPolicyPreference(option.value);
                   }}
-                  className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                     selected
                       ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
                       : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
@@ -473,7 +472,7 @@ export function Settings() {
         description={t("settings.offline.subtitle")}
       >
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
               {t("settings.offline.items")}
             </div>
@@ -491,7 +490,7 @@ export function Settings() {
                 : ""}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
               {t("common.tracks")}
             </div>
@@ -502,7 +501,7 @@ export function Settings() {
               {t("settings.offline.mirrored")}
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
               {t("settings.offline.storage")}
             </div>
@@ -535,7 +534,7 @@ export function Settings() {
                   );
                 });
             }}
-            className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {offlineSyncing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -563,14 +562,14 @@ export function Settings() {
                   );
                 });
             }}
-            className="inline-flex items-center gap-2 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-red-400/25 bg-red-400/10 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 size={16} />
             {t("settings.offline.removeCopies")}
           </button>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
           <div className="flex items-start gap-3">
             <ArrowDownToLine size={16} className="mt-0.5 text-white/50" />
             <div>
@@ -609,13 +608,6 @@ export function Settings() {
           >
             <Users size={18} className="text-muted-foreground" />{" "}
             {t("settings.links.people")}
-          </Link>
-          <Link
-            to="/jam"
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
-          >
-            <Radio size={18} className="text-muted-foreground" />{" "}
-            {t("settings.links.jam")}
           </Link>
           <Link
             to="/upload"
@@ -687,7 +679,7 @@ function LanguageSection({
           role="radio"
           aria-checked={selection === "auto"}
           onClick={() => changeLanguage("auto")}
-          className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+          className={`rounded-lg border px-3 py-3 text-left transition-colors ${
             selection === "auto"
               ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
               : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
@@ -710,7 +702,7 @@ function LanguageSection({
               role="radio"
               aria-checked={selected}
               onClick={() => changeLanguage(option.value)}
-              className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+              className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                 selected
                   ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
                   : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
@@ -727,7 +719,7 @@ function LanguageSection({
         })}
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
+      <div className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
         <Globe size={16} className="mt-0.5 text-cyan-300/80" />
         <span>
           {t("settings.language.current", {
@@ -778,7 +770,7 @@ function SleepTimerSection() {
         ))}
       </div>
       {timer.active && timer.remainingSeconds > 0 ? (
-        <div className="flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
+        <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
           <div className="flex items-center gap-2">
             <Moon size={16} className="text-primary" />
             <span className="text-sm text-foreground">
@@ -997,7 +989,7 @@ function BandcampSection() {
 
   return (
     <Section title="Bandcamp" description={t("settings.bandcamp.description")}>
-      <div className="rounded-2xl border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-4">
+      <div className="rounded-xl border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             {status?.image_url ? (
@@ -1066,7 +1058,7 @@ function BandcampSection() {
       </div>
 
       {!status?.connected ? (
-        <div className="space-y-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4">
+        <div className="space-y-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4">
           {isTauriRuntime ? (
             <div className="space-y-3">
               <div className="flex items-start gap-3 text-xs leading-5 text-yellow-100/80">
@@ -1111,7 +1103,7 @@ function BandcampSection() {
               rows={3}
               spellCheck={false}
               placeholder={t("settings.bandcamp.cookiePlaceholder")}
-              className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-white/25 focus:border-primary/50"
+              className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-white/25 focus:border-primary/50"
             />
             <button
               onClick={() => void connectWithCookie(bandcampCookie)}

@@ -55,6 +55,9 @@ def _handle_reconcile_incremental(task_id: str, params: dict, config: dict) -> d
     result = reconcile_dirty_catalog_sources(limit=batch_size)
     if result["completed"]:
         refresh_global_catalog_genre_snapshots()
+        from crate.api.cache_events import broadcast_invalidation
+
+        broadcast_invalidation("global_catalog")
     return {
         "status": "completed",
         "mode": "incremental",

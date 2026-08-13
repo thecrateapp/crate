@@ -17,7 +17,7 @@ export function OverviewCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+    <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">
@@ -28,7 +28,7 @@ export function OverviewCard({
             <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
           ) : null}
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary">
           <Icon size={18} />
         </div>
       </div>
@@ -46,7 +46,7 @@ export function StatsSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+    <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         {subtitle ? (
@@ -101,7 +101,7 @@ export function TopList({
   const hasVisibleItems = Children.count(children) > 0;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+    <div className="rounded-xl border border-white/10 bg-black/10 p-4">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <div className="mt-3 space-y-2">
         {loading ? (
@@ -141,7 +141,7 @@ export function TrendChart({
 
   if (loading) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
+      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
         {t("stats.trend.loading")}
       </div>
     );
@@ -149,14 +149,14 @@ export function TrendChart({
 
   if (points.length === 0) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
+      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
         {t("stats.trend.empty")}
       </div>
     );
   }
 
   return (
-    <div className="h-72 rounded-[1.35rem] border border-white/10 bg-[radial-gradient(circle_at_20%_12%,rgba(34,211,238,0.10),transparent_30%),rgba(0,0,0,0.24)] p-3">
+    <div className="h-72 rounded-xl border border-white/10 bg-[radial-gradient(circle_at_20%_12%,rgba(34,211,238,0.10),transparent_30%),rgba(0,0,0,0.24)] p-3">
       <ResponsiveLine
         data={data}
         margin={{ top: 22, right: 22, bottom: 40, left: 48 }}

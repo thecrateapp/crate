@@ -10,9 +10,14 @@ import {
 
 import type { Track } from "@/contexts/player-types";
 import {
+  createPlayerQueueSnapshot,
+  type PlayerQueueSnapshot,
+} from "@/contexts/player-session";
+import {
   PlayerActionsContext,
   PlayerProgressContext,
   PlayerStateContext,
+  type JamTransportControls,
   type PlayerActionsValue,
   type PlayerContextValue,
   type PlayerProgressValue,
@@ -238,9 +243,18 @@ export function usePlayer(): PlayerContextValue {
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [playbackNeedsUserGesture, setPlaybackNeedsUserGesture] =
     useState(false);
+  const [jamTransport, setJamTransportState] =
+    useState<JamTransportControls | null>(null);
+  const setJamTransport = useCallback(
+    (controls: JamTransportControls | null) => {
+      setJamTransportState(controls);
+    },
+    [],
+  );
   const {
     queue,
     currentIndex,
+    jamQueueLocked,
     currentTrack,
     isPlaying,
     isBuffering,
@@ -272,6 +286,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setPlaybackDeliveryPolicy,
     crossfadeTimerRef,
     queueRef,
+    jamQueueLockedRef,
     currentIndexRef,
     currentTrackRef,
     repeatRef,
@@ -293,6 +308,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     engineTrackMapRef,
     resetEngineTrackMap,
     commitQueue,
+    commitJamQueueLocked,
     buildEngineUrls,
     registerEngineTrack,
     unregisterEngineTrack,
@@ -1771,6 +1787,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // The restore-on-mount flow + autoplay timeout live in useRestoreOnMount.
   // Online/offline listeners + stall timers live in useSoftInterruption.
 
+  const ensureJamQueueLockedRef = useRef<(() => void) | null>(null);
+  const ensureJamQueueLocked = useCallback(() => {
+    ensureJamQueueLockedRef.current?.();
+  }, []);
+
   const {
     play,
     playAll,
@@ -1789,8 +1810,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     addToQueue,
     removeFromQueue,
     reorderQueue,
+    syncJamQueue,
   } = usePlayerQueueActions({
     queueRef,
+    jamQueueLockedRef,
     currentIndexRef,
     currentTimeRef,
     isPlayingRef,
@@ -1828,6 +1851,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     commitDuration,
     commitIsPlaying,
     commitIsBuffering,
+    ensureJamQueueLocked,
     pullFromEngine,
     pushToEngine,
     advanceCursorTo,
@@ -1836,6 +1860,77 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       playbackDeliveryPolicy,
     ),
   });
+
+  const jamQueueSnapshotRef = useRef<PlayerQueueSnapshot | null>(null);
+  const captureQueueSnapshot = useCallback(
+    () =>
+      createPlayerQueueSnapshot({
+        queue: queueRef.current,
+        currentIndex: currentIndexRef.current,
+        currentTime: currentTimeRef.current,
+        isPlaying: isPlayingRef.current,
+        shuffle: shuffleRef.current,
+        repeat: repeatRef.current,
+        playSource: playSourceRef.current,
+        unshuffledQueue: unshuffledQueueRef.current,
+      }),
+    [
+      currentIndexRef,
+      currentTimeRef,
+      isPlayingRef,
+      playSourceRef,
+      queueRef,
+      repeatRef,
+      shuffleRef,
+      unshuffledQueueRef,
+    ],
+  );
+  const restoreQueueSnapshot = useCallback(
+    (snapshot: PlayerQueueSnapshot) => {
+      jamQueueLockedRef.current = false;
+      commitJamQueueLocked(false);
+      repeatRef.current = snapshot.repeat;
+      shuffleRef.current = snapshot.shuffle;
+      playSourceRef.current = snapshot.playSource;
+      unshuffledQueueRef.current = snapshot.unshuffledQueue
+        ? [...snapshot.unshuffledQueue]
+        : null;
+      setRepeatState(snapshot.repeat);
+      setShuffleState(snapshot.shuffle);
+      setPlaySource(snapshot.playSource);
+      pushToEngine(snapshot.queue, snapshot.currentIndex, {
+        autoplay: snapshot.isPlaying,
+        positionMs: snapshot.currentTime * 1000,
+        preservePlayback: snapshot.isPlaying,
+      });
+      commitCurrentTime(snapshot.currentTime);
+    },
+    [
+      commitCurrentTime,
+      commitJamQueueLocked,
+      jamQueueLockedRef,
+      pushToEngine,
+      setPlaySource,
+      setRepeatState,
+      setShuffleState,
+    ],
+  );
+  const enterJamSession = useCallback(() => {
+    if (jamQueueLockedRef.current) return;
+    jamQueueSnapshotRef.current = captureQueueSnapshot();
+    commitJamQueueLocked(true);
+  }, [captureQueueSnapshot, commitJamQueueLocked, jamQueueLockedRef]);
+  const leaveJamSession = useCallback(() => {
+    const snapshot = jamQueueSnapshotRef.current;
+    jamQueueSnapshotRef.current = null;
+    if (!snapshot) {
+      commitJamQueueLocked(false);
+      return;
+    }
+    restoreQueueSnapshot(snapshot);
+  }, [commitJamQueueLocked, restoreQueueSnapshot]);
+
+  ensureJamQueueLockedRef.current = enterJamSession;
 
   const clearQueueRef = useRef(clearQueue);
   useEffect(() => {
@@ -2298,6 +2393,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     () => ({
       queue,
       currentIndex,
+      jamQueueLocked,
+      jamTransport,
       shuffle,
       playSource,
       repeat,
@@ -2321,12 +2418,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       addToQueue,
       removeFromQueue,
       reorderQueue,
+      enterJamSession,
+      leaveJamSession,
+      setJamTransport,
+      syncJamQueue,
+      captureQueueSnapshot,
+      restoreQueueSnapshot,
       publishConnectState,
       connect: connectValue,
     }),
     [
       queue,
       currentIndex,
+      jamQueueLocked,
+      jamTransport,
       shuffle,
       playSource,
       repeat,
@@ -2350,6 +2455,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       addToQueue,
       removeFromQueue,
       reorderQueue,
+      enterJamSession,
+      leaveJamSession,
+      setJamTransport,
+      syncJamQueue,
+      captureQueueSnapshot,
+      restoreQueueSnapshot,
       publishConnectState,
       connectValue,
     ],

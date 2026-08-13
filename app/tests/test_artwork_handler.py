@@ -51,8 +51,13 @@ def _mock_scan_missing(monkeypatch, return_value=None):
 class TestHandlerRegistration:
     def test_artwork_task_handlers_registers_all_handlers(self):
         expected = {
+            "backfill_artist_heroes",
             "backfill_artwork_variants",
             "cleanup_artwork_variants",
+            "compose_artist_hero",
+            "preview_artist_hero",
+            "recompose_artist_hero",
+            "derive_artist_hero",
             "materialize_artwork_variants",
             "repair_artwork_variants",
             "resolve_external_artist_artwork",
@@ -64,6 +69,9 @@ class TestHandlerRegistration:
             "scan_missing_covers",
             "apply_cover",
             "upload_image",
+            "import_artist_artwork_asset",
+            "assign_artist_artwork_slot",
+            "delete_artist_artwork_asset",
         }
         assert set(ARTWORK_TASK_HANDLERS.keys()) == expected
 

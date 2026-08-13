@@ -123,7 +123,7 @@ export function ArtistTopTracks() {
         </div>
 
         <button
-          className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           onClick={handlePlayAll}
         >
           <Play size={15} fill="currentColor" />

@@ -128,11 +128,34 @@ describe("TopBarSearch", () => {
     const searchShell = searchButton.parentElement?.parentElement;
 
     expect(searchShell).toBeInTheDocument();
-    expect(searchShell).toHaveClass("md:bg-transparent", "md:border-0");
+    expect(searchShell).toHaveClass("bg-transparent", "border-0");
     expect(searchShell).not.toHaveClass(
       "listen-glass-panel",
       "listen-search-glass",
     );
+  });
+
+  it("keeps the collapsed desktop search trigger fully transparent", async () => {
+    mockHoverPointer(true);
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+    const searchShell = searchButton.closest('div[data-state="closed"]');
+
+    await waitFor(() => {
+      expect(searchShell).toHaveClass(
+        "border-0",
+        "bg-transparent",
+        "shadow-none",
+        "backdrop-blur-0",
+      );
+      expect(searchButton).toHaveClass(
+        "border-0",
+        "bg-transparent",
+        "shadow-none",
+        "backdrop-blur-0",
+      );
+    });
   });
 
   it("opens on hover and collapses again when idle", async () => {
@@ -217,7 +240,7 @@ describe("TopBarSearch", () => {
 
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
       "listen-glass-panel",
-      "rounded-2xl",
+      "rounded-[12px]",
     );
   });
 

@@ -292,6 +292,28 @@ def test_home_user_invalidation_marks_home_snapshot_stale(monkeypatch):
     assert ("home:discovery", "7") in marked
 
 
+def test_library_and_catalog_invalidations_mark_home_snapshots_stale(monkeypatch):
+    from crate.api import cache_events
+
+    marked: list[tuple[str | None, str | None]] = []
+
+    monkeypatch.setattr(
+        "crate.db.cache_store.delete_cache_prefix",
+        lambda _prefix: None,
+    )
+    monkeypatch.setattr(
+        "crate.db.ui_snapshot_store.mark_ui_snapshots_stale",
+        lambda scope=None, subject_key=None, scope_prefix=None: marked.append(
+            (scope or scope_prefix, subject_key)
+        ),
+    )
+
+    cache_events._clear_backend_cache_for_scopes(["library"])
+    cache_events._clear_backend_cache_for_scopes(["global_catalog"])
+
+    assert marked.count(("home:", None)) == 2
+
+
 def test_jam_mutations_invalidate_jam_scope():
     from crate.api import cache_events
 

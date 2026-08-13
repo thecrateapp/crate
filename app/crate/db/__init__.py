@@ -305,6 +305,16 @@ from crate.db.jam import (
     list_jam_rooms_for_user,
     reactivate_permanent_jam_room,
     update_jam_room_settings,
+    add_jam_queue_item,
+    advance_jam_queue,
+    create_jam_track_request,
+    list_jam_queue_items,
+    list_jam_track_requests,
+    remove_jam_queue_item,
+    reorder_jam_queue_item,
+    resolve_jam_track_request,
+    start_jam_queue,
+    toggle_jam_queue_vote,
 )
 
 # Management

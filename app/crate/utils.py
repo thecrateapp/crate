@@ -35,6 +35,24 @@ def normalize_key(name: str) -> str:
     return name
 
 
+def coerce_int(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return default
+    try:
+        return int(value) if isinstance(value, (int, float, str)) else default
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def coerce_float(value: object, default: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return default
+    try:
+        return float(value) if isinstance(value, (int, float, str)) else default
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
 def to_datetime(value) -> datetime | None:
     """Normalize a DB/date-ish value to a timezone-aware datetime.
 

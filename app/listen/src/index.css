@@ -21,6 +21,12 @@ body {
   background: #0a0a0f;
 }
 
+@media (min-width: 768px) {
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
 /* Prevent iOS WebView auto-zoom on input focus (requires font-size >= 16px) */
 @media screen and (max-width: 767px) {
   input[type="text"],
@@ -188,6 +194,22 @@ textarea {
     contrast(0.88);
 }
 
+.listen-mobile-eq-glass {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: radial-gradient(
+      circle at 16% 0%,
+      rgba(6, 182, 212, 0.12),
+      transparent 42%
+    ),
+    linear-gradient(180deg, rgba(25, 27, 37, 0.78), rgba(8, 10, 16, 0.7));
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.56),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(28px) saturate(1.14) brightness(0.68) contrast(0.92);
+  -webkit-backdrop-filter: blur(28px) saturate(1.14) brightness(0.68)
+    contrast(0.92);
+}
+
 @supports (content-visibility: auto) {
   .listen-deferred-grid-item {
     content-visibility: auto;
@@ -235,7 +257,29 @@ html[data-keyboard-open] select {
   }
 }
 
+/* Listen uses 6px on controls and text CTAs; only geometric icon controls stay circular. */
+[data-slot="button"] {
+  border-radius: var(--radius-lg);
+}
+
+:is(button, a).rounded-full[class*="px-"] {
+  border-radius: var(--radius-lg);
+}
+
 /* ── Listen-only vendor overrides ── */
+
+/* Keep shared modal primitives within Listen's 12px large-surface contract. */
+.bg-modal-surface.rounded-t-3xl,
+.listen-glass-panel.fixed.inset-x-0.rounded-t-3xl {
+  border-top-left-radius: 12px !important;
+  border-top-right-radius: 12px !important;
+}
+
+@media (min-width: 640px) {
+  .bg-modal-surface.rounded-t-3xl {
+    border-radius: 12px !important;
+  }
+}
 
 /* Leaflet */
 .leaflet-popup-content-wrapper {
@@ -243,7 +287,7 @@ html[data-keyboard-open] select {
   color: var(--color-foreground) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
-  border-radius: 16px !important;
+  border-radius: 8px !important;
 }
 .leaflet-popup-content {
   margin: 10px 12px !important;

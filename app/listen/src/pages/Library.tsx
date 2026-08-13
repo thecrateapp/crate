@@ -336,7 +336,7 @@ function CollectionSortDropdown<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-xl border px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_0_18px_rgba(34,211,238,0.16)] focus-visible:border-primary/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_rgba(34,211,238,0.22)] ${
+        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_0_18px_rgba(34,211,238,0.16)] focus-visible:border-primary/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_rgba(34,211,238,0.22)] ${
           open
             ? "border-primary/45 shadow-[0_0_20px_rgba(34,211,238,0.18)]"
             : "border-white/10"
@@ -355,7 +355,7 @@ function CollectionSortDropdown<T extends string>({
         <div
           role="listbox"
           aria-label={label}
-          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-xl border border-white/10 p-1 shadow-[0_20px_48px_rgba(0,0,0,0.42)] animate-pop-in"
+          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-[12px] border border-white/10 p-1 shadow-[0_20px_48px_rgba(0,0,0,0.42)] animate-pop-in"
         >
           {options.map((option) => {
             const selected = option.value === value;
@@ -648,7 +648,7 @@ function PlaylistsTab() {
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
           <button
             type="button"
-            className="rounded-xl px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
             onClick={() => setDeletingPlaylist(null)}
             disabled={deleting}
           >
@@ -656,7 +656,7 @@ function PlaylistsTab() {
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500/90 transition-colors disabled:opacity-50"
             onClick={handleDeletePlaylist}
             disabled={deleting}
           >
@@ -895,7 +895,7 @@ function BandcampTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-5">
+      <div className="rounded-[12px] border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#1da0c3]/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-primary">
@@ -940,7 +940,7 @@ function BandcampTab() {
             {importedContributions.map((contribution) => (
               <article
                 key={contribution.id}
-                className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
+                className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3"
               >
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
                   {contribution.album_id ? (
@@ -1012,7 +1012,7 @@ function BandcampTab() {
             return (
               <article
                 key={`${item.id}-${item.item_url}`}
-                className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
+                className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3"
               >
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/8 bg-white/6">
                   {coverUrl ? (
@@ -1201,7 +1201,7 @@ function ContributionsTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+      <div className="rounded-[12px] border border-white/10 bg-white/[0.04] p-5">
         <h2 className="text-xl font-black text-foreground">
           {t("library.contributions.title")}
         </h2>
@@ -1217,7 +1217,7 @@ function ContributionsTab() {
           {contributions.map((contribution) => (
             <article
               key={contribution.id}
-              className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
+              className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3"
             >
               <ContributionArtwork contribution={contribution} />
               <div className="min-w-0 flex-1">

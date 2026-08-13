@@ -21,6 +21,7 @@ import {
 import { ArtistSimilarSection } from "@/components/artist/ArtistSimilarSection";
 import { ArtistStatsSection } from "@/components/artist/ArtistStatsSection";
 import { ArtistTopTracksSection } from "@/components/artist/ArtistTopTracksSection";
+import { ArtistArtworkSection } from "@/components/artist/ArtistArtworkSection";
 import { ArtistTabsNav } from "@/components/artist/ArtistTabsNav";
 import {
   buildArtistTabs,
@@ -777,6 +778,17 @@ export function Artist() {
             artistName={artistName}
             artistId={data.id}
             artistEntityUid={data.entity_uid}
+          />
+        )}
+
+        {activeTab === "artwork" && data.id != null && (
+          <ArtistArtworkSection
+            artistId={data.id}
+            artistEntityUid={data.entity_uid}
+            artistName={artistName}
+            genres={data.genres}
+            imageVersion={data.updated_at}
+            canEdit={canEditMetadata}
           />
         )}
 

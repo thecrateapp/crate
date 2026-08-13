@@ -3,6 +3,7 @@ from __future__ import annotations
 from crate.db.home_builder_discovery_queries import (
     fallback_recent_interest_tracks as _fallback_recent_interest_tracks,
     get_home_hero as _get_home_hero,
+    get_home_hero_bundle as _get_home_hero_bundle,
     query_discovery_tracks as _query_discovery_tracks,
     track_candidates_for_album_ids as _track_candidates_for_album_ids,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "_fallback_recent_interest_tracks",
     "_filter_interesting_releases",
     "_get_home_hero",
+    "_get_home_hero_bundle",
     "_get_library_artist",
     "_query_discovery_tracks",
     "_track_candidates_for_album_ids",

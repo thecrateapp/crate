@@ -12,7 +12,6 @@ import { toast } from "sonner";
 
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import {
-  CustomMixesSection,
   EssentialsSection,
   FavoriteArtistsSection,
   HomeTasteHero,
@@ -27,6 +26,7 @@ import {
   getHomeGreeting,
 } from "@/components/home/HomeSections";
 import { CrateLoader } from "@/components/ui/CrateLoader";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { HomeReplaySection } from "@/components/home/HomePlaybackSections";
 import {
   HomeShowPrepSection,
@@ -101,10 +101,6 @@ function snapshotVersion(
   return Number(payload?.snapshot?.version || 0);
 }
 
-function homeHeroEntityKey(artist: HomeHeroArtist): string {
-  return `artist:${artist.slug || artist.id || artist.name}`;
-}
-
 const HOME_DISCOVERY_SSE_CHANNEL = "home-discovery";
 const HOME_DISCOVERY_DEGRADE_AFTER_MS = 75_000;
 const HOME_DISCOVERY_DEGRADED_REFRESH_MS = 60_000;
@@ -116,16 +112,17 @@ export function Home() {
   const { play, playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const isDesktop = useIsDesktop();
-  const [dismissedHeroKeys, setDismissedHeroKeys] = useState<Set<string>>(
-    () => new Set(),
-  );
 
-  const { data: discovery, refetch: refetchDiscovery } =
-    useApi<HomeDiscoveryPayload>("/api/me/home/discovery", "GET", undefined, {
-      reactive: false,
-      revalidateIfCached: "idle",
-      idleRevalidateMs: 12_000,
-    });
+  const {
+    data: discovery,
+    error: discoveryError,
+    loading: discoveryLoading,
+    refetch: refetchDiscovery,
+  } = useApi<HomeDiscoveryPayload>("/api/me/home/discovery", "GET", undefined, {
+    reactive: false,
+    revalidateIfCached: "idle",
+    idleRevalidateMs: 12_000,
+  });
   const [liveDiscovery, setLiveDiscovery] =
     useState<HomeDiscoveryPayload | null>(null);
   const [authTokenRevision, setAuthTokenRevision] = useState(0);
@@ -298,6 +295,7 @@ export function Home() {
       if (
         scope === "home" ||
         scope === "library" ||
+        scope === "global_catalog" ||
         scope === "upcoming" ||
         scope.startsWith("home:user:") ||
         scope.startsWith("artist:") ||
@@ -323,9 +321,6 @@ export function Home() {
     : heroRaw
       ? [heroRaw]
       : [];
-  const visibleHeroes = heroes.filter(
-    (hero) => !dismissedHeroKeys.has(homeHeroEntityKey(hero)),
-  );
   const recentGlobalArtists = currentDiscovery?.recent_global_artists || [];
   const upcoming = currentDiscovery?.upcoming;
   const replay = currentDiscovery?.replay as ReplayMix | undefined;
@@ -364,58 +359,8 @@ export function Home() {
     navigate(homeSectionPath(sectionId));
   }
 
-  async function recordHeroRecommendationAction(
-    artist: HomeHeroArtist,
-    action: "opened" | "played" | "followed" | "not_interested",
-  ) {
-    try {
-      await api("/api/me/recommendations/feedback", "POST", {
-        surface: "home.hero",
-        entity_type: "artist",
-        entity_key: homeHeroEntityKey(artist),
-        action,
-      });
-    } catch {
-      // Recommendation telemetry should never block the primary action.
-    }
-  }
-
-  async function recordHeroExposure(artist: HomeHeroArtist) {
-    try {
-      await api("/api/me/recommendations/exposures", "POST", {
-        surface: "home.hero",
-        entity_type: "artist",
-        entity_key: homeHeroEntityKey(artist),
-      });
-    } catch {
-      // Best-effort telemetry only.
-    }
-  }
-
-  async function dismissHeroArtist(artist: HomeHeroArtist) {
-    const key = homeHeroEntityKey(artist);
-    setDismissedHeroKeys((previous) => new Set(previous).add(key));
-    try {
-      await api("/api/me/recommendations/feedback", "POST", {
-        surface: "home.hero",
-        entity_type: "artist",
-        entity_key: key,
-        action: "not_interested",
-      });
-      void refreshLiveDiscovery(true);
-    } catch {
-      setDismissedHeroKeys((previous) => {
-        const next = new Set(previous);
-        next.delete(key);
-        return next;
-      });
-      toast.error(t("home.toasts.updateRecommendationFailed"));
-    }
-  }
-
   async function playHeroArtist(artist: HomeHeroArtist) {
     try {
-      void recordHeroRecommendationAction(artist, "played");
       const queue = await fetchArtistTopTracks({
         artistId: artist.id,
         artistSlug: artist.slug,
@@ -437,17 +382,11 @@ export function Home() {
 
   async function toggleHeroFollow(artist: HomeHeroArtist) {
     try {
-      void recordHeroRecommendationAction(artist, "followed");
       await toggleArtistFollow(artist.id);
       // Refetch to replace followed artist with a new one
       refetchDiscovery();
-      toast.success(
-        isFollowing(artist.id)
-          ? t("actions.artist.toasts.unfollowed", { name: artist.name })
-          : t("actions.artist.toasts.following", { name: artist.name }),
-      );
     } catch {
-      toast.error(t("home.toasts.updateFollowFailed"));
+      // Follow state rolls back in ArtistFollowsContext.
     }
   }
 
@@ -605,131 +544,139 @@ export function Home() {
   }
 
   if (!currentDiscovery) {
-    return <CrateLoader label={t("home.loading")} />;
+    if (discoveryLoading || !discoveryError) {
+      return <CrateLoader label={t("home.loading")} />;
+    }
+    return (
+      <ErrorState
+        message={t("search.errors.tryAgain")}
+        onRetry={() => {
+          refetchDiscovery();
+          void refreshLiveDiscovery(true);
+        }}
+      />
+    );
   }
 
+  const homeIntro = (
+    <div>
+      <h1 className="text-3xl font-bold text-foreground">
+        {getHomeGreeting(t)}
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {getHomeDateString(i18n.language)}
+      </p>
+    </div>
+  );
+
   return (
-    <div className="space-y-10" {...pullHandlers}>
+    <div className="w-full" {...pullHandlers}>
       <PullIndicator distance={pullDistance} refreshing={refreshing} />
 
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            {getHomeGreeting(t)}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {getHomeDateString(i18n.language)}
-          </p>
-        </div>
-
-        <HomeTasteHero
-          heroes={visibleHeroes}
-          isFollowing={isFollowing}
-          onOpenArtist={(artist) => {
-            void recordHeroRecommendationAction(artist, "opened");
-            navigate(
-              artistPagePath({
-                artistId: artist.id,
-                artistSlug: artist.slug,
-                artistName: artist.name,
-              }),
-            );
-          }}
-          onPlay={(artist) => void playHeroArtist(artist)}
-          onToggleFollow={(artist) => void toggleHeroFollow(artist)}
-          onInfo={(artist) => {
-            void recordHeroRecommendationAction(artist, "opened");
-            navigate(
-              artistPagePath({
-                artistId: artist.id,
-                artistSlug: artist.slug,
-                artistName: artist.name,
-              }),
-            );
-          }}
-          onDismiss={(artist) => void dismissHeroArtist(artist)}
-          onExpose={(artist) => void recordHeroExposure(artist)}
-        />
-      </div>
-
-      <RecentlyPlayedSection
-        items={currentDiscovery?.recently_played || []}
-        onOpenItem={(item) => navigate(openRecentItemPath(item))}
-        onViewAll={openHomeSection}
+      <HomeTasteHero
+        heroes={heroes}
+        heroSurfaces={currentDiscovery?.hero_surfaces}
+        isFollowing={isFollowing}
+        onOpenArtist={(artist) => {
+          navigate(
+            artistPagePath({
+              artistId: artist.id,
+              artistSlug: artist.slug,
+              artistName: artist.name,
+            }),
+          );
+        }}
+        onPlay={(artist) => void playHeroArtist(artist)}
+        onToggleFollow={(artist) => void toggleHeroFollow(artist)}
+        desktopIntro={isDesktop ? homeIntro : undefined}
       />
 
-      <CustomMixesSection
-        mixes={currentDiscovery?.custom_mixes || []}
-        onOpenMix={(mix) => navigate(homePlaylistPath(mix.id))}
-        onPlayMix={(mix) => void playHomePlaylist(mix)}
-        onShuffleMix={(mix) => void shuffleHomePlaylist(mix)}
-        onStartRadio={(mix) => void startHomePlaylistRadio(mix)}
-        onViewAll={openHomeSection}
-      />
-
-      <SuggestedAlbumsSection
-        albums={currentDiscovery?.suggested_albums || []}
-        onViewAll={openHomeSection}
-      />
-
-      {isDesktop ? (
-        <RecommendedTracksSection
-          tracks={recommendedTracks}
+      <div
+        data-testid="home-discovery-content"
+        className={`mx-auto w-full max-w-[1480px] space-y-10 px-6 pb-10 ${
+          isDesktop ? "relative z-30 mt-0 pt-8 2xl:-mt-16 2xl:pt-0" : "pt-8"
+        }`}
+        style={{
+          paddingLeft: isDesktop
+            ? undefined
+            : "max(1rem, var(--listen-safe-left))",
+          paddingRight: isDesktop
+            ? undefined
+            : "max(1rem, var(--listen-safe-right))",
+        }}
+      >
+        <RecentlyPlayedSection
+          items={currentDiscovery?.recently_played || []}
+          onOpenItem={(item) => navigate(openRecentItemPath(item))}
           onViewAll={openHomeSection}
         />
-      ) : null}
 
-      {isDesktop ? (
-        <FavoriteArtistsSection
-          artists={currentDiscovery?.favorite_artists || []}
-          onViewAll={openHomeSection}
-        />
-      ) : null}
-
-      {isDesktop ? (
-        <EssentialsSection
-          items={currentDiscovery?.essentials || []}
-          onOpenPlaylist={(item) => navigate(homePlaylistPath(item.id))}
-          onPlayPlaylist={(item) => void playHomePlaylist(item)}
-          onShufflePlaylist={(item) => void shuffleHomePlaylist(item)}
-          onStartRadio={(item) => void startHomePlaylistRadio(item)}
-          onViewAll={openHomeSection}
-        />
-      ) : null}
-
-      <HomeUpcomingSection
-        previewItems={upcomingPreview}
-        summary={upcoming?.summary}
-        onOpenUpcoming={() => navigate("/upcoming")}
-        onPlaySetlist={(item) => void playUpcomingSetlist(item)}
-      />
-
-      <HomeShowPrepSection
-        insights={homeInsights}
-        onOpenUpcoming={() => navigate("/upcoming")}
-        onPlaySetlist={(insight) => void playInsightSetlist(insight)}
-        onSaveReminder={(insight) => void acknowledgeInsight(insight)}
-      />
-
-      {isDesktop ? (
-        <>
-          <HomeReplaySection
-            replay={replay || undefined}
-            replayPreview={replayPreview}
-            onOpenStats={openReplayStats}
-            onPlayReplay={playReplayMix}
-            onPlayTrack={(item) =>
-              play(toPlayerTrack(item), { type: "track", name: item.title })
-            }
-          />
-
+        {!isDesktop ? (
           <JustLandedSection
             artists={recentGlobalArtists}
             loading={globalArtistsLoading}
             onOpenExplore={() => navigate("/explore")}
           />
-        </>
-      ) : null}
+        ) : null}
+
+        <SuggestedAlbumsSection
+          albums={currentDiscovery?.suggested_albums || []}
+          onViewAll={openHomeSection}
+        />
+
+        {isDesktop ? (
+          <RecommendedTracksSection
+            tracks={recommendedTracks}
+            onViewAll={openHomeSection}
+          />
+        ) : null}
+
+        {isDesktop ? (
+          <FavoriteArtistsSection
+            artists={currentDiscovery?.favorite_artists || []}
+            onViewAll={openHomeSection}
+          />
+        ) : null}
+
+        {isDesktop ? (
+          <EssentialsSection
+            items={currentDiscovery?.essentials || []}
+            onOpenPlaylist={(item) => navigate(homePlaylistPath(item.id))}
+            onPlayPlaylist={(item) => void playHomePlaylist(item)}
+            onShufflePlaylist={(item) => void shuffleHomePlaylist(item)}
+            onStartRadio={(item) => void startHomePlaylistRadio(item)}
+            onViewAll={openHomeSection}
+          />
+        ) : null}
+
+        <HomeUpcomingSection
+          previewItems={upcomingPreview}
+          summary={upcoming?.summary}
+          onOpenUpcoming={() => navigate("/upcoming")}
+          onPlaySetlist={(item) => void playUpcomingSetlist(item)}
+        />
+
+        <HomeShowPrepSection
+          insights={homeInsights}
+          onOpenUpcoming={() => navigate("/upcoming")}
+          onPlaySetlist={(insight) => void playInsightSetlist(insight)}
+          onSaveReminder={(insight) => void acknowledgeInsight(insight)}
+        />
+
+        {isDesktop ? (
+          <>
+            <HomeReplaySection
+              replay={replay || undefined}
+              replayPreview={replayPreview}
+              onOpenStats={openReplayStats}
+              onPlayReplay={playReplayMix}
+              onPlayTrack={(item) =>
+                play(toPlayerTrack(item), { type: "track", name: item.title })
+              }
+            />
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

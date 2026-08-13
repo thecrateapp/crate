@@ -27,6 +27,7 @@ import { MobileActionSheet } from "@crate/ui/domain/actions";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
+import { getTrackCacheKey } from "@/contexts/player-utils";
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { TopBar } from "@/components/layout/TopBar";
 import { useAudioVisualizer } from "@/hooks/use-audio-visualizer";
@@ -57,7 +58,9 @@ function Sidebar() {
     isPlaying && playSource?.radio?.seedType === "discovery";
   const { frequenciesDb } = useAudioVisualizer(
     discoveryRadioActive,
-    `sidebar:${currentTrack?.id ?? "none"}:${analyserVersion}`,
+    `sidebar:${
+      currentTrack ? getTrackCacheKey(currentTrack) : "none"
+    }:${analyserVersion}`,
   );
   const discoveryGlowStrength = useMemo(() => {
     if (!discoveryRadioActive) return 0;
@@ -438,17 +441,22 @@ export function Shell() {
   const [sidebarExpanded, setSidebarExpanded] = useState(getStoredExpanded);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const overlayHeader = hasOverlayHeader(location.pathname, location.search);
+  const homePage = location.pathname === "/";
+  const homeDesktopOverlay = isDesktop && homePage;
+  const homeMobileOverlay = !isDesktop && homePage;
+  const desktopOverlayHeader = overlayHeader || homeDesktopOverlay;
   const collectionActive =
     location.pathname === "/library" ||
     location.pathname.startsWith("/collection");
-  const headerOffsetClass = overlayHeader ? "" : "pt-24";
-  const desktopContentPadClass = overlayHeader ? "pt-0 pb-6" : "py-6";
-  const mobileContentPadClass = overlayHeader
-    ? "pt-0 pb-4"
-    : "py-4 pt-[var(--listen-mobile-page-top)]";
+  const headerOffsetClass = desktopOverlayHeader ? "" : "pt-24";
+  const desktopContentPadClass = desktopOverlayHeader ? "pt-0 pb-6" : "py-6";
+  const mobileContentPadClass =
+    overlayHeader || homeMobileOverlay
+      ? "pt-0 pb-4"
+      : "py-4 pt-[var(--listen-mobile-page-top)]";
   const headerChromeClass =
     "border-b border-white/6 bg-app-surface/68 shadow-[0_12px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl";
-  const overlayHeaderChromeClass = overlayHeader
+  const overlayHeaderChromeClass = desktopOverlayHeader
     ? "bg-transparent"
     : headerChromeClass;
 
@@ -474,9 +482,19 @@ export function Shell() {
         <Sidebar />
 
         <div
+          data-testid="listen-header"
+          data-home-overlay={String(homeDesktopOverlay)}
           className={`z-app-header fixed top-0 ${sidebarLeft} right-0 transition-all duration-200 ${overlayHeaderChromeClass}`}
         >
-          <TopBar hideMobileActions={overlayHeader} />
+          {homeDesktopOverlay ? (
+            <div
+              aria-hidden="true"
+              className="listen-home-top-scrim pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/65 via-black/30 to-transparent"
+            />
+          ) : null}
+          <div className="relative z-10">
+            <TopBar hideMobileActions={overlayHeader} />
+          </div>
         </div>
 
         <main
@@ -485,8 +503,9 @@ export function Shell() {
           }`}
         >
           <div
-            className={`mx-auto w-full max-w-[1560px] ${desktopContentPadClass} ${
-              sidebarExpanded ? "px-6" : "px-10"
+            data-testid="listen-content"
+            className={`mx-auto w-full ${desktopContentPadClass} ${
+              homeDesktopOverlay ? "max-w-[1480px] px-0" : "max-w-[1480px] px-6"
             } transition-all duration-200 ${headerOffsetClass}`}
           >
             <Outlet />
@@ -501,8 +520,12 @@ export function Shell() {
   return (
     <div className="flex min-h-screen flex-col bg-app-surface">
       <div
+        data-testid="listen-header"
+        data-home-overlay={String(homeMobileOverlay)}
         className={`z-app-header fixed top-0 left-0 right-0 ${
-          overlayHeader ? "bg-transparent" : headerChromeClass
+          overlayHeader || homeMobileOverlay
+            ? "bg-transparent"
+            : headerChromeClass
         }`}
         style={{ paddingTop: "var(--listen-safe-top)" }}
       >
@@ -518,10 +541,13 @@ export function Shell() {
         }}
       >
         <div
-          className={`mx-auto w-full max-w-[1560px] ${mobileContentPadClass}`}
+          data-testid="listen-content"
+          className={`mx-auto w-full ${
+            homePage ? "max-w-none" : "max-w-[1480px]"
+          } ${mobileContentPadClass}`}
           style={{
-            paddingLeft: "max(1rem, var(--listen-safe-left))",
-            paddingRight: "max(1rem, var(--listen-safe-right))",
+            paddingLeft: homePage ? 0 : "max(1rem, var(--listen-safe-left))",
+            paddingRight: homePage ? 0 : "max(1rem, var(--listen-safe-right))",
           }}
         >
           <Outlet />
@@ -530,7 +556,7 @@ export function Shell() {
 
       <div
         aria-hidden="true"
-        className="listen-glass-panel listen-mobile-dock-glass pointer-events-none fixed z-20 rounded-[2rem]"
+        className="listen-glass-panel listen-mobile-dock-glass pointer-events-none fixed z-20 rounded-[12px]"
         style={{
           height: hasTrack
             ? "calc(var(--listen-mobile-player-height) + var(--listen-mobile-bottom-nav-content-height))"
@@ -546,7 +572,7 @@ export function Shell() {
 
       <nav
         className={`z-app-player fixed isolate flex items-center justify-around overflow-visible bg-transparent px-1.5 ${
-          hasTrack ? "rounded-b-[2rem] border-t-0" : "rounded-[2rem]"
+          hasTrack ? "rounded-b-[12px] border-t-0" : "rounded-[12px]"
         }`}
         style={{
           bottom:

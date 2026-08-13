@@ -244,6 +244,7 @@ func classifyFallbackRoute(r *http.Request) fallbackRouteClass {
 	path := strings.ToLower(r.URL.Path)
 	if strings.HasSuffix(path, "/photo") ||
 		strings.HasSuffix(path, "/background") ||
+		strings.HasSuffix(path, "/hero") ||
 		strings.HasSuffix(path, "/cover") ||
 		strings.HasSuffix(path, "/avatar") ||
 		strings.HasSuffix(path, "/artwork") {

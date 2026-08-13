@@ -14,7 +14,7 @@ from crate.db.tx import transaction_scope
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MIGRATION = ROOT / "app/crate/db/migrations/versions/082_smart_mix_profiles.py"
+MIGRATION = ROOT / "app/crate/db/migrations/versions/087_smart_mix_profiles.py"
 
 
 def test_candidate_query_is_bounded_and_never_reads_beat_grid() -> None:

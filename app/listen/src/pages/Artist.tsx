@@ -115,15 +115,9 @@ export function Artist() {
       routeGlobalArtistUid ?? data?.global_artist_uid ?? data?.global_uid;
     if (!data?.id && !globalArtistUid) return;
     try {
-      const following = isFollowing(data?.id, globalArtistUid);
       await toggleArtistFollow(data?.id, globalArtistUid, data?.name);
-      toast.success(
-        following
-          ? t("artist.toasts.unfollowed", { name: data?.name })
-          : t("artist.toasts.following", { name: data?.name }),
-      );
     } catch {
-      toast.error(t("artist.toasts.followFailed"));
+      // Follow state rolls back in ArtistFollowsContext.
     }
   }
 
@@ -270,7 +264,7 @@ export function Artist() {
     return (
       <div className="flex flex-col items-center gap-4 py-20 text-center">
         <p className="text-muted-foreground">{t("artist.unavailable")}</p>
-        <Button variant="outline" onClick={refetch}>
+        <Button className="rounded-lg" variant="outline" onClick={refetch}>
           {t("common.retry")}
         </Button>
       </div>

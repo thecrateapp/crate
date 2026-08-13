@@ -182,7 +182,7 @@ export function UpcomingPreviewRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/5"
+      className="flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/5"
     >
       <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
         <span className="text-[10px] uppercase tracking-wide text-white/40">
@@ -275,7 +275,7 @@ export function FeaturedPlaylistCard({
       }}
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
-      className="group w-[180px] flex-shrink-0 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl"
+      className="group w-[180px] flex-shrink-0 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl"
     >
       <div className="relative">
         <EditorialPlaylistArtwork
@@ -283,7 +283,7 @@ export function FeaturedPlaylistCard({
           kicker={editorialLabel.kicker}
           coverDataUrl={coverDataUrl}
           tracks={tracks}
-          className="aspect-square rounded-3xl shadow-xl transition-transform group-hover:scale-[1.02]"
+          className="aspect-square rounded-xl shadow-xl transition-transform group-hover:scale-[1.02]"
         />
       </div>
       <div className="px-1 pt-3">
@@ -322,13 +322,13 @@ export function ContinueListeningCard({
   onPlay: () => void;
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+    <div className="group relative overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.18),transparent_55%)]" />
       <div className="relative flex items-center gap-3 sm:gap-4">
         <TrackCoverThumb
           src={track.albumCover}
           iconSize={24}
-          className="h-16 w-16 shrink-0 rounded-2xl sm:h-20 sm:w-20"
+          className="h-16 w-16 shrink-0 rounded-xl sm:h-20 sm:w-20"
         />
         <div className="min-w-0 flex-1">
           <div className="mb-2 inline-flex max-w-full items-center gap-2 truncate rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">

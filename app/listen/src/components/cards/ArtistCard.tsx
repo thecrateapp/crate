@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import {
-  CRATE_ICON_SIZE,
-  Heart,
-  HeartBold,
-  Loader2,
-  Play,
-  UserRound,
-} from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2, Play, UserRound } from "@crate/ui/icons";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { toast } from "sonner";
 
 import {
@@ -225,8 +219,7 @@ export function ArtistCard({
                     <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />
                   )}
                 </button>
-                <button
-                  type="button"
+                <FollowHeartButton
                   className={cn(
                     "pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-sm",
                     following
@@ -238,13 +231,8 @@ export function ArtistCard({
                     setTogglingFollow(true);
                     try {
                       await toggleArtistFollow(artistId, globalArtistUid, name);
-                      toast.success(
-                        following
-                          ? t("actions.artist.toasts.unfollowed", { name })
-                          : t("actions.artist.toasts.following", { name }),
-                      );
                     } catch {
-                      toast.error(t("home.toasts.updateFollowFailed"));
+                      // Follow state rolls back in ArtistFollowsContext.
                     } finally {
                       setTogglingFollow(false);
                     }
@@ -255,21 +243,10 @@ export function ArtistCard({
                       : t("actions.artist.followNamed", { name })
                   }
                   title={following ? t("common.following") : t("common.follow")}
-                >
-                  {togglingFollow ? (
-                    <Loader2
-                      size={CRATE_ICON_SIZE.md}
-                      className="animate-spin"
-                    />
-                  ) : following ? (
-                    <HeartBold
-                      size={CRATE_ICON_SIZE.md}
-                      className="animate-crate-icon-active-pulse"
-                    />
-                  ) : (
-                    <Heart size={CRATE_ICON_SIZE.md} />
-                  )}
-                </button>
+                  following={following}
+                  disabled={togglingFollow}
+                  iconSize={CRATE_ICON_SIZE.md}
+                />
               </div>
             </div>
           </>

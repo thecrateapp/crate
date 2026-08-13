@@ -130,11 +130,6 @@ export function useArtistActionEntries(
             input.globalArtistUid ?? null,
             input.name,
           );
-          toast.success(
-            following
-              ? t("actions.artist.toasts.unfollowed", { name: input.name })
-              : t("actions.artist.toasts.following", { name: input.name }),
-          );
         },
       }),
       action({

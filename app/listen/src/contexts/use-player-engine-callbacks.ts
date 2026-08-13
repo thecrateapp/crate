@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
+import { PLAYER_TRACK_FINISHED_EVENT } from "@/contexts/player-events";
 import { getStreamUrl } from "@/contexts/player-utils";
 import {
   getCurrentTrackDuration as gpGetCurrentTrackDuration,
@@ -234,6 +235,14 @@ export function usePlayerEngineCallbacks({
         queueRef.current.find((track) => getStreamUrl(track) === path);
       if (!endedTrack) return;
 
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent(PLAYER_TRACK_FINISHED_EVENT, {
+            detail: { track: endedTrack },
+          }),
+        );
+      }
+
       rotateTrackerSession(
         "completed",
         endedTrack,
@@ -291,6 +300,9 @@ export function usePlayerEngineCallbacks({
       scheduleStallProtection();
     },
     onAnalyserReady: () => {
+      setAnalyserVersion((version) => version + 1);
+    },
+    onAnalyserInvalidated: () => {
       setAnalyserVersion((version) => version + 1);
     },
   };

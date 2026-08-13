@@ -30,6 +30,14 @@ def _file_etag(path: Path, source_revision: str | None = None) -> str:
     return f'W/"{hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]}"'
 
 
+def _file_source_revision(path: Path) -> str | None:
+    """Return the materializer revision for a local source, if readable."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    except OSError:
+        return None
+
+
 def _record_request(asset: ArtworkAsset, result: str) -> None:
     record_counter_later("artwork.requests", {"kind": asset.kind, "result": result})
 
@@ -86,8 +94,16 @@ def deliver_artwork(
     missing_response: Response,
     queue_on_miss: bool = True,
     cache_visibility: Literal["public", "private"] = "public",
+    validate_source_revision: bool = False,
 ) -> Response:
     variant = resolve_materialized_variant(asset, requested_size)
+    if validate_source_revision and variant is not None and local_original is not None:
+        current_revision = _file_source_revision(local_original)
+        if current_revision is not None and current_revision != variant.source_revision:
+            # A worker can finish the canonical write before its deduplicated
+            # materialization task. Never serve the previous composition while
+            # that task catches up.
+            variant = None
     if variant is not None:
         _record_request(asset, "variant")
         return FileResponse(

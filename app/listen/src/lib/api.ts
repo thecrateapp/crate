@@ -706,6 +706,17 @@ function redirectAfterUnauthorized(): void {
   });
 }
 
+async function clearRejectedWebSession(): Promise<void> {
+  if (usesConfigurableServer) return;
+  await fetch(`${getApiBase()}/api/auth/logout`, {
+    method: "POST",
+    credentials: apiCredentials(),
+    headers: getApiAuthHeaders(),
+  }).catch(() => {
+    // The session is already unusable; a network failure should not block auth recovery.
+  });
+}
+
 export async function refreshAuthToken(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
@@ -728,6 +739,7 @@ export async function refreshAuthToken(): Promise<boolean> {
         response.status === 403
       ) {
         setAuthToken(null);
+        await clearRejectedWebSession();
       }
       return false;
     }
@@ -738,6 +750,7 @@ export async function refreshAuthToken(): Promise<boolean> {
     } | null;
     if (!data?.token) {
       setAuthToken(null);
+      await clearRejectedWebSession();
       return false;
     }
     setAuthTokens(

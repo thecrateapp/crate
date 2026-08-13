@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Loader2, Search, UserRoundPlus, Users } from "@crate/ui/icons";
+import { Loader2, Search, UserRoundPlus } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -116,7 +116,7 @@ export function People() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="rounded-[12px] border border-white/10 bg-white/5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
@@ -126,19 +126,12 @@ export function People() {
               {t("people.subtitle")}
             </p>
           </div>
-          <Link
-            to="/jam"
-            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
-          >
-            <Users size={16} />
-            {t("people.jamSessions")}
-          </Link>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <Link
             to={ownProfileHref}
-            className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4 hover:bg-cyan-400/10 transition-colors"
+            className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4 hover:bg-cyan-400/10 transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-cyan-300/70">
               {t("people.summary.yourProfile")}
@@ -157,7 +150,7 @@ export function People() {
           </Link>
           <Link
             to={ownFollowersHref}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
+            className="rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.followers")}
@@ -168,7 +161,7 @@ export function People() {
           </Link>
           <Link
             to={ownFollowingHref}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
+            className="rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.following")}
@@ -177,7 +170,7 @@ export function People() {
               {data?.following_count ?? "—"}
             </div>
           </Link>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.friends")}
             </div>
@@ -188,8 +181,8 @@ export function People() {
         </div>
       </div>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+      <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-4 py-3">
           <Search size={16} className="text-muted-foreground" />
           <input
             value={query}
@@ -208,13 +201,13 @@ export function People() {
           ) : null}
 
           {!query.trim() ? (
-            <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
               {t("people.search.emptyPrompt")}
             </div>
           ) : null}
 
           {query.trim() && !searching && results.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
               {t("people.search.noMatches", { query: query.trim() })}
             </div>
           ) : null}
@@ -227,7 +220,7 @@ export function People() {
                 key={item.id}
                 username={item.username}
                 hoverClassName="block"
-                className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
               >
                 <UserAvatar
                   name={label}

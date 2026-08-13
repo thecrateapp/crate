@@ -1,11 +1,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   renderWithListenProviders,
   createMockTrack,
 } from "@/test/render-with-listen-providers";
+import { PLAYER_TRACK_FINISHED_EVENT } from "@/contexts/player-events";
 import type { JamRoom, JamRoomsResponse, JamInvite } from "@/pages/jam-reducer";
 
 // ── Hoisted mock state ───────────────────────────────────────────────────────
@@ -15,19 +17,32 @@ const {
   mockParams,
   mockApiCall,
   mockUseApiData,
+  mockUseApiTaxonomyData,
   mockUseApiLoading,
   mockUseApiError,
   mockRefetch,
   mockSendEvent,
+  mockJamConnected,
+  mockDndContext,
 } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   mockParams: { roomId: undefined as string | undefined },
   mockApiCall: vi.fn(),
   mockUseApiData: { value: null as unknown },
+  mockUseApiTaxonomyData: { value: null as unknown },
   mockUseApiLoading: { value: false },
   mockUseApiError: { value: null as string | null },
   mockRefetch: vi.fn(),
   mockSendEvent: vi.fn(() => true),
+  mockJamConnected: { value: false },
+  mockDndContext: {
+    onDragEnd: null as
+      | ((event: {
+          active: { id: string };
+          over: { id: string } | null;
+        }) => void)
+      | null,
+  },
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -43,17 +58,35 @@ vi.mock("react-router", async () => {
 });
 
 vi.mock("@/hooks/use-jam-websocket", () => ({
-  useJamWebSocket: () => ({ sendEvent: mockSendEvent }),
+  useJamWebSocket: ({
+    dispatch,
+  }: {
+    dispatch: (action: { type: "WEBSOCKET_OPEN" }) => void;
+  }) => {
+    useEffect(() => {
+      if (mockJamConnected.value) dispatch({ type: "WEBSOCKET_OPEN" });
+    }, [dispatch]);
+    return { sendEvent: mockSendEvent };
+  },
 }));
 
 vi.mock("@/lib/api", () => ({
   api: mockApiCall,
+  apiAssetUrl: (path: string) => path,
   apiWsUrl: (path: string) => `ws://localhost${path}`,
+  isUsableMediaAssetUrl: () => true,
+  requiresMediaAccessTicket: () => false,
+  resolveMaybeApiAssetUrl: (value: string | null | undefined) => value,
 }));
 
 vi.mock("@/hooks/use-api", () => ({
   useApi: (_url: string | null) => ({
-    data: _url ? mockUseApiData.value : null,
+    data:
+      _url === "/api/genres/taxonomy/tree"
+        ? mockUseApiTaxonomyData.value
+        : _url
+          ? mockUseApiData.value
+          : null,
     loading: _url ? mockUseApiLoading.value : false,
     error: _url ? mockUseApiError.value : null,
     refetch: mockRefetch,
@@ -65,6 +98,45 @@ vi.mock("@/hooks/use-user-avatar-url", () => ({
     avatarUrl: null,
     handleAvatarError: vi.fn(),
   }),
+}));
+
+vi.mock("@dnd-kit/core", () => ({
+  KeyboardSensor: class KeyboardSensor {},
+  PointerSensor: class PointerSensor {},
+  DndContext: ({
+    children,
+    onDragEnd,
+  }: {
+    children: ReactNode;
+    onDragEnd: (event: {
+      active: { id: string };
+      over: { id: string } | null;
+    }) => void;
+  }) => {
+    mockDndContext.onDragEnd = onDragEnd;
+    return <>{children}</>;
+  },
+  closestCenter: {},
+  useSensor: () => ({}),
+  useSensors: (...sensors: unknown[]) => sensors,
+}));
+
+vi.mock("@dnd-kit/sortable", () => ({
+  SortableContext: ({ children }: { children: ReactNode }) => <>{children}</>,
+  sortableKeyboardCoordinates: vi.fn(),
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: false,
+  }),
+  verticalListSortingStrategy: {},
+}));
+
+vi.mock("@dnd-kit/utilities", () => ({
+  CSS: { Transform: { toString: () => "" } },
 }));
 
 vi.mock("@crate/ui/primitives/QrCodeImage", () => ({
@@ -117,8 +189,11 @@ beforeEach(() => {
   mockRefetch.mockReset();
   mockSendEvent.mockReset();
   mockSendEvent.mockReturnValue(true);
+  mockJamConnected.value = false;
+  mockDndContext.onDragEnd = null;
   mockParams.roomId = undefined;
   mockUseApiData.value = null;
+  mockUseApiTaxonomyData.value = null;
   mockUseApiLoading.value = false;
   mockUseApiError.value = null;
   localStorage.clear();
@@ -131,6 +206,29 @@ afterEach(() => {
 // ── Imports after mocks ──────────────────────────────────────────────────────
 
 import { JamSession } from "@/pages/JamSession";
+
+function JamSessionRerenderHarness() {
+  const [, setVersion] = useState(0);
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="rerender-jam-session"
+        onClick={() => setVersion((version) => version + 1)}
+      />
+      <JamSession />
+    </>
+  );
+}
+
+async function openRoomActionsMenu() {
+  await userEvent.click(
+    screen.getByRole("button", {
+      name: /room settings|opciones de la sala/i,
+      expanded: false,
+    }),
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // LOBBY (no roomId)
@@ -197,6 +295,55 @@ describe("JamSession lobby (no roomId)", () => {
       );
     });
     expect(mockNavigate).toHaveBeenCalledWith("/jam/rooms/new-room");
+  });
+
+  it("suggests taxonomy genres and submits the selected slugs for Auto DJ", async () => {
+    mockUseApiData.value = makeRoomsResponse([]);
+    mockUseApiTaxonomyData.value = {
+      nodes: [
+        {
+          slug: "post-hardcore",
+          name: "Post-hardcore",
+          alias_names: ["post hardcore"],
+        },
+        { slug: "hardcore", name: "Hardcore", alias_names: [] },
+      ],
+    };
+    mockApiCall.mockResolvedValueOnce({ id: "new-room", name: "Test Room" });
+    renderWithListenProviders(<JamSession />);
+
+    expect(document.querySelector("select")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("combobox", { name: "Playback mode" }),
+    );
+    await userEvent.click(screen.getByRole("option", { name: "Auto DJ" }));
+    const genreInput = screen.getByPlaceholderText("Search taxonomy genres…");
+    await userEvent.type(genreInput, "post");
+
+    expect(
+      screen.getByRole("option", { name: /Post-hardcore/ }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("option", { name: /Post-hardcore/ }),
+    );
+    expect(screen.getByText("post-hardcore")).toBeInTheDocument();
+
+    await userEvent.type(
+      screen.getByPlaceholderText("Friday night queue"),
+      "Test Room",
+    );
+    await userEvent.click(screen.getByRole("button", { name: /create room/i }));
+
+    await waitFor(() => {
+      expect(mockApiCall).toHaveBeenCalledWith(
+        "/api/jam/rooms",
+        "POST",
+        expect.objectContaining({
+          genre_filters: ["post-hardcore"],
+          queue_mode: "auto_dj",
+        }),
+      );
+    });
   });
 
   it("shows error toast when room creation fails", async () => {
@@ -456,9 +603,11 @@ describe("JamSession lobby - room cards", () => {
     mockUseApiData.value = makeRoomsResponse([room]);
     renderWithListenProviders(<JamSession />);
 
-    expect(
-      screen.getByRole("button", { name: "Delete Host Room" }),
-    ).toBeInTheDocument();
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete Host Room",
+    });
+    expect(deleteButton).toBeInTheDocument();
+    expect(deleteButton.closest('[role="button"]')).toBeNull();
   });
 
   it("opens delete confirmation modal when delete is clicked", async () => {
@@ -616,8 +765,11 @@ describe("JamSession active room - host", () => {
       screen.getByPlaceholderText("Busca pistas para añadir a esta sala"),
     ).toBeInTheDocument();
 
+    await openRoomActionsMenu();
     await userEvent.click(
-      screen.getByRole("button", { name: "Editar perfil de la sala" }),
+      screen.getByRole("button", {
+        name: "Editar perfil de la sala",
+      }),
     );
 
     expect(
@@ -658,6 +810,14 @@ describe("JamSession active room - host", () => {
     expect(screen.getByText("Public room")).toBeInTheDocument();
   });
 
+  it("shows the queue mode badge in the room header", () => {
+    renderWithListenProviders(<JamSession />);
+
+    expect(screen.getByText("DJ mode").closest("div")).toHaveClass(
+      "rounded-full",
+    );
+  });
+
   it("shows tags as badges", () => {
     renderWithListenProviders(<JamSession />);
 
@@ -668,25 +828,30 @@ describe("JamSession active room - host", () => {
   it("shows host control buttons", () => {
     renderWithListenProviders(<JamSession />);
 
-    expect(
-      screen.getByRole("button", { name: /make room invite-only/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /make room permanent/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /edit room profile/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /invite people/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /end room/i }),
-    ).toBeInTheDocument();
+    return openRoomActionsMenu().then(() => {
+      expect(
+        screen.getByRole("button", { name: /make room invite-only/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /make room permanent/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: /edit room profile/i,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /invite people/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /end room/i }),
+      ).toBeInTheDocument();
+    });
   });
 
-  it("shows delete room button for host", () => {
+  it("shows delete room button for host", async () => {
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     expect(
       screen.getByRole("button", { name: /delete room/i }),
@@ -696,6 +861,7 @@ describe("JamSession active room - host", () => {
   it("toggles room visibility via API", async () => {
     mockApiCall.mockResolvedValueOnce(makeRoom({ visibility: "private" }));
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
       screen.getByRole("button", { name: /make room invite-only/i }),
@@ -713,6 +879,7 @@ describe("JamSession active room - host", () => {
   it("toggles permanent status via API", async () => {
     mockApiCall.mockResolvedValueOnce(makeRoom({ is_permanent: true }));
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
       screen.getByRole("button", { name: /make room permanent/i }),
@@ -730,6 +897,7 @@ describe("JamSession active room - host", () => {
   it("ends the room via API", async () => {
     mockApiCall.mockResolvedValueOnce(makeRoom({ status: "ended" }));
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(screen.getByRole("button", { name: /end room/i }));
 
@@ -750,6 +918,7 @@ describe("JamSession active room - host", () => {
     };
     mockApiCall.mockResolvedValueOnce(invite);
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
       screen.getByRole("button", { name: /invite people/i }),
@@ -770,9 +939,12 @@ describe("JamSession active room - host", () => {
       makeRoom({ description: "Updated desc", tags: ["new-tag"] }),
     );
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
-      screen.getByRole("button", { name: /edit room profile/i }),
+      screen.getByRole("button", {
+        name: /edit room profile/i,
+      }),
     );
 
     expect(screen.getByText("Room profile")).toBeInTheDocument();
@@ -812,6 +984,7 @@ describe("JamSession active room - host", () => {
       room_id: "room-1",
     });
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(screen.getByRole("button", { name: /delete room/i }));
 
@@ -908,6 +1081,20 @@ describe("JamSession active room - members and activity", () => {
 
     expect(screen.getByText("No room events yet.")).toBeInTheDocument();
   });
+
+  it("takes ownership of the local queue on entry and releases it on exit", () => {
+    const enterJamSession = vi.fn();
+    const leaveJamSession = vi.fn();
+    const rendered = renderWithListenProviders(<JamSession />, {
+      playerActions: { enterJamSession, leaveJamSession },
+    });
+
+    expect(enterJamSession).toHaveBeenCalledTimes(1);
+
+    rendered.unmount();
+
+    expect(leaveJamSession).toHaveBeenCalled();
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -991,7 +1178,7 @@ describe("JamSession shared queue", () => {
       screen.getByText(/Nothing in the shared queue yet/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /browse library/i }),
+      screen.getByRole("button", { name: /browse library/i }),
     ).toBeInTheDocument();
   });
 
@@ -1008,6 +1195,39 @@ describe("JamSession shared queue", () => {
       type: "queue_remove",
       index: 0,
     });
+  });
+
+  it("removes a persisted queue item immediately and sends its stable id", async () => {
+    const track = createMockTrack({ id: "track-1", title: "Persisted Song" });
+    mockUseApiData.value = makeRoom({
+      queue: [
+        {
+          id: "queue-1",
+          track,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />);
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Remove Persisted Song from queue",
+      }),
+    );
+
+    expect(mockSendEvent).toHaveBeenCalledWith({
+      type: "queue_remove",
+      queue_item_id: "queue-1",
+    });
+    expect(
+      screen.queryByRole("button", {
+        name: "Remove Persisted Song from queue",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("calls sendEvent when moving a track up in queue", async () => {
@@ -1054,6 +1274,59 @@ describe("JamSession shared queue", () => {
     expect(
       screen.getByPlaceholderText("Search tracks to add to this room"),
     ).toBeInTheDocument();
+  });
+
+  it("uses the heart control for one-way voting in auto mode", async () => {
+    mockJamConnected.value = true;
+    const track = createMockTrack({ id: "track-vote", title: "Vote Song" });
+    mockUseApiData.value = makeRoom({
+      queue_mode: "auto",
+      queue: [
+        {
+          id: "queue-vote",
+          track,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />);
+
+    const voteButton = screen.getByRole("button", {
+      name: "Vote for Vote Song",
+    });
+    await userEvent.click(voteButton);
+
+    expect(mockSendEvent).toHaveBeenCalledWith({
+      type: "queue_vote",
+      queue_item_id: "queue-vote",
+    });
+    expect(
+      screen.getByRole("button", { name: "Vote recorded for Vote Song" }),
+    ).toBeDisabled();
+    expect(screen.getByLabelText("1 vote")).toBeInTheDocument();
+  });
+
+  it("shows the next-track suggestions supplied by Auto DJ", () => {
+    mockUseApiData.value = makeRoom({
+      queue_mode: "auto_dj",
+      auto_dj_suggestions: [
+        {
+          id: "auto-dj-track",
+          title: "Suggested track",
+          artist: "Suggested artist",
+          album: "Suggested album",
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />);
+
+    expect(screen.getByText("Suggested next")).toBeInTheDocument();
+    expect(screen.getByText("Suggested track")).toBeInTheDocument();
+    expect(screen.getByText("Suggested artist")).toBeInTheDocument();
   });
 });
 
@@ -1171,13 +1444,161 @@ describe("JamSession current track", () => {
     expect(screen.getByText("Current Jam")).toBeInTheDocument();
   });
 
-  it("does not show now playing when no track is set", () => {
+  it("renders host transport controls beside the room now-playing track", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const track = createMockTrack({
+      id: "ct1",
+      title: "Current Jam",
+      artist: "Jammer",
+      album: "Live Room",
+    });
+    mockUseApiData.value = makeRoom({
+      current_track_payload: {
+        track,
+        position: 34,
+        playing: false,
+      },
+      queue: [
+        {
+          id: "queue-next",
+          track: createMockTrack({ id: "next", title: "Next Jam" }),
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+    const resume = vi.fn();
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: track, resume },
+      playerProgress: { currentTime: 34, duration: 180 },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected to room")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Current Jam")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Play room" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Play next track" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sync playback" }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Play room" }));
+
+    expect(mockSendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "play",
+        track: expect.objectContaining({ id: "track-1" }),
+        position: 34,
+        playing: true,
+      }),
+    );
+    expect(resume).toHaveBeenCalled();
+  });
+
+  it("uses the room track when the host's local player is stale", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const roomTrack = createMockTrack({
+      id: "room-track",
+      entityUid: "room-track",
+      title: "Room Song",
+    });
+    const staleTrack = createMockTrack({
+      id: "stale-track",
+      entityUid: "stale-track",
+      title: "Old Song",
+    });
+    mockUseApiData.value = makeRoom({
+      current_track_payload: {
+        track: roomTrack,
+        position: 12,
+        playing: false,
+      },
+      queue: [
+        {
+          id: "queue-room-track",
+          track: roomTrack,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: staleTrack },
+      playerProgress: { currentTime: 12, duration: 180 },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Play room" }));
+
+    expect(mockSendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "play",
+        track: expect.objectContaining({ id: "room-track" }),
+      }),
+    );
+  });
+
+  it("anchors a room sync to the host's actual playback position", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const roomTrack = createMockTrack({
+      id: "room-track",
+      entityUid: "room-track",
+      title: "Room Song",
+    });
+    mockUseApiData.value = makeRoom({
+      current_track_payload: {
+        track: roomTrack,
+        position: 12,
+        playing: true,
+      },
+      queue: [
+        {
+          id: "queue-room-track",
+          track: roomTrack,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: roomTrack },
+      playerState: { isPlaying: true },
+      playerProgress: { currentTime: 12.34, duration: 180 },
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sync playback" }),
+    );
+
+    expect(mockSendEvent).toHaveBeenCalledWith({
+      type: "sync",
+      scope: "room",
+      track: expect.objectContaining({ entityUid: "room-track" }),
+      position: 12.34,
+      playing: true,
+    });
+  });
+
+  it("shows an empty now-playing state when no track is set", () => {
     mockParams.roomId = "room-1";
     mockUseApiLoading.value = false;
     mockUseApiData.value = makeRoom({ current_track_payload: null });
     renderWithListenProviders(<JamSession />);
 
-    expect(screen.queryByText("Now playing in room")).not.toBeInTheDocument();
+    expect(screen.getByText("The room queue is empty")).toBeInTheDocument();
   });
 });
 
@@ -1186,11 +1607,12 @@ describe("JamSession current track", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("JamSession permanent room", () => {
-  it("shows permanent badge and toggle text for permanent rooms", () => {
+  it("shows permanent badge and toggle text for permanent rooms", async () => {
     mockParams.roomId = "room-1";
     mockUseApiLoading.value = false;
     mockUseApiData.value = makeRoom({ is_permanent: true });
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     expect(screen.getByText("Permanent")).toBeInTheDocument();
     expect(
@@ -1204,11 +1626,12 @@ describe("JamSession permanent room", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("JamSession private room", () => {
-  it("shows invite-only badge for private rooms", () => {
+  it("shows invite-only badge for private rooms", async () => {
     mockParams.roomId = "room-1";
     mockUseApiLoading.value = false;
     mockUseApiData.value = makeRoom({ visibility: "private" });
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     expect(screen.getByText("Invite-only")).toBeInTheDocument();
     expect(
@@ -1247,6 +1670,80 @@ describe("JamSession WebSocket states", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("JamSession queue search", () => {
+  it("uses global album identity to render artwork for searched tracks", async () => {
+    mockParams.roomId = "room-1";
+    mockUseApiData.value = makeRoom();
+    mockApiCall.mockResolvedValueOnce({
+      tracks: [
+        {
+          id: 42,
+          title: "Searched track",
+          artist: "Artist",
+          album: "Album",
+          global_track_uid: "track-global-1",
+          global_album_uid: "album-global-1",
+        },
+      ],
+    });
+    renderWithListenProviders(<JamSession />);
+
+    await userEvent.type(
+      screen.getByPlaceholderText("Search tracks to add to this room"),
+      "searched",
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Searched track")).toBeInTheDocument();
+    });
+    expect(
+      document.querySelector<HTMLImageElement>(
+        'img[src*="/api/catalog/albums/album-global-1/cover"]',
+      ),
+    ).not.toBeNull();
+  });
+
+  it("does not persist an authentication-bound artwork URL in Jam events", async () => {
+    mockParams.roomId = "room-1";
+    mockUseApiData.value = makeRoom();
+    mockApiCall.mockResolvedValueOnce({
+      tracks: [
+        {
+          id: 42,
+          title: "Searched track",
+          artist: "Artist",
+          album: "Album",
+          global_track_uid: "track-global-1",
+          global_album_uid: "album-global-1",
+        },
+      ],
+    });
+    renderWithListenProviders(<JamSession />);
+
+    await userEvent.type(
+      screen.getByPlaceholderText("Search tracks to add to this room"),
+      "searched",
+    );
+
+    const result = await screen.findByRole("button", {
+      name: /searched track/i,
+    });
+    await userEvent.click(result);
+
+    expect(mockSendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "queue_add",
+        track: expect.objectContaining({
+          globalAlbumUid: "album-global-1",
+        }),
+      }),
+    );
+    const calls = mockSendEvent.mock.calls as unknown as Array<
+      [{ track?: Record<string, unknown> }]
+    >;
+    const event = calls[calls.length - 1]?.[0];
+    expect(event?.track).not.toHaveProperty("albumCover");
+  });
+
   it("shows disabled search input when user cannot edit queue", () => {
     mockParams.roomId = "room-1";
     mockUseApiLoading.value = false;
@@ -1292,6 +1789,7 @@ describe("JamSession API error handling", () => {
     mockUseApiData.value = makeRoom();
     mockApiCall.mockRejectedValueOnce(new Error("fail"));
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(screen.getByRole("button", { name: /end room/i }));
 
@@ -1307,6 +1805,7 @@ describe("JamSession API error handling", () => {
     mockUseApiData.value = makeRoom();
     mockApiCall.mockRejectedValueOnce(new Error("fail"));
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
       screen.getByRole("button", { name: /invite people/i }),
@@ -1323,6 +1822,7 @@ describe("JamSession API error handling", () => {
     mockUseApiData.value = makeRoom();
     mockApiCall.mockRejectedValueOnce(new Error("fail"));
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
       screen.getByRole("button", { name: /make room invite-only/i }),
@@ -1405,8 +1905,62 @@ describe("JamSession player actions", () => {
     expect(addBtn).toBeDisabled();
   });
 
-  it("plays room queue when button is clicked", async () => {
+  it("disables sharing the current track when it is already in the room queue", () => {
     mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const track = createMockTrack({
+      id: "current",
+      title: "Now Playing",
+      artist: "Artist",
+    });
+    mockUseApiData.value = makeRoom({
+      queue: [
+        {
+          id: "queue-1",
+          track,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: track },
+    });
+
+    expect(
+      screen.getByRole("button", { name: /add current track/i }),
+    ).toBeDisabled();
+  });
+
+  it("lets the authoritative room event start the first track", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    mockUseApiData.value = makeRoom({ queue: [] });
+    const track = createMockTrack({
+      id: "current",
+      title: "Now Playing",
+      artist: "Artist",
+    });
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: track },
+    });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /add current track/i }),
+    );
+
+    expect(mockSendEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "queue_add" }),
+    );
+  });
+
+  it("asks the host to play the room queue when the button is clicked", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
     mockUseApiLoading.value = false;
     mockUseApiData.value = makeRoom({
       events: [
@@ -1423,16 +1977,481 @@ describe("JamSession player actions", () => {
       ],
     });
 
-    const playAll = vi.fn();
-    renderWithListenProviders(<JamSession />, {
-      playerActions: { playAll },
-    });
+    renderWithListenProviders(<JamSession />);
 
     await userEvent.click(
       screen.getByRole("button", { name: /play room queue/i }),
     );
 
-    expect(playAll).toHaveBeenCalled();
+    expect(mockSendEvent).toHaveBeenCalledWith({ type: "queue_play" });
+  });
+
+  it("lets the authoritative queue event load the room queue", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({
+      id: "t1",
+      entityUid: "track-1",
+      title: "Song One",
+    });
+    const second = createMockTrack({
+      id: "t2",
+      entityUid: "track-2",
+      title: "Song Two",
+    });
+    mockUseApiData.value = makeRoom({
+      queue: [
+        {
+          id: "queue-1",
+          track: first,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /play room queue/i }),
+    );
+
+    expect(mockSendEvent).toHaveBeenCalledWith({ type: "queue_play" });
+  });
+
+  it("hydrates the local player queue from the room snapshot on entry", async () => {
+    mockParams.roomId = "room-1";
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({ id: "t1", title: "Room Song One" });
+    const second = createMockTrack({ id: "t2", title: "Room Song Two" });
+    mockUseApiData.value = makeRoom({
+      queue: [
+        {
+          id: "queue-1",
+          track: first,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    const syncJamQueue = vi.fn();
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { syncJamQueue },
+    });
+
+    await waitFor(() => {
+      expect(syncJamQueue).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ id: "t1" }),
+          expect.objectContaining({ id: "t2" }),
+        ],
+        expect.objectContaining({
+          source: { type: "queue", name: "Jam: Test Room" },
+        }),
+      );
+    });
+  });
+
+  it("reconciles a derived room queue before websocket state is marked open", async () => {
+    mockParams.roomId = "room-1";
+    mockUseApiLoading.value = false;
+    mockUseApiData.value = makeRoom({
+      events: [
+        ...["Song One", "Song Two", "Song Three"].map((title, index) => ({
+          id: index + 1,
+          room_id: "room-1",
+          user_id: 1,
+          event_type: "queue_add",
+          payload_json: {
+            track: { id: `t${index + 1}`, title, artist: "Artist" },
+          },
+          created_at: `2026-01-01T12:0${index}:00Z`,
+        })),
+      ],
+    });
+
+    const syncJamQueue = vi.fn();
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { syncJamQueue },
+    });
+
+    await waitFor(() => {
+      expect(syncJamQueue).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ title: "Song One" }),
+          expect.objectContaining({ title: "Song Two" }),
+          expect.objectContaining({ title: "Song Three" }),
+        ]),
+        expect.objectContaining({
+          source: { type: "queue", name: "Jam: Test Room" },
+        }),
+      );
+    });
+  });
+
+  it("does not replay a stale REST snapshot after the room websocket is connected", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({ id: "t1", title: "Room Song One" });
+    const second = createMockTrack({ id: "t2", title: "Room Song Two" });
+    const initialRoom = makeRoom({
+      current_track_payload: {
+        track: first,
+        position: 0,
+        playing: true,
+      },
+      queue: [
+        {
+          id: "queue-1",
+          track: first,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+    mockUseApiData.value = initialRoom;
+
+    const syncJamQueue = vi.fn();
+    renderWithListenProviders(<JamSessionRerenderHarness />, {
+      playerActions: { syncJamQueue },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected to room")).toBeInTheDocument();
+    });
+    const callsAfterConnection = syncJamQueue.mock.calls.length;
+
+    mockUseApiData.value = makeRoom({
+      ...initialRoom,
+      name: "Refreshed Room Snapshot",
+      current_track_payload: {
+        track: first,
+        position: 0,
+        playing: true,
+      },
+    });
+    await userEvent.click(screen.getByTestId("rerender-jam-session"));
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+
+    expect(syncJamQueue).toHaveBeenCalledTimes(callsAfterConnection);
+  });
+
+  it("lets the host drag a queue item to a new position", () => {
+    mockParams.roomId = "room-1";
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({ id: "t1", title: "Song One" });
+    const second = createMockTrack({ id: "t2", title: "Song Two" });
+    mockUseApiData.value = makeRoom({
+      queue: [
+        {
+          id: "queue-1",
+          track: first,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />);
+
+    expect(
+      screen.getByRole("button", { name: "Drag Song Two to reorder" }),
+    ).toBeInTheDocument();
+    mockDndContext.onDragEnd?.({
+      active: { id: "queue-2" },
+      over: { id: "queue-1" },
+    });
+
+    expect(mockSendEvent).toHaveBeenCalledWith({
+      type: "queue_reorder",
+      queue_item_id: "queue-2",
+      toIndex: 0,
+    });
+  });
+
+  it("uses the hovered row as the insertion target when dragging down", () => {
+    mockParams.roomId = "room-1";
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({ id: "t1", title: "Song One" });
+    const second = createMockTrack({ id: "t2", title: "Song Two" });
+    mockUseApiData.value = makeRoom({
+      queue: [
+        {
+          id: "queue-1",
+          track: first,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />);
+    mockDndContext.onDragEnd?.({
+      active: { id: "queue-1" },
+      over: { id: "queue-2" },
+    });
+
+    expect(mockSendEvent).toHaveBeenCalledWith({
+      type: "queue_reorder",
+      queue_item_id: "queue-1",
+      toIndex: 1,
+    });
+  });
+
+  it("keeps the shared queue inside a scrollable panel", () => {
+    mockParams.roomId = "room-1";
+    mockUseApiLoading.value = false;
+    mockUseApiData.value = makeRoom({
+      queue: [
+        {
+          id: "queue-1",
+          track: createMockTrack({ id: "t1", title: "Song One" }),
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+    renderWithListenProviders(<JamSession />);
+
+    const queueList = screen.getByTestId("jam-shared-queue-list");
+    expect(queueList.className).toContain("max-h");
+    expect(queueList.className).toContain("overflow-y-auto");
+  });
+
+  it("advances the shared queue at the end of a track in DJ mode", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({ id: "t1", title: "Song One" });
+    const second = createMockTrack({ id: "t2", title: "Song Two" });
+    mockUseApiData.value = makeRoom({
+      queue_mode: "manual",
+      current_track_payload: {
+        track: first,
+        position: 0,
+        playing: true,
+      },
+      queue: [
+        {
+          id: "queue-1",
+          track: first,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />, {
+      playerState: { isPlaying: true },
+      playerProgress: { currentTime: 99.5, duration: 100 },
+    });
+
+    await waitFor(() => {
+      expect(mockSendEvent).toHaveBeenCalledWith({ type: "play_next" });
+    });
+  });
+
+  it("advances the authoritative queue when the player already moved to the next track", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({
+      id: "t1",
+      entityUid: "track-1",
+      title: "Song One",
+    });
+    const second = createMockTrack({
+      id: "t2",
+      entityUid: "track-2",
+      title: "Song Two",
+    });
+    mockUseApiData.value = makeRoom({
+      queue_mode: "manual",
+      current_track_payload: {
+        track: first,
+        position: 0,
+        playing: true,
+      },
+      queue: [
+        {
+          id: "queue-1",
+          track: first,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: second },
+      playerState: { isPlaying: true },
+      playerProgress: { currentTime: 0, duration: 100 },
+    });
+
+    await waitFor(() => {
+      expect(mockSendEvent).toHaveBeenCalledWith({ type: "play_next" });
+    });
+  });
+
+  it("advances the room when the player reports the current track finished", async () => {
+    mockParams.roomId = "room-1";
+    mockJamConnected.value = true;
+    mockUseApiLoading.value = false;
+    const first = createMockTrack({
+      id: "t1",
+      entityUid: "track-1",
+      title: "Song One",
+    });
+    const second = createMockTrack({
+      id: "t2",
+      entityUid: "track-2",
+      title: "Song Two",
+    });
+    const roomFirst = {
+      ...first,
+      globalTrackUid: "room-global-track-1",
+      entityUid: "stable-entity-track-1",
+    };
+    const playerFirst = {
+      ...first,
+      globalTrackUid: "player-global-track-1",
+      entityUid: "stable-entity-track-1",
+    };
+    mockUseApiData.value = makeRoom({
+      queue_mode: "manual",
+      current_track_payload: {
+        track: roomFirst,
+        position: 100,
+        playing: false,
+      },
+      queue: [
+        {
+          id: "queue-1",
+          track: roomFirst,
+          status: "playing",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+        {
+          id: "queue-2",
+          track: second,
+          status: "queued",
+          vote_count: 0,
+          voted_by_me: false,
+        },
+      ],
+    });
+
+    renderWithListenProviders(<JamSession />, {
+      playerActions: { currentTrack: playerFirst },
+      playerProgress: { currentTime: 100, duration: 100 },
+    });
+
+    window.dispatchEvent(
+      new CustomEvent(PLAYER_TRACK_FINISHED_EVENT, {
+        detail: { track: playerFirst },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockSendEvent).toHaveBeenCalledWith({ type: "play_next" });
+    });
+  });
+
+  it("reflects a queue mode change even when the PATCH response is stale", async () => {
+    mockParams.roomId = "room-1";
+    mockUseApiLoading.value = false;
+    mockUseApiData.value = makeRoom({ queue_mode: "manual" });
+    mockApiCall.mockResolvedValueOnce(makeRoom({ queue_mode: "manual" }));
+    renderWithListenProviders(<JamSession />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /switch to auto mode/i }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /switch to dj mode/i }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("Auto mode")).toBeInTheDocument();
+  });
+
+  it("keeps the user in the room and focuses queue search from the empty state", async () => {
+    mockParams.roomId = "room-1";
+    mockUseApiLoading.value = false;
+    mockUseApiData.value = makeRoom({ queue: [] });
+    renderWithListenProviders(<JamSession />);
+
+    const searchInput = screen.getByPlaceholderText(
+      "Search tracks to add to this room",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /browse library/i }),
+    );
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+    await waitFor(() => expect(searchInput).toHaveFocus());
   });
 });
 
@@ -1449,9 +2468,12 @@ describe("JamSession modals", () => {
 
   it("closes metadata modal when cancel is clicked", async () => {
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
-      screen.getByRole("button", { name: /edit room profile/i }),
+      screen.getByRole("button", {
+        name: /edit room profile/i,
+      }),
     );
     expect(screen.getByText("Room profile")).toBeInTheDocument();
 
@@ -1469,6 +2491,7 @@ describe("JamSession modals", () => {
     };
     mockApiCall.mockResolvedValueOnce(invite);
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(
       screen.getByRole("button", { name: /invite people/i }),
@@ -1480,6 +2503,7 @@ describe("JamSession modals", () => {
 
   it("closes delete modal when cancel is clicked", async () => {
     renderWithListenProviders(<JamSession />);
+    await openRoomActionsMenu();
 
     await userEvent.click(screen.getByRole("button", { name: /delete room/i }));
     const heading = screen.getByRole("heading", { name: /delete room/i });

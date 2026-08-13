@@ -1,0 +1,70 @@
+[
+  {
+    "name": "desktop-centered",
+    "source": { "width": 2400, "height": 1200 },
+    "target": { "width": 1480, "height": 600 },
+    "recipe": {
+      "mode": "extend",
+      "position_x": 0.5,
+      "position_y": 0.5,
+      "scale": 1,
+      "blur": 32,
+      "feather": 28,
+      "gradient": 0.45,
+      "brightness": 1,
+      "contrast": 1
+    },
+    "expected_frame": { "x": 0, "y": -70, "width": 1480, "height": 740 }
+  },
+  {
+    "name": "mobile-centered",
+    "source": { "width": 1200, "height": 2000 },
+    "target": { "width": 1080, "height": 1350 },
+    "recipe": {
+      "mode": "extend",
+      "position_x": 0.5,
+      "position_y": 0.5,
+      "scale": 1,
+      "blur": 32,
+      "feather": 28,
+      "gradient": 0.45,
+      "brightness": 1,
+      "contrast": 1
+    },
+    "expected_frame": { "x": 0, "y": -225, "width": 1080, "height": 1800 }
+  },
+  {
+    "name": "desktop-zoomed-placement",
+    "source": { "width": 2000, "height": 1000 },
+    "target": { "width": 1480, "height": 600 },
+    "recipe": {
+      "mode": "extend",
+      "position_x": 0.2,
+      "position_y": 0.75,
+      "scale": 1.25,
+      "blur": 32,
+      "feather": 28,
+      "gradient": 0.45,
+      "brightness": 0.8,
+      "contrast": 1.2
+    },
+    "expected_frame": { "x": -74, "y": -244, "width": 1850, "height": 925 }
+  },
+  {
+    "name": "desktop-edge-placement",
+    "source": { "width": 1000, "height": 1000 },
+    "target": { "width": 1480, "height": 600 },
+    "recipe": {
+      "mode": "extend",
+      "position_x": 1.3,
+      "position_y": -0.25,
+      "scale": 0.75,
+      "blur": 32,
+      "feather": 28,
+      "gradient": 0.45,
+      "brightness": 1,
+      "contrast": 1
+    },
+    "expected_frame": { "x": 814, "y": 150, "width": 1110, "height": 1110 }
+  }
+]

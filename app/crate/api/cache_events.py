@@ -83,6 +83,7 @@ _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
     {
         "home",
         "library",
+        "global_catalog",
         "shows",
         "upcoming",
         "curation",
@@ -123,6 +124,18 @@ def broadcast_invalidation(*scopes: str):
     except Exception:
         log.warning("Failed to persist cache invalidations", exc_info=True)
     _get_invalidation_dispatcher().submit(normalized)
+
+
+def wait_for_cache_invalidation(*, timeout: float = 2.0) -> bool:
+    """Wait until this process has applied queued cache invalidations."""
+    dispatcher = _invalidation_dispatcher
+    if dispatcher is None:
+        return True
+    try:
+        return dispatcher.wait_until_idle(timeout=max(0.0, timeout))
+    except Exception:
+        log.warning("Failed to wait for cache invalidation", exc_info=True)
+        return False
 
 
 def _persist_invalidation_events(scopes: tuple[str, ...]) -> None:
@@ -232,6 +245,7 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "saved_albums",
                 "history",
                 "library",
+                "global_catalog",
                 "curation",
                 "playlists",
                 "shows",
@@ -242,7 +256,15 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
         ):
             mark_ui_snapshots_stale(scope_prefix="home:")
         if any(
-            scope in {"library", "shows", "upcoming", "curation", "playlists"}
+            scope
+            in {
+                "library",
+                "global_catalog",
+                "shows",
+                "upcoming",
+                "curation",
+                "playlists",
+            }
             or scope.startswith(("artist:", "album:", "playlist:"))
             for scope in scopes
         ):

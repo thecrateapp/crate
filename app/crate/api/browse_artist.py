@@ -7,6 +7,11 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 
 from crate.api.artwork_delivery import deliver_artwork, deliver_original_artwork
+from crate.artist_hero_artwork import (
+    ARTIST_HERO_RENDER_VERSION,
+    DESKTOP_HERO_SIZE,
+    MOBILE_HERO_SIZE,
+)
 from crate.api._deps import (
     artist_name_from_id,
     artist_name_from_ref,
@@ -63,7 +68,9 @@ from crate.db.repositories.library import (
     get_library_artist_by_entity_uid,
     get_library_artist_by_slug,
 )
+from crate.db.repositories.artist_hero_artwork import get_artist_hero_artwork
 from crate.db.repositories.playlists import get_public_system_playlists_for_artist
+from crate.db.repositories.tasks import create_task_dedup
 from crate.db.queries.browse_artist import (
     artist_decade_filter_sql,
     check_artists_in_library,
@@ -976,6 +983,54 @@ def api_artist_background_by_entity_uid(
 
 
 @router.get(
+    "/api/artists/{artist_id}/hero",
+    responses=_IMAGE_RESPONSES,
+    summary="Get an editorial artist-hero composition",
+)
+def api_artist_hero_by_id(
+    request: Request,
+    artist_id: int,
+    composition: str = Query("desktop", pattern="^(desktop|mobile)$"),
+    size: int | None = Query(None, ge=32, le=2048),
+    image_format: str | None = Query(None, alias="format", pattern="^webp$"),
+):
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return Response(status_code=404)
+    return api_artist_hero(
+        request,
+        artist_name,
+        composition=composition,
+        size=size,
+        image_format=image_format,
+    )
+
+
+@router.get(
+    "/api/artists/by-entity/{artist_entity_uid}/hero",
+    responses=_IMAGE_RESPONSES,
+    summary="Get an editorial artist-hero composition by entity UID",
+)
+def api_artist_hero_by_entity_uid(
+    request: Request,
+    artist_entity_uid: str,
+    composition: str = Query("desktop", pattern="^(desktop|mobile)$"),
+    size: int | None = Query(None, ge=32, le=2048),
+    image_format: str | None = Query(None, alias="format", pattern="^webp$"),
+):
+    artist = get_library_artist_by_entity_uid(artist_entity_uid)
+    if not artist:
+        return Response(status_code=404)
+    return api_artist_hero(
+        request,
+        artist["name"],
+        composition=composition,
+        size=size,
+        image_format=image_format,
+    )
+
+
+@router.get(
     "/api/artists/{artist_id}/top-tracks",
     response_model=list[ArtistTopTrackResponse],
     responses=AUTH_ERROR_RESPONSES,
@@ -1257,6 +1312,104 @@ def api_artist_background(
             cache_control="private, max-age=300, stale-while-revalidate=86400",
         )
     return Response(status_code=404)
+
+
+def api_artist_hero(
+    request: Request,
+    name: str,
+    *,
+    composition: str,
+    size: int | None = None,
+    image_format: str | None = None,
+):
+    """Deliver the canonical composed hero for Home and artist pages."""
+    _require_auth(request)
+    artist_row = get_library_artist(name)
+    artist_dir = resolve_artist_dir(
+        library_path(), artist_row, fallback_name=name, existing_only=True
+    )
+    entity_uid = str((artist_row or {}).get("entity_uid") or "")
+    artist_id = int((artist_row or {}).get("id") or 0)
+    profile = get_artist_hero_artwork(artist_id) if artist_id else None
+    local_original = (
+        artist_dir / f"artist-hero-{composition}.webp" if artist_dir else None
+    )
+    has_eligible_profile = bool(
+        entity_uid and profile and profile.get("review_status") != "rejected"
+    )
+    if has_eligible_profile and profile is not None:
+        revision = str(profile.get("revision") or "")
+        renderer_is_current = revision.startswith(f"{ARTIST_HERO_RENDER_VERSION}:")
+        if (
+            local_original is None
+            or not local_original.is_file()
+            or not renderer_is_current
+        ):
+            _queue_artist_hero_recompose(name, artist_id)
+            return _artist_hero_pending_response(composition, revision)
+        canonical_width = (
+            DESKTOP_HERO_SIZE[0] if composition == "desktop" else MOBILE_HERO_SIZE[0]
+        )
+        if size is None or size == canonical_width:
+            response = deliver_original_artwork(
+                local_original,
+                cache_control="private, no-cache, must-revalidate",
+            )
+        else:
+            response = deliver_artwork(
+                ArtworkAsset("artist-hero", f"{entity_uid}:{composition}"),
+                requested_size=size,
+                local_original=local_original,
+                missing_response=Response(status_code=404),
+                cache_visibility="private",
+                validate_source_revision=True,
+            )
+        return _decorate_artist_hero_response(response, composition, revision)
+    return api_artist_background(
+        request,
+        name,
+        False,
+        size=size,
+        image_format=image_format,
+    )
+
+
+def _queue_artist_hero_recompose(name: str, artist_id: int) -> None:
+    try:
+        create_task_dedup(
+            "recompose_artist_hero",
+            {"artist": name},
+            dedup_key=f"recompose-artist-hero:{artist_id}",
+        )
+    except Exception:
+        logging.getLogger(__name__).debug(
+            "Failed to queue artist hero recomposition",
+            exc_info=True,
+        )
+
+
+def _artist_hero_pending_response(composition: str, revision: str) -> Response:
+    return Response(
+        status_code=503,
+        headers={
+            "Cache-Control": "no-store",
+            "Retry-After": "1",
+            "X-Crate-Artwork": "hero-pending",
+            "X-Crate-Artwork-Revision": revision,
+            "X-Crate-Hero-Composition": composition,
+        },
+    )
+
+
+def _decorate_artist_hero_response(
+    response: Response, composition: str, revision: str
+) -> Response:
+    headers = getattr(response, "headers", None)
+    if headers is not None:
+        headers["X-Crate-Artwork"] = "hero"
+        headers["X-Crate-Artwork-Revision"] = revision
+        headers["X-Crate-Hero-Composition"] = composition
+    return response
 
 
 def api_artist_photo(

@@ -5,6 +5,7 @@ Config priority: function arg > DB setting > env var > detected provider > Ollam
 """
 
 import json
+import base64
 import logging
 import os
 from typing import TypeVar
@@ -264,3 +265,91 @@ def ask_structured(
             raw[:200],
         )
         raise ValueError(f"LLM returned invalid JSON: {e}") from e
+
+
+def ask_image_structured(
+    response_model: type[T],
+    prompt: str,
+    *,
+    image: bytes,
+    media_type: str,
+    system: str = "",
+    model: str | None = None,
+) -> T:
+    """Ask a vision-capable provider for structured image analysis."""
+    if not image or not media_type.startswith("image/"):
+        raise ValueError("A valid image payload is required")
+    selected_model = model or _get_model()
+    schema = json.dumps(response_model.model_json_schema(), indent=2)
+    instruction = (f"{system}\n\n" if system else "") + (
+        f"Respond with ONLY a valid JSON object matching this schema:\n{schema}"
+    )
+    encoded = base64.b64encode(image).decode()
+
+    if selected_model.startswith("gemini/"):
+        api_key = get_provider_api_key("gemini")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY not set")
+        model_name = selected_model.removeprefix("gemini/")
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model_name}:generateContent"
+        )
+        body = {
+            "systemInstruction": {"parts": [{"text": instruction}]},
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {"inlineData": {"mimeType": media_type, "data": encoded}},
+                    ]
+                }
+            ],
+            "generationConfig": {"responseMimeType": "application/json"},
+        }
+        try:
+            response = requests.post(
+                url, json=body, params={"key": api_key}, timeout=90
+            )
+            response.raise_for_status()
+            parts = response.json()["candidates"][0]["content"]["parts"]
+            raw = next(str(part["text"]) for part in parts if "text" in part)
+        except Exception as exc:
+            raise RuntimeError(f"Gemini vision error: {exc}") from exc
+    elif selected_model.startswith(("ollama/", "ollama_chat/")):
+        raw = _ollama_chat(
+            selected_model,
+            [
+                {"role": "system", "content": instruction},
+                {"role": "user", "content": prompt, "images": [encoded]},
+            ],
+            json_mode=True,
+        )
+    else:
+        raw = _litellm_chat(
+            selected_model,
+            [
+                {"role": "system", "content": instruction},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:{media_type};base64,{encoded}"},
+                        },
+                    ],
+                },
+            ],
+            json_mode=True,
+        )
+
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+    try:
+        return response_model.model_validate(json.loads(cleaned.strip()))
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ValueError(f"LLM returned invalid JSON: {exc}") from exc

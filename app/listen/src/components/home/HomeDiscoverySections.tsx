@@ -4,18 +4,25 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  ARTIST_HERO_DESKTOP_SIZE,
+  ARTIST_HERO_MOBILE_SIZE,
+  ArtistHeroFrame,
+  type ArtistHeroArtworkBounds,
+} from "@crate/ui/domain/ArtistHeroFrame";
+import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import {
   Play,
   Sparkles,
   Radio,
   Disc3,
   UserRound,
-  ChevronLeft,
-  ChevronRight,
-  Info,
-  X,
+  ChevronUp,
+  ChevronDown,
 } from "@crate/ui/icons";
 
 import {
@@ -51,7 +58,7 @@ import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
 import {
   albumCoverApiUrl,
   albumPagePath,
-  artistBackgroundApiUrl,
+  artistHeroApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
@@ -60,6 +67,7 @@ import { cn } from "@/lib/utils";
 
 import type {
   HomeDiscoveryPayload,
+  HomeDiscoveryHeroSurfaces,
   HomeGeneratedPlaylistSummary,
   HomeHeroArtist,
   HomeListeningHistoryCard,
@@ -69,18 +77,7 @@ import type {
   HomeSuggestedAlbum,
 } from "./home-model";
 
-const numberFormatter = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const HERO_BACKGROUND_VERSION = "home-hero-bg-v2";
-const HERO_SWIPE_MIN_DISTANCE_PX = 44;
-const HERO_SWIPE_MAX_DURATION_MS = 1_200;
-const HERO_SWIPE_AXIS_DOMINANCE = 1.2;
-
-function statValue(value: number): string {
-  return numberFormatter.format(value || 0);
-}
+const HERO_BACKGROUND_VERSION = "home-just-landed-v1";
 
 function chunkItems<T>(items: T[], size: number): T[][] {
   if (size <= 0) return [items];
@@ -89,6 +86,21 @@ function chunkItems<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function dedupeHeroArtists(heroes: HomeHeroArtist[]): HomeHeroArtist[] {
+  const seen = new Set<string>();
+  return heroes.filter((hero) => {
+    const name = hero.name?.trim().replace(/\s+/g, " ").toLowerCase();
+    const key = name || hero.entity_uid || String(hero.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function heroSelectionKey(hero: HomeHeroArtist): string {
+  return hero.entity_uid || String(hero.id);
 }
 
 function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
@@ -260,20 +272,44 @@ function radioSeedSubtitle(station: HomeRadioStation): string | null {
   );
 }
 
-function heroBackgroundSrc(hero: HomeHeroArtist): string | undefined {
-  const backgroundUrl = artistBackgroundApiUrl(
+function heroBackgroundSrc(
+  hero: HomeHeroArtist,
+  composition: "desktop" | "mobile",
+): string | undefined {
+  const canonical = hero.hero_compositions?.[composition];
+  const backgroundUrl = artistHeroApiUrl(
     {
       artistId: hero.id,
+      artistEntityUid: hero.entity_uid,
       artistSlug: hero.slug,
       artistName: hero.name,
     },
-    { size: 1280 },
+    composition,
+    {
+      size:
+        canonical?.width ??
+        (composition === "desktop"
+          ? ARTIST_HERO_DESKTOP_SIZE.width
+          : ARTIST_HERO_MOBILE_SIZE.width),
+      version:
+        canonical?.render_revision ||
+        hero.artwork_revision ||
+        HERO_BACKGROUND_VERSION,
+    },
   );
-  return backgroundUrl
-    ? `${backgroundUrl}${
-        backgroundUrl.includes("?") ? "&" : "?"
-      }v=${HERO_BACKGROUND_VERSION}`
-    : undefined;
+  return backgroundUrl || undefined;
+}
+
+function heroArtworkBounds(
+  hero: HomeHeroArtist,
+  composition: "desktop" | "mobile",
+): ArtistHeroArtworkBounds | undefined {
+  return (
+    hero.hero_compositions?.[composition]?.bounds ||
+    (composition === "desktop"
+      ? hero.desktop_artwork_bounds
+      : hero.mobile_artwork_bounds)
+  );
 }
 
 function requestBackgroundWork(callback: () => void): () => void {
@@ -295,27 +331,17 @@ function requestBackgroundWork(callback: () => void): () => void {
   return () => window.clearTimeout(handle);
 }
 
-function sameSet(left: Set<string>, right: Set<string>): boolean {
-  if (left.size !== right.size) return false;
-  for (const value of left) {
-    if (!right.has(value)) return false;
-  }
-  return true;
-}
-
 function useHeroBackgroundPreloader(
   heroes: HomeHeroArtist[],
   activeIndex: number,
-): Set<string> {
+  composition: "desktop" | "mobile",
+): void {
   const sources = useMemo(
     () =>
       heroes
-        .map(heroBackgroundSrc)
+        .map((hero) => heroBackgroundSrc(hero, composition))
         .filter((src): src is string => Boolean(src)),
-    [heroes],
-  );
-  const [readySources, setReadySources] = useState<Set<string>>(
-    () => new Set(),
+    [composition, heroes],
   );
   const readyRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
@@ -328,10 +354,6 @@ function useHeroBackgroundPreloader(
     inFlightRef.current = new Set(
       [...inFlightRef.current].filter((src) => allowed.has(src)),
     );
-    setReadySources((prev) => {
-      const next = new Set([...prev].filter((src) => allowed.has(src)));
-      return sameSet(prev, next) ? prev : next;
-    });
   }, [sources]);
 
   useEffect(() => {
@@ -344,12 +366,6 @@ function useHeroBackgroundPreloader(
 
     const markReady = (src: string) => {
       readyRef.current.add(src);
-      setReadySources((prev) => {
-        if (prev.has(src)) return prev;
-        const next = new Set(prev);
-        next.add(src);
-        return next;
-      });
     };
 
     const loadSource = (src: string | undefined, priority: "high" | "low") => {
@@ -403,244 +419,274 @@ function useHeroBackgroundPreloader(
       started.forEach((src) => inFlightRef.current.delete(src));
     };
   }, [activeIndex, sources]);
-
-  return readySources;
 }
 
 export function HomeTasteHero({
   heroes,
+  heroSurfaces,
   isFollowing,
   onOpenArtist,
   onPlay,
   onToggleFollow,
-  onInfo,
-  onDismiss,
-  onExpose,
+  desktopIntro,
 }: {
   heroes: HomeHeroArtist[];
+  heroSurfaces?: HomeDiscoveryHeroSurfaces | null;
   isFollowing: (id?: number) => boolean;
   onOpenArtist: (artist: HomeHeroArtist) => void;
   onPlay: (artist: HomeHeroArtist) => void;
   onToggleFollow: (artist: HomeHeroArtist) => void;
-  onInfo: (artist: HomeHeroArtist) => void;
-  onDismiss?: (artist: HomeHeroArtist) => void;
-  onExpose?: (artist: HomeHeroArtist) => void;
+  desktopIntro?: ReactNode;
 }) {
-  const [idx, setIdx] = useState(0);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
-  const exposedRef = useRef<Set<string>>(new Set());
-  const visibleRef = useRef(false);
-  const count = heroes.length;
   const isDesktop = useIsDesktop();
-  const readyBackgrounds = useHeroBackgroundPreloader(heroes, idx);
-
-  const go = (to: number) => setIdx(((to % count) + count) % count);
-
-  // Autoplay
-  useEffect(() => {
-    if (count <= 1) return;
-    autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
-    return () => {
-      if (autoRef.current) clearInterval(autoRef.current);
-    };
-  }, [count]);
-
-  const pause = () => {
-    if (autoRef.current) {
-      clearInterval(autoRef.current);
-      autoRef.current = null;
-    }
-  };
-  const resume = () => {
-    pause();
-    if (count <= 1) return;
-    autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
-  };
-
-  const exposeCurrent = () => {
-    if (!onExpose || !visibleRef.current || !count) return;
-    const hero = heroes[idx];
-    if (!hero) return;
-    const key = `${hero.id || hero.slug || hero.name}:${idx}`;
-    if (exposedRef.current.has(key)) return;
-    exposedRef.current.add(key);
-    onExpose(hero);
-  };
-
-  useEffect(() => {
-    if (!onExpose) return;
-    const node = rootRef.current;
-    if (!node || typeof IntersectionObserver === "undefined") {
-      visibleRef.current = true;
-      exposeCurrent();
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        visibleRef.current = Boolean(entry?.isIntersecting);
-        exposeCurrent();
-      },
-      { threshold: 0.45 },
+  const composition = isDesktop ? "desktop" : "mobile";
+  const surface = heroSurfaces?.[composition];
+  const surfaceArtists = heroSurfaces ? surface?.artists ?? [] : heroes;
+  const surfaceHeroes = useMemo(
+    () => dedupeHeroArtists(surfaceArtists),
+    [surfaceArtists],
+  );
+  const count = surfaceHeroes.length;
+  const [idx, setIdx] = useState(() =>
+    isDesktop && count > 1 ? Math.floor(Math.random() * count) : 0,
+  );
+  const [mobileHeroKey, setMobileHeroKey] = useState<string | null>(() => {
+    if (isDesktop || !count) return null;
+    return heroSelectionKey(
+      surfaceHeroes[Math.floor(Math.random() * count)] || surfaceHeroes[0]!,
     );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [onExpose]);
+  });
+  const desktopActiveIndex = Math.min(idx, Math.max(count - 1, 0));
+  const mobileHero = surfaceHeroes.find(
+    (hero) => heroSelectionKey(hero) === mobileHeroKey,
+  );
+  const mobileActiveIndex = mobileHero
+    ? Math.max(0, surfaceHeroes.indexOf(mobileHero))
+    : 0;
+  const activeIndex = isDesktop ? desktopActiveIndex : mobileActiveIndex;
+  const desktopInitialIndexSet = useRef(isDesktop && count > 1);
+  useHeroBackgroundPreloader(surfaceHeroes, activeIndex, composition);
 
   useEffect(() => {
-    exposeCurrent();
-  }, [idx, heroes, onExpose]);
+    setIdx((current) =>
+      Math.min(current, Math.max(surfaceHeroes.length - 1, 0)),
+    );
+  }, [surfaceHeroes.length]);
 
-  // Touch swipe
-  const onTouchStart = (e: React.TouchEvent) => {
-    pause();
-    const touch = e.touches[0];
-    if (touch) {
-      touchRef.current = {
-        x: touch.clientX,
-        y: touch.clientY,
-        t: Date.now(),
-      };
-    }
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const start = touchRef.current;
-    if (!start) {
-      resume();
-      return;
-    }
-    const endTouch = e.changedTouches[0];
-    if (!endTouch) {
-      resume();
-      return;
-    }
-    const dx = endTouch.clientX - start.x;
-    const dy = endTouch.clientY - start.y;
-    const dt = Date.now() - start.t;
-    const horizontal = Math.abs(dx);
-    const vertical = Math.abs(dy);
-    if (
-      horizontal > HERO_SWIPE_MIN_DISTANCE_PX &&
-      horizontal > vertical * HERO_SWIPE_AXIS_DOMINANCE &&
-      dt <= HERO_SWIPE_MAX_DURATION_MS
-    ) {
-      go(idx + (dx < 0 ? 1 : -1));
-    }
-    touchRef.current = null;
-    resume();
-  };
+  useEffect(() => {
+    if (!isDesktop || count <= 1 || desktopInitialIndexSet.current) return;
+    desktopInitialIndexSet.current = true;
+    setIdx(Math.floor(Math.random() * count));
+  }, [count, isDesktop]);
+
+  useEffect(() => {
+    if (isDesktop || !count) return;
+    setMobileHeroKey((current) => {
+      if (
+        current &&
+        surfaceHeroes.some((hero) => heroSelectionKey(hero) === current)
+      ) {
+        return current;
+      }
+      return heroSelectionKey(
+        surfaceHeroes[Math.floor(Math.random() * count)] || surfaceHeroes[0]!,
+      );
+    });
+  }, [count, isDesktop, surfaceHeroes]);
 
   if (!count) return null;
 
-  const slides = heroes.map((hero, i) => {
-    const backgroundSrc = heroBackgroundSrc(hero);
-    const backgroundReady = Boolean(
-      backgroundSrc && readyBackgrounds.has(backgroundSrc),
-    );
-    const renderPreparedBackground =
-      i === idx || i === (idx + 1) % count || i === (idx - 1 + count) % count;
-
+  if (!isDesktop) {
+    if (!mobileHero) return null;
+    const hero = mobileHero;
     return (
-      <div
-        key={hero.id}
-        className={cn(
-          "transition-opacity duration-500 ease-in-out",
-          i === idx
-            ? "relative z-10 opacity-100"
-            : "pointer-events-none absolute inset-0 z-0 opacity-0",
-        )}
-        aria-hidden={i !== idx}
-      >
-        <HeroSlide
-          hero={hero}
-          backgroundSrc={
-            backgroundReady && renderPreparedBackground
-              ? backgroundSrc
-              : undefined
-          }
-          following={isFollowing(hero.id)}
-          onOpenArtist={() => onOpenArtist(hero)}
-          onPlay={() => onPlay(hero)}
-          onToggleFollow={() => onToggleFollow(hero)}
-          onInfo={() => onInfo(hero)}
-          onDismiss={onDismiss ? () => onDismiss(hero) : undefined}
-        />
-      </div>
+      <MobileFeaturedArtist
+        hero={hero}
+        backgroundSrc={heroBackgroundSrc(hero, "mobile")}
+        following={isFollowing(hero.id)}
+        onOpenArtist={() => onOpenArtist(hero)}
+        onPlay={() => onPlay(hero)}
+        onToggleFollow={() => onToggleFollow(hero)}
+      />
     );
-  });
+  }
+
+  const go = (offset: number) => {
+    setIdx((current) => (current + offset + count) % count);
+  };
 
   return (
     <div
-      ref={rootRef}
-      className="relative touch-pan-y"
-      onMouseEnter={pause}
-      onMouseLeave={resume}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      data-testid="desktop-editorial-hero"
+      className="relative mx-auto aspect-[1480/600] min-h-[clamp(480px,38dvh,600px)] w-full max-w-[1480px] overflow-hidden bg-app-surface"
     >
-      {/* Stack all slides — only active one is visible */}
-      {slides}
+      {surfaceHeroes.map((hero, index) => {
+        const source = heroBackgroundSrc(hero, "desktop");
+        const isPrepared =
+          index === desktopActiveIndex ||
+          index === (desktopActiveIndex + 1) % count ||
+          index === (desktopActiveIndex - 1 + count) % count;
+        return (
+          <DesktopFeaturedArtist
+            key={hero.entity_uid || hero.id}
+            hero={hero}
+            active={index === desktopActiveIndex}
+            backgroundSrc={isPrepared ? source : undefined}
+            following={isFollowing(hero.id)}
+            onOpenArtist={() => onOpenArtist(hero)}
+            onPlay={() => onPlay(hero)}
+            onToggleFollow={() => onToggleFollow(hero)}
+          />
+        );
+      })}
 
-      {/* Nav arrows */}
-      {isDesktop && count > 1 && (
-        <>
-          <button
-            onClick={() => {
-              go(idx - 1);
-              pause();
-            }}
-            className="absolute left-3 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/60 backdrop-blur-sm transition hover:bg-black/60 hover:text-white sm:top-1/2 sm:h-8 sm:w-8 sm:-translate-y-1/2"
-            aria-label="Previous"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            onClick={() => {
-              go(idx + 1);
-              pause();
-            }}
-            className="absolute right-3 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/60 backdrop-blur-sm transition hover:bg-black/60 hover:text-white sm:top-1/2 sm:h-8 sm:w-8 sm:-translate-y-1/2"
-            aria-label="Next"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </>
-      )}
+      {count > 1 ? (
+        <DesktopHeroNavigation
+          heroes={surfaceHeroes}
+          activeIndex={desktopActiveIndex}
+          onPrevious={() => go(-1)}
+          onNext={() => go(1)}
+          onSelect={setIdx}
+        />
+      ) : null}
 
-      {/* Dots */}
-      {count > 1 && (
-        <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-1.5 sm:bottom-4">
-          {heroes.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setIdx(i);
-                pause();
-              }}
-              className={cn(
-                "h-1.5 rounded-full transition-all duration-300",
-                i === idx
-                  ? "w-6 bg-primary"
-                  : "w-1.5 bg-white/25 hover:bg-white/40",
-              )}
-            />
-          ))}
+      {desktopIntro ? (
+        <div
+          data-testid="desktop-hero-intro"
+          className="pointer-events-none absolute inset-x-0 top-0 z-20"
+        >
+          <div className="mx-auto w-full max-w-[1480px] px-6 pt-[92px]">
+            {desktopIntro}
+          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function HeroSlide({
+function HeroBackdrop({
+  hero,
+  backgroundSrc,
+  composition,
+  artworkBounds,
+}: {
+  hero: HomeHeroArtist;
+  backgroundSrc?: string;
+  composition: "desktop" | "mobile";
+  artworkBounds?: ArtistHeroArtworkBounds;
+}) {
+  // A persisted hero already contains the worker's treatment. Applying a
+  // second browser filter here would make Admin and Home render different
+  // pixels, especially for derived compositions.
+  const grayscale =
+    !hero.artwork_revision && hero.artwork_provenance !== "specific";
+  const usesExtendedCanvas =
+    artworkBounds &&
+    (artworkBounds.left !== 0 ||
+      artworkBounds.top !== 0 ||
+      artworkBounds.right !== 1 ||
+      artworkBounds.bottom !== 1);
+
+  if (!backgroundSrc) return null;
+
+  return (
+    <CrateImage
+      data-testid={`${composition}-hero-artwork`}
+      src={backgroundSrc}
+      retryPolicy="eventual"
+      alt=""
+      aria-hidden="true"
+      decoding="async"
+      className={cn(
+        "absolute inset-0 h-full w-full transition-opacity duration-500",
+        usesExtendedCanvas ? "object-fill" : "object-cover object-center",
+        grayscale ? "grayscale" : "",
+      )}
+    />
+  );
+}
+
+function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
+  const genres =
+    hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
+
+  if (genres.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
+      {genres.slice(0, 2).map((genre) => (
+        <GenrePill
+          key={genre.name}
+          item={genre}
+          className="max-w-[42vw] border-white/10 bg-black/30 text-white/80 backdrop-blur-sm sm:max-w-none"
+        />
+      ))}
+    </div>
+  );
+}
+
+function HeroActions({
+  hero,
+  following,
+  onPlay,
+  onToggleFollow,
+}: {
+  hero: HomeHeroArtist;
+  following: boolean;
+  onPlay: () => void;
+  onToggleFollow: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const playLabel = t("home.hero.playArtist", { name: hero.name });
+  const followLabel = t(
+    following ? "actions.artist.unfollowNamed" : "actions.artist.followNamed",
+    { name: hero.name },
+  );
+
+  return (
+    <div className="mt-6 flex items-center gap-2.5">
+      <button
+        type="button"
+        aria-label={playLabel}
+        className={cn(
+          "inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground shadow-[0_10px_28px_rgba(6,182,212,0.2)] transition-colors hover:bg-primary/90",
+          "px-5",
+        )}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onPlay();
+        }}
+      >
+        <Play size={17} fill="currentColor" />
+        <span>{t("home.hero.playCta")}</span>
+      </button>
+      <FollowHeartButton
+        aria-label={followLabel}
+        className={cn(
+          "inline-flex h-11 w-11 items-center justify-center rounded-md border-0 bg-transparent text-white/80 transition-colors hover:bg-transparent hover:text-white",
+        )}
+        following={following}
+        heartTestId="hero-follow-heart"
+        particlesTestId="hero-follow-particles"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onToggleFollow();
+        }}
+      />
+    </div>
+  );
+}
+
+function MobileFeaturedArtist({
   hero,
   backgroundSrc,
   following,
   onOpenArtist,
   onPlay,
   onToggleFollow,
-  onInfo,
-  onDismiss,
 }: {
   hero: HomeHeroArtist;
   backgroundSrc?: string;
@@ -648,118 +694,175 @@ function HeroSlide({
   onOpenArtist: () => void;
   onPlay: () => void;
   onToggleFollow: () => void;
-  onInfo: () => void;
-  onDismiss?: () => void;
 }) {
   const { t } = useTranslation();
-  const genres =
-    hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
-
   return (
-    <section
-      className="group relative w-full overflow-hidden rounded-[34px] border border-white/10"
-      role="button"
-      tabIndex={0}
-      onClick={onOpenArtist}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpenArtist();
+    <section className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden bg-app-surface">
+      <ArtistHeroFrame
+        composition="mobile"
+        artworkBounds={heroArtworkBounds(hero, "mobile")}
+        className="absolute inset-0 h-full"
+        artwork={
+          <HeroBackdrop
+            hero={hero}
+            backgroundSrc={backgroundSrc}
+            composition="mobile"
+            artworkBounds={heroArtworkBounds(hero, "mobile")}
+          />
         }
-      }}
-    >
-      <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(6,10,14,0.98)_0%,rgba(10,16,22,0.96)_52%,rgba(4,9,13,0.98)_100%)]" />
-      {backgroundSrc ? (
-        <CrateImage
-          src={backgroundSrc}
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover object-top"
-        />
-      ) : null}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.92)_0%,rgba(5,7,11,0.75)_45%,rgba(5,7,11,0.32)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.26),transparent_42%)]" />
-      {onDismiss ? (
+      >
         <button
           type="button"
-          className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-black/35 px-3 text-[11px] font-semibold text-white/70 backdrop-blur-xl transition hover:bg-black/55 hover:text-white"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDismiss();
-          }}
-        >
-          <X size={13} />
-          {t("home.hero.notInterested")}
-        </button>
-      ) : null}
-
-      <div className="relative z-10 flex min-h-[260px] flex-col justify-between px-4 py-5 pb-12 sm:min-h-[280px] sm:px-8 sm:py-8 lg:px-10">
-        <div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-            {genres.length > 0 ? (
-              <div className="flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
-                {genres.slice(0, 2).map((genre) => (
-                  <GenrePill
-                    key={genre.name}
-                    item={genre}
-                    className="max-w-[42vw] sm:max-w-none"
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <h1 className="mt-4 truncate text-3xl font-black tracking-tight text-white min-[380px]:text-4xl sm:text-5xl lg:text-6xl">
-            {hero.name}
-          </h1>
-
-          <div className="mt-3 flex min-w-0 flex-wrap gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground sm:text-[11px] sm:tracking-[0.18em]">
-            <div className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-              {statValue(hero.listeners)} listeners
-            </div>
-            <div className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-              {hero.album_count} albums · {hero.track_count} tracks
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2.5">
-          <button
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:min-h-0 sm:px-5 sm:py-2.5 sm:text-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay();
-            }}
-          >
-            <Play size={15} fill="currentColor" />
-            {t("player.play")}
-          </button>
-          <button
-            className={cn(
-              "inline-flex min-h-11 items-center rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/[0.12] sm:min-h-0 sm:px-5 sm:py-2.5 sm:text-sm",
-              following ? "text-primary" : "",
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFollow();
-            }}
-          >
-            {following ? t("common.following") : t("common.follow")}
-          </button>
-          <button
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white sm:min-h-0 sm:py-2.5 sm:text-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onInfo();
-            }}
-          >
-            <Info size={14} />
-            {t("common.about")}
-          </button>
-        </div>
-      </div>
+          aria-label={t("home.hero.openArtist", { name: hero.name })}
+          className="absolute inset-0 z-10 cursor-pointer"
+          onClick={onOpenArtist}
+        />
+        <ArtistHeroPresentation
+          composition="mobile"
+          kicker={t("home.hero.featuredArtist")}
+          artistName={hero.name}
+          genres={<HeroGenres hero={hero} />}
+          actions={
+            <HeroActions
+              hero={hero}
+              following={following}
+              onPlay={onPlay}
+              onToggleFollow={onToggleFollow}
+            />
+          }
+          actionsClassName="pointer-events-auto"
+        />
+      </ArtistHeroFrame>
     </section>
+  );
+}
+
+function DesktopFeaturedArtist({
+  hero,
+  active,
+  backgroundSrc,
+  following,
+  onOpenArtist,
+  onPlay,
+  onToggleFollow,
+}: {
+  hero: HomeHeroArtist;
+  active: boolean;
+  backgroundSrc?: string;
+  following: boolean;
+  onOpenArtist: () => void;
+  onPlay: () => void;
+  onToggleFollow: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section
+      aria-hidden={!active}
+      className={cn(
+        "absolute inset-0 transition-opacity duration-500 ease-out motion-reduce:transition-opacity",
+        active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
+      )}
+    >
+      <ArtistHeroFrame
+        composition="desktop"
+        artworkBounds={heroArtworkBounds(hero, "desktop")}
+        className="h-full"
+        artwork={
+          <HeroBackdrop
+            hero={hero}
+            backgroundSrc={backgroundSrc}
+            composition="desktop"
+            artworkBounds={heroArtworkBounds(hero, "desktop")}
+          />
+        }
+      >
+        <button
+          type="button"
+          aria-label={t("home.hero.openArtist", { name: hero.name })}
+          tabIndex={active ? 0 : -1}
+          className="absolute inset-0 z-10 cursor-pointer"
+          onClick={onOpenArtist}
+        />
+        <ArtistHeroPresentation
+          composition="desktop"
+          kicker={t("home.hero.featuredArtist")}
+          artistName={hero.name}
+          genres={<HeroGenres hero={hero} />}
+          actions={
+            <HeroActions
+              hero={hero}
+              following={following}
+              onPlay={onPlay}
+              onToggleFollow={onToggleFollow}
+            />
+          }
+          actionsClassName="pointer-events-auto"
+          copyClassName={cn(
+            "transition-opacity duration-500 ease-out motion-reduce:transition-none",
+            active ? "opacity-100" : "opacity-0",
+          )}
+        />
+      </ArtistHeroFrame>
+    </section>
+  );
+}
+
+function DesktopHeroNavigation({
+  heroes,
+  activeIndex,
+  onPrevious,
+  onNext,
+  onSelect,
+}: {
+  heroes: HomeHeroArtist[];
+  activeIndex: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSelect: (index: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="absolute right-6 top-[200px] z-30 flex h-[190px] w-8 flex-col items-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-1">
+        {heroes.map((hero, index) => (
+          <button
+            key={hero.entity_uid || hero.id}
+            type="button"
+            aria-label={t("home.hero.showArtist", { name: hero.name })}
+            aria-current={index === activeIndex ? "true" : undefined}
+            className="group flex h-6 w-8 items-center justify-center rounded-full bg-transparent"
+            onClick={() => onSelect(index)}
+          >
+            <span
+              className={cn(
+                "block w-1 rounded-full transition-[height,background-color] duration-300",
+                index === activeIndex
+                  ? "h-6 bg-primary"
+                  : "h-1.5 bg-white/35 group-hover:bg-white/60",
+              )}
+            />
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col items-center gap-0.5">
+        <button
+          type="button"
+          aria-label={t("home.hero.previousArtist")}
+          className="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-white/55 shadow-none transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          onClick={onPrevious}
+        >
+          <ChevronUp size={20} />
+        </button>
+        <button
+          type="button"
+          aria-label={t("home.hero.nextArtist")}
+          className="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-white/55 shadow-none transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          onClick={onNext}
+        >
+          <ChevronDown size={20} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -915,7 +1018,7 @@ function RecentEntityRowFrame({
       onClick={onClick}
       onKeyDown={handleKeyDown}
       onContextMenu={actionMenu.handleContextMenu}
-      className="group flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition-colors hover:bg-white/[0.06]"
+      className="group flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition-colors hover:bg-white/[0.06]"
       {...actionMenu.longPressHandlers}
     >
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white/5">
@@ -1109,14 +1212,14 @@ export function CustomMixCard({
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
       className={cn(
-        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl",
+        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
-      <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
+      <div className="relative mb-2 overflow-hidden rounded-xl bg-white/5">
         <MixArtwork
           item={item}
-          className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]"
+          className="aspect-square rounded-xl transition-transform group-hover:scale-[1.02]"
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
           <button
@@ -1220,7 +1323,7 @@ function ListeningHistoryCard({
         tracks={item.artwork_tracks}
         variant="history"
         className={cn(
-          "aspect-[1.12] rounded-2xl bg-gradient-to-br shadow-xl shadow-black/20 transition duration-300 group-hover:border-primary/30 group-hover:brightness-110",
+          "aspect-[1.12] rounded-xl bg-gradient-to-br shadow-xl shadow-black/20 transition duration-300 group-hover:border-primary/30 group-hover:brightness-110",
           HISTORY_TONES[index % HISTORY_TONES.length],
         )}
         textClassName={cn(
@@ -1362,7 +1465,7 @@ export function RadioStationCard({
     <button
       onClick={onPlay}
       className={cn(
-        "group relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] text-left",
+        "group relative overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.04] text-left",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
@@ -1517,14 +1620,14 @@ export function CoreTracksPlaylistCard({
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
       className={cn(
-        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl",
+        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
-      <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
+      <div className="relative mb-2 overflow-hidden rounded-xl bg-white/5">
         <CoreTracksArtwork
           item={item}
-          className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]"
+          className="aspect-square rounded-xl transition-transform group-hover:scale-[1.02]"
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
           <button

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sys
 import types
 
@@ -197,6 +198,54 @@ def test_tasks_stream_cleans_up_redis_on_pubsub_error(monkeypatch):
     assert fake_pubsub.subscribed == [tasks.TASKS_SURFACE_STREAM_CHANNEL]
     assert fake_pubsub.unsubscribed == [tasks.TASKS_SURFACE_STREAM_CHANNEL]
     assert fake_redis.closed is False
+
+
+def test_task_stream_flattens_pubsub_task_done_payload(monkeypatch):
+    from crate.api import events
+
+    fake_pubsub = _FakePubSub(
+        [
+            {
+                "type": "message",
+                "data": json.dumps(
+                    {
+                        "task_id": "preview-task",
+                        "event_type": "task_done",
+                        "data": {
+                            "type": "task_done",
+                            "status": "completed",
+                            "result": {"preview_url": "/preview.webp"},
+                        },
+                    }
+                ),
+            }
+        ]
+    )
+
+    async def _open_pubsub(_channel):
+        return fake_pubsub
+
+    async def _close_pubsub(_pubsub, _channel):
+        return None
+
+    monkeypatch.setattr(events, "open_pubsub", _open_pubsub)
+    monkeypatch.setattr(events, "close_pubsub", _close_pubsub)
+    monkeypatch.setattr(events, "get_task_events", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(events, "get_task", lambda _task_id: None)
+
+    async def _collect():
+        stream = events._task_stream_pubsub("preview-task")
+        item = await anext(stream)
+        await stream.aclose()
+        return item
+
+    item = asyncio.run(_collect())
+    assert item.startswith("event: task_done\ndata: ")
+    assert json.loads(item.split("data: ", 1)[1]) == {
+        "type": "task_done",
+        "status": "completed",
+        "result": {"preview_url": "/preview.webp"},
+    }
 
 
 def test_health_stream_cleans_up_redis_on_pubsub_error(monkeypatch):

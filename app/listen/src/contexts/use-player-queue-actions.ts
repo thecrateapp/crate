@@ -1,11 +1,13 @@
 import {
   useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
 } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import { getJamQueueSyncPlan, tracksMatch } from "@/contexts/player-session";
 import {
   toFreshEngineTrack,
   toStartupEngineQueueSnapshot,
@@ -69,6 +71,7 @@ import {
 
 const SOFT_PAUSE_FADE_MS = 220;
 const PREV_DOUBLE_TAP_WINDOW_MS = 1500;
+const JAM_EXPLICIT_SYNC_TOLERANCE_SECONDS = 0.005;
 function shouldUseImmediateTransportAction(): boolean {
   return (
     typeof document !== "undefined" && document.visibilityState === "hidden"
@@ -89,6 +92,65 @@ function getKnownDuration(track: Track | undefined): number {
 
 function nativeCrossfadeMs(): number {
   return Math.max(0, getCrossfadeDurationPreference() * 1000);
+}
+
+function isJamPlaybackSource(source: PlaySource | undefined): boolean {
+  return source?.type === "queue" && source.name.startsWith("Jam:");
+}
+
+type QueueEdit =
+  | { type: "remove"; index: number; track: Track }
+  | { type: "insert"; index: number; track: Track };
+
+function planQueueEdits(
+  currentQueue: Track[],
+  nextQueue: Track[],
+): QueueEdit[] {
+  const workingQueue = [...currentQueue];
+  const edits: QueueEdit[] = [];
+
+  for (let index = workingQueue.length - 1; index >= 0; index -= 1) {
+    const track = workingQueue[index];
+    if (
+      track &&
+      !nextQueue.some((candidate) => tracksMatch(candidate, track))
+    ) {
+      edits.push({ type: "remove", index, track });
+      workingQueue.splice(index, 1);
+    }
+  }
+
+  for (let index = 0; index < nextQueue.length; index += 1) {
+    const target = nextQueue[index];
+    if (!target) continue;
+    const current = workingQueue[index];
+    if (current && tracksMatch(current, target)) continue;
+
+    const existingIndex = workingQueue.findIndex(
+      (candidate, candidateIndex) =>
+        candidateIndex > index && tracksMatch(candidate, target),
+    );
+    if (existingIndex >= 0) {
+      const [moved] = workingQueue.splice(existingIndex, 1);
+      if (!moved) continue;
+      edits.push({ type: "remove", index: existingIndex, track: moved });
+      edits.push({ type: "insert", index, track: target });
+      workingQueue.splice(index, 0, target);
+      continue;
+    }
+
+    edits.push({ type: "insert", index, track: target });
+    workingQueue.splice(index, 0, target);
+  }
+
+  return edits;
+}
+
+function playSourcesMatch(
+  left: PlaySource | null | undefined,
+  right: PlaySource | null | undefined,
+): boolean {
+  return left?.type === right?.type && left?.name === right?.name;
 }
 
 function silenceGaplessEngine() {
@@ -113,6 +175,7 @@ function playbackPositionMs(currentTimeSeconds: number): number {
 
 interface UsePlayerQueueActionsParams {
   queueRef: MutableRefObject<Track[]>;
+  jamQueueLockedRef: MutableRefObject<boolean>;
   currentIndexRef: MutableRefObject<number>;
   currentTimeRef: MutableRefObject<number>;
   isPlayingRef: MutableRefObject<boolean>;
@@ -153,13 +216,18 @@ interface UsePlayerQueueActionsParams {
   commitDuration: (duration: number) => void;
   commitIsPlaying: (isPlaying: boolean) => void;
   commitIsBuffering: (isBuffering: boolean) => void;
+  ensureJamQueueLocked?: () => void;
   pullFromEngine: (sourceQueue?: Track[]) => {
     resolvedTrack: Track | undefined;
   };
   pushToEngine: (
     queue: Track[],
     requestedIndex: number,
-    options?: { autoplay?: boolean; positionMs?: number },
+    options?: {
+      autoplay?: boolean;
+      positionMs?: number;
+      preservePlayback?: boolean;
+    },
   ) => void;
   advanceCursorTo: (index: number) => void;
   publishConnectState?: (options?: { claimActive?: boolean }) => Promise<void>;
@@ -168,6 +236,7 @@ interface UsePlayerQueueActionsParams {
 
 export function usePlayerQueueActions({
   queueRef,
+  jamQueueLockedRef,
   currentIndexRef,
   currentTimeRef,
   isPlayingRef,
@@ -205,14 +274,19 @@ export function usePlayerQueueActions({
   commitDuration,
   commitIsPlaying,
   commitIsBuffering,
+  ensureJamQueueLocked,
   pullFromEngine,
   pushToEngine,
   advanceCursorTo,
   publishConnectState,
   playbackDeliveryPolicy,
 }: UsePlayerQueueActionsParams) {
+  const jamQueueSyncRevisionRef = useRef(0);
+  const nativeJamQueueMutationRef = useRef(Promise.resolve());
+
   const startQueuePlayback = useCallback(
     (tracks: Track[], startIndex: number, source?: PlaySource) => {
+      if (jamQueueLockedRef.current && !isJamPlaybackSource(source)) return;
       if (!tracks.length) return;
       const normalizedIndex = clampIndex(startIndex, tracks.length);
       const restartingSameQueueAtSameIndex =
@@ -324,6 +398,7 @@ export function usePlayerQueueActions({
       commitIsPlaying,
       commitQueue,
       currentIndexRef,
+      jamQueueLockedRef,
       flushCurrentPlayEvent,
       lastNonZeroVolumeRef,
       rememberActiveTrack,
@@ -456,6 +531,7 @@ export function usePlayerQueueActions({
   );
 
   const next = useCallback(() => {
+    if (jamQueueLockedRef.current) return;
     if (!queueRef.current.length) return;
 
     const nextIndex = currentIndexRef.current + 1;
@@ -526,11 +602,13 @@ export function usePlayerQueueActions({
     continueInfinitePlayback,
     currentIndexRef,
     flushCurrentPlayEvent,
+    jamQueueLockedRef,
     queueRef,
     repeatRef,
   ]);
 
   const prev = useCallback(() => {
+    if (jamQueueLockedRef.current) return;
     if (!queueRef.current.length) return;
     const activeTrack = queueRef.current[currentIndexRef.current];
     const activeTrackKey = activeTrack ? getTrackCacheKey(activeTrack) : null;
@@ -642,6 +720,7 @@ export function usePlayerQueueActions({
     commitIsBuffering,
     commitIsPlaying,
     currentIndexRef,
+    jamQueueLockedRef,
     currentTimeRef,
     markSeekPosition,
     prevRestartTrackKeyRef,
@@ -732,6 +811,7 @@ export function usePlayerQueueActions({
   }, []);
 
   const clearQueue = useCallback(() => {
+    if (jamQueueLockedRef.current) return;
     if (isCastSessionActive()) {
       void castStop().catch((error) => {
         console.error("[cast] failed to stop:", error);
@@ -774,6 +854,7 @@ export function usePlayerQueueActions({
     commitIsPlaying,
     commitQueue,
     flushCurrentPlayEvent,
+    jamQueueLockedRef,
     pendingRestoreTimeRef,
     resetPlaybackIntelligence,
     resumeAfterReloadRef,
@@ -781,6 +862,7 @@ export function usePlayerQueueActions({
   ]);
 
   const toggleShuffle = useCallback(() => {
+    if (jamQueueLockedRef.current) return;
     const previousQueue = queueRef.current;
     if (!previousQueue.length) {
       setShuffleState((value) => !value);
@@ -824,6 +906,7 @@ export function usePlayerQueueActions({
   }, [
     currentTimeRef,
     currentIndexRef,
+    jamQueueLockedRef,
     isPlayingRef,
     pushToEngine,
     queueRef,
@@ -834,6 +917,7 @@ export function usePlayerQueueActions({
   ]);
 
   const cycleRepeat = useCallback(() => {
+    if (jamQueueLockedRef.current) return;
     setRepeatState((previousMode) => {
       const nextMode =
         previousMode === "off" ? "all" : previousMode === "all" ? "one" : "off";
@@ -846,10 +930,11 @@ export function usePlayerQueueActions({
       }
       return nextMode;
     });
-  }, [setRepeatState]);
+  }, [jamQueueLockedRef, setRepeatState]);
 
   const jumpTo = useCallback(
     (index: number) => {
+      if (jamQueueLockedRef.current) return;
       if (index < 0 || index >= queueRef.current.length) return;
       pendingRestoreTimeRef.current = 0;
       if (isCastSessionActive()) {
@@ -881,6 +966,7 @@ export function usePlayerQueueActions({
       advanceToTrack,
       commitCurrentTime,
       commitIsPlaying,
+      jamQueueLockedRef,
       pendingRestoreTimeRef,
       queueRef,
     ],
@@ -888,6 +974,7 @@ export function usePlayerQueueActions({
 
   const playNext = useCallback(
     (track: Track) => {
+      if (jamQueueLockedRef.current) return;
       const insertAt = currentIndexRef.current + 1;
       const nextQueue = [...queueRef.current];
       nextQueue.splice(insertAt, 0, track);
@@ -913,6 +1000,7 @@ export function usePlayerQueueActions({
     [
       commitQueue,
       currentIndexRef,
+      jamQueueLockedRef,
       queueRef,
       registerEngineTrack,
       unshuffledQueueRef,
@@ -921,6 +1009,7 @@ export function usePlayerQueueActions({
 
   const addToQueue = useCallback(
     (track: Track) => {
+      if (jamQueueLockedRef.current) return;
       const nextQueue = [...queueRef.current, track];
       if (shouldUseAndroidNativePlayer()) {
         void (async () => {
@@ -940,11 +1029,18 @@ export function usePlayerQueueActions({
         unshuffledQueueRef.current = [...unshuffledQueueRef.current, track];
       }
     },
-    [commitQueue, queueRef, registerEngineTrack, unshuffledQueueRef],
+    [
+      commitQueue,
+      jamQueueLockedRef,
+      queueRef,
+      registerEngineTrack,
+      unshuffledQueueRef,
+    ],
   );
 
   const removeFromQueue = useCallback(
     (index: number) => {
+      if (jamQueueLockedRef.current) return;
       const previousQueue = queueRef.current;
       if (index < 0 || index >= previousQueue.length) return;
 
@@ -997,6 +1093,7 @@ export function usePlayerQueueActions({
       currentIndexRef,
       flushCurrentPlayEvent,
       isPlayingRef,
+      jamQueueLockedRef,
       pushToEngine,
       queueRef,
       unregisterEngineTrack,
@@ -1006,6 +1103,7 @@ export function usePlayerQueueActions({
 
   const reorderQueue = useCallback(
     (fromIndex: number, toIndex: number) => {
+      if (jamQueueLockedRef.current) return;
       const previousQueue = queueRef.current;
       if (
         fromIndex < 0 ||
@@ -1064,11 +1162,178 @@ export function usePlayerQueueActions({
       currentIndexRef,
       currentTimeRef,
       isPlayingRef,
+      jamQueueLockedRef,
       pushToEngine,
       queueRef,
       registerEngineTrack,
       unregisterEngineTrack,
       unshuffledQueueRef,
+    ],
+  );
+
+  const syncJamQueue = useCallback(
+    (
+      tracks: Track[],
+      options?: {
+        currentTrack?: Track | null;
+        positionSeconds?: number;
+        playing?: boolean;
+        queueOnly?: boolean;
+        forcePosition?: boolean;
+        source?: PlaySource;
+      },
+    ) => {
+      const source = options?.source ||
+        playSourceRef.current || {
+          type: "queue" as const,
+          name: "Jam session",
+        };
+      if (!jamQueueLockedRef.current) {
+        if (!isJamPlaybackSource(source)) return;
+        ensureJamQueueLocked?.();
+        if (!jamQueueLockedRef.current) return;
+      }
+
+      const plan = getJamQueueSyncPlan({
+        currentQueue: queueRef.current,
+        currentIndex: currentIndexRef.current,
+        currentTime: currentTimeRef.current,
+        isPlaying: isPlayingRef.current,
+        nextQueue: tracks,
+        currentTrack: options?.currentTrack,
+        positionSeconds: options?.positionSeconds,
+        playing: options?.playing,
+      });
+      const currentTrack =
+        options?.currentTrack !== undefined
+          ? options.currentTrack
+          : queueRef.current[currentIndexRef.current];
+      const nextTrack = tracks[plan.currentIndex];
+      const queueOrderMatches =
+        tracks.length === queueRef.current.length &&
+        tracks.every((track, index) =>
+          tracksMatch(track, queueRef.current[index]),
+        );
+      const activeTrackMatches =
+        nextTrack === undefined && currentTrack == null
+          ? true
+          : tracksMatch(nextTrack, currentTrack);
+      const currentIndexMatches = currentIndexRef.current === plan.currentIndex;
+
+      if (!playSourcesMatch(playSourceRef.current, source)) {
+        playSourceRef.current = source;
+        setPlaySource(source);
+      }
+
+      if (!queueOrderMatches || !activeTrackMatches || !currentIndexMatches) {
+        const jamQueueSyncRevision = ++jamQueueSyncRevisionRef.current;
+        if (options?.queueOnly && activeTrackMatches && currentTrack) {
+          const edits = planQueueEdits(queueRef.current, tracks);
+          if (shouldUseAndroidNativePlayer()) {
+            const applyNativeEdits = async () => {
+              for (const edit of edits) {
+                if (jamQueueSyncRevisionRef.current !== jamQueueSyncRevision) {
+                  return;
+                }
+                if (edit.type === "remove") {
+                  await nativeEngine.removeTrack(edit.index);
+                  if (
+                    jamQueueSyncRevisionRef.current !== jamQueueSyncRevision
+                  ) {
+                    return;
+                  }
+                  unregisterEngineTrack(edit.track);
+                } else {
+                  const engineTrack = await toFreshEngineTrack(
+                    edit.track,
+                    undefined,
+                    {
+                      target: "android-native",
+                    },
+                  );
+                  if (
+                    jamQueueSyncRevisionRef.current !== jamQueueSyncRevision
+                  ) {
+                    return;
+                  }
+                  await nativeEngine.insertTrack(edit.index, engineTrack);
+                }
+              }
+            };
+            nativeJamQueueMutationRef.current =
+              nativeJamQueueMutationRef.current
+                .catch(() => undefined)
+                .then(applyNativeEdits)
+                .catch((error) => {
+                  if (
+                    jamQueueSyncRevisionRef.current === jamQueueSyncRevision
+                  ) {
+                    console.error(
+                      "[native-player] failed to apply Jam queue update:",
+                      error,
+                    );
+                  }
+                });
+          } else {
+            for (const edit of edits) {
+              if (edit.type === "remove") {
+                gpRemoveTrack(edit.index);
+                unregisterEngineTrack(edit.track);
+              } else {
+                gpInsertTrack(edit.index, registerEngineTrack(edit.track));
+              }
+            }
+          }
+          commitQueue(tracks);
+          if (currentIndexRef.current !== plan.currentIndex) {
+            commitCurrentIndex(plan.currentIndex);
+          }
+        } else {
+          // Transport changes and initial room hydration still use the full
+          // engine sync. Ordinary queue snapshots take the in-place path above
+          // so they cannot restart the active media element at zero.
+          const preservePlayback = tracksMatch(currentTrack, nextTrack);
+          pushToEngine(tracks, plan.currentIndex, {
+            autoplay: plan.playing,
+            positionMs: plan.positionSeconds * 1000,
+            ...(preservePlayback ? { preservePlayback: true } : {}),
+          });
+          return;
+        }
+      }
+
+      if (options?.positionSeconds !== undefined) {
+        const drift = Math.abs(
+          options.positionSeconds - currentTimeRef.current,
+        );
+        if (
+          drift >
+          (options.forcePosition ? JAM_EXPLICIT_SYNC_TOLERANCE_SECONDS : 1)
+        ) {
+          seek(plan.positionSeconds);
+        }
+      }
+      if (options?.playing !== undefined) {
+        if (options.playing && !isPlayingRef.current) resume();
+        else if (!options.playing && isPlayingRef.current) pause();
+      }
+    },
+    [
+      commitCurrentIndex,
+      commitCurrentTime,
+      commitQueue,
+      currentIndexRef,
+      currentTimeRef,
+      ensureJamQueueLocked,
+      isPlayingRef,
+      jamQueueLockedRef,
+      pause,
+      playSourceRef,
+      pushToEngine,
+      queueRef,
+      resume,
+      seek,
+      setPlaySource,
     ],
   );
 
@@ -1090,5 +1355,6 @@ export function usePlayerQueueActions({
     addToQueue,
     removeFromQueue,
     reorderQueue,
+    syncJamQueue,
   };
 }

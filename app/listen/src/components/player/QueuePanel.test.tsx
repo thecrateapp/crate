@@ -30,6 +30,7 @@ const nextTrack: Track = {
   title: "Next",
   artist: "Artist",
   album: "Album",
+  albumCover: "/covers/next.jpg",
 };
 
 describe("QueuePanel", () => {
@@ -71,5 +72,25 @@ describe("QueuePanel", () => {
     expect(
       screen.getByText("Queue").closest(".listen-glass-panel"),
     ).toHaveClass("listen-glass-panel--dock");
+  });
+
+  it("makes the local queue visibly readonly inside a Jam room", () => {
+    renderWithListenProviders(<QueuePanel open onClose={vi.fn()} />, {
+      playerActions: {
+        currentTrack,
+        queue: [currentTrack, nextTrack],
+        currentIndex: 0,
+        jamQueueLocked: true,
+      },
+    });
+
+    expect(screen.getByText("Jam room queue")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Playback is controlled by the room while you are connected.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByAltText("")).toHaveClass("grayscale");
+    expect(screen.getByText("Next").closest('[role="button"]')).toBeNull();
   });
 });

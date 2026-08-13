@@ -61,6 +61,7 @@ def test_external_artist_identity_is_hashed():
         ("artist-photo", None, 1024),
         ("external-artist", None, 768),
         ("artist-background", None, 2048),
+        ("artist-hero", None, 2048),
         ("genre-cover", 1280, 1280),
     ],
 )

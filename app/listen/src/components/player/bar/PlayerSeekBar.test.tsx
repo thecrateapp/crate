@@ -15,4 +15,17 @@ describe("PlayerSeekBar", () => {
       screen.getByRole("slider", { name: "Buscar posición de la canción" }),
     ).toBeVisible();
   });
+
+  it("can be disabled while playback is controlled by a Jam room", () => {
+    renderWithListenProviders(
+      <PlayerSeekBar
+        currentTime={30}
+        duration={180}
+        onSeek={vi.fn()}
+        disabled
+      />,
+    );
+
+    expect(screen.getByRole("slider")).toBeDisabled();
+  });
 });

@@ -142,8 +142,9 @@ function searchErrorHint(
 
 export function SearchResults() {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
+  const [emptyQuery, setEmptyQuery] = useState("");
   const [data, setData] = useState<SearchData | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -199,7 +200,48 @@ export function SearchResults() {
   );
 
   if (!query)
-    return <p className="text-muted-foreground">{t("search.emptyPrompt")}</p>;
+    return (
+      <div className="mx-auto max-w-2xl rounded-[12px] border border-white/10 bg-white/[0.035] p-6 shadow-[0_22px_70px_rgba(0,0,0,0.24)] sm:p-8">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
+            <Search size={18} />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">
+              {t("search.label")}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("search.emptyPrompt")}
+            </p>
+          </div>
+        </div>
+        <form
+          className="mt-5 flex flex-col gap-2 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const nextQuery = emptyQuery.trim();
+            if (nextQuery) setSearchParams({ q: nextQuery });
+          }}
+        >
+          <input
+            autoFocus
+            value={emptyQuery}
+            onChange={(event) => setEmptyQuery(event.target.value)}
+            placeholder={t("search.placeholder")}
+            aria-label={t("search.placeholder")}
+            className="h-11 min-w-0 flex-1 rounded-md border border-white/12 bg-black/20 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-primary/50"
+          />
+          <button
+            type="submit"
+            disabled={!emptyQuery.trim()}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-[0_14px_28px_rgba(6,182,212,0.22)] transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+          >
+            <Search size={17} />
+            {t("search.label")}
+          </button>
+        </form>
+      </div>
+    );
   if (loading && !data)
     return <CrateLoader label={t("search.loadingResults")} />;
   if (searchError)
@@ -208,7 +250,7 @@ export function SearchResults() {
         <h1 className="text-2xl font-bold">
           {t("search.resultsFor", { query })}
         </h1>
-        <div className="mx-auto max-w-sm rounded-3xl border border-amber-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-amber-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/8 text-amber-100">
             <Search size={18} />
           </div>
@@ -388,7 +430,7 @@ export function SearchResults() {
       )}
 
       {noResults ? (
-        <div className="mx-auto max-w-sm rounded-3xl border border-cyan-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-cyan-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
             <Search size={18} />
           </div>

@@ -379,7 +379,7 @@ export function ContextMenu({
       ref={menuRef}
       role="menu"
       className={cn(
-        "listen-glass-panel fixed z-app-context-menu w-72 origin-top-left overflow-hidden rounded-2xl animate-pop-in",
+        "listen-glass-panel fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden rounded-2xl animate-pop-in",
         className,
       )}
       style={style}

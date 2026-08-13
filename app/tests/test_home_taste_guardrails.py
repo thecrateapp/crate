@@ -43,6 +43,12 @@ def test_canonical_mix_song_key_collapses_known_versions():
     assert canonical_mix_song_key(row) == ("converge", "concubine")
 
 
+def test_canonical_mix_song_key_accepts_the_shared_nested_track_shape():
+    assert canonical_mix_song_key(
+        {"track": {"id": 1, "title": "Concubine (Live)", "artist": "Converge"}}
+    ) == ("converge", "concubine")
+
+
 def test_canonical_mix_song_key_collapses_named_mix_versions():
     row = _row(
         1,

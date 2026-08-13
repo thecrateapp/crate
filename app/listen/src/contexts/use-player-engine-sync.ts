@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -10,10 +11,7 @@ import {
   toStartupEngineQueueSnapshot,
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
-import {
-  clampIndex,
-  resolveQueueFromUrls,
-} from "@/contexts/player-queue-helpers";
+import { clampIndex } from "@/contexts/player-queue-helpers";
 import {
   getEffectiveCrossfadeSeconds,
   getPredictableNextTrack,
@@ -24,7 +22,6 @@ import {
 import {
   getCurrentTrackDuration as gpGetCurrentTrackDuration,
   getTrackIndex as gpGetTrackIndex,
-  getTracks as gpGetTracks,
   loadQueue as gpLoadQueue,
   pause as gpPause,
   play as gpPlay,
@@ -107,6 +104,8 @@ export function usePlayerEngineSync({
   clearPrevRestartLatch,
   markSeekPosition,
 }: UsePlayerEngineSyncParams) {
+  const engineSyncRevisionRef = useRef(0);
+
   const syncEffectiveCrossfade = useCallback(() => {
     const nextTrack = getPredictableNextTrack(
       queueRef.current,
@@ -167,11 +166,10 @@ export function usePlayerEngineSync({
 
   const pullFromEngine = useCallback(
     (sourceQueue?: Track[]) => {
-      const resolvedQueue = resolveQueueFromUrls(
-        gpGetTracks(),
-        sourceQueue ?? queueRef.current,
-        engineTrackMapRef.current,
-      );
+      // React owns queue order and membership. Engine callbacks can observe
+      // a stale/partial playlist while a reload is in flight, so they may
+      // only provide the cursor and duration here—not replace the queue.
+      const resolvedQueue = sourceQueue ?? queueRef.current;
       const resolvedIndex = clampIndex(gpGetTrackIndex(), resolvedQueue.length);
       const resolvedTrack = resolvedQueue[resolvedIndex];
       const engineDuration = Math.max(gpGetCurrentTrackDuration() / 1000, 0);
@@ -221,11 +219,19 @@ export function usePlayerEngineSync({
     (
       nextQueue: Track[],
       requestedIndex: number,
-      options?: { autoplay?: boolean; positionMs?: number },
+      options?: {
+        autoplay?: boolean;
+        positionMs?: number;
+        preservePlayback?: boolean;
+      },
     ) => {
+      const syncRevision = ++engineSyncRevisionRef.current;
+      const isCurrentSync = () =>
+        engineSyncRevisionRef.current === syncRevision;
       const nextIndex = clampIndex(requestedIndex, nextQueue.length);
       const autoplay = options?.autoplay ?? isPlayingRef.current;
       const positionMs = options?.positionMs ?? 0;
+      const preservePlayback = options?.preservePlayback === true;
 
       if (nextQueue.length === 0) {
         bufferingIntentRef.current = false;
@@ -290,8 +296,10 @@ export function usePlayerEngineSync({
             shuffle: shuffleRef.current,
             target: "android-native",
           });
+          if (!isCurrentSync()) return;
           return androidNativeEngine.loadQueue(snapshot);
         })().catch((error) => {
+          if (!isCurrentSync()) return;
           console.error("[native-player] failed to sync queue:", error);
           commitIsBuffering(false);
           commitIsPlaying(false);
@@ -299,9 +307,25 @@ export function usePlayerEngineSync({
         return;
       }
 
+      // Publish the authoritative queue immediately. The web engine load is
+      // asynchronous and pullFromEngine can briefly observe the previous
+      // queue; committing first prevents that stale read from winning.
+      // Pause before resolving/loading the replacement playlist. Otherwise
+      // Gapless-5 can start the newly selected source at 0 while the async
+      // queue rebuild is still in flight, producing an audible restart before
+      // the authoritative position is applied.
+      if (preservePlayback) {
+        gpPause();
+      }
+      commitQueue(nextQueue);
+      commitCurrentIndex(nextIndex);
+      commitCurrentTime(positionMs / 1000);
+
       void (async () => {
         const engineTracks = await toStartupEngineTracks(nextQueue, nextIndex);
         const engineUrls = engineTracks.map((track) => track.url);
+
+        if (!isCurrentSync()) return;
 
         stopNativeEngineIfAvailable("before web engine sync");
         gpLoadQueue(buildEngineUrls(nextQueue, engineUrls), nextIndex);
@@ -325,6 +349,7 @@ export function usePlayerEngineSync({
           gpPause();
         }
       })().catch((error) => {
+        if (!isCurrentSync()) return;
         console.error("[gapless] failed to sync queue playback:", error);
         commitIsBuffering(false);
         commitIsPlaying(false);

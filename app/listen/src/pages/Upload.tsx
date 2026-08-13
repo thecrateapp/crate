@@ -190,10 +190,10 @@ export function Upload() {
         </p>
       </div>
 
-      <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6">
+      <div className="rounded-[12px] border border-white/10 bg-white/[0.04] p-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-4">
-            <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center transition-colors hover:border-primary/40 hover:bg-white/[0.05]">
+            <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center transition-colors hover:border-primary/40 hover:bg-white/[0.05]">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <UploadIcon size={24} />
               </div>
@@ -213,7 +213,7 @@ export function Upload() {
             </label>
 
             {files.length > 0 ? (
-              <div className="space-y-2 rounded-2xl border border-white/10 bg-[var(--gradient-bg-50)] p-4">
+              <div className="space-y-2 rounded-xl border border-white/10 bg-[var(--gradient-bg-50)] p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="text-sm font-semibold text-foreground">
@@ -257,7 +257,7 @@ export function Upload() {
             ) : null}
           </div>
 
-          <div className="space-y-4 rounded-[24px] border border-white/10 bg-[var(--gradient-bg-50)] p-5">
+          <div className="space-y-4 rounded-xl border border-white/10 bg-[var(--gradient-bg-50)] p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {t("upload.next.title")}
             </h2>
@@ -286,7 +286,7 @@ export function Upload() {
                 : t("upload.import")}
             </button>
             {lastUpload ? (
-              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
                 <div className="flex items-center gap-2 font-medium">
                   <CheckCircle2 size={15} />
                   {t("upload.status.queued")}

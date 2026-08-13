@@ -341,6 +341,15 @@ def create_activity_schema(cur) -> None:
         "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb"
     )
     cur.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS queue_mode TEXT NOT NULL DEFAULT 'manual'"
+    )
+    cur.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS auto_dj_voting BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    cur.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS genre_filters JSONB NOT NULL DEFAULT '[]'::jsonb"
+    )
+    cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_jam_rooms_host ON jam_rooms(host_user_id, created_at DESC)"
     )
     cur.execute(

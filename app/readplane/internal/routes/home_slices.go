@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 	"github.com/thecrateapp/crate/app/readplane/internal/snapshots"
@@ -66,7 +67,11 @@ func (s *Server) homeSlice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.MarkReadplane(w, "hit")
-	if err := httpx.WriteJSON(w, http.StatusOK, homeSlicePayload(row, def)); err != nil {
+	payload := homeSlicePayload(row, def)
+	if def.payloadKey == "hero" {
+		payload = rotateHomeHeroValue(payload, user.ID, time.Now().UTC())
+	}
+	if err := httpx.WriteJSON(w, http.StatusOK, payload); err != nil {
 		_ = httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
 	}
 }

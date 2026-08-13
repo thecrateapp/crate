@@ -124,7 +124,7 @@ export function ArtistSetlistModal({
         <div className="flex gap-2 border-t border-white/5 px-5 py-4">
           <button
             onClick={handlePlay}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary/15 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary/15 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25"
           >
             <Play size={14} fill="currentColor" />
             {t("artist.setlist.play")}
@@ -132,7 +132,7 @@ export function ArtistSetlistModal({
           <button
             onClick={handleExport}
             disabled={saving || !artistId}
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-white/5 disabled:opacity-40"
+            className="flex items-center justify-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-white/5 disabled:opacity-40"
           >
             <Save size={14} />
             {saving ? t("common.saving") : t("artist.setlist.export")}

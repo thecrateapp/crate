@@ -29,6 +29,7 @@ export function usePlayerRuntimeState() {
   const [currentIndex, setCurrentIndexState] = useState(
     clampIndex(stored.current.currentIndex, stored.current.queue.length),
   );
+  const [jamQueueLocked, setJamQueueLockedState] = useState(false);
   const [isPlaying, setIsPlayingState] = useState(false);
   const [isBuffering, setIsBufferingState] = useState(false);
   const [currentTime, setCurrentTimeState] = useState(0);
@@ -61,6 +62,7 @@ export function usePlayerRuntimeState() {
 
   const crossfadeTimerRef = useRef<number | null>(null);
   const queueRef = useRef(queue);
+  const jamQueueLockedRef = useRef(jamQueueLocked);
   const currentIndexRef = useRef(currentIndex);
   const currentTrackRef = useRef(currentTrack);
   const repeatRef = useRef(repeat);
@@ -99,6 +101,8 @@ export function usePlayerRuntimeState() {
       onBuffering: (path) => callbacksRef.current.onBuffering?.(path),
       onAnalyserReady: (analyser) =>
         callbacksRef.current.onAnalyserReady?.(analyser),
+      onAnalyserInvalidated: () =>
+        callbacksRef.current.onAnalyserInvalidated?.(),
     });
   }
 
@@ -114,6 +118,11 @@ export function usePlayerRuntimeState() {
   const commitQueue = useCallback((nextQueue: Track[]) => {
     queueRef.current = nextQueue;
     setQueueState(nextQueue);
+  }, []);
+
+  const commitJamQueueLocked = useCallback((locked: boolean) => {
+    jamQueueLockedRef.current = locked;
+    setJamQueueLockedState(locked);
   }, []);
 
   const buildEngineUrls = useCallback(
@@ -197,6 +206,7 @@ export function usePlayerRuntimeState() {
   return {
     queue,
     currentIndex,
+    jamQueueLocked,
     currentTrack,
     isPlaying,
     isBuffering,
@@ -228,6 +238,7 @@ export function usePlayerRuntimeState() {
     setPlaybackDeliveryPolicy,
     crossfadeTimerRef,
     queueRef,
+    jamQueueLockedRef,
     currentIndexRef,
     currentTrackRef,
     repeatRef,
@@ -249,6 +260,7 @@ export function usePlayerRuntimeState() {
     engineTrackMapRef,
     resetEngineTrackMap,
     commitQueue,
+    commitJamQueueLocked,
     buildEngineUrls,
     registerEngineTrack,
     unregisterEngineTrack,

@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,6 +14,7 @@ import {
   Shuffle,
   Users,
 } from "@crate/ui/icons";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 
 import {
   type ArtistData,
@@ -25,8 +26,8 @@ import {
   ContextMenu,
   type ContextMenuEntry,
 } from "@/components/actions/ItemActionMenu";
-import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+import { useContextMenuController } from "@crate/ui/domain/actions";
 import { formatCompact } from "@/lib/utils";
 
 interface ArtistHeroSectionProps {
@@ -66,49 +67,17 @@ export function ArtistHeroSection({
 }: ArtistHeroSectionProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [desktopMenuPosition, setDesktopMenuPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const desktopMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const menuController = useContextMenuController<HTMLButtonElement>({
+    placement: "bottom-end",
+  });
   const bio = artistInfo?.bio ?? "";
   const heroBackgroundSrc = backgroundUrl
     ? `${backgroundUrl}${
         backgroundUrl.includes("?") ? "&" : "?"
       }v=artist-hero-bg-v1`
     : undefined;
-  const closeMenu = () => {
-    setMenuOpen(false);
-    setDesktopMenuPosition(null);
-  };
-
-  useDismissibleLayer({
-    active: menuOpen && isDesktop,
-    refs: [menuRef, desktopMenuRef],
-    onDismiss: closeMenu,
-  });
-
   function handleToggleMenu(event: MouseEvent<HTMLButtonElement>) {
-    if (menuOpen) {
-      closeMenu();
-      return;
-    }
-
-    if (isDesktop) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      const width = 288;
-      const padding = 12;
-      const maxX = Math.max(padding, window.innerWidth - width - padding);
-      setDesktopMenuPosition({
-        x: Math.min(Math.max(padding, rect.right - width), maxX),
-        y: rect.bottom + 8,
-      });
-    }
-
-    setMenuOpen(true);
+    menuController.openFromTrigger(event);
   }
 
   const menuItems: ContextMenuEntry[] = [
@@ -163,9 +132,9 @@ export function ArtistHeroSection({
           top: "calc(var(--listen-safe-top) + 0.625rem)",
           right: "max(1rem, var(--listen-safe-right))",
         }}
-        ref={menuRef}
       >
         <button
+          ref={menuController.anchorRef}
           data-testid="artist-mobile-hero-menu"
           className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleMenu}
@@ -192,10 +161,10 @@ export function ArtistHeroSection({
             fallbackIcon: Users,
           }}
           items={menuItems}
-          menuRef={mobileMenuRef}
-          onClose={closeMenu}
-          open={menuOpen}
-          position={desktopMenuPosition}
+          menuRef={menuController.menuRef}
+          onClose={menuController.close}
+          open={menuController.open}
+          position={menuController.position}
         />
       </div>
     ) : null;
@@ -299,15 +268,15 @@ export function ArtistHeroSection({
         </div>
       </div>
 
-      <div className="px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
+      <div className="px-4 py-4 sm:px-0">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 sm:px-6 md:flex-row md:items-center md:justify-between md:gap-6">
           <div
             role="group"
             aria-label={t("artist.actions.primaryGroup")}
             className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
           >
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] md:px-7 md:text-[15px]"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] md:px-7 md:text-[15px]"
               onClick={onPlay}
               aria-label={t("player.play")}
             >
@@ -315,7 +284,7 @@ export function ArtistHeroSection({
               <span>{t("player.play")}</span>
             </button>
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
               onClick={onShuffle}
               aria-label={t("player.shuffle")}
             >
@@ -346,27 +315,21 @@ export function ArtistHeroSection({
               <ListMusic size={CRATE_ICON_SIZE.lg} />
               <span>{t("artist.actions.setlist")}</span>
             </button>
-            <button
+            <FollowHeartButton
               className={`${SECONDARY_ACTION_CLASS} ${
                 following
                   ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
                   : "text-white/62"
               }`}
+              following={following}
+              iconSize={CRATE_ICON_SIZE.lg}
               onClick={onToggleFollow}
               aria-label={following ? t("common.unfollow") : t("common.follow")}
             >
-              {following ? (
-                <HeartBold
-                  size={CRATE_ICON_SIZE.lg}
-                  className="animate-crate-icon-active-pulse"
-                />
-              ) : (
-                <Heart size={CRATE_ICON_SIZE.lg} />
-              )}
               <span>
                 {following ? t("common.following") : t("common.follow")}
               </span>
-            </button>
+            </FollowHeartButton>
             <button
               className={SECONDARY_ACTION_CLASS}
               onClick={onShare}
@@ -381,8 +344,9 @@ export function ArtistHeroSection({
               presentation="secondary-action"
             />
             {isDesktop ? (
-              <div className="relative shrink-0" ref={menuRef}>
+              <div className="relative shrink-0">
                 <button
+                  ref={menuController.anchorRef}
                   className={SECONDARY_ACTION_CLASS}
                   onClick={handleToggleMenu}
                   aria-label={t("common.more")}
@@ -405,10 +369,10 @@ export function ArtistHeroSection({
                     fallbackIcon: Users,
                   }}
                   items={menuItems}
-                  menuRef={isDesktop ? desktopMenuRef : mobileMenuRef}
-                  onClose={closeMenu}
-                  open={menuOpen}
-                  position={desktopMenuPosition}
+                  menuRef={menuController.menuRef}
+                  onClose={menuController.close}
+                  open={menuController.open}
+                  position={menuController.position}
                 />
               </div>
             ) : null}

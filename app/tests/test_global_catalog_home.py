@@ -1,14 +1,20 @@
+import uuid
+
+import pytest
+from sqlalchemy import text
+
 import crate.db.home_builder_upcoming_artists as home_builder_upcoming_artists
 import crate.db.home_builder_recent_activity as home_builder_recent_activity
 import crate.db.home_builder_track_payloads as home_builder_track_payloads
 import crate.db.home_personalized_discovery as home_personalized_discovery
 import crate.db.queries.radio_stations as radio_stations
+from tests.conftest import PG_AVAILABLE
 
 
 def test_recent_global_artists_uses_canonical_catalog(monkeypatch):
     monkeypatch.setattr(
         home_builder_upcoming_artists,
-        "list_global_collection_artists",
+        "list_recent_global_collection_artists",
         lambda limit: [
             {
                 "artist_id": None,
@@ -36,6 +42,59 @@ def test_recent_global_artists_uses_canonical_catalog(monkeypatch):
             "has_photo": True,
             "photo_url": "/api/catalog/artists/artist-global/photo",
         }
+    ]
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_recent_global_artists_order_by_catalog_arrival(pg_db):
+    from crate.db.tx import transaction_scope
+
+    older_artist_uid = str(uuid.uuid4())
+    newer_artist_uid = str(uuid.uuid4())
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_artists
+                    (global_artist_uid, canonical_name, sort_name, normalized_name)
+                VALUES
+                    (CAST(:older_artist_uid AS uuid), 'Alpha Archive', 'Alpha Archive', 'alpha archive'),
+                    (CAST(:newer_artist_uid AS uuid), 'Zulu Latest', 'Zulu Latest', 'zulu latest')
+                """
+            ),
+            {
+                "older_artist_uid": older_artist_uid,
+                "newer_artist_uid": newer_artist_uid,
+            },
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_sources
+                    (
+                        entity_type,
+                        global_entity_uid,
+                        source_kind,
+                        local_id,
+                        match_key,
+                        created_at
+                    )
+                VALUES
+                    ('artist', CAST(:older_artist_uid AS uuid), 'local', 900001, 'alpha-archive', '2026-07-01T12:00:00+00:00'),
+                    ('artist', CAST(:newer_artist_uid AS uuid), 'local', 900002, 'zulu-latest', '2026-07-29T12:00:00+00:00')
+                """
+            ),
+            {
+                "older_artist_uid": older_artist_uid,
+                "newer_artist_uid": newer_artist_uid,
+            },
+        )
+
+    artists = home_builder_upcoming_artists._build_recent_global_artists(2)
+
+    assert [artist["name"] for artist in artists] == [
+        "Zulu Latest",
+        "Alpha Archive",
     ]
 
 

@@ -88,9 +88,13 @@ describe("ContextMenu", () => {
     const menu = screen.getByRole("menu");
     expect(menu).toHaveClass(
       "listen-glass-panel",
+      "fixed",
+      "max-w-[calc(100vw-24px)]",
+      "max-h-[calc(100vh-24px)]",
       "w-72",
       "rounded-2xl",
-      "overflow-hidden",
+      "overflow-y-auto",
+      "overflow-x-hidden",
       "z-app-context-menu",
     );
     expect(screen.getByText("El Cielo")).toBeInTheDocument();

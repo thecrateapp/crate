@@ -51,6 +51,7 @@ interface SpinningDiscProps {
   onPlaybackRateChange?: (rate: number) => void;
   onSeek?: (time: number) => void;
   onTogglePlay: () => void;
+  disabled?: boolean;
 }
 
 export function SpinningDisc({
@@ -69,6 +70,7 @@ export function SpinningDisc({
   onPlaybackRateChange,
   onSeek,
   onTogglePlay,
+  disabled = false,
 }: SpinningDiscProps) {
   const discRef = useRef<HTMLDivElement>(null);
   const rotorRef = useRef<HTMLDivElement>(null);
@@ -370,7 +372,13 @@ export function SpinningDisc({
   );
 
   return (
-    <div className={cn("relative", className)}>
+    <div
+      className={cn(
+        "relative",
+        className,
+        disabled && "pointer-events-none grayscale opacity-60",
+      )}
+    >
       <div className="absolute inset-[7%] rounded-full bg-primary/12 blur-3xl opacity-80" />
       <div
         ref={discRef}
@@ -433,6 +441,7 @@ export function SpinningDisc({
         <button
           type="button"
           onClick={onTogglePlay}
+          disabled={disabled}
           onPointerDown={(event) => event.stopPropagation()}
           className="absolute left-1/2 top-1/2 z-10 flex h-[26%] w-[26%] min-h-[72px] min-w-[72px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-[radial-gradient(circle,rgba(15,23,42,0.96),rgba(2,6,12,0.98))] text-white shadow-[0_14px_34px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97]"
           aria-label={isPlaying ? "Pause" : "Play"}

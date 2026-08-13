@@ -107,6 +107,7 @@ def test_media_ticket_cannot_be_reused_for_another_path_in_the_same_audience(
         ("/api/auth/users/7/avatar", "artwork"),
         ("/api/artists/12/photo", "artwork"),
         ("/api/artists/12/background", "artwork"),
+        ("/api/artists/12/hero?composition=mobile", "artwork"),
         ("/api/me/contributions/4/export", "artwork"),
         ("/api/tracks/12/stream", "stream"),
         ("/api/stream/Band/Album/Song.flac", "stream"),
@@ -188,6 +189,10 @@ def test_ticket_endpoint_issues_requested_browser_media_paths(
                     path="/api/albums/12/cover",
                 ),
                 MediaAccessTargetRequest(
+                    audience="artwork",
+                    path="/api/artists/12/hero?composition=mobile",
+                ),
+                MediaAccessTargetRequest(
                     audience="stream",
                     path="/api/tracks/12/stream",
                 ),
@@ -197,6 +202,7 @@ def test_ticket_endpoint_issues_requested_browser_media_paths(
 
     assert [(item.audience, item.path) for item in response.tickets] == [
         ("artwork", "/api/albums/12/cover"),
+        ("artwork", "/api/artists/12/hero"),
         ("stream", "/api/tracks/12/stream"),
     ]
     assert all(item.ticket for item in response.tickets)

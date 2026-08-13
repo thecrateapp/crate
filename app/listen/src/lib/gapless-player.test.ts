@@ -196,7 +196,10 @@ describe("initPlayer", () => {
     expect(options.volume).toBe(1);
     expect(options.logLevel).toBe(3);
     expect(options.deferAdjacentLoadsUntilBufferedSeconds).toBe(15);
-    expect(options.switchToWebAudioDuringPlayback).toBe(false);
+    // Desktop may start through HTML5 while WebAudio is decoding. Once the
+    // buffer is ready, promote the active source so visualizers receive the
+    // analyser for the first track as well.
+    expect(options.switchToWebAudioDuringPlayback).toBe(true);
     expect(player).toBeDefined();
   });
 
@@ -353,6 +356,49 @@ describe("initPlayer", () => {
 
     expect(isCurrentTrackFullyBuffered()).toBe(true);
     expect(onAnalyserReady).toHaveBeenCalledWith({});
+  });
+
+  it("invalidates the previous analyser before changing tracks", () => {
+    const analyser = {} as AnalyserNode;
+    const onAnalyserReady = vi.fn();
+    const onAnalyserInvalidated = vi.fn();
+    initPlayer({ onAnalyserReady, onAnalyserInvalidated });
+
+    const switched = (mock as unknown as Record<string, unknown>)
+      .onswitchtowebaudio as
+      | ((path: string, analyser: AnalyserNode) => void)
+      | undefined;
+    switched?.("/tracks/1/stream", analyser);
+    expect(getAnalyserNode()).toBe(analyser);
+
+    const next = (mock as unknown as Record<string, unknown>).onnext as
+      | ((from: string, to: string) => void)
+      | undefined;
+    next?.("/tracks/1/stream", "/tracks/2/stream");
+
+    expect(getAnalyserNode()).toBeNull();
+    expect(onAnalyserInvalidated).toHaveBeenCalledTimes(1);
+    expect(onAnalyserReady).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not keep a stale analyser when HTML5 starts the next track", () => {
+    const analyser = {} as AnalyserNode;
+    const onAnalyserInvalidated = vi.fn();
+    initPlayer({ onAnalyserInvalidated });
+
+    const switched = (mock as unknown as Record<string, unknown>)
+      .onswitchtowebaudio as
+      | ((path: string, analyser: AnalyserNode) => void)
+      | undefined;
+    switched?.("/tracks/1/stream", analyser);
+
+    const onPlay = (mock as unknown as Record<string, unknown>).onplay as
+      | ((path: string, analyser?: AnalyserNode) => void)
+      | undefined;
+    onPlay?.("/tracks/2/stream");
+
+    expect(getAnalyserNode()).toBeNull();
+    expect(onAnalyserInvalidated).toHaveBeenCalledTimes(1);
   });
 
   it("clears the fully buffered marker when the current track advances", () => {
