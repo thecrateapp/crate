@@ -289,6 +289,90 @@ describe("ArtistHeroArtworkEditor", () => {
     });
   });
 
+  it("uses the background fallback as an editable source", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith("/hero-profile")) {
+          return new Response("not found", { status: 404 });
+        }
+        if (url.includes("/background")) {
+          return new Response("background", {
+            headers: { "Content-Type": "image/jpeg" },
+          });
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    expect(await screen.findByText("Background fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("canvas-source-url")).toHaveTextContent(
+      "/api/artists/7/background?size=1280",
+    );
+    expect(
+      screen.getByRole("button", { name: "Preview result" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Generate hero artwork" }),
+    ).toBeEnabled();
+  });
+
+  it("sends the background fallback file when previewing a new hero", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.mocked(waitForTask).mockResolvedValue({
+      status: "completed",
+      result: {
+        preview_url: "/api/artwork/artists/7/hero-preview/fallback-preview",
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        requests.push({ url, init });
+        if (url.endsWith("/hero-profile")) {
+          return new Response("not found", { status: 404 });
+        }
+        if (url.includes("/background")) {
+          return new Response("background", {
+            headers: { "Content-Type": "image/jpeg" },
+          });
+        }
+        if (init?.method === "POST") {
+          return Response.json({
+            status: "queued",
+            task_id: "preview-fallback",
+          });
+        }
+        return new Response("not found", { status: 404 });
+      }),
+    );
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Preview result" }),
+    );
+
+    const previewRequest = await waitFor(() => {
+      const request = requests.find((item) =>
+        item.url.endsWith("/preview-hero"),
+      );
+      expect(request).toBeDefined();
+      return request;
+    });
+    const form = previewRequest?.init?.body as FormData;
+    expect(form.get("file")).toBeInstanceOf(File);
+    expect(form.get("composition")).toBe("desktop");
+  });
+
   it("sends the adjusted framing when generating an uploaded source", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal(

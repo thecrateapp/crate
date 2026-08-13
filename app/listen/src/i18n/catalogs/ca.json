@@ -286,6 +286,7 @@
   "explore.moods.subtitle": "Impulsat per l'anàlisi d'àudio de la teva biblioteca.",
   "explore.moods.mixName": "Mix {mood}",
   "home.hero.notInterested": "No m'interessa",
+  "home.hero.featuredArtist": "Artista destacat",
   "home.hero.previousArtist": "Artista anterior",
   "home.hero.nextArtist": "Artista següent",
   "home.hero.showArtist": "Mostra {name}",

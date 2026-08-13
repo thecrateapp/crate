@@ -326,6 +326,58 @@ def test_home_hero_bundle_selects_ready_artists_per_surface(monkeypatch):
     ] == ["Mobile Ready"]
 
 
+def test_home_hero_bundle_selects_up_to_eight_desktop_artists(monkeypatch):
+    from crate.db import home_builder_discovery_queries as queries
+
+    desktop_ready = [
+        _prepared_hero_row(f"Desktop Ready {index}", mobile=False) for index in range(8)
+    ]
+    monkeypatch.setattr(
+        queries,
+        "get_home_hero_rows",
+        lambda **_: desktop_ready,
+    )
+    monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
+
+    bundle = queries.get_home_hero_bundle(7, [], [], [])
+
+    assert bundle is not None
+    assert [
+        artist["name"] for artist in bundle["hero_surfaces"]["desktop"]["artists"]
+    ] == [f"Desktop Ready {index}" for index in range(8)]
+
+
+def test_home_hero_bundle_does_not_lose_ready_desktop_artists_to_fallbacks(
+    monkeypatch,
+):
+    from crate.db import home_builder_discovery_queries as queries
+
+    fallback_candidates = [
+        {
+            **_hero_row(f"Fallback {index}", listeners=100),
+            "is_followed": True,
+            "user_play_count": 20,
+        }
+        for index in range(2)
+    ]
+    desktop_ready = [
+        _prepared_hero_row(f"Desktop Ready {index}", mobile=False) for index in range(6)
+    ]
+    monkeypatch.setattr(
+        queries,
+        "get_home_hero_rows",
+        lambda **_: fallback_candidates + desktop_ready,
+    )
+    monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
+
+    bundle = queries.get_home_hero_bundle(7, [], [], [])
+
+    assert bundle is not None
+    assert [
+        artist["name"] for artist in bundle["hero_surfaces"]["desktop"]["artists"]
+    ] == [f"Desktop Ready {index}" for index in range(6)]
+
+
 def test_home_hero_bundle_skips_artist_without_mobile_source(monkeypatch):
     from crate.db import home_builder_discovery_queries as queries
 

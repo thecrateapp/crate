@@ -184,7 +184,7 @@ describe("Home", () => {
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
 
-  it("keeps Custom mixes and Just landed out of the desktop home", () => {
+  it("keeps Custom mixes and the library rail out of the desktop home", () => {
     viewportState.isDesktop = true;
     vi.mocked(useApi).mockReturnValue({
       data: homeDiscoveryPayloadWithDiscoveryRails(),
@@ -196,7 +196,8 @@ describe("Home", () => {
     renderWithListenProviders(<Home />);
 
     expect(screen.queryByText("Custom mixes")).toBeNull();
-    expect(screen.getAllByText("Just landed")).toHaveLength(1);
+    expect(screen.getByText("Featured Artist")).toBeInTheDocument();
+    expect(screen.queryByText("Just landed")).toBeNull();
   });
 
   it("composes the desktop greeting inside the hero without overlapping the rails", () => {
@@ -229,7 +230,7 @@ describe("Home", () => {
     ).toBeNull();
   });
 
-  it("shows Just landed on the mobile home", () => {
+  it("shows the featured artist and Just landed rail on the mobile home", () => {
     vi.mocked(useApi).mockReturnValue({
       data: homeDiscoveryPayloadWithDiscoveryRails(),
       loading: false,
@@ -239,7 +240,8 @@ describe("Home", () => {
 
     renderWithListenProviders(<Home />);
 
-    expect(screen.getAllByText("Just landed")).toHaveLength(2);
+    expect(screen.getByText("Featured Artist")).toBeInTheDocument();
+    expect(screen.getByText("Just landed")).toBeInTheDocument();
   });
 
   it("does not treat the featured artist as a recommendation surface", () => {

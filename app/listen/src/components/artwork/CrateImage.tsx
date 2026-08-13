@@ -115,6 +115,9 @@ export function CrateImage({
       sizes,
     });
   }, [rawSource, retryPolicy, sizes, srcSet]);
+  const isTicketedArtwork = requiresMediaAccessTicket(artwork.src);
+  const preservesReadyArtwork =
+    artwork.retryPolicy === "credentials" || isTicketedArtwork;
   const resolved = useMemo(
     () => resolveArtworkCandidate(artwork),
     // ticketVersion intentionally re-registers protected paths. Content
@@ -154,7 +157,7 @@ export function CrateImage({
     desiredRef.current = desired;
     const current = activeRef.current;
     if (!resolved) {
-      if (current?.ready && artwork.retryPolicy === "credentials") return;
+      if (current?.ready && preservesReadyArtwork) return;
       commit(null);
       return;
     }
@@ -181,12 +184,12 @@ export function CrateImage({
     return () => {
       cancelled = true;
     };
-  }, [artwork, resolved]);
+  }, [artwork, preservesReadyArtwork, resolved]);
 
   useEffect(() => {
     if (handledResumeVersion.current === resumeVersion) return;
     handledResumeVersion.current = resumeVersion;
-    if (!artwork.src || artwork.retryPolicy !== "credentials") return;
+    if (!artwork.src || !preservesReadyArtwork) return;
     const wasReady = Boolean(activeRef.current?.ready);
     if (wasReady && !shouldRefreshAfterResume(imageRef.current, loading)) {
       return;
@@ -218,10 +221,10 @@ export function CrateImage({
     return () => {
       cancelled = true;
     };
-  }, [artwork, loading, resumeVersion]);
+  }, [artwork, loading, preservesReadyArtwork, resumeVersion]);
 
   const displayed = !resolved
-    ? active?.ready && artwork.retryPolicy === "credentials"
+    ? active?.ready && preservesReadyArtwork
       ? active
       : null
     : !active || active.candidate.logicalKey !== resolved.logicalKey
