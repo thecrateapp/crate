@@ -117,6 +117,7 @@ describe("ArtistHeroPresentation", () => {
         artistName="Converge"
         intro={<span>Good afternoon</span>}
         actions={<span>Play</span>}
+        mobileIntroClassName="pt-[calc(var(--listen-mobile-header-height)+0.5rem)]"
       />,
     );
 
@@ -124,7 +125,7 @@ describe("ArtistHeroPresentation", () => {
     expect(screen.getByTestId("mobile-hero-intro-layout")).toHaveClass(
       "top-0",
       "px-5",
-      "pt-4",
+      "pt-[calc(var(--listen-mobile-header-height)+0.5rem)]",
     );
     expect(screen.getByText("Good afternoon")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-hero-copy-layout")).toHaveClass(

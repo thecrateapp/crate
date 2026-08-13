@@ -43,16 +43,39 @@ def _dedupe_home_hero_rows(rows: list[dict]) -> list[dict]:
     return deduped
 
 
+def _hero_source_dimensions(
+    item: Mapping[str, object], composition: str
+) -> tuple[object, object]:
+    width = item.get(f"_hero_{composition}_source_width")
+    height = item.get(f"_hero_{composition}_source_height")
+    has_composition_dimensions = any(
+        item.get(f"_hero_{candidate}_source_width") is not None
+        or item.get(f"_hero_{candidate}_source_height") is not None
+        for candidate in _CANONICAL_SURFACES
+    )
+    if has_composition_dimensions:
+        return width, height
+    return item.get("_hero_source_width"), item.get("_hero_source_height")
+
+
 def _add_hero_artwork_bounds(item: dict) -> None:
     generic_width = item.pop("_hero_source_width", None)
     generic_height = item.pop("_hero_source_height", None)
+    has_composition_dimensions = any(
+        item.get(f"_hero_{candidate}_source_width") is not None
+        or item.get(f"_hero_{candidate}_source_height") is not None
+        for candidate in _CANONICAL_SURFACES
+    )
     compositions: dict[str, dict] = {}
     for composition, output_size in (
         ("desktop", DESKTOP_HERO_SIZE),
         ("mobile", MOBILE_HERO_SIZE),
     ):
-        width = item.pop(f"_hero_{composition}_source_width", None) or generic_width
-        height = item.pop(f"_hero_{composition}_source_height", None) or generic_height
+        width = item.pop(f"_hero_{composition}_source_width", None)
+        height = item.pop(f"_hero_{composition}_source_height", None)
+        if not has_composition_dimensions:
+            width = width or generic_width
+            height = height or generic_height
         recipe = item.pop(f"_hero_{composition}_recipe", None)
         if not width or not height or not isinstance(recipe, Mapping):
             continue
@@ -90,10 +113,7 @@ def _canonical_surface_ready(item: Mapping[str, object], composition: str) -> bo
     ):
         return False
 
-    generic_width = item.get("_hero_source_width")
-    generic_height = item.get("_hero_source_height")
-    width = item.get(f"_hero_{composition}_source_width") or generic_width
-    height = item.get(f"_hero_{composition}_source_height") or generic_height
+    width, height = _hero_source_dimensions(item, composition)
     recipe = item.get(f"_hero_{composition}_recipe")
     return bool(
         width
@@ -205,13 +225,10 @@ def get_home_hero_bundle(
     surfaces = {}
     for composition in _CANONICAL_SURFACES:
         ready_names = ready_by_surface[composition]
-        if ready_names:
-            artists = [item for item in hero if item["name"] in ready_names]
-            mode = "canonical"
-        else:
-            artists = list(hero)
-            mode = "legacy"
-        surfaces[composition] = {"mode": mode, "artists": artists}
+        surfaces[composition] = {
+            "mode": "canonical",
+            "artists": [item for item in hero if item["name"] in ready_names],
+        }
 
     return {"hero": hero, "hero_surfaces": surfaces}
 

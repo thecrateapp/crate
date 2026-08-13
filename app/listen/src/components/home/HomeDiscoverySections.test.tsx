@@ -17,11 +17,7 @@ import type {
   HomeRadioStation,
   HomeRecentItem,
 } from "@/components/home/home-model";
-import {
-  artistBackgroundApiUrl,
-  artistHeroApiUrl,
-  artistPhotoApiUrl,
-} from "@/lib/library-routes";
+import { artistHeroApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 vi.mock("@/lib/library-routes", async (importOriginal) => {
@@ -30,7 +26,6 @@ vi.mock("@/lib/library-routes", async (importOriginal) => {
     ...actual,
     artistPhotoApiUrl: vi.fn(actual.artistPhotoApiUrl),
     artistHeroApiUrl: vi.fn(actual.artistHeroApiUrl),
-    artistBackgroundApiUrl: vi.fn(actual.artistBackgroundApiUrl),
   };
 });
 
@@ -120,20 +115,20 @@ function heroFixture(overrides: Partial<HomeHeroArtist> = {}): HomeHeroArtist {
 }
 
 describe("HomeTasteHero", () => {
-  it("uses the legacy background when the surface is not canonically ready", () => {
+  it("does not render when the canonical surface has no available artists", () => {
     mockDesktopPointer();
 
     renderWithListenProviders(
       <HomeTasteHero
-        heroes={[heroFixture({ artwork_revision: "stale-revision" })]}
+        heroes={[heroFixture()]}
         heroSurfaces={{
           desktop: {
-            mode: "legacy",
-            artists: [heroFixture({ artwork_revision: "stale-revision" })],
+            mode: "canonical",
+            artists: [],
           },
           mobile: {
-            mode: "legacy",
-            artists: [heroFixture({ artwork_revision: "stale-revision" })],
+            mode: "canonical",
+            artists: [],
           },
         }}
         isFollowing={() => false}
@@ -143,12 +138,35 @@ describe("HomeTasteHero", () => {
       />,
     );
 
-    expect(artistBackgroundApiUrl).toHaveBeenCalled();
     expect(artistHeroApiUrl).not.toHaveBeenCalled();
-    expect(screen.getByTestId("desktop-legacy-hero")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("desktop-legacy-hero-artwork"),
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-editorial-hero")).toBeNull();
+  });
+
+  it("does not render on mobile when the mobile surface has no available artists", () => {
+    mockMobilePointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture()]}
+        heroSurfaces={{
+          desktop: {
+            mode: "canonical",
+            artists: [heroFixture()],
+          },
+          mobile: {
+            mode: "canonical",
+            artists: [],
+          },
+        }}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(artistHeroApiUrl).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Converge" })).toBeNull();
   });
 
   it("renders the editorial Just Landed content without recommendation controls", () => {
@@ -457,7 +475,7 @@ describe("HomeTasteHero", () => {
       <HomeTasteHero
         heroes={[
           heroFixture({
-            artwork_revision: "legacy-revision",
+            artwork_revision: "stale-revision",
             hero_compositions: {
               desktop: {
                 schema_version: 1,
@@ -539,7 +557,10 @@ describe("HomeTasteHero", () => {
       maskImage: "none",
     });
     expect(screen.getByTestId("mobile-hero-scrim")).toHaveClass("h-[82%]");
-    expect(screen.getByTestId("mobile-hero-intro-layout")).toHaveClass("top-0");
+    expect(screen.getByTestId("mobile-hero-intro-layout")).toHaveClass(
+      "top-0",
+      "pt-[calc(var(--listen-mobile-header-height)+0.5rem)]",
+    );
     expect(screen.getByText("Good morning")).toBeInTheDocument();
     expect(artistHeroApiUrl).toHaveBeenCalledWith(
       expect.objectContaining({ artistEntityUid: "artist-entity" }),

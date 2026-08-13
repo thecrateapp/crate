@@ -443,15 +443,17 @@ export function Shell() {
   const overlayHeader = hasOverlayHeader(location.pathname, location.search);
   const homePage = location.pathname === "/";
   const homeDesktopOverlay = isDesktop && homePage;
+  const homeMobileOverlay = !isDesktop && homePage;
   const desktopOverlayHeader = overlayHeader || homeDesktopOverlay;
   const collectionActive =
     location.pathname === "/library" ||
     location.pathname.startsWith("/collection");
   const headerOffsetClass = desktopOverlayHeader ? "" : "pt-24";
   const desktopContentPadClass = desktopOverlayHeader ? "pt-0 pb-6" : "py-6";
-  const mobileContentPadClass = overlayHeader
-    ? "pt-0 pb-4"
-    : "py-4 pt-[var(--listen-mobile-page-top)]";
+  const mobileContentPadClass =
+    overlayHeader || homeMobileOverlay
+      ? "pt-0 pb-4"
+      : "py-4 pt-[var(--listen-mobile-page-top)]";
   const headerChromeClass =
     "border-b border-white/6 bg-app-surface/68 shadow-[0_12px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl";
   const overlayHeaderChromeClass = desktopOverlayHeader
@@ -519,9 +521,11 @@ export function Shell() {
     <div className="flex min-h-screen flex-col bg-app-surface">
       <div
         data-testid="listen-header"
-        data-home-overlay="false"
+        data-home-overlay={String(homeMobileOverlay)}
         className={`z-app-header fixed top-0 left-0 right-0 ${
-          overlayHeader ? "bg-transparent" : headerChromeClass
+          overlayHeader || homeMobileOverlay
+            ? "bg-transparent"
+            : headerChromeClass
         }`}
         style={{ paddingTop: "var(--listen-safe-top)" }}
       >

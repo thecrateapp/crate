@@ -305,11 +305,11 @@ def test_home_hero_bundle_selects_ready_artists_per_surface(monkeypatch):
 
     desktop_only = _prepared_hero_row("Desktop Ready", mobile=False)
     mobile_only = _prepared_hero_row("Mobile Ready", desktop=False)
-    legacy = _hero_row("Legacy Fallback", listeners=900)
+    unavailable = _hero_row("Unavailable Candidate", listeners=900)
     monkeypatch.setattr(
         queries,
         "get_home_hero_rows",
-        lambda **_: [desktop_only, mobile_only, legacy],
+        lambda **_: [desktop_only, mobile_only, unavailable],
     )
     monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
 
@@ -326,7 +326,35 @@ def test_home_hero_bundle_selects_ready_artists_per_surface(monkeypatch):
     ] == ["Mobile Ready"]
 
 
-def test_home_hero_bundle_uses_legacy_surface_until_manual_approved_artwork_is_ready(
+def test_home_hero_bundle_skips_artist_without_mobile_source(monkeypatch):
+    from crate.db import home_builder_discovery_queries as queries
+
+    desktop_only = _prepared_hero_row("Birds In Row")
+    desktop_only.update(
+        {
+            "_hero_desktop_source_width": 1400,
+            "_hero_desktop_source_height": 700,
+            "_hero_mobile_source_width": None,
+            "_hero_mobile_source_height": None,
+        }
+    )
+    mobile_ready = _prepared_hero_row("Mobile Ready")
+    monkeypatch.setattr(
+        queries,
+        "get_home_hero_rows",
+        lambda **_: [desktop_only, mobile_ready],
+    )
+    monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
+
+    bundle = queries.get_home_hero_bundle(7, [], [], [])
+
+    assert bundle is not None
+    assert [
+        artist["name"] for artist in bundle["hero_surfaces"]["mobile"]["artists"]
+    ] == ["Mobile Ready"]
+
+
+def test_home_hero_bundle_hides_surfaces_without_manual_approved_artwork(
     monkeypatch,
 ):
     from crate.db import home_builder_discovery_queries as queries
@@ -343,18 +371,17 @@ def test_home_hero_bundle_uses_legacy_surface_until_manual_approved_artwork_is_r
     bundle = queries.get_home_hero_bundle(7, [], [], [])
 
     assert bundle is not None
-    for surface in ("desktop", "mobile"):
-        assert bundle["hero_surfaces"][surface]["mode"] == "legacy"
-        assert [
-            artist["name"] for artist in bundle["hero_surfaces"][surface]["artists"]
-        ] == ["Derived Candidate", "Pending Candidate"]
+    assert bundle["hero_surfaces"]["desktop"]["mode"] == "canonical"
+    assert bundle["hero_surfaces"]["desktop"]["artists"] == []
+    assert bundle["hero_surfaces"]["mobile"]["mode"] == "canonical"
+    assert bundle["hero_surfaces"]["mobile"]["artists"] == []
 
 
 def test_home_hero_surface_rotation_keeps_surface_modes(monkeypatch):
     from crate.db import home_discovery_surface as surface
 
     payload = {
-        "hero": [{"id": 1, "name": "Legacy"}],
+        "hero": [{"id": 1, "name": "Unavailable"}],
         "hero_surfaces": {
             "desktop": {
                 "mode": "canonical",
@@ -364,7 +391,7 @@ def test_home_hero_surface_rotation_keeps_surface_modes(monkeypatch):
                 ],
             },
             "mobile": {
-                "mode": "legacy",
+                "mode": "canonical",
                 "artists": [{"id": 3, "name": "Three"}],
             },
         },
@@ -382,4 +409,4 @@ def test_home_hero_surface_rotation_keeps_surface_modes(monkeypatch):
     assert [
         artist["name"] for artist in rotated["hero_surfaces"]["desktop"]["artists"]
     ] == ["Two", "One"]
-    assert rotated["hero_surfaces"]["mobile"]["mode"] == "legacy"
+    assert rotated["hero_surfaces"]["mobile"]["mode"] == "canonical"

@@ -158,14 +158,14 @@ describe("Shell", () => {
     );
   });
 
-  it("keeps the existing mobile Home header chrome", () => {
+  it("overlays the mobile Home header on the hero", () => {
     const { container } = renderWithListenProviders(<Shell />, { route: "/" });
 
     expect(screen.getByTestId("listen-header")).toHaveAttribute(
       "data-home-overlay",
-      "false",
+      "true",
     );
     expect(container.querySelector(".listen-home-top-scrim")).toBeNull();
-    expect(screen.getByTestId("listen-content")).not.toHaveClass("pt-0");
+    expect(screen.getByTestId("listen-content")).toHaveClass("pt-0");
   });
 });
