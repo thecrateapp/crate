@@ -484,6 +484,46 @@ class TestOAuthStart:
         assert captured_state["native_state"] == "s" * 43
         assert captured_state["app_id"] == "listen-android"
 
+    def test_native_oauth_start_accepts_isolated_debug_callback(self):
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        captured_state: dict[str, Any] = {}
+        request = self._request(headers=[(b"x-crate-app", b"listen-android")])
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "provider-verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="provider-challenge"),
+            patch.dict(
+                "os.environ",
+                {
+                    "GOOGLE_CLIENT_ID": "google-client",
+                    "NATIVE_OAUTH_EXCHANGE_ENABLED": "true",
+                },
+                clear=False,
+            ),
+        ):
+            oauth_start(
+                request,
+                "google",
+                OAuthStartRequest(
+                    return_to="cratemusic-dbg://oauth/callback",
+                    native_code_challenge="c" * 43,
+                    native_state="s" * 43,
+                ),
+            )
+
+        assert captured_state["return_to"] == "cratemusic-dbg://oauth/callback"
+
     def test_oauth_link_uses_link_mode_for_current_user(self):
         from crate.api.auth import oauth_link
         from crate.api.schemas.auth import OAuthStartRequest

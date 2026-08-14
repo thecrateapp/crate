@@ -363,6 +363,10 @@ func (s *Server) trackByIDRoute(w http.ResponseWriter, r *http.Request, trackID 
 }
 
 func (s *Server) trackByEntityRoute(w http.ResponseWriter, r *http.Request, entityUID string, action string) {
+	if action == "mix-profile" {
+		s.smartMixProfileSummary(w, r, entityUID)
+		return
+	}
 	if action == "stream" {
 		if !s.requireCatalogAssetAuth(w, r) {
 			return

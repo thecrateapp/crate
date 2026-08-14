@@ -291,6 +291,7 @@ def create_app() -> FastAPI:
                 "curation",
                 "analytics",
                 "lyrics",
+                "system",
             },
             title="Crate App & Listening API",
             summary="Authentication, personal library, browsing, playlists, radio, and listening surfaces.",
@@ -479,6 +480,9 @@ def create_app() -> FastAPI:
     from crate.api.federation_remote import router as federation_remote_router
     from crate.api.internal_federation import router as internal_federation_router
     from crate.api.catalog import router as catalog_router
+    from crate.api.capabilities import router as capabilities_router
+    from crate.api.smart_mix import router as smart_mix_router
+    from crate.api.smart_mix_admin import router as smart_mix_admin_router
 
     # Public well-known (no auth required)
     app.include_router(federation_well_known)
@@ -486,6 +490,7 @@ def create_app() -> FastAPI:
     # Auth + management + settings + enrichment BEFORE browse (browse has {name:path} catch-all)
     app.include_router(setup_router)
     app.include_router(auth_router)
+    app.include_router(capabilities_router)
     app.include_router(media_access_router)
     app.include_router(admin_auth_router)
     app.include_router(me_router)
@@ -521,6 +526,8 @@ def create_app() -> FastAPI:
     app.include_router(federation_router)
     app.include_router(internal_federation_router)
     app.include_router(federation_remote_router)
+    app.include_router(smart_mix_router)
+    app.include_router(smart_mix_admin_router)
     app.include_router(catalog_router)
     app.include_router(browse_router)
     app.include_router(tags_router)

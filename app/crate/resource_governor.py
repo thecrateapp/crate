@@ -20,11 +20,13 @@ log = logging.getLogger(__name__)
 RESOURCE_GOVERNED_TASK_TYPES = frozenset(
     {
         "backfill_track_audio_fingerprints",
+        "backfill_smart_mix_profiles",
         "backfill_artwork_variants",
         "cleanup_artwork_variants",
         "batch_covers",
         "batch_retag",
         "compute_analytics",
+        "compute_smart_mix_profile",
         "compute_popularity",
         "enrich_mbids",
         "export_rich_metadata",
@@ -54,6 +56,8 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
 AUDIO_HEAVY_TASK_TYPES = frozenset(
     {
         "backfill_track_audio_fingerprints",
+        "backfill_smart_mix_profiles",
+        "compute_smart_mix_profile",
     }
 )
 

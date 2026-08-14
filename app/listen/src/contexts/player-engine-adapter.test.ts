@@ -51,9 +51,11 @@ vi.mock("@/lib/offline", () => ({
 import {
   toEngineTrack,
   toFreshEngineTrack,
+  toStartupEngineQueueSnapshot,
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { getPlaybackSession } from "@/lib/playback-provenance";
+import { setSmartMixCapabilities } from "@/lib/smart-mix";
 
 describe("player engine adapter", () => {
   beforeEach(() => {
@@ -70,6 +72,12 @@ describe("player engine adapter", () => {
       return true;
     });
     offlineUrlState.url = null;
+    setSmartMixCapabilities({
+      available: false,
+      androidNativeCrossfade: false,
+      androidBeatmatch: false,
+      plannerVersion: null,
+    });
   });
 
   it("sends absolute authenticated artwork URLs to the native player", () => {
@@ -323,5 +331,88 @@ describe("player engine adapter", () => {
       "https://listen.example/api/albums/1/cover?size=512&media_ticket=fresh-artwork",
       "https://listen.example/api/albums/2/cover?size=512&media_ticket=fresh-artwork",
     ]);
+  });
+
+  it("carries bounded safe plans in native offline queue snapshots", async () => {
+    offlineUrlState.url =
+      "file:///data/user/0/app.cratemusic.crate/files/offline/song.m4a";
+    const queue = [
+      {
+        id: "runtime-1",
+        entityUid: "11111111-1111-4111-8111-111111111111",
+        title: "One",
+        artist: "Band A",
+      },
+      {
+        id: "runtime-2",
+        entityUid: "22222222-2222-4222-8222-222222222222",
+        title: "Two",
+        artist: "Band B",
+      },
+      {
+        id: "runtime-3",
+        entityUid: "33333333-3333-4333-8333-333333333333",
+        title: "Three",
+        artist: "Band C",
+      },
+    ];
+
+    const snapshot = await toStartupEngineQueueSnapshot({
+      revision: "offline-queue",
+      tracks: queue,
+      currentIndex: 0,
+      positionMs: 1200,
+      autoplay: true,
+      repeat: "off",
+      crossfadeMs: 3000,
+      volume: 0.8,
+      playSource: { type: "playlist", name: "Offline mix", id: 1 },
+      shuffle: false,
+      target: "android-native",
+    });
+
+    expect(
+      snapshot.tracks.every((track) => track.url.startsWith("file:")),
+    ).toBe(true);
+    expect(snapshot.transitionPlans).toHaveLength(2);
+    expect(snapshot.transitionPlans?.[0]).toMatchObject({
+      outgoingTrackId: "runtime-1",
+      incomingTrackId: "runtime-2",
+      fallbackReason: "capability_unavailable",
+    });
+    expect(JSON.parse(JSON.stringify(snapshot)).transitionPlans).toEqual(
+      snapshot.transitionPlans,
+    );
+  });
+
+  it("keeps web and desktop snapshots on the legacy transition path", async () => {
+    const snapshot = await toStartupEngineQueueSnapshot({
+      revision: "web-queue",
+      tracks: [
+        {
+          id: "runtime-1",
+          entityUid: "11111111-1111-4111-8111-111111111111",
+          title: "One",
+          artist: "Band A",
+        },
+        {
+          id: "runtime-2",
+          entityUid: "22222222-2222-4222-8222-222222222222",
+          title: "Two",
+          artist: "Band B",
+        },
+      ],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 4000,
+      volume: 1,
+      playSource: { type: "playlist", name: "Web mix", id: 1 },
+      shuffle: false,
+      target: "webview",
+    });
+
+    expect(snapshot.transitionPlans).toBeUndefined();
   });
 });

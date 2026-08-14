@@ -56,6 +56,14 @@ PANNS_DURATION = 30  # seconds — enough for genre classification
 SIGNAL_DURATION = 120  # seconds — for BPM/key accuracy
 FRAME_STEP = 4  # analyze every Nth frame for spectral features
 
+
+def analyze_mix_profile(filepath: str | Path):
+    """Analyze full-track signals used by the versioned Smart Mix profile."""
+    from crate.smart_mix.analyzer import analyze_mix_profile as analyze
+
+    return analyze(filepath)
+
+
 # ── PANNs CNN14 (lazy singleton) ──────────────────────────────────
 
 _panns_tagger: Any | None = None
@@ -371,6 +379,7 @@ def _analyze_rust(filepath: str) -> dict | None:
             "valence": data.get("valence"),
             "acousticness": data.get("acousticness"),
             "instrumentalness": data.get("instrumentalness"),
+            "mix_profile": data.get("mixProfile"),
         }
     except Exception:
         return None
@@ -416,6 +425,7 @@ def _analyze_rust_batch(filepaths: list) -> list | None:
                             "valence": t.get("valence"),
                             "acousticness": t.get("acousticness"),
                             "instrumentalness": t.get("instrumentalness"),
+                            "mix_profile": t.get("mixProfile"),
                         }
                     )
                 else:
@@ -441,6 +451,7 @@ def _empty_result() -> dict:
         "loudness": None,
         "dynamic_range": None,
         "spectral_complexity": None,
+        "mix_profile": None,
     }
 
 

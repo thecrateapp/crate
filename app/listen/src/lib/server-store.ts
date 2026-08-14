@@ -21,6 +21,7 @@ import {
   removeSecureSessionValue,
   setSecureSessionValue,
 } from "@/lib/native-secure-session";
+import { FIXED_SERVER_URL } from "@/lib/mobile-build-config";
 import { isCapacitorRuntime, usesConfigurableServer } from "@/lib/platform";
 
 const SERVERS_KEY = "crate-servers";
@@ -146,6 +147,11 @@ export function getServers(): ServerConfig[] {
 
 export function getCurrentServerId(): string | null {
   if (!usesConfigurableServer) return null;
+  if (FIXED_SERVER_URL) {
+    return (
+      getServers().find((server) => server.url === FIXED_SERVER_URL)?.id ?? null
+    );
+  }
   try {
     return localStorage.getItem(CURRENT_KEY);
   } catch {
@@ -289,6 +295,9 @@ function dispatchChange(): void {
 
 export function addServer(url: string, label?: string): ServerConfig {
   const normalised = normaliseServerUrl(url);
+  if (FIXED_SERVER_URL && normalised !== FIXED_SERVER_URL) {
+    throw new Error(`This build is pinned to fixed server ${FIXED_SERVER_URL}`);
+  }
   if (
     !isAllowedServerUrl(normalised, {
       allowInsecureLoopback: ALLOW_INSECURE_LOOPBACK,
@@ -314,6 +323,14 @@ export function addServer(url: string, label?: string): ServerConfig {
 }
 
 export function removeServer(id: string): void {
+  if (
+    FIXED_SERVER_URL &&
+    getServers().some(
+      (server) => server.id === id && server.url === FIXED_SERVER_URL,
+    )
+  ) {
+    throw new Error("The fixed server cannot be removed");
+  }
   const servers = getServers().filter((s) => s.id !== id);
   writeServers(servers);
   if (getCurrentServerId() === id) {
@@ -334,6 +351,15 @@ export function removeServer(id: string): void {
 
 export function setCurrentServerId(id: string | null): void {
   try {
+    if (FIXED_SERVER_URL) {
+      const fixedId =
+        getServers().find((server) => server.url === FIXED_SERVER_URL)?.id ??
+        null;
+      if (fixedId) localStorage.setItem(CURRENT_KEY, fixedId);
+      else localStorage.removeItem(CURRENT_KEY);
+      dispatchChange();
+      return;
+    }
     if (id) localStorage.setItem(CURRENT_KEY, id);
     else localStorage.removeItem(CURRENT_KEY);
     dispatchChange();
@@ -479,6 +505,11 @@ export function migrateLegacyToken(defaultUrl: string): void {
 
 export function seedDefaultServer(defaultUrl: string): void {
   if (!usesConfigurableServer) return;
+  if (FIXED_SERVER_URL) {
+    const seeded = addServer(FIXED_SERVER_URL);
+    setCurrentServerId(seeded.id);
+    return;
+  }
   if (getServers().length > 0) return;
   const normalised = normaliseServerUrl(defaultUrl);
   if (!normalised) return;

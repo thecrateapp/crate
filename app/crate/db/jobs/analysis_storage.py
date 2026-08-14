@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
+import logging
+from pathlib import Path
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from crate.db.bliss_vectors import to_pgvector_literal
 from crate.db.jobs.artist_bliss_centroids import (
@@ -19,7 +23,17 @@ from crate.db.jobs.analysis_shared import (
     pipeline_name_for_state_column,
     validate_state_column,
 )
-from crate.db.tx import transaction_scope
+from crate.db.orm.smart_mix import TrackMixProfileRow
+from crate.db.repositories.library_analysis_writes import (
+    upsert_track_mix_profile_draft,
+)
+from crate.db.tx import read_scope, transaction_scope
+from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+
+
+SMART_MIX_PIPELINE = "smart_mix"
+SMART_MIX_ANALYZER_VERSION = "smart-mix-v1"
+log = logging.getLogger(__name__)
 
 
 def mark_done(track_id: int, state_column: str) -> None:
@@ -353,14 +367,253 @@ def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
             append_pipeline_event(
                 session, pipeline="analysis", track_id=row["track_id"], state="done"
             )
+        for track_id, path, result in results:
+            payload = result.get("mix_profile") or result.get("mixProfile")
+            if isinstance(payload, dict):
+                try:
+                    with session.begin_nested():
+                        _store_smart_mix_profile_result(
+                            session,
+                            int(track_id),
+                            Path(path),
+                            _draft_from_payload(payload),
+                        )
+                except Exception as exc:
+                    log.warning(
+                        "Smart Mix profile persistence failed for %s",
+                        path,
+                        exc_info=True,
+                    )
+                    _record_smart_mix_failure(
+                        session,
+                        int(track_id),
+                        Path(path),
+                        str(exc),
+                    )
         mark_ops_snapshot_dirty(session)
+
+
+def resolve_smart_mix_track(
+    *,
+    track_id: int | None = None,
+    track_entity_uid: str | None = None,
+) -> dict[str, Any] | None:
+    if not track_id and not track_entity_uid:
+        return None
+    params: dict[str, Any] = {}
+    if track_id and track_entity_uid:
+        predicate = "id = :track_id AND entity_uid = CAST(:track_entity_uid AS uuid)"
+        params["track_id"] = int(track_id)
+        params["track_entity_uid"] = str(track_entity_uid)
+    elif track_id:
+        predicate = "id = :track_id"
+        params["track_id"] = int(track_id)
+    else:
+        predicate = "entity_uid = CAST(:track_entity_uid AS uuid)"
+        params["track_entity_uid"] = str(track_entity_uid)
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    f"""
+                    SELECT id, entity_uid::text AS entity_uid, path, artist, album, title
+                    FROM library_tracks
+                    WHERE {predicate}
+                    ORDER BY id
+                    LIMIT 1
+                    """
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+
+def smart_mix_source_revision(path: str | Path) -> str:
+    source = Path(path)
+    try:
+        stat = source.stat()
+        identity = f"{stat.st_size}:{stat.st_mtime_ns}"
+    except OSError:
+        identity = f"missing:{source}"
+    return hashlib.sha256(identity.encode()).hexdigest()
+
+
+def store_smart_mix_profile_result(
+    track_id: int,
+    path: str | Path,
+    draft: TrackMixProfileDraft,
+) -> bool:
+    with transaction_scope() as session:
+        return _store_smart_mix_profile_result(session, track_id, Path(path), draft)
+
+
+def _store_smart_mix_profile_result(
+    session,
+    track_id: int,
+    path: Path,
+    draft: TrackMixProfileDraft,
+) -> bool:
+    source_revision = smart_mix_source_revision(path)
+    current = session.execute(
+        select(
+            TrackMixProfileRow.profile_version,
+            TrackMixProfileRow.source_revision,
+            TrackMixProfileRow.analyzer_version,
+            TrackMixProfileRow.quality,
+        ).where(TrackMixProfileRow.track_id == track_id)
+    ).first()
+    if (
+        current
+        and current.profile_version == 1
+        and current.source_revision == source_revision
+        and (current.analyzer_version == draft.analyzer_version)
+        and current.quality != MixProfileQuality.UNAVAILABLE.value
+    ):
+        _complete_smart_mix_state(session, track_id)
+        return False
+    stored = upsert_track_mix_profile_draft(
+        track_id,
+        source_revision,
+        draft,
+        session=session,
+    )
+    _complete_smart_mix_state(session, track_id)
+    return stored
+
+
+def record_smart_mix_failure(
+    track_id: int,
+    path: str | Path,
+    reason: str,
+) -> None:
+    with transaction_scope() as session:
+        _record_smart_mix_failure(session, track_id, Path(path), reason)
+
+
+def _record_smart_mix_failure(
+    session,
+    track_id: int,
+    path: Path,
+    reason: str,
+) -> None:
+    current_quality = session.execute(
+        select(TrackMixProfileRow.quality).where(
+            TrackMixProfileRow.track_id == track_id
+        )
+    ).scalar_one_or_none()
+    if current_quality is None:
+        upsert_track_mix_profile_draft(
+            track_id,
+            smart_mix_source_revision(path),
+            TrackMixProfileDraft(
+                analyzer="crate-python",
+                analyzer_version=SMART_MIX_ANALYZER_VERSION,
+                duration_ms=0,
+                quality=MixProfileQuality.UNAVAILABLE,
+            ),
+            session=session,
+        )
+    session.execute(
+        text(
+            """
+            INSERT INTO track_processing_state (
+                track_id, pipeline, state, attempts, priority,
+                last_error, updated_at
+            )
+            VALUES (
+                :track_id, :pipeline, 'failed', 1, 5,
+                :last_error, NOW()
+            )
+            ON CONFLICT (track_id, pipeline) DO UPDATE SET
+                state = 'failed',
+                claimed_by = NULL,
+                claimed_at = NULL,
+                last_error = EXCLUDED.last_error,
+                updated_at = NOW()
+            """
+        ),
+        {
+            "track_id": track_id,
+            "pipeline": SMART_MIX_PIPELINE,
+            "last_error": str(reason)[:2_000],
+        },
+    )
+
+
+def _complete_smart_mix_state(session, track_id: int) -> None:
+    session.execute(
+        text(
+            """
+            INSERT INTO track_processing_state (
+                track_id, pipeline, state, attempts, priority,
+                last_error, completed_at, updated_at
+            )
+            VALUES (
+                :track_id, :pipeline, 'done', 1, 5,
+                NULL, NOW(), NOW()
+            )
+            ON CONFLICT (track_id, pipeline) DO UPDATE SET
+                state = 'done',
+                claimed_by = NULL,
+                claimed_at = NULL,
+                last_error = NULL,
+                completed_at = NOW(),
+                updated_at = NOW()
+            """
+        ),
+        {"track_id": track_id, "pipeline": SMART_MIX_PIPELINE},
+    )
+
+
+def _draft_from_payload(payload: dict[str, Any]) -> TrackMixProfileDraft:
+    def value(snake_case: str, camel_case: str) -> Any:
+        return payload.get(snake_case, payload.get(camel_case))
+
+    return TrackMixProfileDraft(
+        analyzer=str(value("analyzer", "analyzer") or "crate-rust"),
+        analyzer_version=str(
+            value("analyzer_version", "analyzerVersion") or SMART_MIX_ANALYZER_VERSION
+        ),
+        duration_ms=int(value("duration_ms", "durationMs") or 0),
+        quality=value("quality", "quality") or MixProfileQuality.PARTIAL,
+        bpm=value("bpm", "bpm"),
+        bpm_confidence=value("bpm_confidence", "bpmConfidence"),
+        tempo_stability=value("tempo_stability", "tempoStability"),
+        beat_anchor_ms=value("beat_anchor_ms", "beatAnchorMs"),
+        downbeat_anchor_ms=value("downbeat_anchor_ms", "downbeatAnchorMs"),
+        time_signature=value("time_signature", "timeSignature"),
+        beat_grid_ms=tuple(value("beat_grid_ms", "beatGridMs") or ()),
+        key=value("key", "key"),
+        scale=value("scale", "scale"),
+        camelot=value("camelot", "camelot"),
+        key_confidence=value("key_confidence", "keyConfidence"),
+        intro_cue_ms=value("intro_cue_ms", "introCueMs"),
+        outro_cue_ms=value("outro_cue_ms", "outroCueMs"),
+        intro_lufs=value("intro_lufs", "introLufs"),
+        outro_lufs=value("outro_lufs", "outroLufs"),
+        true_peak_dbfs=value("true_peak_dbfs", "truePeakDbfs"),
+        intro_energy=value("intro_energy", "introEnergy"),
+        outro_energy=value("outro_energy", "outroEnergy"),
+        intro_spectral_density=value("intro_spectral_density", "introSpectralDensity"),
+        outro_spectral_density=value("outro_spectral_density", "outroSpectralDensity"),
+        global_energy=value("global_energy", "globalEnergy"),
+        danceability=value("danceability", "danceability"),
+        valence=value("valence", "valence"),
+    )
 
 
 __all__ = [
     "mark_done",
     "mark_failed",
+    "record_smart_mix_failure",
+    "resolve_smart_mix_track",
+    "smart_mix_source_revision",
     "store_analysis_result",
     "store_analysis_results",
     "store_bliss_vector",
     "store_bliss_vectors",
+    "store_smart_mix_profile_result",
 ]

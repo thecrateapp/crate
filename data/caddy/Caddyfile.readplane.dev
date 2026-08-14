@@ -2,6 +2,17 @@
 	local_certs
 }
 
+(smart_mix_full) {
+	@smart_mix_full {
+		method GET
+		path /api/tracks/by-entity/*/mix-profile
+		query detail=full
+	}
+	handle @smart_mix_full {
+		reverse_proxy api:8585
+	}
+}
+
 (readplane_listen) {
 	@readplane_listen {
 		method GET
@@ -50,6 +61,7 @@ https://listen.dev.lespedants.org {
 	tls internal
 	route {
 		import auth_api
+		import smart_mix_full
 		import readplane_listen
 		import api_backend
 		handle {
@@ -77,6 +89,7 @@ https://api.dev.lespedants.org {
 	tls internal
 	route {
 		import auth_api
+		import smart_mix_full
 		import readplane_listen
 		handle {
 			reverse_proxy api:8585

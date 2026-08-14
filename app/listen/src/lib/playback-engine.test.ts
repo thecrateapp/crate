@@ -100,6 +100,57 @@ describe("EngineQueueSnapshot", () => {
 
     expect(snapshot.revision).toBe("rev-1");
   });
+
+  it("carries optional transition plans without embedding credentials", () => {
+    const snapshot: EngineQueueSnapshot = {
+      revision: "rev-2",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 4000,
+      volume: 1,
+      transitionPlans: [
+        {
+          plannerVersion: 1,
+          outgoingTrackId: "track-1",
+          incomingTrackId: "track-2",
+          mode: "adaptive",
+          durationMs: 4000,
+          handoffProgress: 0.5,
+          outgoingGainDb: 0,
+          incomingGainDb: 0,
+          curve: "equal-power",
+          bassHandoff: "none",
+          confidence: 0.7,
+          fallbackReason: "local_fallback",
+        },
+      ],
+    };
+
+    expect(snapshot.transitionPlans?.[0]).toMatchObject({
+      outgoingTrackId: "track-1",
+      incomingTrackId: "track-2",
+      mode: "adaptive",
+    });
+    expect(JSON.stringify(snapshot.transitionPlans)).not.toContain("Bearer");
+  });
+
+  it("keeps transition plans optional for older plugins", () => {
+    const snapshot: EngineQueueSnapshot = {
+      revision: "legacy-rev",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 0,
+      volume: 1,
+    };
+
+    expect(snapshot.transitionPlans).toBeUndefined();
+  });
 });
 
 describe("EngineState", () => {
@@ -225,6 +276,7 @@ describe("EngineEventMap", () => {
       "transitionStarted",
       "transitionProgress",
       "transitionEnded",
+      "transitionCancelled",
       "bufferingChanged",
       "queueEnded",
       "nearQueueEnd",

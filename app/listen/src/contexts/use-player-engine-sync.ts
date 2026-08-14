@@ -7,7 +7,10 @@ import {
 } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
-import { toStartupEngineTracks } from "@/contexts/player-engine-adapter";
+import {
+  toStartupEngineQueueSnapshot,
+  toStartupEngineTracks,
+} from "@/contexts/player-engine-adapter";
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import {
   getEffectiveCrossfadeSeconds,
@@ -279,23 +282,22 @@ export function usePlayerEngineSync({
           );
         });
         void (async () => {
-          const engineTracks = await toStartupEngineTracks(
-            nextQueue,
-            nextIndex,
-            undefined,
-            { target: "android-native" },
-          );
-          if (!isCurrentSync()) return;
-          return androidNativeEngine.loadQueue({
-            revision: createQueueRevision(),
-            tracks: engineTracks,
+          const revision = createQueueRevision();
+          const snapshot = await toStartupEngineQueueSnapshot({
+            revision,
+            tracks: nextQueue,
             currentIndex: nextIndex,
             positionMs,
             autoplay,
             repeat: repeatRef.current,
             crossfadeMs: effectiveCrossfadeMsRef.current,
             volume: 1,
+            playSource: playSourceRef.current,
+            shuffle: shuffleRef.current,
+            target: "android-native",
           });
+          if (!isCurrentSync()) return;
+          return androidNativeEngine.loadQueue(snapshot);
         })().catch((error) => {
           if (!isCurrentSync()) return;
           console.error("[native-player] failed to sync queue:", error);
@@ -376,9 +378,11 @@ export function usePlayerEngineSync({
       engineTrackMapRef,
       isPlayingRef,
       markSeekPosition,
+      playSourceRef,
       pullFromEngine,
       rememberActiveTrack,
       repeatRef,
+      shuffleRef,
     ],
   );
 

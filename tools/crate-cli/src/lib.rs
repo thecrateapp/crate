@@ -6,6 +6,7 @@ pub mod analyze;
 pub mod bliss;
 pub mod diff;
 pub mod fingerprint;
+pub mod mix_profile;
 #[cfg(feature = "ml")]
 pub mod ml;
 pub mod quality;

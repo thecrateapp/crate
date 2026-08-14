@@ -160,6 +160,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "analyze_all": TaskPoolConfig(
         "fast", 3, 60, 0
     ),  # just resets state for background daemon
+    "compute_smart_mix_profile": TaskPoolConfig("heavy", 2, 900, 2),
+    "backfill_smart_mix_profiles": TaskPoolConfig("heavy", 3, 14400, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
     "infer_genre_taxonomy": TaskPoolConfig("maintenance", 3, 3600, 0),
