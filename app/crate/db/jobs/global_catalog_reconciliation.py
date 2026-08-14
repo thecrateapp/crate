@@ -2040,6 +2040,7 @@ def _upsert_album(
                     artist_slug,
                     public_slug,
                     year,
+                    release_date,
                     track_count,
                     total_duration_seconds,
                     musicbrainz_release_group_mbid,
@@ -2069,6 +2070,7 @@ def _upsert_album(
                     :artist_slug,
                     :public_slug,
                     :year,
+                    :release_date,
                     :track_count,
                     :total_duration_seconds,
                     :musicbrainz_release_group_mbid,
@@ -2096,6 +2098,10 @@ def _upsert_album(
                 artist_slug = EXCLUDED.artist_slug,
                 public_slug = EXCLUDED.public_slug,
                 year = EXCLUDED.year,
+                release_date = COALESCE(
+                    NULLIF(EXCLUDED.release_date, ''),
+                    global_catalog_albums.release_date
+                ),
                 track_count = EXCLUDED.track_count,
                 total_duration_seconds = EXCLUDED.total_duration_seconds,
                 musicbrainz_release_group_mbid = EXCLUDED.musicbrainz_release_group_mbid,
@@ -2131,6 +2137,7 @@ def _upsert_album(
             "artist_slug": build_artist_slug(payload["artist_name"]),
             "public_slug": build_public_album_slug(payload["canonical_name"]),
             "year": payload["year"],
+            "release_date": payload.get("release_date"),
             "track_count": payload["track_count"],
             "total_duration_seconds": payload["total_duration_seconds"],
             "musicbrainz_release_group_mbid": payload["musicbrainz_release_group_mbid"],
@@ -2375,6 +2382,10 @@ def _upsert_remote_album(
                 UPDATE global_catalog_albums
                 SET
                     has_remote = true,
+                    release_date = COALESCE(
+                        NULLIF(global_catalog_albums.release_date, ''),
+                        NULLIF(:release_date, '')
+                    ),
                     release_group_primary_type = COALESCE(
                         release_group_primary_type,
                         :release_group_primary_type
@@ -2395,6 +2406,7 @@ def _upsert_remote_album(
             ),
             {
                 "global_uid": global_uid,
+                "release_date": payload.get("release_date"),
                 "release_group_primary_type": payload.get("release_group_primary_type"),
                 "release_group_secondary_types": _json(
                     payload.get("release_group_secondary_types") or []

@@ -32,6 +32,7 @@ from crate.db.repositories.library import (
     get_library_tracks,
 )
 from crate.provider_rate_limits import wait_for_provider_slot
+from crate.release_dates import normalize_release_date
 from crate.storage_layout import looks_like_entity_uid, resolve_artist_dir
 from crate.task_progress import (
     TaskProgress,
@@ -187,6 +188,8 @@ def _persist_album_release_mbids(
 
 def _backfill_known_release_group_types(
     albums: Sequence[Mapping[str, Any]],
+    *,
+    dates_only: bool = False,
 ) -> set[int]:
     from crate.musicbrainz_ext import get_artist_releases
 
@@ -199,26 +202,46 @@ def _backfill_known_release_group_types(
 
     updates: list[dict] = []
     for artist_mbid, artist_albums in by_artist_mbid.items():
-        release_groups = {
-            str(release.get("mbid") or ""): release
-            for release in get_artist_releases(artist_mbid)
-            if release.get("mbid")
-        }
+        try:
+            release_groups = {
+                str(release.get("mbid") or ""): release
+                for release in get_artist_releases(artist_mbid)
+                if release.get("mbid")
+            }
+        except Exception:
+            log.warning(
+                "MusicBrainz release-group backfill failed for artist %s",
+                artist_mbid,
+                exc_info=True,
+            )
+            continue
         for album in artist_albums:
             release = release_groups.get(
                 str(album.get("musicbrainz_releasegroupid") or "")
             )
-            if not release or not release.get("type"):
+            if not release:
                 continue
-            updates.append(
-                {
-                    "id": int(album["id"]),
-                    "release_group_primary_type": release["type"],
-                    "release_group_secondary_types": list(
-                        release.get("secondary_types") or []
-                    ),
-                }
-            )
+            release_date = normalize_release_date(release.get("first_release_date"))
+            if dates_only:
+                if not release_date:
+                    continue
+                updates.append({"id": int(album["id"]), "release_date": release_date})
+                continue
+            if not release.get("type") and not release_date:
+                continue
+            update = {"id": int(album["id"])}
+            if release.get("type"):
+                update.update(
+                    {
+                        "release_group_primary_type": release["type"],
+                        "release_group_secondary_types": list(
+                            release.get("secondary_types") or []
+                        ),
+                    }
+                )
+            if release_date:
+                update["release_date"] = release_date
+            updates.append(update)
 
     persist_album_release_group_types(updates)
     return {int(update["id"]) for update in updates}
@@ -228,20 +251,26 @@ def _persist_existing_release_group_types(album_id: int, release: dict) -> bool:
     primary_type = release.get("release_group_primary_type")
     secondary_types = list(release.get("release_group_secondary_types") or [])
     release_group_id = str(release.get("release_group_id") or "").strip()
-    if not primary_type and not secondary_types:
+    release_date = normalize_release_date(release.get("first_release_date"))
+    if not primary_type and not secondary_types and not release_date:
         return False
 
-    persist_album_release_group_types(
-        [
-            {
-                "id": int(album_id),
-                "musicbrainz_releasegroupid": release_group_id,
-                "release_group_primary_type": primary_type,
-                "release_group_secondary_types": secondary_types,
-            }
-        ]
-    )
+    update = {
+        "id": int(album_id),
+        "musicbrainz_releasegroupid": release_group_id,
+        "release_group_primary_type": primary_type,
+        "release_group_secondary_types": secondary_types,
+    }
+    if release_date:
+        update["release_date"] = release_date
+    persist_album_release_group_types([update])
     return True
+
+
+def _broadcast_release_metadata_invalidation() -> None:
+    from crate.api.cache_events import broadcast_invalidation
+
+    broadcast_invalidation("library", "home", "global_catalog")
 
 
 def _write_album_release_tags(
@@ -536,6 +565,7 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
     artist_filter = params.get("artist")
     min_score = params.get("min_score", 70)
     release_types_only = bool(params.get("release_types_only"))
+    release_dates_only = bool(params.get("release_dates_only"))
 
     if artist_filter:
         albums = get_library_albums(artist_filter)
@@ -548,12 +578,23 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
             if album.get("musicbrainz_albumid")
             or album.get("musicbrainz_releasegroupid")
         ]
+    if release_dates_only:
+        albums = [
+            album
+            for album in albums
+            if not normalize_release_date(album.get("release_date"))
+        ]
 
     total = len(albums)
     enriched = 0
     skipped = 0
     failed = 0
-    type_backfilled_ids = _backfill_known_release_group_types(albums)
+    if release_dates_only:
+        type_backfilled_ids = _backfill_known_release_group_types(
+            albums, dates_only=True
+        )
+    else:
+        type_backfilled_ids = _backfill_known_release_group_types(albums)
 
     p = TaskProgress(phase="matching_mbids", phase_count=1, total=total)
 
@@ -567,10 +608,21 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
 
         existing_mbid = album.get("musicbrainz_albumid")
         existing_primary_type = album.get("release_group_primary_type")
+        existing_release_date = normalize_release_date(album.get("release_date"))
         if album["id"] in type_backfilled_ids or (
-            existing_mbid and existing_mbid.strip() and existing_primary_type
+            existing_mbid
+            and existing_mbid.strip()
+            and existing_primary_type
+            and existing_release_date
         ):
-            skipped += 1
+            if release_dates_only:
+                enriched += 1
+            else:
+                skipped += 1
+            continue
+
+        if release_dates_only and not existing_mbid:
+            failed += 1
             continue
 
         if release_types_only and not existing_mbid:
@@ -658,7 +710,18 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
             best_release["mbid"],
         )
 
-    return {"enriched": enriched, "skipped": skipped, "failed": failed, "total": total}
+    result = {
+        "enriched": enriched,
+        "skipped": skipped,
+        "failed": failed,
+        "total": total,
+    }
+    if release_dates_only:
+        result["matched"] = enriched
+        result["unresolved"] = failed
+    if release_dates_only or release_types_only:
+        _broadcast_release_metadata_invalidation()
+    return result
 
 
 def _reorganize_artist_folders(
@@ -868,6 +931,7 @@ def _process_new_content_album_mbids(
                 existing_mbid
                 and existing_mbid.strip()
                 and album.get("release_group_primary_type")
+                and normalize_release_date(album.get("release_date"))
             ):
                 continue
 

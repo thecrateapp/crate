@@ -204,6 +204,7 @@ class EnrichMbidsRequest(BaseModel):
     artist: str | None = None
     min_score: int | float | None = None
     release_types_only: bool = False
+    release_dates_only: bool = False
 
 
 class StorageMigrationRequest(BaseModel):

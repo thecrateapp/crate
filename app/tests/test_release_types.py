@@ -7,6 +7,29 @@ def test_release_type_uses_musicbrainz_primary_type():
     assert classify_release(primary_type="Single") == "ep_single"
 
 
+def test_release_date_normalization_accepts_only_complete_iso_dates():
+    from crate.release_dates import normalize_release_date
+
+    assert normalize_release_date("2024-03-09") == "2024-03-09"
+    assert normalize_release_date("2024-03") is None
+    assert normalize_release_date("2024") is None
+    assert normalize_release_date("not-a-date") is None
+
+
+def test_release_metadata_backfill_invalidates_home_and_catalog_caches(monkeypatch):
+    from crate.worker_handlers import enrichment
+
+    scopes: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *values: scopes.append(tuple(values)),
+    )
+
+    enrichment._broadcast_release_metadata_invalidation()
+
+    assert scopes == [("library", "home", "global_catalog")]
+
+
 def test_release_type_secondary_types_override_primary_type():
     assert (
         classify_release(primary_type="Album", secondary_types=["Compilation"])
@@ -86,6 +109,84 @@ def test_release_type_backfill_batches_release_groups_by_artist(monkeypatch):
     ]
 
 
+def test_release_group_backfill_persists_first_public_release_date(monkeypatch):
+    from crate.worker_handlers import enrichment
+
+    persisted: list[dict] = []
+    monkeypatch.setattr(
+        "crate.musicbrainz_ext.get_artist_releases",
+        lambda _artist_mbid: [
+            {
+                "mbid": "rg-album",
+                "type": "Album",
+                "secondary_types": [],
+                "first_release_date": "2024-03-09",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        enrichment,
+        "persist_album_release_group_types",
+        lambda updates: persisted.extend(updates) or len(updates),
+    )
+
+    updated_ids = enrichment._backfill_known_release_group_types(
+        [
+            {
+                "id": 3,
+                "artist_mbid": "artist-1",
+                "musicbrainz_releasegroupid": "rg-album",
+            }
+        ]
+    )
+
+    assert updated_ids == {3}
+    assert persisted == [
+        {
+            "id": 3,
+            "release_group_primary_type": "Album",
+            "release_group_secondary_types": [],
+            "release_date": "2024-03-09",
+        }
+    ]
+
+
+def test_release_group_date_only_backfill_does_not_rewrite_type_metadata(monkeypatch):
+    from crate.worker_handlers import enrichment
+
+    persisted: list[dict] = []
+    monkeypatch.setattr(
+        "crate.musicbrainz_ext.get_artist_releases",
+        lambda _artist_mbid: [
+            {
+                "mbid": "rg-album",
+                "type": "Album",
+                "secondary_types": ["Compilation"],
+                "first_release_date": "2024-03-09",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        enrichment,
+        "persist_album_release_group_types",
+        lambda updates: persisted.extend(updates) or len(updates),
+    )
+
+    updated_ids = enrichment._backfill_known_release_group_types(
+        [
+            {
+                "id": 4,
+                "artist_mbid": "artist-1",
+                "musicbrainz_releasegroupid": "rg-album",
+            }
+        ],
+        dates_only=True,
+    )
+
+    assert updated_ids == {4}
+    assert persisted == [{"id": 4, "release_date": "2024-03-09"}]
+
+
 def test_existing_release_type_backfill_only_persists_catalog_metadata(monkeypatch):
     from crate.worker_handlers import enrichment
 
@@ -112,6 +213,36 @@ def test_existing_release_type_backfill_only_persists_catalog_metadata(monkeypat
             "musicbrainz_releasegroupid": "rg-live",
             "release_group_primary_type": "Album",
             "release_group_secondary_types": ["Live"],
+        }
+    ]
+
+
+def test_existing_release_backfill_persists_first_public_release_date(monkeypatch):
+    from crate.worker_handlers import enrichment
+
+    persisted: list[dict] = []
+    monkeypatch.setattr(
+        enrichment,
+        "persist_album_release_group_types",
+        lambda updates: persisted.extend(updates) or len(updates),
+    )
+
+    updated = enrichment._persist_existing_release_group_types(
+        8,
+        {
+            "release_group_id": "rg-album",
+            "first_release_date": "2024-03-09",
+        },
+    )
+
+    assert updated is True
+    assert persisted == [
+        {
+            "id": 8,
+            "musicbrainz_releasegroupid": "rg-album",
+            "release_group_primary_type": None,
+            "release_group_secondary_types": [],
+            "release_date": "2024-03-09",
         }
     ]
 
@@ -144,6 +275,34 @@ def test_release_group_type_persistence_updates_existing_album_metadata(pg_db):
     assert album["musicbrainz_releasegroupid"] == "rg-existing"
     assert album["release_group_primary_type"] == "Album"
     assert album["release_group_secondary_types"] == ["Compilation"]
+
+
+def test_release_date_persistence_does_not_replace_an_existing_date(pg_db):
+    from crate.db.jobs.enrichment import persist_album_release_group_types
+
+    pg_db.upsert_artist({"name": "Release Date Artist"})
+    album_id = pg_db.upsert_album(
+        {
+            "artist": "Release Date Artist",
+            "name": "First Release",
+            "path": "/music/release-date-artist/first-release",
+            "release_date": "2020-01-02",
+        }
+    )
+
+    persist_album_release_group_types(
+        [
+            {
+                "id": album_id,
+                "release_group_primary_type": "Album",
+                "release_group_secondary_types": [],
+                "release_date": "",
+            }
+        ]
+    )
+
+    album = pg_db.get_library_album_by_id(album_id)
+    assert album["release_date"] == "2020-01-02"
 
 
 def test_existing_mbid_backfill_never_runs_filesystem_auto_apply(monkeypatch, tmp_path):
@@ -222,6 +381,7 @@ def test_release_detail_preserves_musicbrainz_release_group_types(monkeypatch):
                     "id": "rg-1",
                     "primary-type": "Album",
                     "secondary-type-list": ["Live"],
+                    "first-release-date": "1998-04-11",
                 },
                 "medium-list": [],
             }
@@ -234,6 +394,7 @@ def test_release_detail_preserves_musicbrainz_release_group_types(monkeypatch):
     assert release["release_group_id"] == "rg-1"
     assert release["release_group_primary_type"] == "Album"
     assert release["release_group_secondary_types"] == ["Live"]
+    assert release["first_release_date"] == "1998-04-11"
 
 
 def test_artist_release_groups_include_all_primary_and_secondary_types(monkeypatch):

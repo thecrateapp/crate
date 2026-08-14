@@ -106,6 +106,7 @@ def create_library_catalog_schema(cur) -> None:
             musicbrainz_releasegroupid TEXT,
             release_group_primary_type TEXT,
             release_group_secondary_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+            release_date TEXT,
             discogs_master_id TEXT,
             lastfm_listeners INTEGER,
             lastfm_playcount BIGINT,
@@ -120,6 +121,7 @@ def create_library_catalog_schema(cur) -> None:
     cur.execute(
         "ALTER TABLE library_albums ADD COLUMN IF NOT EXISTS search_vector tsvector"
     )
+    cur.execute("ALTER TABLE library_albums ADD COLUMN IF NOT EXISTS release_date TEXT")
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_lib_albums_artist ON library_albums(artist)"
     )

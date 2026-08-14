@@ -90,6 +90,7 @@ class LibraryAlbumRow(TypedDict):
     musicbrainz_releasegroupid: str | None
     release_group_primary_type: str | None
     release_group_secondary_types: list[str]
+    release_date: str | None
     tag_album: str | None
     dir_mtime: float | None
     updated_at: Any | None
@@ -242,6 +243,7 @@ def album_to_dict(album) -> LibraryAlbumRow | None:
         "release_group_secondary_types": list(
             album.release_group_secondary_types or []
         ),
+        "release_date": album.release_date,
         "tag_album": album.tag_album,
         "dir_mtime": album.dir_mtime,
         "updated_at": album.updated_at,

@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import text
 
 import crate.db.home_builder_upcoming_artists as home_builder_upcoming_artists
+import crate.db.home_builder_global_recommendations as home_builder_global_recommendations
 import crate.db.home_builder_recent_activity as home_builder_recent_activity
 import crate.db.home_builder_track_payloads as home_builder_track_payloads
 import crate.db.home_personalized_discovery as home_personalized_discovery
@@ -159,6 +160,142 @@ def test_home_suggested_albums_merges_global_catalog_and_dedupes(monkeypatch):
     ]
     assert albums[0]["global_album_uid"] == "global-blending"
     assert albums[1]["global_album_uid"] == "global-pedals"
+
+
+def test_home_suggested_albums_orders_catalog_by_public_release_date(monkeypatch):
+    monkeypatch.setattr(
+        home_personalized_discovery,
+        "_build_suggested_albums",
+        lambda recent_releases, limit: [
+            {
+                "album_id": 9,
+                "artist_name": "Local Artist",
+                "album_name": "Newest Local Album",
+                "release_date": "2026-08-12",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        home_personalized_discovery,
+        "global_suggested_albums",
+        lambda limit: [
+            {
+                "global_album_uid": "global-older",
+                "artist_name": "Remote Artist",
+                "album_name": "Older Public Album",
+                "release_date": "2026-08-01",
+            }
+        ],
+    )
+
+    albums = home_personalized_discovery._build_home_suggested_albums([], 2)
+
+    assert [album["album_name"] for album in albums] == [
+        "Newest Local Album",
+        "Older Public Album",
+    ]
+
+
+def test_global_suggested_albums_preserves_public_release_date(monkeypatch):
+    monkeypatch.setattr(
+        home_builder_global_recommendations,
+        "list_global_collection_albums",
+        lambda limit: [
+            {
+                "id": None,
+                "global_album_uid": "global-latest",
+                "global_artist_uid": "global-artist",
+                "album_entity_uid": None,
+                "slug": None,
+                "artist": "Remote Artist",
+                "artist_id": None,
+                "artist_entity_uid": None,
+                "artist_slug": None,
+                "name": "Latest Public Album",
+                "year": "2026",
+                "release_date": "2026-08-14",
+                "cover_url": "/api/catalog/albums/global-latest/cover",
+            }
+        ],
+    )
+
+    albums = home_builder_global_recommendations.global_suggested_albums(1)
+
+    assert albums[0]["release_date"] == "2026-08-14"
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_global_collection_albums_orders_by_public_release_date(pg_db):
+    from crate.db.repositories.global_user_library import list_global_collection_albums
+    from crate.db.tx import transaction_scope
+
+    artist_uid = str(uuid.uuid4())
+    older_album_uid = str(uuid.uuid4())
+    newer_album_uid = str(uuid.uuid4())
+    artist_name = f"Home Date Artist {artist_uid[:8]}"
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_artists
+                    (global_artist_uid, canonical_name, sort_name, normalized_name)
+                VALUES
+                    (CAST(:artist_uid AS uuid), :artist_name, :artist_name, :artist_name)
+                """
+            ),
+            {"artist_uid": artist_uid, "artist_name": artist_name},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_albums
+                    (
+                        global_album_uid,
+                        global_artist_uid,
+                        canonical_name,
+                        normalized_name,
+                        artist_name,
+                        year,
+                        release_date
+                    )
+                VALUES
+                    (
+                        CAST(:older_album_uid AS uuid),
+                        CAST(:artist_uid AS uuid),
+                        'Older Album',
+                        'older album',
+                        :artist_name,
+                        '2026',
+                        '2026-01-01'
+                    ),
+                    (
+                        CAST(:newer_album_uid AS uuid),
+                        CAST(:artist_uid AS uuid),
+                        'Latest Album',
+                        'latest album',
+                        :artist_name,
+                        '2026',
+                        '2026-08-14'
+                    )
+                """
+            ),
+            {
+                "artist_uid": artist_uid,
+                "artist_name": artist_name,
+                "older_album_uid": older_album_uid,
+                "newer_album_uid": newer_album_uid,
+            },
+        )
+
+    albums = list_global_collection_albums(2000)
+    matching = [album for album in albums if album["artist"] == artist_name]
+
+    assert [album["name"] for album in matching[:2]] == [
+        "Latest Album",
+        "Older Album",
+    ]
+    assert matching[0]["release_date"] == "2026-08-14"
 
 
 def test_home_recently_played_preserves_global_catalog_routes(monkeypatch):

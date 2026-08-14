@@ -1648,6 +1648,8 @@ def enrich_mbids(request: Request, body: EnrichMbidsRequest | None = None):
             params["min_score"] = body.min_score
         if body.release_types_only:
             params["release_types_only"] = True
+        if body.release_dates_only:
+            params["release_dates_only"] = True
     task_id = create_task("enrich_mbids", params)
     return {"task_id": task_id}
 
