@@ -115,6 +115,33 @@ def test_home_hero_rotation_is_stable_per_day_but_varies_over_time():
     assert len(across_days) >= 2
 
 
+def test_home_hero_selection_rotates_the_full_candidate_pool():
+    from crate.db.home_hero_scoring import select_home_hero_rows
+
+    rows = [{"id": index, "name": f"Artist {index}"} for index in range(24)]
+    first_day = date(2026, 8, 2)
+
+    same_day = select_home_hero_rows(rows, user_id=7, day=first_day, limit=8)
+    repeated_same_day = select_home_hero_rows(rows, user_id=7, day=first_day, limit=8)
+    across_days = {
+        tuple(
+            row["id"]
+            for row in select_home_hero_rows(
+                rows,
+                user_id=7,
+                day=first_day + timedelta(days=offset),
+                limit=8,
+            )
+        )
+        for offset in range(31)
+    }
+
+    assert same_day == repeated_same_day
+    assert len(same_day) == 8
+    assert len({row["id"] for row in same_day}) == 8
+    assert len(across_days) >= 2
+
+
 def test_home_hero_builder_preserves_recent_arrival_order(monkeypatch):
     from crate.db import home_builder_discovery_queries as queries
 
@@ -176,7 +203,7 @@ def test_home_hero_builder_personalizes_a_larger_candidate_pool(monkeypatch):
 
     heroes = queries.get_home_hero(7, ["followed match"], [], ["hardcore"])
 
-    assert captured["limit"] == 15
+    assert captured["limit"] == 32
     assert heroes is not None
     assert heroes[0]["name"] == "Followed Match"
     assert len(heroes) == 2

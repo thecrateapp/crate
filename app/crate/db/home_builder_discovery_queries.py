@@ -13,6 +13,7 @@ from crate.db.home_builder_shared import _trim_bio
 from crate.db.home_hero_scoring import (
     HOME_HERO_SCORE_VERSION,
     score_home_hero_rows,
+    select_home_hero_rows,
     strip_home_hero_score,
 )
 from crate.db.home_debug import record_home_hero_debug
@@ -27,7 +28,7 @@ from crate.genre_taxonomy import expand_genre_terms_with_aliases
 from crate.utils import coerce_int
 
 HOME_JUST_LANDED_VERSION = "home_just_landed_v2"
-HOME_HERO_CANDIDATE_LIMIT = 15
+HOME_HERO_CANDIDATE_LIMIT = 32
 HOME_HERO_SELECTED_LIMIT = 8
 _CANONICAL_SURFACES = ("desktop", "mobile")
 
@@ -130,7 +131,7 @@ def _rank_home_hero_rows(
     followed_names_lower: list[str],
     similar_target_names_lower: list[str],
     top_genres_lower: list[str],
-) -> tuple[list[dict], dict[str, set[str]]] | None:
+) -> tuple[list[dict], dict[str, list[dict]]] | None:
     rows = get_home_hero_rows(
         user_id=user_id,
         followed_names_lower=followed_names_lower,
@@ -183,16 +184,25 @@ def _rank_home_hero_rows(
         }
     )
 
-    artist_names = [row["name"] for row in selected_rows]
+    surface_rows = {
+        composition: select_home_hero_rows(
+            [row for row in ranked_rows if _canonical_surface_ready(row, composition)],
+            user_id=user_id,
+            limit=HOME_HERO_SELECTED_LIMIT,
+        )
+        for composition in _CANONICAL_SURFACES
+    }
+    source_rows = list(selected_rows)
+    for rows_for_surface in surface_rows.values():
+        source_rows.extend(rows_for_surface)
+    source_rows = _dedupe_home_hero_rows(source_rows)
+
+    artist_names = [row["name"] for row in source_rows]
     genre_map = get_artist_genres_map(artist_names)
 
-    public_rows: list[dict] = []
-    ready_by_surface = {composition: set() for composition in _CANONICAL_SURFACES}
-    for source_item in selected_rows:
+    public_by_name: dict[str, dict] = {}
+    for source_item in source_rows:
         item = dict(source_item)
-        for composition in _CANONICAL_SURFACES:
-            if _canonical_surface_ready(source_item, composition):
-                ready_by_surface[composition].add(str(source_item["name"]))
         _add_hero_artwork_bounds(item)
         item["bio"] = _trim_bio(item.get("bio") or "")
         item["genres"] = genre_map.get(item["name"], [])[:4]
@@ -202,9 +212,14 @@ def _rank_home_hero_rows(
             "_hero_review_status",
         ):
             item.pop(key, None)
-        public_rows.append(strip_home_hero_score(item))
+        public_by_name[str(source_item["name"])] = strip_home_hero_score(item)
 
-    return public_rows, ready_by_surface
+    hero = [public_by_name[str(row["name"])] for row in selected_rows]
+    public_surfaces = {
+        composition: [public_by_name[str(row["name"])] for row in rows_for_surface]
+        for composition, rows_for_surface in surface_rows.items()
+    }
+    return hero, public_surfaces
 
 
 def get_home_hero_bundle(
@@ -222,13 +237,12 @@ def get_home_hero_bundle(
     if ranked is None:
         return None
 
-    hero, ready_by_surface = ranked
+    hero, surface_artists = ranked
     surfaces = {}
     for composition in _CANONICAL_SURFACES:
-        ready_names = ready_by_surface[composition]
         surfaces[composition] = {
             "mode": "canonical",
-            "artists": [item for item in hero if item["name"] in ready_names],
+            "artists": surface_artists[composition],
         }
 
     return {"hero": hero, "hero_surfaces": surfaces}
