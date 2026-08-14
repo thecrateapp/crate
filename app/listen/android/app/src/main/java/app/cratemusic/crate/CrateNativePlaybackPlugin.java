@@ -88,10 +88,14 @@ public class CrateNativePlaybackPlugin extends Plugin {
         if (!ensureService(call)) return;
         JSArray tracks = call.getArray("tracks");
         List<NativeTrack> parsedTracks;
+        List<JSONObject> parsedTransitionPlans;
         try {
             parsedTracks = parseTracks(tracks);
+            parsedTransitionPlans = parseTransitionPlans(
+                call.getArray("transitionPlans")
+            );
         } catch (JSONException e) {
-            call.reject("Invalid tracks payload");
+            call.reject("Invalid queue payload");
             return;
         }
         runOnMain(call, () -> {
@@ -103,7 +107,8 @@ public class CrateNativePlaybackPlugin extends Plugin {
                 call.getBoolean("autoplay", true),
                 call.getString("repeat", "off"),
                 call.getInt("crossfadeMs", 0),
-                (float) call.getDouble("volume", 1.0).doubleValue()
+                (float) call.getDouble("volume", 1.0).doubleValue(),
+                parsedTransitionPlans
             );
             call.resolve(service.getSnapshot());
         });
@@ -323,6 +328,18 @@ public class CrateNativePlaybackPlugin extends Plugin {
         if (tracks == null) return parsed;
         for (int i = 0; i < tracks.length(); i++) {
             parsed.add(parseTrack(tracks.getJSONObject(i)));
+        }
+        return parsed;
+    }
+
+    private List<JSONObject> parseTransitionPlans(JSArray plans)
+        throws JSONException {
+        List<JSONObject> parsed = new ArrayList<>();
+        if (plans == null) return parsed;
+        for (int i = 0; i < plans.length(); i++) {
+            JSONObject plan = plans.getJSONObject(i);
+            if (plan == null) throw new JSONException("Missing transition plan");
+            parsed.add(plan);
         }
         return parsed;
     }

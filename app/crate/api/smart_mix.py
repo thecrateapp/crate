@@ -152,9 +152,11 @@ def transition_plans(
         )
         for edge in unique_edges
     ]
-    return TransitionPlanBatchResponse(
-        planner_version=payload.planner_version,
-        plans=plans,
+    return TransitionPlanBatchResponse.model_validate(
+        {
+            "plannerVersion": payload.planner_version,
+            "plans": plans,
+        }
     )
 
 

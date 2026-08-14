@@ -2,11 +2,14 @@ package app.cratemusic.crate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import com.getcapacitor.JSObject;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 import org.junit.Test;
 
@@ -41,6 +44,54 @@ public class NativeQueueStateTest {
         assertEquals("third", state.get(0).canonicalId());
         assertTrue(state.remove("revision-1", 1));
         assertEquals(2, state.size());
+    }
+
+    @Test
+    public void recoversOnlyPlansForCurrentAdjacentEdges() {
+        NativeQueueState state = new NativeQueueState();
+        NativeTrack first = track("first");
+        NativeTrack second = track("second");
+        NativeTrack third = track("third");
+        NativeTrack inserted = track("inserted");
+        NativeTransitionPlan firstToSecond = NativeTransitionPlan.safeFallback(
+            "first",
+            "second",
+            3000L,
+            "test"
+        );
+        NativeTransitionPlan secondToThird = NativeTransitionPlan.safeFallback(
+            "second",
+            "third",
+            3000L,
+            "test"
+        );
+
+        state.replace(
+            "revision-1",
+            Arrays.asList(first, second, third),
+            Arrays.asList(firstToSecond, secondToThird)
+        );
+
+        assertSame(
+            firstToSecond,
+            state.transitionPlanFor("first", "second")
+        );
+        assertSame(
+            secondToThird,
+            state.transitionPlanFor("second", "third")
+        );
+        assertNull(state.transitionPlanFor("first", "third"));
+
+        assertEquals(1, state.insert("revision-1", 1, inserted));
+        assertNull(state.transitionPlanFor("first", "second"));
+        assertNull(state.transitionPlanFor("second", "third"));
+
+        state.replace(
+            "revision-2",
+            Arrays.asList(first, second),
+            Collections.emptyList()
+        );
+        assertNull(state.transitionPlanFor("first", "second"));
     }
 
     @Test

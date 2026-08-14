@@ -47,6 +47,7 @@ import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -959,7 +960,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
         boolean autoplay,
         String repeat,
         int crossfadeMs,
-        float volume
+        float volume,
+        @Nullable List<JSONObject> transitionPlanPayloads
     ) {
         if (player == null) return;
         resumeAuthorizationPending = false;
@@ -981,7 +983,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
             mediaItems.add(toMediaItem(track));
         }
 
-        queueState.replace(revision, playableTracks);
+        queueState.replace(
+            revision,
+            playableTracks,
+            resolveTransitionPlans(playableTracks, transitionPlanPayloads)
+        );
         int safeIndex = queueState.clampPlaybackIndex(filteredStartIndex);
         int standbyIndex = mediaItems.isEmpty()
             ? 0
@@ -1053,6 +1059,65 @@ public class CrateNativePlaybackService extends MediaSessionService {
             headers.put("Authorization", authorization);
         }
         httpDataSourceFactory.setDefaultRequestProperties(headers);
+    }
+
+    private List<NativeTransitionPlan> resolveTransitionPlans(
+        List<NativeTrack> playableTracks,
+        @Nullable List<JSONObject> transitionPlanPayloads
+    ) {
+        if (
+            playableTracks == null ||
+            playableTracks.isEmpty() ||
+            transitionPlanPayloads == null ||
+            transitionPlanPayloads.isEmpty()
+        ) {
+            return Collections.emptyList();
+        }
+
+        List<NativeTransitionPlan> resolvedPlans = new ArrayList<>();
+        for (JSONObject payload : transitionPlanPayloads) {
+            if (payload == null) continue;
+            String outgoingTrackId = payload.optString("outgoingTrackId", "");
+            String incomingTrackId = payload.optString("incomingTrackId", "");
+            int outgoingIndex = indexOfTrack(playableTracks, outgoingTrackId);
+            if (
+                outgoingIndex < 0 ||
+                outgoingIndex + 1 >= playableTracks.size() ||
+                !incomingTrackId.equals(
+                    playableTracks.get(outgoingIndex + 1).id
+                )
+            ) {
+                Log.w(TAG, "Ignoring Smart Mix plan for a non-adjacent queue edge");
+                continue;
+            }
+
+            NativeTrack outgoing = playableTracks.get(outgoingIndex);
+            NativeTrack incoming = playableTracks.get(outgoingIndex + 1);
+            try {
+                resolvedPlans.add(
+                    NativeTransitionPlan.fromJson(
+                        payload,
+                        outgoing.id,
+                        incoming.id,
+                        crossfadeMs
+                    )
+                );
+            } catch (IllegalArgumentException error) {
+                Log.w(TAG, "Ignoring invalid Smart Mix transition plan", error);
+            }
+        }
+        return resolvedPlans;
+    }
+
+    private static int indexOfTrack(
+        List<NativeTrack> tracks,
+        String trackId
+    ) {
+        if (trackId == null || trackId.isEmpty()) return -1;
+        for (int index = 0; index < tracks.size(); index++) {
+            if (trackId.equals(tracks.get(index).id)) return index;
+        }
+        return -1;
     }
 
     private boolean isHttpsUrl(String url) {
@@ -1354,12 +1419,18 @@ public class CrateNativePlaybackService extends MediaSessionService {
             crossfadeMs
         );
         if (fadeDurationMs <= 0L) return;
-        NativeTransitionPlan plan = NativeTransitionPlan.safeFallback(
+        NativeTransitionPlan plan = queueState.transitionPlanFor(
             outgoing.id,
-            incoming.id,
-            fadeDurationMs,
-            "local_equal_power"
+            incoming.id
         );
+        if (plan == null) {
+            plan = NativeTransitionPlan.safeFallback(
+                outgoing.id,
+                incoming.id,
+                fadeDurationMs,
+                "missing_plan"
+            );
+        }
         ExoPlayer outgoingPlayer = activePhysicalPlayer();
         if (outgoingPlayer == null) return;
 

@@ -9,6 +9,7 @@ import java.util.UUID;
 
 final class NativeQueueState {
     private final List<NativeTrack> tracks = new ArrayList<>();
+    private final List<NativeTransitionPlan> transitionPlans = new ArrayList<>();
     private String revision = "";
 
     String revision() {
@@ -33,11 +34,48 @@ final class NativeQueueState {
     }
 
     void replace(String requestedRevision, List<NativeTrack> replacement) {
+        replace(requestedRevision, replacement, Collections.emptyList());
+    }
+
+    void replace(
+        String requestedRevision,
+        List<NativeTrack> replacement,
+        List<NativeTransitionPlan> replacementPlans
+    ) {
         revision = valueOrDefault(requestedRevision, UUID.randomUUID().toString());
         tracks.clear();
+        transitionPlans.clear();
         if (replacement != null) {
             tracks.addAll(replacement);
         }
+        if (replacementPlans != null) {
+            transitionPlans.addAll(replacementPlans);
+        }
+    }
+
+    @Nullable
+    NativeTransitionPlan transitionPlanFor(
+        String outgoingTrackId,
+        String incomingTrackId
+    ) {
+        if (outgoingTrackId == null || incomingTrackId == null) return null;
+        int outgoingIndex = indexOfTrack(outgoingTrackId);
+        int incomingIndex = indexOfTrack(incomingTrackId);
+        if (
+            outgoingIndex < 0 ||
+            incomingIndex != outgoingIndex + 1
+        ) {
+            return null;
+        }
+        for (NativeTransitionPlan plan : transitionPlans) {
+            if (
+                outgoingTrackId.equals(plan.outgoingTrackId) &&
+                incomingTrackId.equals(plan.incomingTrackId)
+            ) {
+                return plan;
+            }
+        }
+        return null;
     }
 
     boolean append(String requestedRevision, List<NativeTrack> additions) {
@@ -51,6 +89,7 @@ final class NativeQueueState {
         if (!acceptsRevision(requestedRevision) || track == null) return -1;
         int safeIndex = Math.max(0, Math.min(index, tracks.size()));
         tracks.add(safeIndex, track);
+        transitionPlans.clear();
         return safeIndex;
     }
 
@@ -58,6 +97,7 @@ final class NativeQueueState {
         if (!acceptsRevision(requestedRevision)) return false;
         if (index < 0 || index >= tracks.size()) return false;
         tracks.remove(index);
+        transitionPlans.clear();
         return true;
     }
 
@@ -73,6 +113,7 @@ final class NativeQueueState {
         }
         NativeTrack moved = tracks.remove(fromIndex);
         tracks.add(toIndex, moved);
+        transitionPlans.clear();
         return true;
     }
 
@@ -87,6 +128,13 @@ final class NativeQueueState {
             requestedRevision.isEmpty() ||
             revision.equals(requestedRevision)
         );
+    }
+
+    private int indexOfTrack(String trackId) {
+        for (int index = 0; index < tracks.size(); index++) {
+            if (trackId.equals(tracks.get(index).id)) return index;
+        }
+        return -1;
     }
 
     private static String valueOrDefault(String value, String fallback) {

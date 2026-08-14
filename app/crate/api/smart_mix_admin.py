@@ -59,10 +59,12 @@ def smart_mix_status(request: Request) -> SmartMixAdminStatusResponse:
     tasks = _backfill_tasks()
     active = _active_backfill_task(tasks)
     coverage = get_smart_mix_admin_status()
-    return SmartMixAdminStatusResponse(
-        **coverage,
-        control_state=_control_state(tasks, active),
-        active_task=active,
+    return SmartMixAdminStatusResponse.model_validate(
+        {
+            **coverage,
+            "controlState": _control_state(tasks, active),
+            "activeTask": active,
+        }
     )
 
 
@@ -111,17 +113,21 @@ def _queue_backfill(
         dedup_key=BACKFILL_DEDUP_KEY,
     )
     if task_id is not None:
-        return SmartMixBackfillResponse(
-            task_id=task_id,
-            status=response_status,
-            deduplicated=False,
+        return SmartMixBackfillResponse.model_validate(
+            {
+                "taskId": task_id,
+                "status": response_status,
+                "deduplicated": False,
+            }
         )
 
     active = _active_backfill_task()
-    return SmartMixBackfillResponse(
-        task_id=str(active["id"]) if active and active.get("id") else None,
-        status="already_running",
-        deduplicated=True,
+    return SmartMixBackfillResponse.model_validate(
+        {
+            "taskId": str(active["id"]) if active and active.get("id") else None,
+            "status": "already_running",
+            "deduplicated": True,
+        }
     )
 
 
@@ -137,7 +143,9 @@ def _stop_backfill(
         status="cancelled",
         result={"control": control, "checkpointed": True},
     )
-    return SmartMixBackfillResponse(task_id=task_id, status=control)
+    return SmartMixBackfillResponse.model_validate(
+        {"taskId": task_id, "status": control}
+    )
 
 
 __all__ = ["router"]
