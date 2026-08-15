@@ -303,6 +303,8 @@
   "home.sections.listeningDna.defaultSubtitle": "Garai honetako zure musikarik entzunena.",
   "home.sections.suggestedAlbums.title": "Zuretzako album berri gomendatuak",
   "home.sections.suggestedAlbums.subtitle": "Dagoeneko axola zaizkizun artisten azken argitalpenak.",
+  "home.sections.upcomingAlbums.title": "Datorrena",
+  "home.sections.upcomingAlbums.subtitle": "Datozen argitalpenak, hurbilen dagoen datatik hasita.",
   "home.sections.recommendedTracks.title": "Gomendatutako abesti berriak",
   "home.sections.recommendedTracks.subtitle": "Zure gustuarekin bat datozen artista eta albumen pieza berriak.",
   "home.sections.radioStations.title": "Irratiak",

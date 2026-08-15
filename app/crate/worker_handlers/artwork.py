@@ -49,6 +49,7 @@ from crate.db.repositories.library import (
     get_library_artist,
 )
 from crate.db.repositories.artist_hero_artwork import (
+    delete_artist_hero_composition,
     get_artist_hero_artwork,
     list_artist_hero_backfill_candidates,
     upsert_artist_hero_artwork,
@@ -1042,6 +1043,83 @@ def _handle_delete_artist_artwork_asset(
     return {"status": "deleted", "artist_id": artist_id, "asset_id": asset_id}
 
 
+def _handle_delete_artist_hero_composition(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Delete one Hero composition and its rendered/source artifacts."""
+    del task_id
+    artist = str(params.get("artist") or "").strip()
+    composition = str(params.get("composition") or "")
+    if not artist:
+        return {"error": "Artist is required"}
+    if composition not in {"desktop", "mobile"}:
+        return {"error": "Invalid artist hero composition"}
+
+    artist_row = get_library_artist(artist)
+    if not artist_row:
+        return {"error": "Artist not found"}
+    artist_id = int(artist_row["id"])
+    if int(params.get("artist_id") or artist_id) != artist_id:
+        return {"error": "Artist identity mismatch"}
+
+    existing = get_artist_hero_artwork(artist_id)
+    if not existing or existing.get(f"{composition}_enabled", True) is False:
+        return {"error": "Artist hero composition not found"}
+
+    lib = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist, existing_only=True
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"error": "Artist directory not found"}
+    artist_dir = artist_dir.resolve()
+    if not artist_dir.is_relative_to(lib):
+        return {"error": "Artist directory is outside the library"}
+
+    def _safe_child(filename: str) -> Path:
+        path = (artist_dir / filename).resolve()
+        if not path.is_relative_to(artist_dir):
+            raise ValueError("Artist hero path is outside the artist directory")
+        return path
+
+    other = "mobile" if composition == "desktop" else "desktop"
+    target_files = (
+        _safe_child(f"artist-hero-source-{composition}.jpg"),
+        _safe_child(f"artist-hero-{composition}.webp"),
+    )
+    other_enabled = existing.get(f"{other}_enabled", True) is not False
+    files_to_delete = list(target_files)
+    if not other_enabled:
+        files_to_delete.extend(
+            _safe_child(filename)
+            for filename in (
+                "artist-hero-source.jpg",
+                "artist-hero-source-desktop.jpg",
+                "artist-hero-source-mobile.jpg",
+                "artist-hero-desktop.webp",
+                "artist-hero-mobile.webp",
+            )
+        )
+
+    deleted = delete_artist_hero_composition(
+        artist_id=artist_id, composition=composition
+    )
+    if deleted is None:
+        return {"error": "Artist hero composition not found"}
+    for path in dict.fromkeys(files_to_delete):
+        if path.is_file():
+            path.unlink()
+
+    _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
+    _warm_recent_home_discovery_snapshots()
+    return {
+        "status": "deleted",
+        "artist_id": artist_id,
+        "composition": composition,
+        "remaining_compositions": deleted.get("remaining_compositions", []),
+    }
+
+
 def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
     """Save uploaded image to the correct location in the library."""
     from PIL import Image
@@ -1201,6 +1279,16 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             mobile_source_width=mobile_width,
             mobile_source_height=mobile_height,
             mobile_source_origin=mobile_origin,
+            desktop_enabled=(
+                True
+                if composition in {"shared", "desktop"}
+                else existing.get("desktop_enabled", True)
+            ),
+            mobile_enabled=(
+                True
+                if composition in {"shared", "mobile"}
+                else existing.get("mobile_enabled", True)
+            ),
         )
         entity_uid = str(artist_row.get("entity_uid") or "")
         if entity_uid:
@@ -1383,6 +1471,16 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         mobile_source_width=mobile_source_width,
         mobile_source_height=mobile_source_height,
         mobile_source_origin=existing.get("mobile_source_origin") or "manual-upload",
+        desktop_enabled=(
+            True
+            if composition in {"shared", "desktop"}
+            else existing.get("desktop_enabled", True)
+        ),
+        mobile_enabled=(
+            True
+            if composition in {"shared", "mobile"}
+            else existing.get("mobile_enabled", True)
+        ),
     )
     entity_uid = str(artist_row.get("entity_uid") or "")
     if entity_uid:
@@ -1513,6 +1611,8 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
     }
     available_paths: dict[str, Path] = {}
     for composition, specific_path in source_paths.items():
+        if existing.get(f"{composition}_enabled", True) is False:
+            continue
         if specific_path.is_file():
             available_paths[composition] = specific_path
         elif legacy_source_path.is_file():
@@ -1665,6 +1765,8 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
         desktop_recipe=desktop_recipe,
         mobile_recipe=mobile_recipe,
         revision=revision,
+        desktop_enabled=True,
+        mobile_enabled=True,
     )
     entity_uid = str(artist_row.get("entity_uid") or "")
     if entity_uid:
@@ -1824,6 +1926,7 @@ ARTWORK_TASK_HANDLERS: dict[str, TaskHandler] = {
     "apply_cover": _handle_apply_cover,
     "assign_artist_artwork_slot": _handle_assign_artist_artwork_slot,
     "delete_artist_artwork_asset": _handle_delete_artist_artwork_asset,
+    "delete_artist_hero_composition": _handle_delete_artist_hero_composition,
     "import_artist_artwork_asset": _handle_import_artist_artwork_asset,
     "upload_image": _handle_upload_image,
 }

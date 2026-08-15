@@ -75,6 +75,10 @@ class ArtistHeroRecipe(BaseModel):
 
 class ArtistHeroArtworkResponse(BaseModel):
     artist_id: int
+    is_featured: bool = False
+    featured_devices: list[Literal["desktop", "mobile"]] = Field(default_factory=list)
+    desktop_enabled: bool = True
+    mobile_enabled: bool = True
     provenance: Literal["manual", "derived_background"]
     review_status: Literal["approved", "unreviewed", "rejected"]
     source_width: int

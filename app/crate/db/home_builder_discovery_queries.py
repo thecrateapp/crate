@@ -79,6 +79,8 @@ def _add_hero_artwork_bounds(item: dict) -> None:
             width = width or generic_width
             height = height or generic_height
         recipe = item.pop(f"_hero_{composition}_recipe", None)
+        if item.get(f"_hero_{composition}_enabled", True) is False:
+            continue
         if not width or not height or not isinstance(recipe, Mapping):
             continue
         bounds = get_artist_hero_artwork_bounds(
@@ -106,9 +108,13 @@ def _add_hero_artwork_bounds(item: dict) -> None:
 def _canonical_surface_ready(item: Mapping[str, object], composition: str) -> bool:
     """Return whether a profile can safely use the canonical Home surface."""
 
+    if item.get("is_featured") is not True:
+        return False
     if item.get("_hero_provenance") != "manual":
         return False
     if item.get("_hero_review_status") != "approved":
+        return False
+    if item.get(f"_hero_{composition}_enabled", True) is False:
         return False
     if not str(item.get("artwork_revision") or "").startswith(
         f"{ARTIST_HERO_RENDER_VERSION}:"
@@ -210,6 +216,8 @@ def _rank_home_hero_rows(
         for key in (
             "_hero_provenance",
             "_hero_review_status",
+            "_hero_desktop_enabled",
+            "_hero_mobile_enabled",
         ):
             item.pop(key, None)
         public_by_name[str(source_item["name"])] = strip_home_hero_score(item)
@@ -240,9 +248,10 @@ def get_home_hero_bundle(
     hero, surface_artists = ranked
     surfaces = {}
     for composition in _CANONICAL_SURFACES:
+        artists = surface_artists[composition]
         surfaces[composition] = {
-            "mode": "canonical",
-            "artists": surface_artists[composition],
+            "mode": "canonical" if artists else "legacy",
+            "artists": artists or hero,
         }
 
     return {"hero": hero, "hero_surfaces": surfaces}

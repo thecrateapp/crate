@@ -31,6 +31,11 @@ _SECTION_METADATA = {
         "Recent releases from the artists you already care about.",
         "suggested_albums",
     ),
+    "upcoming-albums": (
+        "What's coming up",
+        "Upcoming releases, starting with the nearest date.",
+        "upcoming_albums",
+    ),
     "recommended-tracks": (
         "Recommended new tracks",
         "Fresh cuts from artists and albums that line up with your taste.",
@@ -55,7 +60,7 @@ _SECTION_METADATA = {
 
 
 def _cache_key(user_id: int, section_id: str, limit: int) -> str:
-    return f"home_section:v4:global:{user_id}:{section_id}:{limit}"
+    return f"home_section:v5:global:{user_id}:{section_id}:{limit}"
 
 
 def _schedule_home_refresh(user_id: int) -> None:

@@ -603,6 +603,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "apply_cover",
             "assign_artist_artwork_slot",
             "delete_artist_artwork_asset",
+            "delete_artist_hero_composition",
             "import_artist_artwork_asset",
             "upload_image",
         ),

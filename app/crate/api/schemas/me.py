@@ -683,6 +683,7 @@ class HomeDiscoveryResponse(BaseModel):
     recently_played: list[dict[str, Any]] = Field(default_factory=list)
     custom_mixes: list[HomeCardResponse] = Field(default_factory=list)
     suggested_albums: list[dict[str, Any]] = Field(default_factory=list)
+    upcoming_albums: list[dict[str, Any]] = Field(default_factory=list)
     recommended_tracks: list[HomeTrackResponse] = Field(default_factory=list)
     radio_stations: list[dict[str, Any]] = Field(default_factory=list)
     favorite_artists: list[dict[str, Any]] = Field(default_factory=list)
