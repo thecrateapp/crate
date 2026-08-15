@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from crate.db.home_album_surfaces import filter_published_albums
 from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.repositories.global_user_library import list_global_collection_albums
 
@@ -86,7 +87,7 @@ def merge_suggested_albums(
 ) -> list[dict]:
     candidates: list[dict] = []
     seen: set[tuple[str, str]] = set()
-    for album in [*global_albums, *local_albums]:
+    for album in filter_published_albums([*global_albums, *local_albums]):
         key = (
             (album.get("artist_name") or "").strip().casefold(),
             (album.get("album_name") or "").strip().casefold(),

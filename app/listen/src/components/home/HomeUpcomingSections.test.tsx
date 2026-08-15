@@ -22,6 +22,33 @@ const PREVIEW_ITEMS: HomeUpcomingItem[] = [
   },
 ];
 
+const MULTIPLE_PREVIEW_ITEMS: HomeUpcomingItem[] = [
+  {
+    type: "release",
+    date: "2030-04-12",
+    artist: "Artist One",
+    title: "First release",
+    subtitle: "Album",
+    is_upcoming: true,
+  },
+  {
+    type: "show",
+    date: "2030-04-20",
+    artist: "Artist Two",
+    title: "Sala Radar",
+    subtitle: "Madrid, Spain",
+    is_upcoming: true,
+  },
+  {
+    type: "release",
+    date: "2030-05-01",
+    artist: "Artist Three",
+    title: "Third release",
+    subtitle: "Album",
+    is_upcoming: true,
+  },
+];
+
 describe("HomeUpcomingSection", () => {
   it("uses Radar as the visible destination name", () => {
     renderWithRouter(
@@ -43,6 +70,29 @@ describe("HomeUpcomingSection", () => {
       screen.getByRole("button", { name: "Open Radar" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Upcoming")).not.toBeInTheDocument();
+  });
+
+  it("does not repeat the featured event in the next-up list", () => {
+    renderWithRouter(
+      <HomeUpcomingSection
+        previewItems={MULTIPLE_PREVIEW_ITEMS}
+        onOpenUpcoming={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText("First release")).toHaveLength(1);
+    expect(screen.getByText("Third release")).toBeInTheDocument();
+  });
+
+  it("keeps the Radar rail visible when there are no upcoming events", () => {
+    renderWithRouter(
+      <HomeUpcomingSection previewItems={[]} onOpenUpcoming={vi.fn()} />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Radar" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Follow some artists to unlock Radar"),
+    ).toBeInTheDocument();
   });
 });
 

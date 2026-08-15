@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   artistShowToUpcomingItem,
   canOpenUpcomingRelease,
+  upcomingCountdown,
   itemKey,
   upcomingReleaseBadgeLabel,
 } from "@/components/upcoming/upcoming-model";
@@ -114,5 +115,17 @@ describe("upcoming model", () => {
         is_upcoming: false,
       }),
     ).toBe("Released");
+  });
+
+  it("returns a readable countdown for upcoming dates", () => {
+    expect(
+      upcomingCountdown("2030-04-20", "11:00", new Date(2030, 3, 20, 10, 15)),
+    ).toEqual({ value: 1, unit: "hours" });
+    expect(
+      upcomingCountdown("2030-04-25", undefined, new Date(2030, 3, 20, 10, 15)),
+    ).toEqual({ value: 6, unit: "days" });
+    expect(
+      upcomingCountdown("2030-04-19", undefined, new Date(2030, 3, 20, 10, 15)),
+    ).toBeNull();
   });
 });

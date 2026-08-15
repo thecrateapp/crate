@@ -64,6 +64,11 @@ def test_cold_home_request_returns_schema_valid_minimal_payload(monkeypatch):
     monkeypatch.setattr(surface, "get_ui_snapshot", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         surface,
+        "get_or_build_ui_snapshot",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("cold build failed")),
+    )
+    monkeypatch.setattr(
+        surface,
         "create_task_dedup",
         lambda _task_type, params, **_kwargs: queued.append(params["user_id"]),
     )

@@ -303,6 +303,8 @@
   "home.sections.listeningDna.defaultSubtitle": "La teva música més escoltada d'aquest període.",
   "home.sections.suggestedAlbums.title": "Nous àlbums suggerits per a tu",
   "home.sections.suggestedAlbums.subtitle": "Llançaments recents dels artistes que ja t'importen.",
+  "home.sections.upcomingAlbums.title": "El que ve",
+  "home.sections.upcomingAlbums.subtitle": "Propers llançaments, començant per la data més propera.",
   "home.sections.recommendedTracks.title": "Noves cançons recomanades",
   "home.sections.recommendedTracks.subtitle": "Talls recents d'artistes i àlbums que encaixen amb el teu gust.",
   "home.sections.radioStations.title": "Radios",

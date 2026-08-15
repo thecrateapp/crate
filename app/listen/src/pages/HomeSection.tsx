@@ -245,7 +245,7 @@ export function HomeSection() {
         </div>
       ) : null}
 
-      {data.id === "suggested-albums" ? (
+      {data.id === "suggested-albums" || data.id === "upcoming-albums" ? (
         <div className="grid gap-4 grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
           {data.items.map((album) => (
             <AlbumCard
@@ -263,6 +263,8 @@ export function HomeSection() {
               albumSlug={album.album_slug}
               year={album.year}
               cover={album.cover_url ?? undefined}
+              isPreRelease={album.is_pre_release}
+              releaseDate={album.release_date}
               layout="grid"
             />
           ))}

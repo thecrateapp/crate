@@ -20,6 +20,7 @@ def _hero_row(
         "id": abs(hash(name)) % 10000,
         "slug": slug,
         "name": name,
+        "is_featured": True,
         "listeners": listeners,
         "scrobbles": listeners * 10,
         "album_count": 3,
@@ -450,10 +451,61 @@ def test_home_hero_bundle_hides_surfaces_without_manual_approved_artwork(
     bundle = queries.get_home_hero_bundle(7, [], [], [])
 
     assert bundle is not None
+    assert bundle["hero_surfaces"]["desktop"]["mode"] == "legacy"
+    assert bundle["hero_surfaces"]["desktop"]["artists"] == bundle["hero"]
+    assert bundle["hero_surfaces"]["mobile"]["mode"] == "legacy"
+    assert bundle["hero_surfaces"]["mobile"]["artists"] == bundle["hero"]
+
+
+def test_home_hero_bundle_falls_back_to_legacy_without_featured_candidates(monkeypatch):
+    from crate.db import home_builder_discovery_queries as queries
+
+    legacy = {
+        **_hero_row("Legacy Artist", listeners=100),
+        "is_featured": False,
+    }
+    monkeypatch.setattr(
+        queries,
+        "get_home_hero_rows",
+        lambda **_: [legacy],
+    )
+    monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
+
+    bundle = queries.get_home_hero_bundle(7, [], [], [])
+
+    assert bundle is not None
+    assert bundle["hero_surfaces"]["desktop"] == {
+        "mode": "legacy",
+        "artists": [bundle["hero"][0]],
+    }
+    assert bundle["hero_surfaces"]["mobile"]["mode"] == "legacy"
+
+
+def test_home_hero_bundle_keeps_non_featured_artists_out_of_canonical_surfaces(
+    monkeypatch,
+):
+    from crate.db import home_builder_discovery_queries as queries
+
+    featured = _prepared_hero_row("Featured Artist", mobile=False)
+    legacy = {
+        **_prepared_hero_row("Legacy Artist", mobile=False),
+        "is_featured": False,
+    }
+    monkeypatch.setattr(
+        queries,
+        "get_home_hero_rows",
+        lambda **_: [legacy, featured],
+    )
+    monkeypatch.setattr(queries, "get_artist_genres_map", lambda _names: {})
+
+    bundle = queries.get_home_hero_bundle(7, [], [], [])
+
+    assert bundle is not None
     assert bundle["hero_surfaces"]["desktop"]["mode"] == "canonical"
-    assert bundle["hero_surfaces"]["desktop"]["artists"] == []
-    assert bundle["hero_surfaces"]["mobile"]["mode"] == "canonical"
-    assert bundle["hero_surfaces"]["mobile"]["artists"] == []
+    assert [
+        artist["name"] for artist in bundle["hero_surfaces"]["desktop"]["artists"]
+    ] == ["Featured Artist"]
+    assert bundle["hero_surfaces"]["mobile"]["mode"] == "legacy"
 
 
 def test_home_hero_surface_rotation_keeps_surface_modes(monkeypatch):

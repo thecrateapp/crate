@@ -173,6 +173,14 @@ function adjustedProfile() {
   };
 }
 
+function featuredReadyProfile() {
+  return {
+    ...manualProfile(),
+    is_featured: false,
+    featured_devices: ["desktop"],
+  };
+}
+
 describe("ArtistHeroArtworkEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -563,6 +571,45 @@ describe("ArtistHeroArtworkEditor", () => {
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(2);
   });
 
+  it("keeps switch thumbs anchored inside the track in both states", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          ...manualProfile(),
+          is_featured: true,
+          featured_devices: ["desktop", "mobile"],
+        }),
+      ),
+    );
+
+    const user = userEvent.setup();
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    const featured = await screen.findByRole("switch", {
+      name: "Featured artist",
+    });
+    expect(featured.querySelector("span")).toHaveClass(
+      "left-0.5",
+      "translate-x-5",
+    );
+
+    const grayscale = screen.getByRole("switch", { name: "Grayscale" });
+    expect(grayscale.querySelector("span")).toHaveClass(
+      "left-0.5",
+      "translate-x-0",
+    );
+
+    await user.click(grayscale);
+
+    expect(grayscale.querySelector("span")).toHaveClass(
+      "left-0.5",
+      "translate-x-5",
+    );
+  });
+
   it("shows the final artist presentation inside the editable canvas", async () => {
     vi.stubGlobal(
       "fetch",
@@ -682,6 +729,59 @@ describe("ArtistHeroArtworkEditor", () => {
     expect((upload?.init?.body as FormData).get("composition")).toBe("mobile");
   });
 
+  it("persists deletion of the active hero composition", async () => {
+    let profileReads = 0;
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        requests.push({ url, init });
+        if (init?.method === "DELETE") {
+          return Response.json({ status: "queued", task_id: "delete-hero" });
+        }
+        if (url.endsWith("/hero-profile")) {
+          profileReads += 1;
+          return Response.json({
+            ...manualProfile(),
+            desktop_enabled: profileReads === 1,
+            mobile_enabled: true,
+          });
+        }
+        return Response.json({ status: "queued", task_id: "unexpected" });
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Delete desktop composition",
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Delete composition" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url === "/api/artwork/artists/7/hero-profile/desktop" &&
+            request.init?.method === "DELETE",
+        ),
+      ).toBe(true),
+    );
+    expect(vi.mocked(waitForTask)).toHaveBeenCalledWith("delete-hero", 120_000);
+    await waitFor(() => expect(profileReads).toBe(2));
+    expect(
+      screen.queryByRole("button", { name: "Delete desktop composition" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("allows a derived composition to be approved", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal(
@@ -712,6 +812,63 @@ describe("ArtistHeroArtworkEditor", () => {
         ),
       ).toBe(true),
     );
+  });
+
+  it("exposes Featured Artist state and updates it from the editor", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        requests.push({ url, init });
+        if (init?.method === "PATCH" && url.endsWith("/featured")) {
+          return Response.json({
+            artist_id: 7,
+            is_featured: true,
+            featured_devices: ["desktop"],
+            featured_eligible: true,
+          });
+        }
+        return Response.json(featuredReadyProfile());
+      }),
+    );
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    expect(await screen.findByText("Desktop ready")).toBeInTheDocument();
+    expect(screen.getByText("Mobile not ready")).toBeInTheDocument();
+    const toggle = screen.getByRole("switch", { name: "Featured artist" });
+    expect(toggle).toBeEnabled();
+
+    await userEvent.click(toggle);
+
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url === "/api/artists/7/featured" &&
+            request.init?.method === "PATCH" &&
+            request.init.body === JSON.stringify({ is_featured: true }),
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("disables Featured Artist until a composition is ready", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(derivedProfile())),
+    );
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    expect(
+      await screen.findByRole("switch", { name: "Featured artist" }),
+    ).toBeDisabled();
   });
 
   it("renders a clean preview through the canonical backend renderer", async () => {

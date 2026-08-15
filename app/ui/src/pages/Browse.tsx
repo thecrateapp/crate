@@ -41,6 +41,8 @@ interface ArtistItem {
   listeners?: number;
   genres?: string[];
   has_issues?: boolean;
+  is_featured?: boolean;
+  featured_devices?: string[];
 }
 
 interface PaginatedResponse {
@@ -73,6 +75,11 @@ const SORT_OPTIONS = [
   { value: "size", label: "Size" },
 ];
 
+const FEATURED_OPTIONS = [
+  { value: "true", label: "Featured artists" },
+  { value: "false", label: "Not featured" },
+];
+
 export function Browse() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -81,7 +88,8 @@ export function Browse() {
   const country = searchParams.get("country") ?? "";
   const decade = searchParams.get("decade") ?? "";
   const format = searchParams.get("format") ?? "";
-  const sort = searchParams.get("sort") ?? "name";
+  const sort = searchParams.get("sort") ?? "recent";
+  const featured = searchParams.get("featured") ?? "";
   const view = (searchParams.get("view") ?? "grid") as "grid" | "list";
   const [filters, setFilters] = useState<BrowseFilters | null>(null);
   const [artists, setArtists] = useState<ArtistItem[]>([]);
@@ -235,7 +243,7 @@ export function Browse() {
     hasMoreRef.current = true;
     setArtists([]);
     fetchPage(1, true);
-  }, [genre, country, decade, format, sort, view]);
+  }, [genre, country, decade, format, sort, featured, view]);
 
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -248,6 +256,7 @@ export function Browse() {
       if (country) params.set("country", country);
       if (decade) params.set("decade", decade);
       if (format) params.set("format", format);
+      if (featured) params.set("featured", featured);
       params.set("sort", sort);
       params.set("page", String(page));
       params.set("per_page", String(PER_PAGE));
@@ -265,7 +274,7 @@ export function Browse() {
           setLoadingMore(false);
         });
     },
-    [genre, country, decade, format, sort, view],
+    [genre, country, decade, format, sort, featured, view],
   );
 
   // Infinite scroll: observe sentinel element
@@ -363,9 +372,17 @@ export function Browse() {
         />
 
         <AdminSelect
-          placeholder="Name"
+          placeholder="Featured"
+          value={featured}
+          onChange={(nextValue) => setParam("featured", nextValue)}
+          options={FEATURED_OPTIONS}
+          triggerClassName="min-w-[130px] max-w-[170px]"
+        />
+
+        <AdminSelect
+          placeholder="Recently Added"
           value={sort}
-          onChange={(nextValue) => setParam("sort", nextValue || "name")}
+          onChange={(nextValue) => setParam("sort", nextValue || "recent")}
           options={sortOptions}
           allowClear={false}
           triggerClassName="min-w-[120px] max-w-[150px]"
@@ -438,6 +455,8 @@ export function Browse() {
               size_mb={a.total_size_mb}
               primary_format={a.primary_format ?? ""}
               hasIssues={a.has_issues}
+              isFeatured={a.is_featured}
+              featuredDevices={a.featured_devices}
               selectMode={selectMode}
               isSelected={a.id != null ? selected.has(a.id) : false}
               onClick={() =>
@@ -468,6 +487,8 @@ export function Browse() {
               listeners={a.listeners}
               genres={a.genres}
               hasIssues={a.has_issues}
+              isFeatured={a.is_featured}
+              featuredDevices={a.featured_devices}
               selectMode={selectMode}
               isSelected={a.id != null ? selected.has(a.id) : false}
               onClick={() =>

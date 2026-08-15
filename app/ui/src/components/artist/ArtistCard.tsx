@@ -15,6 +15,8 @@ interface ArtistCardProps {
   size_mb: number;
   primary_format: string;
   hasIssues?: boolean;
+  isFeatured?: boolean;
+  featuredDevices?: string[];
   selectMode?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
@@ -29,6 +31,8 @@ export function ArtistCard({
   size_mb,
   primary_format,
   hasIssues,
+  isFeatured,
+  featuredDevices = [],
   selectMode,
   isSelected,
   onClick,
@@ -95,6 +99,12 @@ export function ArtistCard({
         {name}
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+        {isFeatured ? <CrateChip active>Featured</CrateChip> : null}
+        {isFeatured
+          ? featuredDevices.map((device) => (
+              <CrateChip key={device}>{device}</CrateChip>
+            ))
+          : null}
         {primary_format ? (
           <CrateChip>{primary_format.replace(".", "").toUpperCase()}</CrateChip>
         ) : null}

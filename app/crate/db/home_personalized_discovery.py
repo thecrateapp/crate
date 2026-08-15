@@ -12,6 +12,7 @@ from crate.db.home_builders import (
     _build_recommended_tracks,
     _build_recent_global_artists,
     _build_suggested_albums,
+    _build_upcoming_albums,
     _fallback_recent_interest_tracks,
     _get_home_hero_bundle,
     _query_discovery_tracks,
@@ -29,11 +30,13 @@ from crate.db.home_builder_global_recommendations import (
     merge_global_track_rows,
     merge_suggested_albums,
 )
+from crate.db.home_album_surfaces import merge_upcoming_albums
 from crate.db.home_personalized_collections import (
     get_home_favorite_artists,
     get_home_recently_played,
 )
 from crate.db.queries.user_library_stats_month import get_month_replay_mix
+from crate.db.releases import get_new_releases
 
 
 def _build_home_recommended_tracks(
@@ -131,6 +134,14 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
             "items": _build_home_suggested_albums(recent_releases, limit),
         }
 
+    if section_id == "upcoming-albums":
+        return {
+            "id": section_id,
+            "title": "What's coming up",
+            "subtitle": "Upcoming releases, starting with the nearest date.",
+            "items": _build_home_upcoming_albums(limit),
+        }
+
     if section_id == "recommended-tracks":
         rows = _build_home_recommended_tracks(
             user_id,
@@ -216,6 +227,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
         precomputed_mixes["my-new-arrivals"] = my_new_arrivals_mix
 
     suggested_albums = _build_home_suggested_albums(recent_releases, 14)
+    upcoming_albums = _build_home_upcoming_albums(14)
     global_track_rows = _global_home_track_rows(context, limit=64)
     recommended_tracks = _build_home_recommended_tracks(
         user_id,
@@ -250,6 +262,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
         "recently_played": get_home_recently_played(user_id),
         "custom_mixes": custom_mixes,
         "suggested_albums": suggested_albums,
+        "upcoming_albums": upcoming_albums,
         "recommended_tracks": [_track_payload(row) for row in recommended_tracks],
         "radio_stations": _build_radio_stations(merged_artists, top_albums, 14),
         "favorite_artists": get_home_favorite_artists(user_id),
@@ -270,6 +283,20 @@ def _build_home_suggested_albums(recent_releases: list[dict], limit: int) -> lis
         local_albums,
         global_suggested_albums(limit),
         limit=limit,
+    )
+
+
+def _build_home_upcoming_albums(limit: int) -> list[dict]:
+    requested_limit = max(1, int(limit or 1))
+    local_albums = _build_upcoming_albums(
+        get_new_releases(upcoming=True, limit=max(requested_limit * 4, 40)),
+        requested_limit * 4,
+    )
+    global_albums = global_suggested_albums(max(requested_limit * 4, 40))
+    return merge_upcoming_albums(
+        local_albums,
+        global_albums,
+        limit=requested_limit,
     )
 
 

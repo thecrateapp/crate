@@ -77,6 +77,7 @@ def _cold_home_payload(user_id: int) -> dict:
         "recently_played": [],
         "custom_mixes": [],
         "suggested_albums": [],
+        "upcoming_albums": [],
         "recommended_tracks": [],
         "radio_stations": [],
         "favorite_artists": [],
