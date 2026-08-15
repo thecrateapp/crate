@@ -200,7 +200,7 @@ def _backfill_known_release_group_types(
         if artist_mbid and release_group_id:
             by_artist_mbid.setdefault(artist_mbid, []).append(album)
 
-    updates: list[dict] = []
+    updates: list[dict[str, Any]] = []
     for artist_mbid, artist_albums in by_artist_mbid.items():
         try:
             release_groups = {
@@ -229,7 +229,7 @@ def _backfill_known_release_group_types(
                 continue
             if not release.get("type") and not release_date:
                 continue
-            update = {"id": int(album["id"])}
+            update: dict[str, Any] = {"id": int(album["id"])}
             if release.get("type"):
                 update.update(
                     {
