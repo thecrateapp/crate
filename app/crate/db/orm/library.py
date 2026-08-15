@@ -92,6 +92,7 @@ class LibraryAlbum(Base):
     release_group_secondary_types: Mapped[list[str]] = mapped_column(
         JSON, default=list, server_default="[]"
     )
+    release_date: Mapped[str | None] = mapped_column(Text)
     discogs_master_id: Mapped[str | None] = mapped_column(Text)
     lastfm_listeners: Mapped[int | None] = mapped_column(Integer)
     lastfm_playcount: Mapped[int | None] = mapped_column(BIGINT)

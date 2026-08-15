@@ -396,4 +396,24 @@ describe("CommandPalette", () => {
       ),
     );
   });
+
+  it("queues the album release date backfill from the palette", async () => {
+    mockAuth(["library.metadata.write"]);
+    vi.mocked(api).mockResolvedValue({});
+
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    fireEvent.click(screen.getByText("Backfill Album Release Dates"));
+
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith("/api/manage/enrich-mbids", "POST", {
+        release_dates_only: true,
+      }),
+    );
+  });
 });

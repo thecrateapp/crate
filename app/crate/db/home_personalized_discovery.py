@@ -128,7 +128,7 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
             "id": section_id,
             "title": "Suggested new albums for you",
             "subtitle": "Recent releases from the artists you already care about.",
-            "items": _build_suggested_albums(recent_releases, limit),
+            "items": _build_home_suggested_albums(recent_releases, limit),
         }
 
     if section_id == "recommended-tracks":

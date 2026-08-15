@@ -90,6 +90,7 @@ class AlbumRow(BaseModel):
     musicbrainz_releasegroupid: str | None = None
     release_group_primary_type: str | None = None
     release_group_secondary_types: list[str] = []
+    release_date: str | None = None
     tag_album: str | None = None
     dir_mtime: float | None = None
     updated_at: datetime | None = None
