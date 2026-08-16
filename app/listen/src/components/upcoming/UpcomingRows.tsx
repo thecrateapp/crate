@@ -66,14 +66,7 @@ export function UpcomingMonthGroup({
             );
           }
 
-          return (
-            <UpcomingEventRow
-              key={key}
-              item={itemWithOverrides}
-              expanded={expandedId === key}
-              onToggle={() => onToggleExpand(expandedId === key ? null : key)}
-            />
-          );
+          return <UpcomingEventRow key={key} item={itemWithOverrides} />;
         })}
       </div>
     </div>

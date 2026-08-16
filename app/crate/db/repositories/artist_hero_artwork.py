@@ -20,7 +20,7 @@ def get_artist_hero_artwork(artist_id: int, *, session=None) -> dict | None:
                            desktop_source_height, desktop_source_origin,
                            mobile_source_width, mobile_source_height,
                            mobile_source_origin, desktop_recipe, mobile_recipe,
-                           revision, updated_at
+                           desktop_enabled, mobile_enabled, revision, updated_at
                     FROM artist_hero_artwork
                     WHERE artist_id = :artist_id
                     """
@@ -54,6 +54,8 @@ def upsert_artist_hero_artwork(
     mobile_source_width: int | None = None,
     mobile_source_height: int | None = None,
     mobile_source_origin: str | None = None,
+    desktop_enabled: bool | None = None,
+    mobile_enabled: bool | None = None,
     session=None,
 ) -> None:
     def _write(active_session) -> None:
@@ -66,14 +68,27 @@ def upsert_artist_hero_artwork(
                     desktop_source_height, desktop_source_origin,
                     mobile_source_width, mobile_source_height,
                     mobile_source_origin, desktop_recipe, mobile_recipe,
-                    revision, updated_at
+                    desktop_enabled, mobile_enabled, revision, updated_at
                 ) VALUES (
                     :artist_id, :provenance, :review_status, :source_width,
                     :source_height, :desktop_source_width,
                     :desktop_source_height, :desktop_source_origin,
                     :mobile_source_width, :mobile_source_height,
                     :mobile_source_origin, CAST(:desktop_recipe AS JSONB),
-                    CAST(:mobile_recipe AS JSONB), :revision, NOW()
+                    CAST(:mobile_recipe AS JSONB),
+                    COALESCE(
+                        :desktop_enabled,
+                        (SELECT desktop_enabled FROM artist_hero_artwork
+                         WHERE artist_id = :artist_id),
+                        TRUE
+                    ),
+                    COALESCE(
+                        :mobile_enabled,
+                        (SELECT mobile_enabled FROM artist_hero_artwork
+                         WHERE artist_id = :artist_id),
+                        TRUE
+                    ),
+                    :revision, NOW()
                 )
                 ON CONFLICT (artist_id) DO UPDATE SET
                     provenance = EXCLUDED.provenance,
@@ -88,6 +103,8 @@ def upsert_artist_hero_artwork(
                     mobile_source_origin = EXCLUDED.mobile_source_origin,
                     desktop_recipe = EXCLUDED.desktop_recipe,
                     mobile_recipe = EXCLUDED.mobile_recipe,
+                    desktop_enabled = EXCLUDED.desktop_enabled,
+                    mobile_enabled = EXCLUDED.mobile_enabled,
                     revision = EXCLUDED.revision,
                     updated_at = NOW()
                 """
@@ -104,6 +121,8 @@ def upsert_artist_hero_artwork(
                 "mobile_source_width": mobile_source_width,
                 "mobile_source_height": mobile_source_height,
                 "mobile_source_origin": mobile_source_origin,
+                "desktop_enabled": desktop_enabled,
+                "mobile_enabled": mobile_enabled,
                 "desktop_recipe": json.dumps(desktop_recipe),
                 "mobile_recipe": json.dumps(mobile_recipe),
                 "revision": revision,
@@ -140,7 +159,80 @@ def update_artist_hero_review_status(
             ),
             {"artist_id": artist_id, "review_status": review_status},
         )
+        if result.rowcount > 0:
+            from crate.db.repositories.featured_artists import (
+                clear_featured_if_not_ready,
+            )
+
+            clear_featured_if_not_ready(artist_id, session=active_session)
         return result.rowcount > 0
+
+    if session is not None:
+        return _write(session)
+    with transaction_scope() as active_session:
+        return _write(active_session)
+
+
+def delete_artist_hero_composition(
+    artist_id: int, composition: str, *, session=None
+) -> dict | None:
+    """Disable one persisted composition and update Featured eligibility."""
+
+    if composition not in {"desktop", "mobile"}:
+        raise ValueError("Invalid artist hero composition")
+
+    other = "mobile" if composition == "desktop" else "desktop"
+    enabled_column = f"{composition}_enabled"
+    width_column = f"{composition}_source_width"
+    height_column = f"{composition}_source_height"
+    origin_column = f"{composition}_source_origin"
+
+    def _write(active_session) -> dict | None:
+        row = (
+            active_session.execute(
+                text(
+                    f"""
+                    SELECT {enabled_column}, {other}_enabled
+                    FROM artist_hero_artwork
+                    WHERE artist_id = :artist_id
+                    FOR UPDATE
+                    """
+                ),
+                {"artist_id": artist_id},
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+
+        active_session.execute(
+            text(
+                f"""
+                UPDATE artist_hero_artwork
+                SET {enabled_column} = FALSE,
+                    {width_column} = NULL,
+                    {height_column} = NULL,
+                    {origin_column} = NULL,
+                    revision = SUBSTRING(
+                        MD5(
+                            revision || ':delete:{composition}:' ||
+                            clock_timestamp()::text
+                        ), 1, 16
+                    ),
+                    updated_at = NOW()
+                WHERE artist_id = :artist_id
+                """
+            ),
+            {"artist_id": artist_id},
+        )
+
+        from crate.db.repositories.featured_artists import (
+            clear_featured_if_not_ready,
+        )
+
+        clear_featured_if_not_ready(artist_id, session=active_session)
+        return {"remaining_compositions": [other] if row[f"{other}_enabled"] else []}
 
     if session is not None:
         return _write(session)

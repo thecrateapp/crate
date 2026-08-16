@@ -10,7 +10,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
-import { Eye, Heart, ImagePlus, Loader2, Play } from "lucide-react";
+import { Eye, Heart, ImagePlus, Loader2, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -20,6 +20,8 @@ import {
 } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 import type { ArtistHeroCompositionView } from "../../../../shared/web/artist-hero-contract";
+
+import { ConfirmDialog } from "../ui/confirm-dialog";
 
 import { HeroCompositionCanvas } from "./HeroCompositionCanvas";
 import type { HeroRecipe } from "./hero-composition-geometry";
@@ -41,6 +43,10 @@ interface HeroProfile {
   mobile_recipe: HeroRecipe;
   revision: string;
   updated_at: string;
+  is_featured?: boolean;
+  featured_devices?: HeroComposition[];
+  desktop_enabled?: boolean;
+  mobile_enabled?: boolean;
   compositions?: Partial<Record<HeroComposition, ArtistHeroCompositionView>>;
 }
 
@@ -135,6 +141,9 @@ export function ArtistHeroArtworkEditor({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [featuredBusy, setFeaturedBusy] = useState(false);
+  const [deleteComposition, setDeleteComposition] =
+    useState<HeroComposition | null>(null);
   const profileEndpoint = artistArtworkApiPath({ artistId }, "hero-profile");
 
   const loadProfile = useCallback(
@@ -149,8 +158,13 @@ export function ArtistHeroArtworkEditor({
         setProfile(null);
         return;
       }
-      const nextProfile = (await response.json()) as HeroProfile;
+      const responseProfile = (await response.json()) as HeroProfile;
       if (requestId !== profileRequestRef.current) return;
+      const nextProfile: HeroProfile = {
+        ...responseProfile,
+        is_featured: responseProfile.is_featured ?? false,
+        featured_devices: responseProfile.featured_devices ?? [],
+      };
       const desktopRecipe = normalizeRecipe(nextProfile.desktop_recipe);
       const sharedTreatment = {
         grayscale: desktopRecipe.grayscale,
@@ -192,9 +206,14 @@ export function ArtistHeroArtworkEditor({
         "hero-source",
       )}?composition=${active}&v=${encodeURIComponent(profile.revision)}`
     : null;
+  const activeCompositionEnabled =
+    !profile || profile[`${active}_enabled`] !== false;
   const fallbackSource =
     fallbackSourceUrl ?? artistBackgroundApiUrl({ artistId }, { size: 1280 });
-  const activeSource = sourceUrls[active] ?? persistedSource ?? fallbackSource;
+  const activeSource =
+    sourceUrls[active] ??
+    (activeCompositionEnabled ? persistedSource : null) ??
+    fallbackSource;
   const previewKey = JSON.stringify({
     composition: active,
     recipe,
@@ -269,7 +288,9 @@ export function ArtistHeroArtworkEditor({
       form.append("composition", active);
       const sourceFile =
         sourceFiles[active] ??
-        (!profile ? await loadFallbackSourceFile() : null);
+        (!profile || !activeCompositionEnabled
+          ? await loadFallbackSourceFile()
+          : null);
       if (sourceFile) form.append("file", sourceFile);
       const response = await fetch(
         artistArtworkApiPath({ artistId }, "preview-hero"),
@@ -311,7 +332,9 @@ export function ArtistHeroArtworkEditor({
       let response: Response;
       const sourceFile =
         sourceFiles[active] ??
-        (!profile ? await loadFallbackSourceFile() : null);
+        (!profile || !activeCompositionEnabled
+          ? await loadFallbackSourceFile()
+          : null);
       if (sourceFile) {
         const form = new FormData();
         form.append("file", sourceFile);
@@ -356,6 +379,43 @@ export function ArtistHeroArtworkEditor({
       );
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function deletePersistedComposition(composition: HeroComposition) {
+    setProcessing(true);
+    try {
+      const response = await fetch(`${profileEndpoint}/${composition}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const result = (await response.json()) as { task_id?: string };
+      if (result.task_id) {
+        const task = await waitForTask(result.task_id, 120_000);
+        if (task.status === "failed") {
+          throw new Error(task.error || "Hero composition deletion failed");
+        }
+      }
+      setPreviewArtifact(null);
+      setRecipes(createRecipes());
+      setSourceFiles(createSourceState<File | null>(null));
+      setSourceUrls(createSourceState<string | null>(null));
+      await loadProfile();
+      setRecipes((current) => ({
+        ...current,
+        [composition]: createRecipes()[composition],
+      }));
+      toast.success(`${composition} hero composition deleted`);
+      onUploaded?.();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Hero composition deletion failed",
+      );
+    } finally {
+      setProcessing(false);
     }
   }
 
@@ -412,6 +472,44 @@ export function ArtistHeroArtworkEditor({
     }
   }
 
+  async function setFeatured(next: boolean) {
+    setFeaturedBusy(true);
+    try {
+      const response = await fetch(`/api/artists/${artistId}/featured`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_featured: next }),
+      });
+      if (!response.ok) {
+        const raw = await response.text();
+        let message = raw || "Featured Artist update failed";
+        try {
+          const payload = JSON.parse(raw) as { error?: string };
+          if (payload.error === "approved_hero_required") {
+            message = "Approve at least one hero composition first";
+          }
+        } catch {
+          // Keep the server response when it is not JSON.
+        }
+        throw new Error(message);
+      }
+      await loadProfile({ preserveRecipes: true });
+      toast.success(
+        next ? "Artist marked as Featured" : "Artist removed from Featured",
+      );
+      onUploaded?.();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Featured Artist update failed",
+      );
+    } finally {
+      setFeaturedBusy(false);
+    }
+  }
+
   return (
     <>
       <section className="rounded-md border border-border bg-card/55 p-4 md:p-6">
@@ -434,6 +532,28 @@ export function ArtistHeroArtworkEditor({
               <div className="flex gap-2">
                 <Badge variant="outline">{provenanceLabel(profile)}</Badge>
                 <Badge variant="secondary">{reviewLabel(profile)}</Badge>
+                <Badge
+                  variant={
+                    profile.featured_devices?.includes("desktop")
+                      ? "secondary"
+                      : "outline"
+                  }
+                >
+                  {profile.featured_devices?.includes("desktop")
+                    ? "Desktop ready"
+                    : "Desktop not ready"}
+                </Badge>
+                <Badge
+                  variant={
+                    profile.featured_devices?.includes("mobile")
+                      ? "secondary"
+                      : "outline"
+                  }
+                >
+                  {profile.featured_devices?.includes("mobile")
+                    ? "Mobile ready"
+                    : "Mobile not ready"}
+                </Badge>
               </div>
               {canEdit && profile.provenance === "derived_background" ? (
                 <div className="flex gap-2">
@@ -456,6 +576,44 @@ export function ArtistHeroArtworkEditor({
                       Approve
                     </Button>
                   ) : null}
+                </div>
+              ) : null}
+              {canEdit ? (
+                <div className="flex items-center gap-3 rounded-md border border-border bg-background/35 px-3 py-2">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">
+                      Featured artist
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {profile.is_featured
+                        ? "Shown in the home hero"
+                        : "Enable after approving a composition"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="Featured artist"
+                    aria-checked={profile.is_featured ?? false}
+                    disabled={
+                      featuredBusy ||
+                      (!profile.is_featured &&
+                        (profile.featured_devices?.length ?? 0) === 0)
+                    }
+                    onClick={() => void setFeatured(!profile.is_featured)}
+                    className={`relative h-6 w-11 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      profile.is_featured
+                        ? "border-primary bg-primary"
+                        : "border-border bg-muted"
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform ${
+                        profile.is_featured ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -540,8 +698,9 @@ export function ArtistHeroArtworkEditor({
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform ${
-                      treatment.grayscale ? "translate-x-5" : "translate-x-0.5"
+                    aria-hidden="true"
+                    className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform ${
+                      treatment.grayscale ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>
@@ -625,6 +784,18 @@ export function ArtistHeroArtworkEditor({
                   ) : null}
                   Generate hero artwork
                 </Button>
+
+                {profile && activeCompositionEnabled ? (
+                  <Button
+                    variant="outline"
+                    className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={processing || uploading}
+                    onClick={() => setDeleteComposition(active)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete {active} composition
+                  </Button>
+                ) : null}
               </>
             ) : (
               <>
@@ -730,6 +901,22 @@ export function ArtistHeroArtworkEditor({
           </Button>
         </ModalFooter>
       </AppModal>
+
+      <ConfirmDialog
+        open={deleteComposition !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteComposition(null);
+        }}
+        title={`Delete ${deleteComposition ?? ""} hero composition?`}
+        description="This permanently removes the saved composition and its rendered artwork. You can create it again from a new source or the artist background."
+        confirmLabel="Delete composition"
+        variant="destructive"
+        onConfirm={() => {
+          const composition = deleteComposition;
+          setDeleteComposition(null);
+          if (composition) void deletePersistedComposition(composition);
+        }}
+      />
     </>
   );
 }

@@ -80,6 +80,8 @@ class ArtistBrowseItemResponse(IdentityFieldsMixin):
     popularity: int | None = None
     popularity_score: float | None = None
     popularity_confidence: float | None = None
+    is_featured: bool = False
+    featured_devices: list[str] = Field(default_factory=list)
 
 
 class ArtistBrowseListResponse(BaseModel):
@@ -95,6 +97,10 @@ class ArtistCheckLibraryRequest(BaseModel):
 
 class ArtistCheckLibraryResponse(RootModel[dict[str, bool]]):
     pass
+
+
+class ArtistFeaturedUpdateRequest(BaseModel):
+    is_featured: bool
 
 
 class ArtistAlbumSummaryResponse(IdentityFieldsMixin):

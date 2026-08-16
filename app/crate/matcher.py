@@ -255,6 +255,7 @@ def _get_release_detail(mbid: str) -> dict | None:
             "country": release.get("country", ""),
             "track_count": len(tracks),
             "release_group_id": release_group.get("id"),
+            "first_release_date": release_group.get("first-release-date", ""),
             "release_group_primary_type": release_group.get("primary-type"),
             "release_group_secondary_types": list(
                 release_group.get("secondary-type-list") or []

@@ -63,6 +63,42 @@ def test_incremental_reconcile_claims_dirty_sources_without_full_library_scan(
     assert pending == 0
 
 
+def test_incremental_local_album_reconcile_propagates_release_date(pg_db):
+    from crate.db.jobs.global_catalog_reconciliation import (
+        reconcile_dirty_catalog_sources,
+    )
+    from crate.db.queries.global_catalog import get_global_catalog_counts
+    from crate.db.tx import read_scope
+
+    pg_db.upsert_artist({"name": "Release Date Artist"})
+    pg_db.upsert_album(
+        {
+            "artist": "Release Date Artist",
+            "name": "Canonical Release",
+            "path": "/music/release-date-artist/canonical-release",
+            "year": "2024",
+            "release_date": "2024-03-09",
+        }
+    )
+
+    local_album = pg_db.get_library_album("Release Date Artist", "Canonical Release")
+    assert local_album["release_date"] == "2024-03-09"
+
+    result = reconcile_dirty_catalog_sources(limit=10)
+
+    assert result["failed"] == 0
+    assert get_global_catalog_counts()["albums"] == 1
+    with read_scope() as session:
+        release_date = session.execute(
+            text(
+                "SELECT release_date FROM global_catalog_albums WHERE canonical_name = :name"
+            ),
+            {"name": "Canonical Release"},
+        ).scalar_one()
+
+    assert release_date == "2024-03-09"
+
+
 def test_remote_catalog_upsert_is_projected_from_its_dirty_source(pg_db):
     from crate.db.tx import read_scope, transaction_scope
     from crate.federation.catalog import upsert_catalog_item

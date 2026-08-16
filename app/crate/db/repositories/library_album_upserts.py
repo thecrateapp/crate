@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from crate.entity_ids import album_entity_uid
 from crate.db.orm.library import LibraryAlbum
 from crate.db.orm.library import LibraryArtist
+from crate.release_dates import normalize_release_date
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
 from crate.db.repositories.global_catalog_dirty_sources import (
     enqueue_local_dirty_source,
@@ -41,6 +42,7 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             for value in (data.get("release_group_secondary_types") or [])
             if str(value).strip()
         ]
+        requested_release_date = normalize_release_date(data.get("release_date"))
         existing_columns = (
             LibraryAlbum.id,
             LibraryAlbum.slug,
@@ -133,6 +135,7 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                         if "release_group_secondary_types" in data
                         else LibraryAlbum.release_group_secondary_types
                     ),
+                    release_date=requested_release_date or LibraryAlbum.release_date,
                     tag_album=requested_tag_album
                     if requested_tag_album is not None
                     else existing_tag_album,
@@ -192,6 +195,7 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             musicbrainz_releasegroupid=data.get("musicbrainz_releasegroupid"),
             release_group_primary_type=requested_primary_type,
             release_group_secondary_types=requested_secondary_types,
+            release_date=requested_release_date,
             tag_album=data.get("tag_album"),
             dir_mtime=data.get("dir_mtime"),
             updated_at=now,
@@ -234,6 +238,10 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                         insert_stmt.excluded.release_group_secondary_types
                         if "release_group_secondary_types" in data
                         else LibraryAlbum.release_group_secondary_types
+                    ),
+                    "release_date": func.coalesce(
+                        func.nullif(insert_stmt.excluded.release_date, ""),
+                        LibraryAlbum.release_date,
                     ),
                     "tag_album": func.coalesce(
                         insert_stmt.excluded.tag_album, LibraryAlbum.tag_album

@@ -4,7 +4,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BIGINT, JSON, DateTime, Float, ForeignKey, Integer, Text
+from sqlalchemy import BIGINT, JSON, Boolean, DateTime, Float, ForeignKey, Integer, Text
+from sqlalchemy import false, func
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +29,12 @@ class LibraryArtist(Base):
     has_photo: Mapped[int | None] = mapped_column(Integer, default=0)
     dir_mtime: Mapped[float | None] = mapped_column(Float)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_featured: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     bio: Mapped[str | None] = mapped_column(Text)
     tags_json: Mapped[Any | None] = mapped_column(JSON)
@@ -92,6 +99,7 @@ class LibraryAlbum(Base):
     release_group_secondary_types: Mapped[list[str]] = mapped_column(
         JSON, default=list, server_default="[]"
     )
+    release_date: Mapped[str | None] = mapped_column(Text)
     discogs_master_id: Mapped[str | None] = mapped_column(Text)
     lastfm_listeners: Mapped[int | None] = mapped_column(Integer)
     lastfm_playcount: Mapped[int | None] = mapped_column(BIGINT)

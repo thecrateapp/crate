@@ -12,6 +12,7 @@ from crate.artist_hero_artwork import (
     DESKTOP_HERO_SIZE,
     MOBILE_HERO_SIZE,
 )
+from crate.artist_hero_contract import artist_hero_profile_ready_compositions
 from crate.api._deps import (
     artist_name_from_id,
     artist_name_from_ref,
@@ -39,6 +40,7 @@ from crate.api.schemas.browse import (
     ArtistBrowseListResponse,
     ArtistCheckLibraryRequest,
     ArtistCheckLibraryResponse,
+    ArtistFeaturedUpdateRequest,
     ArtistDetailResponse,
     ArtistEnqueueResponse,
     ArtistInfoResponse,
@@ -69,6 +71,7 @@ from crate.db.repositories.library import (
     get_library_artist_by_slug,
 )
 from crate.db.repositories.artist_hero_artwork import get_artist_hero_artwork
+from crate.db.repositories.featured_artists import set_artist_featured
 from crate.db.repositories.playlists import get_public_system_playlists_for_artist
 from crate.db.repositories.tasks import create_task_dedup
 from crate.db.queries.browse_artist import (
@@ -162,11 +165,11 @@ def _artist_browse_order_sql(sort: str) -> str:
             "la.name ASC"
         ),
         "albums": "la.album_count DESC, la.name ASC",
-        "recent": "recent_sort DESC, la.name ASC",
+        "recent": "la.first_seen_at DESC, la.id DESC",
         "size": "la.total_size DESC, la.name ASC",
         "tracks": "la.track_count DESC, la.name ASC",
     }
-    return sort_map.get(sort, "la.name ASC")
+    return sort_map.get(sort, "la.first_seen_at DESC, la.id DESC")
 
 
 def _library_artist_ref(name: str) -> dict | None:
@@ -668,6 +671,39 @@ def api_browse_filters(
     return payload
 
 
+@router.patch(
+    "/api/artists/{artist_id}/featured",
+    responses=_BROWSE_RESPONSES,
+    summary="Set an artist's Featured Artist state",
+)
+def api_set_artist_featured(
+    request: Request, artist_id: int, body: ArtistFeaturedUpdateRequest
+):
+    _require_metadata_editor(request)
+    result = set_artist_featured(artist_id, body.is_featured)
+    if result is None:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    if result["status"] == "rejected":
+        reason = str(result.get("reason") or "featured_artist_not_eligible")
+        return JSONResponse({"error": reason, "reason": reason}, status_code=409)
+
+    from crate.api.cache_events import (
+        broadcast_invalidation,
+        wait_for_cache_invalidation,
+    )
+
+    broadcast_invalidation(
+        "home", "library", "browse:artists", f"artist:{int(artist_id)}"
+    )
+    wait_for_cache_invalidation()
+    return {
+        "artist_id": int(artist_id),
+        "is_featured": bool(result["is_featured"]),
+        "featured_devices": list(result.get("featured_devices") or ()),
+        "featured_eligible": bool(result.get("featured_devices")),
+    }
+
+
 @router.get(
     "/api/artists",
     response_model=ArtistBrowseListResponse,
@@ -679,7 +715,8 @@ def api_artists(
     q: str = "",
     page: int = 1,
     per_page: int = Query(60, ge=1, le=120),
-    sort: str = "name",
+    sort: str = "recent",
+    featured: str = Query("all", pattern="^(all|true|false)$"),
     genre: str = "",
     country: str = "",
     decade: str = "",
@@ -703,7 +740,14 @@ def api_artists(
         total = len(artists)
         start = (page - 1) * per_page
         return {
-            "items": artists[start : start + per_page],
+            "items": [
+                {
+                    **artist,
+                    "is_featured": False,
+                    "featured_devices": [],
+                }
+                for artist in artists[start : start + per_page]
+            ],
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -726,9 +770,25 @@ def api_artists(
         la.popularity_confidence,
         la.dir_mtime,
         la.updated_at,
-        COALESCE(la.dir_mtime, EXTRACT(EPOCH FROM la.updated_at)::bigint) AS recent_sort
+        la.first_seen_at,
+        la.is_featured,
+        hero.provenance AS _hero_provenance,
+        hero.review_status AS _hero_review_status,
+        hero.source_width AS _hero_source_width,
+        hero.source_height AS _hero_source_height,
+        hero.desktop_source_width AS _hero_desktop_source_width,
+        hero.desktop_source_height AS _hero_desktop_source_height,
+        hero.mobile_source_width AS _hero_mobile_source_width,
+        hero.mobile_source_height AS _hero_mobile_source_height,
+        hero.desktop_recipe AS _hero_desktop_recipe,
+        hero.mobile_recipe AS _hero_mobile_recipe,
+        hero.desktop_enabled AS _hero_desktop_enabled,
+        hero.mobile_enabled AS _hero_mobile_enabled,
+        hero.revision AS _hero_revision
     """
-    joins = ""
+    joins = """
+        LEFT JOIN artist_hero_artwork hero ON hero.artist_id = la.id
+    """
     where_clauses = [
         "la.name NOT LIKE '.%'",
         "COALESCE(la.folder_name, '') NOT LIKE '.%'",
@@ -765,6 +825,11 @@ def api_artists(
         where_clauses.append("la.primary_format = :format")
         params["format"] = format
 
+    if featured == "true":
+        where_clauses.append("la.is_featured = TRUE")
+    elif featured == "false":
+        where_clauses.append("la.is_featured = FALSE")
+
     if q:
         where_clauses.append("la.name ILIKE :q")
         params["q"] = f"%{q}%"
@@ -791,6 +856,21 @@ def api_artists(
     )
     items = []
     for row in rows:
+        hero_profile = {
+            "provenance": row.get("_hero_provenance"),
+            "review_status": row.get("_hero_review_status"),
+            "source_width": row.get("_hero_source_width"),
+            "source_height": row.get("_hero_source_height"),
+            "desktop_source_width": row.get("_hero_desktop_source_width"),
+            "desktop_source_height": row.get("_hero_desktop_source_height"),
+            "mobile_source_width": row.get("_hero_mobile_source_width"),
+            "mobile_source_height": row.get("_hero_mobile_source_height"),
+            "desktop_recipe": row.get("_hero_desktop_recipe"),
+            "mobile_recipe": row.get("_hero_mobile_recipe"),
+            "desktop_enabled": row.get("_hero_desktop_enabled"),
+            "mobile_enabled": row.get("_hero_mobile_enabled"),
+            "revision": row.get("_hero_revision"),
+        }
         item = {
             "id": row.get("id"),
             "entity_uid": str(row["entity_uid"])
@@ -812,6 +892,10 @@ def api_artists(
             "popularity": row.get("popularity"),
             "popularity_score": row.get("popularity_score"),
             "popularity_confidence": row.get("popularity_confidence"),
+            "is_featured": bool(row.get("is_featured")),
+            "featured_devices": list(
+                artist_hero_profile_ready_compositions(hero_profile)
+            ),
         }
         if view == "list":
             item["listeners"] = row.get("listeners") or 0
@@ -1335,7 +1419,10 @@ def api_artist_hero(
         artist_dir / f"artist-hero-{composition}.webp" if artist_dir else None
     )
     has_eligible_profile = bool(
-        entity_uid and profile and profile.get("review_status") != "rejected"
+        entity_uid
+        and profile
+        and profile.get("review_status") != "rejected"
+        and profile.get(f"{composition}_enabled", True) is not False
     )
     if has_eligible_profile and profile is not None:
         revision = str(profile.get("revision") or "")

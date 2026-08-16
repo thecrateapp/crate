@@ -98,6 +98,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "import_artist_artwork_asset": TaskPoolConfig("fast", 0, 60, 0),
     "assign_artist_artwork_slot": TaskPoolConfig("fast", 0, 60, 0),
     "delete_artist_artwork_asset": TaskPoolConfig("fast", 0, 60, 0),
+    "delete_artist_hero_composition": TaskPoolConfig("fast", 0, 60, 0),
     "compose_artist_hero": TaskPoolConfig("fast", 0, 60, 0),
     "preview_artist_hero": TaskPoolConfig("fast", 0, 120, 0),
     "recompose_artist_hero": TaskPoolConfig("fast", 0, 60, 0),

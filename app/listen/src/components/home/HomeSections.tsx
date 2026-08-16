@@ -21,7 +21,9 @@ import {
   editorialPlaylistLabel,
 } from "@/components/playlists/EditorialPlaylistArtwork";
 import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import type { Track } from "@/contexts/PlayerContext";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import type { HomeUpcomingItem } from "./home-model";
@@ -178,13 +180,26 @@ export function UpcomingPreviewRow({
         day: "numeric",
       })
     : t("home.radar.soon");
+  const artworkUrl = resolveMaybeApiAssetUrl(item.cover_url);
 
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/5"
+      className="group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/5"
     >
-      <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
+      {artworkUrl ? (
+        <CrateImage
+          src={artworkUrl}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover opacity-20 grayscale transition-opacity group-hover:opacity-30"
+          onError={(event) => {
+            (event.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+      ) : null}
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,16,22,0.96),rgba(15,16,22,0.72)_55%,rgba(15,16,22,0.35))]" />
+      <div className="relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
         <span className="text-[10px] uppercase tracking-wide text-white/40">
           {dateLabel.split(" ")[0]}
         </span>
@@ -192,7 +207,7 @@ export function UpcomingPreviewRow({
           {dateLabel.split(" ")[1] || ""}
         </span>
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="relative min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-foreground">
             {item.type === "show" ? item.artist : item.title}
@@ -209,7 +224,7 @@ export function UpcomingPreviewRow({
             : `${item.artist} · ${item.title}`}
         </div>
       </div>
-      <div className="shrink-0 rounded-full border border-primary/15 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
+      <div className="relative shrink-0 rounded-full border border-primary/15 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
         {item.type === "show"
           ? t("home.radar.itemType.show")
           : t("home.radar.itemType.release")}

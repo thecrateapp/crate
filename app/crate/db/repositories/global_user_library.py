@@ -142,6 +142,7 @@ def list_global_collection_albums(limit: int = 500) -> list[dict[str, Any]]:
                         lar.slug AS artist_slug,
                         a.canonical_name AS name,
                         a.year,
+                        a.release_date,
                         a.has_cover,
                         COALESCE(a.track_count, track_counts.track_count, 0) AS track_count,
                         COALESCE(a.total_duration_seconds, track_counts.total_duration, 0) AS total_duration,
@@ -164,7 +165,9 @@ def list_global_collection_albums(limit: int = 500) -> list[dict[str, Any]]:
                         FROM global_catalog_tracks
                         GROUP BY global_album_uid
                     ) track_counts ON track_counts.global_album_uid = a.global_album_uid
-                    ORDER BY a.has_local DESC, a.year DESC NULLS LAST,
+                    ORDER BY NULLIF(a.release_date, '') DESC NULLS LAST,
+                             NULLIF(a.year, '') DESC NULLS LAST,
+                             a.has_local DESC,
                              a.artist_name ASC, a.canonical_name ASC
                     LIMIT :limit
                     """

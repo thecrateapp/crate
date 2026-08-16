@@ -19,6 +19,7 @@ import {
   RecentlyPlayedSection,
   RecommendedTracksSection,
   SuggestedAlbumsSection,
+  UpcomingAlbumsSection,
 } from "@/components/home/HomeDiscoverySections";
 import { JustLandedSection } from "@/components/home/HomeLibrarySections";
 import {
@@ -42,6 +43,10 @@ import type {
   HomeUpcomingInsight,
   HomeUpcomingItem,
   ReplayMix,
+} from "@/components/home/home-model";
+import {
+  homeUpcomingAlbumKey,
+  selectHomeRadarItems,
 } from "@/components/home/home-model";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -341,10 +346,15 @@ export function Home() {
   } = usePullToRefresh(onRefresh);
 
   const replayPreview = (replay?.items || []).slice(0, 4);
-  const upcomingPreview = (upcoming?.items || [])
-    .filter((item) => item.is_upcoming)
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
-    .slice(0, 3);
+  const upcomingAlbumKeys = new Set(
+    (currentDiscovery?.upcoming_albums || []).map((album) =>
+      homeUpcomingAlbumKey(album.artist_name, album.album_name),
+    ),
+  );
+  const upcomingPreview = selectHomeRadarItems(
+    upcoming?.items || [],
+    upcomingAlbumKeys,
+  );
   const homeInsights = (upcoming?.insights || []).slice(0, 2);
 
   const recommendedTracks = useMemo(
@@ -621,6 +631,11 @@ export function Home() {
 
         <SuggestedAlbumsSection
           albums={currentDiscovery?.suggested_albums || []}
+          onViewAll={openHomeSection}
+        />
+
+        <UpcomingAlbumsSection
+          albums={currentDiscovery?.upcoming_albums || []}
           onViewAll={openHomeSection}
         />
 

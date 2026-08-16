@@ -18,6 +18,7 @@ def _insert_remote_catalog_item(
     artist: str | None = None,
     album: str | None = None,
     year: str | None = None,
+    release_date: str | None = None,
     track_count: int | None = None,
     duration_seconds: int | None = None,
     musicbrainz_artist_mbid: str | None = None,
@@ -41,6 +42,7 @@ def _insert_remote_catalog_item(
                         artist,
                         album,
                         year,
+                        release_date,
                         track_count,
                         duration_seconds,
                         musicbrainz_artist_mbid,
@@ -58,6 +60,7 @@ def _insert_remote_catalog_item(
                         :artist,
                         :album,
                         :year,
+                        :release_date,
                         :track_count,
                         :duration_seconds,
                         :musicbrainz_artist_mbid,
@@ -76,6 +79,7 @@ def _insert_remote_catalog_item(
                 "artist": artist,
                 "album": album,
                 "year": year,
+                "release_date": release_date,
                 "track_count": track_count,
                 "duration_seconds": duration_seconds,
                 "musicbrainz_artist_mbid": musicbrainz_artist_mbid,
@@ -360,6 +364,7 @@ def test_remote_album_artwork_refreshes_existing_canonical_album(pg_db):
         title="Guided Tour",
         artist="High Vis",
         year="2024",
+        release_date="2024-08-16",
         track_count=11,
         raw_json={
             "has_cover": True,
@@ -374,7 +379,7 @@ def test_remote_album_artwork_refreshes_existing_canonical_album(pg_db):
             session.execute(
                 text(
                     """
-                    SELECT has_cover, artwork_source_json
+                    SELECT has_cover, artwork_source_json, release_date
                     FROM global_catalog_albums
                     WHERE artist_name = 'High Vis' AND canonical_name = 'Guided Tour'
                     """
@@ -386,6 +391,7 @@ def test_remote_album_artwork_refreshes_existing_canonical_album(pg_db):
 
     assert row["has_cover"] is True
     assert row["artwork_source_json"]["source_kind"] == "federated"
+    assert row["release_date"] == "2024-08-16"
 
 
 def test_remote_track_with_same_recording_mbid_merges_into_local_track(pg_db):

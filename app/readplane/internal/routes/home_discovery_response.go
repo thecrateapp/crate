@@ -8,6 +8,7 @@ var homeDiscoveryListDefaults = []string{
 	"recently_played",
 	"custom_mixes",
 	"suggested_albums",
+	"upcoming_albums",
 	"recommended_tracks",
 	"radio_stations",
 	"favorite_artists",

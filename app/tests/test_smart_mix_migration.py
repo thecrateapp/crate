@@ -14,15 +14,15 @@ MIGRATION = (
     / "db"
     / "migrations"
     / "versions"
-    / "087_smart_mix_profiles.py"
+    / "090_smart_mix_profiles.py"
 )
 
 
 def test_migration_contract_is_isolated_from_library_tracks() -> None:
     source = MIGRATION.read_text()
 
-    assert 'revision = "087"' in source
-    assert 'down_revision = "086"' in source
+    assert 'revision = "090"' in source
+    assert 'down_revision = "089"' in source
     assert 'has_table("track_mix_profiles")' in source
     assert "CREATE INDEX IF NOT EXISTS" in source
     assert '"track_mix_profiles"' in source

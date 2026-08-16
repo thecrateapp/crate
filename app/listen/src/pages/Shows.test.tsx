@@ -52,6 +52,8 @@ const UPCOMING_RESPONSE = {
       subtitle: "Album",
       cover_url: null,
       status: "announced",
+      album_id: 22,
+      tidal_url: "https://example.com/future-lp",
       is_upcoming: true,
     },
   ],
@@ -157,6 +159,20 @@ describe("Shows page", () => {
       expect.stringContaining("maps"),
     );
     expect(screen.getByTitle("hardcore")).toBeInTheDocument();
+  });
+
+  it("keeps release rows focused on date, countdown, and album access", () => {
+    renderWithListenProviders(<Shows />);
+
+    expect(screen.queryByText("announced")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("future-lp"),
+    );
+    expect(
+      screen.queryByRole("link", { name: "Source" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/days to go/i)).toBeInTheDocument();
   });
 
   it("uses genre shows when Radar is opened from a genre page", () => {

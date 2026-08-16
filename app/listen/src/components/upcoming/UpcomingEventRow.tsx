@@ -1,32 +1,22 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import {
-  Calendar,
-  ChevronDown,
-  Disc3,
-  ExternalLink,
-  Play,
-} from "@crate/ui/icons";
+import { Calendar, Disc3, Play } from "@crate/ui/icons";
 
+import { CrateImage } from "@/components/artwork/CrateImage";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import {
   albumPagePath,
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
-import { CrateImage } from "@/components/artwork/CrateImage";
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
-import { canOpenUpcomingRelease, type UpcomingItem } from "./upcoming-model";
+import {
+  canOpenUpcomingRelease,
+  upcomingCountdown,
+  type UpcomingItem,
+} from "./upcoming-model";
 
-export function UpcomingEventRow({
-  item,
-  expanded = false,
-  onToggle,
-}: {
-  item: UpcomingItem;
-  expanded?: boolean;
-  onToggle?: () => void;
-}) {
+export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
   const { t, i18n } = useTranslation();
   const dateObj = item.date ? new Date(`${item.date}T12:00:00`) : null;
   const dateStr = dateObj
@@ -46,6 +36,10 @@ export function UpcomingEventRow({
       { size: 800 },
     ) ||
     undefined;
+  const badgeLabel = item.is_upcoming
+    ? t("radar.release.preRelease")
+    : t("radar.release.released");
+  const countdown = upcomingCountdown(item.date, item.time);
   const useVirtualAlbumRoute =
     !item.album_id && item.release_id != null && item.release_id > 0;
   const virtualAlbumId = useVirtualAlbumRoute ? item.release_id : null;
@@ -62,9 +56,6 @@ export function UpcomingEventRow({
           artistName: item.artist,
         })
       : null;
-  const badgeLabel = item.is_upcoming
-    ? t("radar.release.preRelease")
-    : t("radar.release.released");
   const artistPath = artistPagePath({
     artistId: item.artist_id,
     artistSlug: item.artist_slug,
@@ -72,19 +63,7 @@ export function UpcomingEventRow({
   });
 
   return (
-    <article
-      role={onToggle ? "button" : undefined}
-      tabIndex={onToggle ? 0 : undefined}
-      onClick={onToggle}
-      onKeyDown={(event) => {
-        if (!onToggle) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onToggle();
-        }
-      }}
-      className="group relative overflow-hidden rounded-[12px] border border-primary/10 bg-white/[0.025] p-4 text-left transition-all hover:border-primary/25 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-    >
+    <article className="group relative overflow-hidden rounded-[12px] border border-primary/10 bg-white/[0.025] p-4 text-left transition-colors hover:border-primary/25 hover:bg-white/[0.04]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_20%,rgba(6,182,212,0.22),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.06),transparent_58%)]" />
       {coverUrl ? (
         <CrateImage
@@ -136,14 +115,6 @@ export function UpcomingEventRow({
               </Link>
               <span className="text-white/20">&middot;</span>
               <span className="truncate">{item.subtitle}</span>
-              {item.status ? (
-                <>
-                  <span className="text-white/20">&middot;</span>
-                  <span className="capitalize text-primary/90">
-                    {item.status}
-                  </span>
-                </>
-              ) : null}
             </div>
           </div>
         </div>
@@ -158,84 +129,21 @@ export function UpcomingEventRow({
           {albumPath ? (
             <Link
               to={albumPath}
-              onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Play size={14} className="fill-current" />
               {t("common.open")}
             </Link>
           ) : null}
-          {item.tidal_url ? (
-            <a
-              href={item.tidal_url}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(event) => event.stopPropagation()}
-              className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
-            >
-              <ExternalLink size={14} />
-              {t("common.source")}
-            </a>
-          ) : null}
-          {onToggle ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggle();
-              }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-foreground transition-colors hover:bg-white/[0.1]"
-              aria-label={
-                expanded
-                  ? t("radar.release.hideDetails")
-                  : t("radar.release.showDetails")
-              }
-            >
-              <ChevronDown
-                size={16}
-                className={`transition-transform ${
-                  expanded ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+          {countdown ? (
+            <div className="rounded-lg border border-primary/15 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
+              {countdown.unit === "hours"
+                ? t("radar.show.time.hoursToGo", { count: countdown.value })
+                : t("radar.show.time.daysToGo", { count: countdown.value })}
+            </div>
           ) : null}
         </div>
       </div>
-      {expanded ? (
-        <div className="relative mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                {t("radar.release.detailTitle")}
-              </div>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/68">
-                {item.is_upcoming
-                  ? t("radar.release.preReleaseDetail")
-                  : t("radar.release.releasedDetail")}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {albumPath ? (
-                <Link
-                  to={albumPath}
-                  onClick={(event) => event.stopPropagation()}
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                >
-                  <Play size={14} className="fill-current" />
-                  {t("home.radar.openAlbum")}
-                </Link>
-              ) : null}
-              <Link
-                to={artistPath}
-                onClick={(event) => event.stopPropagation()}
-                className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
-              >
-                {t("common.artist")}
-              </Link>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </article>
   );
 }

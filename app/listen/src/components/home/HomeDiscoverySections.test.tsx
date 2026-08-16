@@ -19,12 +19,14 @@ import {
   RadioStationsSection,
   RecentEntityRow,
   RecentlyPlayedSection,
+  UpcomingAlbumsSection,
 } from "@/components/home/HomeDiscoverySections";
 import type {
   HomeGeneratedPlaylistSummary,
   HomeHeroArtist,
   HomeRadioStation,
   HomeRecentItem,
+  HomeSuggestedAlbum,
 } from "@/components/home/home-model";
 import { artistHeroApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -206,6 +208,31 @@ describe("HomeTasteHero", () => {
 
     expect(artistHeroApiUrl).not.toHaveBeenCalled();
     expect(screen.queryByRole("heading", { name: "Converge" })).toBeNull();
+  });
+
+  it("renders the legacy carousel when the device has no featured surface", () => {
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture()]}
+        heroSurfaces={{
+          desktop: {
+            mode: "legacy",
+            artists: [heroFixture()],
+          },
+          mobile: {
+            mode: "legacy",
+            artists: [heroFixture()],
+          },
+        }}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("desktop-legacy-hero")).toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-hero-artwork")).toBeNull();
   });
 
   it("renders the editorial Just Landed content without recommendation controls", () => {
@@ -1142,5 +1169,27 @@ describe("EssentialsSection", () => {
 
     expect(screen.getByText("Artist Sets")).toBeInTheDocument();
     expect(screen.queryByText("Core tracks")).toBeNull();
+  });
+});
+
+describe("UpcomingAlbumsSection", () => {
+  it("renders the dedicated upcoming rail and routes View all to its section", () => {
+    const albums: HomeSuggestedAlbum[] = [
+      {
+        artist_name: "Rival Schools",
+        album_name: "New Record",
+        release_date: "2026-09-01",
+        is_pre_release: true,
+      },
+    ];
+    const onViewAll = vi.fn();
+
+    renderWithListenProviders(
+      <UpcomingAlbumsSection albums={albums} onViewAll={onViewAll} />,
+    );
+
+    expect(screen.getByText("What's coming up")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "View all" }));
+    expect(onViewAll).toHaveBeenCalledWith("upcoming-albums");
   });
 });

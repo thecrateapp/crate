@@ -303,6 +303,8 @@
   "home.sections.listeningDna.defaultSubtitle": "Your most played music from this period.",
   "home.sections.suggestedAlbums.title": "Suggested new albums for you",
   "home.sections.suggestedAlbums.subtitle": "Recent releases from the artists you already care about.",
+  "home.sections.upcomingAlbums.title": "What's coming up",
+  "home.sections.upcomingAlbums.subtitle": "Upcoming releases, starting with the nearest date.",
   "home.sections.recommendedTracks.title": "Recommended new tracks",
   "home.sections.recommendedTracks.subtitle": "Fresh cuts from artists and albums that line up with your taste.",
   "home.sections.radioStations.title": "Radio stations",

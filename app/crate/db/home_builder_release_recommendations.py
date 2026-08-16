@@ -7,6 +7,7 @@ from crate.db.home_builder_shared import (
     _merge_track_rows,
     _select_diverse_tracks,
 )
+from crate.db.home_album_surfaces import is_pre_release_album
 from crate.db.home_builder_discovery_queries import track_candidates_for_album_ids
 
 
@@ -61,11 +62,47 @@ def build_suggested_albums(recent_releases: list[dict], limit: int) -> list[dict
                 "year": row.get("year"),
                 "release_date": row.get("release_date"),
                 "release_type": row.get("release_type") or "Album",
+                "is_pre_release": is_pre_release_album(row),
             }
         )
         if len(suggested_albums) >= limit:
             break
     return suggested_albums
+
+
+def build_upcoming_albums(releases: list[dict], limit: int) -> list[dict]:
+    upcoming_albums: list[dict] = []
+    for row in releases:
+        album_name = row.get("album_title") or row.get("name") or ""
+        artist_name = row.get("artist_name") or row.get("artist") or ""
+        if not album_name or not artist_name:
+            continue
+
+        album_id = row.get("album_id")
+        if album_id is None and row.get("id") is not None:
+            album_id = -int(row["id"])
+        upcoming_albums.append(
+            {
+                "album_id": album_id,
+                "global_album_uid": row.get("global_album_uid"),
+                "global_artist_uid": row.get("global_artist_uid"),
+                "album_entity_uid": row.get("album_entity_uid"),
+                "album_slug": row.get("album_slug"),
+                "artist_name": artist_name,
+                "artist_id": row.get("artist_id"),
+                "artist_entity_uid": row.get("artist_entity_uid"),
+                "artist_slug": row.get("artist_slug"),
+                "album_name": album_name,
+                "year": row.get("year"),
+                "release_date": row.get("release_date"),
+                "release_type": row.get("release_type") or "Album",
+                "cover_url": row.get("cover_url"),
+                "is_pre_release": True,
+            }
+        )
+        if len(upcoming_albums) >= limit:
+            break
+    return upcoming_albums
 
 
 def build_recommended_tracks(
@@ -119,5 +156,6 @@ def build_recommended_tracks(
 __all__ = [
     "build_recommended_tracks",
     "build_suggested_albums",
+    "build_upcoming_albums",
     "filter_interesting_releases",
 ]

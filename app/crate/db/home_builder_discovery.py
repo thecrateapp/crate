@@ -15,6 +15,7 @@ from crate.db.home_builder_recent_activity import (
 from crate.db.home_builder_release_recommendations import (
     build_recommended_tracks as _build_recommended_tracks,
     build_suggested_albums as _build_suggested_albums,
+    build_upcoming_albums as _build_upcoming_albums,
     filter_interesting_releases as _filter_interesting_releases,
 )
 from crate.db.home_builder_shared import _track_payload
@@ -25,6 +26,7 @@ __all__ = [
     "_build_recently_played",
     "_build_recommended_tracks",
     "_build_suggested_albums",
+    "_build_upcoming_albums",
     "_fallback_recent_interest_tracks",
     "_filter_interesting_releases",
     "_get_home_hero",

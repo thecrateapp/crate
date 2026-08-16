@@ -111,6 +111,28 @@ export function upcomingReleaseBadgeLabel(item: UpcomingItem) {
   return item.is_upcoming ? "Pre-release" : "Released";
 }
 
+export function upcomingCountdown(
+  date: string,
+  time?: string,
+  now: Date = new Date(),
+): { value: number; unit: "days" | "hours" } | null {
+  if (!date) return null;
+  const target = new Date(`${date}T${time || "23:59:59"}`);
+  if (Number.isNaN(target.getTime())) return null;
+
+  const millisecondsRemaining = target.getTime() - now.getTime();
+  if (millisecondsRemaining <= 0) return null;
+
+  const hoursRemaining = Math.max(
+    1,
+    Math.ceil(millisecondsRemaining / (60 * 60 * 1000)),
+  );
+  if (hoursRemaining < 48) {
+    return { value: hoursRemaining, unit: "hours" };
+  }
+  return { value: Math.ceil(hoursRemaining / 24), unit: "days" };
+}
+
 export function groupByMonth(
   items: UpcomingItem[],
 ): [string, UpcomingItem[]][] {

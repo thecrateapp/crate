@@ -190,6 +190,16 @@ export function CommandPalette() {
       run: () => api("/api/manage/enrich-mbids", "POST"),
     },
     {
+      label: "Backfill Album Release Dates",
+      toastLabel: "Backfill album release dates",
+      capabilities: COMMAND_METADATA_WRITE,
+      icon: Calendar,
+      run: () =>
+        api("/api/manage/enrich-mbids", "POST", {
+          release_dates_only: true,
+        }),
+    },
+    {
       label: "Sync Missing Lyrics",
       toastLabel: "Sync Lyrics",
       capabilities: COMMAND_METADATA_WRITE,

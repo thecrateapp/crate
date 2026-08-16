@@ -113,6 +113,32 @@ export interface HomeUpcomingItem {
   probable_setlist?: unknown[];
 }
 
+export function homeUpcomingAlbumKey(artist: string, album: string): string {
+  return `${artist.trim().toLocaleLowerCase()}::${album
+    .trim()
+    .toLocaleLowerCase()}`;
+}
+
+export function selectHomeRadarItems(
+  items: HomeUpcomingItem[],
+  upcomingAlbumKeys: ReadonlySet<string>,
+  limit = 4,
+): HomeUpcomingItem[] {
+  const upcomingItems = [...items].filter((item) => item.is_upcoming);
+  const deduplicatedItems = upcomingItems.filter(
+    (item) =>
+      item.type !== "release" ||
+      !upcomingAlbumKeys.has(homeUpcomingAlbumKey(item.artist, item.title)),
+  );
+  const radarItems = deduplicatedItems.length
+    ? deduplicatedItems
+    : upcomingItems;
+
+  return radarItems
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, Math.max(0, limit));
+}
+
 export interface HomeUpcomingInsight {
   type: "one_month" | "one_week" | "show_prep";
   show_id: number;
@@ -326,6 +352,7 @@ export interface HomeSuggestedAlbum {
   release_date?: string;
   release_type?: string;
   cover_url?: string | null;
+  is_pre_release?: boolean;
 }
 
 export interface HomeRecommendedTrack {
@@ -414,6 +441,7 @@ export interface HomeDiscoveryPayload {
   recently_played: HomeRecentItem[];
   custom_mixes: HomeGeneratedPlaylistSummary[];
   suggested_albums: HomeSuggestedAlbum[];
+  upcoming_albums?: HomeSuggestedAlbum[];
   recommended_tracks: HomeRecommendedTrack[];
   radio_stations: HomeRadioStation[];
   favorite_artists: HomeFavoriteArtist[];
@@ -444,6 +472,7 @@ export type HomeSectionId =
   | "recently-played"
   | "custom-mixes"
   | "suggested-albums"
+  | "upcoming-albums"
   | "recommended-tracks"
   | "radio-stations"
   | "favorite-artists"
@@ -460,6 +489,7 @@ export type HomeSectionDetailPayload =
   | HomeSectionBase<"recently-played", HomeRecentItem>
   | HomeSectionBase<"custom-mixes", HomeGeneratedPlaylistSummary>
   | HomeSectionBase<"suggested-albums", HomeSuggestedAlbum>
+  | HomeSectionBase<"upcoming-albums", HomeSuggestedAlbum>
   | HomeSectionBase<"recommended-tracks", HomeRecommendedTrack>
   | HomeSectionBase<"radio-stations", HomeRadioStation>
   | HomeSectionBase<"favorite-artists", HomeFavoriteArtist>

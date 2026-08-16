@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
   Calendar,
   Disc3,
-  ExternalLink,
   MapPin,
   Play,
   RadioTower,
@@ -57,7 +56,26 @@ export function HomeUpcomingSection({
 }) {
   const { t, i18n } = useTranslation();
   const nextUpcoming = previewItems[0] || null;
-  if (!nextUpcoming) return null;
+  if (!nextUpcoming) {
+    return (
+      <section className="space-y-4">
+        <SectionHeader
+          title={t("home.radar.title")}
+          subtitle={t("home.radar.subtitle")}
+          actionLabel={t("home.radar.open")}
+          onAction={onOpenUpcoming}
+        />
+        <div className="rounded-[12px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.16),transparent_42%),rgba(255,255,255,0.03)] p-5">
+          <h2 className="text-lg font-bold text-foreground">
+            {t("radar.empty.followTitle")}
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-white/60">
+            {t("radar.empty.followBody")}
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   const isShow = nextUpcoming.type === "show";
   const nextUpcomingDate = formatUpcomingDate(nextUpcoming.date, i18n.language);
@@ -173,16 +191,6 @@ export function HomeUpcomingSection({
                     </div>
                   </div>
                 ) : null}
-                {!isShow && nextUpcoming.status ? (
-                  <div className="rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
-                      {t("home.radar.meta.state")}
-                    </div>
-                    <div className="mt-1 text-sm font-semibold capitalize text-foreground">
-                      {nextUpcoming.status}
-                    </div>
-                  </div>
-                ) : null}
                 {nextUpcoming.user_attending && isShow ? (
                   <div className="rounded-lg border border-primary/20 bg-primary/12 px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
                     {t("radar.show.going")}
@@ -217,17 +225,6 @@ export function HomeUpcomingSection({
                   <Calendar size={15} />
                   {t("home.radar.viewRadar")}
                 </button>
-                {!isShow && nextUpcoming.tidal_url ? (
-                  <a
-                    href={nextUpcoming.tidal_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
-                  >
-                    <ExternalLink size={15} />
-                    {t("home.radar.openSource")}
-                  </a>
-                ) : null}
                 {isShow && artistPath ? (
                   <Link
                     to={artistPath}
@@ -255,7 +252,7 @@ export function HomeUpcomingSection({
             </div>
           </div>
           <div className="space-y-1">
-            {previewItems.map((item) => (
+            {previewItems.slice(1).map((item) => (
               <UpcomingPreviewRow
                 key={`${item.type}-${item.artist}-${item.title}-${item.date}`}
                 item={item}

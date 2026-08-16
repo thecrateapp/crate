@@ -7,6 +7,7 @@ from typing import Any
 
 HOME_HERO_SCORE_VERSION = "home_hero_v2"
 HOME_HERO_ROTATION_VERSION = "home_hero_rotation_v1"
+HOME_HERO_SELECTION_VERSION = "home_hero_selection_v1"
 
 HOME_HERO_SCORE_WEIGHTS_V1 = {
     "followed_artist": 2.6,
@@ -208,11 +209,56 @@ def rotate_home_hero_rows(
     return [selected, *remaining, *rows[candidate_count:]]
 
 
+def select_home_hero_rows(
+    rows: list[dict],
+    *,
+    user_id: int,
+    day: date | None = None,
+    limit: int = 8,
+) -> list[dict]:
+    """Select a stable daily subset from the complete ranked candidate pool.
+
+    Ranking still controls the weights, but the selection is made without
+    replacement so artists outside the first eight can become visible on a
+    later day. The result remains deterministic for a user and UTC day.
+    """
+
+    if limit <= 0 or not rows:
+        return []
+    if len(rows) <= limit:
+        return list(rows)
+
+    selection_day = day or datetime.now(timezone.utc).date()
+    remaining = list(rows)
+    selected: list[dict] = []
+    selection_count = min(limit, len(remaining))
+
+    for selection_index in range(selection_count):
+        weights = [
+            0.35 + (1.0 / ((index + 1) ** 0.65)) for index in range(len(remaining))
+        ]
+        target = _stable_unit_interval(
+            f"{HOME_HERO_SELECTION_VERSION}:{user_id}:"
+            f"{selection_day.isoformat()}:{selection_index}"
+        ) * sum(weights)
+        selected_index = len(remaining) - 1
+        for index, weight in enumerate(weights):
+            if target < weight:
+                selected_index = index
+                break
+            target -= weight
+        selected.append(remaining.pop(selected_index))
+
+    return selected
+
+
 __all__ = [
     "HOME_HERO_SCORE_VERSION",
     "HOME_HERO_ROTATION_VERSION",
+    "HOME_HERO_SELECTION_VERSION",
     "HOME_HERO_SCORE_WEIGHTS_V1",
     "rotate_home_hero_rows",
+    "select_home_hero_rows",
     "score_home_hero_rows",
     "strip_home_hero_score",
 ]

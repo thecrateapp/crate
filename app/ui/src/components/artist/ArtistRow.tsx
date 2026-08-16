@@ -17,6 +17,8 @@ interface ArtistRowProps {
   genres?: string[];
   primary_format?: string;
   hasIssues?: boolean;
+  isFeatured?: boolean;
+  featuredDevices?: string[];
   selectMode?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
@@ -32,6 +34,8 @@ export function ArtistRow({
   listeners,
   genres,
   hasIssues,
+  isFeatured,
+  featuredDevices = [],
   selectMode,
   isSelected,
   onClick,
@@ -93,8 +97,16 @@ export function ArtistRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">
-          {name}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <div className="truncate text-sm font-medium text-foreground">
+            {name}
+          </div>
+          {isFeatured ? <CrateChip active>Featured</CrateChip> : null}
+          {isFeatured
+            ? featuredDevices.map((device) => (
+                <CrateChip key={device}>{device}</CrateChip>
+              ))
+            : null}
         </div>
         {genres && genres.length > 0 ? (
           <div className="mt-1 flex flex-wrap gap-1.5">

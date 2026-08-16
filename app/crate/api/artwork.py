@@ -48,7 +48,10 @@ from crate.artist_hero_candidates import (
     discover_artist_hero_candidates,
     load_candidate_content,
 )
-from crate.artist_hero_contract import artist_hero_profile_contract
+from crate.artist_hero_contract import (
+    artist_hero_profile_contract,
+    artist_hero_profile_ready_compositions,
+)
 from crate.db.repositories.library import get_albums_missing_covers, get_library_artist
 from crate.db.repositories.artist_artwork_assets import (
     get_artist_artwork_asset,
@@ -58,6 +61,7 @@ from crate.db.repositories.artist_hero_artwork import (
     get_artist_hero_artwork,
     update_artist_hero_review_status,
 )
+from crate.db.repositories.featured_artists import get_artist_featured_state
 from crate.db.releases import get_release_by_virtual_album_id
 from crate.db.repositories.tasks import create_task
 from crate.storage_layout import resolve_artist_dir
@@ -496,8 +500,11 @@ def api_artist_hero_profile(request: Request, artist_id: int):
     profile = get_artist_hero_artwork(artist_id)
     if not profile:
         return JSONResponse({"error": "Artist hero not found"}, status_code=404)
+    featured_state = get_artist_featured_state(artist_id) or {}
     payload = {
         **profile,
+        "is_featured": bool(featured_state.get("is_featured")),
+        "featured_devices": list(artist_hero_profile_ready_compositions(profile)),
         **artist_hero_profile_contract(artist_id=artist_id, profile=profile),
     }
     return JSONResponse(
@@ -530,6 +537,12 @@ def api_artist_hero_source(
 
     if composition not in {None, "desktop", "mobile"}:
         return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    if composition:
+        profile = get_artist_hero_artwork(int(artist_id))
+        if profile and profile.get(f"{composition}_enabled", True) is False:
+            return JSONResponse(
+                {"error": "Artist hero composition not found"}, status_code=404
+            )
     composition_path = (
         artist_dir / f"artist-hero-source-{composition}.jpg"
         if composition
@@ -939,6 +952,38 @@ def api_review_artist_hero(
     wait_for_cache_invalidation()
     warm_recent_home_discovery_snapshots()
     return {"status": body.review_status}
+
+
+@router.delete(
+    "/api/artwork/artists/{artist_id}/hero-profile/{composition}",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Queue deletion of one artist-hero composition",
+)
+def api_delete_artist_hero_composition(
+    request: Request, artist_id: int, composition: str
+):
+    _require_artwork_editor(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    if composition not in {"desktop", "mobile"}:
+        return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    profile = get_artist_hero_artwork(artist_id)
+    if not profile or profile.get(f"{composition}_enabled", True) is False:
+        return JSONResponse(
+            {"error": "Artist hero composition not found"}, status_code=404
+        )
+    task_id = create_task(
+        "delete_artist_hero_composition",
+        {
+            "artist": artist_name,
+            "artist_id": artist_id,
+            "composition": composition,
+        },
+    )
+    return {"status": "queued", "task_id": task_id}
 
 
 @router.post(

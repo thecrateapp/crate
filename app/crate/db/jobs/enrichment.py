@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import text
 
+from crate.release_dates import normalize_release_date
 from crate.db.repositories.global_catalog_dirty_sources import (
     enqueue_local_dirty_source,
 )
@@ -40,6 +41,8 @@ def get_albums_needing_release_metadata() -> list[dict]:
                        OR album.musicbrainz_albumid = ''
                        OR album.release_group_primary_type IS NULL
                        OR album.release_group_primary_type = ''
+                       OR album.release_date IS NULL
+                       OR album.release_date = ''
                     ORDER BY album.artist, album.year NULLS LAST, album.name
                     """
                 )
@@ -90,6 +93,7 @@ def persist_album_release_mbids(
     release_group_secondary_types = list(
         release.get("release_group_secondary_types") or []
     )
+    release_date = normalize_release_date(release.get("first_release_date")) or ""
     mb_tracks = release.get("tracks", [])
 
     with transaction_scope() as session:
@@ -98,6 +102,10 @@ def persist_album_release_mbids(
                 """
                 UPDATE library_albums
                 SET musicbrainz_albumid = :mbid,
+                    release_date = COALESCE(
+                        NULLIF(:release_date, ''),
+                        release_date
+                    ),
                     release_group_primary_type = COALESCE(
                         :release_group_primary_type,
                         release_group_primary_type
@@ -111,6 +119,7 @@ def persist_album_release_mbids(
             {
                 "mbid": release_mbid,
                 "release_group_primary_type": release_group_primary_type,
+                "release_date": release_date,
                 "release_group_secondary_types": json.dumps(
                     release_group_secondary_types
                 ),
@@ -162,7 +171,14 @@ def persist_album_release_group_types(updates: list[dict]) -> int:
                         NULLIF(:musicbrainz_releasegroupid, ''),
                         musicbrainz_releasegroupid
                     ),
-                    release_group_primary_type = :release_group_primary_type,
+                    release_group_primary_type = COALESCE(
+                        :release_group_primary_type,
+                        release_group_primary_type
+                    ),
+                    release_date = COALESCE(
+                        NULLIF(:release_date, ''),
+                        release_date
+                    ),
                     release_group_secondary_types =
                         CAST(:release_group_secondary_types AS jsonb),
                     updated_at = NOW()
@@ -175,6 +191,11 @@ def persist_album_release_group_types(updates: list[dict]) -> int:
                     "musicbrainz_releasegroupid": str(
                         update.get("musicbrainz_releasegroupid") or ""
                     ),
+                    "release_group_primary_type": update.get(
+                        "release_group_primary_type"
+                    ),
+                    "release_date": normalize_release_date(update.get("release_date"))
+                    or "",
                     "release_group_secondary_types": json.dumps(
                         update.get("release_group_secondary_types") or []
                     ),

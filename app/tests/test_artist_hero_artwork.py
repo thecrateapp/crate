@@ -492,6 +492,10 @@ def test_artist_hero_profile_endpoint_returns_persisted_metadata(test_app):
             "crate.api.artwork.get_artist_hero_artwork",
             return_value=profile,
         ),
+        patch(
+            "crate.api.artwork.get_artist_featured_state",
+            return_value={"is_featured": False},
+        ),
     ):
         response = test_app.get("/api/artwork/artists/7/hero-profile")
 
@@ -514,6 +518,10 @@ def test_artist_hero_source_endpoint_delivers_the_editable_original(test_app, tm
             return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
         ),
         patch("crate.api.artwork.library_path", return_value=tmp_path),
+        patch(
+            "crate.api.artwork.get_artist_hero_artwork",
+            return_value={"mobile_enabled": True},
+        ),
     ):
         response = test_app.get("/api/artwork/artists/7/hero-source")
 
@@ -539,11 +547,37 @@ def test_artist_hero_source_endpoint_delivers_a_composition_override(
             return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
         ),
         patch("crate.api.artwork.library_path", return_value=tmp_path),
+        patch(
+            "crate.api.artwork.get_artist_hero_artwork",
+            return_value={"mobile_enabled": True},
+        ),
     ):
         response = test_app.get("/api/artwork/artists/7/hero-source?composition=mobile")
 
     assert response.status_code == 200
     assert Image.open(io.BytesIO(response.content)).size == (1080, 1350)
+
+
+def test_delete_artist_hero_composition_enqueues_persistent_delete(test_app):
+    profile = {
+        "desktop_enabled": True,
+        "mobile_enabled": True,
+    }
+    with (
+        patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value=profile),
+        patch(
+            "crate.api.artwork.create_task", return_value="task-delete-hero"
+        ) as create,
+    ):
+        response = test_app.delete("/api/artwork/artists/7/hero-profile/desktop")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "queued", "task_id": "task-delete-hero"}
+    create.assert_called_once_with(
+        "delete_artist_hero_composition",
+        {"artist": "Converge", "artist_id": 7, "composition": "desktop"},
+    )
 
 
 def test_derive_artist_hero_endpoint_queues_background_conversion(test_app):

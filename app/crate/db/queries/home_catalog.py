@@ -88,6 +88,7 @@ def get_home_hero_rows(
                         COALESCE(la.album_count, 0) AS album_count,
                         COALESCE(la.track_count, 0) AS track_count,
                         COALESCE(la.bio, '') AS bio,
+                        la.is_featured,
                         COALESCE(
                             MIN(
                                 COALESCE(
@@ -117,7 +118,7 @@ def get_home_hero_rows(
                     GROUP BY
                         la.id, la.entity_uid, la.slug, la.name, la.listeners,
                         la.lastfm_playcount, la.album_count, la.track_count,
-                        la.bio, la.dir_mtime, la.updated_at,
+                        la.bio, la.is_featured, la.dir_mtime, la.updated_at,
                         candidate_hero.provenance,
                         candidate_hero.review_status
                     ORDER BY
@@ -167,6 +168,8 @@ def get_home_hero_rows(
                     hero.mobile_source_height AS _hero_mobile_source_height,
                     hero.desktop_recipe AS _hero_desktop_recipe,
                     hero.mobile_recipe AS _hero_mobile_recipe,
+                    hero.desktop_enabled AS _hero_desktop_enabled,
+                    hero.mobile_enabled AS _hero_mobile_enabled,
                     hero.provenance AS _hero_provenance,
                     hero.review_status AS _hero_review_status
                 FROM recent

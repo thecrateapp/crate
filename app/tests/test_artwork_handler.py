@@ -72,6 +72,7 @@ class TestHandlerRegistration:
             "import_artist_artwork_asset",
             "assign_artist_artwork_slot",
             "delete_artist_artwork_asset",
+            "delete_artist_hero_composition",
         }
         assert set(ARTWORK_TASK_HANDLERS.keys()) == expected
 

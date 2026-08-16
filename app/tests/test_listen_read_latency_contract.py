@@ -115,7 +115,7 @@ def test_home_section_refresh_builds_and_caches_full_payload(monkeypatch):
     assert section == expected
     assert writes == [
         (
-            "home_section:v4:global:7:custom-mixes:42",
+            "home_section:v5:global:7:custom-mixes:42",
             {
                 "_home_section_cached_at": 1234.0,
                 "_home_section_payload": expected,

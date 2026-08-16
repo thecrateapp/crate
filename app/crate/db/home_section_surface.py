@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -12,6 +13,7 @@ _FRESH_MAX_AGE_SECONDS = 300
 _STALE_MAX_AGE_SECONDS = 3600
 _CACHE_TTL_SECONDS = 3600
 _DEFAULT_SECTION_LIMIT = 42
+log = logging.getLogger(__name__)
 
 _SECTION_METADATA = {
     "recently-played": (
@@ -28,6 +30,11 @@ _SECTION_METADATA = {
         "Suggested new albums for you",
         "Recent releases from the artists you already care about.",
         "suggested_albums",
+    ),
+    "upcoming-albums": (
+        "What's coming up",
+        "Upcoming releases, starting with the nearest date.",
+        "upcoming_albums",
     ),
     "recommended-tracks": (
         "Recommended new tracks",
@@ -53,7 +60,7 @@ _SECTION_METADATA = {
 
 
 def _cache_key(user_id: int, section_id: str, limit: int) -> str:
-    return f"home_section:v4:global:{user_id}:{section_id}:{limit}"
+    return f"home_section:v5:global:{user_id}:{section_id}:{limit}"
 
 
 def _schedule_home_refresh(user_id: int) -> None:
@@ -127,9 +134,27 @@ def get_cached_home_section(
 
     stale_value = get_cache(key, max_age_seconds=_STALE_MAX_AGE_SECONDS)
     stale = _unpack(stale_value, max_age_seconds=_STALE_MAX_AGE_SECONDS)
-    _schedule_home_refresh(user_id)
     if stale is not None:
+        _schedule_home_refresh(user_id)
         return stale
+
+    # Expanded sections must not depend on a previously warmed home snapshot.
+    # Otherwise the first View all request after invalidation renders an empty
+    # page while the worker rebuilds the cache in the background.
+    try:
+        section = get_home_section(user_id, section_id, limit)
+        if section is not None:
+            set_cache(key, _pack(section), ttl=_CACHE_TTL_SECONDS)
+            return section
+    except Exception:
+        log.warning(
+            "Cold home section build failed for user %s (%s)",
+            user_id,
+            section_id,
+            exc_info=True,
+        )
+
+    _schedule_home_refresh(user_id)
     return _discovery_fallback(user_id, section_id, limit=limit)
 
 
