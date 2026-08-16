@@ -15,7 +15,18 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
             "planner_version": None,
             "android_native_crossfade": False,
             "android_beatmatch": False,
-        }
+        },
+        "vdj": {
+            "available": False,
+            "min_plugin_version": "1.0.0",
+            "max_plugin_version": "1.x",
+            "contract_version": "2026-08",
+            "profile_schema_version": 1,
+            "planner_version": "smart-mix-v1",
+            "online_source": False,
+            "smart_mix_assistant": False,
+            "automation": False,
+        },
     }
 
 
@@ -35,5 +46,16 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
             "planner_version": "smart-mix-v1",
             "android_native_crossfade": True,
             "android_beatmatch": True,
-        }
+        },
+        "vdj": {
+            "available": False,
+            "min_plugin_version": "1.0.0",
+            "max_plugin_version": "1.x",
+            "contract_version": "2026-08",
+            "profile_schema_version": 1,
+            "planner_version": "smart-mix-v1",
+            "online_source": False,
+            "smart_mix_assistant": False,
+            "automation": False,
+        },
     }

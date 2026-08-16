@@ -52,3 +52,11 @@ def android_native_crossfade_enabled() -> bool:
 
 def android_beatmatch_enabled() -> bool:
     return _env_enabled("CRATE_ANDROID_BEATMATCH_ENABLED")
+
+
+def vdj_enabled() -> bool:
+    return _env_enabled("CRATE_VDJ_ENABLED")
+
+
+def vdj_automation_enabled() -> bool:
+    return _env_enabled("CRATE_VDJ_AUTOMATION_ENABLED")
