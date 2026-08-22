@@ -704,6 +704,12 @@ class FeedItemResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     type: str
+    source: str | None = None
+    canonical_url: str | None = None
+    published_at: date_type | datetime | str | None = None
+    event_date: date_type | datetime | str | None = None
+    image_url: str | None = None
+    dedupe_key: str | None = None
     artist: str | None = None
     title: str | None = None
     date: date_type | datetime | str | None = None

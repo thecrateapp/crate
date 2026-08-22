@@ -495,6 +495,40 @@ class TestUserEndpoints:
         data = resp.json()
         assert "items" in data
 
+    def test_feed_returns_source_metadata_and_supports_offset(
+        self, api_client, monkeypatch
+    ):
+        from crate.api import me as me_api
+
+        monkeypatch.setattr(me_api, "get_followed_artists", lambda _user_id: [])
+        monkeypatch.setattr(
+            me_api,
+            "get_feed_new_releases",
+            lambda _limit: [
+                {
+                    "artist": "Artist",
+                    "title": "Newer LP",
+                    "date": "2030-05-02",
+                    "source_url": "https://crate.test/releases/newer",
+                },
+                {
+                    "artist": "Artist",
+                    "title": "Older LP",
+                    "date": "2030-05-01",
+                    "source_url": "https://crate.test/releases/older",
+                },
+            ],
+        )
+
+        response = api_client.get("/api/me/feed?limit=1&offset=1")
+
+        assert response.status_code == 200
+        assert response.json()[0]["title"] == "Older LP"
+        assert response.json()[0]["source"] == "new_releases"
+        assert (
+            response.json()[0]["canonical_url"] == "https://crate.test/releases/older"
+        )
+
 
 class TestGenreTaxonomy:
     """Genre taxonomy endpoints — important because EQ presets live here."""
