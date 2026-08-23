@@ -133,3 +133,72 @@ def test_build_updates_feed_excludes_bandcamp_without_active_connection():
     )
 
     assert items == []
+
+
+def test_build_updates_feed_keeps_provenance_when_local_release_wins_dedupe():
+    items = build_updates_feed(
+        releases=[
+            {
+                "artist": "Artist",
+                "title": "New LP",
+                "date": "2026-08-20",
+                "source_url": "https://crate.test/releases/new-lp",
+            }
+        ],
+        shows=[],
+        radar_items=[
+            {
+                "source": "discover_followed",
+                "item_url": "https://artist.bandcamp.com/album/new-lp",
+                "artist_name": "Artist",
+                "album_title": "New LP",
+                "release_date": "2026-08-20",
+            }
+        ],
+        followed_artists=[],
+        bandcamp_connected=True,
+        limit=20,
+    )
+
+    assert len(items) == 1
+    assert items[0]["source"] == "new_releases"
+    assert items[0]["provenance"] == [
+        {
+            "source": "new_releases",
+            "canonical_url": "https://crate.test/releases/new-lp",
+        },
+        {
+            "source": "bandcamp",
+            "source_detail": "discover_followed",
+            "canonical_url": "https://artist.bandcamp.com/album/new-lp",
+        },
+    ]
+
+
+def test_build_updates_feed_exposes_bandcamp_provenance_for_unique_item():
+    items = build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[
+            {
+                "source": "discover_followed",
+                "item_url": "https://artist.bandcamp.com/album/unique-lp",
+                "artist_name": "Artist",
+                "album_title": "Unique LP",
+                "release_date": "2026-08-20",
+            }
+        ],
+        followed_artists=[],
+        bandcamp_connected=True,
+        limit=20,
+    )
+
+    assert items[0]["source"] == "bandcamp"
+    assert items[0]["source_detail"] == "discover_followed"
+    assert items[0]["provenance"] == [
+        {
+            "source": "bandcamp",
+            "source_detail": "discover_followed",
+            "canonical_url": "https://artist.bandcamp.com/album/unique-lp",
+        }
+    ]

@@ -26,8 +26,19 @@ def build_updates_feed(
     for candidate in candidates:
         key = candidate["dedupe_key"]
         previous = deduped.get(key)
-        if previous is None or _item_priority(candidate) < _item_priority(previous):
+        if previous is None:
+            candidate["provenance"] = _merge_provenance(candidate)
             deduped[key] = candidate
+            continue
+
+        winner = (
+            candidate
+            if _item_priority(candidate) < _item_priority(previous)
+            else previous
+        )
+        loser = previous if winner is candidate else candidate
+        winner["provenance"] = _merge_provenance(winner, loser)
+        deduped[key] = winner
 
     items = sorted(deduped.values(), key=_sort_key)
     start = max(0, offset)
@@ -142,6 +153,34 @@ def _item_priority(item: Mapping[str, Any]) -> int:
     return {"release": 0, "show": 0, "artist": 1, "bandcamp": 2}.get(
         str(item.get("type")), 3
     )
+
+
+def _merge_provenance(*items: Mapping[str, Any]) -> list[dict[str, str]]:
+    records: list[dict[str, str]] = []
+    for item in items:
+        existing = item.get("provenance")
+        if isinstance(existing, list):
+            for value in existing:
+                if isinstance(value, Mapping):
+                    record = _provenance_record(value)
+                    if record and record not in records:
+                        records.append(record)
+        record = _provenance_record(item)
+        if record and record not in records:
+            records.append(record)
+    return records
+
+
+def _provenance_record(item: Mapping[str, Any]) -> dict[str, str]:
+    source = _text(item.get("source"))
+    if not source:
+        return {}
+    record = {"source": source}
+    for field in ("source_detail", "canonical_url"):
+        value = _text(item.get(field))
+        if value:
+            record[field] = value
+    return record
 
 
 def _sort_key(item: Mapping[str, Any]) -> tuple[float, str, str]:

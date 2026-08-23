@@ -700,12 +700,20 @@ class HomeSectionResponse(BaseModel):
     items: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class FeedProvenanceResponse(BaseModel):
+    source: str
+    source_detail: str | None = None
+    canonical_url: str | None = None
+
+
 class FeedItemResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     type: str
     source: str | None = None
+    source_detail: str | None = None
     canonical_url: str | None = None
+    provenance: list[FeedProvenanceResponse] = Field(default_factory=list)
     published_at: date_type | datetime | str | None = None
     event_date: date_type | datetime | str | None = None
     image_url: str | None = None

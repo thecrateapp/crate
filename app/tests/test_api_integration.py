@@ -528,6 +528,13 @@ class TestUserEndpoints:
         assert (
             response.json()[0]["canonical_url"] == "https://crate.test/releases/older"
         )
+        assert response.json()[0]["provenance"] == [
+            {
+                "source": "new_releases",
+                "source_detail": None,
+                "canonical_url": "https://crate.test/releases/older",
+            }
+        ]
 
 
 class TestGenreTaxonomy:
