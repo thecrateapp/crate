@@ -11,6 +11,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import text
 
+from crate.db.serialize import serialize_rows
 from crate.db.tx import read_scope, transaction_scope
 
 
@@ -272,6 +273,82 @@ def list_bandcamp_feed_candidates(*, limit: int = 100) -> list[dict[str, Any]]:
             {"limit": bounded_limit},
         ).mappings()
         return [dict(row) for row in rows]
+
+
+def list_external_feed_items_for_user(
+    user_id: int, *, limit: int = 100
+) -> list[dict[str, Any]]:
+    """Return only active RSS items associated with this user's Bandcamp graph."""
+    bounded_limit = max(1, min(int(limit), 500))
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT
+                    efi.*,
+                    efs.source_kind,
+                    efs.source_url AS feed_source_url,
+                    efs.canonical_url AS artist_url,
+                    efs.association_method,
+                    COALESCE(
+                        la.name,
+                        NULLIF(efi.payload_json ->> 'author', '')
+                    ) AS artist_name
+                FROM external_feed_items efi
+                JOIN external_feed_sources efs ON efs.id = efi.source_id
+                LEFT JOIN library_artists la ON la.id = efs.artist_id
+                WHERE efi.state = 'active'
+                  AND efs.source_kind = 'bandcamp_rss'
+                  AND efs.state IN ('active', 'degraded')
+                  AND EXISTS (
+                      SELECT 1
+                      FROM bandcamp_connections bc
+                      WHERE bc.user_id = :user_id
+                        AND bc.status = 'connected'
+                        AND bc.revoked_at IS NULL
+                  )
+                  AND (
+                      EXISTS (
+                          SELECT 1
+                          FROM user_global_artist_follows ugaf
+                          JOIN global_catalog_artists ga
+                            ON ga.global_artist_uid = ugaf.global_artist_uid
+                          WHERE ugaf.user_id = :user_id
+                            AND ga.local_artist_id = efs.artist_id
+                      )
+                      OR EXISTS (
+                          SELECT 1
+                          FROM user_follows uf
+                          WHERE uf.user_id = :user_id
+                            AND lower(uf.artist_name) = lower(la.name)
+                      )
+                      OR EXISTS (
+                          SELECT 1
+                          FROM user_bandcamp_items ubi
+                          JOIN bandcamp_connections bc
+                            ON bc.id = ubi.connection_id
+                           AND bc.user_id = ubi.user_id
+                           AND bc.status = 'connected'
+                           AND bc.revoked_at IS NULL
+                          JOIN bandcamp_items bi
+                            ON bi.id = ubi.bandcamp_item_id
+                          WHERE ubi.user_id = :user_id
+                            AND ubi.relation_type IN ('wishlist', 'following')
+                            AND ubi.removed_at IS NULL
+                            AND lower(regexp_replace(
+                                trim(coalesce(bi.artist_url, '')), '/+$', ''
+                            )) = lower(regexp_replace(
+                                trim(coalesce(efs.canonical_url, '')), '/+$', ''
+                            ))
+                      )
+                  )
+                ORDER BY efi.published_at DESC NULLS LAST, efi.id DESC
+                LIMIT :limit
+                """
+            ),
+            {"user_id": user_id, "limit": bounded_limit},
+        ).mappings()
+        return serialize_rows(rows)
 
 
 def list_due_external_feed_sources(
@@ -605,6 +682,7 @@ def upsert_external_feed_item(
 __all__ = [
     "get_external_feed_source",
     "list_bandcamp_feed_candidates",
+    "list_external_feed_items_for_user",
     "list_due_external_feed_sources",
     "mark_external_feed_source_failure",
     "mark_external_feed_source_not_found",

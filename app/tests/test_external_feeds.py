@@ -331,3 +331,151 @@ def test_bandcamp_feed_candidates_only_use_active_bandcamp_connections(pg_db):
     assert not any(
         candidate["artist_name"] == "Revoked Artist" for candidate in candidates
     )
+
+
+def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import transaction_scope
+    from sqlalchemy import text
+
+    pg_db.upsert_artist({"name": "Followed Feed Artist"})
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE library_artists
+                SET bandcamp_url = 'https://followed-feed.bandcamp.com'
+                WHERE name = 'Followed Feed Artist'
+                """
+            )
+        )
+        artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = 'Followed Feed Artist'")
+        ).scalar_one()
+        user_id = session.execute(
+            text(
+                """
+                INSERT INTO users (email, created_at)
+                VALUES ('updates-feed-user@example.test', NOW())
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        other_user_id = session.execute(
+            text(
+                """
+                INSERT INTO users (email, created_at)
+                VALUES ('updates-feed-other@example.test', NOW())
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO user_follows (user_id, artist_name, created_at)
+                VALUES (:user_id, 'Followed Feed Artist', NOW())
+                """
+            ),
+            {"user_id": user_id},
+        )
+        connection_ids = {}
+        for target_user_id, suffix in (
+            (user_id, "primary"),
+            (other_user_id, "other"),
+        ):
+            connection_ids[target_user_id] = session.execute(
+                text(
+                    """
+                    INSERT INTO bandcamp_connections (
+                        user_id, status, session_secret_ref, session_fingerprint,
+                        connection_method, created_at, updated_at
+                    ) VALUES (
+                        :user_id, 'connected', :secret_ref, :fingerprint,
+                        'test', NOW(), NOW()
+                    )
+                    RETURNING id
+                    """
+                ),
+                {
+                    "user_id": target_user_id,
+                    "secret_ref": f"feed-secret-{suffix}",
+                    "fingerprint": f"feed-fingerprint-{suffix}",
+                },
+            ).scalar_one()
+
+    source = external_feeds.upsert_external_feed_source(
+        source_kind="bandcamp_rss",
+        source_url="https://followed-feed.bandcamp.com/feed",
+        canonical_url="https://followed-feed.bandcamp.com",
+        artist_id=artist_id,
+        association_method="followed_artist",
+        parser_version="bandcamp-rss-v1",
+    )
+    external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url="https://followed-feed.bandcamp.com/feed",
+        canonical_url="https://followed-feed.bandcamp.com/news/tour",
+        external_guid="tour-1",
+        title="Tour announcement",
+        content_hash="tour-hash",
+        parser_version="bandcamp-rss-v1",
+        author="Followed Feed Artist",
+        published_at=datetime(2026, 8, 23, 10, 0, tzinfo=timezone.utc),
+        payload={"image_url": "https://followed-feed.bandcamp.com/tour.jpg"},
+    )
+
+    user_items = external_feeds.list_external_feed_items_for_user(user_id)
+    assert user_items[0]["title"] == "Tour announcement"
+    assert external_feeds.list_external_feed_items_for_user(other_user_id) == []
+
+    with transaction_scope() as session:
+        item_id = session.execute(
+            text(
+                """
+                INSERT INTO bandcamp_items (
+                    bandcamp_item_type, artist_name, item_url, artist_url,
+                    first_seen_at, updated_at
+                ) VALUES (
+                    'artist', 'Followed Feed Artist',
+                    'https://followed-feed.bandcamp.com',
+                    'https://followed-feed.bandcamp.com', NOW(), NOW()
+                )
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO user_bandcamp_items (
+                    user_id, connection_id, bandcamp_item_id, relation_type,
+                    last_seen_at
+                ) VALUES (:user_id, :connection_id, :item_id, 'wishlist', NOW())
+                """
+            ),
+            {
+                "user_id": other_user_id,
+                "connection_id": connection_ids[other_user_id],
+                "item_id": item_id,
+            },
+        )
+
+    wishlist_items = external_feeds.list_external_feed_items_for_user(other_user_id)
+    assert wishlist_items[0]["title"] == "Tour announcement"
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE bandcamp_connections
+                SET status = 'revoked', revoked_at = NOW()
+                WHERE user_id = :user_id
+                """
+            ),
+            {"user_id": user_id},
+        )
+
+    assert external_feeds.list_external_feed_items_for_user(user_id) == []

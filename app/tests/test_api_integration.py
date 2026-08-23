@@ -536,6 +536,33 @@ class TestUserEndpoints:
             }
         ]
 
+    def test_feed_includes_connected_user_external_items(self, api_client, monkeypatch):
+        from crate.api import me as me_api
+
+        monkeypatch.setattr(me_api, "get_followed_artists", lambda _user_id: [])
+        monkeypatch.setattr(me_api, "has_active_connection", lambda _user_id: True)
+        monkeypatch.setattr(
+            me_api,
+            "list_external_feed_items_for_user",
+            lambda _user_id, limit: [
+                {
+                    "item_kind": "news",
+                    "artist_name": "Connected Artist",
+                    "title": "New announcement",
+                    "canonical_url": "https://connected.bandcamp.com/news/new",
+                    "published_at": "2030-05-03T10:00:00+00:00",
+                    "source_kind": "bandcamp_rss",
+                    "payload_json": {},
+                }
+            ],
+        )
+
+        response = api_client.get("/api/me/feed?limit=10")
+
+        assert response.status_code == 200
+        assert response.json()[0]["type"] == "news"
+        assert response.json()[0]["source"] == "bandcamp_rss"
+
 
 class TestGenreTaxonomy:
     """Genre taxonomy endpoints — important because EQ presets live here."""

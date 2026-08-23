@@ -273,6 +273,23 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 - El scheduler y el actor existen, pero la feature permanece inerte con
   `CRATE_EXTERNAL_RSS_ENABLED=false`.
 
+### Roadmap Task F2.3: Integrar items RSS en el feed de Updates
+
+**Estado:** implementada en el corte siguiente al registro de fuentes.
+
+- `list_external_feed_items_for_user` aplica autorización en backend: exige
+  conexión Bandcamp activa y asociación por follow local/canónico o wishlist/
+  following Bandcamp activos.
+- Las fuentes explícitas de la biblioteca sirven para descubrimiento, pero no
+  hacen que un RSS aparezca indiscriminadamente a todos los usuarios.
+- El mapping de Updates convierte anuncios en `news` y publicaciones de
+  lanzamiento en `bandcamp`, deduplica lanzamientos contra `new_releases` y
+  conserva la procedencia sin exponer `payload_json` ni columnas internas.
+- `/api/me/feed` consume únicamente el dataset ya persistido; no realiza
+  llamadas HTTP al proveedor.
+- RSS continúa desactivado por defecto y no altera el comportamiento de
+  usuarios sin conexión Bandcamp.
+
 ### Roadmap Task F3.1: Registrar y sincronizar fuentes editoriales
 
 **Files:**
@@ -290,6 +307,14 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 5. Normalizar noticia, anuncio, fecha, autor, URL canónica y asociación artística.
 6. Separar las noticias de los eventos: una página editorial de gira puede generar una propuesta revisable, pero no debe crear automáticamente un concierto sin datos suficientes.
 7. Testear fuentes válidas, HTML cambiado, asociación ambigua, contenido duplicado y error de fuente aislado.
+
+**Estado del corte actual (2026-08-23):**
+
+- `register_editorial_feed_source` exige HTTPS, asociación explícita, allowlist de host y un tipo de fuente conocido.
+- El adaptador editorial reutiliza el parser RSS/Atom acotado, mantiene una versión de parser propia y rechaza redirecciones fuera del host registrado.
+- El worker comprueba `robots.txt`, usa `ETag`/`Last-Modified`, aplica backoff con jitter y aísla los errores por fuente.
+- Se ha añadido un refresco editorial independiente al scheduler/worker registry, pero comparte `CRATE_EXTERNAL_RSS_ENABLED` y permanece desactivado por defecto.
+- La asociación soportada en este corte es por artista; el soporte de sellos requiere modelar la entidad de sello antes de exponerlo como relación de primer nivel.
 
 ### Roadmap Task F4.1: Añadir enriquecimiento opcional con IA sobre items ingeridos
 

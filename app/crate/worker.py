@@ -643,6 +643,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "external_feeds_discover_sources",
             "external_feeds_refresh",
+            "external_feeds_refresh_editorial",
         ),
     ),
     (

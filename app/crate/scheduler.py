@@ -24,6 +24,7 @@ DEFAULT_SCHEDULES = {
     "sync_shows": 86400,  # 24h — sync shows from Ticketmaster
     "external_feeds_discover_sources": 86400,  # 24h — discover eligible Bandcamp RSS links
     "external_feeds_refresh": 21600,  # 6h — refresh explicitly registered RSS sources
+    "external_feeds_refresh_editorial": 21600,  # 6h — refresh allowlisted editorial feeds
     "federation_health_poll": 60,  # 1min — poll approved peers for health
     "federation_sync_catalog": 120,  # 2min — consume peer catalog deltas
     "federation_directory_refresh": 300,  # 5min — refresh due signed directories

@@ -202,3 +202,76 @@ def test_build_updates_feed_exposes_bandcamp_provenance_for_unique_item():
             "canonical_url": "https://artist.bandcamp.com/album/unique-lp",
         }
     ]
+
+
+def test_build_updates_feed_maps_rss_news_and_keeps_release_deduplication():
+    items = build_updates_feed(
+        releases=[
+            {
+                "artist": "Artist",
+                "title": "New LP",
+                "date": "2026-08-20",
+                "source": "new_releases",
+            }
+        ],
+        shows=[],
+        radar_items=[],
+        external_feed_items=[
+            {
+                "item_kind": "release",
+                "artist_name": "Artist",
+                "title": "New LP",
+                "canonical_url": "https://artist.bandcamp.com/album/new-lp",
+                "published_at": "2026-08-20T10:00:00+00:00",
+                "source_kind": "bandcamp_rss",
+                "payload_json": {"image_url": "https://artist.bandcamp.com/cover.jpg"},
+            },
+            {
+                "item_kind": "news",
+                "artist_name": "Artist",
+                "title": "Tour announcement",
+                "canonical_url": "https://artist.bandcamp.com/news/tour",
+                "published_at": "2026-08-21T10:00:00+00:00",
+                "excerpt": "New dates announced.",
+                "source_kind": "bandcamp_rss",
+                "payload_json": {},
+            },
+        ],
+        followed_artists=[],
+        bandcamp_connected=True,
+        limit=20,
+    )
+
+    assert [item["type"] for item in items] == ["news", "release"]
+    assert items[0]["source"] == "bandcamp_rss"
+    assert items[0]["title"] == "Tour announcement"
+    assert "payload_json" not in items[0]
+    assert items[1]["source"] == "new_releases"
+    assert items[1]["provenance"] == [
+        {"source": "new_releases"},
+        {
+            "source": "bandcamp_rss",
+            "canonical_url": "https://artist.bandcamp.com/album/new-lp",
+        },
+    ]
+
+
+def test_build_updates_feed_excludes_rss_without_active_connection():
+    items = build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        external_feed_items=[
+            {
+                "item_kind": "news",
+                "artist_name": "Artist",
+                "title": "Private feed item",
+                "canonical_url": "https://artist.bandcamp.com/news/private",
+            }
+        ],
+        followed_artists=[],
+        bandcamp_connected=False,
+        limit=20,
+    )
+
+    assert items == []

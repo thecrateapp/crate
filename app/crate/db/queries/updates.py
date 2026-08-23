@@ -14,6 +14,7 @@ def build_updates_feed(
     bandcamp_connected: bool,
     limit: int = 30,
     offset: int = 0,
+    external_feed_items: Iterable[Mapping[str, Any]] = (),
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     candidates.extend(_release_item(row) for row in releases)
@@ -21,6 +22,7 @@ def build_updates_feed(
     candidates.extend(_artist_item(row) for row in followed_artists)
     if bandcamp_connected:
         candidates.extend(_bandcamp_item(row) for row in radar_items)
+        candidates.extend(_external_feed_item(row) for row in external_feed_items)
 
     deduped: dict[str, dict[str, Any]] = {}
     for candidate in candidates:
@@ -149,8 +151,42 @@ def _bandcamp_item(row: Mapping[str, Any]) -> dict[str, Any]:
     return item
 
 
+def _external_feed_item(row: Mapping[str, Any]) -> dict[str, Any]:
+    payload = row.get("payload_json")
+    payload = payload if isinstance(payload, Mapping) else {}
+    artist = _text(row.get("artist_name") or row.get("author"))
+    title = _text(row.get("title") or artist)
+    item_kind = _normalize(row.get("item_kind"))
+    published_at = _iso(
+        row.get("published_at") or row.get("discovered_at") or row.get("updated_at")
+    )
+    canonical_url = _text(row.get("canonical_url") or row.get("source_url")) or None
+    item_type = "news" if item_kind in {"news", "announcement"} else "bandcamp"
+    image_url = _text(row.get("image_url") or payload.get("image_url")) or None
+    return {
+        "type": item_type,
+        "source": _text(row.get("source_kind")) or "bandcamp_rss",
+        "source_detail": None,
+        "canonical_url": canonical_url,
+        "published_at": published_at,
+        "event_date": None,
+        "artist": artist or None,
+        "title": title or None,
+        "image_url": image_url,
+        "cover_url": image_url,
+        "date": published_at,
+        "excerpt": _text(row.get("excerpt")) or None,
+        "author": _text(row.get("author")) or None,
+        "dedupe_key": (
+            _release_key(artist, title)
+            if item_type == "bandcamp"
+            else _news_key(artist, title, canonical_url)
+        ),
+    }
+
+
 def _item_priority(item: Mapping[str, Any]) -> int:
-    return {"release": 0, "show": 0, "artist": 1, "bandcamp": 2}.get(
+    return {"release": 0, "show": 0, "artist": 1, "bandcamp": 2, "news": 2}.get(
         str(item.get("type")), 3
     )
 
@@ -208,6 +244,10 @@ def _timestamp(value: Any) -> float:
 
 def _release_key(artist: str, title: str) -> str:
     return f"release:{_normalize(artist)}:{_normalize(title)}"
+
+
+def _news_key(artist: str, title: str, canonical_url: str | None) -> str:
+    return f"news:{_normalize(canonical_url or '')}:{_normalize(artist)}:{_normalize(title)}"
 
 
 def _show_key(artist: str, event_date: str | None, venue: str, city: str) -> str:

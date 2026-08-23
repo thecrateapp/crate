@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from random import random
 from typing import Any
 
@@ -26,8 +27,14 @@ from crate.feeds.rss import (
     discover_rss_feed_from_page,
     fetch_rss_feed,
 )
-from crate.feeds.sources import select_bandcamp_feed_candidates
 from crate.db.events import emit_task_event
+from crate.feeds.editorial import (
+    EDITORIAL_SOURCE_KINDS,
+    PARSER_VERSION as EDITORIAL_PARSER_VERSION,
+    can_fetch_editorial_source,
+    fetch_editorial_feed,
+)
+from crate.feeds.sources import select_bandcamp_feed_candidates
 from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
@@ -160,25 +167,40 @@ def _retry_delay_seconds(
     return base + int(random() * (jitter_limit + 1))
 
 
-def _handle_external_feeds_refresh(
+def _list_due_editorial_feed_sources(limit: int) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    for source_kind in sorted(EDITORIAL_SOURCE_KINDS):
+        sources.extend(
+            list_due_external_feed_sources(limit=limit, source_kind=source_kind)
+        )
+    return sorted(
+        sources,
+        key=lambda source: (
+            source.get("next_fetch_at") is not None,
+            str(source.get("next_fetch_at") or ""),
+            int(source.get("id") or 0),
+        ),
+    )[:limit]
+
+
+def _refresh_external_feed_sources(
     task_id: str,
     params: dict,
     config: dict,
+    *,
+    source_loader: Callable[[int], list[dict[str, Any]]],
+    feed_fetcher: Callable[..., Any],
+    parser_version: str,
+    event_name: str,
+    error_label: str,
+    robots_checker: Callable[..., bool] | None = None,
 ) -> dict[str, Any]:
-    """Refresh due Bandcamp RSS sources without touching the read path."""
+    """Refresh registered external feeds without touching the read path."""
     del config
     if not external_rss_enabled():
         return {"enabled": False, "sources_checked": 0}
 
-    requested_limit = params.get("limit")
-    try:
-        limit = (
-            max(1, min(int(requested_limit), MAX_MAX_SOURCES))
-            if requested_limit
-            else external_rss_max_sources()
-        )
-    except (TypeError, ValueError):
-        limit = external_rss_max_sources()
+    limit = _external_feed_discovery_limit(params)
 
     stats: dict[str, Any] = {
         "enabled": True,
@@ -189,10 +211,13 @@ def _handle_external_feeds_refresh(
         "sources_failed": 0,
         "items_upserted": 0,
     }
-    sources = list_due_external_feed_sources(limit=limit, source_kind="bandcamp_rss")
+    if robots_checker is not None:
+        stats["sources_blocked_by_robots"] = 0
+
+    sources = source_loader(limit)
     emit_task_event(
         task_id,
-        "external_feeds.refresh.started",
+        f"{event_name}.started",
         {"sources_due": len(sources), "limit": limit},
     )
 
@@ -202,7 +227,20 @@ def _handle_external_feeds_refresh(
         stats["sources_checked"] += 1
         source_id = int(source["id"])
         try:
-            result = fetch_rss_feed(
+            if robots_checker is not None and not robots_checker(
+                str(source["source_url"]),
+                timeout=external_rss_timeout(),
+            ):
+                mark_external_feed_source_failure(
+                    source_id,
+                    error="Blocked by robots.txt",
+                    retry_after_seconds=_retry_delay_seconds(source),
+                )
+                stats["sources_failed"] += 1
+                stats["sources_blocked_by_robots"] += 1
+                continue
+
+            result = feed_fetcher(
                 str(source["source_url"]),
                 etag=source.get("etag"),
                 last_modified=source.get("last_modified"),
@@ -225,7 +263,7 @@ def _handle_external_feeds_refresh(
                     source_url=str(source["source_url"]),
                     title=item.title,
                     content_hash=item.content_hash,
-                    parser_version=PARSER_VERSION,
+                    parser_version=parser_version,
                     canonical_url=item.canonical_url,
                     external_guid=item.external_guid,
                     author=item.author,
@@ -259,18 +297,58 @@ def _handle_external_feeds_refresh(
         except (RSSFeedError, requests.RequestException, ValueError) as exc:
             mark_external_feed_source_failure(
                 source_id,
-                error=str(exc) or "RSS refresh failed",
+                error=str(exc) or f"{error_label} refresh failed",
                 retry_after_seconds=_retry_delay_seconds(source),
             )
             stats["sources_failed"] += 1
             log.warning("External feed %s failed: %s", source_id, exc)
 
-    emit_task_event(task_id, "external_feeds.refresh.finished", stats)
+    emit_task_event(task_id, f"{event_name}.finished", stats)
     return stats
+
+
+def _handle_external_feeds_refresh(
+    task_id: str,
+    params: dict,
+    config: dict,
+) -> dict[str, Any]:
+    """Refresh due Bandcamp RSS sources without touching the read path."""
+    return _refresh_external_feed_sources(
+        task_id,
+        params,
+        config,
+        source_loader=lambda limit: list_due_external_feed_sources(
+            limit=limit, source_kind="bandcamp_rss"
+        ),
+        feed_fetcher=fetch_rss_feed,
+        parser_version=PARSER_VERSION,
+        event_name="external_feeds.refresh",
+        error_label="RSS",
+    )
+
+
+def _handle_external_feeds_refresh_editorial(
+    task_id: str,
+    params: dict,
+    config: dict,
+) -> dict[str, Any]:
+    """Refresh registered editorial sources after a robots.txt check."""
+    return _refresh_external_feed_sources(
+        task_id,
+        params,
+        config,
+        source_loader=_list_due_editorial_feed_sources,
+        feed_fetcher=fetch_editorial_feed,
+        parser_version=EDITORIAL_PARSER_VERSION,
+        event_name="external_feeds.editorial_refresh",
+        error_label="Editorial feed",
+        robots_checker=can_fetch_editorial_source,
+    )
 
 
 FEED_TASK_HANDLERS: dict[str, TaskHandler] = {
     "external_feeds_discover_sources": _handle_external_feeds_discover_sources,
+    "external_feeds_refresh_editorial": _handle_external_feeds_refresh_editorial,
     "external_feeds_refresh": _handle_external_feeds_refresh,
 }
 
@@ -278,6 +356,7 @@ FEED_TASK_HANDLERS: dict[str, TaskHandler] = {
 __all__ = [
     "FEED_TASK_HANDLERS",
     "_handle_external_feeds_discover_sources",
+    "_handle_external_feeds_refresh_editorial",
     "_handle_external_feeds_refresh",
     "external_rss_enabled",
     "external_rss_max_sources",

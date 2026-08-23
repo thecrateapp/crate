@@ -16,7 +16,7 @@ import hashlib
 from html import unescape
 from html.parser import HTMLParser
 import re
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urljoin, urlsplit, urlunsplit
 import xml.etree.ElementTree as ET
 
@@ -145,8 +145,28 @@ def parse_rss_payload(
     max_bytes: int = DEFAULT_MAX_BYTES,
     max_items: int = DEFAULT_MAX_ITEMS,
 ) -> tuple[RSSFeedItem, ...]:
-    """Parse a bounded RSS 2.0 or Atom payload into stable feed items."""
-    _validate_bandcamp_url(source_url)
+    """Parse a bounded RSS 2.0 or Atom payload from Bandcamp."""
+    return parse_feed_payload(
+        payload,
+        source_url=source_url,
+        max_bytes=max_bytes,
+        max_items=max_items,
+        source_url_validator=_validate_bandcamp_url,
+    )
+
+
+def parse_feed_payload(
+    payload: bytes | str,
+    *,
+    source_url: str,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+    max_items: int = DEFAULT_MAX_ITEMS,
+    parser_version: str = PARSER_VERSION,
+    source_url_validator: Callable[[str], str] | None = None,
+) -> tuple[RSSFeedItem, ...]:
+    """Parse a bounded RSS 2.0 or Atom payload with an adapter URL policy."""
+    if source_url_validator is not None:
+        source_url_validator(source_url)
     if max_bytes <= 0:
         raise RSSFeedInvalidError("RSS document maximum size must be positive")
     if max_items <= 0:
@@ -180,7 +200,7 @@ def parse_rss_payload(
     items: list[RSSFeedItem] = []
     seen: set[tuple[str, str]] = set()
     for entry in entries[:max_items]:
-        item = _normalize_entry(entry)
+        item = _normalize_entry(entry, parser_version=parser_version)
         if item is None:
             continue
         identity = (item.external_guid or "", item.canonical_url or item.content_hash)
@@ -325,7 +345,7 @@ class _AlternateLinkParser(HTMLParser):
             self.links.append((href, media_type))
 
 
-def _normalize_entry(entry: ET.Element) -> RSSFeedItem | None:
+def _normalize_entry(entry: ET.Element, *, parser_version: str) -> RSSFeedItem | None:
     title = _clean_text(_child_text(entry, {"title"}))
     if not title:
         return None
@@ -359,7 +379,7 @@ def _normalize_entry(entry: ET.Element) -> RSSFeedItem | None:
         "excerpt": excerpt,
         "image_url": image_url,
         "item_kind": item_kind,
-        "parser_version": PARSER_VERSION,
+        "parser_version": parser_version,
     }
     return RSSFeedItem(
         external_guid=external_guid,
@@ -558,5 +578,6 @@ __all__ = [
     "discover_feed_url",
     "discover_rss_feed_from_page",
     "fetch_rss_feed",
+    "parse_feed_payload",
     "parse_rss_payload",
 ]

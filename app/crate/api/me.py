@@ -129,6 +129,7 @@ from crate.db.repositories.bandcamp import (
     has_active_connection,
     list_bandcamp_radar_items,
 )
+from crate.db.repositories.external_feeds import list_external_feed_items_for_user
 from crate.db.repositories.auth import (
     get_user_by_id,
     unlink_user_external_identity,
@@ -1408,6 +1409,11 @@ def feed(
         if bandcamp_connected
         else []
     )
+    external_feed_items = (
+        list_external_feed_items_for_user(int(user["id"]), limit=candidate_limit)
+        if bandcamp_connected
+        else []
+    )
     return build_updates_feed(
         releases=releases,
         shows=shows,
@@ -1416,6 +1422,7 @@ def feed(
         bandcamp_connected=bandcamp_connected,
         limit=limit,
         offset=offset,
+        external_feed_items=external_feed_items,
     )
 
 
