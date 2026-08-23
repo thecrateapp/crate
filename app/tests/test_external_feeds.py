@@ -425,7 +425,7 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
         association_method="followed_artist",
         parser_version="bandcamp-rss-v1",
     )
-    external_feeds.upsert_external_feed_item(
+    item = external_feeds.upsert_external_feed_item(
         source_id=source["id"],
         artist_id=artist_id,
         item_kind="news",
@@ -442,6 +442,53 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
 
     user_items = external_feeds.list_external_feed_items_for_user(user_id)
     assert user_items[0]["title"] == "Tour announcement"
+    assert user_items[0]["accepted_enrichment_json"] is None
+
+    enrichment = external_feeds.queue_external_feed_item_enrichment(
+        item_id=item["id"],
+        operation="summary",
+        source_content_hash="tour-hash",
+        prompt_version="external-feed-summary-v1",
+    )
+    external_feeds.mark_external_feed_enrichment_ready(
+        enrichment["id"],
+        result={
+            "summary": "The band announced European tour dates.",
+            "key_points": ["European tour"],
+            "generated_at": "2026-08-23T12:00:00+00:00",
+        },
+        model="ollama/test",
+        prompt_version="external-feed-summary-v1",
+    )
+    external_feeds.review_external_feed_enrichment(
+        enrichment["id"], reviewer_id=1, decision="accept"
+    )
+
+    accepted_items = external_feeds.list_external_feed_items_for_user(user_id)
+    assert accepted_items[0]["accepted_enrichment_json"]["summary"] == (
+        "The band announced European tour dates."
+    )
+    assert accepted_items[0]["accepted_enrichment_model"] == "ollama/test"
+    assert accepted_items[0]["accepted_enrichment_prompt_version"] == (
+        "external-feed-summary-v1"
+    )
+
+    external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url="https://followed-feed.bandcamp.com/feed",
+        canonical_url="https://followed-feed.bandcamp.com/news/tour",
+        external_guid="tour-1",
+        title="Tour announcement updated",
+        content_hash="tour-hash-updated",
+        parser_version="bandcamp-rss-v1",
+        author="Followed Feed Artist",
+        published_at=datetime(2026, 8, 23, 10, 0, tzinfo=timezone.utc),
+        payload={"image_url": "https://followed-feed.bandcamp.com/tour.jpg"},
+    )
+    current_items = external_feeds.list_external_feed_items_for_user(user_id)
+    assert current_items[0]["accepted_enrichment_json"] is None
     assert external_feeds.list_external_feed_items_for_user(other_user_id) == []
 
     with transaction_scope() as session:
@@ -477,7 +524,7 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
         )
 
     wishlist_items = external_feeds.list_external_feed_items_for_user(other_user_id)
-    assert wishlist_items[0]["title"] == "Tour announcement"
+    assert wishlist_items[0]["title"] == "Tour announcement updated"
 
     with transaction_scope() as session:
         session.execute(

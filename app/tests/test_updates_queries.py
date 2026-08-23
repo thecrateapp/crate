@@ -275,3 +275,59 @@ def test_build_updates_feed_excludes_rss_without_active_connection():
     )
 
     assert items == []
+
+
+def test_build_updates_feed_exposes_only_accepted_editorial_summary():
+    items = build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        external_feed_items=[
+            {
+                "item_kind": "news",
+                "artist_name": "Artist",
+                "title": "Tour announcement",
+                "canonical_url": "https://artist.bandcamp.com/news/tour",
+                "published_at": "2026-08-23T10:00:00+00:00",
+                "source_kind": "bandcamp_rss",
+                "accepted_enrichment_json": {
+                    "summary": "The band announced European tour dates.",
+                    "key_points": ["European tour"],
+                    "generated_at": "2026-08-23T12:00:00+00:00",
+                },
+                "accepted_enrichment_model": "ollama/test",
+                "accepted_enrichment_prompt_version": "external-feed-summary-v1",
+            }
+        ],
+        followed_artists=[],
+        bandcamp_connected=True,
+        limit=20,
+    )
+
+    assert items[0]["editorial_summary"] == ("The band announced European tour dates.")
+    assert items[0]["editorial_summary_key_points"] == ["European tour"]
+    assert items[0]["editorial_summary_model"] == "ollama/test"
+    assert items[0]["editorial_summary_prompt_version"] == "external-feed-summary-v1"
+    assert items[0]["editorial_summary_generated_at"] == "2026-08-23T12:00:00+00:00"
+
+
+def test_build_updates_feed_does_not_expose_missing_editorial_summary():
+    items = build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        external_feed_items=[
+            {
+                "item_kind": "news",
+                "artist_name": "Artist",
+                "title": "Pending announcement",
+                "canonical_url": "https://artist.bandcamp.com/news/pending",
+                "source_kind": "bandcamp_rss",
+            }
+        ],
+        followed_artists=[],
+        bandcamp_connected=True,
+        limit=20,
+    )
+
+    assert "editorial_summary" not in items[0]

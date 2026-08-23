@@ -553,6 +553,13 @@ class TestUserEndpoints:
                     "published_at": "2030-05-03T10:00:00+00:00",
                     "source_kind": "bandcamp_rss",
                     "payload_json": {},
+                    "accepted_enrichment_json": {
+                        "summary": "The artist announced new dates.",
+                        "key_points": ["New dates"],
+                        "generated_at": "2030-05-03T12:00:00+00:00",
+                    },
+                    "accepted_enrichment_model": "ollama/test",
+                    "accepted_enrichment_prompt_version": "external-feed-summary-v1",
                 }
             ],
         )
@@ -562,6 +569,9 @@ class TestUserEndpoints:
         assert response.status_code == 200
         assert response.json()[0]["type"] == "news"
         assert response.json()[0]["source"] == "bandcamp_rss"
+        assert response.json()[0]["editorial_summary"] == (
+            "The artist announced new dates."
+        )
 
 
 class TestGenreTaxonomy:

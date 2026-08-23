@@ -163,7 +163,7 @@ def _external_feed_item(row: Mapping[str, Any]) -> dict[str, Any]:
     canonical_url = _text(row.get("canonical_url") or row.get("source_url")) or None
     item_type = "news" if item_kind in {"news", "announcement"} else "bandcamp"
     image_url = _text(row.get("image_url") or payload.get("image_url")) or None
-    return {
+    item = {
         "type": item_type,
         "source": _text(row.get("source_kind")) or "bandcamp_rss",
         "source_detail": None,
@@ -183,6 +183,41 @@ def _external_feed_item(row: Mapping[str, Any]) -> dict[str, Any]:
             else _news_key(artist, title, canonical_url)
         ),
     }
+    item.update(_editorial_summary(row))
+    return item
+
+
+def _editorial_summary(row: Mapping[str, Any]) -> dict[str, Any]:
+    result = row.get("accepted_enrichment_json")
+    if not isinstance(result, Mapping):
+        return {}
+
+    summary = _text(result.get("summary"))
+    if not summary:
+        return {}
+
+    key_points_value = result.get("key_points")
+    key_points = (
+        [_text(point) for point in key_points_value if _text(point)]
+        if isinstance(key_points_value, list)
+        else []
+    )
+    item: dict[str, Any] = {
+        "editorial_summary": summary,
+        "editorial_summary_key_points": key_points,
+    }
+    generated_at = _iso(result.get("generated_at"))
+    model = _text(row.get("accepted_enrichment_model") or result.get("model"))
+    prompt_version = _text(
+        row.get("accepted_enrichment_prompt_version") or result.get("prompt_version")
+    )
+    if generated_at:
+        item["editorial_summary_generated_at"] = generated_at
+    if model:
+        item["editorial_summary_model"] = model
+    if prompt_version:
+        item["editorial_summary_prompt_version"] = prompt_version
+    return item
 
 
 def _item_priority(item: Mapping[str, Any]) -> int:

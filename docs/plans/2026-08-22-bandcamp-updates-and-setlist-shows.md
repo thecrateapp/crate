@@ -341,7 +341,9 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 - Las propuestas se persisten en `external_feed_enrichments`, separadas del payload original, con estados de generación `pending`, `ready`, `failed`, `rejected` y `stale`, además de un estado editorial independiente `pending`, `accepted` o `rejected`.
 - La tarea `external_feeds_enrich_item` es on-demand, deduplicada por item/operación/hash/idioma y protegida por `CRATE_EXTERNAL_FEED_AI_ENABLED`.
 - Los endpoints administrativos separan el encolado de la consulta y revisión; la UI solo muestra propuestas `ready` cuyo hash sigue coincidiendo con el item actual.
-- `Feed Review` registra aceptación o rechazo sin modificar automáticamente el contenido original. Queda pendiente consumir los aceptados en el feed público y añadir las operaciones de agrupación, clasificación y extracción de shows.
+- `Feed Review` registra aceptación o rechazo sin modificar automáticamente el contenido original.
+- `/api/me/feed` consume únicamente resúmenes `ready` y `accepted` cuyo `source_content_hash` coincide con el item activo; si no existe una propuesta vigente, conserva el texto original como fallback.
+- El read path no ejecuta IA y mantiene la visibilidad Bandcamp condicionada a una conexión activa. Quedan pendientes las operaciones de agrupación, clasificación y extracción de shows.
 
 ## Canonical provider contracts
 

@@ -316,6 +316,10 @@ def list_external_feed_items_for_user(
                     efs.source_url AS feed_source_url,
                     efs.canonical_url AS artist_url,
                     efs.association_method,
+                    accepted_enrichment.result_json AS accepted_enrichment_json,
+                    accepted_enrichment.model AS accepted_enrichment_model,
+                    accepted_enrichment.prompt_version
+                        AS accepted_enrichment_prompt_version,
                     COALESCE(
                         la.name,
                         NULLIF(efi.payload_json ->> 'author', '')
@@ -323,6 +327,20 @@ def list_external_feed_items_for_user(
                 FROM external_feed_items efi
                 JOIN external_feed_sources efs ON efs.id = efi.source_id
                 LEFT JOIN library_artists la ON la.id = efs.artist_id
+                LEFT JOIN LATERAL (
+                    SELECT
+                        efe.result_json,
+                        efe.model,
+                        efe.prompt_version
+                    FROM external_feed_enrichments efe
+                    WHERE efe.item_id = efi.id
+                      AND efe.operation = 'summary'
+                      AND efe.status = 'ready'
+                      AND efe.review_status = 'accepted'
+                      AND efe.source_content_hash = efi.content_hash
+                    ORDER BY efe.id DESC
+                    LIMIT 1
+                ) accepted_enrichment ON TRUE
                 WHERE efi.state = 'active'
                   AND efs.source_kind = 'bandcamp_rss'
                   AND efs.state IN ('active', 'degraded')
