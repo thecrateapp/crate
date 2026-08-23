@@ -29,6 +29,7 @@ _SOURCE_KINDS = {
     "event_page",
 }
 _ITEM_KINDS = {"news", "announcement", "release", "other"}
+_ENRICHMENT_OPERATIONS = {"summary", "cluster", "classify", "extract_show"}
 
 
 def _now() -> datetime:
@@ -184,6 +185,31 @@ def get_external_feed_source(source_id: int) -> dict[str, Any] | None:
             session.execute(
                 text("SELECT * FROM external_feed_sources WHERE id = :source_id"),
                 {"source_id": source_id},
+            )
+        )
+
+
+def get_external_feed_item(item_id: int) -> dict[str, Any] | None:
+    """Return one active feed item with the source context used by enrichment."""
+    with read_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        efi.*,
+                        efs.source_kind,
+                        efs.source_url AS feed_source_url,
+                        efs.canonical_url AS artist_url,
+                        la.name AS artist_name
+                    FROM external_feed_items efi
+                    JOIN external_feed_sources efs ON efs.id = efi.source_id
+                    LEFT JOIN library_artists la ON la.id = efi.artist_id
+                    WHERE efi.id = :item_id
+                      AND efi.state = 'active'
+                    """
+                ),
+                {"item_id": int(item_id)},
             )
         )
 
@@ -375,6 +401,294 @@ def list_due_external_feed_sources(
             {"now": due_at, "limit": bounded_limit, "source_kind": source_kind},
         ).mappings()
         return [dict(row) for row in rows]
+
+
+def get_external_feed_item_enrichment(
+    *, item_id: int, operation: str = "summary"
+) -> dict[str, Any] | None:
+    if operation not in _ENRICHMENT_OPERATIONS:
+        raise ValueError(f"Unsupported external feed AI operation: {operation}")
+    with read_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    SELECT *
+                    FROM external_feed_enrichments
+                    WHERE item_id = :item_id
+                      AND operation = :operation
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                ),
+                {"item_id": int(item_id), "operation": operation},
+            )
+        )
+
+
+def list_external_feed_enrichments_for_review(
+    *, review_status: str | None = "pending", limit: int = 100
+) -> list[dict[str, Any]]:
+    """List current AI proposals with enough context for curator review."""
+    if review_status not in {None, "pending", "accepted", "rejected"}:
+        raise ValueError(f"Unsupported external feed review status: {review_status}")
+    bounded_limit = max(1, min(int(limit), 200))
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT
+                    efe.*,
+                    efi.title,
+                    efi.item_kind,
+                    efi.source_url,
+                    efi.canonical_url,
+                    efi.excerpt,
+                    efi.published_at,
+                    efi.content_hash AS current_content_hash,
+                    efs.source_kind,
+                    efs.source_url AS feed_source_url,
+                    efs.canonical_url AS artist_url,
+                    COALESCE(
+                        la.name,
+                        NULLIF(efi.payload_json ->> 'author', '')
+                    ) AS artist_name
+                FROM external_feed_enrichments efe
+                JOIN external_feed_items efi ON efi.id = efe.item_id
+                JOIN external_feed_sources efs ON efs.id = efi.source_id
+                LEFT JOIN library_artists la ON la.id = efi.artist_id
+                WHERE efe.status = 'ready'
+                  AND efi.state = 'active'
+                  AND efe.source_content_hash = efi.content_hash
+                  AND (:review_status IS NULL OR efe.review_status = :review_status)
+                ORDER BY efi.published_at DESC NULLS LAST, efe.updated_at DESC,
+                    efe.id DESC
+                LIMIT :limit
+                """
+            ),
+            {"review_status": review_status, "limit": bounded_limit},
+        ).mappings()
+        return serialize_rows(rows)
+
+
+def get_external_feed_enrichment(enrichment_id: int) -> dict[str, Any] | None:
+    with read_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        efe.*,
+                        efi.title,
+                        efi.item_kind,
+                        efi.source_url,
+                        efi.canonical_url,
+                        efi.excerpt,
+                        efi.published_at,
+                        efi.content_hash AS current_content_hash,
+                        efs.source_kind,
+                        efs.source_url AS feed_source_url,
+                        efs.canonical_url AS artist_url,
+                        COALESCE(
+                            la.name,
+                            NULLIF(efi.payload_json ->> 'author', '')
+                        ) AS artist_name
+                    FROM external_feed_enrichments efe
+                    JOIN external_feed_items efi ON efi.id = efe.item_id
+                    JOIN external_feed_sources efs ON efs.id = efi.source_id
+                    LEFT JOIN library_artists la ON la.id = efi.artist_id
+                    WHERE efe.id = :enrichment_id
+                    """
+                ),
+                {"enrichment_id": int(enrichment_id)},
+            )
+        )
+
+
+def review_external_feed_enrichment(
+    enrichment_id: int,
+    *,
+    reviewer_id: int,
+    decision: str,
+    rejection_reason: str | None = None,
+) -> dict[str, Any] | None:
+    """Record editorial acceptance or rejection of a current AI proposal."""
+    if decision not in {"accept", "reject"}:
+        raise ValueError(f"Unsupported external feed review decision: {decision}")
+    reason = _clean_text(rejection_reason, max_length=1000)
+    if decision == "reject" and not reason:
+        raise ValueError("A rejection reason is required")
+    review_status = "accepted" if decision == "accept" else "rejected"
+    with transaction_scope() as session:
+        result = session.execute(
+            text(
+                """
+                UPDATE external_feed_enrichments AS efe
+                SET review_status = :review_status,
+                    reviewed_by_user_id = :reviewer_id,
+                    reviewed_at = NOW(),
+                    rejection_reason = :rejection_reason,
+                    updated_at = NOW()
+                FROM external_feed_items efi
+                WHERE efe.id = :enrichment_id
+                  AND efi.id = efe.item_id
+                  AND efe.status = 'ready'
+                  AND efi.state = 'active'
+                  AND efe.source_content_hash = efi.content_hash
+                RETURNING efe.*
+                """
+            ),
+            {
+                "enrichment_id": int(enrichment_id),
+                "reviewer_id": int(reviewer_id),
+                "review_status": review_status,
+                "rejection_reason": reason if decision == "reject" else None,
+            },
+        )
+        return _row(result)
+
+
+def queue_external_feed_item_enrichment(
+    *,
+    item_id: int,
+    operation: str,
+    source_content_hash: str,
+    prompt_version: str,
+    language: str = "English",
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Create one deduplicated enrichment proposal for the current item hash."""
+    if operation not in _ENRICHMENT_OPERATIONS:
+        raise ValueError(f"Unsupported external feed AI operation: {operation}")
+    content_hash = _required_text(source_content_hash, max_length=128)
+    prompt_version = _required_text(prompt_version, max_length=128)
+    language = _required_text(language, max_length=40)
+    with transaction_scope() as session:
+        item = _row(
+            session.execute(
+                text(
+                    """
+                    SELECT state, content_hash
+                    FROM external_feed_items
+                    WHERE id = :item_id
+                    FOR UPDATE
+                    """
+                ),
+                {"item_id": int(item_id)},
+            )
+        )
+        if item is None:
+            raise ValueError("External feed item not found")
+        if item["state"] != "active":
+            raise ValueError("External feed item must be active")
+        if item["content_hash"] != content_hash:
+            raise ValueError("External feed item content has changed")
+
+        result = session.execute(
+            text(
+                """
+                INSERT INTO external_feed_enrichments (
+                    item_id, operation, status, source_content_hash,
+                    language, model, prompt_version
+                ) VALUES (
+                    :item_id, :operation, 'pending', :source_content_hash,
+                    :language, :model, :prompt_version
+                )
+                ON CONFLICT (item_id, operation, source_content_hash, language) DO UPDATE SET
+                    status = CASE
+                        WHEN external_feed_enrichments.status IN ('failed', 'stale')
+                            THEN 'pending'
+                        ELSE external_feed_enrichments.status
+                    END,
+                    result_json = CASE
+                        WHEN external_feed_enrichments.status IN ('failed', 'stale')
+                            THEN '{}'::jsonb
+                        ELSE external_feed_enrichments.result_json
+                    END,
+                    error = CASE
+                        WHEN external_feed_enrichments.status IN ('failed', 'stale')
+                            THEN NULL
+                        ELSE external_feed_enrichments.error
+                    END,
+                    review_status = CASE
+                        WHEN external_feed_enrichments.status IN ('failed', 'stale')
+                            THEN 'pending'
+                        ELSE external_feed_enrichments.review_status
+                    END,
+                    model = COALESCE(EXCLUDED.model, external_feed_enrichments.model),
+                    prompt_version = EXCLUDED.prompt_version,
+                    updated_at = NOW()
+                RETURNING *
+                """
+            ),
+            {
+                "item_id": int(item_id),
+                "operation": operation,
+                "source_content_hash": content_hash,
+                "language": language,
+                "model": _clean_text(model, max_length=256),
+                "prompt_version": prompt_version,
+            },
+        )
+        return dict(result.mappings().one())
+
+
+def mark_external_feed_enrichment_ready(
+    enrichment_id: int,
+    *,
+    result: Mapping[str, Any],
+    model: str | None,
+    prompt_version: str,
+) -> dict[str, Any] | None:
+    payload = json.dumps(dict(result), default=str, ensure_ascii=False)
+    with transaction_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    UPDATE external_feed_enrichments
+                    SET status = 'ready',
+                        result_json = CAST(:result_json AS jsonb),
+                        model = :model,
+                        prompt_version = :prompt_version,
+                        error = NULL,
+                        updated_at = NOW()
+                    WHERE id = :enrichment_id
+                    RETURNING *
+                    """
+                ),
+                {
+                    "enrichment_id": int(enrichment_id),
+                    "result_json": payload,
+                    "model": _clean_text(model, max_length=256),
+                    "prompt_version": _required_text(prompt_version, max_length=128),
+                },
+            )
+        )
+
+
+def mark_external_feed_enrichment_failed(
+    enrichment_id: int, *, error: str
+) -> dict[str, Any] | None:
+    with transaction_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    UPDATE external_feed_enrichments
+                    SET status = 'failed',
+                        error = :error,
+                        updated_at = NOW()
+                    WHERE id = :enrichment_id
+                    RETURNING *
+                    """
+                ),
+                {
+                    "enrichment_id": int(enrichment_id),
+                    "error": _required_text(error, max_length=1000),
+                },
+            )
+        )
 
 
 def mark_external_feed_source_not_modified(
@@ -680,13 +994,21 @@ def upsert_external_feed_item(
 
 
 __all__ = [
+    "get_external_feed_item",
+    "get_external_feed_enrichment",
+    "get_external_feed_item_enrichment",
     "get_external_feed_source",
     "list_bandcamp_feed_candidates",
     "list_external_feed_items_for_user",
+    "list_external_feed_enrichments_for_review",
     "list_due_external_feed_sources",
+    "mark_external_feed_enrichment_failed",
+    "mark_external_feed_enrichment_ready",
     "mark_external_feed_source_failure",
     "mark_external_feed_source_not_found",
     "mark_external_feed_source_not_modified",
+    "queue_external_feed_item_enrichment",
+    "review_external_feed_enrichment",
     "upsert_external_feed_item",
     "upsert_external_feed_source",
 ]

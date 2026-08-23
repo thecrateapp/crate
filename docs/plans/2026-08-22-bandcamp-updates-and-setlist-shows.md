@@ -335,6 +335,14 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 7. Testear proveedor no configurado, respuesta malformada, reintento, contenido repetido y aceptación/rechazo editorial.
 8. No ejecutar IA como parte de una petición de feed ni como crawler recurrente de fuentes.
 
+**Estado del corte actual (2026-08-23):**
+
+- Añadido el primer vertical de `summary`: prompt versionado, respuesta estructurada y servicio que conserva el hash de contenido, modelo y timestamp.
+- Las propuestas se persisten en `external_feed_enrichments`, separadas del payload original, con estados de generación `pending`, `ready`, `failed`, `rejected` y `stale`, además de un estado editorial independiente `pending`, `accepted` o `rejected`.
+- La tarea `external_feeds_enrich_item` es on-demand, deduplicada por item/operación/hash/idioma y protegida por `CRATE_EXTERNAL_FEED_AI_ENABLED`.
+- Los endpoints administrativos separan el encolado de la consulta y revisión; la UI solo muestra propuestas `ready` cuyo hash sigue coincidiendo con el item actual.
+- `Feed Review` registra aceptación o rechazo sin modificar automáticamente el contenido original. Queda pendiente consumir los aceptados en el feed público y añadir las operaciones de agrupación, clasificación y extracción de shows.
+
 ## Canonical provider contracts
 
 ### Bandcamp follow item

@@ -341,6 +341,7 @@ def create_app() -> FastAPI:
                 "setup",
                 "admin",
                 "admin-auth",
+                "external-feeds",
             },
             title="Crate Admin & System API",
             summary="Setup, administration, health, task orchestration, and system control.",
@@ -426,6 +427,7 @@ def create_app() -> FastAPI:
     from crate.api.browse import router as browse_router
     from crate.api.tags import router as tags_router
     from crate.api.artist_research import router as artist_research_router
+    from crate.api.external_feeds import router as external_feeds_router
     from crate.api.scanner import router as scanner_router
     from crate.api.matcher import router as matcher_router
     from crate.api.duplicates import router as duplicates_router
@@ -524,6 +526,7 @@ def create_app() -> FastAPI:
     app.include_router(federation_remote_router)
     app.include_router(catalog_router)
     app.include_router(artist_research_router)
+    app.include_router(external_feeds_router)
     app.include_router(browse_router)
     app.include_router(tags_router)
     app.include_router(organizer_router)

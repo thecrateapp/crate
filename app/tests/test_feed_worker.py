@@ -43,10 +43,12 @@ def _item():
 def test_feed_task_handler_is_registered():
     assert set(FEED_TASK_HANDLERS) == {
         "external_feeds_discover_sources",
+        "external_feeds_enrich_item",
         "external_feeds_refresh_editorial",
         "external_feeds_refresh",
     }
     assert callable(FEED_TASK_HANDLERS["external_feeds_discover_sources"])
+    assert callable(FEED_TASK_HANDLERS["external_feeds_enrich_item"])
     assert callable(FEED_TASK_HANDLERS["external_feeds_refresh_editorial"])
     assert callable(FEED_TASK_HANDLERS["external_feeds_refresh"])
 

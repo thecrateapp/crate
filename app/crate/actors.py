@@ -181,6 +181,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "research_artist_bio": TaskPoolConfig("default", 1, 900, 1),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
     "external_feeds_discover_sources": TaskPoolConfig("maintenance", 3, 1800, 1),
+    "external_feeds_enrich_item": TaskPoolConfig("default", 1, 900, 1),
     "external_feeds_refresh": TaskPoolConfig("maintenance", 3, 1800, 1),
     "external_feeds_refresh_editorial": TaskPoolConfig("maintenance", 3, 1800, 1),
     "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),

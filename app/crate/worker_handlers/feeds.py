@@ -11,13 +11,21 @@ from typing import Any
 import requests
 
 from crate.db.repositories.external_feeds import (
+    get_external_feed_item,
     list_bandcamp_feed_candidates,
     list_due_external_feed_sources,
+    mark_external_feed_enrichment_failed,
+    mark_external_feed_enrichment_ready,
     mark_external_feed_source_failure,
     mark_external_feed_source_not_found,
     mark_external_feed_source_not_modified,
     upsert_external_feed_item,
     upsert_external_feed_source,
+    queue_external_feed_item_enrichment,
+)
+from crate.feeds.ai_enrichment import (
+    ai_enrichment_enabled,
+    summarize_external_feed_item,
 )
 from crate.feeds.rss import (
     PARSER_VERSION,
@@ -68,6 +76,10 @@ def external_rss_timeout() -> float:
     except (TypeError, ValueError):
         value = DEFAULT_TIMEOUT_SECONDS
     return max(1.0, min(value, 120.0))
+
+
+def external_feed_ai_enabled() -> bool:
+    return ai_enrichment_enabled()
 
 
 def _external_feed_discovery_limit(params: dict) -> int:
@@ -152,6 +164,90 @@ def _handle_external_feeds_discover_sources(
 
     emit_task_event(task_id, "external_feeds.discovery.finished", stats)
     return stats
+
+
+def _handle_external_feeds_enrich_item(
+    task_id: str,
+    params: dict,
+    config: dict,
+) -> dict[str, Any]:
+    """Generate one reviewable AI proposal for an ingested feed item."""
+    del config
+    raw_item_id: Any = params.get("item_id")
+    try:
+        item_id = int(raw_item_id)
+    except (TypeError, ValueError):
+        return {"error": "External feed item_id is required"}
+
+    if not external_feed_ai_enabled():
+        return {"enabled": False, "item_id": item_id, "status": "disabled"}
+
+    item = get_external_feed_item(item_id)
+    if item is None:
+        return {"error": "External feed item not found", "item_id": item_id}
+
+    operation = str(params.get("operation") or "summary")
+    if operation != "summary":
+        return {"error": "Unsupported external feed AI operation"}
+
+    from crate.llm.prompts.feed_summary import PROMPT_VERSION
+
+    enrichment = queue_external_feed_item_enrichment(
+        item_id=item_id,
+        operation=operation,
+        source_content_hash=str(item["content_hash"]),
+        prompt_version=PROMPT_VERSION,
+        language=str(params.get("language") or "English"),
+    )
+    enrichment_id = int(enrichment["id"])
+    if enrichment["status"] == "ready":
+        return {
+            "enabled": True,
+            "item_id": item_id,
+            "enrichment_id": enrichment_id,
+            "status": "ready",
+            "result": enrichment.get("result_json") or {},
+        }
+
+    emit_task_event(
+        task_id,
+        "external_feeds.enrichment.started",
+        {"item_id": item_id, "enrichment_id": enrichment_id},
+    )
+    try:
+        result = summarize_external_feed_item(
+            item,
+            language=str(params.get("language") or "English"),
+        )
+        mark_external_feed_enrichment_ready(
+            enrichment_id,
+            result=result,
+            model=str(result.get("model") or "") or None,
+            prompt_version=str(result["prompt_version"]),
+        )
+    except Exception as exc:
+        error = str(exc)[:1000] or "External feed AI enrichment failed"
+        mark_external_feed_enrichment_failed(enrichment_id, error=error)
+        emit_task_event(
+            task_id,
+            "external_feeds.enrichment.finished",
+            {"item_id": item_id, "enrichment_id": enrichment_id, "error": error},
+        )
+        log.warning("External feed AI enrichment failed for %s: %s", item_id, exc)
+        return {"error": error, "item_id": item_id, "enrichment_id": enrichment_id}
+
+    emit_task_event(
+        task_id,
+        "external_feeds.enrichment.finished",
+        {"item_id": item_id, "enrichment_id": enrichment_id, "status": "ready"},
+    )
+    return {
+        "enabled": True,
+        "item_id": item_id,
+        "enrichment_id": enrichment_id,
+        "status": "ready",
+        "result": result,
+    }
 
 
 def _retry_delay_seconds(
@@ -348,6 +444,7 @@ def _handle_external_feeds_refresh_editorial(
 
 FEED_TASK_HANDLERS: dict[str, TaskHandler] = {
     "external_feeds_discover_sources": _handle_external_feeds_discover_sources,
+    "external_feeds_enrich_item": _handle_external_feeds_enrich_item,
     "external_feeds_refresh_editorial": _handle_external_feeds_refresh_editorial,
     "external_feeds_refresh": _handle_external_feeds_refresh,
 }
@@ -356,9 +453,11 @@ FEED_TASK_HANDLERS: dict[str, TaskHandler] = {
 __all__ = [
     "FEED_TASK_HANDLERS",
     "_handle_external_feeds_discover_sources",
+    "_handle_external_feeds_enrich_item",
     "_handle_external_feeds_refresh_editorial",
     "_handle_external_feeds_refresh",
     "external_rss_enabled",
+    "external_feed_ai_enabled",
     "external_rss_max_sources",
     "external_rss_timeout",
 ]

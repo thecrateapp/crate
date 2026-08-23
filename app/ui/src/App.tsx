@@ -103,6 +103,9 @@ const GlobalCatalog = lazy(() =>
     default: m.GlobalCatalog,
   })),
 );
+const FeedReview = lazy(() =>
+  import("@/pages/FeedReview").then((m) => ({ default: m.FeedReview })),
+);
 
 function PageSpinner() {
   return (
@@ -195,6 +198,7 @@ const UPCOMING_CURATION = [
 ] as const;
 const SYSTEM_PLAYLISTS_WRITE = ["curation.playlists.write"] as const;
 const FEDERATION_NODES_VIEW = ["federation.nodes.view"] as const;
+const FEED_REVIEW = ["library.metadata.write"] as const;
 export default function App() {
   return (
     <BrowserRouter>
@@ -453,6 +457,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={FEDERATION_NODES_VIEW}>
                       <GlobalCatalog />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="feed-review"
+                  element={
+                    <RequireCapabilities anyOf={FEED_REVIEW}>
+                      <FeedReview />
                     </RequireCapabilities>
                   }
                 />

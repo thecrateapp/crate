@@ -29,6 +29,7 @@ import {
   Languages,
   Network,
   DatabaseZap,
+  FileCheck2,
 } from "lucide-react";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
@@ -94,6 +95,12 @@ const navItems = [
     icon: HandHeart,
     label: "Contributions",
     capabilities: ["library.import.manage"],
+  },
+  {
+    to: "/feed-review",
+    icon: FileCheck2,
+    label: "Feed Review",
+    capabilities: ["library.metadata.write"],
   },
   { section: "Music" },
   {

@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "crate/db/migrations/versions/090_external_feed_sources.py"
+AI_MIGRATION = ROOT / "crate/db/migrations/versions/091_external_feed_ai_enrichments.py"
 
 
 def test_external_feed_migration_separates_sources_and_items():
@@ -20,6 +21,18 @@ def test_external_feed_migration_separates_sources_and_items():
     assert "duplicate_of_id" in source
     assert "ON DELETE CASCADE" in source
     assert "ON DELETE SET NULL" in source
+
+
+def test_external_feed_ai_migration_preserves_reviewable_provenance():
+    source = AI_MIGRATION.read_text()
+
+    assert 'revision = "091"' in source
+    assert 'down_revision = "090"' in source
+    assert "source_content_hash" in source
+    assert "prompt_version" in source
+    assert "review_status" in source
+    assert "reviewed_by_user_id" in source
+    assert "external_feed_enrichments" in source
 
 
 def _source(repo):
