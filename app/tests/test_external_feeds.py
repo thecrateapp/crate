@@ -157,3 +157,177 @@ def test_external_feed_source_failure_marks_degraded_with_backoff(pg_db):
     assert failed["last_error"] == "timeout"
     assert failed["consecutive_failures"] == 1
     assert failed["next_fetch_at"] == failed_at + timedelta(seconds=900)
+
+
+def test_external_feed_source_not_found_stops_future_polling(pg_db):
+    from crate.db.repositories import external_feeds
+
+    source = _source(external_feeds)
+    checked_at = datetime(2026, 8, 23, 12, 0, tzinfo=timezone.utc)
+
+    missing = external_feeds.mark_external_feed_source_not_found(
+        source["id"],
+        error="HTTP 404",
+        checked_at=checked_at,
+    )
+
+    assert missing is not None
+    assert missing["state"] == "not_found"
+    assert missing["last_error"] == "HTTP 404"
+    assert missing["next_fetch_at"] is None
+    assert external_feeds.list_due_external_feed_sources(now=checked_at) == []
+
+
+def test_bandcamp_feed_candidates_include_explicit_library_urls(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import transaction_scope
+    from sqlalchemy import text
+
+    pg_db.upsert_artist({"name": "RSS Candidate"})
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE library_artists
+                SET bandcamp_url = 'https://rss-candidate.bandcamp.com'
+                WHERE name = 'RSS Candidate'
+                """
+            )
+        )
+
+    candidates = external_feeds.list_bandcamp_feed_candidates()
+
+    assert {
+        "artist_name": "RSS Candidate",
+        "artist_url": "https://rss-candidate.bandcamp.com",
+        "association_method": "explicit_artist_url",
+    }.items() <= candidates[0].items()
+
+
+def test_bandcamp_feed_candidates_only_use_active_bandcamp_connections(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import transaction_scope
+    from sqlalchemy import text
+
+    with transaction_scope() as session:
+        user_id = session.execute(
+            text(
+                """
+                INSERT INTO users (email, created_at)
+                VALUES ('feed-candidate@example.test', NOW())
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        connection_id = session.execute(
+            text(
+                """
+                INSERT INTO bandcamp_connections (
+                    user_id, status, session_secret_ref, session_fingerprint,
+                    connection_method, created_at, updated_at
+                ) VALUES (
+                    :user_id, :status, :secret_ref, :fingerprint,
+                    'test', NOW(), NOW()
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "user_id": user_id,
+                "status": "connected",
+                "secret_ref": "test-feed-secret",
+                "fingerprint": "test-feed-fingerprint",
+            },
+        ).scalar_one()
+        item_id = session.execute(
+            text(
+                """
+                INSERT INTO bandcamp_items (
+                    bandcamp_item_type, artist_name, item_url, artist_url,
+                    first_seen_at, updated_at
+                ) VALUES (
+                    'artist', 'Wishlist Artist',
+                    'https://wishlist-artist.bandcamp.com',
+                    'https://wishlist-artist.bandcamp.com', NOW(), NOW()
+                )
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO user_bandcamp_items (
+                    user_id, connection_id, bandcamp_item_id, relation_type,
+                    last_seen_at
+                ) VALUES (:user_id, :connection_id, :item_id, 'wishlist', NOW())
+                """
+            ),
+            {"user_id": user_id, "connection_id": connection_id, "item_id": item_id},
+        )
+
+        revoked_user_id = session.execute(
+            text(
+                """
+                INSERT INTO users (email, created_at)
+                VALUES ('revoked-feed-candidate@example.test', NOW())
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        revoked_connection_id = session.execute(
+            text(
+                """
+                INSERT INTO bandcamp_connections (
+                    user_id, status, session_secret_ref, session_fingerprint,
+                    connection_method, created_at, updated_at, revoked_at
+                ) VALUES (
+                    :user_id, 'connected', 'revoked-secret', 'revoked-fingerprint',
+                    'test', NOW(), NOW(), NOW()
+                )
+                RETURNING id
+                """
+            ),
+            {"user_id": revoked_user_id},
+        ).scalar_one()
+        revoked_item_id = session.execute(
+            text(
+                """
+                INSERT INTO bandcamp_items (
+                    bandcamp_item_type, artist_name, item_url, artist_url,
+                    first_seen_at, updated_at
+                ) VALUES (
+                    'artist', 'Revoked Artist',
+                    'https://revoked-artist.bandcamp.com',
+                    'https://revoked-artist.bandcamp.com', NOW(), NOW()
+                )
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO user_bandcamp_items (
+                    user_id, connection_id, bandcamp_item_id, relation_type,
+                    last_seen_at
+                ) VALUES (:user_id, :connection_id, :item_id, 'wishlist', NOW())
+                """
+            ),
+            {
+                "user_id": revoked_user_id,
+                "connection_id": revoked_connection_id,
+                "item_id": revoked_item_id,
+            },
+        )
+
+    candidates = external_feeds.list_bandcamp_feed_candidates()
+
+    assert any(
+        candidate["artist_name"] == "Wishlist Artist"
+        and candidate["association_method"] == "bandcamp_wishlist"
+        for candidate in candidates
+    )
+    assert not any(
+        candidate["artist_name"] == "Revoked Artist" for candidate in candidates
+    )

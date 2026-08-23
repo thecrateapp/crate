@@ -187,8 +187,98 @@ def get_external_feed_source(source_id: int) -> dict[str, Any] | None:
         )
 
 
+def list_bandcamp_feed_candidates(*, limit: int = 100) -> list[dict[str, Any]]:
+    """List persisted artist URLs eligible for public Bandcamp RSS discovery."""
+    bounded_limit = max(1, min(int(limit), 500))
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                """
+                WITH candidates AS (
+                    SELECT
+                        la.id AS artist_id,
+                        la.name AS artist_name,
+                        la.bandcamp_url AS artist_url,
+                        'explicit_artist_url' AS association_method
+                    FROM library_artists la
+                    WHERE NULLIF(trim(coalesce(la.bandcamp_url, '')), '') IS NOT NULL
+
+                    UNION ALL
+
+                    SELECT
+                        la.id AS artist_id,
+                        la.name AS artist_name,
+                        la.bandcamp_url AS artist_url,
+                        'followed_artist' AS association_method
+                    FROM user_global_artist_follows f
+                    JOIN global_catalog_artists ga
+                      ON ga.global_artist_uid = f.global_artist_uid
+                    JOIN library_artists la ON la.id = ga.local_artist_id
+                    WHERE NULLIF(trim(coalesce(la.bandcamp_url, '')), '') IS NOT NULL
+
+                    UNION ALL
+
+                    SELECT
+                        la.id AS artist_id,
+                        la.name AS artist_name,
+                        la.bandcamp_url AS artist_url,
+                        'followed_artist' AS association_method
+                    FROM user_follows uf
+                    JOIN library_artists la
+                      ON lower(la.name) = lower(uf.artist_name)
+                    WHERE NULLIF(trim(coalesce(la.bandcamp_url, '')), '') IS NOT NULL
+
+                    UNION ALL
+
+                    SELECT
+                        la.id AS artist_id,
+                        COALESCE(la.name, bi.artist_name) AS artist_name,
+                        bi.artist_url AS artist_url,
+                        CASE ubi.relation_type
+                            WHEN 'wishlist' THEN 'bandcamp_wishlist'
+                            WHEN 'following' THEN 'bandcamp_following'
+                        END AS association_method
+                    FROM user_bandcamp_items ubi
+                    JOIN bandcamp_connections bc
+                      ON bc.id = ubi.connection_id
+                     AND bc.user_id = ubi.user_id
+                     AND bc.status = 'connected'
+                     AND bc.revoked_at IS NULL
+                    JOIN bandcamp_items bi ON bi.id = ubi.bandcamp_item_id
+                    LEFT JOIN library_artists la
+                      ON lower(la.name) = lower(bi.artist_name)
+                    WHERE ubi.relation_type IN ('wishlist', 'following')
+                      AND ubi.removed_at IS NULL
+                      AND NULLIF(trim(coalesce(bi.artist_url, '')), '') IS NOT NULL
+                )
+                SELECT DISTINCT ON (
+                    lower(regexp_replace(trim(artist_url), '/+$', ''))
+                )
+                    artist_id, artist_name, artist_url, association_method
+                FROM candidates
+                ORDER BY
+                    lower(regexp_replace(trim(artist_url), '/+$', '')),
+                    CASE association_method
+                        WHEN 'followed_artist' THEN 0
+                        WHEN 'bandcamp_wishlist' THEN 1
+                        WHEN 'bandcamp_following' THEN 2
+                        ELSE 3
+                    END,
+                    artist_name ASC NULLS LAST,
+                    artist_url ASC
+                LIMIT :limit
+                """
+            ),
+            {"limit": bounded_limit},
+        ).mappings()
+        return [dict(row) for row in rows]
+
+
 def list_due_external_feed_sources(
-    *, limit: int = 50, now: datetime | None = None
+    *,
+    limit: int = 50,
+    now: datetime | None = None,
+    source_kind: str | None = None,
 ) -> list[dict[str, Any]]:
     bounded_limit = max(1, min(int(limit), 500))
     due_at = now or _now()
@@ -200,11 +290,12 @@ def list_due_external_feed_sources(
                 FROM external_feed_sources
                 WHERE state IN ('active', 'degraded')
                   AND (next_fetch_at IS NULL OR next_fetch_at <= :now)
+                  AND (:source_kind IS NULL OR source_kind = :source_kind)
                 ORDER BY next_fetch_at ASC NULLS FIRST, id ASC
                 LIMIT :limit
                 """
             ),
-            {"now": due_at, "limit": bounded_limit},
+            {"now": due_at, "limit": bounded_limit, "source_kind": source_kind},
         ).mappings()
         return [dict(row) for row in rows]
 
@@ -307,6 +398,40 @@ def mark_external_feed_source_failure(
                     "error": error,
                     "failures": failures,
                     "next_fetch_at": failed_at + timedelta(seconds=delay),
+                },
+            )
+        )
+
+
+def mark_external_feed_source_not_found(
+    source_id: int,
+    *,
+    error: str = "External feed source not found",
+    checked_at: datetime | None = None,
+) -> dict[str, Any] | None:
+    """Stop polling a source after a definitive HTTP 404."""
+    checked_at = checked_at or _now()
+    error = _required_text(error, max_length=MAX_ERROR_LENGTH)
+    with transaction_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    UPDATE external_feed_sources
+                    SET state = 'not_found',
+                        last_checked_at = :checked_at,
+                        last_error_at = :checked_at,
+                        last_error = :error,
+                        next_fetch_at = NULL,
+                        updated_at = :checked_at
+                    WHERE id = :source_id
+                    RETURNING *
+                    """
+                ),
+                {
+                    "source_id": source_id,
+                    "checked_at": checked_at,
+                    "error": error,
                 },
             )
         )
@@ -479,8 +604,10 @@ def upsert_external_feed_item(
 
 __all__ = [
     "get_external_feed_source",
+    "list_bandcamp_feed_candidates",
     "list_due_external_feed_sources",
     "mark_external_feed_source_failure",
+    "mark_external_feed_source_not_found",
     "mark_external_feed_source_not_modified",
     "upsert_external_feed_item",
     "upsert_external_feed_source",

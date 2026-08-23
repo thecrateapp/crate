@@ -638,6 +638,14 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        "crate.worker_handlers.feeds",
+        "FEED_TASK_HANDLERS",
+        (
+            "external_feeds_discover_sources",
+            "external_feeds_refresh",
+        ),
+    ),
+    (
         "crate.worker_handlers.bandcamp",
         "BANDCAMP_TASK_HANDLERS",
         (

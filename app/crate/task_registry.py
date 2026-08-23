@@ -39,6 +39,8 @@ TASK_TYPE_LABELS: dict[str, str] = {
     "enrich_artist": "Artist Enrichment",
     "normalize_artist_bios": "Normalize Artist Bios",
     "research_artist_bio": "Research Artist Bio",
+    "external_feeds_discover_sources": "External Feed Source Discovery",
+    "external_feeds_refresh": "External Feed Refresh",
     "enrich_all": "Full Enrichment",
     "sync_lyrics": "Lyrics Sync",
     # Analysis
@@ -104,6 +106,7 @@ TASK_TYPE_ICONS: dict[str, str] = {
     "tidal_download": "\U0001f4e5",
     "soulseek_download": "\U0001f4e5",
     "bandcamp_backfill_entity_urls": "\U0001f517",
+    "external_feeds_discover_sources": "\U0001f310",
     "index_genres": "\U0001f3f7\ufe0f",
     "infer_genre_taxonomy": "\U0001f3f7\ufe0f",
     "enrich_genre_descriptions": "\U0001f4dd",

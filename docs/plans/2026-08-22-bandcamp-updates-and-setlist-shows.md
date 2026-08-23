@@ -259,6 +259,20 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 8. Testear `200`, `304`, `403`, `404`, `429`, timeout, XML inválido, GUID ausente y feed sin actividad.
 9. Mantener el worker detrás de `CRATE_EXTERNAL_RSS_ENABLED=false` hasta superar la validación de Fase 0.
 
+**Estado del corte actual (2026-08-23):**
+
+- La infraestructura de parser, persistencia y refresh está implementada y
+  cubierta por tests.
+- La selección de candidatos ya combina follows locales/canónicos, wishlist y
+  following Bandcamp activos, y URLs Bandcamp explícitas de la biblioteca.
+- La selección deduplica por artista y prioriza la relación más fuerte antes de
+  hacer autodiscovery público del RSS.
+- La autodetección se ejecuta únicamente en worker, registra solo feeds
+  encontrados y trata ausencia/404 como fuente sin feed; no hace fallback a
+  scraping agresivo.
+- El scheduler y el actor existen, pero la feature permanece inerte con
+  `CRATE_EXTERNAL_RSS_ENABLED=false`.
+
 ### Roadmap Task F3.1: Registrar y sincronizar fuentes editoriales
 
 **Files:**

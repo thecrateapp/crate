@@ -180,6 +180,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "normalize_artist_bios": TaskPoolConfig("maintenance", 2, 3600, 0),
     "research_artist_bio": TaskPoolConfig("default", 1, 900, 1),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
+    "external_feeds_discover_sources": TaskPoolConfig("maintenance", 3, 1800, 1),
+    "external_feeds_refresh": TaskPoolConfig("maintenance", 3, 1800, 1),
     "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),
     "bandcamp_sync_collection": TaskPoolConfig("maintenance", 2, 7200, 1),
     "bandcamp_discover_refresh": TaskPoolConfig("maintenance", 2, 600, 1),
