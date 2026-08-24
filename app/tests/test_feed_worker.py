@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from crate.feeds.editorial import EditorialFeedFetchResult
 from crate.feeds.rss import RSSFeedFetchResult, RSSFeedHTTPError, RSSFeedItem
 from crate.feeds.rss import RSSFeedNotFoundError
@@ -274,15 +276,21 @@ def test_editorial_refresh_includes_global_publisher_sources(monkeypatch):
     assert marked[0][1]["etag"] == '"publisher"'
 
 
-def test_publisher_refresh_queues_ai_summary_for_enabled_sources(monkeypatch):
+@pytest.mark.parametrize(
+    ("source_kind", "artist_id"),
+    [("publisher_rss", None), ("artist_site", 42)],
+)
+def test_editorial_refresh_queues_ai_enrichments_for_enabled_sources(
+    monkeypatch, source_kind, artist_id
+):
     monkeypatch.setenv("CRATE_EXTERNAL_RSS_ENABLED", "true")
     monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
     monkeypatch.setattr(
         "crate.worker_handlers.feeds._list_due_editorial_feed_sources",
         lambda limit: [
             _source(
-                source_kind="publisher_rss",
-                artist_id=None,
+                source_kind=source_kind,
+                artist_id=artist_id,
                 ai_policy="enabled",
             )
         ],
@@ -306,6 +314,7 @@ def test_publisher_refresh_queues_ai_summary_for_enabled_sources(monkeypatch):
         "crate.worker_handlers.feeds.upsert_external_feed_item",
         lambda **kwargs: {
             "id": 101,
+            "artist_id": artist_id,
             "content_hash": item.content_hash,
         },
     )

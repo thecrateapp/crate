@@ -63,6 +63,7 @@ DEFAULT_MAX_SOURCES = 25
 MAX_MAX_SOURCES = 100
 DEFAULT_TIMEOUT_SECONDS = 20.0
 MAX_RETRY_DELAY_SECONDS = 21600
+AI_ENRICHABLE_SOURCE_KINDS = EDITORIAL_SOURCE_KINDS | PUBLISHER_SOURCE_KINDS
 
 
 def external_rss_enabled() -> bool:
@@ -482,7 +483,7 @@ def _refresh_external_feed_sources(
                             exc_info=True,
                         )
                 if (
-                    source.get("source_kind") in PUBLISHER_SOURCE_KINDS
+                    source.get("source_kind") in AI_ENRICHABLE_SOURCE_KINDS
                     and source.get("ai_policy", "enabled") == "enabled"
                     and external_feed_ai_enabled()
                     and (persisted_item or {}).get("state", "active") == "active"
