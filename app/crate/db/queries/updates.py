@@ -53,6 +53,77 @@ def build_updates_feed(
     return items[start:end]
 
 
+def merge_editorial_releases_into_radar(
+    *,
+    radar_items: Iterable[Mapping[str, Any]],
+    external_feed_items: Iterable[Mapping[str, Any]],
+    followed_artists: Iterable[str],
+    today: date,
+) -> list[dict[str, Any]]:
+    """Add reviewed editorial releases to Radar without duplicating local releases."""
+    items = [dict(item) for item in radar_items]
+    followed = {_normalize(name) for name in followed_artists if _normalize(name)}
+    by_release_key = {
+        _release_key(_text(item.get("artist")), _text(item.get("title"))): item
+        for item in items
+        if item.get("type") == "release"
+    }
+
+    for row in external_feed_items:
+        if _normalize(row.get("artist_name")) not in followed:
+            continue
+        if _external_feed_classification(row) != "release":
+            continue
+
+        normalized = _external_feed_item(row)
+        artist = _text(normalized.get("artist"))
+        title = _text(normalized.get("title"))
+        if not artist or not title:
+            continue
+        release_key = _release_key(artist, title)
+        provenance = _provenance_record(normalized)
+        existing = by_release_key.get(release_key)
+        if existing is not None:
+            _append_unique_provenance(existing, provenance)
+            continue
+
+        release_date = _iso(
+            row.get("release_date")
+            or row.get("event_date")
+            or row.get("published_at")
+            or row.get("discovered_at")
+        )
+        release = {
+            "type": "release",
+            "date": release_date or "",
+            "artist": artist,
+            "artist_id": row.get("artist_id"),
+            "artist_slug": row.get("artist_slug"),
+            "title": title,
+            "subtitle": "Album",
+            "cover_url": normalized.get("cover_url"),
+            "status": "editorial",
+            "source": normalized.get("source"),
+            "source_url": normalized.get("canonical_url"),
+            "external_feed_item_id": normalized.get("external_feed_item_id"),
+            "is_upcoming": bool(release_date and release_date > today.isoformat()),
+            "editorial_provenance": [provenance] if provenance else [],
+        }
+        for field in (
+            "editorial_summary",
+            "editorial_summary_key_points",
+            "editorial_summary_model",
+            "editorial_summary_prompt_version",
+            "editorial_summary_generated_at",
+        ):
+            if field in normalized:
+                release[field] = normalized[field]
+        items.append(release)
+        by_release_key[release_key] = release
+
+    return items
+
+
 def _release_item(row: Mapping[str, Any]) -> dict[str, Any]:
     artist = _text(row.get("artist_name") or row.get("artist"))
     title = _text(row.get("album_title") or row.get("title"))
@@ -206,7 +277,32 @@ def _external_feed_item(row: Mapping[str, Any]) -> dict[str, Any]:
     if feed_clusters:
         item["feed_clusters"] = feed_clusters
     item.update(_editorial_summary(row))
+    classification = _external_feed_classification(row)
+    if classification:
+        item["editorial_classification"] = classification
     return item
+
+
+def _external_feed_classification(row: Mapping[str, Any]) -> str | None:
+    result = row.get("accepted_classification_json")
+    if isinstance(result, Mapping):
+        classification = _text(result.get("classification"))
+        if classification:
+            return classification
+    if (
+        _normalize(row.get("source_kind")) == "bandcamp_rss"
+        and _normalize(row.get("item_kind")) == "release"
+    ):
+        return "release"
+    return None
+
+
+def _append_unique_provenance(item: dict[str, Any], value: dict[str, str]) -> None:
+    if not value:
+        return
+    records = item.setdefault("editorial_provenance", [])
+    if isinstance(records, list) and value not in records:
+        records.append(value)
 
 
 def _is_global_external_feed_item(row: Mapping[str, Any]) -> bool:

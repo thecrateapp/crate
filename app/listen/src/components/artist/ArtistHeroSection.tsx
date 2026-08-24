@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Play,
   Radio,
+  Rss,
   Share2,
   Shuffle,
   Users,
@@ -46,6 +47,7 @@ interface ArtistHeroSectionProps {
   onToggleFollow: () => void;
   onShare: () => void;
   onOpenBio: () => void;
+  onOpenUpdates?: () => void;
 }
 
 const SECONDARY_ACTION_CLASS =
@@ -65,6 +67,7 @@ export function ArtistHeroSection({
   onToggleFollow,
   onShare,
   onOpenBio,
+  onOpenUpdates,
 }: ArtistHeroSectionProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -124,6 +127,16 @@ export function ArtistHeroSection({
       icon: Share2,
       onSelect: onShare,
     },
+    ...(!isDesktop && onOpenUpdates
+      ? [
+          {
+            key: "updates",
+            label: t("artist.actions.updates"),
+            icon: Rss,
+            onSelect: onOpenUpdates,
+          },
+        ]
+      : []),
   ];
   const mobileMenuTrigger =
     !isDesktop && typeof document !== "undefined" ? (
@@ -344,6 +357,16 @@ export function ArtistHeroSection({
               entityUid={artist.entity_uid}
               presentation="secondary-action"
             />
+            {isDesktop && onOpenUpdates ? (
+              <button
+                className={SECONDARY_ACTION_CLASS}
+                onClick={onOpenUpdates}
+                aria-label={t("artist.actions.updates")}
+              >
+                <Rss size={CRATE_ICON_SIZE.lg} />
+                <span>{t("artist.actions.updates")}</span>
+              </button>
+            ) : null}
             {isDesktop ? (
               <div className="relative shrink-0">
                 <button

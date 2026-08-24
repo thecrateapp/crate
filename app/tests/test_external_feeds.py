@@ -822,6 +822,102 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
     assert external_feeds.list_external_feed_items_for_user(user_id) == []
 
 
+def test_external_feed_items_for_artist_keeps_explicit_associations_only(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import transaction_scope
+    from sqlalchemy import text
+
+    pg_db.upsert_artist({"name": "Artist Updates Target"})
+    pg_db.upsert_artist({"name": "Other Updates Artist"})
+    with transaction_scope() as session:
+        artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = 'Artist Updates Target'")
+        ).scalar_one()
+        other_artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = 'Other Updates Artist'")
+        ).scalar_one()
+        user_id = session.execute(
+            text(
+                """
+                INSERT INTO users (email, created_at)
+                VALUES ('artist-updates@example.test', NOW())
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+
+    artist_source = external_feeds.upsert_external_feed_source(
+        source_kind="artist_site",
+        source_url="https://artist-updates.example/feed.xml",
+        artist_id=artist_id,
+        parser_version="artist-site-v1",
+    )
+    publisher_source = external_feeds.upsert_external_feed_source(
+        source_kind="publisher_rss",
+        source_scope="publisher",
+        source_url="https://publisher-updates.example/feed.xml",
+        parser_version="editorial-feed-v1",
+    )
+    bandcamp_source = external_feeds.upsert_external_feed_source(
+        source_kind="bandcamp_rss",
+        source_url="https://artist-updates.bandcamp.com/feed",
+        artist_id=artist_id,
+        parser_version="bandcamp-rss-v1",
+    )
+
+    external_feeds.upsert_external_feed_item(
+        source_id=artist_source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=artist_source["source_url"],
+        canonical_url="https://artist-updates.example/news/artist",
+        external_guid="artist-news",
+        title="Artist-site news",
+        content_hash="artist-news-hash",
+        parser_version="artist-site-v1",
+    )
+    external_feeds.upsert_external_feed_item(
+        source_id=publisher_source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=publisher_source["source_url"],
+        canonical_url="https://publisher-updates.example/news/artist",
+        external_guid="publisher-news",
+        title="Publisher news about the artist",
+        content_hash="publisher-news-hash",
+        parser_version="editorial-feed-v1",
+    )
+    external_feeds.upsert_external_feed_item(
+        source_id=publisher_source["id"],
+        artist_id=other_artist_id,
+        item_kind="news",
+        source_url=publisher_source["source_url"],
+        canonical_url="https://publisher-updates.example/news/other",
+        external_guid="other-news",
+        title="Publisher news about another artist",
+        content_hash="other-news-hash",
+        parser_version="editorial-feed-v1",
+    )
+    external_feeds.upsert_external_feed_item(
+        source_id=bandcamp_source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=bandcamp_source["source_url"],
+        canonical_url="https://artist-updates.bandcamp.com/news/artist",
+        external_guid="bandcamp-news",
+        title="Bandcamp artist news",
+        content_hash="bandcamp-news-hash",
+        parser_version="bandcamp-rss-v1",
+    )
+
+    items = external_feeds.list_external_feed_items_for_artist(user_id, artist_id)
+
+    assert [item["title"] for item in items] == [
+        "Publisher news about the artist",
+        "Artist-site news",
+    ]
+
+
 def test_external_feed_cluster_application_is_idempotent_and_reversible(pg_db):
     from crate.db.repositories import external_feeds
     from crate.db.tx import read_scope

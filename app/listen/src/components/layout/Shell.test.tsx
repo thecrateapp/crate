@@ -48,6 +48,7 @@ describe("Shell", () => {
     expect(screen.getByText("Explorar")).toBeInTheDocument();
     expect(screen.getByText("Colección")).toBeInTheDocument();
     expect(screen.getByText("Radar")).toBeInTheDocument();
+    expect(screen.getByText("Novedades")).toBeInTheDocument();
   });
 
   it("renders one unified glass backdrop for the mobile dock when a track is loaded", () => {

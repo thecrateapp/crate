@@ -259,6 +259,53 @@ describe("ArtistHeroSection", () => {
     ).toHaveTextContent("Más");
   });
 
+  it("opens the artist updates modal from the desktop action rail", () => {
+    const onOpenUpdates = vi.fn();
+
+    renderWithI18n(
+      <MemoryRouter>
+        <ArtistHeroSection
+          artist={{
+            id: 7,
+            entity_uid: "artist-entity-7",
+            slug: "crossed",
+            name: "Crossed",
+            albums: [],
+            total_tracks: 10,
+            total_size_mb: 120,
+            primary_format: "flac",
+            genres: [],
+            issue_count: 0,
+          }}
+          artistInfo={{
+            bio: "",
+            tags: [],
+            similar: [],
+            listeners: 0,
+            playcount: 0,
+            image_url: null,
+            url: "",
+          }}
+          photoUrl="/artist.jpg"
+          tags={[]}
+          following={false}
+          onPlay={vi.fn()}
+          onShuffle={vi.fn()}
+          onArtistRadio={vi.fn()}
+          onToggleFollow={vi.fn()}
+          onShare={vi.fn()}
+          onOpenBio={vi.fn()}
+          onOpenUpdates={onOpenUpdates}
+        />
+      </MemoryRouter>,
+    );
+
+    const updates = screen.getByRole("button", { name: "Updates" });
+    expect(updates).toHaveTextContent("Updates");
+    fireEvent.click(updates);
+    expect(onOpenUpdates).toHaveBeenCalledOnce();
+  });
+
   it("keeps the circular artist picture in the desktop hero", () => {
     renderWithI18n(
       <MemoryRouter>
@@ -364,6 +411,7 @@ describe("ArtistHeroSection", () => {
 
   it("uses the mobile Tidal-style artist action layout", async () => {
     mockMobilePointer();
+    const onOpenUpdates = vi.fn();
 
     renderWithI18n(
       <MemoryRouter>
@@ -400,6 +448,7 @@ describe("ArtistHeroSection", () => {
           onToggleFollow={vi.fn()}
           onShare={vi.fn()}
           onOpenBio={vi.fn()}
+          onOpenUpdates={onOpenUpdates}
         />
       </MemoryRouter>,
     );
@@ -456,6 +505,9 @@ describe("ArtistHeroSection", () => {
     fireEvent.click(heroMenu);
     expect(
       await screen.findByRole("menuitem", { name: "Play top tracks" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("menuitem", { name: "Updates" }),
     ).toBeInTheDocument();
   });
 });

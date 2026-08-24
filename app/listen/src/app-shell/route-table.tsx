@@ -70,6 +70,9 @@ const Stats = React.lazy(() =>
 const Shows = React.lazy(() =>
   import("@/pages/Shows").then((m) => ({ default: m.Shows })),
 );
+const Updates = React.lazy(() =>
+  import("@/pages/Updates").then((m) => ({ default: m.Updates })),
+);
 const PathsPage = React.lazy(() =>
   import("@/pages/Paths").then((m) => ({ default: m.Paths })),
 );
@@ -147,6 +150,7 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   { path: "playlist/invite/:token", element: deferred(<PlaylistInvite />) },
   { path: "shows", element: <Navigate to="/upcoming" replace /> },
   { path: "upcoming", element: deferred(<Shows />) },
+  { path: "updates", element: deferred(<Updates />) },
   { path: "paths", element: deferred(<PathsPage />) },
   { path: "paths/:id", element: deferred(<PathDetailPage />) },
   { path: "radio", element: deferred(<RadioPage />) },

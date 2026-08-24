@@ -596,6 +596,8 @@ def list_external_feed_items_for_user(
                     accepted_enrichment.model AS accepted_enrichment_model,
                     accepted_enrichment.prompt_version
                         AS accepted_enrichment_prompt_version,
+                    accepted_classification.result_json
+                        AS accepted_classification_json,
                     accepted_cluster.id AS accepted_cluster_enrichment_id,
                     accepted_cluster.result_json AS accepted_cluster_json,
                     accepted_cluster.cluster_applied_at
@@ -603,15 +605,21 @@ def list_external_feed_items_for_user(
                     accepted_cluster.cluster_reverted_at
                         AS accepted_cluster_reverted_at,
                     CASE
-                        WHEN efs.source_kind = 'publisher_rss' THEN NULL
+                        WHEN efs.source_kind = 'publisher_rss' THEN item_artist.name
                         ELSE COALESCE(
                             la.name,
+                            item_artist.name,
                             NULLIF(efi.payload_json ->> 'author', '')
                         )
-                    END AS artist_name
+                    END AS artist_name,
+                    CASE
+                        WHEN efs.source_kind = 'publisher_rss' THEN item_artist.slug
+                        ELSE COALESCE(la.slug, item_artist.slug)
+                    END AS artist_slug
                 FROM external_feed_items efi
                 JOIN external_feed_sources efs ON efs.id = efi.source_id
                 LEFT JOIN library_artists la ON la.id = efs.artist_id
+                LEFT JOIN library_artists item_artist ON item_artist.id = efi.artist_id
                 LEFT JOIN LATERAL (
                     SELECT
                         efe.result_json,
@@ -626,6 +634,17 @@ def list_external_feed_items_for_user(
                     ORDER BY efe.id DESC
                     LIMIT 1
                 ) accepted_enrichment ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT efe.result_json
+                    FROM external_feed_enrichments efe
+                    WHERE efe.item_id = efi.id
+                      AND efe.operation = 'classify'
+                      AND efe.status = 'ready'
+                      AND efe.review_status = 'accepted'
+                      AND efe.source_content_hash = efi.content_hash
+                    ORDER BY efe.id DESC
+                    LIMIT 1
+                ) accepted_classification ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT
                         efe.id,
@@ -700,6 +719,99 @@ def list_external_feed_items_for_user(
                 """
             ),
             {"user_id": user_id, "limit": bounded_limit},
+        ).mappings()
+        return _attach_feed_cluster_context(serialize_rows(rows))
+
+
+def list_external_feed_items_for_artist(
+    user_id: int,
+    artist_id: int,
+    *,
+    limit: int = 30,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Return only feed items explicitly associated with one library artist."""
+    bounded_limit = max(1, min(int(limit), 100))
+    bounded_offset = max(0, min(int(offset), 10000))
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT
+                    efi.*,
+                    efs.source_kind,
+                    efs.source_url AS feed_source_url,
+                    efs.canonical_url AS artist_url,
+                    efs.association_method,
+                    efs.source_scope,
+                    efs.display_name,
+                    efs.publisher_name,
+                    efs.category,
+                    accepted_enrichment.result_json AS accepted_enrichment_json,
+                    accepted_enrichment.model AS accepted_enrichment_model,
+                    accepted_enrichment.prompt_version
+                        AS accepted_enrichment_prompt_version,
+                    accepted_classification.result_json
+                        AS accepted_classification_json,
+                    CASE
+                        WHEN efs.source_kind = 'publisher_rss' THEN item_artist.name
+                        ELSE COALESCE(source_artist.name, item_artist.name)
+                    END AS artist_name
+                FROM external_feed_items efi
+                JOIN external_feed_sources efs ON efs.id = efi.source_id
+                LEFT JOIN library_artists source_artist
+                    ON source_artist.id = efs.artist_id
+                LEFT JOIN library_artists item_artist
+                    ON item_artist.id = efi.artist_id
+                LEFT JOIN LATERAL (
+                    SELECT
+                        efe.result_json,
+                        efe.model,
+                        efe.prompt_version
+                    FROM external_feed_enrichments efe
+                    WHERE efe.item_id = efi.id
+                      AND efe.operation = 'summary'
+                      AND efe.status = 'ready'
+                      AND efe.review_status = 'accepted'
+                      AND efe.source_content_hash = efi.content_hash
+                    ORDER BY efe.id DESC
+                    LIMIT 1
+                ) accepted_enrichment ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT efe.result_json
+                    FROM external_feed_enrichments efe
+                    WHERE efe.item_id = efi.id
+                      AND efe.operation = 'classify'
+                      AND efe.status = 'ready'
+                      AND efe.review_status = 'accepted'
+                      AND efe.source_content_hash = efi.content_hash
+                    ORDER BY efe.id DESC
+                    LIMIT 1
+                ) accepted_classification ON TRUE
+                WHERE efi.state = 'active'
+                  AND efi.duplicate_of_id IS NULL
+                  AND efs.state IN ('active', 'degraded')
+                  AND (efs.artist_id = :artist_id OR efi.artist_id = :artist_id)
+                  AND (
+                      efs.source_kind <> 'bandcamp_rss'
+                      OR EXISTS (
+                          SELECT 1
+                          FROM bandcamp_connections bc
+                          WHERE bc.user_id = :user_id
+                            AND bc.status = 'connected'
+                            AND bc.revoked_at IS NULL
+                      )
+                  )
+                ORDER BY efi.published_at DESC NULLS LAST, efi.id DESC
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            {
+                "user_id": int(user_id),
+                "artist_id": int(artist_id),
+                "limit": bounded_limit,
+                "offset": bounded_offset,
+            },
         ).mappings()
         return _attach_feed_cluster_context(serialize_rows(rows))
 
@@ -1733,6 +1845,7 @@ __all__ = [
     "get_external_feed_source",
     "list_external_feed_sources",
     "list_external_feed_items_for_source",
+    "list_external_feed_items_for_artist",
     "list_external_feed_cluster_candidates",
     "apply_external_feed_cluster_enrichment",
     "apply_external_feed_show_enrichment",

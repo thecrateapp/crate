@@ -21,4 +21,12 @@ describe("protected app routes", () => {
     expect(paths).not.toContain("jam/invite/:token");
     expect(paths).toContain("jam/*");
   });
+
+  it("exposes the provisional global updates route", () => {
+    const paths = protectedAppRoutes
+      .map((route) => route.path)
+      .filter((path): path is string => Boolean(path));
+
+    expect(paths).toContain("updates");
+  });
 });

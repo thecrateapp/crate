@@ -161,7 +161,10 @@ from crate.db.repositories.user_library import (
 )
 from crate.db.user_stats_dashboard_surface import get_user_stats_dashboard
 from crate.db.repositories.user_library_shared import resolve_track_reference_read
-from crate.db.queries.updates import build_updates_feed
+from crate.db.queries.updates import (
+    build_updates_feed,
+    merge_editorial_releases_into_radar,
+)
 from crate.db.repositories.users import (
     get_remote_scrobbling_enabled,
     set_remote_scrobbling_enabled,
@@ -1425,6 +1428,36 @@ def feed(
 
 
 @router.get(
+    "/updates",
+    response_model=list[FeedItemResponse],
+    responses=AUTH_ERROR_RESPONSES,
+    summary="List global editorial updates",
+)
+def updates(
+    request: Request,
+    limit: int = Query(30, ge=1, le=120),
+    offset: int = Query(0, ge=0, le=10000),
+):
+    """Return normalized editorial feed items without Radar entities."""
+    user = _require_auth(request)
+    candidate_limit = min(300, max(1, limit + offset) * 2)
+    bandcamp_connected = has_active_connection(int(user["id"]))
+    external_feed_items = list_external_feed_items_for_user(
+        int(user["id"]), limit=candidate_limit
+    )
+    return build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        followed_artists=[],
+        bandcamp_connected=bandcamp_connected,
+        external_feed_items=external_feed_items,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
     "/upcoming",
     response_model=MeUpcomingResponse,
     responses=AUTH_ERROR_RESPONSES,
@@ -1495,6 +1528,16 @@ def upcoming(request: Request, limit: int = 120):
                 "is_upcoming": bool(scheduled_date and scheduled_date > today),
             }
         )
+
+    editorial_feed_items = list_external_feed_items_for_user(
+        int(user["id"]), limit=min(300, max(1, limit) * 2)
+    )
+    items = merge_editorial_releases_into_radar(
+        radar_items=items,
+        external_feed_items=editorial_feed_items,
+        followed_artists=followed_names,
+        today=today,
+    )
 
     shows = get_upcoming_shows(
         followed_names, today, user_lat, user_lon, user_radius, limit

@@ -1,4 +1,102 @@
-from crate.db.queries.updates import build_updates_feed
+from datetime import date
+
+from crate.db.queries.updates import (
+    build_updates_feed,
+    merge_editorial_releases_into_radar,
+)
+
+
+def test_merge_editorial_releases_into_radar_deduplicates_and_keeps_provenance():
+    items = merge_editorial_releases_into_radar(
+        radar_items=[
+            {
+                "type": "release",
+                "artist": "Artist",
+                "title": "New LP",
+                "date": "2026-08-20",
+            }
+        ],
+        external_feed_items=[
+            {
+                "id": 41,
+                "artist_id": 7,
+                "artist_name": "Artist",
+                "item_kind": "news",
+                "title": "New LP",
+                "canonical_url": "https://pitchfork.com/news/new-lp",
+                "published_at": "2026-08-21T10:00:00+00:00",
+                "source_kind": "publisher_rss",
+                "display_name": "Pitchfork",
+                "accepted_classification_json": {"classification": "release"},
+            },
+            {
+                "id": 42,
+                "artist_id": 7,
+                "artist_name": "Artist",
+                "item_kind": "news",
+                "title": "Artist announces a new EP",
+                "canonical_url": "https://pitchfork.com/news/new-ep",
+                "published_at": "2026-08-22T10:00:00+00:00",
+                "source_kind": "publisher_rss",
+                "display_name": "Pitchfork",
+                "accepted_classification_json": {"classification": "release"},
+            },
+            {
+                "id": 43,
+                "artist_id": 7,
+                "artist_name": "Artist",
+                "item_kind": "news",
+                "title": "Interview with Artist",
+                "canonical_url": "https://pitchfork.com/news/interview",
+                "published_at": "2026-08-23T10:00:00+00:00",
+                "source_kind": "publisher_rss",
+                "display_name": "Pitchfork",
+                "accepted_classification_json": {"classification": "interview"},
+            },
+        ],
+        followed_artists={"artist"},
+        today=date(2026, 8, 24),
+    )
+
+    assert [item["title"] for item in items] == [
+        "New LP",
+        "Artist announces a new EP",
+    ]
+    assert items[0]["editorial_provenance"] == [
+        {
+            "source": "publisher_rss",
+            "source_detail": "Pitchfork",
+            "canonical_url": "https://pitchfork.com/news/new-lp",
+        }
+    ]
+    assert items[1]["external_feed_item_id"] == 42
+
+
+def test_merge_editorial_releases_requires_review_for_publisher_items():
+    items = merge_editorial_releases_into_radar(
+        radar_items=[],
+        external_feed_items=[
+            {
+                "id": 44,
+                "artist_name": "Artist",
+                "item_kind": "release",
+                "title": "Generic publisher article",
+                "source_kind": "publisher_rss",
+            },
+            {
+                "id": 45,
+                "artist_name": "Artist",
+                "item_kind": "news",
+                "title": "Reviewed release article",
+                "source_kind": "publisher_rss",
+                "accepted_classification_json": {"classification": "release"},
+            },
+        ],
+        followed_artists={"artist"},
+        today=date(2026, 8, 24),
+    )
+
+    assert [item["title"] for item in items] == ["Reviewed release article"]
 
 
 def test_build_updates_feed_deduplicates_and_preserves_source_metadata():
