@@ -560,6 +560,25 @@ class TestUserEndpoints:
                     },
                     "accepted_enrichment_model": "ollama/test",
                     "accepted_enrichment_prompt_version": "external-feed-summary-v1",
+                    "feed_clusters": [
+                        {
+                            "cluster_id": "external-feed-cluster:12",
+                            "enrichment_id": 12,
+                            "cluster_type": "tour",
+                            "confidence": 0.8,
+                            "rationale": "The announcement covers the same tour.",
+                            "applied": False,
+                            "members": [
+                                {
+                                    "id": 77,
+                                    "role": "representative",
+                                    "reason": "Primary announcement.",
+                                    "visible": True,
+                                    "title": "New announcement",
+                                }
+                            ],
+                        }
+                    ],
                 }
             ],
         )
@@ -571,6 +590,9 @@ class TestUserEndpoints:
         assert response.json()[0]["source"] == "bandcamp_rss"
         assert response.json()[0]["editorial_summary"] == (
             "The artist announced new dates."
+        )
+        assert response.json()[0]["feed_clusters"][0]["cluster_id"] == (
+            "external-feed-cluster:12"
         )
 
 

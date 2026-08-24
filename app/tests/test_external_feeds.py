@@ -50,6 +50,47 @@ def test_external_feed_cluster_migration_tracks_reversible_applications():
     assert "cluster_reverted_by_user_id" in source
 
 
+def test_feed_cluster_context_marks_hidden_members_without_breaking_the_read_path():
+    from crate.db.repositories.external_feeds import _attach_feed_cluster_context
+
+    rows = [
+        {
+            "id": 10,
+            "title": "Representative",
+            "source_kind": "bandcamp_rss",
+            "canonical_url": "https://artist.example/representative",
+            "published_at": "2026-08-23T12:00:00+00:00",
+            "accepted_cluster_enrichment_id": 5,
+            "accepted_cluster_json": {
+                "cluster_type": "release",
+                "members": [
+                    {
+                        "item_id": 10,
+                        "role": "representative",
+                        "reason": "Primary item.",
+                    },
+                    {
+                        "item_id": 11,
+                        "role": "related",
+                        "reason": "Duplicate coverage.",
+                    },
+                ],
+                "confidence": 0.95,
+                "rationale": "The items cover the same release.",
+                "warnings": [],
+            },
+            "accepted_cluster_applied_at": "2026-08-23T13:00:00+00:00",
+            "accepted_cluster_reverted_at": None,
+        }
+    ]
+
+    result = _attach_feed_cluster_context(rows)
+
+    assert result[0]["feed_clusters"][0]["applied"] is True
+    assert result[0]["feed_clusters"][0]["members"][1]["visible"] is False
+    assert "accepted_cluster_json" not in result[0]
+
+
 def _source(repo):
     return repo.upsert_external_feed_source(
         source_kind="artist_site",
@@ -597,6 +638,68 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
         "external-feed-summary-v1"
     )
 
+    cluster_related = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="release",
+        source_url="https://followed-feed.bandcamp.com/feed",
+        canonical_url="https://followed-feed.bandcamp.com/album/tour",
+        external_guid="tour-release-1",
+        title="Tour release",
+        content_hash="tour-release-hash",
+        parser_version="bandcamp-rss-v1",
+        author="Followed Feed Artist",
+        published_at=datetime(2026, 8, 23, 11, 0, tzinfo=timezone.utc),
+    )
+    cluster_enrichment = external_feeds.queue_external_feed_item_enrichment(
+        item_id=item["id"],
+        operation="cluster",
+        source_content_hash="tour-hash",
+        prompt_version="external-feed-clustering-v1",
+    )
+    external_feeds.mark_external_feed_enrichment_ready(
+        cluster_enrichment["id"],
+        result={
+            "cluster_type": "release",
+            "members": [
+                {
+                    "item_id": item["id"],
+                    "role": "representative",
+                    "reason": "Introduces the release.",
+                },
+                {
+                    "item_id": cluster_related["id"],
+                    "role": "related",
+                    "reason": "Covers the same release.",
+                },
+            ],
+            "confidence": 0.9,
+            "rationale": "Both items cover the same release.",
+            "warnings": [],
+        },
+        model="ollama/test",
+        prompt_version="external-feed-clustering-v1",
+    )
+    external_feeds.review_external_feed_enrichment(
+        cluster_enrichment["id"], reviewer_id=1, decision="accept"
+    )
+
+    clustered_items = external_feeds.list_external_feed_items_for_user(user_id)
+    cluster_context = next(
+        context
+        for row in clustered_items
+        for context in row.get("feed_clusters", [])
+        if context["enrichment_id"] == cluster_enrichment["id"]
+    )
+    assert cluster_context["applied"] is False
+    assert {
+        (member["id"], member["role"], member["visible"])
+        for member in cluster_context["members"]
+    } == {
+        (item["id"], "representative", True),
+        (cluster_related["id"], "related", True),
+    }
+
     external_feeds.upsert_external_feed_item(
         source_id=source["id"],
         artist_id=artist_id,
@@ -648,7 +751,10 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
         )
 
     wishlist_items = external_feeds.list_external_feed_items_for_user(other_user_id)
-    assert wishlist_items[0]["title"] == "Tour announcement updated"
+    assert {row["title"] for row in wishlist_items} == {
+        "Tour announcement updated",
+        "Tour release",
+    }
 
     representative = external_feeds.upsert_external_feed_item(
         source_id=source["id"],
@@ -669,7 +775,7 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
                 """
                 UPDATE external_feed_items
                 SET duplicate_of_id = :representative_id
-                WHERE external_guid = 'tour-1'
+                WHERE external_guid IN ('tour-1', 'tour-release-1')
                 """
             ),
             {"representative_id": representative["id"]},

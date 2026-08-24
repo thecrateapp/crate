@@ -390,6 +390,12 @@ def list_external_feed_items_for_user(
                     accepted_enrichment.model AS accepted_enrichment_model,
                     accepted_enrichment.prompt_version
                         AS accepted_enrichment_prompt_version,
+                    accepted_cluster.id AS accepted_cluster_enrichment_id,
+                    accepted_cluster.result_json AS accepted_cluster_json,
+                    accepted_cluster.cluster_applied_at
+                        AS accepted_cluster_applied_at,
+                    accepted_cluster.cluster_reverted_at
+                        AS accepted_cluster_reverted_at,
                     COALESCE(
                         la.name,
                         NULLIF(efi.payload_json ->> 'author', '')
@@ -411,6 +417,21 @@ def list_external_feed_items_for_user(
                     ORDER BY efe.id DESC
                     LIMIT 1
                 ) accepted_enrichment ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT
+                        efe.id,
+                        efe.result_json,
+                        efe.cluster_applied_at,
+                        efe.cluster_reverted_at
+                    FROM external_feed_enrichments efe
+                    WHERE efe.item_id = efi.id
+                      AND efe.operation = 'cluster'
+                      AND efe.status = 'ready'
+                      AND efe.review_status = 'accepted'
+                      AND efe.source_content_hash = efi.content_hash
+                    ORDER BY efe.id DESC
+                    LIMIT 1
+                ) accepted_cluster ON TRUE
                 WHERE efi.state = 'active'
                   AND efi.duplicate_of_id IS NULL
                   AND efs.source_kind = 'bandcamp_rss'
@@ -463,7 +484,69 @@ def list_external_feed_items_for_user(
             ),
             {"user_id": user_id, "limit": bounded_limit},
         ).mappings()
-        return serialize_rows(rows)
+        return _attach_feed_cluster_context(serialize_rows(rows))
+
+
+def _attach_feed_cluster_context(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Attach safe, current cluster metadata to every visible cluster member."""
+    visible_by_id = {
+        int(row["id"]): row for row in rows if isinstance(row.get("id"), int)
+    }
+
+    for row in rows:
+        enrichment_id = row.get("accepted_cluster_enrichment_id")
+        result = row.get("accepted_cluster_json")
+        if not isinstance(enrichment_id, int) or not isinstance(result, Mapping):
+            continue
+        try:
+            proposal = FeedClusterResponse.model_validate(result)
+        except ValueError:
+            # A malformed historical proposal must not break the user feed.
+            continue
+
+        members: list[dict[str, Any]] = []
+        for member in proposal.members:
+            member_row = visible_by_id.get(member.item_id)
+            member_context: dict[str, Any] = {
+                "id": member.item_id,
+                "role": member.role,
+                "reason": member.reason,
+                "visible": member_row is not None,
+            }
+            if member_row is not None:
+                for field in ("title", "canonical_url", "published_at"):
+                    value = member_row.get(field)
+                    if value is not None and str(value).strip():
+                        member_context[field] = str(value).strip()
+                source = member_row.get("source_kind")
+                if source is not None and str(source).strip():
+                    member_context["source"] = str(source).strip()
+            members.append(member_context)
+
+        cluster = {
+            "cluster_id": f"external-feed-cluster:{enrichment_id}",
+            "enrichment_id": enrichment_id,
+            "cluster_type": proposal.cluster_type,
+            "confidence": proposal.confidence,
+            "rationale": proposal.rationale,
+            "applied": bool(
+                row.get("accepted_cluster_applied_at") is not None
+                and row.get("accepted_cluster_reverted_at") is None
+            ),
+            "members": members,
+        }
+        for member in proposal.members:
+            member_row = visible_by_id.get(member.item_id)
+            if member_row is None:
+                continue
+            member_row.setdefault("feed_clusters", []).append(cluster)
+
+    for row in rows:
+        row.pop("accepted_cluster_enrichment_id", None)
+        row.pop("accepted_cluster_json", None)
+        row.pop("accepted_cluster_applied_at", None)
+        row.pop("accepted_cluster_reverted_at", None)
+    return rows
 
 
 def list_due_external_feed_sources(

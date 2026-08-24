@@ -331,3 +331,78 @@ def test_build_updates_feed_does_not_expose_missing_editorial_summary():
     )
 
     assert "editorial_summary" not in items[0]
+
+
+def test_build_updates_feed_exposes_reviewable_cluster_context():
+    items = build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        external_feed_items=[
+            {
+                "id": 41,
+                "item_kind": "news",
+                "artist_name": "Artist",
+                "title": "Album announcement",
+                "canonical_url": "https://artist.example/news/album",
+                "published_at": "2026-08-23T10:00:00+00:00",
+                "source_kind": "artist_site",
+                "feed_clusters": [
+                    {
+                        "cluster_id": "external-feed-cluster:9",
+                        "enrichment_id": 9,
+                        "cluster_type": "release",
+                        "confidence": 0.9,
+                        "rationale": "Both items describe the same release.",
+                        "applied": False,
+                        "members": [
+                            {
+                                "id": 41,
+                                "role": "representative",
+                                "reason": "Introduces the release.",
+                                "title": "Album announcement",
+                                "visible": True,
+                            },
+                            {
+                                "id": 42,
+                                "role": "related",
+                                "reason": "Covers the same release.",
+                                "title": "Album pre-order",
+                                "visible": True,
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+        followed_artists=[],
+        bandcamp_connected=True,
+        limit=20,
+    )
+
+    assert items[0]["feed_clusters"] == [
+        {
+            "cluster_id": "external-feed-cluster:9",
+            "enrichment_id": 9,
+            "cluster_type": "release",
+            "confidence": 0.9,
+            "rationale": "Both items describe the same release.",
+            "applied": False,
+            "members": [
+                {
+                    "id": 41,
+                    "role": "representative",
+                    "reason": "Introduces the release.",
+                    "title": "Album announcement",
+                    "visible": True,
+                },
+                {
+                    "id": 42,
+                    "role": "related",
+                    "reason": "Covers the same release.",
+                    "title": "Album pre-order",
+                    "visible": True,
+                },
+            ],
+        }
+    ]

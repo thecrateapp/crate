@@ -40,6 +40,7 @@ def build_updates_feed(
         )
         loser = previous if winner is candidate else candidate
         winner["provenance"] = _merge_provenance(winner, loser)
+        winner["feed_clusters"] = _merge_feed_clusters(winner, loser)
         deduped[key] = winner
 
     items = sorted(deduped.values(), key=_sort_key)
@@ -183,6 +184,12 @@ def _external_feed_item(row: Mapping[str, Any]) -> dict[str, Any]:
             else _news_key(artist, title, canonical_url)
         ),
     }
+    external_feed_item_id = row.get("id")
+    if isinstance(external_feed_item_id, int):
+        item["external_feed_item_id"] = external_feed_item_id
+    feed_clusters = _feed_clusters(row.get("feed_clusters"))
+    if feed_clusters:
+        item["feed_clusters"] = feed_clusters
     item.update(_editorial_summary(row))
     return item
 
@@ -240,6 +247,77 @@ def _merge_provenance(*items: Mapping[str, Any]) -> list[dict[str, str]]:
         if record and record not in records:
             records.append(record)
     return records
+
+
+def _merge_feed_clusters(*items: Mapping[str, Any]) -> list[dict[str, Any]]:
+    clusters: list[dict[str, Any]] = []
+    for item in items:
+        for cluster in _feed_clusters(item.get("feed_clusters")):
+            cluster_id = cluster.get("cluster_id")
+            if not cluster_id or any(
+                existing.get("cluster_id") == cluster_id for existing in clusters
+            ):
+                continue
+            clusters.append(cluster)
+    return clusters
+
+
+def _feed_clusters(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+
+    clusters: list[dict[str, Any]] = []
+    for raw_cluster in value:
+        if not isinstance(raw_cluster, Mapping):
+            continue
+        cluster_id = _text(raw_cluster.get("cluster_id"))
+        if not cluster_id:
+            continue
+        cluster: dict[str, Any] = {
+            "cluster_id": cluster_id,
+            "cluster_type": _text(raw_cluster.get("cluster_type")) or "other",
+            "confidence": _bounded_confidence(raw_cluster.get("confidence")),
+            "rationale": _text(raw_cluster.get("rationale")),
+            "applied": bool(raw_cluster.get("applied")),
+            "members": _feed_cluster_members(raw_cluster.get("members")),
+        }
+        enrichment_id = raw_cluster.get("enrichment_id")
+        if isinstance(enrichment_id, int):
+            cluster["enrichment_id"] = enrichment_id
+        clusters.append(cluster)
+    return clusters
+
+
+def _feed_cluster_members(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+
+    members: list[dict[str, Any]] = []
+    for raw_member in value:
+        if not isinstance(raw_member, Mapping):
+            continue
+        item_id = raw_member.get("id")
+        if not isinstance(item_id, int):
+            continue
+        member: dict[str, Any] = {
+            "id": item_id,
+            "role": _text(raw_member.get("role")) or "related",
+            "reason": _text(raw_member.get("reason")),
+            "visible": bool(raw_member.get("visible")),
+        }
+        for field in ("title", "source", "canonical_url", "published_at"):
+            value = _text(raw_member.get(field))
+            if value:
+                member[field] = value
+        members.append(member)
+    return members
+
+
+def _bounded_confidence(value: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _provenance_record(item: Mapping[str, Any]) -> dict[str, str]:
