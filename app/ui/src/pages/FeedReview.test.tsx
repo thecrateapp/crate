@@ -199,6 +199,7 @@ describe("FeedReview", () => {
     apiMock.mockResolvedValue({
       review_status: "accepted",
       associated_artist_id: 7,
+      cluster_task_id: "task-cluster-7",
     });
     useApiMock.mockReturnValue({
       data: {
@@ -261,7 +262,19 @@ describe("FeedReview", () => {
         "POST",
         { decision: "accept", rejection_reason: null },
       );
+      expect(pollTaskMock).toHaveBeenCalledWith(
+        "task-cluster-7",
+        expect.any(Function),
+        expect.any(Function),
+        3000,
+        120000,
+      );
     });
+    const onComplete = pollTaskMock.mock.calls[0]?.[1] as
+      | (() => void)
+      | undefined;
+    onComplete?.();
+    expect(refetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("renders cluster proposals and their source items in the review modal", async () => {

@@ -253,7 +253,10 @@ export function FeedReview() {
     }
     setBusyId(selected.id);
     try {
-      const response = await api<{ follow_up_task_id?: string | null }>(
+      const response = await api<{
+        follow_up_task_id?: string | null;
+        cluster_task_id?: string | null;
+      }>(
         `/api/admin/external-feeds/enrichments/${selected.id}/review`,
         "POST",
         {
@@ -261,16 +264,32 @@ export function FeedReview() {
           rejection_reason: decision === "reject" ? reason : null,
         },
       );
-      if (response.follow_up_task_id) {
-        toast.success("Proposal accepted; show extraction queued");
+      const followUpTaskId =
+        response.follow_up_task_id ?? response.cluster_task_id;
+      if (followUpTaskId) {
+        const isShowExtraction = Boolean(response.follow_up_task_id);
+        toast.success(
+          isShowExtraction
+            ? "Proposal accepted; show extraction queued"
+            : "Artist association accepted; clustering queued",
+        );
         pollTask(
-          response.follow_up_task_id,
+          followUpTaskId,
           () => {
             void refetch();
-            toast.success("Show extraction is ready for review");
+            toast.success(
+              isShowExtraction
+                ? "Show extraction is ready for review"
+                : "Clustering is ready for review",
+            );
           },
           (taskError) => {
-            toast.error(taskError || "Show extraction failed");
+            toast.error(
+              taskError ||
+                (isShowExtraction
+                  ? "Show extraction failed"
+                  : "Clustering failed"),
+            );
           },
           3000,
           120000,
