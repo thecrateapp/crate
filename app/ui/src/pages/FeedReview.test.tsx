@@ -138,6 +138,76 @@ describe("FeedReview", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("renders artist association candidates and accepts the selected association", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({
+      review_status: "accepted",
+      associated_artist_id: 7,
+    });
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            result_json: {
+              operation: "associate_artist",
+              artist_id: 7,
+              artist_name: "Example Artist",
+              confidence: 0.91,
+              reason: "The title explicitly names the artist.",
+              candidates: [
+                {
+                  artist_id: 7,
+                  artist_name: "Example Artist",
+                  artist_slug: "example-artist",
+                  score: 0.96,
+                  reasons: ["Exact artist name in title"],
+                },
+                {
+                  artist_id: 8,
+                  artist_name: "Example Arts",
+                  artist_slug: "example-arts",
+                  score: 0.74,
+                  reasons: ["Close name similarity in title"],
+                },
+              ],
+              warnings: [],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText("Associate with Example Artist · 91% confidence"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Review proposal" }));
+    expect(screen.getByText("Artist association")).toBeInTheDocument();
+    expect(
+      screen.getByText("The title explicitly names the artist."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Example Arts")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Accept proposal" }));
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/external-feeds/enrichments/19/review",
+        "POST",
+        { decision: "accept", rejection_reason: null },
+      );
+    });
+  });
+
   it("renders cluster proposals and their source items in the review modal", async () => {
     const user = userEvent.setup();
     useApiMock.mockReturnValue({

@@ -40,6 +40,144 @@ def test_global_publisher_migration_adds_metadata_and_seeds_initial_sources():
     assert "https://daily.bandcamp.com/feed" in migration
 
 
+def test_external_feed_artist_association_migration_tracks_reviewable_associations():
+    migration = (
+        ROOT / "crate/db/migrations/versions/095_external_feed_artist_associations.py"
+    ).read_text()
+
+    assert 'revision = "095"' in migration
+    assert 'down_revision = "094"' in migration
+    assert "associate_artist" in migration
+    assert "artist_association_method" in migration
+    assert "artist_association_confidence" in migration
+    assert "artist_associated_by_user_id" in migration
+
+
+def test_external_feed_artist_association_auto_match_is_persisted_and_invalidated(
+    pg_db,
+):
+    from crate.db.repositories import external_feed_associations, external_feeds
+
+    pg_db.upsert_artist({"name": "Neon Wolves", "slug": "neon-wolves"})
+    source = external_feeds.upsert_external_feed_source(
+        source_kind="publisher_rss",
+        source_scope="publisher",
+        source_url="https://publisher.example/feed.xml",
+        parser_version="editorial-feed-v1",
+    )
+    item = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url="https://publisher.example/neon-wolves-news",
+        external_guid="neon-1",
+        title="Neon Wolves announce a new album",
+        content_hash="neon-hash-1",
+        parser_version="editorial-feed-v1",
+    )
+
+    association = (
+        external_feed_associations.associate_external_feed_item_deterministically(
+            item["id"]
+        )
+    )
+
+    assert association["applied"] is True
+    assert association["auto_candidate"]["artist_name"] == "Neon Wolves"
+    associated = external_feeds.get_external_feed_item(item["id"])
+    assert associated["artist_id"] is not None
+    assert associated["artist_association_method"] == "deterministic_title_match"
+
+    refreshed = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url=item["canonical_url"],
+        external_guid="neon-1",
+        title=item["title"],
+        content_hash="neon-hash-1",
+        parser_version="editorial-feed-v1",
+    )
+    assert refreshed["artist_id"] == associated["artist_id"]
+
+    changed = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url=item["canonical_url"],
+        external_guid="neon-1",
+        title="A broad independent music roundup",
+        content_hash="neon-hash-2",
+        parser_version="editorial-feed-v1",
+    )
+    assert changed["artist_id"] is None
+    assert changed["artist_association_method"] is None
+
+
+def test_accepting_artist_association_applies_ai_choice_atomically(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import read_scope
+    from sqlalchemy import text
+
+    pg_db.upsert_artist({"name": "Example Artist", "slug": "example-artist"})
+    source = external_feeds.upsert_external_feed_source(
+        source_kind="publisher_rss",
+        source_scope="publisher",
+        source_url="https://publisher-ai.example/feed.xml",
+        parser_version="editorial-feed-v1",
+    )
+    item = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        item_kind="news",
+        source_url=source["source_url"],
+        title="New music from Example Artist",
+        content_hash="ai-association-hash",
+        parser_version="editorial-feed-v1",
+    )
+    with read_scope() as session:
+        artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = 'Example Artist'")
+        ).scalar_one()
+    enrichment = external_feeds.queue_external_feed_item_enrichment(
+        item_id=item["id"],
+        operation="associate_artist",
+        source_content_hash="ai-association-hash",
+        prompt_version="external-feed-artist-association-v1",
+    )
+    external_feeds.mark_external_feed_enrichment_ready(
+        enrichment["id"],
+        result={
+            "operation": "associate_artist",
+            "artist_id": artist_id,
+            "artist_name": "Example Artist",
+            "confidence": 0.92,
+            "reason": "The title explicitly names the artist.",
+            "warnings": [],
+            "candidates": [
+                {
+                    "artist_id": artist_id,
+                    "artist_name": "Example Artist",
+                    "artist_slug": "example-artist",
+                    "score": 0.96,
+                    "reasons": ["Exact artist name in title"],
+                }
+            ],
+        },
+        model="ollama/test",
+        prompt_version="external-feed-artist-association-v1",
+    )
+
+    reviewed = external_feeds.review_external_feed_enrichment(
+        enrichment["id"], reviewer_id=1, decision="accept"
+    )
+
+    assert reviewed["review_status"] == "accepted"
+    associated = external_feeds.get_external_feed_item(item["id"])
+    assert associated["artist_id"] == artist_id
+    assert associated["artist_association_method"] == "ai_review"
+    assert associated["artist_associated_by_user_id"] == 1
+
+
 def test_external_feed_ai_migration_preserves_reviewable_provenance():
     source = AI_MIGRATION.read_text()
 

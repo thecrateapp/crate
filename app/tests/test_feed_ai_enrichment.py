@@ -98,6 +98,73 @@ def test_classify_external_feed_item_records_model_and_content_provenance(monkey
     assert result["generated_at"]
 
 
+def test_associate_external_feed_item_uses_only_supplied_candidates(monkeypatch):
+    from crate.feeds import ai_enrichment
+    from crate.llm.prompts.feed_artist_association import (
+        FeedArtistAssociationResponse,
+    )
+
+    monkeypatch.setattr(
+        ai_enrichment,
+        "ask_structured",
+        lambda *args, **kwargs: FeedArtistAssociationResponse(
+            artist_id=7,
+            confidence=0.91,
+            reason="The title names Neon Wolves explicitly.",
+            warnings=[],
+        ),
+    )
+    monkeypatch.setattr(
+        ai_enrichment,
+        "get_config",
+        lambda: {"model": "gemini/gemini-2.5-flash"},
+    )
+
+    result = ai_enrichment.associate_external_feed_item(
+        _item(title="Neon Wolves announce a new album"),
+        [
+            {
+                "artist_id": 7,
+                "artist_name": "Neon Wolves",
+                "artist_slug": "neon-wolves",
+                "score": 0.96,
+                "reasons": ["Exact artist name in title"],
+            }
+        ],
+        language="English",
+    )
+
+    assert result["operation"] == "associate_artist"
+    assert result["artist_id"] == 7
+    assert result["confidence"] == 0.91
+    assert result["candidates"][0]["artist_id"] == 7
+    assert result["prompt_version"] == "external-feed-artist-association-v1"
+
+
+def test_associate_external_feed_item_rejects_unknown_model_artist(monkeypatch):
+    from crate.feeds import ai_enrichment
+    from crate.llm.prompts.feed_artist_association import (
+        FeedArtistAssociationResponse,
+    )
+
+    monkeypatch.setattr(
+        ai_enrichment,
+        "ask_structured",
+        lambda *args, **kwargs: FeedArtistAssociationResponse(
+            artist_id=999,
+            confidence=0.99,
+            reason="Unsupported candidate.",
+            warnings=[],
+        ),
+    )
+
+    with pytest.raises(ValueError, match="supplied candidate"):
+        ai_enrichment.associate_external_feed_item(
+            _item(),
+            [{"artist_id": 7, "artist_name": "Example Artist"}],
+        )
+
+
 def test_extract_external_feed_shows_serializes_reviewable_candidates(monkeypatch):
     from crate.feeds import ai_enrichment
     from crate.llm.prompts.feed_show_extraction import (
@@ -377,6 +444,61 @@ def test_external_feed_ai_handler_persists_reviewable_cluster(monkeypatch):
     assert completed[0][1]["prompt_version"] == "external-feed-clustering-v1"
 
 
+def test_external_feed_ai_handler_persists_artist_association_proposal(monkeypatch):
+    from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.get_external_feed_item",
+        lambda item_id: _item(
+            title="Example Artist tour announcement", author="Example Artist"
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.list_library_artists_for_feed_association",
+        lambda: [{"id": 7, "name": "Example Artist", "slug": "example-artist"}],
+    )
+    queued = {"id": 23, "status": "pending", "source_content_hash": "hash-1"}
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.queue_external_feed_item_enrichment",
+        lambda **kwargs: queued,
+    )
+    proposal = {
+        "operation": "associate_artist",
+        "prompt_version": "external-feed-artist-association-v1",
+        "source_content_hash": "hash-1",
+        "language": "English",
+        "artist_id": 7,
+        "artist_name": "Example Artist",
+        "confidence": 0.91,
+        "reason": "The title names the artist.",
+        "warnings": [],
+        "candidates": [{"artist_id": 7, "artist_name": "Example Artist"}],
+        "model": "ollama/test",
+        "generated_at": "2026-08-23T12:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.associate_external_feed_item",
+        lambda item, candidates, language: proposal,
+    )
+    completed = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.mark_external_feed_enrichment_ready",
+        lambda *args, **kwargs: completed.append((args, kwargs)) or {"id": 23},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.emit_task_event", lambda *args: None
+    )
+
+    result = _handle_external_feeds_enrich_item(
+        "task-1", {"item_id": 7, "operation": "associate_artist"}, {}
+    )
+
+    assert result["status"] == "ready"
+    assert result["result"] == proposal
+    assert completed[0][1]["prompt_version"] == "external-feed-artist-association-v1"
+
+
 def test_external_feed_ai_handler_rejects_unknown_operation(monkeypatch):
     from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
 
@@ -518,6 +640,38 @@ def test_external_feed_ai_api_accepts_cluster_operation(monkeypatch):
 
     assert result == {"task_id": "task-4"}
     assert captured[0][1]["operation"] == "cluster"
+    assert "hash-1" in captured[0][2]
+
+
+def test_external_feed_ai_api_accepts_artist_association_operation(monkeypatch):
+    from crate.api.external_feeds import (
+        ExternalFeedEnrichmentRequest,
+        enrich_external_feed_item,
+    )
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission", lambda request, capability: {}
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.get_external_feed_item", lambda item_id: _item()
+    )
+    captured = []
+    monkeypatch.setattr(
+        "crate.api.external_feeds.create_task_dedup",
+        lambda task_type, params, dedup_key: (
+            captured.append((task_type, params, dedup_key)) or "task-5"
+        ),
+    )
+
+    result = enrich_external_feed_item(
+        None,
+        7,
+        ExternalFeedEnrichmentRequest(operation="associate_artist", language="Spanish"),
+    )
+
+    assert result == {"task_id": "task-5"}
+    assert captured[0][1]["operation"] == "associate_artist"
     assert "hash-1" in captured[0][2]
 
 

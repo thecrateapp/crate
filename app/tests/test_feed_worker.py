@@ -331,6 +331,71 @@ def test_publisher_refresh_queues_ai_summary_for_enabled_sources(monkeypatch):
     assert queued[0][0][1]["operation"] == "summary"
 
 
+def test_publisher_refresh_queues_ambiguous_artist_association_for_review(monkeypatch):
+    monkeypatch.setenv("CRATE_EXTERNAL_RSS_ENABLED", "true")
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds._list_due_editorial_feed_sources",
+        lambda limit: [_source(source_kind="publisher_rss", artist_id=None)],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.can_fetch_editorial_source",
+        lambda *args, **kwargs: True,
+    )
+    item = _item()
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.fetch_editorial_feed",
+        lambda *args, **kwargs: EditorialFeedFetchResult(
+            not_modified=False,
+            items=(item,),
+            etag=None,
+            last_modified=None,
+            content_type="application/rss+xml",
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.upsert_external_feed_item",
+        lambda **kwargs: {"id": 102, "content_hash": item.content_hash},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.list_library_artists_for_feed_association",
+        lambda: [{"id": 7, "name": "Example Artist"}],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.associate_external_feed_item_deterministically",
+        lambda item_id, artists: {
+            "item_id": item_id,
+            "candidates": [{"artist_id": 7, "artist_name": "Example Artist"}],
+            "auto_candidate": None,
+            "requires_review": True,
+            "applied": False,
+        },
+    )
+    queued = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.create_task_dedup",
+        lambda *args, **kwargs: queued.append((args, kwargs)) or "task-ai-102",
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.mark_external_feed_source_not_modified",
+        lambda *args, **kwargs: _source(),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.emit_task_event", lambda *args: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.is_cancelled", lambda task_id: False
+    )
+
+    result = _handle_external_feeds_refresh_editorial("task-1", {}, {})
+
+    assert result["artist_associations_queued"] == 1
+    assert [call[0][1]["operation"] for call in queued] == [
+        "associate_artist",
+        "summary",
+    ]
+
+
 def test_editorial_feed_refresh_skips_sources_disallowed_by_robots(monkeypatch):
     monkeypatch.setenv("CRATE_EXTERNAL_RSS_ENABLED", "true")
     monkeypatch.setattr(
@@ -411,6 +476,8 @@ def test_external_feed_refresh_persists_items_and_cache_validators(monkeypatch):
         "sources_failed": 0,
         "items_upserted": 1,
         "enrichments_queued": 0,
+        "artist_associations_auto": 0,
+        "artist_associations_queued": 0,
     }
     assert upserted[0]["source_id"] == 11
     assert upserted[0]["artist_id"] == 42

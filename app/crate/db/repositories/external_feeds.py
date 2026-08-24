@@ -12,6 +12,9 @@ from urllib.parse import urlsplit, urlunsplit
 from sqlalchemy import text
 
 from crate.db.serialize import serialize_rows
+from crate.db.repositories.external_feed_associations import (
+    apply_external_feed_artist_association,
+)
 from crate.db.repositories.shows import upsert_show
 from crate.db.tx import read_scope, transaction_scope
 from crate.llm.prompts.feed_clustering import FeedClusterResponse
@@ -35,7 +38,13 @@ _SOURCE_KINDS = {
 _SOURCE_SCOPES = {"artist", "label", "publisher"}
 _AI_POLICIES = {"enabled", "manual", "disabled"}
 _ITEM_KINDS = {"news", "announcement", "release", "other"}
-_ENRICHMENT_OPERATIONS = {"summary", "cluster", "classify", "extract_show"}
+_ENRICHMENT_OPERATIONS = {
+    "summary",
+    "cluster",
+    "classify",
+    "extract_show",
+    "associate_artist",
+}
 
 
 def _now() -> datetime:
@@ -957,6 +966,11 @@ def list_external_feed_enrichments_for_review(
                     efs.source_kind,
                     efs.source_url AS feed_source_url,
                     efs.canonical_url AS artist_url,
+                    efi.artist_id AS associated_artist_id,
+                    efi.artist_association_method,
+                    efi.artist_association_confidence,
+                    efi.artist_associated_at,
+                    efi.artist_associated_by_user_id,
                     COALESCE(
                         la.name,
                         NULLIF(efi.payload_json ->> 'author', '')
@@ -997,6 +1011,11 @@ def get_external_feed_enrichment(enrichment_id: int) -> dict[str, Any] | None:
                         efs.source_kind,
                         efs.source_url AS feed_source_url,
                         efs.canonical_url AS artist_url,
+                        efi.artist_id AS associated_artist_id,
+                        efi.artist_association_method,
+                        efi.artist_association_confidence,
+                        efi.artist_associated_at,
+                        efi.artist_associated_by_user_id,
                         COALESCE(
                             la.name,
                             NULLIF(efi.payload_json ->> 'author', '')
@@ -1053,7 +1072,18 @@ def review_external_feed_enrichment(
                 "rejection_reason": reason if decision == "reject" else None,
             },
         )
-        return _row(result)
+        row = _row(result)
+        if (
+            row is not None
+            and decision == "accept"
+            and row["operation"] == ("associate_artist")
+        ):
+            apply_external_feed_artist_association(
+                session,
+                enrichment_id=int(enrichment_id),
+                applied_by_user_id=int(reviewer_id),
+            )
+        return row
 
 
 def apply_external_feed_show_enrichment(
@@ -1796,12 +1826,16 @@ def upsert_external_feed_item(
                         source_id, artist_id, item_kind, state, external_guid,
                         source_url, canonical_url, title, author, excerpt,
                         published_at, content_hash, duplicate_of_id,
-                        payload_json, parser_version
+                        payload_json, parser_version, artist_association_method,
+                        artist_association_confidence, artist_associated_at
                     ) VALUES (
                         :source_id, :artist_id, :item_kind, :state, :external_guid,
                         :source_url, :canonical_url, :title, :author, :excerpt,
                         :published_at, :content_hash, :duplicate_of_id,
-                        CAST(:payload_json AS jsonb), :parser_version
+                        CAST(:payload_json AS jsonb), :parser_version,
+                        CASE WHEN :artist_id IS NOT NULL THEN 'source_artist' END,
+                        CASE WHEN :artist_id IS NOT NULL THEN 1.0 END,
+                        CASE WHEN :artist_id IS NOT NULL THEN NOW() END
                     )
                     RETURNING *
                     """
@@ -1814,7 +1848,36 @@ def upsert_external_feed_item(
                 text(
                     """
                     UPDATE external_feed_items
-                    SET artist_id = :artist_id,
+                    SET artist_id = CASE
+                            WHEN :artist_id IS NOT NULL THEN :artist_id
+                            WHEN external_feed_items.content_hash <> :content_hash
+                                THEN NULL
+                            ELSE external_feed_items.artist_id
+                        END,
+                        artist_association_method = CASE
+                            WHEN :artist_id IS NOT NULL THEN 'source_artist'
+                            WHEN external_feed_items.content_hash <> :content_hash
+                                THEN NULL
+                            ELSE external_feed_items.artist_association_method
+                        END,
+                        artist_association_confidence = CASE
+                            WHEN :artist_id IS NOT NULL THEN 1.0
+                            WHEN external_feed_items.content_hash <> :content_hash
+                                THEN NULL
+                            ELSE external_feed_items.artist_association_confidence
+                        END,
+                        artist_associated_at = CASE
+                            WHEN :artist_id IS NOT NULL THEN NOW()
+                            WHEN external_feed_items.content_hash <> :content_hash
+                                THEN NULL
+                            ELSE external_feed_items.artist_associated_at
+                        END,
+                        artist_associated_by_user_id = CASE
+                            WHEN :artist_id IS NOT NULL THEN NULL
+                            WHEN external_feed_items.content_hash <> :content_hash
+                                THEN NULL
+                            ELSE external_feed_items.artist_associated_by_user_id
+                        END,
                         item_kind = :item_kind,
                         state = :state,
                         external_guid = :external_guid,

@@ -7,6 +7,12 @@ import os
 from typing import Any
 
 from crate.llm import ask_structured, get_config
+from crate.llm.prompts.feed_artist_association import (
+    FEED_ARTIST_ASSOCIATION_SYSTEM_PROMPT,
+    FeedArtistAssociationResponse,
+    PROMPT_VERSION as ARTIST_ASSOCIATION_PROMPT_VERSION,
+    build_feed_artist_association_prompt,
+)
 from crate.llm.prompts.feed_classification import (
     FEED_CLASSIFICATION_SYSTEM_PROMPT,
     FeedClassificationResponse,
@@ -88,6 +94,53 @@ def classify_external_feed_item(
         "confidence": response.confidence,
         "reasons": response.reasons,
         "warnings": response.warnings,
+        "model": get_config().get("model"),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def associate_external_feed_item(
+    item: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    *,
+    language: str = "English",
+) -> dict[str, Any]:
+    """Generate a reviewable local-artist association proposal."""
+    if not str(item.get("title") or "").strip():
+        raise ValueError("External feed item title is required")
+    if not str(item.get("content_hash") or "").strip():
+        raise ValueError("External feed item content hash is required")
+    if not candidates:
+        raise ValueError("At least one artist candidate is required")
+
+    response = ask_structured(
+        FeedArtistAssociationResponse,
+        build_feed_artist_association_prompt(
+            item=item, candidates=candidates, language=language
+        ),
+        system=FEED_ARTIST_ASSOCIATION_SYSTEM_PROMPT,
+    )
+    candidate_ids = {int(candidate["artist_id"]) for candidate in candidates}
+    if response.artist_id is not None and response.artist_id not in candidate_ids:
+        raise ValueError("Model selected an artist outside the supplied candidate list")
+    return {
+        "operation": "associate_artist",
+        "prompt_version": ARTIST_ASSOCIATION_PROMPT_VERSION,
+        "source_content_hash": str(item["content_hash"]),
+        "language": language,
+        "artist_id": response.artist_id,
+        "artist_name": next(
+            (
+                str(candidate.get("artist_name") or "")
+                for candidate in candidates
+                if int(candidate["artist_id"]) == response.artist_id
+            ),
+            None,
+        ),
+        "confidence": response.confidence,
+        "reason": response.reason,
+        "warnings": response.warnings,
+        "candidates": candidates,
         "model": get_config().get("model"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -207,6 +260,7 @@ def extract_shows_from_external_feed_item(
 
 
 __all__ = [
+    "associate_external_feed_item",
     "ai_enrichment_enabled",
     "classify_external_feed_item",
     "cluster_external_feed_item",

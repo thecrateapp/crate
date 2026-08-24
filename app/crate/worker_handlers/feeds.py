@@ -24,14 +24,20 @@ from crate.db.repositories.external_feeds import (
     upsert_external_feed_source,
     queue_external_feed_item_enrichment,
 )
+from crate.db.repositories.external_feed_associations import (
+    associate_external_feed_item_deterministically,
+    list_library_artists_for_feed_association,
+)
 from crate.db.repositories.tasks import create_task_dedup
 from crate.feeds.ai_enrichment import (
     ai_enrichment_enabled,
+    associate_external_feed_item,
     classify_external_feed_item,
     cluster_external_feed_item,
     extract_shows_from_external_feed_item,
     summarize_external_feed_item,
 )
+from crate.feeds.artist_association import rank_artist_association_candidates
 from crate.feeds.rss import (
     PARSER_VERSION,
     RSSFeedError,
@@ -193,7 +199,13 @@ def _handle_external_feeds_enrich_item(
         return {"error": "External feed item not found", "item_id": item_id}
 
     operation = str(params.get("operation") or "summary")
-    if operation not in {"summary", "classify", "cluster", "extract_show"}:
+    if operation not in {
+        "summary",
+        "classify",
+        "cluster",
+        "extract_show",
+        "associate_artist",
+    }:
         return {"error": "Unsupported external feed AI operation"}
 
     if operation == "summary":
@@ -202,6 +214,8 @@ def _handle_external_feeds_enrich_item(
         from crate.llm.prompts.feed_classification import PROMPT_VERSION
     elif operation == "cluster":
         from crate.llm.prompts.feed_clustering import PROMPT_VERSION
+    elif operation == "associate_artist":
+        from crate.llm.prompts.feed_artist_association import PROMPT_VERSION
     else:
         from crate.llm.prompts.feed_show_extraction import PROMPT_VERSION
 
@@ -236,6 +250,31 @@ def _handle_external_feeds_enrich_item(
         elif operation == "cluster":
             candidates = list_external_feed_cluster_candidates(item_id)
             result = cluster_external_feed_item(item, candidates, language=language)
+        elif operation == "associate_artist":
+            candidates = list_library_artists_for_feed_association()
+            ranked = rank_artist_association_candidates(
+                item=item,
+                artists=candidates,
+            )
+            if not ranked["candidates"]:
+                result = {
+                    "operation": "associate_artist",
+                    "prompt_version": PROMPT_VERSION,
+                    "source_content_hash": str(item["content_hash"]),
+                    "language": language,
+                    "artist_id": None,
+                    "artist_name": None,
+                    "confidence": 0.0,
+                    "reason": "No ambiguous artist candidate remained for review.",
+                    "warnings": ["No artist association was selected."],
+                    "candidates": [],
+                    "model": None,
+                    "generated_at": None,
+                }
+            else:
+                result = associate_external_feed_item(
+                    item, ranked["candidates"], language=language
+                )
         else:
             result = extract_shows_from_external_feed_item(item, language=language)
         mark_external_feed_enrichment_ready(
@@ -330,11 +369,14 @@ def _refresh_external_feed_sources(
         "sources_failed": 0,
         "items_upserted": 0,
         "enrichments_queued": 0,
+        "artist_associations_auto": 0,
+        "artist_associations_queued": 0,
     }
     if robots_checker is not None:
         stats["sources_blocked_by_robots"] = 0
 
     sources = source_loader(limit)
+    association_artists: list[dict[str, Any]] | None = None
     emit_task_event(
         task_id,
         f"{event_name}.started",
@@ -392,18 +434,57 @@ def _refresh_external_feed_sources(
                     payload=item.payload,
                 )
                 stats["items_upserted"] += 1
+                item_id = persisted_item.get("id") if persisted_item else None
+                content_hash = str(
+                    (persisted_item or {}).get("content_hash") or item.content_hash
+                )
+                if (
+                    item_id is not None
+                    and source.get("source_kind") in PUBLISHER_SOURCE_KINDS
+                    and (persisted_item or {}).get("state", "active") == "active"
+                ):
+                    try:
+                        if association_artists is None:
+                            association_artists = (
+                                list_library_artists_for_feed_association()
+                            )
+                        association = associate_external_feed_item_deterministically(
+                            int(item_id), artists=association_artists
+                        )
+                        if association.get("applied"):
+                            stats["artist_associations_auto"] += 1
+                        elif (
+                            association.get("requires_review")
+                            and source.get("ai_policy", "enabled") == "enabled"
+                            and external_feed_ai_enabled()
+                        ):
+                            queued_association = create_task_dedup(
+                                "external_feeds_enrich_item",
+                                {
+                                    "item_id": int(item_id),
+                                    "operation": "associate_artist",
+                                    "language": "English",
+                                },
+                                dedup_key=(
+                                    f"external-feed-auto-association:{item_id}:"
+                                    f"{content_hash}"
+                                ),
+                            )
+                            if queued_association is not None:
+                                stats["artist_associations_queued"] += 1
+                    except Exception:
+                        log.warning(
+                            "Could not associate external feed item %s with an artist",
+                            item_id,
+                            exc_info=True,
+                        )
                 if (
                     source.get("source_kind") in PUBLISHER_SOURCE_KINDS
                     and source.get("ai_policy", "enabled") == "enabled"
                     and external_feed_ai_enabled()
                     and (persisted_item or {}).get("state", "active") == "active"
                 ):
-                    item_id = persisted_item.get("id") if persisted_item else None
                     if item_id is not None:
-                        content_hash = str(
-                            (persisted_item or {}).get("content_hash")
-                            or item.content_hash
-                        )
                         try:
                             queued_task = create_task_dedup(
                                 "external_feeds_enrich_item",

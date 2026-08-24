@@ -38,6 +38,10 @@ type ReviewStatus = "pending" | "accepted" | "rejected";
 
 interface EnrichmentResult {
   operation?: string;
+  artist_id?: number | null;
+  artist_name?: string | null;
+  reason?: string;
+  candidates?: FeedArtistAssociationCandidate[];
   classification?: string;
   cluster_type?: string;
   confidence?: number;
@@ -49,6 +53,15 @@ interface EnrichmentResult {
   key_points?: string[];
   warnings?: string[];
   generated_at?: string;
+}
+
+interface FeedArtistAssociationCandidate {
+  artist_id: number;
+  artist_name: string;
+  artist_slug?: string | null;
+  score?: number;
+  confidence?: number;
+  reasons?: string[];
 }
 
 interface FeedClusterMember {
@@ -106,6 +119,11 @@ interface FeedEnrichment {
   feed_source_url?: string | null;
   artist_url?: string | null;
   artist_name?: string | null;
+  associated_artist_id?: number | null;
+  artist_association_method?: string | null;
+  artist_association_confidence?: number | null;
+  artist_associated_at?: string | null;
+  artist_associated_by_user_id?: number | null;
 }
 
 interface ReviewResponse {
@@ -156,6 +174,16 @@ function formatClassification(value?: string) {
 }
 
 function proposalPreview(result: EnrichmentResult, fallback?: string | null) {
+  if (result.operation === "associate_artist") {
+    if (result.artist_id && result.artist_name) {
+      const confidence =
+        typeof result.confidence === "number"
+          ? ` · ${Math.round(result.confidence * 100)}% confidence`
+          : "";
+      return `Associate with ${result.artist_name}${confidence}`;
+    }
+    return "No artist association selected";
+  }
   if (result.summary) return result.summary;
   if (result.members?.length) {
     return `${result.members.length} related items · ${formatClassification(
@@ -529,7 +557,9 @@ export function FeedReview() {
                 <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/40">
                   AI proposal
                 </h3>
-                {selected.result_json.members?.length ? (
+                {selected.result_json.operation === "associate_artist" ? (
+                  <ArtistAssociationProposal result={selected.result_json} />
+                ) : selected.result_json.members?.length ? (
                   <div className="space-y-3 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-sm font-medium text-white/85">
@@ -914,6 +944,11 @@ function FeedProposalCard({
                 In catalogue
               </Badge>
             ) : null}
+            {item.associated_artist_id ? (
+              <Badge className="border-sky-400/25 bg-sky-400/10 text-sky-200">
+                Artist associated
+              </Badge>
+            ) : null}
             <span className="text-xs text-white/35">
               {formatDate(item.published_at)}
             </span>
@@ -940,5 +975,79 @@ function FeedProposalCard({
         </Button>
       </div>
     </article>
+  );
+}
+
+function ArtistAssociationProposal({ result }: { result: EnrichmentResult }) {
+  const selectedId = result.artist_id;
+  return (
+    <div className="space-y-4 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-sm font-medium text-white/85">
+          Artist association
+        </h4>
+        {typeof result.confidence === "number" ? (
+          <Badge variant="outline">
+            {Math.round(result.confidence * 100)}% confidence
+          </Badge>
+        ) : null}
+      </div>
+      {selectedId && result.artist_name ? (
+        <div className="rounded-md border border-emerald-400/20 bg-emerald-400/[0.06] p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-200/70">
+            Selected artist
+          </p>
+          <p className="mt-1 text-sm font-medium text-white/90">
+            {result.artist_name}
+          </p>
+        </div>
+      ) : (
+        <p className="rounded-md border border-amber-400/20 bg-amber-400/[0.06] p-3 text-sm text-amber-100/80">
+          The model did not select a safe artist association.
+        </p>
+      )}
+      {result.reason ? (
+        <p className="text-sm leading-6 text-white/70">{result.reason}</p>
+      ) : null}
+      {result.candidates?.length ? (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/40">
+            Candidates considered
+          </p>
+          {result.candidates.map((candidate) => (
+            <div
+              key={candidate.artist_id}
+              className={cn(
+                "rounded-md border bg-black/15 p-3",
+                candidate.artist_id === selectedId
+                  ? "border-emerald-400/30"
+                  : "border-white/10",
+              )}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-white/85">
+                  {candidate.artist_name}
+                </span>
+                {candidate.artist_id === selectedId ? (
+                  <Badge className="border-emerald-400/25 bg-emerald-400/10 text-emerald-200">
+                    Selected
+                  </Badge>
+                ) : null}
+                {typeof candidate.score === "number" ? (
+                  <span className="text-xs text-white/40">
+                    {Math.round(candidate.score * 100)}% match
+                  </span>
+                ) : null}
+              </div>
+              {candidate.reasons?.length ? (
+                <p className="mt-1 text-xs leading-5 text-white/50">
+                  {candidate.reasons.join(" · ")}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
