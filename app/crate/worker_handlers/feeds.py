@@ -64,6 +64,21 @@ MAX_MAX_SOURCES = 100
 DEFAULT_TIMEOUT_SECONDS = 20.0
 MAX_RETRY_DELAY_SECONDS = 21600
 AI_ENRICHABLE_SOURCE_KINDS = EDITORIAL_SOURCE_KINDS | PUBLISHER_SOURCE_KINDS
+SOURCE_LANGUAGE_NAMES = {
+    "ca": "Catalan",
+    "de": "German",
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "it": "Italian",
+    "ja": "Japanese",
+    "pt": "Portuguese",
+}
+
+
+def _source_ai_language(source: dict[str, Any]) -> str:
+    language = str(source.get("language") or "en").strip().casefold()
+    return SOURCE_LANGUAGE_NAMES.get(language, "English")
 
 
 def external_rss_enabled() -> bool:
@@ -441,6 +456,7 @@ def _refresh_external_feed_sources(
                 content_hash = str(
                     (persisted_item or {}).get("content_hash") or item.content_hash
                 )
+                ai_language = _source_ai_language(source)
                 association: dict[str, Any] | None = None
                 if (
                     item_id is not None
@@ -467,11 +483,11 @@ def _refresh_external_feed_sources(
                                 {
                                     "item_id": int(item_id),
                                     "operation": "associate_artist",
-                                    "language": "English",
+                                    "language": ai_language,
                                 },
                                 dedup_key=(
                                     f"external-feed-auto-association:{item_id}:"
-                                    f"{content_hash}"
+                                    f"{content_hash}:{ai_language.casefold()}"
                                 ),
                             )
                             if queued_association is not None:
@@ -495,11 +511,11 @@ def _refresh_external_feed_sources(
                                 {
                                     "item_id": int(item_id),
                                     "operation": "summary",
-                                    "language": "English",
+                                    "language": ai_language,
                                 },
                                 dedup_key=(
                                     f"external-feed-auto-summary:{item_id}:"
-                                    f"{content_hash}"
+                                    f"{content_hash}:{ai_language.casefold()}"
                                 ),
                             )
                             if queued_task is not None:
@@ -516,11 +532,11 @@ def _refresh_external_feed_sources(
                                 {
                                     "item_id": int(item_id),
                                     "operation": "classify",
-                                    "language": "English",
+                                    "language": ai_language,
                                 },
                                 dedup_key=(
                                     f"external-feed-auto-classification:{item_id}:"
-                                    f"{content_hash}"
+                                    f"{content_hash}:{ai_language.casefold()}"
                                 ),
                             )
                             if queued_classification is not None:
@@ -548,11 +564,11 @@ def _refresh_external_feed_sources(
                                     {
                                         "item_id": int(item_id),
                                         "operation": "cluster",
-                                        "language": "English",
+                                        "language": ai_language,
                                     },
                                     dedup_key=(
                                         f"external-feed-auto-cluster:{item_id}:"
-                                        f"{content_hash}"
+                                        f"{content_hash}:{ai_language.casefold()}"
                                     ),
                                 )
                                 if queued_cluster is not None:

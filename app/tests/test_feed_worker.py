@@ -277,11 +277,14 @@ def test_editorial_refresh_includes_global_publisher_sources(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("source_kind", "artist_id"),
-    [("publisher_rss", None), ("artist_site", 42)],
+    ("source_kind", "artist_id", "source_language", "ai_language"),
+    [
+        ("publisher_rss", None, "en", "English"),
+        ("artist_site", 42, "es", "Spanish"),
+    ],
 )
 def test_editorial_refresh_queues_ai_enrichments_for_enabled_sources(
-    monkeypatch, source_kind, artist_id
+    monkeypatch, source_kind, artist_id, source_language, ai_language
 ):
     monkeypatch.setenv("CRATE_EXTERNAL_RSS_ENABLED", "true")
     monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
@@ -291,6 +294,7 @@ def test_editorial_refresh_queues_ai_enrichments_for_enabled_sources(
             _source(
                 source_kind=source_kind,
                 artist_id=artist_id,
+                language=source_language,
                 ai_policy="enabled",
             )
         ],
@@ -362,11 +366,17 @@ def test_editorial_refresh_queues_ai_enrichments_for_enabled_sources(
     ]
     assert queued[0][0][0] == "external_feeds_enrich_item"
     assert queued[0][0][1]["item_id"] == 101
+    assert [call[0][1]["language"] for call in queued] == [
+        ai_language,
+        ai_language,
+        ai_language,
+    ]
     assert queued[1][1]["dedup_key"] == (
-        f"external-feed-auto-classification:101:{item.content_hash}"
+        f"external-feed-auto-classification:101:{item.content_hash}:"
+        f"{ai_language.casefold()}"
     )
     assert queued[2][1]["dedup_key"] == (
-        f"external-feed-auto-cluster:101:{item.content_hash}"
+        f"external-feed-auto-cluster:101:{item.content_hash}:{ai_language.casefold()}"
     )
 
 
