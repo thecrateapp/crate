@@ -26,6 +26,7 @@ from crate.feeds.rss import (
 EDITORIAL_SOURCE_KINDS = frozenset(
     {"artist_site", "label", "newsletter", "blog", "event_page"}
 )
+PUBLISHER_SOURCE_KINDS = frozenset({"publisher_rss"})
 EDITORIAL_ASSOCIATION_METHODS = frozenset(
     {"artist_official", "label_official", "newsletter_opt_in", "admin_allowlist"}
 )
@@ -251,6 +252,7 @@ def _retry_after_seconds(value: str | None) -> int | None:
 __all__ = [
     "EDITORIAL_ASSOCIATION_METHODS",
     "EDITORIAL_SOURCE_KINDS",
+    "PUBLISHER_SOURCE_KINDS",
     "EditorialFeedFetchResult",
     "EditorialFeedHTTPError",
     "EditorialFeedInvalidError",

@@ -277,6 +277,33 @@ def test_build_updates_feed_excludes_rss_without_active_connection():
     assert items == []
 
 
+def test_build_updates_feed_includes_global_publisher_news_without_bandcamp():
+    items = build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        external_feed_items=[
+            {
+                "item_kind": "news",
+                "title": "The state of independent music",
+                "canonical_url": "https://pitchfork.com/news/independent-music",
+                "published_at": "2026-08-23T10:00:00+00:00",
+                "source_kind": "publisher_rss",
+                "publisher_name": "Pitchfork",
+                "display_name": "Pitchfork",
+            }
+        ],
+        followed_artists=[],
+        bandcamp_connected=False,
+        limit=20,
+    )
+
+    assert len(items) == 1
+    assert items[0]["type"] == "news"
+    assert items[0]["source"] == "publisher_rss"
+    assert items[0]["source_detail"] == "Pitchfork"
+
+
 def test_build_updates_feed_exposes_only_accepted_editorial_summary():
     items = build_updates_feed(
         releases=[],

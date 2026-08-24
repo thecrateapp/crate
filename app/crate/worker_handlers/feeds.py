@@ -24,6 +24,7 @@ from crate.db.repositories.external_feeds import (
     upsert_external_feed_source,
     queue_external_feed_item_enrichment,
 )
+from crate.db.repositories.tasks import create_task_dedup
 from crate.feeds.ai_enrichment import (
     ai_enrichment_enabled,
     classify_external_feed_item,
@@ -43,6 +44,7 @@ from crate.db.events import emit_task_event
 from crate.feeds.editorial import (
     EDITORIAL_SOURCE_KINDS,
     PARSER_VERSION as EDITORIAL_PARSER_VERSION,
+    PUBLISHER_SOURCE_KINDS,
     can_fetch_editorial_source,
     fetch_editorial_feed,
 )
@@ -280,11 +282,15 @@ def _retry_delay_seconds(
     return base + int(random() * (jitter_limit + 1))
 
 
-def _list_due_editorial_feed_sources(limit: int) -> list[dict[str, Any]]:
+def _list_due_editorial_feed_sources(
+    limit: int, source_id: int | None = None
+) -> list[dict[str, Any]]:
     sources: list[dict[str, Any]] = []
-    for source_kind in sorted(EDITORIAL_SOURCE_KINDS):
+    for source_kind in sorted(EDITORIAL_SOURCE_KINDS | PUBLISHER_SOURCE_KINDS):
         sources.extend(
-            list_due_external_feed_sources(limit=limit, source_kind=source_kind)
+            list_due_external_feed_sources(
+                limit=limit, source_kind=source_kind, source_id=source_id
+            )
         )
     return sorted(
         sources,
@@ -323,6 +329,7 @@ def _refresh_external_feed_sources(
         "sources_not_found": 0,
         "sources_failed": 0,
         "items_upserted": 0,
+        "enrichments_queued": 0,
     }
     if robots_checker is not None:
         stats["sources_blocked_by_robots"] = 0
@@ -369,7 +376,7 @@ def _refresh_external_feed_sources(
                 continue
 
             for item in result.items:
-                upsert_external_feed_item(
+                persisted_item = upsert_external_feed_item(
                     source_id=source_id,
                     artist_id=source.get("artist_id"),
                     item_kind=item.item_kind,
@@ -385,6 +392,39 @@ def _refresh_external_feed_sources(
                     payload=item.payload,
                 )
                 stats["items_upserted"] += 1
+                if (
+                    source.get("source_kind") in PUBLISHER_SOURCE_KINDS
+                    and source.get("ai_policy", "enabled") == "enabled"
+                    and external_feed_ai_enabled()
+                    and (persisted_item or {}).get("state", "active") == "active"
+                ):
+                    item_id = persisted_item.get("id") if persisted_item else None
+                    if item_id is not None:
+                        content_hash = str(
+                            (persisted_item or {}).get("content_hash")
+                            or item.content_hash
+                        )
+                        try:
+                            queued_task = create_task_dedup(
+                                "external_feeds_enrich_item",
+                                {
+                                    "item_id": int(item_id),
+                                    "operation": "summary",
+                                    "language": "English",
+                                },
+                                dedup_key=(
+                                    f"external-feed-auto-summary:{item_id}:"
+                                    f"{content_hash}"
+                                ),
+                            )
+                            if queued_task is not None:
+                                stats["enrichments_queued"] += 1
+                        except Exception:
+                            log.warning(
+                                "Could not queue AI summary for external feed item %s",
+                                item_id,
+                                exc_info=True,
+                            )
             mark_external_feed_source_not_modified(
                 source_id,
                 etag=result.etag,
@@ -446,11 +486,19 @@ def _handle_external_feeds_refresh_editorial(
     config: dict,
 ) -> dict[str, Any]:
     """Refresh registered editorial sources after a robots.txt check."""
+    source_id = params.get("source_id")
+    source_loader = _list_due_editorial_feed_sources
+    if source_id is not None:
+        selected_source_id = int(source_id)
+
+        def source_loader(limit: int) -> list[dict[str, Any]]:
+            return _list_due_editorial_feed_sources(limit, source_id=selected_source_id)
+
     return _refresh_external_feed_sources(
         task_id,
         params,
         config,
-        source_loader=_list_due_editorial_feed_sources,
+        source_loader=source_loader,
         feed_fetcher=fetch_editorial_feed,
         parser_version=EDITORIAL_PARSER_VERSION,
         event_name="external_feeds.editorial_refresh",

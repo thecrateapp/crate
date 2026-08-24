@@ -1409,10 +1409,8 @@ def feed(
         if bandcamp_connected
         else []
     )
-    external_feed_items = (
-        list_external_feed_items_for_user(int(user["id"]), limit=candidate_limit)
-        if bandcamp_connected
-        else []
+    external_feed_items = list_external_feed_items_for_user(
+        int(user["id"]), limit=candidate_limit
     )
     return build_updates_feed(
         releases=releases,

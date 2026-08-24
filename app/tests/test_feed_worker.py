@@ -236,6 +236,101 @@ def test_editorial_feed_refresh_respects_robots_and_persists_items(monkeypatch):
     assert checked[0][1]["etag"] == '"editorial"'
 
 
+def test_editorial_refresh_includes_global_publisher_sources(monkeypatch):
+    monkeypatch.setenv("CRATE_EXTERNAL_RSS_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds._list_due_editorial_feed_sources",
+        lambda limit: [_source(source_kind="publisher_rss", artist_id=None)],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.can_fetch_editorial_source",
+        lambda *args, **kwargs: True,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.fetch_editorial_feed",
+        lambda *args, **kwargs: EditorialFeedFetchResult(
+            not_modified=True,
+            items=(),
+            etag='"publisher"',
+            last_modified=None,
+            content_type="application/rss+xml",
+        ),
+    )
+    marked = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.mark_external_feed_source_not_modified",
+        lambda *args, **kwargs: marked.append((args, kwargs)) or _source(),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.emit_task_event", lambda *args: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.is_cancelled", lambda task_id: False
+    )
+
+    result = _handle_external_feeds_refresh_editorial("task-1", {}, {})
+
+    assert result["sources_not_modified"] == 1
+    assert marked[0][1]["etag"] == '"publisher"'
+
+
+def test_publisher_refresh_queues_ai_summary_for_enabled_sources(monkeypatch):
+    monkeypatch.setenv("CRATE_EXTERNAL_RSS_ENABLED", "true")
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds._list_due_editorial_feed_sources",
+        lambda limit: [
+            _source(
+                source_kind="publisher_rss",
+                artist_id=None,
+                ai_policy="enabled",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.can_fetch_editorial_source",
+        lambda *args, **kwargs: True,
+    )
+    item = _item()
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.fetch_editorial_feed",
+        lambda *args, **kwargs: EditorialFeedFetchResult(
+            not_modified=False,
+            items=(item,),
+            etag=None,
+            last_modified=None,
+            content_type="application/rss+xml",
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.upsert_external_feed_item",
+        lambda **kwargs: {"id": 101, "content_hash": item.content_hash},
+    )
+    queued = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.create_task_dedup",
+        lambda *args, **kwargs: queued.append((args, kwargs)) or "task-ai-101",
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.mark_external_feed_source_not_modified",
+        lambda *args, **kwargs: _source(),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.emit_task_event", lambda *args: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.is_cancelled", lambda task_id: False
+    )
+
+    result = _handle_external_feeds_refresh_editorial("task-1", {}, {})
+
+    assert result["items_upserted"] == 1
+    assert result["enrichments_queued"] == 1
+    assert queued[0][0][0] == "external_feeds_enrich_item"
+    assert queued[0][0][1]["item_id"] == 101
+    assert queued[0][0][1]["operation"] == "summary"
+
+
 def test_editorial_feed_refresh_skips_sources_disallowed_by_robots(monkeypatch):
     monkeypatch.setenv("CRATE_EXTERNAL_RSS_ENABLED", "true")
     monkeypatch.setattr(
@@ -315,6 +410,7 @@ def test_external_feed_refresh_persists_items_and_cache_validators(monkeypatch):
         "sources_not_found": 0,
         "sources_failed": 0,
         "items_upserted": 1,
+        "enrichments_queued": 0,
     }
     assert upserted[0]["source_id"] == 11
     assert upserted[0]["artist_id"] == 42

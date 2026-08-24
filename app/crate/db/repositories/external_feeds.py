@@ -25,12 +25,15 @@ MAX_ERROR_LENGTH = 1000
 
 _SOURCE_KINDS = {
     "bandcamp_rss",
+    "publisher_rss",
     "artist_site",
     "label",
     "newsletter",
     "blog",
     "event_page",
 }
+_SOURCE_SCOPES = {"artist", "label", "publisher"}
+_AI_POLICIES = {"enabled", "manual", "disabled"}
 _ITEM_KINDS = {"news", "announcement", "release", "other"}
 _ENRICHMENT_OPERATIONS = {"summary", "cluster", "classify", "extract_show"}
 
@@ -129,6 +132,13 @@ def upsert_external_feed_source(
     association_method: str | None = None,
     parser_version: str,
     refresh_interval_seconds: int = DEFAULT_REFRESH_INTERVAL_SECONDS,
+    source_scope: str | None = None,
+    display_name: str | None = None,
+    publisher_name: str | None = None,
+    category: str | None = None,
+    logo_url: str | None = None,
+    terms_url: str | None = None,
+    ai_policy: str = "enabled",
 ) -> dict[str, Any]:
     """Create or update a source without resetting its HTTP cache state."""
     if source_kind not in _SOURCE_KINDS:
@@ -137,6 +147,17 @@ def upsert_external_feed_source(
     canonical_url = _clean_http_url(canonical_url, required=False)
     parser_version = _required_text(parser_version, max_length=128)
     interval = _validate_refresh_interval(refresh_interval_seconds)
+    resolved_scope = source_scope or (
+        "publisher" if source_kind == "publisher_rss" else "artist"
+    )
+    if resolved_scope not in _SOURCE_SCOPES:
+        raise ValueError(f"Unsupported external feed source scope: {resolved_scope}")
+    if source_kind == "publisher_rss" and artist_id is not None:
+        raise ValueError("Publisher RSS sources cannot be associated with an artist")
+    if source_kind == "publisher_rss" and resolved_scope != "publisher":
+        raise ValueError("Publisher RSS sources must use publisher scope")
+    if ai_policy not in _AI_POLICIES:
+        raise ValueError(f"Unsupported external feed AI policy: {ai_policy}")
 
     with transaction_scope() as session:
         result = session.execute(
@@ -144,10 +165,14 @@ def upsert_external_feed_source(
                 """
                 INSERT INTO external_feed_sources (
                     source_kind, source_url, canonical_url, artist_id,
-                    association_method, parser_version, refresh_interval_seconds
+                    association_method, parser_version, refresh_interval_seconds,
+                    source_scope, display_name, publisher_name, category, logo_url,
+                    terms_url, ai_policy
                 ) VALUES (
                     :source_kind, :source_url, :canonical_url, :artist_id,
-                    :association_method, :parser_version, :refresh_interval_seconds
+                    :association_method, :parser_version, :refresh_interval_seconds,
+                    :source_scope, :display_name, :publisher_name, :category,
+                    :logo_url, :terms_url, :ai_policy
                 )
                 ON CONFLICT (source_url) DO UPDATE SET
                     source_kind = EXCLUDED.source_kind,
@@ -165,6 +190,23 @@ def upsert_external_feed_source(
                     ),
                     parser_version = EXCLUDED.parser_version,
                     refresh_interval_seconds = EXCLUDED.refresh_interval_seconds,
+                    source_scope = EXCLUDED.source_scope,
+                    display_name = COALESCE(
+                        EXCLUDED.display_name, external_feed_sources.display_name
+                    ),
+                    publisher_name = COALESCE(
+                        EXCLUDED.publisher_name, external_feed_sources.publisher_name
+                    ),
+                    category = COALESCE(
+                        EXCLUDED.category, external_feed_sources.category
+                    ),
+                    logo_url = COALESCE(
+                        EXCLUDED.logo_url, external_feed_sources.logo_url
+                    ),
+                    terms_url = COALESCE(
+                        EXCLUDED.terms_url, external_feed_sources.terms_url
+                    ),
+                    ai_policy = EXCLUDED.ai_policy,
                     updated_at = NOW()
                 RETURNING *
                 """
@@ -177,9 +219,166 @@ def upsert_external_feed_source(
                 "association_method": association_method,
                 "parser_version": parser_version,
                 "refresh_interval_seconds": interval,
+                "source_scope": resolved_scope,
+                "display_name": _clean_text(display_name, max_length=160),
+                "publisher_name": _clean_text(publisher_name, max_length=160),
+                "category": _clean_text(category, max_length=80),
+                "logo_url": _clean_http_url(logo_url, required=False),
+                "terms_url": _clean_http_url(terms_url, required=False),
+                "ai_policy": ai_policy,
             },
         )
         return dict(result.mappings().one())
+
+
+def list_external_feed_sources(
+    *, scope: str | None = None, limit: int = 100
+) -> list[dict[str, Any]]:
+    """List configured sources with lightweight ingestion statistics."""
+    if scope is not None and scope not in _SOURCE_SCOPES:
+        raise ValueError(f"Unsupported external feed source scope: {scope}")
+    bounded_limit = max(1, min(int(limit), 500))
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT
+                    efs.*,
+                    COUNT(efi.id) FILTER (
+                        WHERE efi.state = 'active'
+                    ) AS active_item_count,
+                    MAX(efi.published_at) FILTER (
+                        WHERE efi.state = 'active'
+                    ) AS latest_item_published_at
+                FROM external_feed_sources efs
+                LEFT JOIN external_feed_items efi ON efi.source_id = efs.id
+                WHERE (:scope IS NULL OR efs.source_scope = :scope)
+                GROUP BY efs.id
+                ORDER BY efs.updated_at DESC, efs.id DESC
+                LIMIT :limit
+                """
+            ),
+            {"scope": scope, "limit": bounded_limit},
+        ).mappings()
+        return serialize_rows(rows)
+
+
+def list_external_feed_items_for_source(
+    source_id: int, *, limit: int = 10
+) -> list[dict[str, Any]]:
+    """List cached public items for an admin source preview."""
+    bounded_limit = max(1, min(int(limit), 50))
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT
+                    efi.id,
+                    efi.item_kind,
+                    efi.title,
+                    efi.author,
+                    efi.excerpt,
+                    efi.canonical_url,
+                    efi.published_at,
+                    efi.discovered_at,
+                    efi.content_hash,
+                    efs.display_name,
+                    efs.publisher_name
+                FROM external_feed_items efi
+                JOIN external_feed_sources efs ON efs.id = efi.source_id
+                WHERE efi.source_id = :source_id
+                  AND efs.source_kind = 'publisher_rss'
+                  AND efs.source_scope = 'publisher'
+                  AND efi.state = 'active'
+                  AND efi.duplicate_of_id IS NULL
+                ORDER BY efi.published_at DESC NULLS LAST, efi.id DESC
+                LIMIT :limit
+                """
+            ),
+            {"source_id": int(source_id), "limit": bounded_limit},
+        ).mappings()
+        return serialize_rows(rows)
+
+
+def update_external_feed_source(
+    source_id: int,
+    *,
+    state: str | None = None,
+    display_name: str | None = None,
+    publisher_name: str | None = None,
+    category: str | None = None,
+    logo_url: str | None = None,
+    terms_url: str | None = None,
+    ai_policy: str | None = None,
+    refresh_interval_seconds: int | None = None,
+) -> dict[str, Any] | None:
+    """Update admin-editable metadata without resetting fetch state."""
+    allowed_states = {"active", "disabled"}
+    if state is not None and state not in allowed_states:
+        raise ValueError(f"Unsupported external feed state: {state}")
+    if ai_policy is not None and ai_policy not in _AI_POLICIES:
+        raise ValueError(f"Unsupported external feed AI policy: {ai_policy}")
+    interval = (
+        _validate_refresh_interval(refresh_interval_seconds)
+        if refresh_interval_seconds is not None
+        else None
+    )
+    with transaction_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    UPDATE external_feed_sources
+                    SET state = COALESCE(:state, state),
+                        display_name = COALESCE(:display_name, display_name),
+                        publisher_name = COALESCE(:publisher_name, publisher_name),
+                        category = COALESCE(:category, category),
+                        logo_url = COALESCE(:logo_url, logo_url),
+                        terms_url = COALESCE(:terms_url, terms_url),
+                        ai_policy = COALESCE(:ai_policy, ai_policy),
+                        refresh_interval_seconds = COALESCE(
+                            :refresh_interval_seconds, refresh_interval_seconds
+                        ),
+                        updated_at = NOW()
+                    WHERE id = :source_id
+                      AND source_kind = 'publisher_rss'
+                      AND source_scope = 'publisher'
+                    RETURNING *
+                    """
+                ),
+                {
+                    "source_id": int(source_id),
+                    "state": state,
+                    "display_name": _clean_text(display_name, max_length=160),
+                    "publisher_name": _clean_text(publisher_name, max_length=160),
+                    "category": _clean_text(category, max_length=80),
+                    "logo_url": _clean_http_url(logo_url, required=False),
+                    "terms_url": _clean_http_url(terms_url, required=False),
+                    "ai_policy": ai_policy,
+                    "refresh_interval_seconds": interval,
+                },
+            )
+        )
+
+
+def mark_external_feed_source_due(source_id: int) -> dict[str, Any] | None:
+    """Make one publisher source eligible for the next worker pass."""
+    with transaction_scope() as session:
+        return _row(
+            session.execute(
+                text(
+                    """
+                    UPDATE external_feed_sources
+                    SET state = 'active', next_fetch_at = NOW(), updated_at = NOW()
+                    WHERE id = :source_id
+                      AND source_kind = 'publisher_rss'
+                      AND source_scope = 'publisher'
+                    RETURNING *
+                    """
+                ),
+                {"source_id": int(source_id)},
+            )
+        )
 
 
 def get_external_feed_source(source_id: int) -> dict[str, Any] | None:
@@ -247,10 +446,13 @@ def list_external_feed_cluster_candidates(
                     efs.source_kind,
                     efs.source_url AS feed_source_url,
                     efs.canonical_url AS artist_url,
-                    COALESCE(
-                        la.name,
-                        NULLIF(efi.payload_json ->> 'author', '')
-                    ) AS artist_name
+                    CASE
+                        WHEN efs.source_kind = 'publisher_rss' THEN NULL
+                        ELSE COALESCE(
+                            la.name,
+                            NULLIF(efi.payload_json ->> 'author', '')
+                        )
+                    END AS artist_name
                 FROM external_feed_items efi
                 JOIN external_feed_sources efs ON efs.id = efi.source_id
                 LEFT JOIN library_artists la ON la.id = efi.artist_id
@@ -374,7 +576,7 @@ def list_bandcamp_feed_candidates(*, limit: int = 100) -> list[dict[str, Any]]:
 def list_external_feed_items_for_user(
     user_id: int, *, limit: int = 100
 ) -> list[dict[str, Any]]:
-    """Return only active RSS items associated with this user's Bandcamp graph."""
+    """Return global editorial items plus private items from the user's Bandcamp graph."""
     bounded_limit = max(1, min(int(limit), 500))
     with read_scope() as session:
         rows = session.execute(
@@ -386,6 +588,10 @@ def list_external_feed_items_for_user(
                     efs.source_url AS feed_source_url,
                     efs.canonical_url AS artist_url,
                     efs.association_method,
+                    efs.source_scope,
+                    efs.display_name,
+                    efs.publisher_name,
+                    efs.category,
                     accepted_enrichment.result_json AS accepted_enrichment_json,
                     accepted_enrichment.model AS accepted_enrichment_model,
                     accepted_enrichment.prompt_version
@@ -396,10 +602,13 @@ def list_external_feed_items_for_user(
                         AS accepted_cluster_applied_at,
                     accepted_cluster.cluster_reverted_at
                         AS accepted_cluster_reverted_at,
-                    COALESCE(
-                        la.name,
-                        NULLIF(efi.payload_json ->> 'author', '')
-                    ) AS artist_name
+                    CASE
+                        WHEN efs.source_kind = 'publisher_rss' THEN NULL
+                        ELSE COALESCE(
+                            la.name,
+                            NULLIF(efi.payload_json ->> 'author', '')
+                        )
+                    END AS artist_name
                 FROM external_feed_items efi
                 JOIN external_feed_sources efs ON efs.id = efi.source_id
                 LEFT JOIN library_artists la ON la.id = efs.artist_id
@@ -434,48 +643,56 @@ def list_external_feed_items_for_user(
                 ) accepted_cluster ON TRUE
                 WHERE efi.state = 'active'
                   AND efi.duplicate_of_id IS NULL
-                  AND efs.source_kind = 'bandcamp_rss'
                   AND efs.state IN ('active', 'degraded')
-                  AND EXISTS (
-                      SELECT 1
-                      FROM bandcamp_connections bc
-                      WHERE bc.user_id = :user_id
-                        AND bc.status = 'connected'
-                        AND bc.revoked_at IS NULL
-                  )
-                  AND (
-                      EXISTS (
-                          SELECT 1
-                          FROM user_global_artist_follows ugaf
-                          JOIN global_catalog_artists ga
-                            ON ga.global_artist_uid = ugaf.global_artist_uid
-                          WHERE ugaf.user_id = :user_id
-                            AND ga.local_artist_id = efs.artist_id
+                    AND (
+                      (
+                          efs.source_kind = 'publisher_rss'
+                          AND efs.source_scope = 'publisher'
                       )
-                      OR EXISTS (
-                          SELECT 1
-                          FROM user_follows uf
-                          WHERE uf.user_id = :user_id
-                            AND lower(uf.artist_name) = lower(la.name)
-                      )
-                      OR EXISTS (
-                          SELECT 1
-                          FROM user_bandcamp_items ubi
-                          JOIN bandcamp_connections bc
-                            ON bc.id = ubi.connection_id
-                           AND bc.user_id = ubi.user_id
-                           AND bc.status = 'connected'
-                           AND bc.revoked_at IS NULL
-                          JOIN bandcamp_items bi
-                            ON bi.id = ubi.bandcamp_item_id
-                          WHERE ubi.user_id = :user_id
-                            AND ubi.relation_type IN ('wishlist', 'following')
-                            AND ubi.removed_at IS NULL
-                            AND lower(regexp_replace(
-                                trim(coalesce(bi.artist_url, '')), '/+$', ''
-                            )) = lower(regexp_replace(
-                                trim(coalesce(efs.canonical_url, '')), '/+$', ''
-                            ))
+                      OR (
+                          efs.source_kind = 'bandcamp_rss'
+                          AND EXISTS (
+                              SELECT 1
+                              FROM bandcamp_connections bc
+                              WHERE bc.user_id = :user_id
+                                AND bc.status = 'connected'
+                                AND bc.revoked_at IS NULL
+                          )
+                          AND (
+                              EXISTS (
+                                  SELECT 1
+                                  FROM user_global_artist_follows ugaf
+                                  JOIN global_catalog_artists ga
+                                    ON ga.global_artist_uid = ugaf.global_artist_uid
+                                  WHERE ugaf.user_id = :user_id
+                                    AND ga.local_artist_id = efs.artist_id
+                              )
+                              OR EXISTS (
+                                  SELECT 1
+                                  FROM user_follows uf
+                                  WHERE uf.user_id = :user_id
+                                    AND lower(uf.artist_name) = lower(la.name)
+                              )
+                              OR EXISTS (
+                                  SELECT 1
+                                  FROM user_bandcamp_items ubi
+                                  JOIN bandcamp_connections bc
+                                    ON bc.id = ubi.connection_id
+                                   AND bc.user_id = ubi.user_id
+                                   AND bc.status = 'connected'
+                                   AND bc.revoked_at IS NULL
+                                  JOIN bandcamp_items bi
+                                    ON bi.id = ubi.bandcamp_item_id
+                                  WHERE ubi.user_id = :user_id
+                                    AND ubi.relation_type IN ('wishlist', 'following')
+                                    AND ubi.removed_at IS NULL
+                                    AND lower(regexp_replace(
+                                        trim(coalesce(bi.artist_url, '')), '/+$', ''
+                                    )) = lower(regexp_replace(
+                                        trim(coalesce(efs.canonical_url, '')), '/+$', ''
+                                    ))
+                              )
+                          )
                       )
                   )
                 ORDER BY efi.published_at DESC NULLS LAST, efi.id DESC
@@ -554,6 +771,7 @@ def list_due_external_feed_sources(
     limit: int = 50,
     now: datetime | None = None,
     source_kind: str | None = None,
+    source_id: int | None = None,
 ) -> list[dict[str, Any]]:
     bounded_limit = max(1, min(int(limit), 500))
     due_at = now or _now()
@@ -566,11 +784,17 @@ def list_due_external_feed_sources(
                 WHERE state IN ('active', 'degraded')
                   AND (next_fetch_at IS NULL OR next_fetch_at <= :now)
                   AND (:source_kind IS NULL OR source_kind = :source_kind)
+                  AND (:source_id IS NULL OR id = :source_id)
                 ORDER BY next_fetch_at ASC NULLS FIRST, id ASC
                 LIMIT :limit
                 """
             ),
-            {"now": due_at, "limit": bounded_limit, "source_kind": source_kind},
+            {
+                "now": due_at,
+                "limit": bounded_limit,
+                "source_kind": source_kind,
+                "source_id": source_id,
+            },
         ).mappings()
         return [dict(row) for row in rows]
 
@@ -1507,6 +1731,8 @@ __all__ = [
     "get_external_feed_enrichment",
     "get_external_feed_item_enrichment",
     "get_external_feed_source",
+    "list_external_feed_sources",
+    "list_external_feed_items_for_source",
     "list_external_feed_cluster_candidates",
     "apply_external_feed_cluster_enrichment",
     "apply_external_feed_show_enrichment",
@@ -1517,11 +1743,13 @@ __all__ = [
     "mark_external_feed_enrichment_failed",
     "mark_external_feed_enrichment_ready",
     "mark_external_feed_source_failure",
+    "mark_external_feed_source_due",
     "revert_external_feed_cluster_enrichment",
     "mark_external_feed_source_not_found",
     "mark_external_feed_source_not_modified",
     "queue_external_feed_item_enrichment",
     "review_external_feed_enrichment",
+    "update_external_feed_source",
     "upsert_external_feed_item",
     "upsert_external_feed_source",
 ]

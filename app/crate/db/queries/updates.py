@@ -22,7 +22,11 @@ def build_updates_feed(
     candidates.extend(_artist_item(row) for row in followed_artists)
     if bandcamp_connected:
         candidates.extend(_bandcamp_item(row) for row in radar_items)
-        candidates.extend(_external_feed_item(row) for row in external_feed_items)
+    candidates.extend(
+        _external_feed_item(row)
+        for row in external_feed_items
+        if bandcamp_connected or _is_global_external_feed_item(row)
+    )
 
     deduped: dict[str, dict[str, Any]] = {}
     for candidate in candidates:
@@ -155,19 +159,30 @@ def _bandcamp_item(row: Mapping[str, Any]) -> dict[str, Any]:
 def _external_feed_item(row: Mapping[str, Any]) -> dict[str, Any]:
     payload = row.get("payload_json")
     payload = payload if isinstance(payload, Mapping) else {}
-    artist = _text(row.get("artist_name") or row.get("author"))
+    source_kind = _normalize(row.get("source_kind"))
+    artist = _text(row.get("artist_name"))
+    if not artist and source_kind != "publisher_rss":
+        artist = _text(row.get("author"))
     title = _text(row.get("title") or artist)
     item_kind = _normalize(row.get("item_kind"))
     published_at = _iso(
         row.get("published_at") or row.get("discovered_at") or row.get("updated_at")
     )
     canonical_url = _text(row.get("canonical_url") or row.get("source_url")) or None
-    item_type = "news" if item_kind in {"news", "announcement"} else "bandcamp"
+    item_type = (
+        "bandcamp"
+        if source_kind == "bandcamp_rss" and item_kind == "release"
+        else "news"
+    )
     image_url = _text(row.get("image_url") or payload.get("image_url")) or None
     item = {
         "type": item_type,
         "source": _text(row.get("source_kind")) or "bandcamp_rss",
-        "source_detail": None,
+        "source_detail": (
+            _text(row.get("display_name") or row.get("publisher_name"))
+            if source_kind == "publisher_rss"
+            else None
+        ),
         "canonical_url": canonical_url,
         "published_at": published_at,
         "event_date": None,
@@ -192,6 +207,10 @@ def _external_feed_item(row: Mapping[str, Any]) -> dict[str, Any]:
         item["feed_clusters"] = feed_clusters
     item.update(_editorial_summary(row))
     return item
+
+
+def _is_global_external_feed_item(row: Mapping[str, Any]) -> bool:
+    return _normalize(row.get("source_kind")) == "publisher_rss"
 
 
 def _editorial_summary(row: Mapping[str, Any]) -> dict[str, Any]:

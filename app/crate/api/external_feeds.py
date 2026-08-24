@@ -19,15 +19,21 @@ from crate.db.repositories.external_feeds import (
     apply_external_feed_show_enrichment,
     get_external_feed_enrichment,
     get_external_feed_item,
+    list_external_feed_sources,
+    list_external_feed_items_for_source,
     list_external_feed_enrichments_for_review,
+    mark_external_feed_source_due,
     revert_external_feed_cluster_enrichment,
     review_external_feed_enrichment,
+    update_external_feed_source,
+    upsert_external_feed_source,
 )
 from crate.db.repositories.tasks import (
     create_task_dedup,
     find_active_task_by_type_params,
 )
 from crate.feeds.ai_enrichment import ai_enrichment_enabled
+from crate.feeds.editorial import validate_editorial_feed_url
 
 
 router = APIRouter(prefix="/api/admin/external-feeds", tags=["external-feeds"])
@@ -50,6 +56,156 @@ class ExternalFeedEnrichmentRequest(BaseModel):
 class ExternalFeedReviewRequest(BaseModel):
     decision: Literal["accept", "reject"]
     rejection_reason: str | None = Field(default=None, max_length=1000)
+
+
+class PublisherFeedSourceCreateRequest(BaseModel):
+    source_url: str = Field(min_length=1, max_length=2048)
+    canonical_url: str | None = Field(default=None, max_length=2048)
+    display_name: str = Field(min_length=1, max_length=160)
+    publisher_name: str | None = Field(default=None, max_length=160)
+    category: str | None = Field(default=None, max_length=80)
+    logo_url: str | None = Field(default=None, max_length=2048)
+    terms_url: str | None = Field(default=None, max_length=2048)
+    ai_policy: Literal["enabled", "manual", "disabled"] = "enabled"
+    refresh_interval_seconds: int = Field(default=86400, ge=300, le=604800)
+
+
+class PublisherFeedSourceUpdateRequest(BaseModel):
+    state: Literal["active", "disabled"] | None = None
+    display_name: str | None = Field(default=None, min_length=1, max_length=160)
+    publisher_name: str | None = Field(default=None, max_length=160)
+    category: str | None = Field(default=None, max_length=80)
+    logo_url: str | None = Field(default=None, max_length=2048)
+    terms_url: str | None = Field(default=None, max_length=2048)
+    ai_policy: Literal["enabled", "manual", "disabled"] | None = None
+    refresh_interval_seconds: int | None = Field(default=None, ge=300, le=604800)
+
+
+def _validate_publisher_urls(
+    body: PublisherFeedSourceCreateRequest,
+) -> dict[str, str | None]:
+    try:
+        source_url = validate_editorial_feed_url(body.source_url)
+        canonical_url = validate_editorial_feed_url(
+            body.canonical_url or body.source_url
+        )
+        logo_url = validate_editorial_feed_url(body.logo_url) if body.logo_url else None
+        terms_url = (
+            validate_editorial_feed_url(body.terms_url) if body.terms_url else None
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "source_url": source_url,
+        "canonical_url": canonical_url,
+        "logo_url": logo_url,
+        "terms_url": terms_url,
+    }
+
+
+@router.get(
+    "/sources",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="List admin-managed global RSS sources",
+)
+def list_publisher_feed_sources(request: Request, limit: int = 100):
+    require_permission(request, "settings.manage")
+    return {"items": list_external_feed_sources(scope="publisher", limit=limit)}
+
+
+@router.post(
+    "/sources",
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES, {422: error_response("Invalid RSS source.")}
+    ),
+    summary="Register a global RSS source",
+)
+def create_publisher_feed_source(
+    request: Request, body: PublisherFeedSourceCreateRequest
+):
+    require_permission(request, "settings.manage")
+    urls = _validate_publisher_urls(body)
+    try:
+        source = upsert_external_feed_source(
+            source_kind="publisher_rss",
+            source_scope="publisher",
+            source_url=urls["source_url"] or "",
+            canonical_url=urls["canonical_url"],
+            artist_id=None,
+            association_method="admin_allowlist",
+            display_name=body.display_name,
+            publisher_name=body.publisher_name or body.display_name,
+            category=body.category,
+            logo_url=urls["logo_url"],
+            terms_url=urls["terms_url"],
+            ai_policy=body.ai_policy,
+            parser_version="editorial-feed-v1",
+            refresh_interval_seconds=body.refresh_interval_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    task_id = create_task_dedup(
+        "external_feeds_refresh_editorial",
+        {"source_id": int(source["id"]), "limit": 1},
+        dedup_key=f"external-feed-source-refresh:{source['id']}",
+    )
+    return {"source": source, "task_id": task_id}
+
+
+@router.patch(
+    "/sources/{source_id}",
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES, {404: error_response("Source not found.")}
+    ),
+    summary="Update a global RSS source",
+)
+def update_publisher_feed_source(
+    request: Request, source_id: int, body: PublisherFeedSourceUpdateRequest
+):
+    require_permission(request, "settings.manage")
+    try:
+        changes = body.model_dump(exclude_none=True)
+        source = update_external_feed_source(
+            source_id,
+            **changes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if source is None:
+        raise HTTPException(status_code=404, detail="Publisher RSS source not found")
+    return source
+
+
+@router.post(
+    "/sources/{source_id}/refresh",
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES, {404: error_response("Source not found.")}
+    ),
+    summary="Refresh one global RSS source now",
+)
+def refresh_publisher_feed_source(request: Request, source_id: int):
+    require_permission(request, "settings.manage")
+    source = mark_external_feed_source_due(source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Publisher RSS source not found")
+    task_id = create_task_dedup(
+        "external_feeds_refresh_editorial",
+        {"source_id": int(source_id), "limit": 1},
+        dedup_key=f"external-feed-source-refresh:{source_id}",
+    )
+    return {"source_id": int(source_id), "task_id": task_id}
+
+
+@router.get(
+    "/sources/{source_id}/items",
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES, {404: error_response("Source not found.")}
+    ),
+    summary="Preview cached items from a global RSS source",
+)
+def list_publisher_feed_items(request: Request, source_id: int, limit: int = 10):
+    require_permission(request, "settings.manage")
+    return {"items": list_external_feed_items_for_source(source_id, limit=limit)}
 
 
 @router.get(
@@ -243,12 +399,19 @@ def enrich_external_feed_item(
 __all__ = [
     "ExternalFeedEnrichmentRequest",
     "ExternalFeedReviewRequest",
+    "PublisherFeedSourceCreateRequest",
+    "PublisherFeedSourceUpdateRequest",
     "apply_external_feed_cluster",
     "apply_external_feed_shows",
+    "create_publisher_feed_source",
     "enrich_external_feed_item",
     "get_external_feed_review_item",
     "list_external_feed_review_queue",
+    "list_publisher_feed_sources",
+    "list_publisher_feed_items",
+    "refresh_publisher_feed_source",
     "review_external_feed",
     "revert_external_feed_cluster",
+    "update_publisher_feed_source",
     "router",
 ]

@@ -26,6 +26,20 @@ def test_external_feed_migration_separates_sources_and_items():
     assert "ON DELETE SET NULL" in source
 
 
+def test_global_publisher_migration_adds_metadata_and_seeds_initial_sources():
+    migration = (
+        ROOT / "crate/db/migrations/versions/094_global_publisher_feed_sources.py"
+    ).read_text()
+
+    assert 'revision = "094"' in migration
+    assert 'down_revision = "093"' in migration
+    assert "publisher_rss" in migration
+    assert "source_scope" in migration
+    assert "ai_policy" in migration
+    assert "https://pitchfork.com/feed/rss" in migration
+    assert "https://daily.bandcamp.com/feed" in migration
+
+
 def test_external_feed_ai_migration_preserves_reviewable_provenance():
     source = AI_MIGRATION.read_text()
 
@@ -133,13 +147,14 @@ def test_external_feed_source_preserves_http_cache_metadata_and_tracks_due_time(
 
     assert (
         external_feeds.list_due_external_feed_sources(
-            now=checked_at + timedelta(minutes=30)
+            now=checked_at + timedelta(minutes=30), source_kind="artist_site"
         )
         == []
     )
     assert (
         external_feeds.list_due_external_feed_sources(
-            now=checked_at + timedelta(hours=1, minutes=1)
+            now=checked_at + timedelta(hours=1, minutes=1),
+            source_kind="artist_site",
         )[0]["id"]
         == source["id"]
     )
@@ -353,7 +368,12 @@ def test_external_feed_source_not_found_stops_future_polling(pg_db):
     assert missing["state"] == "not_found"
     assert missing["last_error"] == "HTTP 404"
     assert missing["next_fetch_at"] is None
-    assert external_feeds.list_due_external_feed_sources(now=checked_at) == []
+    assert (
+        external_feeds.list_due_external_feed_sources(
+            now=checked_at, source_kind="artist_site"
+        )
+        == []
+    )
 
 
 def test_bandcamp_feed_candidates_include_explicit_library_urls(pg_db):
@@ -904,3 +924,29 @@ def test_external_feed_cluster_application_is_idempotent_and_reversible(pg_db):
         enrichment["id"], reverted_by_user_id=1
     )
     assert retried_revert["already_reverted"] is True
+
+
+def test_global_publisher_source_is_not_bound_to_an_artist(pg_db):
+    from crate.db.repositories import external_feeds
+
+    source = external_feeds.upsert_external_feed_source(
+        source_kind="publisher_rss",
+        source_url="https://pitchfork.com/feed/rss",
+        canonical_url="https://pitchfork.com/",
+        display_name="Pitchfork",
+        publisher_name="Pitchfork",
+        category="music_news",
+        source_scope="publisher",
+        ai_policy="enabled",
+        parser_version="editorial-feed-v1",
+        refresh_interval_seconds=86400,
+    )
+
+    assert source["artist_id"] is None
+    assert source["source_scope"] == "publisher"
+    assert source["display_name"] == "Pitchfork"
+    assert source["publisher_name"] == "Pitchfork"
+    assert source["refresh_interval_seconds"] == 86400
+
+    listed = external_feeds.list_external_feed_sources(scope="publisher")
+    assert any(row["id"] == source["id"] for row in listed)
