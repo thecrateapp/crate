@@ -100,4 +100,41 @@ describe("FeedReview", () => {
 
     expect(apiMock).not.toHaveBeenCalled();
   });
+
+  it("renders classification proposals in the review modal", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            result_json: {
+              classification: "tour",
+              confidence: 0.94,
+              reasons: ["The source announces European tour dates."],
+              warnings: [],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText("Classified as tour · 94% confidence"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Review proposal" }));
+    expect(screen.getAllByText(/94%/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("The source announces European tour dates.").length,
+    ).toBeGreaterThan(0);
+  });
 });

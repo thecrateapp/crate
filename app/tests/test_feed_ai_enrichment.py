@@ -66,6 +66,38 @@ def test_summarize_external_feed_item_records_model_and_content_provenance(monke
     assert result["generated_at"]
 
 
+def test_classify_external_feed_item_records_model_and_content_provenance(monkeypatch):
+    from crate.feeds import ai_enrichment
+    from crate.llm.prompts.feed_classification import FeedClassificationResponse
+
+    monkeypatch.setattr(
+        ai_enrichment,
+        "ask_structured",
+        lambda *args, **kwargs: FeedClassificationResponse(
+            classification="tour",
+            confidence=0.94,
+            reasons=["The source announces European tour dates."],
+            warnings=[],
+        ),
+    )
+    monkeypatch.setattr(
+        ai_enrichment,
+        "get_config",
+        lambda: {"model": "gemini/gemini-2.5-flash"},
+    )
+
+    result = ai_enrichment.classify_external_feed_item(_item(), language="English")
+
+    assert result["operation"] == "classify"
+    assert result["prompt_version"] == "external-feed-classification-v1"
+    assert result["source_content_hash"] == "hash-1"
+    assert result["language"] == "English"
+    assert result["model"] == "gemini/gemini-2.5-flash"
+    assert result["classification"] == "tour"
+    assert result["confidence"] == 0.94
+    assert result["generated_at"]
+
+
 def test_external_feed_ai_handler_is_inert_when_disabled(monkeypatch):
     from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
 
@@ -134,6 +166,57 @@ def test_external_feed_ai_handler_persists_reviewable_summary(monkeypatch):
     assert completed[0][1]["model"] == "ollama/llama3.1:8b"
 
 
+def test_external_feed_ai_handler_persists_reviewable_classification(monkeypatch):
+    from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.get_external_feed_item", lambda item_id: _item()
+    )
+    queued = {
+        "id": 20,
+        "status": "pending",
+        "source_content_hash": "hash-1",
+    }
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.queue_external_feed_item_enrichment",
+        lambda **kwargs: queued,
+    )
+    proposal = {
+        "operation": "classify",
+        "prompt_version": "external-feed-classification-v1",
+        "source_content_hash": "hash-1",
+        "language": "English",
+        "classification": "tour",
+        "confidence": 0.94,
+        "reasons": ["The source announces European tour dates."],
+        "warnings": [],
+        "model": "ollama/llama3.1:8b",
+        "generated_at": "2026-08-23T12:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.classify_external_feed_item",
+        lambda item, language: proposal,
+    )
+    completed = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.mark_external_feed_enrichment_ready",
+        lambda *args, **kwargs: completed.append((args, kwargs)) or {"id": 20},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.emit_task_event", lambda *args: None
+    )
+
+    result = _handle_external_feeds_enrich_item(
+        "task-1", {"item_id": 7, "operation": "classify"}, {}
+    )
+
+    assert result["status"] == "ready"
+    assert result["enrichment_id"] == 20
+    assert result["result"] == proposal
+    assert completed[0][1]["prompt_version"] == "external-feed-classification-v1"
+
+
 def test_external_feed_ai_handler_rejects_unknown_operation(monkeypatch):
     from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
 
@@ -179,6 +262,38 @@ def test_external_feed_ai_api_queues_hash_deduplicated_task(monkeypatch):
     assert result == {"task_id": "task-1"}
     assert captured[0][0] == "external_feeds_enrich_item"
     assert captured[0][1]["language"] == "Spanish"
+    assert "hash-1" in captured[0][2]
+
+
+def test_external_feed_ai_api_accepts_classification_operation(monkeypatch):
+    from crate.api.external_feeds import (
+        ExternalFeedEnrichmentRequest,
+        enrich_external_feed_item,
+    )
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission", lambda request, capability: {}
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.get_external_feed_item", lambda item_id: _item()
+    )
+    captured = []
+    monkeypatch.setattr(
+        "crate.api.external_feeds.create_task_dedup",
+        lambda task_type, params, dedup_key: (
+            captured.append((task_type, params, dedup_key)) or "task-2"
+        ),
+    )
+
+    result = enrich_external_feed_item(
+        None,
+        7,
+        ExternalFeedEnrichmentRequest(operation="classify", language="Spanish"),
+    )
+
+    assert result == {"task_id": "task-2"}
+    assert captured[0][1]["operation"] == "classify"
     assert "hash-1" in captured[0][2]
 
 

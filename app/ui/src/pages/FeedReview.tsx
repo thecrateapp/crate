@@ -34,6 +34,9 @@ import { cn } from "@/lib/utils";
 type ReviewStatus = "pending" | "accepted" | "rejected";
 
 interface EnrichmentResult {
+  classification?: string;
+  confidence?: number;
+  reasons?: string[];
   summary?: string;
   key_points?: string[];
   warnings?: string[];
@@ -98,6 +101,24 @@ function statusClasses(status: ReviewStatus) {
     return "border-red-400/25 bg-red-400/10 text-red-200";
   }
   return "border-amber-400/25 bg-amber-400/10 text-amber-200";
+}
+
+function formatClassification(value?: string) {
+  return value ? value.replace(/_/g, " ") : "Unknown";
+}
+
+function proposalPreview(result: EnrichmentResult, fallback?: string | null) {
+  if (result.summary) return result.summary;
+  if (result.classification) {
+    const confidence =
+      typeof result.confidence === "number"
+        ? ` · ${Math.round(result.confidence * 100)}% confidence`
+        : "";
+    return `Classified as ${formatClassification(
+      result.classification,
+    )}${confidence}`;
+  }
+  return fallback || "No proposal available.";
 }
 
 export function FeedReview() {
@@ -312,9 +333,37 @@ export function FeedReview() {
                 <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/40">
                   AI proposal
                 </h3>
-                <p className="break-words rounded-md border border-primary/15 bg-primary/[0.06] p-4 text-sm leading-6 text-white/80">
-                  {selected.result_json.summary || "No summary was generated."}
-                </p>
+                {selected.result_json.classification ? (
+                  <div className="space-y-3 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">
+                        {formatClassification(
+                          selected.result_json.classification,
+                        )}
+                      </Badge>
+                      {typeof selected.result_json.confidence === "number" ? (
+                        <span className="text-xs text-white/45">
+                          {Math.round(selected.result_json.confidence * 100)}%
+                          confidence
+                        </span>
+                      ) : null}
+                    </div>
+                    {selected.result_json.reasons?.length ? (
+                      <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-white/75">
+                        {selected.result_json.reasons.map((reason) => (
+                          <li key={reason} className="break-words">
+                            {reason}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="break-words rounded-md border border-primary/15 bg-primary/[0.06] p-4 text-sm leading-6 text-white/80">
+                    {selected.result_json.summary ||
+                      "No summary was generated."}
+                  </p>
+                )}
               </section>
 
               {selected.result_json.key_points?.length ? (
@@ -465,9 +514,7 @@ function FeedProposalCard({
             </p>
           </div>
           <p className="line-clamp-2 break-words text-sm leading-6 text-white/55">
-            {item.result_json.summary ||
-              item.excerpt ||
-              "No summary available."}
+            {proposalPreview(item.result_json, item.excerpt)}
           </p>
         </div>
         <Button
