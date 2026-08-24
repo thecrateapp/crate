@@ -764,6 +764,60 @@ def test_external_feed_review_queues_show_extraction_for_accepted_tour(
     ]
 
 
+def test_external_feed_review_queues_clustering_after_artist_association(
+    monkeypatch,
+):
+    from crate.api.external_feeds import (
+        ExternalFeedReviewRequest,
+        review_external_feed,
+    )
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission",
+        lambda request, capability: {"id": 42},
+    )
+    enrichment = {
+        "id": 21,
+        "item_id": 7,
+        "operation": "associate_artist",
+        "review_status": "accepted",
+        "source_content_hash": "hash-1",
+        "language": "English",
+        "result_json": {"artist_id": 42},
+    }
+    monkeypatch.setattr(
+        "crate.api.external_feeds.review_external_feed_enrichment",
+        lambda *args, **kwargs: enrichment,
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.get_external_feed_item",
+        lambda item_id: {"id": item_id, "artist_id": 42, "content_hash": "hash-1"},
+    )
+    captured = []
+    monkeypatch.setattr(
+        "crate.api.external_feeds.create_task_dedup",
+        lambda task_type, params, dedup_key: (
+            captured.append((task_type, params, dedup_key)) or "task-cluster-7"
+        ),
+    )
+
+    result = review_external_feed(
+        None,
+        21,
+        ExternalFeedReviewRequest(decision="accept"),
+    )
+
+    assert result["cluster_task_id"] == "task-cluster-7"
+    assert captured == [
+        (
+            "external_feeds_enrich_item",
+            {"item_id": 7, "operation": "cluster", "language": "English"},
+            "external-feed-auto-cluster:7:hash-1:english",
+        )
+    ]
+
+
 def test_external_feed_review_api_applies_accepted_show_proposal(monkeypatch):
     from crate.api.external_feeds import apply_external_feed_shows
 

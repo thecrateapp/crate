@@ -316,7 +316,48 @@ def review_external_feed(
                 enrichment_id,
                 exc_info=True,
             )
+    cluster_task_id = None
+    if (
+        body.decision == "accept"
+        and enrichment.get("operation") == "associate_artist"
+        and ai_enrichment_enabled()
+    ):
+        item_id = int(enrichment["item_id"])
+        item = get_external_feed_item(item_id)
+        source_content_hash = str(enrichment.get("source_content_hash") or "")
+        if (
+            item is not None
+            and item.get("artist_id") is not None
+            and str(item.get("content_hash") or "") == source_content_hash
+        ):
+            language = str(enrichment.get("language") or "English")
+            dedup_key = (
+                f"external-feed-auto-cluster:{item_id}:"
+                f"{source_content_hash}:{language.casefold()}"
+            )
+            try:
+                cluster_task_id = create_task_dedup(
+                    "external_feeds_enrich_item",
+                    {
+                        "item_id": item_id,
+                        "operation": "cluster",
+                        "language": language,
+                    },
+                    dedup_key=dedup_key,
+                )
+                if cluster_task_id is None:
+                    cluster_task_id = find_active_task_by_type_params(
+                        "external_feeds_enrich_item",
+                        dedup_key=dedup_key,
+                    )
+            except Exception:
+                log.warning(
+                    "Could not queue clustering for accepted artist association %s",
+                    enrichment_id,
+                    exc_info=True,
+                )
     enrichment["follow_up_task_id"] = follow_up_task_id
+    enrichment["cluster_task_id"] = cluster_task_id
     return enrichment
 
 
