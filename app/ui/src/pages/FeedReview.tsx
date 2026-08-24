@@ -32,6 +32,7 @@ import {
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
+import { useTaskPoll } from "@/hooks/use-task-poll";
 import { cn } from "@/lib/utils";
 
 type ReviewStatus = "pending" | "accepted" | "rejected";
@@ -124,6 +125,7 @@ interface FeedEnrichment {
   artist_association_confidence?: number | null;
   artist_associated_at?: string | null;
   artist_associated_by_user_id?: number | null;
+  follow_up_task_id?: string | null;
 }
 
 interface ReviewResponse {
@@ -222,6 +224,7 @@ export function FeedReview() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const url = `/api/admin/external-feeds/enrichments/review?review_status=${reviewStatus}&limit=100`;
   const { data, loading, error, refetch } = useApi<ReviewResponse>(url);
+  const { pollTask } = useTaskPoll();
   const items = data?.items ?? [];
 
   function selectFilter(value: ReviewStatus) {
@@ -250,7 +253,7 @@ export function FeedReview() {
     }
     setBusyId(selected.id);
     try {
-      await api(
+      const response = await api<{ follow_up_task_id?: string | null }>(
         `/api/admin/external-feeds/enrichments/${selected.id}/review`,
         "POST",
         {
@@ -258,9 +261,25 @@ export function FeedReview() {
           rejection_reason: decision === "reject" ? reason : null,
         },
       );
-      toast.success(
-        decision === "accept" ? "Proposal accepted" : "Proposal rejected",
-      );
+      if (response.follow_up_task_id) {
+        toast.success("Proposal accepted; show extraction queued");
+        pollTask(
+          response.follow_up_task_id,
+          () => {
+            void refetch();
+            toast.success("Show extraction is ready for review");
+          },
+          (taskError) => {
+            toast.error(taskError || "Show extraction failed");
+          },
+          3000,
+          120000,
+        );
+      } else {
+        toast.success(
+          decision === "accept" ? "Proposal accepted" : "Proposal rejected",
+        );
+      }
       setSelected(null);
       setRejectionReason("");
       refetch();

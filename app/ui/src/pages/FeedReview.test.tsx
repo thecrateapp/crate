@@ -3,13 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, refetchMock, useApiMock } = vi.hoisted(() => ({
+const { apiMock, pollTaskMock, refetchMock, useApiMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
+  pollTaskMock: vi.fn(),
   refetchMock: vi.fn(),
   useApiMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-api", () => ({ useApi: useApiMock }));
+vi.mock("@/hooks/use-task-poll", () => ({
+  useTaskPoll: () => ({ pollTask: pollTaskMock }),
+}));
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
@@ -45,6 +49,7 @@ const item = {
 describe("FeedReview", () => {
   beforeEach(() => {
     apiMock.mockReset();
+    pollTaskMock.mockReset();
     refetchMock.mockReset();
     useApiMock.mockReturnValue({
       data: { items: [item] },
@@ -99,6 +104,57 @@ describe("FeedReview", () => {
     await user.click(screen.getByRole("button", { name: "Reject" }));
 
     expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it("tracks show extraction after accepting a tour classification", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({
+      review_status: "accepted",
+      follow_up_task_id: "task-show-7",
+    });
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            result_json: {
+              classification: "tour",
+              confidence: 0.94,
+              reasons: ["The source announces European tour dates."],
+              warnings: [],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Review proposal" }));
+    await user.click(screen.getByRole("button", { name: "Accept proposal" }));
+
+    await waitFor(() => {
+      expect(pollTaskMock).toHaveBeenCalledWith(
+        "task-show-7",
+        expect.any(Function),
+        expect.any(Function),
+        3000,
+        120000,
+      );
+    });
+
+    const onComplete = pollTaskMock.mock.calls[0]?.[1] as
+      | (() => void)
+      | undefined;
+    onComplete?.();
+    expect(refetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("renders classification proposals in the review modal", async () => {
