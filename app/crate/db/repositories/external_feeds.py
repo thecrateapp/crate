@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import re
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -37,6 +38,7 @@ _SOURCE_KINDS = {
 }
 _SOURCE_SCOPES = {"artist", "label", "publisher"}
 _AI_POLICIES = {"enabled", "manual", "disabled"}
+_LANGUAGE_PATTERN = re.compile(r"^[a-z]{2,3}$")
 _ITEM_KINDS = {"news", "announcement", "release", "other"}
 _ENRICHMENT_OPERATIONS = {
     "summary",
@@ -114,6 +116,13 @@ def _validate_refresh_interval(value: int) -> int:
     return interval
 
 
+def _clean_language(value: Any) -> str:
+    language = str(value or "").strip().lower()
+    if not _LANGUAGE_PATTERN.fullmatch(language):
+        raise ValueError("External feed language must be a 2 or 3 letter ISO code")
+    return language
+
+
 def _bounded_payload(payload: Mapping[str, Any] | None) -> dict[str, Any]:
     value = dict(payload or {})
     encoded = json.dumps(value, default=str, ensure_ascii=False, sort_keys=True)
@@ -145,6 +154,7 @@ def upsert_external_feed_source(
     display_name: str | None = None,
     publisher_name: str | None = None,
     category: str | None = None,
+    language: str | None = None,
     logo_url: str | None = None,
     terms_url: str | None = None,
     ai_policy: str = "enabled",
@@ -156,6 +166,7 @@ def upsert_external_feed_source(
     canonical_url = _clean_http_url(canonical_url, required=False)
     parser_version = _required_text(parser_version, max_length=128)
     interval = _validate_refresh_interval(refresh_interval_seconds)
+    resolved_language = _clean_language(language) if language is not None else None
     resolved_scope = source_scope or (
         "publisher" if source_kind == "publisher_rss" else "artist"
     )
@@ -176,12 +187,12 @@ def upsert_external_feed_source(
                     source_kind, source_url, canonical_url, artist_id,
                     association_method, parser_version, refresh_interval_seconds,
                     source_scope, display_name, publisher_name, category, logo_url,
-                    terms_url, ai_policy
+                    terms_url, ai_policy, language
                 ) VALUES (
                     :source_kind, :source_url, :canonical_url, :artist_id,
                     :association_method, :parser_version, :refresh_interval_seconds,
                     :source_scope, :display_name, :publisher_name, :category,
-                    :logo_url, :terms_url, :ai_policy
+                    :logo_url, :terms_url, :ai_policy, COALESCE(:language, 'en')
                 )
                 ON CONFLICT (source_url) DO UPDATE SET
                     source_kind = EXCLUDED.source_kind,
@@ -216,6 +227,9 @@ def upsert_external_feed_source(
                         EXCLUDED.terms_url, external_feed_sources.terms_url
                     ),
                     ai_policy = EXCLUDED.ai_policy,
+                    language = COALESCE(
+                        EXCLUDED.language, external_feed_sources.language
+                    ),
                     updated_at = NOW()
                 RETURNING *
                 """
@@ -232,6 +246,7 @@ def upsert_external_feed_source(
                 "display_name": _clean_text(display_name, max_length=160),
                 "publisher_name": _clean_text(publisher_name, max_length=160),
                 "category": _clean_text(category, max_length=80),
+                "language": resolved_language,
                 "logo_url": _clean_http_url(logo_url, required=False),
                 "terms_url": _clean_http_url(terms_url, required=False),
                 "ai_policy": ai_policy,
@@ -316,6 +331,7 @@ def update_external_feed_source(
     display_name: str | None = None,
     publisher_name: str | None = None,
     category: str | None = None,
+    language: str | None = None,
     logo_url: str | None = None,
     terms_url: str | None = None,
     ai_policy: str | None = None,
@@ -332,6 +348,7 @@ def update_external_feed_source(
         if refresh_interval_seconds is not None
         else None
     )
+    resolved_language = _clean_language(language) if language is not None else None
     with transaction_scope() as session:
         return _row(
             session.execute(
@@ -342,6 +359,7 @@ def update_external_feed_source(
                         display_name = COALESCE(:display_name, display_name),
                         publisher_name = COALESCE(:publisher_name, publisher_name),
                         category = COALESCE(:category, category),
+                        language = COALESCE(:language, language),
                         logo_url = COALESCE(:logo_url, logo_url),
                         terms_url = COALESCE(:terms_url, terms_url),
                         ai_policy = COALESCE(:ai_policy, ai_policy),
@@ -361,6 +379,7 @@ def update_external_feed_source(
                     "display_name": _clean_text(display_name, max_length=160),
                     "publisher_name": _clean_text(publisher_name, max_length=160),
                     "category": _clean_text(category, max_length=80),
+                    "language": resolved_language,
                     "logo_url": _clean_http_url(logo_url, required=False),
                     "terms_url": _clean_http_url(terms_url, required=False),
                     "ai_policy": ai_policy,

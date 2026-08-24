@@ -3,12 +3,17 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from sqlalchemy import text
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "crate/db/migrations/versions/090_external_feed_sources.py"
 AI_MIGRATION = ROOT / "crate/db/migrations/versions/091_external_feed_ai_enrichments.py"
 CLUSTER_MIGRATION = (
     ROOT / "crate/db/migrations/versions/093_external_feed_cluster_applications.py"
+)
+PUBLISHER_CATALOG_MIGRATION = (
+    ROOT / "crate/db/migrations/versions/096_global_publisher_feed_catalog.py"
 )
 
 
@@ -51,6 +56,65 @@ def test_external_feed_artist_association_migration_tracks_reviewable_associatio
     assert "artist_association_method" in migration
     assert "artist_association_confidence" in migration
     assert "artist_associated_by_user_id" in migration
+
+
+def test_global_publisher_catalog_migration_seeds_requested_sources_and_languages():
+    migration = PUBLISHER_CATALOG_MIGRATION.read_text()
+
+    assert 'revision = "096"' in migration
+    assert 'down_revision = "095"' in migration
+    assert "language" in migration
+    assert "ON CONFLICT (source_url) DO UPDATE" in migration
+    assert "metal_punk_hardcore" in migration
+    assert "hip_hop" in migration
+    assert "alternative_underground" in migration
+    for source_url in (
+        "https://metalstorm.net/rss/news.xml",
+        "https://lambgoat.com/rss.xml",
+        "https://idioteq.com/feed/",
+        "https://dyingscene.com/feed/",
+        "https://www.punktastic.com/feed/",
+        "https://www.scienceofnoise.net/feed/",
+        "https://ughhblog.com/feed/",
+        "https://thewordisbond.com/feed/",
+        "https://hiphopdx.com/rss",
+        "https://cvltnation.com/feed/",
+        "https://www.brooklynvegan.com/feed/",
+        "https://scenepointblank.com/blog/rss",
+    ):
+        assert source_url in migration
+
+
+def test_global_publisher_catalog_is_seeded_at_database_head(pg_db):
+    from crate.db.tx import read_scope
+
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                SELECT source_url, category, language
+                FROM external_feed_sources
+                WHERE source_kind = 'publisher_rss'
+                  AND source_scope = 'publisher'
+                ORDER BY source_url
+                """
+                )
+            )
+            .mappings()
+            .all()
+        )
+
+    assert len(rows) == 14
+    by_url = {row["source_url"]: row for row in rows}
+    assert by_url["https://www.scienceofnoise.net/feed/"]["language"] == "es"
+    assert by_url["https://metalstorm.net/rss/news.xml"]["category"] == (
+        "metal_punk_hardcore"
+    )
+    assert by_url["https://hiphopdx.com/rss"]["category"] == "hip_hop"
+    assert by_url["https://cvltnation.com/feed/"]["category"] == (
+        "alternative_underground"
+    )
 
 
 def test_external_feed_artist_association_auto_match_is_persisted_and_invalidated(
@@ -1170,6 +1234,7 @@ def test_global_publisher_source_is_not_bound_to_an_artist(pg_db):
         display_name="Pitchfork",
         publisher_name="Pitchfork",
         category="music_news",
+        language="es",
         source_scope="publisher",
         ai_policy="enabled",
         parser_version="editorial-feed-v1",
@@ -1180,6 +1245,7 @@ def test_global_publisher_source_is_not_bound_to_an_artist(pg_db):
     assert source["source_scope"] == "publisher"
     assert source["display_name"] == "Pitchfork"
     assert source["publisher_name"] == "Pitchfork"
+    assert source["language"] == "es"
     assert source["refresh_interval_seconds"] == 86400
 
     listed = external_feeds.list_external_feed_sources(scope="publisher")

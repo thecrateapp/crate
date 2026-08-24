@@ -28,6 +28,7 @@ const source = {
   display_name: "Pitchfork",
   publisher_name: "Pitchfork",
   category: "music_news",
+  language: "en",
   state: "active",
   ai_policy: "enabled",
   refresh_interval_seconds: 86400,
@@ -66,6 +67,7 @@ describe("FeedSources", () => {
       screen.getByLabelText("RSS or Atom URL"),
       "https://daily.bandcamp.com/feed",
     );
+    await user.selectOptions(screen.getByLabelText("Source language"), "es");
     await user.click(screen.getByRole("button", { name: "Save source" }));
 
     await waitFor(() => {
@@ -75,6 +77,7 @@ describe("FeedSources", () => {
         expect.objectContaining({
           display_name: "Bandcamp Daily",
           source_url: "https://daily.bandcamp.com/feed",
+          language: "es",
         }),
       );
     });

@@ -35,6 +35,7 @@ interface FeedSource {
   display_name?: string | null;
   publisher_name?: string | null;
   category?: string | null;
+  language?: string | null;
   logo_url?: string | null;
   terms_url?: string | null;
   state: "active" | "degraded" | "disabled" | "not_found";
@@ -62,6 +63,7 @@ interface SourceDraft {
   display_name: string;
   publisher_name: string;
   category: string;
+  language: string;
   logo_url: string;
   terms_url: string;
   ai_policy: FeedSource["ai_policy"];
@@ -74,6 +76,7 @@ const EMPTY_DRAFT: SourceDraft = {
   display_name: "",
   publisher_name: "",
   category: "music_news",
+  language: "en",
   logo_url: "",
   terms_url: "",
   ai_policy: "enabled",
@@ -114,6 +117,7 @@ function initialDraft(source?: FeedSource | null): SourceDraft {
     display_name: source.display_name || "",
     publisher_name: source.publisher_name || "",
     category: source.category || "music_news",
+    language: source.language || "en",
     logo_url: source.logo_url || "",
     terms_url: source.terms_url || "",
     ai_policy: source.ai_policy,
@@ -291,6 +295,9 @@ export function FeedSources() {
                             ? "AI enabled"
                             : `AI ${source.ai_policy}`}
                         </Badge>
+                        <Badge variant="outline">
+                          {(source.language || "en").toUpperCase()}
+                        </Badge>
                       </div>
                       <p className="break-all text-sm text-white/45">
                         {source.source_url}
@@ -465,6 +472,25 @@ export function FeedSources() {
                   }
                   placeholder="music_news"
                 />
+              </label>
+              <label className="space-y-1.5">
+                <span className="text-sm text-white/65">Source language</span>
+                <select
+                  aria-label="Source language"
+                  className="flex h-10 w-full rounded-md border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-primary"
+                  value={draft.language}
+                  onChange={(event) =>
+                    updateDraft("language", event.target.value)
+                  }
+                >
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="de">Deutsch</option>
+                  <option value="fr">Français</option>
+                  <option value="it">Italiano</option>
+                  <option value="pt">Português</option>
+                  <option value="ja">日本語</option>
+                </select>
               </label>
               <label className="space-y-1.5">
                 <span className="text-sm text-white/65">Logo URL</span>

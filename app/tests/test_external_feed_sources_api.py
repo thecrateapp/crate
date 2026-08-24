@@ -34,6 +34,7 @@ def test_admin_can_create_global_publisher_source_and_queue_initial_refresh(
             display_name="Pitchfork",
             publisher_name="Pitchfork",
             category="music_news",
+            language="es",
         ),
     )
 
@@ -42,6 +43,7 @@ def test_admin_can_create_global_publisher_source_and_queue_initial_refresh(
     assert captured[0]["source_kind"] == "publisher_rss"
     assert captured[0]["source_scope"] == "publisher"
     assert captured[0]["artist_id"] is None
+    assert captured[0]["language"] == "es"
 
 
 def test_admin_can_update_and_refresh_global_publisher_source(monkeypatch):
@@ -68,13 +70,17 @@ def test_admin_can_update_and_refresh_global_publisher_source(monkeypatch):
     source = update_publisher_feed_source(
         None,
         12,
-        PublisherFeedSourceUpdateRequest(state="disabled", category="reviews"),
+        PublisherFeedSourceUpdateRequest(
+            state="disabled", category="reviews", language="es"
+        ),
     )
     refreshed = refresh_publisher_feed_source(None, 12)
 
     assert source == {"id": 12, "state": "disabled"}
     assert refreshed == {"source_id": 12, "task_id": "task-refresh"}
-    assert updated == [(12, {"state": "disabled", "category": "reviews"})]
+    assert updated == [
+        (12, {"state": "disabled", "category": "reviews", "language": "es"})
+    ]
 
 
 def test_admin_can_preview_cached_items_for_a_global_source(monkeypatch):

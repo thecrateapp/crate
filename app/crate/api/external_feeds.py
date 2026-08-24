@@ -66,6 +66,9 @@ class PublisherFeedSourceCreateRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=160)
     publisher_name: str | None = Field(default=None, max_length=160)
     category: str | None = Field(default=None, max_length=80)
+    language: str = Field(
+        default="en", min_length=2, max_length=3, pattern=r"^[a-zA-Z]{2,3}$"
+    )
     logo_url: str | None = Field(default=None, max_length=2048)
     terms_url: str | None = Field(default=None, max_length=2048)
     ai_policy: Literal["enabled", "manual", "disabled"] = "enabled"
@@ -77,6 +80,9 @@ class PublisherFeedSourceUpdateRequest(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=160)
     publisher_name: str | None = Field(default=None, max_length=160)
     category: str | None = Field(default=None, max_length=80)
+    language: str | None = Field(
+        default=None, min_length=2, max_length=3, pattern=r"^[a-zA-Z]{2,3}$"
+    )
     logo_url: str | None = Field(default=None, max_length=2048)
     terms_url: str | None = Field(default=None, max_length=2048)
     ai_policy: Literal["enabled", "manual", "disabled"] | None = None
@@ -138,6 +144,7 @@ def create_publisher_feed_source(
             display_name=body.display_name,
             publisher_name=body.publisher_name or body.display_name,
             category=body.category,
+            language=body.language,
             logo_url=urls["logo_url"],
             terms_url=urls["terms_url"],
             ai_policy=body.ai_policy,
