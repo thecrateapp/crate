@@ -56,6 +56,16 @@ def upgrade() -> None:
     )
     op.execute(
         """
+        ALTER TABLE external_feed_sources
+            ADD CONSTRAINT external_feed_sources_publisher_check
+            CHECK (
+                source_kind <> 'publisher_rss'
+                OR (source_scope = 'publisher' AND artist_id IS NULL)
+            )
+        """
+    )
+    op.execute(
+        """
         INSERT INTO external_feed_sources (
             source_kind, source_url, canonical_url, association_method,
             parser_version, refresh_interval_seconds, source_scope,
@@ -106,6 +116,7 @@ def downgrade() -> None:
     op.execute(
         """
         ALTER TABLE external_feed_sources
+            DROP CONSTRAINT IF EXISTS external_feed_sources_publisher_check,
             DROP CONSTRAINT IF EXISTS external_feed_sources_ai_policy_check,
             DROP CONSTRAINT IF EXISTS external_feed_sources_scope_check,
             DROP COLUMN IF EXISTS ai_policy,
