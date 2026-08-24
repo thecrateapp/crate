@@ -26,6 +26,7 @@ from crate.db.repositories.external_feeds import (
 from crate.feeds.ai_enrichment import (
     ai_enrichment_enabled,
     classify_external_feed_item,
+    extract_shows_from_external_feed_item,
     summarize_external_feed_item,
 )
 from crate.feeds.rss import (
@@ -188,13 +189,15 @@ def _handle_external_feeds_enrich_item(
         return {"error": "External feed item not found", "item_id": item_id}
 
     operation = str(params.get("operation") or "summary")
-    if operation not in {"summary", "classify"}:
+    if operation not in {"summary", "classify", "extract_show"}:
         return {"error": "Unsupported external feed AI operation"}
 
     if operation == "summary":
         from crate.llm.prompts.feed_summary import PROMPT_VERSION
-    else:
+    elif operation == "classify":
         from crate.llm.prompts.feed_classification import PROMPT_VERSION
+    else:
+        from crate.llm.prompts.feed_show_extraction import PROMPT_VERSION
 
     enrichment = queue_external_feed_item_enrichment(
         item_id=item_id,
@@ -222,8 +225,10 @@ def _handle_external_feeds_enrich_item(
         language = str(params.get("language") or "English")
         if operation == "summary":
             result = summarize_external_feed_item(item, language=language)
-        else:
+        elif operation == "classify":
             result = classify_external_feed_item(item, language=language)
+        else:
+            result = extract_shows_from_external_feed_item(item, language=language)
         mark_external_feed_enrichment_ready(
             enrichment_id,
             result=result,

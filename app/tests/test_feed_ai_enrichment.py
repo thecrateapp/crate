@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -95,6 +95,53 @@ def test_classify_external_feed_item_records_model_and_content_provenance(monkey
     assert result["model"] == "gemini/gemini-2.5-flash"
     assert result["classification"] == "tour"
     assert result["confidence"] == 0.94
+    assert result["generated_at"]
+
+
+def test_extract_external_feed_shows_serializes_reviewable_candidates(monkeypatch):
+    from crate.feeds import ai_enrichment
+    from crate.llm.prompts.feed_show_extraction import (
+        FeedShowCandidate,
+        FeedShowExtractionResponse,
+    )
+
+    monkeypatch.setattr(
+        ai_enrichment,
+        "ask_structured",
+        lambda *args, **kwargs: FeedShowExtractionResponse(
+            shows=[
+                FeedShowCandidate(
+                    event_date=date(2026, 10, 18),
+                    local_time="20:00",
+                    venue="The Roundhouse",
+                    city="London",
+                    country="United Kingdom",
+                    country_code="GB",
+                    url="https://artist.example/shows/london",
+                    tickets_url="https://tickets.example/london",
+                    confidence=0.91,
+                    evidence="The artist will play London on 18 October 2026.",
+                )
+            ],
+            warnings=[],
+        ),
+    )
+    monkeypatch.setattr(
+        ai_enrichment,
+        "get_config",
+        lambda: {"model": "gemini/gemini-2.5-flash"},
+    )
+
+    result = ai_enrichment.extract_shows_from_external_feed_item(
+        _item(), language="English"
+    )
+
+    assert result["operation"] == "extract_show"
+    assert result["prompt_version"] == "external-feed-show-extraction-v1"
+    assert result["source_content_hash"] == "hash-1"
+    assert result["model"] == "gemini/gemini-2.5-flash"
+    assert result["shows"][0]["event_date"] == "2026-10-18"
+    assert result["shows"][0]["tickets_url"] == "https://tickets.example/london"
     assert result["generated_at"]
 
 
@@ -217,6 +264,68 @@ def test_external_feed_ai_handler_persists_reviewable_classification(monkeypatch
     assert completed[0][1]["prompt_version"] == "external-feed-classification-v1"
 
 
+def test_external_feed_ai_handler_persists_reviewable_show_extraction(monkeypatch):
+    from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.get_external_feed_item", lambda item_id: _item()
+    )
+    queued = {
+        "id": 21,
+        "status": "pending",
+        "source_content_hash": "hash-1",
+    }
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.queue_external_feed_item_enrichment",
+        lambda **kwargs: queued,
+    )
+    proposal = {
+        "operation": "extract_show",
+        "prompt_version": "external-feed-show-extraction-v1",
+        "source_content_hash": "hash-1",
+        "language": "English",
+        "shows": [
+            {
+                "event_date": "2026-10-18",
+                "local_time": "20:00",
+                "venue": "The Roundhouse",
+                "city": "London",
+                "country": "United Kingdom",
+                "country_code": "GB",
+                "url": "https://artist.example/shows/london",
+                "tickets_url": "https://tickets.example/london",
+                "confidence": 0.91,
+                "evidence": "The artist will play London on 18 October 2026.",
+            }
+        ],
+        "warnings": [],
+        "model": "ollama/llama3.1:8b",
+        "generated_at": "2026-08-23T12:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.extract_shows_from_external_feed_item",
+        lambda item, language: proposal,
+    )
+    completed = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.mark_external_feed_enrichment_ready",
+        lambda *args, **kwargs: completed.append((args, kwargs)) or {"id": 21},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.emit_task_event", lambda *args: None
+    )
+
+    result = _handle_external_feeds_enrich_item(
+        "task-1", {"item_id": 7, "operation": "extract_show"}, {}
+    )
+
+    assert result["status"] == "ready"
+    assert result["enrichment_id"] == 21
+    assert result["result"] == proposal
+    assert completed[0][1]["prompt_version"] == "external-feed-show-extraction-v1"
+
+
 def test_external_feed_ai_handler_rejects_unknown_operation(monkeypatch):
     from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
 
@@ -226,7 +335,7 @@ def test_external_feed_ai_handler_rejects_unknown_operation(monkeypatch):
     )
 
     result = _handle_external_feeds_enrich_item(
-        "task-1", {"item_id": 7, "operation": "extract_show"}, {}
+        "task-1", {"item_id": 7, "operation": "cluster"}, {}
     )
 
     assert result["error"] == "Unsupported external feed AI operation"
@@ -297,6 +406,38 @@ def test_external_feed_ai_api_accepts_classification_operation(monkeypatch):
     assert "hash-1" in captured[0][2]
 
 
+def test_external_feed_ai_api_accepts_show_extraction_operation(monkeypatch):
+    from crate.api.external_feeds import (
+        ExternalFeedEnrichmentRequest,
+        enrich_external_feed_item,
+    )
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission", lambda request, capability: {}
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.get_external_feed_item", lambda item_id: _item()
+    )
+    captured = []
+    monkeypatch.setattr(
+        "crate.api.external_feeds.create_task_dedup",
+        lambda task_type, params, dedup_key: (
+            captured.append((task_type, params, dedup_key)) or "task-3"
+        ),
+    )
+
+    result = enrich_external_feed_item(
+        None,
+        7,
+        ExternalFeedEnrichmentRequest(operation="extract_show", language="Spanish"),
+    )
+
+    assert result == {"task_id": "task-3"}
+    assert captured[0][1]["operation"] == "extract_show"
+    assert "hash-1" in captured[0][2]
+
+
 def test_external_feed_review_api_lists_and_reviews_proposals(monkeypatch):
     from crate.api.external_feeds import (
         ExternalFeedReviewRequest,
@@ -333,6 +474,33 @@ def test_external_feed_review_api_lists_and_reviews_proposals(monkeypatch):
         (19,),
         {"reviewer_id": 42, "decision": "accept", "rejection_reason": None},
     )
+
+
+def test_external_feed_review_api_applies_accepted_show_proposal(monkeypatch):
+    from crate.api.external_feeds import apply_external_feed_shows
+
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission",
+        lambda request, capability: {"id": 42},
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.apply_external_feed_show_enrichment",
+        lambda enrichment_id, applied_by_user_id: {
+            "enrichment_id": enrichment_id,
+            "show_ids": [101, 102],
+            "applied": True,
+            "already_applied": False,
+        },
+    )
+
+    result = apply_external_feed_shows(None, 19)
+
+    assert result == {
+        "enrichment_id": 19,
+        "show_ids": [101, 102],
+        "applied": True,
+        "already_applied": False,
+    }
 
 
 def test_external_feed_enrichment_migration_has_review_and_provenance_fields():
@@ -491,6 +659,90 @@ def test_external_feed_enrichment_review_accepts_only_current_ready_proposals(pg
         )[0]["id"]
         == enrichment["id"]
     )
+
+
+def test_external_feed_show_proposal_applies_once_and_preserves_ticket_url(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import read_scope
+    from sqlalchemy import text
+
+    source = external_feeds.upsert_external_feed_source(
+        source_kind="artist_site",
+        source_url="https://artist.example/shows.xml",
+        parser_version="artist-site-v1",
+    )
+    item = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        item_kind="news",
+        source_url="https://artist.example/shows.xml",
+        canonical_url="https://artist.example/news/tour",
+        title="Tour announcement",
+        content_hash="hash-show-apply",
+        parser_version="artist-site-v1",
+        excerpt="The artist will play London on 18 October 2026.",
+        payload={"author": "Example Artist"},
+    )
+    enrichment = external_feeds.queue_external_feed_item_enrichment(
+        item_id=item["id"],
+        operation="extract_show",
+        source_content_hash="hash-show-apply",
+        prompt_version="external-feed-show-extraction-v1",
+    )
+    external_feeds.mark_external_feed_enrichment_ready(
+        enrichment["id"],
+        result={
+            "operation": "extract_show",
+            "shows": [
+                {
+                    "event_date": "2026-10-18",
+                    "local_time": "20:00",
+                    "venue": "The Roundhouse",
+                    "city": "London",
+                    "country": "United Kingdom",
+                    "country_code": "GB",
+                    "url": "https://artist.example/shows/london",
+                    "tickets_url": "https://tickets.example/london",
+                    "confidence": 0.91,
+                    "evidence": "The artist will play London on 18 October 2026.",
+                }
+            ],
+            "warnings": [],
+        },
+        model="ollama/test",
+        prompt_version="external-feed-show-extraction-v1",
+    )
+    external_feeds.review_external_feed_enrichment(
+        enrichment["id"], reviewer_id=1, decision="accept"
+    )
+
+    applied = external_feeds.apply_external_feed_show_enrichment(
+        enrichment["id"], applied_by_user_id=1
+    )
+
+    assert applied["enrichment_id"] == enrichment["id"]
+    assert len(applied["show_ids"]) == 1
+    assert applied["applied"] is True
+    assert applied["already_applied"] is False
+    with read_scope() as session:
+        show = (
+            session.execute(
+                text(
+                    "SELECT artist_name, source, tickets_url FROM shows WHERE id = :id"
+                ),
+                {"id": applied["show_ids"][0]},
+            )
+            .mappings()
+            .one()
+        )
+    assert show["artist_name"] == "Example Artist"
+    assert show["source"] == "external_feed_ai"
+    assert show["tickets_url"] == "https://tickets.example/london"
+
+    retried = external_feeds.apply_external_feed_show_enrichment(
+        enrichment["id"], applied_by_user_id=1
+    )
+    assert retried["show_ids"] == applied["show_ids"]
+    assert retried["already_applied"] is True
 
 
 def test_external_feed_enrichment_review_requires_reason_for_rejection(pg_db):

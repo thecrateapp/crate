@@ -15,6 +15,7 @@ from crate.api.openapi_responses import (
 from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.db.repositories.external_feeds import (
+    apply_external_feed_show_enrichment,
     get_external_feed_enrichment,
     get_external_feed_item,
     list_external_feed_enrichments_for_review,
@@ -40,7 +41,7 @@ _RESPONSES = merge_responses(
 
 
 class ExternalFeedEnrichmentRequest(BaseModel):
-    operation: Literal["summary", "classify"] = "summary"
+    operation: Literal["summary", "classify", "extract_show"] = "summary"
     language: str = Field(default="English", min_length=2, max_length=40)
 
 
@@ -115,6 +116,31 @@ def review_external_feed(
 
 
 @router.post(
+    "/enrichments/{enrichment_id}/apply-shows",
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        {
+            404: error_response("The enrichment is missing."),
+            422: error_response("The show proposal cannot be applied."),
+        },
+    ),
+    summary="Apply an accepted external feed show proposal",
+)
+def apply_external_feed_shows(request: Request, enrichment_id: int):
+    user = require_permission(request, "library.metadata.write")
+    try:
+        result = apply_external_feed_show_enrichment(
+            enrichment_id,
+            applied_by_user_id=int(user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Enrichment not found")
+    return result
+
+
+@router.post(
     "/items/{item_id}/enrich",
     response_model=TaskEnqueueResponse,
     responses=_RESPONSES,
@@ -165,6 +191,7 @@ def enrich_external_feed_item(
 __all__ = [
     "ExternalFeedEnrichmentRequest",
     "ExternalFeedReviewRequest",
+    "apply_external_feed_shows",
     "enrich_external_feed_item",
     "get_external_feed_review_item",
     "list_external_feed_review_queue",

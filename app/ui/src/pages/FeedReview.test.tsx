@@ -137,4 +137,107 @@ describe("FeedReview", () => {
       screen.getAllByText("The source announces European tour dates.").length,
     ).toBeGreaterThan(0);
   });
+
+  it("renders extracted show proposals in the review modal", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            result_json: {
+              operation: "extract_show",
+              shows: [
+                {
+                  event_date: "2026-10-18",
+                  local_time: "20:00",
+                  venue: "The Roundhouse",
+                  city: "London",
+                  country: "United Kingdom",
+                  country_code: "GB",
+                  confidence: 0.91,
+                  evidence: "The artist will play London on 18 October 2026.",
+                  tickets_url: "https://tickets.example/london",
+                },
+              ],
+              warnings: [],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("1 show extracted for review")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Review proposal" }));
+    expect(screen.getByText("The Roundhouse")).toBeInTheDocument();
+    expect(screen.getByText(/Oct 18, 2026/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tickets" })).toHaveAttribute(
+      "href",
+      "https://tickets.example/london",
+    );
+  });
+
+  it("applies an accepted show proposal to the catalogue", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({
+      enrichment_id: 19,
+      show_ids: [101],
+      applied: true,
+      already_applied: false,
+    });
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            review_status: "accepted",
+            result_json: {
+              operation: "extract_show",
+              shows: [
+                {
+                  event_date: "2026-10-18",
+                  venue: "The Roundhouse",
+                  city: "London",
+                  confidence: 0.91,
+                  evidence: "The artist will play London on 18 October 2026.",
+                },
+              ],
+            },
+            applied_show_ids: [],
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "View review" }));
+    await user.click(
+      screen.getByRole("button", { name: "Add shows to catalogue" }),
+    );
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/external-feeds/enrichments/19/apply-shows",
+        "POST",
+      );
+    });
+    expect(refetchMock).toHaveBeenCalled();
+  });
 });

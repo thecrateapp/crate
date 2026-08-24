@@ -320,6 +320,8 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 
 **Files:**
 - Create: `app/crate/llm/prompts/feed_summary.py`
+- Create: `app/crate/llm/prompts/feed_classification.py`
+- Create: `app/crate/llm/prompts/feed_show_extraction.py`
 - Create or modify: `app/crate/feeds/ai_enrichment.py`
 - Modify: `app/crate/worker_handlers/feeds.py`
 - Test: `app/tests/test_feed_ai_enrichment.py`
@@ -343,8 +345,11 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 - Los endpoints administrativos separan el encolado de la consulta y revisión; la UI solo muestra propuestas `ready` cuyo hash sigue coincidiendo con el item actual.
 - `Feed Review` registra aceptación o rechazo sin modificar automáticamente el contenido original.
 - Añadida la operación `classify`, con categorías editoriales versionadas (`release`, `announcement`, `tour`, `interview`, `review`, `other`), confianza, razones y warnings revisables en la misma UI.
+- Añadida la operación `extract_show`, que devuelve hasta diez propuestas de eventos con fecha explícita, ubicación, URLs, confianza, evidencia y warnings. Las fechas se serializan en ISO y la propuesta no muta la tabla `shows`.
+- `Feed Review` muestra las propuestas de shows en el modal de revisión, incluyendo fecha, localización, evidencia y enlaces de tickets/evento cuando están disponibles.
+- Una propuesta `extract_show` aceptada puede aplicarse explícitamente desde `Feed Review`; la operación es idempotente mediante IDs externos deterministas, registra usuario/fecha/IDs creados en la revisión `092` y conserva los enlaces de tickets en `shows`.
 - `/api/me/feed` consume únicamente resúmenes `ready` y `accepted` cuyo `source_content_hash` coincide con el item activo; si no existe una propuesta vigente, conserva el texto original como fallback.
-- El read path no ejecuta IA y mantiene la visibilidad Bandcamp condicionada a una conexión activa. Quedan pendientes las operaciones de agrupación y extracción de shows.
+- El read path no ejecuta IA y mantiene la visibilidad Bandcamp condicionada a una conexión activa. Queda pendiente la agrupación de items.
 
 ## Canonical provider contracts
 

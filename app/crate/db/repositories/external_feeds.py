@@ -12,7 +12,9 @@ from urllib.parse import urlsplit, urlunsplit
 from sqlalchemy import text
 
 from crate.db.serialize import serialize_rows
+from crate.db.repositories.shows import upsert_show
 from crate.db.tx import read_scope, transaction_scope
+from crate.llm.prompts.feed_show_extraction import FeedShowExtractionResponse
 
 
 DEFAULT_REFRESH_INTERVAL_SECONDS = 21600
@@ -566,6 +568,120 @@ def review_external_feed_enrichment(
         return _row(result)
 
 
+def apply_external_feed_show_enrichment(
+    enrichment_id: int, *, applied_by_user_id: int
+) -> dict[str, Any] | None:
+    """Apply an accepted current show proposal to the shared show catalogue."""
+    with transaction_scope() as session:
+        row = _row(
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        efe.*,
+                        efi.state AS item_state,
+                        efi.content_hash AS current_content_hash,
+                        COALESCE(
+                            la.name,
+                            NULLIF(efi.payload_json ->> 'author', '')
+                        ) AS artist_name
+                    FROM external_feed_enrichments efe
+                    JOIN external_feed_items efi ON efi.id = efe.item_id
+                    LEFT JOIN library_artists la ON la.id = efi.artist_id
+                    WHERE efe.id = :enrichment_id
+                    FOR UPDATE OF efe, efi
+                    """
+                ),
+                {"enrichment_id": int(enrichment_id)},
+            )
+        )
+        if row is None:
+            return None
+
+        existing_show_ids = [
+            int(value) for value in (row.get("applied_show_ids") or [])
+        ]
+        if existing_show_ids:
+            return {
+                "enrichment_id": int(enrichment_id),
+                "show_ids": existing_show_ids,
+                "applied": True,
+                "already_applied": True,
+            }
+        if row["operation"] != "extract_show":
+            raise ValueError("Only show extraction proposals can be applied")
+        if row["status"] != "ready":
+            raise ValueError("Show proposal is not ready")
+        if row["review_status"] != "accepted":
+            raise ValueError("Show proposal must be accepted before applying")
+        if row["item_state"] != "active":
+            raise ValueError("External feed item is no longer active")
+        if row["source_content_hash"] != row["current_content_hash"]:
+            raise ValueError("Show proposal is stale because the source changed")
+
+        artist_name = str(row.get("artist_name") or "").strip()
+        if not artist_name:
+            raise ValueError("Show proposal has no associated artist")
+
+        try:
+            proposal = FeedShowExtractionResponse.model_validate(
+                row.get("result_json") or {}
+            )
+        except ValueError as exc:
+            raise ValueError("Show proposal has an invalid result") from exc
+        if not proposal.shows:
+            raise ValueError("Show proposal contains no events")
+
+        show_ids: list[int] = []
+        for index, candidate in enumerate(proposal.shows):
+            show_id = upsert_show(
+                external_id=f"external-feed-ai:{enrichment_id}:{index}",
+                artist_name=artist_name,
+                date=candidate.event_date.isoformat(),
+                local_time=candidate.local_time,
+                venue=candidate.venue,
+                address_line1=candidate.address_line1,
+                city=candidate.city,
+                region=candidate.region,
+                postal_code=candidate.postal_code,
+                country=candidate.country,
+                country_code=candidate.country_code,
+                url=str(candidate.url) if candidate.url else None,
+                tickets_url=(
+                    str(candidate.tickets_url) if candidate.tickets_url else None
+                ),
+                status="scheduled",
+                source="external_feed_ai",
+            )
+            if show_id is None:
+                raise RuntimeError("Show upsert did not return an id")
+            show_ids.append(int(show_id))
+
+        session.execute(
+            text(
+                """
+                UPDATE external_feed_enrichments
+                SET applied_at = NOW(),
+                    applied_by_user_id = :applied_by_user_id,
+                    applied_show_ids = CAST(:applied_show_ids AS jsonb),
+                    updated_at = NOW()
+                WHERE id = :enrichment_id
+                """
+            ),
+            {
+                "enrichment_id": int(enrichment_id),
+                "applied_by_user_id": int(applied_by_user_id),
+                "applied_show_ids": json.dumps(show_ids),
+            },
+        )
+        return {
+            "enrichment_id": int(enrichment_id),
+            "show_ids": show_ids,
+            "applied": True,
+            "already_applied": False,
+        }
+
+
 def queue_external_feed_item_enrichment(
     *,
     item_id: int,
@@ -1016,6 +1132,7 @@ __all__ = [
     "get_external_feed_enrichment",
     "get_external_feed_item_enrichment",
     "get_external_feed_source",
+    "apply_external_feed_show_enrichment",
     "list_bandcamp_feed_candidates",
     "list_external_feed_items_for_user",
     "list_external_feed_enrichments_for_review",

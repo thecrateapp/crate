@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import {
+  CalendarDays,
   Check,
+  Database,
   ExternalLink,
   FileText,
   Loader2,
+  MapPin,
   RefreshCw,
   Sparkles,
   X,
@@ -37,10 +40,27 @@ interface EnrichmentResult {
   classification?: string;
   confidence?: number;
   reasons?: string[];
+  shows?: ExtractedShowProposal[];
   summary?: string;
   key_points?: string[];
   warnings?: string[];
   generated_at?: string;
+}
+
+interface ExtractedShowProposal {
+  event_date: string;
+  local_time?: string | null;
+  venue?: string | null;
+  address_line1?: string | null;
+  city?: string | null;
+  region?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  country_code?: string | null;
+  url?: string | null;
+  tickets_url?: string | null;
+  confidence?: number;
+  evidence?: string;
 }
 
 interface FeedEnrichment {
@@ -57,6 +77,8 @@ interface FeedEnrichment {
   error?: string | null;
   rejection_reason?: string | null;
   reviewed_at?: string | null;
+  applied_at?: string | null;
+  applied_show_ids?: number[];
   title: string;
   item_kind: string;
   source_url: string;
@@ -89,6 +111,15 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
+function formatEventDate(value?: string | null) {
+  if (!value) return "Date unavailable";
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+    date,
+  );
+}
+
 function sourceLabel(source: string) {
   return source.replace(/_/g, " ");
 }
@@ -109,6 +140,10 @@ function formatClassification(value?: string) {
 
 function proposalPreview(result: EnrichmentResult, fallback?: string | null) {
   if (result.summary) return result.summary;
+  if (result.shows?.length) {
+    const label = result.shows.length === 1 ? "show" : "shows";
+    return `${result.shows.length} ${label} extracted for review`;
+  }
   if (result.classification) {
     const confidence =
       typeof result.confidence === "number"
@@ -181,6 +216,45 @@ export function FeedReview() {
         reviewError instanceof Error && reviewError.message
           ? reviewError.message
           : "Failed to save the review",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function applyShows() {
+    if (!selected || selected.review_status !== "accepted") return;
+    setBusyId(selected.id);
+    try {
+      const result = await api<{
+        show_ids: number[];
+        already_applied: boolean;
+      }>(
+        `/api/admin/external-feeds/enrichments/${selected.id}/apply-shows`,
+        "POST",
+      );
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              applied_at: current.applied_at || new Date().toISOString(),
+              applied_show_ids: result.show_ids,
+            }
+          : current,
+      );
+      toast.success(
+        result.already_applied
+          ? "Shows are already in the catalogue"
+          : `${result.show_ids.length} show${
+              result.show_ids.length === 1 ? "" : "s"
+            } added to the catalogue`,
+      );
+      refetch();
+    } catch (applyError) {
+      toast.error(
+        applyError instanceof Error && applyError.message
+          ? applyError.message
+          : "Failed to add shows to the catalogue",
       );
     } finally {
       setBusyId(null);
@@ -313,6 +387,11 @@ export function FeedReview() {
                     <Badge variant="outline">
                       {sourceLabel(selected.source_kind)}
                     </Badge>
+                    {selected.applied_show_ids?.length ? (
+                      <Badge className="border-emerald-400/25 bg-emerald-400/10 text-emerald-200">
+                        In catalogue
+                      </Badge>
+                    ) : null}
                   </div>
                   <h2 className="break-words text-xl font-semibold text-white">
                     {selected.title}
@@ -333,7 +412,87 @@ export function FeedReview() {
                 <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/40">
                   AI proposal
                 </h3>
-                {selected.result_json.classification ? (
+                {selected.result_json.shows?.length ? (
+                  <div className="space-y-3 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays size={16} className="text-primary" />
+                      <h4 className="text-sm font-medium text-white/85">
+                        Extracted shows
+                      </h4>
+                      <Badge variant="outline">
+                        {selected.result_json.shows.length}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {selected.result_json.shows.map((show, index) => (
+                        <div
+                          key={`${show.event_date}-${
+                            show.venue || "venue"
+                          }-${index}`}
+                          className="rounded-md border border-white/10 bg-black/15 p-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/85">
+                            <span className="font-medium">
+                              {formatEventDate(show.event_date)}
+                            </span>
+                            {show.local_time ? (
+                              <span className="text-white/55">
+                                {show.local_time}
+                              </span>
+                            ) : null}
+                            {typeof show.confidence === "number" ? (
+                              <span className="text-xs text-white/45">
+                                {Math.round(show.confidence * 100)}% confidence
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/65">
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin size={14} />
+                              {show.venue || "Venue not stated"}
+                            </span>
+                            <span>
+                              {[show.city, show.region, show.country]
+                                .filter(Boolean)
+                                .join(", ") || "Location not stated"}
+                            </span>
+                          </div>
+                          {show.evidence ? (
+                            <p className="mt-2 text-xs leading-5 text-white/45">
+                              {show.evidence}
+                            </p>
+                          ) : null}
+                          {show.tickets_url || show.url ? (
+                            <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                              {show.tickets_url ? (
+                                <a
+                                  href={show.tickets_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:text-primary/80"
+                                >
+                                  <ExternalLink size={13} />
+                                  Tickets
+                                </a>
+                              ) : null}
+                              {show.url ? (
+                                <a
+                                  href={show.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:text-primary/80"
+                                >
+                                  <ExternalLink size={13} />
+                                  Event page
+                                </a>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : selected.result_json.classification ? (
                   <div className="space-y-3 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">
@@ -477,6 +636,29 @@ export function FeedReview() {
                   Accept proposal
                 </Button>
               </ModalFooter>
+            ) : selected.review_status === "accepted" &&
+              selected.result_json.shows?.length ? (
+              <ModalFooter className="flex flex-wrap justify-end gap-2 px-5 py-4">
+                <Button
+                  type="button"
+                  onClick={() => void applyShows()}
+                  disabled={
+                    busyId !== null ||
+                    Boolean(selected.applied_show_ids?.length)
+                  }
+                >
+                  {busyId === selected.id ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : selected.applied_show_ids?.length ? (
+                    <Check size={15} />
+                  ) : (
+                    <Database size={15} />
+                  )}
+                  {selected.applied_show_ids?.length
+                    ? "Already in catalogue"
+                    : "Add shows to catalogue"}
+                </Button>
+              </ModalFooter>
             ) : null}
           </>
         ) : null}
@@ -501,6 +683,11 @@ function FeedProposalCard({
               {item.review_status}
             </Badge>
             <Badge variant="outline">{sourceLabel(item.source_kind)}</Badge>
+            {item.applied_show_ids?.length ? (
+              <Badge className="border-emerald-400/25 bg-emerald-400/10 text-emerald-200">
+                In catalogue
+              </Badge>
+            ) : null}
             <span className="text-xs text-white/35">
               {formatDate(item.published_at)}
             </span>
