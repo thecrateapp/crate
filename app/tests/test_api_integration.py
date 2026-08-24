@@ -495,6 +495,57 @@ class TestUserEndpoints:
         data = resp.json()
         assert "items" in data
 
+    def test_upcoming_includes_accepted_editorial_shows(self, api_client, monkeypatch):
+        from crate.api import me as me_api
+
+        monkeypatch.setattr(
+            me_api,
+            "get_followed_artists",
+            lambda _user_id: [{"artist_name": "Artist"}],
+        )
+        monkeypatch.setattr(me_api, "get_upcoming_releases", lambda *args: [])
+        monkeypatch.setattr(me_api, "get_upcoming_shows", lambda *args: [])
+        monkeypatch.setattr(me_api, "has_active_connection", lambda _user_id: False)
+        monkeypatch.setattr(
+            me_api,
+            "list_external_feed_items_for_user",
+            lambda _user_id, limit: [
+                {
+                    "id": 51,
+                    "artist_id": 7,
+                    "artist_name": "Artist",
+                    "artist_slug": "artist",
+                    "source_kind": "publisher_rss",
+                    "display_name": "Pitchfork",
+                    "canonical_url": "https://pitchfork.com/news/artist-tour",
+                    "accepted_show_json": {
+                        "shows": [
+                            {
+                                "event_date": "2099-10-18",
+                                "venue": "The Roundhouse",
+                                "city": "London",
+                                "country": "United Kingdom",
+                                "tickets_url": "https://tickets.example/london",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+        monkeypatch.setattr(me_api, "get_user_by_id", lambda _user_id: {})
+        monkeypatch.setattr(me_api, "get_attending_show_ids", lambda *_args: set())
+        monkeypatch.setattr(me_api, "get_artist_genres_for_names", lambda *_args: {})
+        monkeypatch.setattr(me_api, "_probable_setlists_for_artists", lambda *_args: {})
+
+        response = api_client.get("/api/me/upcoming")
+
+        assert response.status_code == 200
+        editorial_shows = [
+            item for item in response.json()["items"] if item["status"] == "editorial"
+        ]
+        assert editorial_shows[0]["event_key"] == "external-feed-show:51:0"
+        assert editorial_shows[0]["url"] == "https://tickets.example/london"
+
     def test_feed_returns_source_metadata_and_supports_offset(
         self, api_client, monkeypatch
     ):

@@ -124,6 +124,93 @@ def merge_editorial_releases_into_radar(
     return items
 
 
+def merge_editorial_shows_into_radar(
+    *,
+    radar_items: Iterable[Mapping[str, Any]],
+    external_feed_items: Iterable[Mapping[str, Any]],
+    followed_artists: Iterable[str],
+    today: date,
+) -> list[dict[str, Any]]:
+    """Add current accepted show proposals to Radar without duplicating shows."""
+    items = [dict(item) for item in radar_items]
+    followed = {_normalize(name) for name in followed_artists if _normalize(name)}
+    by_show_key = {
+        _show_identity_key(
+            _text(item.get("artist")),
+            _iso(item.get("date")),
+            _text(item.get("venue") or item.get("title")),
+            _text(item.get("city")),
+        ): item
+        for item in items
+        if item.get("type") == "show"
+    }
+    today_value = today.isoformat()
+
+    for row in external_feed_items:
+        artist = _text(row.get("artist_name"))
+        if not artist or _normalize(artist) not in followed:
+            continue
+        normalized = _external_feed_item(row)
+        provenance = _provenance_record(normalized)
+        for candidate_index, candidate in enumerate(
+            _accepted_external_show_candidates(row)
+        ):
+            event_date = _iso(candidate.get("event_date"))
+            if not event_date or event_date < today_value:
+                continue
+            venue = _text(candidate.get("venue"))
+            city = _text(candidate.get("city"))
+            show_key = _show_identity_key(artist, event_date, venue, city)
+            if not show_key:
+                continue
+
+            existing = by_show_key.get(show_key)
+            if existing is not None:
+                _append_unique_provenance(existing, provenance)
+                continue
+
+            country = _text(candidate.get("country"))
+            subtitle = ", ".join(value for value in (city, country) if value)
+            item_id = row.get("id") or _normalize(row.get("canonical_url"))
+            show = {
+                "type": "show",
+                "id": None,
+                "event_key": f"external-feed-show:{item_id}:{candidate_index}",
+                "date": event_date,
+                "event_date": event_date,
+                "time": _text(candidate.get("local_time")) or None,
+                "artist": artist,
+                "artist_id": row.get("artist_id"),
+                "artist_slug": row.get("artist_slug"),
+                "title": venue,
+                "subtitle": subtitle,
+                "cover_url": normalized.get("cover_url"),
+                "image_url": normalized.get("image_url"),
+                "status": "editorial",
+                "url": _text(
+                    candidate.get("tickets_url")
+                    or candidate.get("url")
+                    or normalized.get("canonical_url")
+                )
+                or None,
+                "tickets_url": _text(candidate.get("tickets_url")) or None,
+                "venue": venue,
+                "address_line1": _text(candidate.get("address_line1")) or None,
+                "city": city,
+                "region": _text(candidate.get("region")) or None,
+                "postal_code": _text(candidate.get("postal_code")) or None,
+                "country": country,
+                "country_code": _text(candidate.get("country_code")) or None,
+                "editorial_provenance": [provenance] if provenance else [],
+                "external_feed_item_id": row.get("id"),
+                "is_upcoming": True,
+            }
+            items.append(show)
+            by_show_key[show_key] = show
+
+    return items
+
+
 def _release_item(row: Mapping[str, Any]) -> dict[str, Any]:
     artist = _text(row.get("artist_name") or row.get("artist"))
     title = _text(row.get("album_title") or row.get("title"))
@@ -295,6 +382,18 @@ def _external_feed_classification(row: Mapping[str, Any]) -> str | None:
     ):
         return "release"
     return None
+
+
+def _accepted_external_show_candidates(
+    row: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    proposal = row.get("accepted_show_json")
+    if not isinstance(proposal, Mapping):
+        return []
+    candidates = proposal.get("shows")
+    if not isinstance(candidates, list):
+        return []
+    return [candidate for candidate in candidates if isinstance(candidate, Mapping)]
 
 
 def _append_unique_provenance(item: dict[str, Any], value: dict[str, str]) -> None:
@@ -480,6 +579,14 @@ def _news_key(artist: str, title: str, canonical_url: str | None) -> str:
 
 def _show_key(artist: str, event_date: str | None, venue: str, city: str) -> str:
     return f"show:{_normalize(artist)}:{event_date or ''}:{_normalize(venue)}:{_normalize(city)}"
+
+
+def _show_identity_key(
+    artist: str, event_date: str | None, venue: str, city: str
+) -> str:
+    if not _normalize(artist) or not event_date:
+        return ""
+    return _show_key(artist, event_date, venue, city)
 
 
 def _normalize(value: Any) -> str:

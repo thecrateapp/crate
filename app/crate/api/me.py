@@ -164,6 +164,7 @@ from crate.db.repositories.user_library_shared import resolve_track_reference_re
 from crate.db.queries.updates import (
     build_updates_feed,
     merge_editorial_releases_into_radar,
+    merge_editorial_shows_into_radar,
 )
 from crate.db.repositories.users import (
     get_remote_scrobbling_enabled,
@@ -1593,6 +1594,13 @@ def upcoming(request: Request, limit: int = 120):
                 "is_upcoming": True,
             }
         )
+
+    items = merge_editorial_shows_into_radar(
+        radar_items=items,
+        external_feed_items=editorial_feed_items,
+        followed_artists=followed_names,
+        today=today,
+    )
 
     enriched_shows = [
         {

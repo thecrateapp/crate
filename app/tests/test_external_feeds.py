@@ -860,6 +860,36 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
         "external-feed-summary-v1"
     )
 
+    show_enrichment = external_feeds.queue_external_feed_item_enrichment(
+        item_id=item["id"],
+        operation="extract_show",
+        source_content_hash="tour-hash",
+        prompt_version="external-feed-show-extraction-v1",
+    )
+    external_feeds.mark_external_feed_enrichment_ready(
+        show_enrichment["id"],
+        result={
+            "shows": [
+                {
+                    "event_date": "2026-10-18",
+                    "venue": "The Roundhouse",
+                    "city": "London",
+                }
+            ],
+            "warnings": [],
+        },
+        model="ollama/test",
+        prompt_version="external-feed-show-extraction-v1",
+    )
+    external_feeds.review_external_feed_enrichment(
+        show_enrichment["id"], reviewer_id=1, decision="accept"
+    )
+
+    accepted_items = external_feeds.list_external_feed_items_for_user(user_id)
+    assert accepted_items[0]["accepted_show_json"]["shows"][0]["venue"] == (
+        "The Roundhouse"
+    )
+
     cluster_related = external_feeds.upsert_external_feed_item(
         source_id=source["id"],
         artist_id=artist_id,

@@ -3,6 +3,7 @@ from datetime import date
 from crate.db.queries.updates import (
     build_updates_feed,
     merge_editorial_releases_into_radar,
+    merge_editorial_shows_into_radar,
 )
 
 
@@ -97,6 +98,74 @@ def test_merge_editorial_releases_requires_review_for_publisher_items():
     )
 
     assert [item["title"] for item in items] == ["Reviewed release article"]
+
+
+def test_merge_editorial_shows_deduplicates_reviewed_events_and_skips_past_dates():
+    items = merge_editorial_shows_into_radar(
+        radar_items=[
+            {
+                "type": "show",
+                "id": 7,
+                "artist": "Artist",
+                "date": "2026-10-18",
+                "venue": "The Roundhouse",
+                "city": "London",
+            }
+        ],
+        external_feed_items=[
+            {
+                "id": 51,
+                "artist_id": 7,
+                "artist_name": "Artist",
+                "source_kind": "publisher_rss",
+                "display_name": "Pitchfork",
+                "canonical_url": "https://pitchfork.com/news/artist-tour",
+                "accepted_show_json": {
+                    "shows": [
+                        {
+                            "event_date": "2026-10-18",
+                            "local_time": "20:00",
+                            "venue": "The Roundhouse",
+                            "city": "London",
+                            "country": "United Kingdom",
+                            "country_code": "GB",
+                            "url": "https://artist.example/shows/london",
+                            "tickets_url": "https://tickets.example/london",
+                        },
+                        {
+                            "event_date": "2026-10-19",
+                            "venue": "Albert Hall",
+                            "city": "Manchester",
+                            "country": "United Kingdom",
+                            "country_code": "GB",
+                            "url": "https://artist.example/shows/manchester",
+                        },
+                        {
+                            "event_date": "2026-08-01",
+                            "venue": "Past Venue",
+                            "city": "Leeds",
+                        },
+                    ]
+                },
+            }
+        ],
+        followed_artists={"artist"},
+        today=date(2026, 8, 24),
+    )
+
+    assert len(items) == 2
+    assert items[0]["id"] == 7
+    assert items[0]["editorial_provenance"] == [
+        {
+            "source": "publisher_rss",
+            "source_detail": "Pitchfork",
+            "canonical_url": "https://pitchfork.com/news/artist-tour",
+        }
+    ]
+    assert items[1]["event_key"] == "external-feed-show:51:1"
+    assert items[1]["title"] == "Albert Hall"
+    assert items[1]["city"] == "Manchester"
+    assert items[1]["tickets_url"] is None
 
 
 def test_build_updates_feed_deduplicates_and_preserves_source_metadata():

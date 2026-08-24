@@ -626,6 +626,7 @@ def list_external_feed_items_for_user(
                         AS accepted_enrichment_prompt_version,
                     accepted_classification.result_json
                         AS accepted_classification_json,
+                    accepted_show.result_json AS accepted_show_json,
                     accepted_cluster.id AS accepted_cluster_enrichment_id,
                     accepted_cluster.result_json AS accepted_cluster_json,
                     accepted_cluster.cluster_applied_at
@@ -673,6 +674,17 @@ def list_external_feed_items_for_user(
                     ORDER BY efe.id DESC
                     LIMIT 1
                 ) accepted_classification ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT efe.result_json
+                    FROM external_feed_enrichments efe
+                    WHERE efe.item_id = efi.id
+                      AND efe.operation = 'extract_show'
+                      AND efe.status = 'ready'
+                      AND efe.review_status = 'accepted'
+                      AND efe.source_content_hash = efi.content_hash
+                    ORDER BY efe.id DESC
+                    LIMIT 1
+                ) accepted_show ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT
                         efe.id,
@@ -781,6 +793,7 @@ def list_external_feed_items_for_artist(
                         AS accepted_enrichment_prompt_version,
                     accepted_classification.result_json
                         AS accepted_classification_json,
+                    accepted_show.result_json AS accepted_show_json,
                     CASE
                         WHEN efs.source_kind = 'publisher_rss' THEN item_artist.name
                         ELSE COALESCE(source_artist.name, item_artist.name)
@@ -816,6 +829,17 @@ def list_external_feed_items_for_artist(
                     ORDER BY efe.id DESC
                     LIMIT 1
                 ) accepted_classification ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT efe.result_json
+                    FROM external_feed_enrichments efe
+                    WHERE efe.item_id = efi.id
+                      AND efe.operation = 'extract_show'
+                      AND efe.status = 'ready'
+                      AND efe.review_status = 'accepted'
+                      AND efe.source_content_hash = efi.content_hash
+                    ORDER BY efe.id DESC
+                    LIMIT 1
+                ) accepted_show ON TRUE
                 WHERE efi.state = 'active'
                   AND efi.duplicate_of_id IS NULL
                   AND efs.state IN ('active', 'degraded')
