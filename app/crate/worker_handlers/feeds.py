@@ -370,6 +370,7 @@ def _refresh_external_feed_sources(
         "items_upserted": 0,
         "enrichments_queued": 0,
         "classifications_queued": 0,
+        "clusters_queued": 0,
         "artist_associations_auto": 0,
         "artist_associations_queued": 0,
     }
@@ -439,6 +440,7 @@ def _refresh_external_feed_sources(
                 content_hash = str(
                     (persisted_item or {}).get("content_hash") or item.content_hash
                 )
+                association: dict[str, Any] | None = None
                 if (
                     item_id is not None
                     and source.get("source_kind") in PUBLISHER_SOURCE_KINDS
@@ -528,6 +530,38 @@ def _refresh_external_feed_sources(
                                 item_id,
                                 exc_info=True,
                             )
+                        associated_artist = bool(
+                            (persisted_item or {}).get("artist_id") is not None
+                            or (
+                                association is not None
+                                and (
+                                    association.get("applied")
+                                    or association.get("already_associated")
+                                )
+                            )
+                        )
+                        if associated_artist:
+                            try:
+                                queued_cluster = create_task_dedup(
+                                    "external_feeds_enrich_item",
+                                    {
+                                        "item_id": int(item_id),
+                                        "operation": "cluster",
+                                        "language": "English",
+                                    },
+                                    dedup_key=(
+                                        f"external-feed-auto-cluster:{item_id}:"
+                                        f"{content_hash}"
+                                    ),
+                                )
+                                if queued_cluster is not None:
+                                    stats["clusters_queued"] += 1
+                            except Exception:
+                                log.warning(
+                                    "Could not queue AI cluster for external feed item %s",
+                                    item_id,
+                                    exc_info=True,
+                                )
             mark_external_feed_source_not_modified(
                 source_id,
                 etag=result.etag,

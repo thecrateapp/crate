@@ -304,7 +304,25 @@ def test_publisher_refresh_queues_ai_summary_for_enabled_sources(monkeypatch):
     )
     monkeypatch.setattr(
         "crate.worker_handlers.feeds.upsert_external_feed_item",
-        lambda **kwargs: {"id": 101, "content_hash": item.content_hash},
+        lambda **kwargs: {
+            "id": 101,
+            "content_hash": item.content_hash,
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.list_library_artists_for_feed_association",
+        lambda: [{"id": 42, "name": "Example Artist"}],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.associate_external_feed_item_deterministically",
+        lambda item_id, artists: {
+            "item_id": item_id,
+            "candidates": [],
+            "auto_candidate": {"artist_id": 42},
+            "requires_review": False,
+            "applied": True,
+            "already_associated": False,
+        },
     )
     queued = []
     monkeypatch.setattr(
@@ -327,14 +345,19 @@ def test_publisher_refresh_queues_ai_summary_for_enabled_sources(monkeypatch):
     assert result["items_upserted"] == 1
     assert result["enrichments_queued"] == 1
     assert result["classifications_queued"] == 1
+    assert result["clusters_queued"] == 1
     assert [call[0][1]["operation"] for call in queued] == [
         "summary",
         "classify",
+        "cluster",
     ]
     assert queued[0][0][0] == "external_feeds_enrich_item"
     assert queued[0][0][1]["item_id"] == 101
     assert queued[1][1]["dedup_key"] == (
         f"external-feed-auto-classification:101:{item.content_hash}"
+    )
+    assert queued[2][1]["dedup_key"] == (
+        f"external-feed-auto-cluster:101:{item.content_hash}"
     )
 
 
@@ -485,6 +508,7 @@ def test_external_feed_refresh_persists_items_and_cache_validators(monkeypatch):
         "items_upserted": 1,
         "enrichments_queued": 0,
         "classifications_queued": 0,
+        "clusters_queued": 0,
         "artist_associations_auto": 0,
         "artist_associations_queued": 0,
     }
