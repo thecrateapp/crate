@@ -152,6 +152,115 @@ def test_external_feed_item_upsert_updates_identity_and_marks_duplicate_content(
     assert bounded["payload_json"]["size_bytes"] > 64 * 1024
 
 
+def test_external_feed_cluster_candidates_are_artist_and_time_bounded(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import transaction_scope
+    from sqlalchemy import text
+
+    artist_name = "Cluster Candidate Artist"
+    other_artist_name = "Other Cluster Artist"
+    pg_db.upsert_artist({"name": artist_name})
+    pg_db.upsert_artist({"name": other_artist_name})
+    with transaction_scope() as session:
+        artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = :name"),
+            {"name": artist_name},
+        ).scalar_one()
+        other_artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = :name"),
+            {"name": other_artist_name},
+        ).scalar_one()
+
+    source = external_feeds.upsert_external_feed_source(
+        source_kind="artist_site",
+        source_url="https://cluster.example/news.xml",
+        artist_id=artist_id,
+        parser_version="cluster-test-v1",
+    )
+    published_at = datetime(2026, 8, 23, 12, 0, tzinfo=timezone.utc)
+    target = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url="https://cluster.example/target",
+        external_guid="cluster-target",
+        title="Target announcement",
+        content_hash="cluster-target-hash",
+        parser_version="cluster-test-v1",
+        published_at=published_at,
+    )
+    nearby = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="release",
+        source_url=source["source_url"],
+        canonical_url="https://cluster.example/nearby",
+        external_guid="cluster-nearby",
+        title="Nearby release",
+        content_hash="cluster-nearby-hash",
+        parser_version="cluster-test-v1",
+        published_at=published_at + timedelta(days=1),
+    )
+    outside = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url="https://cluster.example/outside",
+        external_guid="cluster-outside",
+        title="Outside window",
+        content_hash="cluster-outside-hash",
+        parser_version="cluster-test-v1",
+        published_at=published_at + timedelta(days=46),
+    )
+    other_artist = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=other_artist_id,
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url="https://cluster.example/other-artist",
+        external_guid="cluster-other-artist",
+        title="Other artist",
+        content_hash="cluster-other-artist-hash",
+        parser_version="cluster-test-v1",
+        published_at=published_at + timedelta(days=1),
+    )
+    duplicate_original = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url="https://cluster.example/duplicate-original",
+        external_guid="cluster-duplicate-original",
+        title="Duplicate original",
+        content_hash="cluster-duplicate-hash",
+        parser_version="cluster-test-v1",
+        published_at=published_at + timedelta(days=2),
+    )
+    duplicate = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url="https://cluster.example/duplicate",
+        external_guid="cluster-duplicate",
+        title="Duplicate item",
+        content_hash="cluster-duplicate-hash",
+        parser_version="cluster-test-v1",
+        published_at=published_at + timedelta(days=2),
+    )
+
+    candidates = external_feeds.list_external_feed_cluster_candidates(target["id"])
+    candidate_ids = {candidate["id"] for candidate in candidates}
+
+    assert nearby["id"] in candidate_ids
+    assert outside["id"] not in candidate_ids
+    assert other_artist["id"] not in candidate_ids
+    assert duplicate_original["id"] in candidate_ids
+    assert duplicate["id"] not in candidate_ids
+
+
 def test_external_feed_source_failure_marks_degraded_with_backoff(pg_db):
     from crate.db.repositories import external_feeds
 

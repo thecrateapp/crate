@@ -216,6 +216,73 @@ def get_external_feed_item(item_id: int) -> dict[str, Any] | None:
         )
 
 
+def list_external_feed_cluster_candidates(
+    item_id: int, *, limit: int = 12, window_days: int = 45
+) -> list[dict[str, Any]]:
+    """List nearby active items from the same artist for semantic clustering."""
+    bounded_limit = max(1, min(int(limit), 50))
+    bounded_window = max(1, min(int(window_days), 180))
+    with read_scope() as session:
+        target = _row(
+            session.execute(
+                text(
+                    """
+                    SELECT artist_id, published_at
+                    FROM external_feed_items
+                    WHERE id = :item_id AND state = 'active'
+                    """
+                ),
+                {"item_id": int(item_id)},
+            )
+        )
+        if target is None or target.get("artist_id") is None:
+            return []
+        published_at = target.get("published_at")
+        rows = session.execute(
+            text(
+                """
+                SELECT
+                    efi.*,
+                    efs.source_kind,
+                    efs.source_url AS feed_source_url,
+                    efs.canonical_url AS artist_url,
+                    COALESCE(
+                        la.name,
+                        NULLIF(efi.payload_json ->> 'author', '')
+                    ) AS artist_name
+                FROM external_feed_items efi
+                JOIN external_feed_sources efs ON efs.id = efi.source_id
+                LEFT JOIN library_artists la ON la.id = efi.artist_id
+                WHERE efi.id <> :item_id
+                  AND efi.artist_id = :artist_id
+                  AND efi.state = 'active'
+                  AND efi.duplicate_of_id IS NULL
+                  AND (
+                      :published_at IS NULL
+                      OR efi.published_at IS NULL
+                      OR efi.published_at BETWEEN
+                          :window_start AND :window_end
+                  )
+                ORDER BY efi.published_at DESC NULLS LAST, efi.id DESC
+                LIMIT :limit
+                """
+            ),
+            {
+                "item_id": int(item_id),
+                "artist_id": int(target["artist_id"]),
+                "published_at": published_at,
+                "window_start": published_at - timedelta(days=bounded_window)
+                if published_at
+                else None,
+                "window_end": published_at + timedelta(days=bounded_window)
+                if published_at
+                else None,
+                "limit": bounded_limit,
+            },
+        ).mappings()
+        return serialize_rows(rows)
+
+
 def list_bandcamp_feed_candidates(*, limit: int = 100) -> list[dict[str, Any]]:
     """List persisted artist URLs eligible for public Bandcamp RSS discovery."""
     bounded_limit = max(1, min(int(limit), 500))
@@ -1132,6 +1199,7 @@ __all__ = [
     "get_external_feed_enrichment",
     "get_external_feed_item_enrichment",
     "get_external_feed_source",
+    "list_external_feed_cluster_candidates",
     "apply_external_feed_show_enrichment",
     "list_bandcamp_feed_candidates",
     "list_external_feed_items_for_user",

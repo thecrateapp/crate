@@ -37,14 +37,28 @@ import { cn } from "@/lib/utils";
 type ReviewStatus = "pending" | "accepted" | "rejected";
 
 interface EnrichmentResult {
+  operation?: string;
   classification?: string;
+  cluster_type?: string;
   confidence?: number;
+  rationale?: string;
   reasons?: string[];
+  members?: FeedClusterMember[];
   shows?: ExtractedShowProposal[];
   summary?: string;
   key_points?: string[];
   warnings?: string[];
   generated_at?: string;
+}
+
+interface FeedClusterMember {
+  item_id: number;
+  role: "representative" | "related";
+  reason: string;
+  title: string;
+  source_kind: string;
+  canonical_url?: string | null;
+  published_at?: string | null;
 }
 
 interface ExtractedShowProposal {
@@ -140,6 +154,14 @@ function formatClassification(value?: string) {
 
 function proposalPreview(result: EnrichmentResult, fallback?: string | null) {
   if (result.summary) return result.summary;
+  if (result.members?.length) {
+    return `${result.members.length} related items · ${formatClassification(
+      result.cluster_type,
+    )}`;
+  }
+  if (result.operation === "cluster") {
+    return result.rationale || "No coherent cluster identified.";
+  }
   if (result.shows?.length) {
     const label = result.shows.length === 1 ? "show" : "shows";
     return `${result.shows.length} ${label} extracted for review`;
@@ -412,7 +434,86 @@ export function FeedReview() {
                 <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/40">
                   AI proposal
                 </h3>
-                {selected.result_json.shows?.length ? (
+                {selected.result_json.members?.length ? (
+                  <div className="space-y-3 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-medium text-white/85">
+                        Related items
+                      </h4>
+                      <Badge variant="outline">
+                        {formatClassification(
+                          selected.result_json.cluster_type,
+                        )}
+                      </Badge>
+                      {typeof selected.result_json.confidence === "number" ? (
+                        <span className="text-xs text-white/45">
+                          {Math.round(selected.result_json.confidence * 100)}%
+                          confidence
+                        </span>
+                      ) : null}
+                    </div>
+                    {selected.result_json.rationale ? (
+                      <p className="text-sm leading-6 text-white/70">
+                        {selected.result_json.rationale}
+                      </p>
+                    ) : null}
+                    <div className="space-y-2">
+                      {selected.result_json.members.map((member) => (
+                        <div
+                          key={member.item_id}
+                          className="rounded-md border border-white/10 bg-black/15 p-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium text-white/85">
+                              {member.title}
+                            </span>
+                            <Badge variant="outline">{member.role}</Badge>
+                            <span className="text-xs text-white/40">
+                              {sourceLabel(member.source_kind)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-white/50">
+                            {member.reason}
+                          </p>
+                          {member.canonical_url ? (
+                            <a
+                              href={member.canonical_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                            >
+                              <ExternalLink size={13} />
+                              Open source
+                            </a>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : selected.result_json.operation === "cluster" ? (
+                  <div className="space-y-3 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-medium text-white/85">
+                        Cluster review
+                      </h4>
+                      <Badge variant="outline">
+                        {formatClassification(
+                          selected.result_json.cluster_type,
+                        )}
+                      </Badge>
+                      {typeof selected.result_json.confidence === "number" ? (
+                        <span className="text-xs text-white/45">
+                          {Math.round(selected.result_json.confidence * 100)}%
+                          confidence
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm leading-6 text-white/70">
+                      {selected.result_json.rationale ||
+                        "No coherent cluster was identified."}
+                    </p>
+                  </div>
+                ) : selected.result_json.shows?.length ? (
                   <div className="space-y-3 rounded-md border border-primary/15 bg-primary/[0.06] p-4">
                     <div className="flex items-center gap-2">
                       <CalendarDays size={16} className="text-primary" />

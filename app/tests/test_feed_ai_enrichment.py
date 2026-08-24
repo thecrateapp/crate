@@ -326,6 +326,57 @@ def test_external_feed_ai_handler_persists_reviewable_show_extraction(monkeypatc
     assert completed[0][1]["prompt_version"] == "external-feed-show-extraction-v1"
 
 
+def test_external_feed_ai_handler_persists_reviewable_cluster(monkeypatch):
+    from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.get_external_feed_item", lambda item_id: _item()
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.list_external_feed_cluster_candidates",
+        lambda item_id, limit=12: [_item(id=8)],
+    )
+    queued = {"id": 22, "status": "pending", "source_content_hash": "hash-1"}
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.queue_external_feed_item_enrichment",
+        lambda **kwargs: queued,
+    )
+    proposal = {
+        "operation": "cluster",
+        "prompt_version": "external-feed-clustering-v1",
+        "source_content_hash": "hash-1",
+        "language": "English",
+        "cluster_type": "release",
+        "members": [],
+        "confidence": 0.0,
+        "rationale": "No coherent cluster found.",
+        "warnings": [],
+        "model": "ollama/llama3.1:8b",
+        "generated_at": "2026-08-23T12:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.cluster_external_feed_item",
+        lambda item, candidates, language: proposal,
+    )
+    completed = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.mark_external_feed_enrichment_ready",
+        lambda *args, **kwargs: completed.append((args, kwargs)) or {"id": 22},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.feeds.emit_task_event", lambda *args: None
+    )
+
+    result = _handle_external_feeds_enrich_item(
+        "task-1", {"item_id": 7, "operation": "cluster"}, {}
+    )
+
+    assert result["status"] == "ready"
+    assert result["result"] == proposal
+    assert completed[0][1]["prompt_version"] == "external-feed-clustering-v1"
+
+
 def test_external_feed_ai_handler_rejects_unknown_operation(monkeypatch):
     from crate.worker_handlers.feeds import _handle_external_feeds_enrich_item
 
@@ -335,7 +386,7 @@ def test_external_feed_ai_handler_rejects_unknown_operation(monkeypatch):
     )
 
     result = _handle_external_feeds_enrich_item(
-        "task-1", {"item_id": 7, "operation": "cluster"}, {}
+        "task-1", {"item_id": 7, "operation": "unsupported"}, {}
     )
 
     assert result["error"] == "Unsupported external feed AI operation"
@@ -435,6 +486,38 @@ def test_external_feed_ai_api_accepts_show_extraction_operation(monkeypatch):
 
     assert result == {"task_id": "task-3"}
     assert captured[0][1]["operation"] == "extract_show"
+    assert "hash-1" in captured[0][2]
+
+
+def test_external_feed_ai_api_accepts_cluster_operation(monkeypatch):
+    from crate.api.external_feeds import (
+        ExternalFeedEnrichmentRequest,
+        enrich_external_feed_item,
+    )
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission", lambda request, capability: {}
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.get_external_feed_item", lambda item_id: _item()
+    )
+    captured = []
+    monkeypatch.setattr(
+        "crate.api.external_feeds.create_task_dedup",
+        lambda task_type, params, dedup_key: (
+            captured.append((task_type, params, dedup_key)) or "task-4"
+        ),
+    )
+
+    result = enrich_external_feed_item(
+        None,
+        7,
+        ExternalFeedEnrichmentRequest(operation="cluster", language="Spanish"),
+    )
+
+    assert result == {"task_id": "task-4"}
+    assert captured[0][1]["operation"] == "cluster"
     assert "hash-1" in captured[0][2]
 
 

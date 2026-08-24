@@ -13,6 +13,12 @@ from crate.llm.prompts.feed_classification import (
     PROMPT_VERSION as CLASSIFICATION_PROMPT_VERSION,
     build_feed_classification_prompt,
 )
+from crate.llm.prompts.feed_clustering import (
+    FEED_CLUSTERING_SYSTEM_PROMPT,
+    FeedClusterResponse,
+    PROMPT_VERSION as CLUSTERING_PROMPT_VERSION,
+    build_feed_clustering_prompt,
+)
 from crate.llm.prompts.feed_show_extraction import (
     FEED_SHOW_EXTRACTION_SYSTEM_PROMPT,
     FeedShowExtractionResponse,
@@ -87,6 +93,92 @@ def classify_external_feed_item(
     }
 
 
+def cluster_external_feed_item(
+    item: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    *,
+    language: str = "English",
+) -> dict[str, Any]:
+    """Generate a reviewable semantic cluster without merging source items."""
+    if not str(item.get("title") or "").strip():
+        raise ValueError("External feed item title is required")
+    if not str(item.get("content_hash") or "").strip():
+        raise ValueError("External feed item content hash is required")
+
+    base = {
+        "operation": "cluster",
+        "prompt_version": CLUSTERING_PROMPT_VERSION,
+        "source_content_hash": str(item["content_hash"]),
+        "language": language,
+        "cluster_type": "other",
+        "members": [],
+        "confidence": 0.0,
+        "rationale": "No related candidate items were available.",
+        "warnings": ["No related candidate items were available."],
+        "model": get_config().get("model"),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if not candidates:
+        return base
+
+    response = ask_structured(
+        FeedClusterResponse,
+        build_feed_clustering_prompt(
+            item=item, candidates=candidates, language=language
+        ),
+        system=FEED_CLUSTERING_SYSTEM_PROMPT,
+    )
+    contexts = {int(item["id"]): item}
+    contexts.update(
+        {
+            int(candidate["id"]): candidate
+            for candidate in candidates
+            if candidate.get("id") is not None
+        }
+    )
+    members: list[dict[str, Any]] = []
+    seen_ids: set[int] = set()
+    representative_count = 0
+    for member in response.members:
+        member_id = int(member.item_id)
+        context = contexts.get(member_id)
+        if context is None:
+            raise ValueError("Cluster response contains an unknown candidate item")
+        if member_id in seen_ids:
+            continue
+        seen_ids.add(member_id)
+        if member.role == "representative":
+            representative_count += 1
+        published_at = context.get("published_at")
+        members.append(
+            {
+                **member.model_dump(mode="json"),
+                "title": str(context.get("title") or "Untitled item"),
+                "source_kind": str(context.get("source_kind") or "external"),
+                "canonical_url": context.get("canonical_url")
+                or context.get("source_url"),
+                "published_at": (
+                    published_at.isoformat()
+                    if isinstance(published_at, datetime)
+                    else published_at
+                ),
+            }
+        )
+    if members and (len(members) < 2 or int(item["id"]) not in seen_ids):
+        raise ValueError("Cluster response must include the target and a related item")
+    if members and representative_count != 1:
+        raise ValueError("Cluster response must contain one representative item")
+
+    return {
+        **base,
+        "cluster_type": response.cluster_type,
+        "members": members,
+        "confidence": response.confidence,
+        "rationale": response.rationale,
+        "warnings": response.warnings,
+    }
+
+
 def extract_shows_from_external_feed_item(
     item: dict[str, Any], *, language: str = "English"
 ) -> dict[str, Any]:
@@ -117,6 +209,7 @@ def extract_shows_from_external_feed_item(
 __all__ = [
     "ai_enrichment_enabled",
     "classify_external_feed_item",
+    "cluster_external_feed_item",
     "extract_shows_from_external_feed_item",
     "summarize_external_feed_item",
 ]

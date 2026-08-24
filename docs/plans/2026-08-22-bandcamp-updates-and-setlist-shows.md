@@ -321,10 +321,11 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 **Files:**
 - Create: `app/crate/llm/prompts/feed_summary.py`
 - Create: `app/crate/llm/prompts/feed_classification.py`
+- Create: `app/crate/llm/prompts/feed_clustering.py`
 - Create: `app/crate/llm/prompts/feed_show_extraction.py`
 - Create or modify: `app/crate/feeds/ai_enrichment.py`
 - Modify: `app/crate/worker_handlers/feeds.py`
-- Test: `app/tests/test_feed_ai_enrichment.py`
+- Test: `app/tests/test_feed_ai_enrichment.py` and `app/tests/test_feed_clustering.py`
 
 **Steps:**
 
@@ -348,8 +349,10 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 - Añadida la operación `extract_show`, que devuelve hasta diez propuestas de eventos con fecha explícita, ubicación, URLs, confianza, evidencia y warnings. Las fechas se serializan en ISO y la propuesta no muta la tabla `shows`.
 - `Feed Review` muestra las propuestas de shows en el modal de revisión, incluyendo fecha, localización, evidencia y enlaces de tickets/evento cuando están disponibles.
 - Una propuesta `extract_show` aceptada puede aplicarse explícitamente desde `Feed Review`; la operación es idempotente mediante IDs externos deterministas, registra usuario/fecha/IDs creados en la revisión `092` y conserva los enlaces de tickets en `shows`.
+- Añadida la operación `cluster`, que compara un item con hasta doce items activos del mismo artista en una ventana temporal acotada, valida los IDs y exige un único representante. La propuesta conserva el contexto de cada miembro para revisión y no modifica ni fusiona items automáticamente.
+- `Feed Review` muestra clusters con sus fuentes, roles, razones, confianza y el caso explícito de que no exista una agrupación coherente.
 - `/api/me/feed` consume únicamente resúmenes `ready` y `accepted` cuyo `source_content_hash` coincide con el item activo; si no existe una propuesta vigente, conserva el texto original como fallback.
-- El read path no ejecuta IA y mantiene la visibilidad Bandcamp condicionada a una conexión activa. Queda pendiente la agrupación de items.
+- El read path no ejecuta IA y mantiene la visibilidad Bandcamp condicionada a una conexión activa. Queda pendiente decidir si la aceptación de un cluster debe habilitar una acción explícita de deduplicación editorial, separada de la revisión y sin merge automático.
 
 ## Canonical provider contracts
 

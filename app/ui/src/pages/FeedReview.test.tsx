@@ -138,6 +138,102 @@ describe("FeedReview", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("renders cluster proposals and their source items in the review modal", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            result_json: {
+              operation: "cluster",
+              cluster_type: "release",
+              confidence: 0.88,
+              rationale: "Both items concern the same album campaign.",
+              members: [
+                {
+                  item_id: 7,
+                  role: "representative",
+                  reason: "The announcement introduces the release.",
+                  title: "Tour announcement",
+                  source_kind: "artist_site",
+                  canonical_url: "https://artist.example/news/tour",
+                  published_at: "2026-08-23T12:00:00Z",
+                },
+                {
+                  item_id: 8,
+                  role: "related",
+                  reason: "The pre-order covers the same album.",
+                  title: "Album pre-order",
+                  source_kind: "label",
+                  canonical_url: "https://artist.example/pre-order",
+                  published_at: "2026-08-24T12:00:00Z",
+                },
+              ],
+              warnings: [],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("2 related items · release")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Review proposal" }));
+    expect(screen.getByText("Album pre-order")).toBeInTheDocument();
+    expect(
+      screen.getByText("Both items concern the same album campaign."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("representative")).toBeInTheDocument();
+  });
+
+  it("explains when clustering finds no coherent related item", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            result_json: {
+              operation: "cluster",
+              cluster_type: "other",
+              confidence: 0,
+              rationale: "No related items were available.",
+              members: [],
+              warnings: ["No related candidate items were available."],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByText("No related items were available."),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Review proposal" }));
+    expect(screen.getByText("Cluster review")).toBeInTheDocument();
+    expect(screen.getAllByText("No related items were available.").length).toBe(
+      2,
+    );
+  });
+
   it("renders extracted show proposals in the review modal", async () => {
     const user = userEvent.setup();
     useApiMock.mockReturnValue({

@@ -41,7 +41,7 @@ _RESPONSES = merge_responses(
 
 
 class ExternalFeedEnrichmentRequest(BaseModel):
-    operation: Literal["summary", "classify", "extract_show"] = "summary"
+    operation: Literal["summary", "classify", "cluster", "extract_show"] = "summary"
     language: str = Field(default="English", min_length=2, max_length=40)
 
 
