@@ -586,6 +586,64 @@ def test_external_feed_review_api_applies_accepted_show_proposal(monkeypatch):
     }
 
 
+def test_external_feed_review_api_applies_accepted_cluster(monkeypatch):
+    from crate.api.external_feeds import apply_external_feed_cluster
+
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission",
+        lambda request, capability: {"id": 42},
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.apply_external_feed_cluster_enrichment",
+        lambda enrichment_id, applied_by_user_id: {
+            "enrichment_id": enrichment_id,
+            "representative_item_id": 7,
+            "related_item_ids": [8],
+            "applied": True,
+            "already_applied": False,
+        },
+    )
+
+    result = apply_external_feed_cluster(None, 19)
+
+    assert result == {
+        "enrichment_id": 19,
+        "representative_item_id": 7,
+        "related_item_ids": [8],
+        "applied": True,
+        "already_applied": False,
+    }
+
+
+def test_external_feed_review_api_reverts_cluster(monkeypatch):
+    from crate.api.external_feeds import revert_external_feed_cluster
+
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission",
+        lambda request, capability: {"id": 42},
+    )
+    monkeypatch.setattr(
+        "crate.api.external_feeds.revert_external_feed_cluster_enrichment",
+        lambda enrichment_id, reverted_by_user_id: {
+            "enrichment_id": enrichment_id,
+            "representative_item_id": 7,
+            "restored_item_ids": [8],
+            "restored": True,
+            "already_reverted": False,
+        },
+    )
+
+    result = revert_external_feed_cluster(None, 19)
+
+    assert result == {
+        "enrichment_id": 19,
+        "representative_item_id": 7,
+        "restored_item_ids": [8],
+        "restored": True,
+        "already_reverted": False,
+    }
+
+
 def test_external_feed_enrichment_migration_has_review_and_provenance_fields():
     migration = Path(__file__).parents[1] / (
         "crate/db/migrations/versions/091_external_feed_ai_enrichments.py"

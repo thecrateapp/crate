@@ -93,6 +93,9 @@ interface FeedEnrichment {
   reviewed_at?: string | null;
   applied_at?: string | null;
   applied_show_ids?: number[];
+  cluster_applied_at?: string | null;
+  cluster_applied_item_ids?: number[];
+  cluster_reverted_at?: string | null;
   title: string;
   item_kind: string;
   source_url: string;
@@ -277,6 +280,98 @@ export function FeedReview() {
         applyError instanceof Error && applyError.message
           ? applyError.message
           : "Failed to add shows to the catalogue",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function applyCluster() {
+    if (
+      !selected ||
+      selected.review_status !== "accepted" ||
+      selected.result_json.operation !== "cluster"
+    ) {
+      return;
+    }
+    setBusyId(selected.id);
+    try {
+      const result = await api<{
+        related_item_ids: number[];
+        already_applied: boolean;
+      }>(
+        `/api/admin/external-feeds/enrichments/${selected.id}/apply-cluster`,
+        "POST",
+      );
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              cluster_applied_at:
+                current.cluster_applied_at || new Date().toISOString(),
+              cluster_applied_item_ids: result.related_item_ids,
+              cluster_reverted_at: null,
+            }
+          : current,
+      );
+      toast.success(
+        result.already_applied
+          ? "Related items are already hidden"
+          : `${result.related_item_ids.length} related item${
+              result.related_item_ids.length === 1 ? "" : "s"
+            } hidden from the feed`,
+      );
+      refetch();
+    } catch (applyError) {
+      toast.error(
+        applyError instanceof Error && applyError.message
+          ? applyError.message
+          : "Failed to hide related items",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function revertCluster() {
+    if (
+      !selected ||
+      selected.review_status !== "accepted" ||
+      selected.result_json.operation !== "cluster"
+    ) {
+      return;
+    }
+    setBusyId(selected.id);
+    try {
+      const result = await api<{
+        restored_item_ids: number[];
+        already_reverted: boolean;
+      }>(
+        `/api/admin/external-feeds/enrichments/${selected.id}/revert-cluster`,
+        "POST",
+      );
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              cluster_reverted_at: new Date().toISOString(),
+              cluster_applied_item_ids: [],
+            }
+          : current,
+      );
+      toast.success(
+        result.already_reverted
+          ? "Related items are already visible"
+          : `${result.restored_item_ids.length} related item${
+              result.restored_item_ids.length === 1 ? "" : "s"
+            } restored to the feed`,
+      );
+      refetch();
+    } catch (revertError) {
+      toast.error(
+        revertError instanceof Error && revertError.message
+          ? revertError.message
+          : "Failed to restore related items",
       );
     } finally {
       setBusyId(null);
@@ -758,6 +853,36 @@ export function FeedReview() {
                   {selected.applied_show_ids?.length
                     ? "Already in catalogue"
                     : "Add shows to catalogue"}
+                </Button>
+              </ModalFooter>
+            ) : selected.review_status === "accepted" &&
+              selected.result_json.operation === "cluster" &&
+              selected.result_json.members?.length ? (
+              <ModalFooter className="flex flex-wrap justify-end gap-2 px-5 py-4">
+                <Button
+                  type="button"
+                  variant={
+                    selected.cluster_applied_item_ids?.length
+                      ? "outline"
+                      : "default"
+                  }
+                  onClick={() =>
+                    void (selected.cluster_applied_item_ids?.length
+                      ? revertCluster()
+                      : applyCluster())
+                  }
+                  disabled={busyId !== null}
+                >
+                  {busyId === selected.id ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : selected.cluster_applied_item_ids?.length ? (
+                    <RefreshCw size={15} />
+                  ) : (
+                    <Database size={15} />
+                  )}
+                  {selected.cluster_applied_item_ids?.length
+                    ? "Restore related items"
+                    : "Hide related items"}
                 </Button>
               </ModalFooter>
             ) : null}

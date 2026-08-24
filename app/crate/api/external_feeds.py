@@ -15,10 +15,12 @@ from crate.api.openapi_responses import (
 from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.db.repositories.external_feeds import (
+    apply_external_feed_cluster_enrichment,
     apply_external_feed_show_enrichment,
     get_external_feed_enrichment,
     get_external_feed_item,
     list_external_feed_enrichments_for_review,
+    revert_external_feed_cluster_enrichment,
     review_external_feed_enrichment,
 )
 from crate.db.repositories.tasks import (
@@ -141,6 +143,56 @@ def apply_external_feed_shows(request: Request, enrichment_id: int):
 
 
 @router.post(
+    "/enrichments/{enrichment_id}/apply-cluster",
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        {
+            404: error_response("The enrichment is missing."),
+            422: error_response("The cluster proposal cannot be applied."),
+        },
+    ),
+    summary="Hide the related items from an accepted external feed cluster",
+)
+def apply_external_feed_cluster(request: Request, enrichment_id: int):
+    user = require_permission(request, "library.metadata.write")
+    try:
+        result = apply_external_feed_cluster_enrichment(
+            enrichment_id,
+            applied_by_user_id=int(user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Enrichment not found")
+    return result
+
+
+@router.post(
+    "/enrichments/{enrichment_id}/revert-cluster",
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        {
+            404: error_response("The enrichment is missing."),
+            422: error_response("The cluster application cannot be reverted."),
+        },
+    ),
+    summary="Restore the related items hidden by an external feed cluster",
+)
+def revert_external_feed_cluster(request: Request, enrichment_id: int):
+    user = require_permission(request, "library.metadata.write")
+    try:
+        result = revert_external_feed_cluster_enrichment(
+            enrichment_id,
+            reverted_by_user_id=int(user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Enrichment not found")
+    return result
+
+
+@router.post(
     "/items/{item_id}/enrich",
     response_model=TaskEnqueueResponse,
     responses=_RESPONSES,
@@ -191,10 +243,12 @@ def enrich_external_feed_item(
 __all__ = [
     "ExternalFeedEnrichmentRequest",
     "ExternalFeedReviewRequest",
+    "apply_external_feed_cluster",
     "apply_external_feed_shows",
     "enrich_external_feed_item",
     "get_external_feed_review_item",
     "list_external_feed_review_queue",
     "review_external_feed",
+    "revert_external_feed_cluster",
     "router",
 ]

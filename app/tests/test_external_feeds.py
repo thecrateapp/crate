@@ -7,6 +7,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "crate/db/migrations/versions/090_external_feed_sources.py"
 AI_MIGRATION = ROOT / "crate/db/migrations/versions/091_external_feed_ai_enrichments.py"
+CLUSTER_MIGRATION = (
+    ROOT / "crate/db/migrations/versions/093_external_feed_cluster_applications.py"
+)
 
 
 def test_external_feed_migration_separates_sources_and_items():
@@ -33,6 +36,18 @@ def test_external_feed_ai_migration_preserves_reviewable_provenance():
     assert "review_status" in source
     assert "reviewed_by_user_id" in source
     assert "external_feed_enrichments" in source
+
+
+def test_external_feed_cluster_migration_tracks_reversible_applications():
+    source = CLUSTER_MIGRATION.read_text()
+
+    assert 'revision = "093"' in source
+    assert 'down_revision = "092"' in source
+    assert "cluster_applied_at" in source
+    assert "cluster_applied_by_user_id" in source
+    assert "cluster_applied_item_ids" in source
+    assert "cluster_reverted_at" in source
+    assert "cluster_reverted_by_user_id" in source
 
 
 def _source(repo):
@@ -635,6 +650,37 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
     wishlist_items = external_feeds.list_external_feed_items_for_user(other_user_id)
     assert wishlist_items[0]["title"] == "Tour announcement updated"
 
+    representative = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url="https://followed-feed.bandcamp.com/feed",
+        canonical_url="https://followed-feed.bandcamp.com/news/tour-representative",
+        external_guid="tour-representative",
+        title="Representative tour announcement",
+        content_hash="tour-representative-hash",
+        parser_version="bandcamp-rss-v1",
+        author="Followed Feed Artist",
+        published_at=datetime(2026, 8, 23, 11, 0, tzinfo=timezone.utc),
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE external_feed_items
+                SET duplicate_of_id = :representative_id
+                WHERE external_guid = 'tour-1'
+                """
+            ),
+            {"representative_id": representative["id"]},
+        )
+
+    visible_titles = [
+        row["title"]
+        for row in external_feeds.list_external_feed_items_for_user(user_id)
+    ]
+    assert visible_titles == ["Representative tour announcement"]
+
     with transaction_scope() as session:
         session.execute(
             text(
@@ -648,3 +694,107 @@ def test_external_feed_items_are_scoped_to_connected_users_and_follows(pg_db):
         )
 
     assert external_feeds.list_external_feed_items_for_user(user_id) == []
+
+
+def test_external_feed_cluster_application_is_idempotent_and_reversible(pg_db):
+    from crate.db.repositories import external_feeds
+    from crate.db.tx import read_scope
+    from sqlalchemy import text
+
+    pg_db.upsert_artist({"name": "Cluster Apply Artist"})
+    with read_scope() as session:
+        artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = 'Cluster Apply Artist'")
+        ).scalar_one()
+
+    source = external_feeds.upsert_external_feed_source(
+        source_kind="artist_site",
+        source_url="https://cluster-apply.example/feed.xml",
+        artist_id=artist_id,
+        parser_version="cluster-apply-v1",
+    )
+    target = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="news",
+        source_url=source["source_url"],
+        canonical_url="https://cluster-apply.example/target",
+        external_guid="cluster-apply-target",
+        title="Album announcement",
+        content_hash="cluster-apply-target-hash",
+        parser_version="cluster-apply-v1",
+    )
+    related = external_feeds.upsert_external_feed_item(
+        source_id=source["id"],
+        artist_id=artist_id,
+        item_kind="release",
+        source_url=source["source_url"],
+        canonical_url="https://cluster-apply.example/preorder",
+        external_guid="cluster-apply-related",
+        title="Album pre-order",
+        content_hash="cluster-apply-related-hash",
+        parser_version="cluster-apply-v1",
+    )
+    enrichment = external_feeds.queue_external_feed_item_enrichment(
+        item_id=target["id"],
+        operation="cluster",
+        source_content_hash=target["content_hash"],
+        prompt_version="external-feed-clustering-v1",
+    )
+    external_feeds.mark_external_feed_enrichment_ready(
+        enrichment["id"],
+        result={
+            "operation": "cluster",
+            "cluster_type": "release",
+            "members": [
+                {
+                    "item_id": target["id"],
+                    "role": "representative",
+                    "reason": "The announcement introduces the release.",
+                },
+                {
+                    "item_id": related["id"],
+                    "role": "related",
+                    "reason": "The pre-order covers the same release.",
+                },
+            ],
+            "confidence": 0.9,
+            "rationale": "Both items cover the same release campaign.",
+            "warnings": [],
+        },
+        model="ollama/test",
+        prompt_version="external-feed-clustering-v1",
+    )
+    external_feeds.review_external_feed_enrichment(
+        enrichment["id"], reviewer_id=1, decision="accept"
+    )
+
+    applied = external_feeds.apply_external_feed_cluster_enrichment(
+        enrichment["id"], applied_by_user_id=1
+    )
+
+    assert applied["representative_item_id"] == target["id"]
+    assert applied["related_item_ids"] == [related["id"]]
+    assert applied["already_applied"] is False
+    assert external_feeds.list_external_feed_cluster_candidates(target["id"]) == []
+
+    retried = external_feeds.apply_external_feed_cluster_enrichment(
+        enrichment["id"], applied_by_user_id=1
+    )
+    assert retried["related_item_ids"] == [related["id"]]
+    assert retried["already_applied"] is True
+
+    reverted = external_feeds.revert_external_feed_cluster_enrichment(
+        enrichment["id"], reverted_by_user_id=1
+    )
+    assert reverted["restored_item_ids"] == [related["id"]]
+    assert reverted["already_reverted"] is False
+    assert (
+        external_feeds.list_external_feed_cluster_candidates(target["id"])[0]["id"]
+        == related["id"]
+    )
+
+    retried_revert = external_feeds.revert_external_feed_cluster_enrichment(
+        enrichment["id"], reverted_by_user_id=1
+    )
+    assert retried_revert["already_reverted"] is True

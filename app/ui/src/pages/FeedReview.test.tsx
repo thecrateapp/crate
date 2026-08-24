@@ -234,6 +234,138 @@ describe("FeedReview", () => {
     );
   });
 
+  it("applies an accepted cluster and hides only its related items", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({
+      enrichment_id: 19,
+      representative_item_id: 7,
+      related_item_ids: [8],
+      applied: true,
+      already_applied: false,
+    });
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            review_status: "accepted",
+            cluster_applied_item_ids: [],
+            result_json: {
+              operation: "cluster",
+              cluster_type: "release",
+              confidence: 0.88,
+              rationale: "Both items concern the same album campaign.",
+              members: [
+                {
+                  item_id: 7,
+                  role: "representative",
+                  reason: "The announcement introduces the release.",
+                  title: "Tour announcement",
+                  source_kind: "artist_site",
+                },
+                {
+                  item_id: 8,
+                  role: "related",
+                  reason: "The pre-order covers the same album.",
+                  title: "Album pre-order",
+                  source_kind: "label",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "View review" }));
+    await user.click(
+      screen.getByRole("button", { name: "Hide related items" }),
+    );
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/external-feeds/enrichments/19/apply-cluster",
+        "POST",
+      );
+    });
+    expect(refetchMock).toHaveBeenCalled();
+  });
+
+  it("restores related items from an applied cluster", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({
+      enrichment_id: 19,
+      representative_item_id: 7,
+      restored_item_ids: [8],
+      restored: true,
+      already_reverted: false,
+    });
+    useApiMock.mockReturnValue({
+      data: {
+        items: [
+          {
+            ...item,
+            review_status: "accepted",
+            cluster_applied_item_ids: [8],
+            result_json: {
+              operation: "cluster",
+              cluster_type: "release",
+              confidence: 0.88,
+              rationale: "Both items concern the same album campaign.",
+              members: [
+                {
+                  item_id: 7,
+                  role: "representative",
+                  reason: "The announcement introduces the release.",
+                  title: "Tour announcement",
+                  source_kind: "artist_site",
+                },
+                {
+                  item_id: 8,
+                  role: "related",
+                  reason: "The pre-order covers the same album.",
+                  title: "Album pre-order",
+                  source_kind: "label",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(
+      <MemoryRouter>
+        <FeedReview />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "View review" }));
+    await user.click(
+      screen.getByRole("button", { name: "Restore related items" }),
+    );
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/external-feeds/enrichments/19/revert-cluster",
+        "POST",
+      );
+    });
+    expect(refetchMock).toHaveBeenCalled();
+  });
+
   it("renders extracted show proposals in the review modal", async () => {
     const user = userEvent.setup();
     useApiMock.mockReturnValue({

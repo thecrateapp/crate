@@ -323,6 +323,7 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 - Create: `app/crate/llm/prompts/feed_classification.py`
 - Create: `app/crate/llm/prompts/feed_clustering.py`
 - Create: `app/crate/llm/prompts/feed_show_extraction.py`
+- Create: `app/crate/db/migrations/versions/093_external_feed_cluster_applications.py`
 - Create or modify: `app/crate/feeds/ai_enrichment.py`
 - Modify: `app/crate/worker_handlers/feeds.py`
 - Test: `app/tests/test_feed_ai_enrichment.py` and `app/tests/test_feed_clustering.py`
@@ -351,8 +352,9 @@ La IA debe ejecutarse bajo demanda o como tarea asíncrona limitada, con dedupli
 - Una propuesta `extract_show` aceptada puede aplicarse explícitamente desde `Feed Review`; la operación es idempotente mediante IDs externos deterministas, registra usuario/fecha/IDs creados en la revisión `092` y conserva los enlaces de tickets en `shows`.
 - Añadida la operación `cluster`, que compara un item con hasta doce items activos del mismo artista en una ventana temporal acotada, valida los IDs y exige un único representante. La propuesta conserva el contexto de cada miembro para revisión y no modifica ni fusiona items automáticamente.
 - `Feed Review` muestra clusters con sus fuentes, roles, razones, confianza y el caso explícito de que no exista una agrupación coherente.
+- Añadida una aplicación explícita y reversible de clusters aceptados: solo los miembros `related` reciben `duplicate_of_id`, dejan de aparecer en el feed y pueden restaurarse desde la misma revisión. La aplicación es idempotente, valida artista/estado/hash y conserva usuario y timestamps de aplicación/reversión.
 - `/api/me/feed` consume únicamente resúmenes `ready` y `accepted` cuyo `source_content_hash` coincide con el item activo; si no existe una propuesta vigente, conserva el texto original como fallback.
-- El read path no ejecuta IA y mantiene la visibilidad Bandcamp condicionada a una conexión activa. Queda pendiente decidir si la aceptación de un cluster debe habilitar una acción explícita de deduplicación editorial, separada de la revisión y sin merge automático.
+- El read path no ejecuta IA y mantiene la visibilidad Bandcamp condicionada a una conexión activa. Queda pendiente agrupar visualmente los items relacionados en el feed sin ocultarlos, si la experiencia de deduplicación explícita demuestra que esa presentación aporta más contexto.
 
 ## Canonical provider contracts
 

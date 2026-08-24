@@ -14,6 +14,7 @@ from sqlalchemy import text
 from crate.db.serialize import serialize_rows
 from crate.db.repositories.shows import upsert_show
 from crate.db.tx import read_scope, transaction_scope
+from crate.llm.prompts.feed_clustering import FeedClusterResponse
 from crate.llm.prompts.feed_show_extraction import FeedShowExtractionResponse
 
 
@@ -411,6 +412,7 @@ def list_external_feed_items_for_user(
                     LIMIT 1
                 ) accepted_enrichment ON TRUE
                 WHERE efi.state = 'active'
+                  AND efi.duplicate_of_id IS NULL
                   AND efs.source_kind = 'bandcamp_rss'
                   AND efs.state IN ('active', 'degraded')
                   AND EXISTS (
@@ -746,6 +748,229 @@ def apply_external_feed_show_enrichment(
             "show_ids": show_ids,
             "applied": True,
             "already_applied": False,
+        }
+
+
+def _load_cluster_application_row(session, enrichment_id: int) -> dict[str, Any] | None:
+    return _row(
+        session.execute(
+            text(
+                """
+                SELECT
+                    efe.*,
+                    efi.state AS item_state,
+                    efi.artist_id AS item_artist_id,
+                    efi.content_hash AS current_content_hash
+                FROM external_feed_enrichments efe
+                JOIN external_feed_items efi ON efi.id = efe.item_id
+                WHERE efe.id = :enrichment_id
+                FOR UPDATE OF efe, efi
+                """
+            ),
+            {"enrichment_id": int(enrichment_id)},
+        )
+    )
+
+
+def _parse_cluster_application(row: Mapping[str, Any]) -> tuple[int, list[int]]:
+    if row["operation"] != "cluster":
+        raise ValueError("Only clustering proposals can be applied")
+    try:
+        proposal = FeedClusterResponse.model_validate(row.get("result_json") or {})
+    except ValueError as exc:
+        raise ValueError("Cluster proposal has an invalid result") from exc
+
+    representative_ids = [
+        int(member.item_id)
+        for member in proposal.members
+        if member.role == "representative"
+    ]
+    member_ids = [int(member.item_id) for member in proposal.members]
+    related_ids = [
+        int(member.item_id) for member in proposal.members if member.role == "related"
+    ]
+    if len(member_ids) != len(set(member_ids)):
+        raise ValueError("Cluster proposal contains duplicate item IDs")
+    if len(representative_ids) != 1:
+        raise ValueError("Cluster proposal must contain one representative item")
+    if not related_ids:
+        raise ValueError("Cluster proposal contains no related items")
+    if int(row["item_id"]) not in member_ids:
+        raise ValueError("Cluster proposal does not include its target item")
+    return representative_ids[0], related_ids
+
+
+def apply_external_feed_cluster_enrichment(
+    enrichment_id: int, *, applied_by_user_id: int
+) -> dict[str, Any] | None:
+    """Hide accepted related items while preserving an explicit undo path."""
+    with transaction_scope() as session:
+        row = _load_cluster_application_row(session, enrichment_id)
+        if row is None:
+            return None
+        representative_id, related_ids = _parse_cluster_application(row)
+        existing_ids = [
+            int(value) for value in (row.get("cluster_applied_item_ids") or [])
+        ]
+        if (
+            row.get("cluster_applied_at") is not None
+            and row.get("cluster_reverted_at") is None
+        ):
+            return {
+                "enrichment_id": int(enrichment_id),
+                "representative_item_id": representative_id,
+                "related_item_ids": existing_ids,
+                "applied": True,
+                "already_applied": True,
+            }
+        if row["status"] != "ready":
+            raise ValueError("Cluster proposal is not ready")
+        if row["review_status"] != "accepted":
+            raise ValueError("Cluster proposal must be accepted before applying")
+        if row["item_state"] != "active":
+            raise ValueError("External feed item is no longer active")
+        if row["current_content_hash"] != row["source_content_hash"]:
+            raise ValueError("Cluster proposal is stale because the source changed")
+        if row.get("item_artist_id") is None:
+            raise ValueError("Cluster proposal has no associated artist")
+
+        member_ids = [representative_id, *related_ids]
+        locked_items: dict[int, dict[str, Any]] = {}
+        for member_id in sorted(set(member_ids)):
+            member_row = _row(
+                session.execute(
+                    text(
+                        """
+                        SELECT id, state, artist_id, duplicate_of_id
+                        FROM external_feed_items
+                        WHERE id = :item_id
+                        FOR UPDATE
+                        """
+                    ),
+                    {"item_id": member_id},
+                )
+            )
+            if member_row is None:
+                raise ValueError("Cluster proposal references a missing item")
+            if member_row["state"] != "active":
+                raise ValueError("Cluster proposal references an inactive item")
+            if member_row["artist_id"] != row["item_artist_id"]:
+                raise ValueError("Cluster proposal references a different artist")
+            locked_items[member_id] = member_row
+
+        representative = locked_items[representative_id]
+        if representative["duplicate_of_id"] is not None:
+            raise ValueError("Cluster representative is already hidden as a duplicate")
+
+        applied_ids: list[int] = []
+        for related_id in related_ids:
+            duplicate_of_id = locked_items[related_id]["duplicate_of_id"]
+            if duplicate_of_id is not None and duplicate_of_id != representative_id:
+                raise ValueError(
+                    "A related item is already assigned to another duplicate"
+                )
+            if duplicate_of_id is None:
+                session.execute(
+                    text(
+                        """
+                        UPDATE external_feed_items
+                        SET duplicate_of_id = :representative_id,
+                            updated_at = NOW()
+                        WHERE id = :item_id
+                        """
+                    ),
+                    {"item_id": related_id, "representative_id": representative_id},
+                )
+            applied_ids.append(related_id)
+
+        session.execute(
+            text(
+                """
+                UPDATE external_feed_enrichments
+                SET cluster_applied_at = NOW(),
+                    cluster_applied_by_user_id = :applied_by_user_id,
+                    cluster_applied_item_ids = CAST(:item_ids AS jsonb),
+                    cluster_reverted_at = NULL,
+                    cluster_reverted_by_user_id = NULL,
+                    updated_at = NOW()
+                WHERE id = :enrichment_id
+                """
+            ),
+            {
+                "enrichment_id": int(enrichment_id),
+                "applied_by_user_id": int(applied_by_user_id),
+                "item_ids": json.dumps(applied_ids),
+            },
+        )
+        return {
+            "enrichment_id": int(enrichment_id),
+            "representative_item_id": representative_id,
+            "related_item_ids": applied_ids,
+            "applied": True,
+            "already_applied": False,
+        }
+
+
+def revert_external_feed_cluster_enrichment(
+    enrichment_id: int, *, reverted_by_user_id: int
+) -> dict[str, Any] | None:
+    """Restore only related items hidden by the last cluster application."""
+    with transaction_scope() as session:
+        row = _load_cluster_application_row(session, enrichment_id)
+        if row is None:
+            return None
+        representative_id, _ = _parse_cluster_application(row)
+        applied_ids = [
+            int(value) for value in (row.get("cluster_applied_item_ids") or [])
+        ]
+        if not applied_ids or row.get("cluster_reverted_at") is not None:
+            return {
+                "enrichment_id": int(enrichment_id),
+                "representative_item_id": representative_id,
+                "restored_item_ids": [],
+                "restored": True,
+                "already_reverted": True,
+            }
+
+        restored_ids: list[int] = []
+        for related_id in applied_ids:
+            result = session.execute(
+                text(
+                    """
+                    UPDATE external_feed_items
+                    SET duplicate_of_id = NULL,
+                        updated_at = NOW()
+                    WHERE id = :item_id
+                      AND duplicate_of_id = :representative_id
+                    RETURNING id
+                    """
+                ),
+                {"item_id": related_id, "representative_id": representative_id},
+            )
+            if result.scalar_one_or_none() is not None:
+                restored_ids.append(related_id)
+
+        session.execute(
+            text(
+                """
+                UPDATE external_feed_enrichments
+                SET cluster_reverted_at = NOW(),
+                    cluster_reverted_by_user_id = :reverted_by_user_id,
+                    updated_at = NOW()
+                WHERE id = :enrichment_id
+                """
+            ),
+            {
+                "enrichment_id": int(enrichment_id),
+                "reverted_by_user_id": int(reverted_by_user_id),
+            },
+        )
+        return {
+            "enrichment_id": int(enrichment_id),
+            "representative_item_id": representative_id,
+            "restored_item_ids": restored_ids,
+            "restored": True,
+            "already_reverted": False,
         }
 
 
@@ -1200,6 +1425,7 @@ __all__ = [
     "get_external_feed_item_enrichment",
     "get_external_feed_source",
     "list_external_feed_cluster_candidates",
+    "apply_external_feed_cluster_enrichment",
     "apply_external_feed_show_enrichment",
     "list_bandcamp_feed_candidates",
     "list_external_feed_items_for_user",
@@ -1208,6 +1434,7 @@ __all__ = [
     "mark_external_feed_enrichment_failed",
     "mark_external_feed_enrichment_ready",
     "mark_external_feed_source_failure",
+    "revert_external_feed_cluster_enrichment",
     "mark_external_feed_source_not_found",
     "mark_external_feed_source_not_modified",
     "queue_external_feed_item_enrichment",
