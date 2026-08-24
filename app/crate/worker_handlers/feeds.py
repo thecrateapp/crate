@@ -369,6 +369,7 @@ def _refresh_external_feed_sources(
         "sources_failed": 0,
         "items_upserted": 0,
         "enrichments_queued": 0,
+        "classifications_queued": 0,
         "artist_associations_auto": 0,
         "artist_associations_queued": 0,
     }
@@ -503,6 +504,27 @@ def _refresh_external_feed_sources(
                         except Exception:
                             log.warning(
                                 "Could not queue AI summary for external feed item %s",
+                                item_id,
+                                exc_info=True,
+                            )
+                        try:
+                            queued_classification = create_task_dedup(
+                                "external_feeds_enrich_item",
+                                {
+                                    "item_id": int(item_id),
+                                    "operation": "classify",
+                                    "language": "English",
+                                },
+                                dedup_key=(
+                                    f"external-feed-auto-classification:{item_id}:"
+                                    f"{content_hash}"
+                                ),
+                            )
+                            if queued_classification is not None:
+                                stats["classifications_queued"] += 1
+                        except Exception:
+                            log.warning(
+                                "Could not queue AI classification for external feed item %s",
                                 item_id,
                                 exc_info=True,
                             )

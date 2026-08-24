@@ -326,9 +326,16 @@ def test_publisher_refresh_queues_ai_summary_for_enabled_sources(monkeypatch):
 
     assert result["items_upserted"] == 1
     assert result["enrichments_queued"] == 1
+    assert result["classifications_queued"] == 1
+    assert [call[0][1]["operation"] for call in queued] == [
+        "summary",
+        "classify",
+    ]
     assert queued[0][0][0] == "external_feeds_enrich_item"
     assert queued[0][0][1]["item_id"] == 101
-    assert queued[0][0][1]["operation"] == "summary"
+    assert queued[1][1]["dedup_key"] == (
+        f"external-feed-auto-classification:101:{item.content_hash}"
+    )
 
 
 def test_publisher_refresh_queues_ambiguous_artist_association_for_review(monkeypatch):
@@ -393,6 +400,7 @@ def test_publisher_refresh_queues_ambiguous_artist_association_for_review(monkey
     assert [call[0][1]["operation"] for call in queued] == [
         "associate_artist",
         "summary",
+        "classify",
     ]
 
 
@@ -476,6 +484,7 @@ def test_external_feed_refresh_persists_items_and_cache_validators(monkeypatch):
         "sources_failed": 0,
         "items_upserted": 1,
         "enrichments_queued": 0,
+        "classifications_queued": 0,
         "artist_associations_auto": 0,
         "artist_associations_queued": 0,
     }
