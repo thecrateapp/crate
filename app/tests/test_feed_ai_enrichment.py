@@ -707,10 +707,61 @@ def test_external_feed_review_api_lists_and_reviews_proposals(monkeypatch):
         ExternalFeedReviewRequest(decision="accept"),
     )
     assert result["review_status"] == "accepted"
+    assert result["follow_up_task_id"] is None
     assert captured[0] == (
         (19,),
         {"reviewer_id": 42, "decision": "accept", "rejection_reason": None},
     )
+
+
+def test_external_feed_review_queues_show_extraction_for_accepted_tour(
+    monkeypatch,
+):
+    from crate.api.external_feeds import (
+        ExternalFeedReviewRequest,
+        review_external_feed,
+    )
+
+    monkeypatch.setenv("CRATE_EXTERNAL_FEED_AI_ENABLED", "true")
+    monkeypatch.setattr(
+        "crate.api.external_feeds.require_permission",
+        lambda request, capability: {"id": 42},
+    )
+    enrichment = {
+        "id": 19,
+        "item_id": 7,
+        "operation": "classify",
+        "review_status": "accepted",
+        "source_content_hash": "hash-1",
+        "language": "English",
+        "result_json": {"classification": "tour"},
+    }
+    monkeypatch.setattr(
+        "crate.api.external_feeds.review_external_feed_enrichment",
+        lambda *args, **kwargs: enrichment,
+    )
+    captured = []
+    monkeypatch.setattr(
+        "crate.api.external_feeds.create_task_dedup",
+        lambda task_type, params, dedup_key: (
+            captured.append((task_type, params, dedup_key)) or "task-show-7"
+        ),
+    )
+
+    result = review_external_feed(
+        None,
+        19,
+        ExternalFeedReviewRequest(decision="accept"),
+    )
+
+    assert result["follow_up_task_id"] == "task-show-7"
+    assert captured == [
+        (
+            "external_feeds_enrich_item",
+            {"item_id": 7, "operation": "extract_show", "language": "English"},
+            "external-feed-auto-show-extraction:7:hash-1:english",
+        )
+    ]
 
 
 def test_external_feed_review_api_applies_accepted_show_proposal(monkeypatch):

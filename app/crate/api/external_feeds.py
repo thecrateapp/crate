@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
@@ -37,6 +38,7 @@ from crate.feeds.editorial import validate_editorial_feed_url
 
 
 router = APIRouter(prefix="/api/admin/external-feeds", tags=["external-feeds"])
+log = logging.getLogger(__name__)
 
 _RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -279,6 +281,42 @@ def review_external_feed(
             status_code=404,
             detail="Enrichment is missing, failed, or no longer current",
         )
+    follow_up_task_id = None
+    result_json = enrichment.get("result_json") or {}
+    if (
+        body.decision == "accept"
+        and enrichment.get("operation") == "classify"
+        and result_json.get("classification") == "tour"
+        and ai_enrichment_enabled()
+    ):
+        item_id = int(enrichment["item_id"])
+        language = str(enrichment.get("language") or "English")
+        dedup_key = (
+            f"external-feed-auto-show-extraction:{item_id}:"
+            f"{enrichment['source_content_hash']}:{language.casefold()}"
+        )
+        try:
+            follow_up_task_id = create_task_dedup(
+                "external_feeds_enrich_item",
+                {
+                    "item_id": item_id,
+                    "operation": "extract_show",
+                    "language": language,
+                },
+                dedup_key=dedup_key,
+            )
+            if follow_up_task_id is None:
+                follow_up_task_id = find_active_task_by_type_params(
+                    "external_feeds_enrich_item",
+                    dedup_key=dedup_key,
+                )
+        except Exception:
+            log.warning(
+                "Could not queue show extraction for accepted tour enrichment %s",
+                enrichment_id,
+                exc_info=True,
+            )
+    enrichment["follow_up_task_id"] = follow_up_task_id
     return enrichment
 
 
