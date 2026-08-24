@@ -30,6 +30,7 @@ import {
   Network,
   DatabaseZap,
   FileCheck2,
+  Rss,
 } from "lucide-react";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
@@ -101,6 +102,12 @@ const navItems = [
     icon: FileCheck2,
     label: "Feed Review",
     capabilities: ["library.metadata.write"],
+  },
+  {
+    to: "/feed-sources",
+    icon: Rss,
+    label: "RSS Sources",
+    capabilities: ["settings.manage"],
   },
   { section: "Music" },
   {
