@@ -1,0 +1,30 @@
+name: PR Agent Review
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  review:
+    name: Review pull request
+    if: >-
+      github.event.sender.type != 'Bot' &&
+      (github.event_name == 'pull_request_target' ||
+      (github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/review')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Run PR-Agent
+        uses: docker://pragent/pr-agent:0.41.0-github_action
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEEPSEEK.KEY: ${{ secrets.DEEPSEEK_API_KEY }}
