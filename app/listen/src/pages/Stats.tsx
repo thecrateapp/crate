@@ -199,22 +199,22 @@ export function Stats() {
 
   return (
     <div className="relative -mx-4 -mt-2 overflow-hidden px-4 pb-12 pt-3 sm:-mx-6 sm:px-6">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_82%_4%,rgba(244,114,182,0.13),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.035),transparent_34%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] [background-size:48px_48px]" />
+      <div className="stats-page-atmosphere pointer-events-none absolute inset-0 -z-10" />
+      <div className="stats-page-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] opacity-30" />
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-primary shadow-[0_0_30px_rgba(34,211,238,0.14)]">
+          <div className="stats-hero-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em]">
             <BarChart3 size={12} />
             {t("stats.hero.badge")}
           </div>
-          <h1 className="mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em] text-foreground">
+          <h1 className="stats-hero-title mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em]">
             {heroTitle}
-            <span className="block text-primary">
+            <span className="stats-hero-title-accent block">
               {t("stats.hero.decoded")}
             </span>
           </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+          <p className="stats-hero-body mt-4 max-w-2xl text-sm leading-6 sm:text-base">
             {heroBody}
           </p>
         </div>
@@ -243,21 +243,21 @@ export function Stats() {
       </div>
 
       <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <div className="relative min-h-[520px] overflow-hidden rounded-[12px] border border-white/10 bg-[#101116] p-5 shadow-2xl shadow-black/35 sm:p-7">
+        <div className="stats-hero-surface relative min-h-[520px] overflow-hidden rounded-[12px] p-5 sm:p-7">
           <StatsCoverMosaic tracks={coverTracks} />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_68%_18%,rgba(34,211,238,0.28),transparent_24%),linear-gradient(90deg,rgba(9,10,15,0.92)_0%,rgba(9,10,15,0.58)_44%,rgba(9,10,15,0.18)_100%),linear-gradient(180deg,rgba(9,10,15,0.18),rgba(9,10,15,0.9))]" />
+          <div className="stats-hero-overlay absolute inset-0" />
           <div className="relative z-10 flex min-h-[460px] flex-col justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">
+              <span className="stats-hero-period-muted rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
                 {period.label}
               </span>
-              <span className="rounded-full border border-primary/25 bg-primary/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+              <span className="stats-hero-period-accent rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
                 {period.title}
               </span>
             </div>
 
             <div>
-              <div className="max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-[-0.1em] text-white">
+              <div className="stats-hero-title max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-[-0.1em]">
                 {leadGenre?.genre_name || leadArtist?.artist_name || "Crate"}
               </div>
               <div className="mt-5 grid max-w-3xl gap-3 sm:grid-cols-3">
@@ -579,11 +579,11 @@ function StorySignalCard({
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/35 px-4 py-3 backdrop-blur">
-      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+    <div className="stats-hero-metric rounded-lg px-4 py-3 backdrop-blur">
+      <div className="stats-hero-metric-label text-[10px] font-black uppercase tracking-[0.2em]">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
+      <div className="stats-hero-metric-value mt-1 text-2xl font-black tracking-[-0.04em]">
         {value}
       </div>
     </div>

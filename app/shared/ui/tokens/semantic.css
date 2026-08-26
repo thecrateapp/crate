@@ -296,6 +296,84 @@
   );
   --fullscreen-player-artwork-shadow: 0 25px 50px -12px var(--fullscreen-player-artwork-shadow-color);
 
+  --stats-secondary-accent: color-mix(
+    in srgb,
+    var(--accent-action) 52%,
+    var(--state-danger)
+  );
+  --stats-page-atmosphere: radial-gradient(
+      circle at 18% 12%,
+      color-mix(in srgb, var(--accent-action) 18%, transparent),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 82% 4%,
+      color-mix(in srgb, var(--stats-secondary-accent) 13%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+      transparent 34%
+    );
+  --stats-page-grid: linear-gradient(
+      color-mix(in srgb, var(--text-primary) 5.5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--text-primary) 4.5%, transparent) 1px,
+      transparent 1px
+    );
+  --stats-hero-surface: color-mix(
+    in srgb,
+    var(--surface-elevated) 86%,
+    var(--surface-canvas)
+  );
+  --stats-hero-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --stats-hero-shadow: 0 25px 50px -12px color-mix(in srgb, var(
+          --surface-canvas
+        )
+        35%, transparent);
+  --stats-hero-overlay: radial-gradient(
+      circle at 68% 18%,
+      color-mix(in srgb, var(--accent-action) 28%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-canvas) 92%, transparent) 0%,
+      color-mix(in srgb, var(--surface-canvas) 58%, transparent) 44%,
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 90%, transparent)
+    );
+  --stats-hero-muted-surface: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --stats-hero-muted-text: color-mix(
+    in srgb,
+    var(--text-primary) 70%,
+    transparent
+  );
+  --stats-hero-badge-shadow: 0 0 30px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --stats-hero-metric-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 35%,
+    transparent
+  );
+  --stats-hero-metric-label: color-mix(
+    in srgb,
+    var(--text-primary) 45%,
+    transparent
+  );
+
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
     90deg,
@@ -675,4 +753,67 @@
 
 .fullscreen-player-time {
   color: var(--text-muted);
+}
+
+.stats-page-atmosphere {
+  background: var(--stats-page-atmosphere);
+}
+
+.stats-page-grid {
+  background-image: var(--stats-page-grid);
+  background-size: 48px 48px;
+}
+
+.stats-hero-badge {
+  border: 1px solid color-mix(in srgb, var(--accent-action) 25%, transparent);
+  background: color-mix(in srgb, var(--accent-action) 10%, transparent);
+  color: var(--accent-action);
+  box-shadow: var(--stats-hero-badge-shadow);
+}
+
+.stats-hero-title {
+  color: var(--text-primary);
+}
+
+.stats-hero-title-accent {
+  color: var(--accent-action);
+}
+
+.stats-hero-body {
+  color: var(--text-muted);
+}
+
+.stats-hero-surface {
+  border: 1px solid var(--stats-hero-border);
+  background: var(--stats-hero-surface);
+  box-shadow: var(--stats-hero-shadow);
+}
+
+.stats-hero-overlay {
+  background: var(--stats-hero-overlay);
+}
+
+.stats-hero-period-muted {
+  border: 1px solid var(--stats-hero-border);
+  background: var(--stats-hero-muted-surface);
+  color: var(--stats-hero-muted-text);
+}
+
+.stats-hero-period-accent {
+  border: 1px solid color-mix(in srgb, var(--accent-action) 25%, transparent);
+  background: color-mix(in srgb, var(--accent-action) 15%, transparent);
+  color: var(--accent-action);
+}
+
+.stats-hero-metric {
+  border: 1px solid var(--stats-hero-border);
+  background: var(--stats-hero-metric-surface);
+}
+
+.stats-hero-metric-label {
+  color: var(--stats-hero-metric-label);
+}
+
+.stats-hero-metric-value {
+  color: var(--text-primary);
 }
