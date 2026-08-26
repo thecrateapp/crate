@@ -620,6 +620,8 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "process_new_content",
             "compute_completeness",
             "refresh_probable_setlist",
+            "normalize_artist_bios",
+            "research_artist_bio",
         ),
     ),
     (
@@ -636,11 +638,22 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        "crate.worker_handlers.feeds",
+        "FEED_TASK_HANDLERS",
+        (
+            "external_feeds_discover_sources",
+            "external_feeds_enrich_item",
+            "external_feeds_refresh",
+            "external_feeds_refresh_editorial",
+        ),
+    ),
+    (
         "crate.worker_handlers.bandcamp",
         "BANDCAMP_TASK_HANDLERS",
         (
             "bandcamp_connect_credentials",
             "bandcamp_sync_collection",
+            "bandcamp_discover_refresh",
             "bandcamp_import_purchase",
             "bandcamp_radar_refresh",
             "bandcamp_backfill_entity_urls",

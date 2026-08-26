@@ -9,6 +9,7 @@ import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import {
   Home,
   Radar,
+  Rss,
   Search,
   Collection,
   Music,
@@ -259,6 +260,22 @@ function Sidebar() {
           )}
         </NavLink>
 
+        {/* Updates */}
+        <NavLink
+          to="/updates"
+          title={t("nav.updates")}
+          className={({ isActive }) =>
+            `flex items-center gap-3 rounded-lg transition-colors ${
+              expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
+            } ${navClass(isActive)}`
+          }
+        >
+          <Rss size={CRATE_ICON_SIZE.nav} />
+          {expanded && (
+            <span className="text-[13px] font-medium">{t("nav.updates")}</span>
+          )}
+        </NavLink>
+
         <NavLink
           to="/stats"
           title={t("nav.stats")}
@@ -379,6 +396,7 @@ const MOBILE_NAV = [
   { to: "/", icon: Home, labelKey: "nav.home" },
   { to: "/explore", icon: Search, labelKey: "nav.explore" },
   { to: "/upcoming", icon: Radar, labelKey: "nav.radar" },
+  { to: "/updates", icon: Rss, labelKey: "nav.updates" },
 ] as const;
 
 const COLLECTION_SECTIONS = [

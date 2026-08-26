@@ -700,10 +700,47 @@ class HomeSectionResponse(BaseModel):
     items: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class FeedProvenanceResponse(BaseModel):
+    source: str
+    source_detail: str | None = None
+    canonical_url: str | None = None
+
+
+class FeedClusterMemberResponse(BaseModel):
+    id: int
+    role: Literal["representative", "related"]
+    reason: str
+    visible: bool
+    title: str | None = None
+    source: str | None = None
+    canonical_url: str | None = None
+    published_at: date_type | datetime | str | None = None
+
+
+class FeedClusterResponse(BaseModel):
+    cluster_id: str
+    enrichment_id: int
+    cluster_type: str
+    confidence: float = Field(ge=0, le=1)
+    rationale: str
+    applied: bool
+    members: list[FeedClusterMemberResponse] = Field(default_factory=list)
+
+
 class FeedItemResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     type: str
+    source: str | None = None
+    source_detail: str | None = None
+    canonical_url: str | None = None
+    provenance: list[FeedProvenanceResponse] = Field(default_factory=list)
+    published_at: date_type | datetime | str | None = None
+    event_date: date_type | datetime | str | None = None
+    image_url: str | None = None
+    dedupe_key: str | None = None
+    external_feed_item_id: int | None = None
+    feed_clusters: list[FeedClusterResponse] = Field(default_factory=list)
     artist: str | None = None
     title: str | None = None
     date: date_type | datetime | str | None = None

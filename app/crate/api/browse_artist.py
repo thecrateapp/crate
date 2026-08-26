@@ -55,6 +55,8 @@ from crate.api.schemas.browse import (
     ArtistTrackTitleResponse,
     BrowseFiltersResponse,
 )
+from crate.api.schemas.me import FeedItemResponse
+from crate.artist_bio import normalize_artist_bio
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.health import get_all_artist_issue_counts, get_artist_issue_count
 from crate.external_artist_artwork import (
@@ -71,7 +73,9 @@ from crate.db.repositories.library import (
     get_library_artist_by_slug,
 )
 from crate.db.repositories.artist_hero_artwork import get_artist_hero_artwork
+from crate.db.repositories.bandcamp import has_active_connection
 from crate.db.repositories.featured_artists import set_artist_featured
+from crate.db.repositories.external_feeds import list_external_feed_items_for_artist
 from crate.db.repositories.playlists import get_public_system_playlists_for_artist
 from crate.db.repositories.tasks import create_task_dedup
 from crate.db.queries.browse_artist import (
@@ -101,6 +105,7 @@ from crate.db.queries.shows import (
     get_show_countries,
     get_upcoming_shows as db_get_shows,
 )
+from crate.db.queries.updates import build_updates_feed
 from crate.db.releases import get_new_releases, get_upcoming_releases_for_artist
 from crate.db.similarities import get_artist_network
 from crate.lastfm import (
@@ -394,7 +399,7 @@ def _artist_library_info_payload(name: str) -> dict:
         return {"similar": []}
 
     return {
-        "bio": artist.get("bio") or "",
+        "bio": normalize_artist_bio(artist.get("bio")),
         "tags": tags,
         "similar": _enrich_similar_artists(similar),
         "listeners": int(artist.get("listeners") or 0),
@@ -1024,6 +1029,34 @@ def api_artist_page_by_id(
     if isinstance(payload, JSONResponse):
         return payload
     return payload
+
+
+@router.get(
+    "/api/artists/{artist_id}/updates",
+    response_model=list[FeedItemResponse],
+    responses=_BROWSE_RESPONSES,
+    summary="List editorial updates associated with an artist",
+)
+def artist_updates(
+    request: Request,
+    artist_id: int,
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=10000),
+):
+    user = _require_auth(request)
+    external_items = list_external_feed_items_for_artist(
+        int(user["id"]), artist_id, limit=limit + offset, offset=0
+    )
+    return build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        followed_artists=[],
+        bandcamp_connected=has_active_connection(int(user["id"])),
+        external_feed_items=external_items,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
@@ -2004,7 +2037,13 @@ def api_artist(request: Request, name: str):
         album_quality = get_album_quality_map(album_ids)
 
     top_genres = get_artist_top_genres(canonical)
-    genre_profile = build_genre_profile(get_artist_genre_profile(canonical), limit=8)
+    genre_rows = get_artist_genre_profile(canonical)
+    genre_profile = build_genre_profile(genre_rows, limit=8)
+    manual_genres = [
+        str(item["slug"])
+        for item in genre_rows
+        if item.get("source") == "manual" and item.get("slug")
+    ]
 
     upcoming_releases = get_upcoming_releases_for_artist(canonical)
     upcoming_releases_by_slug = {
@@ -2146,12 +2185,13 @@ def api_artist(request: Request, name: str):
         "primary_format": artist.get("primary_format"),
         "genres": top_genres,
         "genre_profile": genre_profile,
+        "manual_genres": manual_genres,
         "issue_count": get_artist_issue_count(canonical),
         "is_v2": is_v2,
         "popularity": artist.get("popularity"),
         "popularity_score": artist.get("popularity_score"),
         "popularity_confidence": artist.get("popularity_confidence"),
-        "bio": artist.get("bio"),
+        "bio": normalize_artist_bio(artist.get("bio")),
         "tags_json": _coerce_json_list(artist.get("tags_json")),
         "urls_json": artist.get("urls_json")
         if isinstance(artist.get("urls_json"), dict)

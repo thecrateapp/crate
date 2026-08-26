@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { ArtistBioModal } from "@/components/artist/ArtistBioModal";
 import { ArtistHeroSection } from "@/components/artist/ArtistHeroSection";
+import { ArtistUpdatesModal } from "@/components/artist/ArtistUpdatesModal";
 import { ArtistSetlistModal } from "@/components/artist/ArtistSetlistSection";
 import {
   ArtistAlbumsSection,
@@ -53,6 +54,7 @@ export function Artist() {
   const navigate = useNavigate();
   const location = useLocation();
   const [bioModalOpen, setBioModalOpen] = useState(false);
+  const [updatesModalOpen, setUpdatesModalOpen] = useState(false);
   const [setlistModalOpen, setSetlistModalOpen] = useState(false);
   const [expandedShowId, setExpandedShowId] = useState<string | null>(null);
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
@@ -323,6 +325,9 @@ export function Artist() {
         onToggleFollow={() => void toggleFollow()}
         onShare={() => void handleShare()}
         onOpenBio={() => setBioModalOpen(true)}
+        onOpenUpdates={
+          data.id != null ? () => setUpdatesModalOpen(true) : undefined
+        }
       />
 
       <div className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 pb-8 space-y-8">
@@ -355,6 +360,12 @@ export function Artist() {
         photoUrl={photoUrl}
         tags={tags}
         onClose={() => setBioModalOpen(false)}
+      />
+      <ArtistUpdatesModal
+        open={updatesModalOpen}
+        artistName={data.name}
+        artistId={data.id}
+        onClose={() => setUpdatesModalOpen(false)}
       />
       {enrichment?.setlist?.probable_setlist?.length ? (
         <ArtistSetlistModal

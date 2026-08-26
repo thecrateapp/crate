@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
@@ -100,7 +100,6 @@ from crate.db.home_section_surface import get_cached_home_section
 from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
 from crate.db.queries.user import (
     get_artist_genres_for_names,
-    get_feed_new_albums,
     get_feed_new_releases,
     get_feed_shows,
     get_scrobble_identities,
@@ -126,6 +125,11 @@ from crate.db.repositories.artist_suggestions import (
     create_artist_suggestion,
     list_user_artist_suggestions,
 )
+from crate.db.repositories.bandcamp import (
+    has_active_connection,
+    list_bandcamp_radar_items,
+)
+from crate.db.repositories.external_feeds import list_external_feed_items_for_user
 from crate.db.repositories.auth import (
     get_user_by_id,
     unlink_user_external_identity,
@@ -157,6 +161,11 @@ from crate.db.repositories.user_library import (
 )
 from crate.db.user_stats_dashboard_surface import get_user_stats_dashboard
 from crate.db.repositories.user_library_shared import resolve_track_reference_read
+from crate.db.queries.updates import (
+    build_updates_feed,
+    merge_editorial_releases_into_radar,
+    merge_editorial_shows_into_radar,
+)
 from crate.db.repositories.users import (
     get_remote_scrobbling_enabled,
     set_remote_scrobbling_enabled,
@@ -1372,30 +1381,81 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
     responses=AUTH_ERROR_RESPONSES,
     summary="List the personalized activity feed",
 )
-def feed(request: Request, limit: int = 30):
-    """Personalized feed: new releases from followed artists + new library additions + upcoming shows."""
+def feed(
+    request: Request,
+    limit: int = Query(30, ge=1, le=120),
+    offset: int = Query(0, ge=0, le=10000),
+):
+    """Personalized feed composed from local releases, shows, follows, and Radar."""
     user = _require_auth(request)
     followed = get_followed_artists(user["id"])
     followed_names = [f["artist_name"] for f in followed if f.get("artist_name")]
-
-    items: list[dict] = []
-    recent_day_cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     today = datetime.now(timezone.utc).date()
+    candidate_limit = min(300, max(1, limit + offset) * 3)
+    recent_cutoff = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
 
+    releases = get_feed_new_releases(candidate_limit)
+    shows: list[dict] = []
     if followed_names:
-        items.extend(get_feed_new_albums(followed_names, recent_day_cutoff, limit))
-        items.extend(get_feed_shows(followed_names, today, limit))
+        releases.extend(
+            get_upcoming_releases(
+                followed_names,
+                today,
+                recent_cutoff,
+                candidate_limit,
+            )
+        )
+        shows = get_feed_shows(followed_names, today, candidate_limit)
 
-    items.extend(get_feed_new_releases(limit))
+    bandcamp_connected = has_active_connection(int(user["id"]))
+    radar_items = (
+        list_bandcamp_radar_items(int(user["id"]), limit=candidate_limit)
+        if bandcamp_connected
+        else []
+    )
+    external_feed_items = list_external_feed_items_for_user(
+        int(user["id"]), limit=candidate_limit
+    )
+    return build_updates_feed(
+        releases=releases,
+        shows=shows,
+        radar_items=radar_items,
+        followed_artists=followed,
+        bandcamp_connected=bandcamp_connected,
+        limit=limit,
+        offset=offset,
+        external_feed_items=external_feed_items,
+    )
 
-    def _feed_sort_key(item: dict):
-        value = item.get("date")
-        normalized = _coerce_date(value)
-        # Keep rows with missing dates at the bottom.
-        return normalized or date.min
 
-    items.sort(key=_feed_sort_key, reverse=True)
-    return items[:limit]
+@router.get(
+    "/updates",
+    response_model=list[FeedItemResponse],
+    responses=AUTH_ERROR_RESPONSES,
+    summary="List global editorial updates",
+)
+def updates(
+    request: Request,
+    limit: int = Query(30, ge=1, le=120),
+    offset: int = Query(0, ge=0, le=10000),
+):
+    """Return normalized editorial feed items without Radar entities."""
+    user = _require_auth(request)
+    candidate_limit = min(300, max(1, limit + offset) * 2)
+    bandcamp_connected = has_active_connection(int(user["id"]))
+    external_feed_items = list_external_feed_items_for_user(
+        int(user["id"]), limit=candidate_limit
+    )
+    return build_updates_feed(
+        releases=[],
+        shows=[],
+        radar_items=[],
+        followed_artists=[],
+        bandcamp_connected=bandcamp_connected,
+        external_feed_items=external_feed_items,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
@@ -1470,6 +1530,16 @@ def upcoming(request: Request, limit: int = 120):
             }
         )
 
+    editorial_feed_items = list_external_feed_items_for_user(
+        int(user["id"]), limit=min(300, max(1, limit) * 2)
+    )
+    items = merge_editorial_releases_into_radar(
+        radar_items=items,
+        external_feed_items=editorial_feed_items,
+        followed_artists=followed_names,
+        today=today,
+    )
+
     shows = get_upcoming_shows(
         followed_names, today, user_lat, user_lon, user_radius, limit
     )
@@ -1524,6 +1594,13 @@ def upcoming(request: Request, limit: int = 120):
                 "is_upcoming": True,
             }
         )
+
+    items = merge_editorial_shows_into_radar(
+        radar_items=items,
+        external_feed_items=editorial_feed_items,
+        followed_artists=followed_names,
+        today=today,
+    )
 
     enriched_shows = [
         {

@@ -151,6 +151,8 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/stats/dashboard")) scopes.push("history");
   else if (url.startsWith("/api/me/upcoming"))
     scopes.push("upcoming", "follows", "library");
+  else if (url.startsWith("/api/me/updates"))
+    scopes.push("updates", "follows", "library");
   else if (url.startsWith("/api/me/shows")) scopes.push("shows");
   // Playlists
   else if (url.startsWith("/api/playlists")) {

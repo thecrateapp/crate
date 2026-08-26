@@ -495,6 +495,157 @@ class TestUserEndpoints:
         data = resp.json()
         assert "items" in data
 
+    def test_upcoming_includes_accepted_editorial_shows(self, api_client, monkeypatch):
+        from crate.api import me as me_api
+
+        monkeypatch.setattr(
+            me_api,
+            "get_followed_artists",
+            lambda _user_id: [{"artist_name": "Artist"}],
+        )
+        monkeypatch.setattr(me_api, "get_upcoming_releases", lambda *args: [])
+        monkeypatch.setattr(me_api, "get_upcoming_shows", lambda *args: [])
+        monkeypatch.setattr(me_api, "has_active_connection", lambda _user_id: False)
+        monkeypatch.setattr(
+            me_api,
+            "list_external_feed_items_for_user",
+            lambda _user_id, limit: [
+                {
+                    "id": 51,
+                    "artist_id": 7,
+                    "artist_name": "Artist",
+                    "artist_slug": "artist",
+                    "source_kind": "publisher_rss",
+                    "display_name": "Pitchfork",
+                    "canonical_url": "https://pitchfork.com/news/artist-tour",
+                    "accepted_show_json": {
+                        "shows": [
+                            {
+                                "event_date": "2099-10-18",
+                                "venue": "The Roundhouse",
+                                "city": "London",
+                                "country": "United Kingdom",
+                                "tickets_url": "https://tickets.example/london",
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
+        monkeypatch.setattr(me_api, "get_user_by_id", lambda _user_id: {})
+        monkeypatch.setattr(me_api, "get_attending_show_ids", lambda *_args: set())
+        monkeypatch.setattr(me_api, "get_artist_genres_for_names", lambda *_args: {})
+        monkeypatch.setattr(me_api, "_probable_setlists_for_artists", lambda *_args: {})
+
+        response = api_client.get("/api/me/upcoming")
+
+        assert response.status_code == 200
+        editorial_shows = [
+            item for item in response.json()["items"] if item["status"] == "editorial"
+        ]
+        assert editorial_shows[0]["event_key"] == "external-feed-show:51:0"
+        assert editorial_shows[0]["url"] == "https://tickets.example/london"
+
+    def test_feed_returns_source_metadata_and_supports_offset(
+        self, api_client, monkeypatch
+    ):
+        from crate.api import me as me_api
+
+        monkeypatch.setattr(me_api, "get_followed_artists", lambda _user_id: [])
+        monkeypatch.setattr(
+            me_api,
+            "get_feed_new_releases",
+            lambda _limit: [
+                {
+                    "artist": "Artist",
+                    "title": "Newer LP",
+                    "date": "2030-05-02",
+                    "source_url": "https://crate.test/releases/newer",
+                },
+                {
+                    "artist": "Artist",
+                    "title": "Older LP",
+                    "date": "2030-05-01",
+                    "source_url": "https://crate.test/releases/older",
+                },
+            ],
+        )
+
+        response = api_client.get("/api/me/feed?limit=1&offset=1")
+
+        assert response.status_code == 200
+        assert response.json()[0]["title"] == "Older LP"
+        assert response.json()[0]["source"] == "new_releases"
+        assert (
+            response.json()[0]["canonical_url"] == "https://crate.test/releases/older"
+        )
+        assert response.json()[0]["provenance"] == [
+            {
+                "source": "new_releases",
+                "source_detail": None,
+                "canonical_url": "https://crate.test/releases/older",
+            }
+        ]
+
+    def test_feed_includes_connected_user_external_items(self, api_client, monkeypatch):
+        from crate.api import me as me_api
+
+        monkeypatch.setattr(me_api, "get_followed_artists", lambda _user_id: [])
+        monkeypatch.setattr(me_api, "has_active_connection", lambda _user_id: True)
+        monkeypatch.setattr(
+            me_api,
+            "list_external_feed_items_for_user",
+            lambda _user_id, limit: [
+                {
+                    "item_kind": "news",
+                    "artist_name": "Connected Artist",
+                    "title": "New announcement",
+                    "canonical_url": "https://connected.bandcamp.com/news/new",
+                    "published_at": "2030-05-03T10:00:00+00:00",
+                    "source_kind": "bandcamp_rss",
+                    "payload_json": {},
+                    "accepted_enrichment_json": {
+                        "summary": "The artist announced new dates.",
+                        "key_points": ["New dates"],
+                        "generated_at": "2030-05-03T12:00:00+00:00",
+                    },
+                    "accepted_enrichment_model": "ollama/test",
+                    "accepted_enrichment_prompt_version": "external-feed-summary-v1",
+                    "feed_clusters": [
+                        {
+                            "cluster_id": "external-feed-cluster:12",
+                            "enrichment_id": 12,
+                            "cluster_type": "tour",
+                            "confidence": 0.8,
+                            "rationale": "The announcement covers the same tour.",
+                            "applied": False,
+                            "members": [
+                                {
+                                    "id": 77,
+                                    "role": "representative",
+                                    "reason": "Primary announcement.",
+                                    "visible": True,
+                                    "title": "New announcement",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        )
+
+        response = api_client.get("/api/me/feed?limit=10")
+
+        assert response.status_code == 200
+        assert response.json()[0]["type"] == "news"
+        assert response.json()[0]["source"] == "bandcamp_rss"
+        assert response.json()[0]["editorial_summary"] == (
+            "The artist announced new dates."
+        )
+        assert response.json()[0]["feed_clusters"][0]["cluster_id"] == (
+            "external-feed-cluster:12"
+        )
+
 
 class TestGenreTaxonomy:
     """Genre taxonomy endpoints — important because EQ presets live here."""

@@ -201,6 +201,19 @@ describe("scopesForUrl", () => {
     expect(scopesForUrl("/api/me/shows")).toEqual(["shows"]);
   });
 
+  it("maps global and artist updates to follow-aware scopes", () => {
+    expect(scopesForUrl("/api/me/updates")).toEqual([
+      "updates",
+      "follows",
+      "library",
+    ]);
+    expect(scopesForUrl("/api/artists/7/updates")).toEqual([
+      "artist:7",
+      "library",
+      "follows",
+    ]);
+  });
+
   // Playlists
   it("returns playlist scope with id", () => {
     expect(scopesForUrl("/api/playlists/42")).toEqual([

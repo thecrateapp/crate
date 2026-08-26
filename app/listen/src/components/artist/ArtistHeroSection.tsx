@@ -10,11 +10,13 @@ import {
   MoreHorizontal,
   Play,
   Radio,
+  Rss,
   Share2,
   Shuffle,
   Users,
 } from "@crate/ui/icons";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
+import { ArtistBioText } from "@crate/ui/domain/ArtistBioText";
 
 import {
   type ArtistData,
@@ -45,6 +47,7 @@ interface ArtistHeroSectionProps {
   onToggleFollow: () => void;
   onShare: () => void;
   onOpenBio: () => void;
+  onOpenUpdates?: () => void;
 }
 
 const SECONDARY_ACTION_CLASS =
@@ -64,6 +67,7 @@ export function ArtistHeroSection({
   onToggleFollow,
   onShare,
   onOpenBio,
+  onOpenUpdates,
 }: ArtistHeroSectionProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -123,6 +127,16 @@ export function ArtistHeroSection({
       icon: Share2,
       onSelect: onShare,
     },
+    ...(!isDesktop && onOpenUpdates
+      ? [
+          {
+            key: "updates",
+            label: t("artist.actions.updates"),
+            icon: Rss,
+            onSelect: onOpenUpdates,
+          },
+        ]
+      : []),
   ];
   const mobileMenuTrigger =
     !isDesktop && typeof document !== "undefined" ? (
@@ -250,8 +264,8 @@ export function ArtistHeroSection({
 
               {bio ? (
                 <div className="mt-3 max-w-2xl">
-                  <p className="line-clamp-2 whitespace-pre-line text-sm leading-relaxed text-white/70 sm:line-clamp-3">
-                    {bio}
+                  <p className="line-clamp-2 text-sm leading-relaxed text-white/70 sm:line-clamp-3">
+                    <ArtistBioText text={bio} />
                   </p>
                   {bio.length > 200 ? (
                     <button
@@ -343,6 +357,16 @@ export function ArtistHeroSection({
               entityUid={artist.entity_uid}
               presentation="secondary-action"
             />
+            {isDesktop && onOpenUpdates ? (
+              <button
+                className={SECONDARY_ACTION_CLASS}
+                onClick={onOpenUpdates}
+                aria-label={t("artist.actions.updates")}
+              >
+                <Rss size={CRATE_ICON_SIZE.lg} />
+                <span>{t("artist.actions.updates")}</span>
+              </button>
+            ) : null}
             {isDesktop ? (
               <div className="relative shrink-0">
                 <button

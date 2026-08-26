@@ -20,10 +20,10 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                         """
                     INSERT INTO shows (external_id, artist_name, date, local_time, venue, address_line1, city, region,
                         postal_code, country, country_code, latitude, longitude, url, image_url, lineup,
-                        price_range, status, source, created_at, updated_at)
+                        price_range, tickets_url, status, source, created_at, updated_at)
                     VALUES (:external_id, :artist_name, :date, :local_time, :venue, :address_line1, :city, :region,
                         :postal_code, :country, :country_code, :latitude, :longitude, :url, :image_url, :lineup,
-                        :price_range, :status, :source, :created_at, :updated_at)
+                        :price_range, :tickets_url, :status, :source, :created_at, :updated_at)
                     ON CONFLICT (external_id) DO UPDATE SET
                         artist_name = EXCLUDED.artist_name,
                         date = EXCLUDED.date,
@@ -41,6 +41,7 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                         image_url = EXCLUDED.image_url,
                         lineup = EXCLUDED.lineup,
                         price_range = EXCLUDED.price_range,
+                        tickets_url = EXCLUDED.tickets_url,
                         status = EXCLUDED.status,
                         source = EXCLUDED.source,
                         updated_at = EXCLUDED.updated_at
@@ -65,6 +66,7 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                         "image_url": kwargs.get("image_url"),
                         "lineup": kwargs.get("lineup"),
                         "price_range": kwargs.get("price_range"),
+                        "tickets_url": kwargs.get("tickets_url"),
                         "status": kwargs.get("status", "onsale"),
                         "source": kwargs.get("source", "ticketmaster"),
                         "created_at": now,
@@ -114,6 +116,7 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                         image_url = :image_url,
                         lineup = :lineup,
                         price_range = :price_range,
+                        tickets_url = :tickets_url,
                         status = :status,
                         source = :source,
                         updated_at = :updated_at
@@ -134,6 +137,7 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                     "image_url": kwargs.get("image_url"),
                     "lineup": kwargs.get("lineup"),
                     "price_range": kwargs.get("price_range"),
+                    "tickets_url": kwargs.get("tickets_url"),
                     "status": kwargs.get("status", "onsale"),
                     "source": kwargs.get("source", "ticketmaster"),
                     "updated_at": now,
@@ -148,10 +152,10 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                     """
                 INSERT INTO shows (external_id, artist_name, date, local_time, venue, address_line1, city, region,
                     postal_code, country, country_code, latitude, longitude, url, image_url, lineup,
-                    price_range, status, source, created_at, updated_at)
+                    price_range, tickets_url, status, source, created_at, updated_at)
                 VALUES (:external_id, :artist_name, :date, :local_time, :venue, :address_line1, :city, :region,
                     :postal_code, :country, :country_code, :latitude, :longitude, :url, :image_url, :lineup,
-                    :price_range, :status, :source, :created_at, :updated_at)
+                    :price_range, :tickets_url, :status, :source, :created_at, :updated_at)
                 RETURNING id
                 """
                 ),
@@ -173,6 +177,7 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                     "image_url": kwargs.get("image_url"),
                     "lineup": kwargs.get("lineup"),
                     "price_range": kwargs.get("price_range"),
+                    "tickets_url": kwargs.get("tickets_url"),
                     "status": kwargs.get("status", "onsale"),
                     "source": kwargs.get("source", "ticketmaster"),
                     "created_at": now,
