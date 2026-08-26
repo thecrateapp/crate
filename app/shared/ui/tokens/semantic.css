@@ -788,6 +788,132 @@
   --track-row-progress-icon-shadow: drop-shadow(
     0 0 4px color-mix(in srgb, var(--text-primary) 35%, transparent)
   );
+
+  --radio-card-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --radio-card-border: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --radio-card-hover-border: color-mix(
+    in srgb,
+    var(--accent-action) 30%,
+    transparent
+  );
+  --radio-card-shadow: 0 18px 70px
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
+  --radio-card-hover-shadow: 0 18px 80px var(--accent-action-glow-soft);
+  --radio-station-placeholder: radial-gradient(
+      circle at 30% 20%,
+      var(--accent-action-glow-medium),
+      transparent 34%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--text-primary) 8%, transparent),
+      color-mix(in srgb, var(--text-primary) 1%, transparent)
+    );
+  --radio-station-overlay: linear-gradient(
+    to top,
+    var(--surface-canvas),
+    color-mix(in srgb, var(--surface-canvas) 35%, transparent),
+    color-mix(in srgb, var(--surface-canvas) 10%, transparent)
+  );
+  --radio-station-badge-border: color-mix(
+    in srgb,
+    var(--text-primary) 12%,
+    transparent
+  );
+  --radio-station-badge-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 35%,
+    transparent
+  );
+  --radio-station-badge-text: color-mix(
+    in srgb,
+    var(--text-primary) 65%,
+    transparent
+  );
+  --radio-station-count-text: color-mix(
+    in srgb,
+    var(--text-primary) 52%,
+    transparent
+  );
+  --radio-hero-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --radio-hero-border: var(--radio-card-border);
+  --radio-hero-shadow: 0 24px 90px
+    color-mix(in srgb, var(--surface-canvas) 28%, transparent);
+  --radio-hero-glow: radial-gradient(
+      circle at 16% 18%,
+      color-mix(in srgb, var(--accent-action) 20%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 6%, transparent),
+      transparent 52%
+    );
+  --radio-hero-intro: color-mix(in srgb, var(--text-primary) 52%, transparent);
+  --radio-discovery-shadow: 0 0 28px var(--accent-action-glow-medium);
+  --radio-discovery-hover-shadow: 0 0 38px var(--accent-action-glow-strong);
+  --radio-session-border: color-mix(
+    in srgb,
+    var(--accent-action) 15%,
+    transparent
+  );
+  --radio-session-surface: color-mix(
+    in srgb,
+    var(--accent-action) 5%,
+    transparent
+  );
+  --radio-session-muted: color-mix(
+    in srgb,
+    var(--text-primary) 35%,
+    transparent
+  );
+  --radio-error-text: color-mix(in srgb, var(--text-primary) 45%, transparent);
+  --radio-seed-panel-surface: var(--radio-hero-surface);
+  --radio-seed-input-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 30%,
+    transparent
+  );
+  --radio-seed-input-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --radio-seed-input-placeholder: color-mix(
+    in srgb,
+    var(--text-primary) 25%,
+    transparent
+  );
+  --radio-seed-input-focus-border: color-mix(
+    in srgb,
+    var(--accent-action) 35%,
+    transparent
+  );
+  --radio-seed-results-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 40%,
+    transparent
+  );
+  --radio-seed-result-text: color-mix(
+    in srgb,
+    var(--text-primary) 70%,
+    transparent
+  );
+  --radio-seed-result-hover-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --radio-seed-result-type: color-mix(
+    in srgb,
+    var(--text-primary) 30%,
+    transparent
+  );
+  --radio-seed-placeholder-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
 }
 
 @theme inline {
@@ -1155,6 +1281,181 @@
 
 .track-row-playback-icon {
   filter: var(--track-row-progress-icon-shadow);
+}
+
+.radio-station-card {
+  border: 1px solid var(--radio-card-border);
+  background: var(--radio-card-surface);
+  box-shadow: var(--radio-card-shadow);
+}
+
+.radio-station-card:hover {
+  border-color: var(--radio-card-hover-border);
+  box-shadow: var(--radio-card-hover-shadow);
+}
+
+.radio-station-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.radio-station-placeholder {
+  background: var(--radio-station-placeholder);
+}
+
+.radio-station-placeholder[data-station-type="genre"] {
+  background: color-mix(in srgb, var(--accent-action) 10%, transparent);
+}
+
+.radio-station-overlay {
+  background: var(--radio-station-overlay);
+}
+
+.radio-station-type {
+  border: 1px solid var(--radio-station-badge-border);
+  background: var(--radio-station-badge-surface);
+  color: var(--radio-station-badge-text);
+}
+
+.radio-station-play {
+  background: var(--accent-action);
+  color: var(--accent-action-foreground);
+  box-shadow: 0 0 24px var(--accent-action-glow-medium);
+}
+
+.radio-station-label {
+  color: var(--text-primary);
+}
+
+.radio-station-count {
+  color: var(--radio-station-count-text);
+}
+
+.radio-page-hero {
+  border: 1px solid var(--radio-hero-border);
+  background: var(--radio-hero-surface);
+  box-shadow: var(--radio-hero-shadow);
+}
+
+.radio-page-hero-glow {
+  background: var(--radio-hero-glow);
+}
+
+.radio-page-icon {
+  background: var(--accent-action);
+  color: var(--accent-action-foreground);
+  box-shadow: 0 0 34px var(--accent-action-glow-medium);
+}
+
+.radio-page-intro {
+  color: var(--radio-hero-intro);
+}
+
+.radio-discovery-button {
+  background: var(--accent-action);
+  color: var(--accent-action-foreground);
+  box-shadow: var(--radio-discovery-shadow);
+}
+
+.radio-discovery-button:hover {
+  box-shadow: var(--radio-discovery-hover-shadow);
+}
+
+.radio-discovery-button:disabled {
+  opacity: 0.4;
+}
+
+.radio-session-status {
+  border: 1px solid var(--radio-session-border);
+  background: var(--radio-session-surface);
+}
+
+.radio-session-dot {
+  background: var(--accent-action);
+  box-shadow: 0 0 8px var(--accent-action-glow-strong);
+}
+
+.radio-session-label {
+  color: var(--accent-action);
+}
+
+.radio-session-muted {
+  color: var(--radio-session-muted);
+}
+
+.radio-error {
+  border: 1px solid var(--radio-card-border);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+  color: var(--radio-error-text);
+}
+
+.radio-seed-panel {
+  border: 1px solid var(--radio-card-border);
+  background: var(--radio-seed-panel-surface);
+  box-shadow: 0 18px 70px
+    color-mix(in srgb, var(--surface-canvas) 22%, transparent);
+}
+
+.radio-seed-heading {
+  color: var(--text-primary);
+}
+
+.radio-seed-heading-icon {
+  color: var(--accent-action);
+}
+
+.radio-seed-input {
+  border: 1px solid var(--radio-seed-input-border);
+  background: var(--radio-seed-input-surface);
+  color: var(--text-primary);
+}
+
+.radio-seed-input::placeholder {
+  color: var(--radio-seed-input-placeholder);
+}
+
+.radio-seed-input:focus {
+  border-color: var(--radio-seed-input-focus-border);
+  outline: none;
+}
+
+.radio-seed-spinner {
+  color: var(--accent-action);
+}
+
+.radio-seed-results {
+  border: 1px solid var(--radio-card-border);
+  background: var(--radio-seed-results-surface);
+}
+
+.radio-seed-result {
+  color: var(--radio-seed-result-text);
+}
+
+.radio-seed-result:hover {
+  background: var(--radio-seed-result-hover-surface);
+  color: var(--text-primary);
+}
+
+.radio-seed-result:disabled {
+  opacity: 0.5;
+}
+
+.radio-seed-result-image {
+  background: var(--radio-seed-placeholder-surface);
+}
+
+.radio-seed-result-placeholder {
+  background: color-mix(in srgb, var(--accent-action) 10%, transparent);
+  color: var(--accent-action);
+}
+
+.radio-seed-result-type {
+  color: var(--radio-seed-result-type);
+}
+
+.radio-seed-result-icon {
+  color: color-mix(in srgb, var(--accent-action) 40%, transparent);
 }
 
 .fullscreen-player-handle {

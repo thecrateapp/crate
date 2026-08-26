@@ -115,7 +115,7 @@ function StationCard({
       aria-label={t("radio.station.startAria", { label, type: typeLabel })}
       disabled={disabled}
       onClick={() => onStart(station)}
-      className="group relative aspect-square snap-start overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] text-left shadow-[0_18px_70px_rgba(0,0,0,0.24)] transition duration-300 hover:border-primary/30 hover:shadow-[0_18px_80px_rgba(10,209,241,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
+      className="radio-station-card group relative aspect-square snap-start overflow-hidden rounded-xl text-left transition duration-300"
     >
       {imageUrl ? (
         <CrateImage
@@ -126,27 +126,25 @@ function StationCard({
         />
       ) : (
         <div
-          className={cn(
-            "absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(10,209,241,0.24),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]",
-            station.type === "genre" && "bg-primary/10",
-          )}
+          className={cn("radio-station-placeholder absolute inset-0")}
+          data-station-type={station.type}
         />
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-black/10" />
+      <div className="radio-station-overlay absolute inset-0" />
       <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
-        <span className="rounded-full border border-white/12 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65 backdrop-blur-md">
+        <span className="radio-station-type rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] backdrop-blur-md">
           {typeLabel}
         </span>
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-black opacity-0 shadow-[0_0_24px_rgba(10,209,241,0.32)] transition duration-300 group-hover:opacity-100">
+        <span className="radio-station-play flex h-8 w-8 items-center justify-center rounded-full opacity-0 transition duration-300 group-hover:opacity-100">
           <Play size={14} className="translate-x-px" />
         </span>
       </div>
       <div className="absolute inset-x-3 bottom-3">
-        <div className="line-clamp-2 text-base font-semibold leading-tight text-white">
+        <div className="radio-station-label line-clamp-2 text-base font-semibold leading-tight">
           {label}
         </div>
         {plays > 0 ? (
-          <div className="mt-1 text-xs text-white/52">
+          <div className="radio-station-count mt-1 text-xs">
             {t("common.playCount", { count: plays })}
           </div>
         ) : null}
@@ -357,19 +355,19 @@ export function RadioPage() {
   };
 
   return (
-    <div className="animate-page-in space-y-7 px-4 py-6 sm:px-6">
-      <div className="relative overflow-hidden rounded-[12px] border border-white/8 bg-white/[0.03] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.28)] sm:p-6">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(10,209,241,0.2),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_52%)]" />
+    <div className="radio-page animate-page-in space-y-7 px-4 py-6 sm:px-6">
+      <div className="radio-page-hero relative overflow-hidden rounded-[12px] p-5 sm:p-6">
+        <div className="radio-page-hero-glow pointer-events-none absolute inset-0" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary text-black shadow-[0_0_34px_rgba(10,209,241,0.32)]">
+            <div className="radio-page-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-xl">
               <RadioIcon size={24} />
             </div>
             <div className="min-w-0">
-              <h1 className="text-3xl font-bold leading-tight text-foreground">
+              <h1 className="text-text-primary text-3xl font-bold leading-tight">
                 {t("radio.title")}
               </h1>
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/52">
+              <p className="radio-page-intro mt-1 max-w-2xl text-sm leading-relaxed">
                 {t("radio.intro")}
               </p>
             </div>
@@ -379,8 +377,7 @@ export function RadioPage() {
             onClick={startDiscovery}
             disabled={starting || !discoveryAvailable}
             className={cn(
-              "group inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-5 text-sm font-semibold text-black transition duration-300",
-              "bg-primary shadow-[0_0_28px_rgba(10,209,241,0.28)] hover:shadow-[0_0_38px_rgba(10,209,241,0.4)] disabled:opacity-40",
+              "radio-discovery-button group inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-5 text-sm font-semibold transition duration-300",
             )}
           >
             {starting ? (
@@ -394,13 +391,13 @@ export function RadioPage() {
       </div>
 
       {activeMode === "discovery" ? (
-        <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+        <div className="radio-session-status rounded-xl px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-primary shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
-            <span className="text-sm font-medium text-primary">
+            <div className="radio-session-dot h-2 w-2 animate-pulse rounded-full" />
+            <span className="radio-session-label text-sm font-medium">
               {t("radio.discovery")}
             </span>
-            <span className="text-[11px] text-white/35">
+            <span className="radio-session-muted text-[11px]">
               {t("common.playing")}
             </span>
           </div>
@@ -426,14 +423,14 @@ export function RadioPage() {
       />
 
       {stationsError ? (
-        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm text-white/45">
+        <div className="radio-error rounded-xl px-4 py-3 text-sm">
           {t("radio.errors.stations")}
         </div>
       ) : null}
 
-      <div className="rounded-[12px] border border-white/8 bg-white/[0.03] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
-        <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <RadioIcon size={16} className="text-primary" />
+      <div className="radio-seed-panel rounded-[12px] p-5">
+        <div className="radio-seed-heading mb-4 flex items-center gap-2 text-sm font-semibold">
+          <RadioIcon size={16} className="radio-seed-heading-icon" />
           {t("radio.seed.title")}
         </div>
 
@@ -445,44 +442,44 @@ export function RadioPage() {
             void search(e.target.value);
           }}
           placeholder={t("radio.seed.placeholder")}
-          className="h-12 w-full rounded-lg border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/35 focus:outline-none"
+          className="radio-seed-input h-12 w-full rounded-lg px-4 text-sm"
         />
 
         {searching && (
-          <Loader2 size={14} className="mt-2 animate-spin text-primary" />
+          <Loader2 size={14} className="radio-seed-spinner mt-2 animate-spin" />
         )}
 
         {results.length > 0 && (
-          <div className="mt-2 space-y-0.5 rounded-xl border border-white/8 bg-black/40 p-1.5">
+          <div className="radio-seed-results mt-2 space-y-0.5 rounded-xl p-1.5">
             {results.map((r) => (
               <button
                 key={`${r.type}-${r.value}`}
                 onClick={() => void startSeeded(r)}
                 disabled={starting}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-white/70 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                className="radio-seed-result flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition"
               >
                 {r.imageUrl ? (
                   <CrateImage
                     src={r.imageUrl}
                     alt=""
-                    className={`h-9 w-9 flex-shrink-0 bg-white/5 object-cover ${
+                    className={`radio-seed-result-image h-9 w-9 flex-shrink-0 object-cover ${
                       r.type === "artist" ? "rounded-full" : "rounded-md"
                     }`}
                   />
                 ) : (
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <div className="radio-seed-result-placeholder flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md">
                     <Music size={16} />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{r.label}</div>
-                  <div className="text-[10px] text-white/30">
+                  <div className="radio-seed-result-type text-[10px]">
                     {t("radio.seed.resultType", { type: r.type })}
                   </div>
                 </div>
                 <RadioIcon
                   size={14}
-                  className="flex-shrink-0 text-primary/40"
+                  className="radio-seed-result-icon flex-shrink-0"
                 />
               </button>
             ))}
@@ -492,17 +489,17 @@ export function RadioPage() {
 
       {/* Active session info */}
       {activeSession && activeMode !== "discovery" && (
-        <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+        <div className="radio-session-status rounded-xl px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-primary shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
-            <span className="text-sm font-medium text-primary">
+            <div className="radio-session-dot h-2 w-2 animate-pulse rounded-full" />
+            <span className="radio-session-label text-sm font-medium">
               {seedLabel} Radio
             </span>
-            <span className="text-[11px] text-white/30">
+            <span className="radio-session-muted text-[11px]">
               {t("common.playing")}
             </span>
           </div>
-          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-white/40">
+          <div className="radio-session-muted mt-1.5 flex items-center gap-1 text-[11px]">
             <ThumbsUp size={10} /> {t("radio.feedback.likePrefix")}{" "}
             <ThumbsDown size={10} /> {t("radio.feedback.dislikeSuffix")}
           </div>
