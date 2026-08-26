@@ -98,6 +98,50 @@
     color-mix(in srgb, var(--accent-action) 6%, transparent),
     transparent
   );
+  --play-button-rim: conic-gradient(
+    from 218deg,
+    color-mix(in srgb, var(--state-info) 65%, var(--accent-action)) 0deg,
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary)) 84deg,
+    color-mix(in srgb, var(--text-primary) 64%, var(--accent-action)) 166deg,
+    var(--accent-action) 248deg,
+    color-mix(in srgb, var(--state-info) 65%, var(--accent-action)) 360deg
+  );
+  --play-button-rim-surface: conic-gradient(
+    from 218deg,
+    color-mix(in srgb, var(--state-info) 78%, var(--accent-action)) 0deg,
+    color-mix(in srgb, var(--accent-action) 92%, var(--text-primary)) 92deg,
+    color-mix(in srgb, var(--text-primary) 72%, var(--accent-action)) 170deg,
+    color-mix(in srgb, var(--accent-action) 92%, var(--state-info)) 250deg,
+    color-mix(in srgb, var(--state-info) 72%, var(--accent-action)) 360deg
+  );
+  --play-button-aura: radial-gradient(
+      ellipse 58% 46% at 46% 57%,
+      var(--accent-action-glow-strong) 0%,
+      var(--accent-action-glow-medium) 24%,
+      var(--accent-action-glow-soft) 42%,
+      transparent 64%
+    ),
+    radial-gradient(
+      ellipse 38% 32% at 68% 34%,
+      color-mix(in srgb, var(--text-primary) 22%, transparent) 0%,
+      color-mix(in srgb, var(--text-primary) 9%, transparent) 34%,
+      transparent 66%
+    ),
+    radial-gradient(
+      ellipse 34% 42% at 30% 66%,
+      color-mix(in srgb, var(--state-info) 25%, transparent) 0%,
+      color-mix(in srgb, var(--state-info) 9%, transparent) 38%,
+      transparent 68%
+    );
+  --play-button-shadow: 0 0 5px var(--accent-action-glow),
+    0 0 9px var(--accent-action-glow-soft);
+  --play-button-active-shadow: 0 0 7px var(--accent-action-glow-strong),
+    0 0 18px var(--accent-action-glow-medium);
+  --play-button-core: var(--surface-elevated);
+  --play-button-core-shadow: inset 0 0 0 1px var(--surface-glass-border),
+    inset 0 -10px 24px var(--surface-glass-shadow);
+  --play-button-icon-shadow: 0 0 4px
+    color-mix(in srgb, var(--text-primary) 35%, transparent);
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -256,4 +300,31 @@
 
 .eq-smart-surface {
   background: var(--eq-smart-surface);
+}
+
+.spectrum-play-button {
+  background: var(--play-button-rim);
+  box-shadow: var(--play-button-shadow);
+}
+
+.spectrum-play-button[data-active="true"] {
+  box-shadow: var(--play-button-active-shadow);
+}
+
+.spectrum-play-button-aura {
+  background: var(--play-button-aura);
+}
+
+.spectrum-play-button-rim {
+  background: var(--play-button-rim-surface);
+}
+
+.spectrum-play-button-core {
+  background: var(--play-button-core);
+  box-shadow: var(--play-button-core-shadow);
+}
+
+.spectrum-play-button-icon {
+  color: var(--text-primary);
+  filter: drop-shadow(var(--play-button-icon-shadow));
 }
