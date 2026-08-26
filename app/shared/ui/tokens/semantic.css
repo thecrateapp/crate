@@ -175,6 +175,7 @@
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
   --color-surface-chrome: var(--surface-chrome);
+  --color-surface-glass-highlight: var(--surface-glass-highlight);
   --color-surface-control: var(--surface-control);
   --color-surface-control-hover: var(--surface-control-hover);
   --color-surface-icon-control: var(--surface-icon-control);
