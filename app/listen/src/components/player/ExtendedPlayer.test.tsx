@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -119,5 +120,68 @@ describe("ExtendedPlayer", () => {
     );
 
     expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+  });
+
+  it("uses semantic tokens for the player chrome and tabs", async () => {
+    localStorage.setItem("listen-eq-enabled", "true");
+    const user = userEvent.setup();
+    const track = createMockTrack({
+      id: "extended-chrome-track",
+      entityUid: "extended-chrome-track",
+      title: "Extended chrome",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(
+      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      },
+    );
+
+    const closeButton = screen.getByLabelText("Close player");
+    const equalizerButton = screen.getByLabelText("Equalizer");
+    const visualizerSettingsButton = screen.getByLabelText(
+      "Visualizer settings",
+    );
+    const activeTab = screen.getByRole("button", { name: "Queue" });
+    const inactiveTab = screen.getByRole("button", { name: "Suggested" });
+
+    for (const button of [closeButton, equalizerButton]) {
+      expect(button).toHaveClass(
+        "bg-surface-control",
+        "text-text-secondary",
+        "hover:bg-surface-control-hover",
+        "hover:text-text-primary",
+      );
+      expect(button.className).not.toContain("black/");
+      expect(button.className).not.toContain("white/");
+    }
+
+    expect(visualizerSettingsButton).toHaveClass(
+      "bg-surface-icon-control",
+      "text-text-faint",
+    );
+    expect(visualizerSettingsButton.className).not.toContain("black/");
+    expect(visualizerSettingsButton.className).not.toContain("white/");
+
+    expect(activeTab).toHaveClass("bg-surface-control", "text-text-primary");
+    expect(inactiveTab).toHaveClass(
+      "text-text-muted",
+      "hover:text-text-secondary",
+    );
+    expect(activeTab.className).not.toContain("white/");
+    expect(inactiveTab.className).not.toContain("white/");
+
+    await user.click(equalizerButton);
+    expect(equalizerButton).toHaveClass(
+      "bg-accent-action/18",
+      "text-accent-action",
+      "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+    );
   });
 });

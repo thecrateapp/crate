@@ -239,7 +239,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
           <button
             onClick={closeWithFeedback}
             aria-label={t("player.close")}
-            className="rounded-full bg-black/30 p-2 text-white/60 backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
+            className="rounded-full bg-surface-control p-2 text-text-secondary backdrop-blur-sm transition-colors hover:bg-surface-control-hover hover:text-text-primary"
           >
             <ChevronDown size={20} />
           </button>
@@ -261,8 +261,8 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                 aria-label={t("player.equalizer")}
                 className={`rounded-full p-2 backdrop-blur-sm transition-colors ${
                   showEqualizer
-                    ? "bg-primary/20 text-primary"
-                    : "bg-black/30 text-white/40 hover:bg-black/50 hover:text-white/70"
+                    ? "bg-accent-action/18 text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary"
                 }`}
               >
                 <SlidersHorizontal size={18} />
@@ -275,10 +275,10 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
               disabled={!isVisualizerMode}
               className={`rounded-full p-2 backdrop-blur-sm transition-colors ${
                 !isVisualizerMode
-                  ? "bg-black/20 text-white/20"
+                  ? "bg-surface-icon-control text-text-faint"
                   : showVizSettings
-                    ? "bg-primary/20 text-primary"
-                    : "bg-black/30 text-white/40 hover:bg-black/50 hover:text-white/70"
+                    ? "bg-accent-action/18 text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary"
               }`}
             >
               <Settings size={18} />
@@ -442,8 +442,8 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
               }}
               className={`rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
                 tab === item.id
-                  ? "bg-white/10 text-white"
-                  : "text-white/40 hover:text-white/60"
+                  ? "bg-surface-control text-text-primary"
+                  : "text-text-muted hover:text-text-secondary"
               }`}
             >
               {t(item.labelKey)}
