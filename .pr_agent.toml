@@ -93,3 +93,6 @@ auto_review = true
 auto_describe = false
 auto_improve = false
 pr_actions = ["opened", "reopened", "ready_for_review", "synchronize"]
+
+[github_app]
+feedback_on_draft_pr = true
