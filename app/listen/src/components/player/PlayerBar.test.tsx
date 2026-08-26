@@ -247,6 +247,32 @@ describe("PlayerBar mobile mini-player", () => {
     );
   });
 
+  it("uses semantic tokens for desktop player actions", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Actions",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    for (const label of ["Queue", "Lyrics", "Expand player"]) {
+      const buttons = screen.getAllByRole("button", { name: label });
+
+      for (const button of buttons) {
+        expect(button.className).toContain("text-text-");
+        expect(button.className).toContain("hover:text-accent-action");
+        expect(button.className).toContain(
+          "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+        );
+        expect(button.className).not.toContain("text-white/");
+        expect(button.className).not.toContain("rgba(");
+      }
+    }
+  });
+
   it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
     useIsDesktopMock.mockReturnValue(true);
     localStorage.setItem("listen-eq-enabled", "true");

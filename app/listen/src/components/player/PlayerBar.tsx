@@ -1603,10 +1603,8 @@ export function PlayerBar() {
                     onMouseEnter={prepareEqualizerPopover}
                     onFocus={prepareEqualizerPopover}
                     aria-label={t("player.equalizer")}
-                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
-                      showEqualizer
-                        ? "text-primary"
-                        : "text-white/30 hover:text-primary"
+                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                      showEqualizer ? "text-accent-action" : "text-text-muted"
                     }`}
                   >
                     <SlidersHorizontal size={CRATE_ICON_SIZE.md} />
@@ -1619,16 +1617,14 @@ export function PlayerBar() {
                     onClick={handleToggleQueue}
                     onMouseEnter={prepareQueuePanel}
                     onFocus={prepareQueuePanel}
-                    className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
-                      showQueue
-                        ? "text-primary"
-                        : "text-white/30 hover:text-primary"
+                    className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                      showQueue ? "text-accent-action" : "text-text-muted"
                     }`}
                     aria-label={t("player.queue")}
                   >
                     <ListMusic size={CRATE_ICON_SIZE.md} />
                     {displayQueue.length > 1 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+                      <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent-action text-[8px] font-bold text-accent-action-foreground">
                         {displayQueue.length - displayCurrentIndex - 1}
                       </span>
                     )}
@@ -1641,10 +1637,8 @@ export function PlayerBar() {
                     onClick={handleToggleLyrics}
                     onMouseEnter={prepareLyricsPanel}
                     onFocus={prepareLyricsPanel}
-                    className={`hidden p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] xl:block ${
-                      showLyrics
-                        ? "text-primary"
-                        : "text-white/30 hover:text-primary"
+                    className={`hidden p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] xl:block ${
+                      showLyrics ? "text-accent-action" : "text-text-muted"
                     }`}
                     aria-label={t("player.lyrics")}
                   >
@@ -1658,10 +1652,8 @@ export function PlayerBar() {
                     onClick={handleToggleExtendedPlayer}
                     onMouseEnter={prepareExtendedPlayer}
                     onFocus={prepareExtendedPlayer}
-                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
-                      extendedOpen
-                        ? "text-primary"
-                        : "text-white/30 hover:text-primary"
+                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                      extendedOpen ? "text-accent-action" : "text-text-muted"
                     }`}
                     aria-label={t("player.expand")}
                   >
@@ -1679,10 +1671,8 @@ export function PlayerBar() {
                   onMouseEnter={prepareQueuePanel}
                   onFocus={prepareQueuePanel}
                   aria-label={t("player.queue")}
-                  className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
-                    showQueue
-                      ? "text-primary"
-                      : "text-white/30 hover:text-primary"
+                  className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                    showQueue ? "text-accent-action" : "text-text-muted"
                   }`}
                 >
                   <ListMusic size={CRATE_ICON_SIZE.md} />
@@ -1694,10 +1684,8 @@ export function PlayerBar() {
                   onMouseEnter={prepareExtendedPlayer}
                   onFocus={prepareExtendedPlayer}
                   aria-label={t("player.expand")}
-                  className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
-                    extendedOpen
-                      ? "text-primary"
-                      : "text-white/30 hover:text-primary"
+                  className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                    extendedOpen ? "text-accent-action" : "text-text-muted"
                   }`}
                 >
                   <Maximize2 size={CRATE_ICON_SIZE.md} />
