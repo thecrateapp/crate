@@ -189,6 +189,8 @@
     var(--accent-action) 18%,
     transparent
   );
+  --quality-hi-res-glow: 0 0 8px
+    color-mix(in srgb, var(--state-warning) 15%, transparent);
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -413,4 +415,15 @@
 
 .spinning-disc-control-ring {
   border: 1px solid var(--disc-control-ring);
+}
+
+.quality-badge-hi-res-glow {
+  box-shadow: var(--quality-hi-res-glow);
+}
+
+.quality-badge-stream {
+  border-color: var(--border-floating);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  color: color-mix(in srgb, var(--text-primary) 68%, transparent);
+  box-shadow: none;
 }
