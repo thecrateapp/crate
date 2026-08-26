@@ -65,11 +65,11 @@ export function HomeUpcomingSection({
           actionLabel={t("home.radar.open")}
           onAction={onOpenUpcoming}
         />
-        <div className="rounded-[12px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.16),transparent_42%),rgba(255,255,255,0.03)] p-5">
+        <div className="home-upcoming-empty-card rounded-[12px] p-5">
           <h2 className="text-lg font-bold text-foreground">
             {t("radar.empty.followTitle")}
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-white/60">
+          <p className="home-upcoming-empty-copy mt-1 max-w-2xl text-sm leading-6">
             {t("radar.empty.followBody")}
           </p>
         </div>
@@ -134,8 +134,8 @@ export function HomeUpcomingSection({
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-        <div className="relative min-h-[270px] overflow-hidden rounded-[12px] border border-white/10 bg-[#101218] p-5 sm:p-6">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(6,182,212,0.34),transparent_35%),linear-gradient(120deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
+        <div className="home-upcoming-feature relative min-h-[270px] overflow-hidden rounded-[12px] p-5 sm:p-6">
+          <div className="home-upcoming-feature-glow absolute inset-0" />
           {artistImage ? (
             <CrateImage
               src={artistImage}
@@ -147,11 +147,11 @@ export function HomeUpcomingSection({
               }}
             />
           ) : null}
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,9,13,0.94),rgba(8,9,13,0.64)_48%,rgba(8,9,13,0.18)),linear-gradient(0deg,rgba(8,9,13,0.9),transparent_55%)]" />
+          <div className="home-upcoming-feature-overlay absolute inset-0" />
 
           <div className="relative flex min-h-[222px] flex-col justify-between">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/12 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
+              <div className="home-upcoming-badge mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em]">
                 {isShow ? <RadioTower size={12} /> : <Disc3 size={12} />}
                 {isShow
                   ? t("home.radar.badge.nextShow")
@@ -161,7 +161,7 @@ export function HomeUpcomingSection({
               <h2 className="max-w-3xl text-3xl font-extrabold leading-none tracking-tight text-foreground sm:text-4xl">
                 {isShow ? nextUpcoming.artist : nextUpcoming.title}
               </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">
+              <p className="home-upcoming-feature-copy mt-3 max-w-2xl text-sm leading-6">
                 {isShow
                   ? `${nextUpcoming.title} · ${nextUpcoming.subtitle}`
                   : `${nextUpcoming.artist} · ${nextUpcoming.subtitle}`}
@@ -171,8 +171,8 @@ export function HomeUpcomingSection({
             <div>
               <div className="mb-4 flex flex-wrap gap-2">
                 {nextUpcomingDate ? (
-                  <div className="rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                  <div className="home-upcoming-meta-card rounded-lg px-3 py-2 backdrop-blur">
+                    <div className="home-upcoming-meta-label text-[10px] uppercase tracking-[0.16em]">
                       {t("home.radar.meta.date")}
                     </div>
                     <div className="mt-1 text-sm font-semibold text-foreground">
@@ -181,8 +181,8 @@ export function HomeUpcomingSection({
                   </div>
                 ) : null}
                 {isShow && nextUpcoming.venue ? (
-                  <div className="rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                  <div className="home-upcoming-meta-card rounded-lg px-3 py-2 backdrop-blur">
+                    <div className="home-upcoming-meta-label text-[10px] uppercase tracking-[0.16em]">
                       {t("home.radar.meta.venue")}
                     </div>
                     <div className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-foreground">
@@ -192,7 +192,7 @@ export function HomeUpcomingSection({
                   </div>
                 ) : null}
                 {nextUpcoming.user_attending && isShow ? (
-                  <div className="rounded-lg border border-primary/20 bg-primary/12 px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
+                  <div className="home-upcoming-attending rounded-lg px-3 py-2 text-sm font-semibold backdrop-blur">
                     {t("radar.show.going")}
                   </div>
                 ) : null}
@@ -220,7 +220,7 @@ export function HomeUpcomingSection({
                 ) : null}
                 <button
                   onClick={onOpenUpcoming}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
+                  className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-foreground transition-colors"
                 >
                   <Calendar size={15} />
                   {t("home.radar.viewRadar")}
@@ -228,7 +228,7 @@ export function HomeUpcomingSection({
                 {isShow && artistPath ? (
                   <Link
                     to={artistPath}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
+                    className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-foreground transition-colors"
                   >
                     {t("common.artist")}
                   </Link>
@@ -238,13 +238,13 @@ export function HomeUpcomingSection({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.03] p-4">
+        <div className="home-upcoming-panel overflow-hidden rounded-[12px] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40">
+            <div className="home-upcoming-panel-kicker flex items-center gap-2 text-[11px] uppercase tracking-wider">
               <Calendar size={12} />
               {t("home.radar.nextUp")}
             </div>
-            <div className="text-[10px] uppercase tracking-[0.16em] text-primary">
+            <div className="home-upcoming-summary text-[10px] uppercase tracking-[0.16em]">
               {t("home.radar.summary", {
                 shows: summary?.show_count ?? 0,
                 releases: summary?.release_count ?? 0,
@@ -293,21 +293,23 @@ export function HomeShowPrepSection({
         {insights.map((insight) => (
           <div
             key={`${insight.type}:${insight.show_id}`}
-            className="rounded-[12px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.16),transparent_42%),rgba(255,255,255,0.03)] p-5"
+            className="home-upcoming-show-prep-card rounded-[12px] p-5"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
+                <div className="home-upcoming-show-prep-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em]">
                   <Sparkles size={12} />
                   {insightLabel(insight.type, t)}
                 </div>
                 <h3 className="mt-3 text-lg font-bold text-foreground">
                   {insight.title}
                 </h3>
-                <p className="mt-1 text-sm text-white/60">{insight.subtitle}</p>
+                <p className="home-upcoming-show-prep-subtitle mt-1 text-sm">
+                  {insight.subtitle}
+                </p>
               </div>
               {insight.weight === "high" ? (
-                <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-primary">
+                <div className="home-upcoming-show-prep-heavy rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.16em]">
                   {t("home.radar.showPrep.heavyRotation")}
                 </div>
               ) : null}
@@ -329,7 +331,7 @@ export function HomeShowPrepSection({
               ) : null}
               <button
                 onClick={() => onSaveReminder(insight)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:text-foreground"
+                className="home-upcoming-show-prep-reminder inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors"
               >
                 <Calendar size={14} />
                 {t("home.radar.showPrep.saveForLater")}

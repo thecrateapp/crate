@@ -914,6 +914,211 @@
     var(--text-primary) 5%,
     transparent
   );
+
+  --home-playback-row-hover: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --home-playback-row-focus-ring: color-mix(
+    in srgb,
+    var(--accent-action) 40%,
+    transparent
+  );
+  --home-playback-cover-hover-overlay: color-mix(
+    in srgb,
+    var(--surface-canvas) 45%,
+    transparent
+  );
+  --home-playback-cover-play-text: var(--text-primary);
+  --home-playback-panel-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-playback-panel-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3%,
+    transparent
+  );
+  --home-playback-panel-kicker: color-mix(
+    in srgb,
+    var(--text-primary) 40%,
+    transparent
+  );
+  --home-playback-empty-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-playback-card-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-playback-card-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3%,
+    transparent
+  );
+  --home-playback-empty-gradient: radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent-action) 18%, transparent),
+      transparent 50%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 4%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
+  --home-playback-badge-border: color-mix(
+    in srgb,
+    var(--accent-action) 20%,
+    transparent
+  );
+  --home-playback-badge-surface: color-mix(
+    in srgb,
+    var(--accent-action) 10%,
+    transparent
+  );
+  --home-playback-badge-text: var(--accent-action);
+  --home-playback-count-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-playback-count-surface: color-mix(
+    in srgb,
+    var(--text-primary) 4%,
+    transparent
+  );
+  --home-playback-count-text: var(--text-muted);
+  --home-playback-album-text: color-mix(
+    in srgb,
+    var(--text-primary) 40%,
+    transparent
+  );
+  --home-replay-card-border: var(--home-playback-card-border);
+  --home-replay-card-surface: radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent-action) 14%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 5%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
+
+  --home-upcoming-empty-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-upcoming-empty-surface: radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent-action) 16%, transparent),
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --home-upcoming-muted-text: color-mix(
+    in srgb,
+    var(--text-primary) 60%,
+    transparent
+  );
+  --home-upcoming-feature-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-upcoming-feature-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 92%,
+    var(--surface-elevated)
+  );
+  --home-upcoming-feature-glow: radial-gradient(
+      circle at 18% 20%,
+      color-mix(in srgb, var(--accent-action) 34%, transparent),
+      transparent 35%
+    ),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--text-primary) 8%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
+  --home-upcoming-feature-overlay: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-canvas) 94%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 64%, transparent) 48%,
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent)
+    ),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--surface-canvas) 90%, transparent),
+      transparent 55%
+    );
+  --home-upcoming-feature-copy: color-mix(
+    in srgb,
+    var(--text-primary) 70%,
+    transparent
+  );
+  --home-upcoming-meta-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-upcoming-meta-surface: color-mix(
+    in srgb,
+    var(--text-primary) 7%,
+    transparent
+  );
+  --home-upcoming-meta-label: color-mix(
+    in srgb,
+    var(--text-primary) 40%,
+    transparent
+  );
+  --home-upcoming-attending-border: color-mix(
+    in srgb,
+    var(--accent-action) 20%,
+    transparent
+  );
+  --home-upcoming-attending-surface: color-mix(
+    in srgb,
+    var(--accent-action) 12%,
+    transparent
+  );
+  --home-upcoming-panel-border: var(--home-playback-panel-border);
+  --home-upcoming-panel-surface: var(--home-playback-panel-surface);
+  --home-upcoming-panel-kicker: var(--home-playback-panel-kicker);
+  --home-upcoming-summary: var(--accent-action);
+  --home-upcoming-secondary-border: color-mix(
+    in srgb,
+    var(--text-primary) 12%,
+    transparent
+  );
+  --home-upcoming-secondary-surface: color-mix(
+    in srgb,
+    var(--text-primary) 6%,
+    transparent
+  );
+  --home-upcoming-secondary-hover-surface: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-upcoming-prep-border: var(--home-upcoming-empty-border);
+  --home-upcoming-prep-surface: var(--home-upcoming-empty-surface);
+  --home-upcoming-prep-subtitle: var(--home-upcoming-muted-text);
+  --home-upcoming-prep-reminder-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-upcoming-prep-reminder-text: color-mix(
+    in srgb,
+    var(--text-primary) 65%,
+    transparent
+  );
 }
 
 @theme inline {
@@ -1082,6 +1287,180 @@
     var(--info-tab-palette-accent, var(--state-warning)) 18%,
     transparent
   );
+}
+
+.home-playback-row:hover,
+.home-playback-row:focus-visible {
+  background: var(--home-playback-row-hover);
+}
+
+.home-playback-row:focus-visible,
+.home-queue-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--home-playback-row-focus-ring);
+}
+
+.home-playback-cover-overlay {
+  background: transparent;
+  transition: background-color var(--motion-duration-fast) ease;
+}
+
+.home-playback-row:hover .home-playback-cover-overlay,
+.home-queue-card:hover .home-playback-cover-overlay {
+  background: var(--home-playback-cover-hover-overlay);
+}
+
+.home-playback-cover-play-icon {
+  color: var(--home-playback-cover-play-text);
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) ease;
+}
+
+.home-playback-row:hover .home-playback-cover-play-icon,
+.home-queue-card:hover .home-playback-cover-play-icon {
+  opacity: 1;
+}
+
+.home-playback-panel,
+.home-replay-panel {
+  border: 1px solid var(--home-playback-panel-border);
+  background: var(--home-playback-panel-surface);
+}
+
+.home-playback-panel-kicker,
+.home-replay-panel-kicker {
+  color: var(--home-playback-panel-kicker);
+}
+
+.home-playback-empty-state {
+  border: 1px dashed var(--home-playback-empty-border);
+}
+
+.home-playback-card,
+.home-queue-card {
+  border: 1px solid var(--home-playback-card-border);
+  background: var(--home-playback-card-surface);
+}
+
+.home-playback-empty-card {
+  border: 1px solid var(--home-playback-card-border);
+  background: var(--home-playback-empty-gradient);
+}
+
+.home-playback-badge,
+.home-replay-badge {
+  border: 1px solid var(--home-playback-badge-border);
+  background: var(--home-playback-badge-surface);
+  color: var(--home-playback-badge-text);
+}
+
+.home-replay-count-badge {
+  border: 1px solid var(--home-playback-count-border);
+  background: var(--home-playback-count-surface);
+  color: var(--home-playback-count-text);
+}
+
+.home-playback-album-text {
+  color: var(--home-playback-album-text);
+}
+
+.home-replay-card {
+  border: 1px solid var(--home-replay-card-border);
+  background: var(--home-replay-card-surface);
+}
+
+.home-replay-metric-card {
+  border: 1px solid var(--home-playback-card-border);
+  background: var(--home-playback-count-surface);
+}
+
+.home-replay-metric-label {
+  color: var(--home-playback-count-text);
+}
+
+.home-upcoming-empty-card {
+  border: 1px solid var(--home-upcoming-empty-border);
+  background: var(--home-upcoming-empty-surface);
+}
+
+.home-upcoming-empty-copy,
+.home-upcoming-feature-copy,
+.home-upcoming-show-prep-subtitle {
+  color: var(--home-upcoming-muted-text);
+}
+
+.home-upcoming-feature {
+  border: 1px solid var(--home-upcoming-feature-border);
+  background: var(--home-upcoming-feature-surface);
+}
+
+.home-upcoming-feature-glow {
+  background: var(--home-upcoming-feature-glow);
+}
+
+.home-upcoming-feature-overlay {
+  background: var(--home-upcoming-feature-overlay);
+}
+
+.home-upcoming-badge,
+.home-upcoming-show-prep-badge {
+  border: 1px solid var(--home-playback-badge-border);
+  background: var(--home-playback-badge-surface);
+  color: var(--home-playback-badge-text);
+}
+
+.home-upcoming-meta-card {
+  border: 1px solid var(--home-upcoming-meta-border);
+  background: var(--home-upcoming-meta-surface);
+}
+
+.home-upcoming-meta-label {
+  color: var(--home-upcoming-meta-label);
+}
+
+.home-upcoming-attending {
+  border: 1px solid var(--home-upcoming-attending-border);
+  background: var(--home-upcoming-attending-surface);
+  color: var(--home-upcoming-summary);
+}
+
+.home-upcoming-panel {
+  border: 1px solid var(--home-upcoming-panel-border);
+  background: var(--home-upcoming-panel-surface);
+}
+
+.home-upcoming-panel-kicker {
+  color: var(--home-upcoming-panel-kicker);
+}
+
+.home-upcoming-summary {
+  color: var(--home-upcoming-summary);
+}
+
+.home-upcoming-secondary-action,
+.home-upcoming-show-prep-reminder {
+  border: 1px solid var(--home-upcoming-secondary-border);
+  background: var(--home-upcoming-secondary-surface);
+}
+
+.home-upcoming-secondary-action:hover,
+.home-upcoming-show-prep-reminder:hover {
+  background: var(--home-upcoming-secondary-hover-surface);
+}
+
+.home-upcoming-show-prep-card {
+  border: 1px solid var(--home-upcoming-prep-border);
+  background: var(--home-upcoming-prep-surface);
+}
+
+.home-upcoming-show-prep-heavy {
+  border: 1px solid var(--home-playback-badge-border);
+  background: var(--home-playback-badge-surface);
+  color: var(--home-playback-badge-text);
+}
+
+.home-upcoming-show-prep-reminder {
+  color: var(--home-upcoming-prep-reminder-text);
 }
 
 .info-tab-artwork {
