@@ -92,6 +92,12 @@
       color-mix(in srgb, var(--surface-canvas) 86%, transparent)
     );
   --lyrics-active-text-shadow: 0 0 20px var(--accent-action-glow);
+  --eq-smart-surface: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 6%, transparent),
+    transparent
+  );
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -246,4 +252,8 @@
 
 .lyrics-active-line {
   text-shadow: var(--lyrics-active-text-shadow);
+}
+
+.eq-smart-surface {
+  background: var(--eq-smart-surface);
 }

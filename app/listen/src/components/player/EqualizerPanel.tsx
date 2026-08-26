@@ -70,7 +70,7 @@ function SmartEqReadout({
   const { t } = useTranslation();
   if (status === "loading") {
     return (
-      <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.07] px-3 py-2 text-[11px] text-cyan-100/80">
+      <div className="rounded-lg border border-accent-action/20 bg-accent-action/[0.07] px-3 py-2 text-[11px] text-accent-action/80">
         {t("player.equalizer.smart.resolving")}
       </div>
     );
@@ -78,7 +78,7 @@ function SmartEqReadout({
 
   if (status === "unavailable" || !eq) {
     return (
-      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-muted-foreground">
+      <div className="rounded-lg border border-border-floating bg-surface-control px-3 py-2 text-[11px] text-text-muted">
         {t("player.equalizer.smart.waiting")}
       </div>
     );
@@ -93,16 +93,16 @@ function SmartEqReadout({
       : eq.reasoning || eq.label;
 
   return (
-    <div className="rounded-lg border border-cyan-400/25 bg-gradient-to-r from-cyan-400/[0.14] via-cyan-400/[0.06] to-transparent px-3 py-2">
+    <div className="eq-smart-surface rounded-lg border border-accent-action/25 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-action/35 bg-accent-action/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-action">
           <Brain size={10} />
           Smart
         </span>
-        <span className="text-xs font-semibold text-foreground">{label}</span>
+        <span className="text-xs font-semibold text-text-primary">{label}</span>
       </div>
       {detail ? (
-        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-text-muted">
           {detail}
         </p>
       ) : null}
@@ -148,14 +148,14 @@ function AdaptiveFeatureChips({
   const { t } = useTranslation();
   if (status === "loading") {
     return (
-      <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
+      <div className="rounded-md border border-border-floating bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.adaptive.loading")}
       </div>
     );
   }
   if (status === "unavailable" || !features) {
     return (
-      <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
+      <div className="rounded-md border border-border-floating bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.adaptive.unavailable")}
       </div>
     );
@@ -236,7 +236,7 @@ function AdaptiveFeatureChips({
 
   if (chips.length === 0) {
     return (
-      <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
+      <div className="rounded-md border border-border-floating bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.adaptive.empty")}
       </div>
     );
@@ -244,7 +244,7 @@ function AdaptiveFeatureChips({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[9px] uppercase tracking-wider text-white/40">
+      <span className="text-[9px] uppercase tracking-wider text-text-subtle">
         {t("player.equalizer.track")}
       </span>
       {chips}
@@ -269,14 +269,14 @@ function GenreResolutionChip({
   const { t } = useTranslation();
   if (status === "loading") {
     return (
-      <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
+      <div className="rounded-md border border-border-floating bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.genre.loading")}
       </div>
     );
   }
   if (status === "unavailable" || !genre?.primary) {
     return (
-      <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
+      <div className="rounded-md border border-border-floating bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.genre.unavailable")}
       </div>
     );
@@ -288,9 +288,9 @@ function GenreResolutionChip({
 
   if (!canonical) {
     return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-white/60">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-floating bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
         <Tag size={10} className="opacity-70" />
-        <span className="font-medium capitalize text-white/80">
+        <span className="font-medium capitalize text-text-primary/80">
           {primaryName}
         </span>
         <span className="opacity-50">
@@ -302,9 +302,9 @@ function GenreResolutionChip({
 
   if (!preset) {
     return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-white/60">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-floating bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
         <Tag size={10} className="opacity-70" />
-        <span className="font-medium capitalize text-white/80">
+        <span className="font-medium capitalize text-text-primary/80">
           {primaryName}
         </span>
         <span className="opacity-50">
@@ -316,7 +316,7 @@ function GenreResolutionChip({
 
   const isInherited = preset.source === "inherited";
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1.5 text-[10px] text-cyan-200">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-accent-action/30 bg-accent-action/10 px-2.5 py-1.5 text-[10px] text-accent-action">
       <Tag size={10} />
       <span className="font-medium capitalize">{primaryName}</span>
       <span className="opacity-70">
@@ -412,9 +412,9 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
         <div className="flex items-center gap-2">
           <SlidersHorizontal
             size={CRATE_ICON_SIZE.md}
-            className="text-cyan-400"
+            className="text-accent-action"
           />
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="text-sm font-semibold text-text-primary">
             {t("player.equalizer")}
           </h2>
         </div>
@@ -430,12 +430,12 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               <span className="ml-1 text-[9px] opacity-60">…</span>
             ) : null}
           </CratePill>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-text-primary">
             <input
               type="checkbox"
               checked={enabled}
               onChange={(event) => toggleEnabled(event.target.checked)}
-              className="h-3.5 w-3.5 accent-cyan-400"
+              className="h-3.5 w-3.5 accent-accent-action"
             />
             {t("common.on")}
           </label>
@@ -444,7 +444,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               type="button"
               onClick={onClose}
               aria-label={t("player.equalizer.close")}
-              className="flex size-9 items-center justify-center text-white/50 hover:text-white"
+              className="flex size-9 items-center justify-center text-text-muted hover:text-text-primary"
             >
               <X size={CRATE_ICON_SIZE.lg} />
             </button>
@@ -455,8 +455,8 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
       {smart ? (
         <SmartEqReadout eq={effectiveEq} status={smartStatus} />
       ) : (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.025] px-2.5 py-2">
-          <span className="mr-1 text-[9px] uppercase tracking-[0.18em] text-white/35">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border-floating bg-surface-control px-2.5 py-2">
+          <span className="mr-1 text-[9px] uppercase tracking-[0.18em] text-text-subtle">
             {t("player.equalizer.manualHelpers")}
           </span>
           <CratePill
@@ -500,22 +500,22 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
 
       <div className="flex items-center justify-between">
         {smart ? (
-          <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
+          <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
             <Brain size={9} />
             {t("player.equalizer.smartCurve")}
           </span>
         ) : adaptive ? (
-          <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
+          <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
             <Sparkles size={9} />
             {t("player.equalizer.adaptiveActive")}
           </span>
         ) : genreAdaptive ? (
-          <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
+          <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
             <Tag size={9} />
             {t("player.equalizer.genreActive")}
           </span>
         ) : preset === "custom" ? (
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] text-white/60">
+          <span className="rounded-full border border-border-floating bg-surface-control px-2 py-0.5 text-[10px] text-text-secondary">
             {t("player.equalizer.custom")}
           </span>
         ) : (
@@ -527,7 +527,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               type="button"
               disabled={saving}
               onClick={handleClearTrack}
-              className="inline-flex items-center gap-1 rounded-full border border-red-400/20 bg-red-400/[0.06] px-2.5 py-0.5 text-[10px] text-red-100/80 hover:border-red-400/35 hover:text-red-100 disabled:cursor-wait disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full border border-state-danger/20 bg-state-danger/[0.06] px-2.5 py-0.5 text-[10px] text-state-danger/80 hover:border-state-danger/35 hover:text-state-danger disabled:cursor-wait disabled:opacity-50"
             >
               <Trash2 size={9} />
               {t("player.equalizer.clearTrackPreset")}
@@ -537,7 +537,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               type="button"
               disabled={!enabled || saving}
               onClick={handleSaveTrack}
-              className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-2.5 py-0.5 text-[10px] text-cyan-100/80 hover:border-cyan-400/35 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-full border border-accent-action/20 bg-accent-action/[0.06] px-2.5 py-0.5 text-[10px] text-accent-action/80 hover:border-accent-action/35 hover:text-accent-action disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Save size={9} />
               {t("player.equalizer.saveForTrack")}
@@ -547,7 +547,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             type="button"
             disabled={!manualControlsEnabled}
             onClick={resetToFlat}
-            className={`inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 text-[10px] text-white/70 hover:border-white/20 hover:text-foreground ${
+            className={`inline-flex items-center gap-1 rounded-full border border-border-floating bg-surface-control px-2.5 py-0.5 text-[10px] text-text-secondary hover:border-border-interactive hover:text-text-primary ${
               !manualControlsEnabled ? "cursor-not-allowed opacity-40" : ""
             }`}
           >
@@ -575,7 +575,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
       ) : null}
 
       {/* Band sliders */}
-      <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+      <div className="rounded-xl border border-border-floating bg-surface-canvas p-3">
         <EqBands
           gains={gains}
           onBandChange={manualControlsEnabled ? updateBand : undefined}
