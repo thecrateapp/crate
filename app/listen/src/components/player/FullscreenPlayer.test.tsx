@@ -861,6 +861,51 @@ describe("FullscreenPlayer", () => {
       });
       expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
     });
+
+    it("uses semantic tokens for active panel and transport states", async () => {
+      const track = makeTrack();
+      const user = userEvent.setup();
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+          shuffle: true,
+          repeat: "one",
+        }),
+      });
+
+      const shuffle = await screen.findByRole("button", {
+        name: "Disable shuffle",
+      });
+      const repeat = screen.getByRole("button", { name: "Repeat: one" });
+      expect(shuffle).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+      );
+      expect(repeat).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+      );
+
+      const queueSwitch = screen.getByRole("button", { name: "Queue" });
+      expect(queueSwitch).toHaveClass(
+        "text-text-muted",
+        "active:text-text-secondary",
+      );
+
+      await user.click(queueSwitch);
+
+      expect(queueSwitch).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-[0_0_12px_var(--accent-action-glow)]",
+      );
+      expect(queueSwitch.querySelector('[aria-hidden="true"]')).toHaveClass(
+        "bg-accent-action",
+        "shadow-[0_0_10px_var(--accent-action-glow-strong)]",
+      );
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════

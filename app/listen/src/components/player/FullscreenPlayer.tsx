@@ -626,7 +626,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         <button
           onClick={closeWithFeedback}
           aria-label={t("player.close")}
-          className="flex h-12 w-12 shrink-0 touch-manipulation items-center justify-center -ml-2 text-white/60 active:text-white"
+          className="flex h-12 w-12 shrink-0 touch-manipulation items-center justify-center -ml-2 text-text-secondary active:text-text-primary"
         >
           <ChevronDown size={28} />
         </button>
@@ -647,8 +647,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 className={cn(
                   "group relative flex h-14 min-w-14 touch-manipulation flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold leading-none transition-[color,filter,transform] active:scale-[0.96]",
                   selected
-                    ? "text-primary drop-shadow-[0_0_12px_rgba(34,211,238,0.42)]"
-                    : "text-white/42 active:text-white/70",
+                    ? "text-accent-action drop-shadow-[0_0_12px_var(--accent-action-glow)]"
+                    : "text-text-muted active:text-text-secondary",
                 )}
               >
                 <Icon
@@ -661,7 +661,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   className={cn(
                     "absolute bottom-0 h-0.5 w-4 rounded-full transition-[opacity,box-shadow]",
                     selected
-                      ? "bg-primary opacity-100 shadow-[0_0_10px_rgba(34,211,238,0.62)]"
+                      ? "bg-accent-action opacity-100 shadow-[0_0_10px_var(--accent-action-glow-strong)]"
                       : "opacity-0",
                   )}
                 />
@@ -797,10 +797,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                     ? t("player.disableShuffle")
                     : t("player.enableShuffle")
                 }
-                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
+                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                   shuffle
-                    ? "text-primary"
-                    : "text-white/35 active:text-white/70"
+                    ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    : "text-text-muted active:text-text-secondary"
                 }`}
               >
                 <Shuffle size={CRATE_ICON_SIZE.lg} />
@@ -809,7 +809,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 onClick={goPrevWithFeedback}
                 disabled={jamQueueLocked}
                 aria-label={t("player.previous")}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-text-secondary transition-colors active:bg-surface-control active:text-text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
               >
                 <SkipBack size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
@@ -840,7 +840,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 onClick={goNextWithFeedback}
                 disabled={jamTransportDisabled}
                 aria-label={t("player.next")}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-text-secondary transition-colors active:bg-surface-control active:text-text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
               >
                 <SkipForward size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
@@ -848,10 +848,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 onClick={cycleRepeatWithFeedback}
                 disabled={jamQueueLocked}
                 aria-label={t("player.repeat", { mode: repeat })}
-                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
+                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                   repeat !== "off"
-                    ? "text-primary"
-                    : "text-white/35 active:text-white/70"
+                    ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    : "text-text-muted active:text-text-secondary"
                 }`}
               >
                 {repeat === "one" ? (
