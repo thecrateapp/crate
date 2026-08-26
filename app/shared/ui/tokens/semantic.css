@@ -228,6 +228,30 @@
     var(--state-info) 85%,
     var(--text-primary)
   );
+  --player-shell-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 68%,
+    transparent
+  );
+  --player-shell-shadow: 0 24px 56px
+    color-mix(in srgb, var(--surface-canvas) 34%, transparent);
+  --player-artwork-placeholder: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --player-liked-border: color-mix(
+    in srgb,
+    var(--accent-action) 60%,
+    transparent
+  );
+  --player-liked-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 80%,
+    transparent
+  );
+  --player-liked-shadow: 0 0 10px
+    color-mix(in srgb, var(--accent-action) 48%, transparent);
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -550,4 +574,26 @@
   border: 1px solid var(--info-mood-border);
   background: var(--info-mood-surface);
   color: var(--info-mood-text);
+}
+
+.listen-player-shell {
+  border: 1px solid var(--border-floating);
+  background: var(--player-shell-surface);
+  box-shadow: var(--player-shell-shadow);
+  backdrop-filter: blur(24px);
+}
+
+.listen-player-artwork {
+  background: var(--surface-glass-highlight);
+}
+
+.listen-player-artwork-placeholder {
+  background: var(--player-artwork-placeholder);
+}
+
+.listen-player-liked-indicator {
+  border: 1px solid var(--player-liked-border);
+  background: var(--player-liked-surface);
+  color: var(--accent-action);
+  box-shadow: var(--player-liked-shadow);
 }

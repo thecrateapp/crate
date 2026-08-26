@@ -1078,7 +1078,7 @@ export function PlayerBar() {
             className={cn(
               "pointer-events-none absolute inset-0 z-0",
               isDesktop
-                ? "border border-white/10 md:rounded-[12px] md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl"
+                ? "listen-player-shell md:rounded-[12px] md:backdrop-blur-xl"
                 : "rounded-t-[2rem] rounded-b-none",
             )}
           />
@@ -1111,7 +1111,7 @@ export function PlayerBar() {
                 On desktop, clicking navigates to the album page. */}
               <div
                 aria-label={isDesktop ? undefined : "Track artwork"}
-                className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-white/5 md:h-12 md:w-12 ${
+                className={`listen-player-artwork relative h-10 w-10 shrink-0 overflow-hidden rounded-md md:h-12 md:w-12 ${
                   isDesktop &&
                   (displayTrack.globalAlbumUid || displayTrack.albumId)
                     ? "cursor-pointer"
@@ -1178,12 +1178,12 @@ export function PlayerBar() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-white/10" />
+                  <div className="listen-player-artwork-placeholder h-full w-full" />
                 )}
                 {!isDesktop && liked ? (
                   <span
                     aria-label="Liked track"
-                    className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-primary/60 bg-black/80 text-primary shadow-[0_0_10px_rgba(34,211,238,0.48)] backdrop-blur-md"
+                    className="listen-player-liked-indicator absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full backdrop-blur-md"
                   >
                     <HeartBold
                       size={10}
@@ -1207,18 +1207,18 @@ export function PlayerBar() {
                         className="absolute inset-0"
                         style={{ opacity: 1 - crossfadeProgress }}
                       >
-                        <p className="text-[13px] font-semibold text-white truncate leading-tight">
+                        <p className="text-[13px] font-semibold text-text-primary truncate leading-tight">
                           {displayCrossfadeTransition.outgoing.title}
                         </p>
-                        <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
+                        <p className="text-[11px] text-text-muted truncate leading-tight mt-0.5">
                           {displayCrossfadeTransition.outgoing.artist}
                         </p>
                       </div>
                       <div style={{ opacity: crossfadeProgress }}>
-                        <p className="text-[13px] font-semibold text-white truncate leading-tight">
+                        <p className="text-[13px] font-semibold text-text-primary truncate leading-tight">
                           {displayCrossfadeTransition.incoming.title}
                         </p>
-                        <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
+                        <p className="text-[11px] text-text-muted truncate leading-tight mt-0.5">
                           {displayCrossfadeTransition.incoming.artist}
                         </p>
                       </div>
@@ -1228,7 +1228,7 @@ export function PlayerBar() {
                       {isDesktop &&
                       (displayTrack.globalAlbumUid || displayTrack.albumId) ? (
                         <p
-                          className="text-[13px] font-semibold text-white truncate leading-tight hover:underline cursor-pointer"
+                          className="text-[13px] font-semibold text-text-primary truncate leading-tight hover:underline cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
@@ -1252,7 +1252,7 @@ export function PlayerBar() {
                           {displayTrack.title}
                         </p>
                       ) : (
-                        <p className="text-[13px] font-semibold text-white truncate leading-tight">
+                        <p className="text-[13px] font-semibold text-text-primary truncate leading-tight">
                           {displayTrack.title}
                         </p>
                       )}
@@ -1260,7 +1260,7 @@ export function PlayerBar() {
                       (displayTrack.globalArtistUid ||
                         displayTrack.artistId) ? (
                         <p
-                          className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 hover:text-foreground hover:underline cursor-pointer transition-colors"
+                          className="text-[11px] text-text-muted truncate leading-tight mt-0.5 hover:text-text-primary hover:underline cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
@@ -1283,7 +1283,7 @@ export function PlayerBar() {
                           {displayTrack.artist}
                         </p>
                       ) : (
-                        <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
+                        <p className="text-[11px] text-text-muted truncate leading-tight mt-0.5">
                           {displayTrack.artist}
                         </p>
                       )}
@@ -1298,13 +1298,13 @@ export function PlayerBar() {
                   <div className="relative mt-0.5 h-[14px] hidden lg:block">
                     <p
                       key={`src-${sourceLabel}`}
-                      className="text-[10px] text-white/40 truncate leading-tight animate-fade-in"
+                      className="text-[10px] text-text-muted truncate leading-tight animate-fade-in"
                     >
                       Playing from:{" "}
                       {displayPlaySource?.href &&
                       sourceLabel !== "Discovery Radio" ? (
                         <span
-                          className="hover:text-foreground hover:underline cursor-pointer transition-colors"
+                          className="hover:text-text-primary hover:underline cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(displayPlaySource.href!);
@@ -1332,12 +1332,12 @@ export function PlayerBar() {
                     {liked ? (
                       <HeartBold
                         size={CRATE_ICON_SIZE.md}
-                        className="animate-crate-icon-active-pulse text-primary"
+                        className="animate-crate-icon-active-pulse text-accent-action"
                       />
                     ) : (
                       <Heart
                         size={CRATE_ICON_SIZE.md}
-                        className="text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+                        className="text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                       />
                     )}
                   </button>

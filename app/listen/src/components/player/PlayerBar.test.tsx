@@ -223,6 +223,31 @@ describe("PlayerBar mobile mini-player", () => {
     }
   });
 
+  it("uses semantic tokens for the desktop shell and track identity", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Shell Track",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    const shell = container.querySelector(".listen-player-shell");
+    const artwork = container.querySelector(".listen-player-artwork");
+
+    expect(shell).toBeInTheDocument();
+    expect(artwork).toBeInTheDocument();
+    expect(screen.getByText("Semantic Shell Track")).toHaveClass(
+      "text-text-primary",
+    );
+    expect(screen.getByText("Crate")).toHaveClass("text-text-muted");
+    expect(shell?.outerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
+  });
+
   it("uses the accent token for active shuffle and repeat states", () => {
     useIsDesktopMock.mockReturnValue(true);
     const track = createMockTrack({
