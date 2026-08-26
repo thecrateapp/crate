@@ -103,13 +103,13 @@ function Sidebar() {
 
   function navClass(isActive: boolean) {
     return isActive
-      ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-      : "text-white/40 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]";
+      ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+      : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]";
   }
 
   return (
     <aside
-      className={`z-app-sidebar fixed top-0 left-0 bottom-0 ${w} flex flex-col border-r border-white/5 bg-app-surface transition-all duration-200`}
+      className={`z-app-sidebar fixed top-0 left-0 bottom-0 ${w} flex flex-col border-r border-border-quiet bg-surface-canvas transition-all duration-200`}
     >
       {/* App icon / toggle */}
       <div
@@ -122,7 +122,7 @@ function Sidebar() {
             <div className="relative shrink-0">
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-[-10px] rounded-[22px] bg-[radial-gradient(circle,rgba(34,211,238,0.34)_0%,rgba(45,212,191,0.18)_32%,rgba(14,165,233,0.08)_54%,transparent_72%)] blur-md transition-[opacity,filter] duration-300"
+                className="pointer-events-none absolute inset-[-10px] rounded-[22px] bg-[radial-gradient(circle,var(--accent-action-glow-strong)_0%,var(--accent-action-glow-medium)_32%,var(--accent-action-glow-soft)_54%,transparent_72%)] blur-md transition-[opacity,filter] duration-300"
                 style={{
                   opacity: discoveryRadioActive
                     ? 0.22 + discoveryGlowStrength * 0.68
@@ -138,22 +138,22 @@ function Sidebar() {
                   filter: discoveryRadioActive
                     ? `drop-shadow(0 0 ${
                         10 + discoveryGlowStrength * 16
-                      }px rgba(34,211,238,${
-                        0.18 + discoveryGlowStrength * 0.24
-                      }))`
+                      }px color-mix(in srgb, var(--accent-action) ${Math.round(
+                        (0.18 + discoveryGlowStrength * 0.24) * 100,
+                      )}%, transparent))`
                     : "none",
                 }}
               />
             </div>
             <span
-              className={`text-sm font-bold flex-1 transition-[color,text-shadow] duration-300 ${
-                discoveryRadioActive ? "text-cyan-50" : "text-white"
-              }`}
+              className="text-sm font-bold flex-1 text-text-primary transition-[color,text-shadow] duration-300"
               style={{
                 textShadow: discoveryRadioActive
-                  ? `0 0 ${8 + discoveryGlowStrength * 10}px rgba(34,211,238,${
-                      0.12 + discoveryGlowStrength * 0.18
-                    })`
+                  ? `0 0 ${
+                      8 + discoveryGlowStrength * 10
+                    }px color-mix(in srgb, var(--accent-action) ${Math.round(
+                      (0.12 + discoveryGlowStrength * 0.18) * 100,
+                    )}%, transparent)`
                   : "none",
               }}
             >
@@ -162,7 +162,7 @@ function Sidebar() {
             <button
               onClick={toggleExpanded}
               aria-label={t("nav.sidebar.collapse")}
-              className="text-white/30 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+              className="text-text-subtle transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
             >
               <PanelLeftClose size={CRATE_ICON_SIZE.nav} />
             </button>
@@ -173,12 +173,12 @@ function Sidebar() {
               toggleExpanded();
               navigate("/");
             }}
-            className="relative flex h-10 w-10 items-center justify-center transition-[filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+            className="relative flex h-10 w-10 items-center justify-center transition-[filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
             aria-label={t("nav.sidebar.expand")}
           >
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-[-6px] rounded-[18px] bg-[radial-gradient(circle,rgba(34,211,238,0.32)_0%,rgba(45,212,191,0.14)_40%,transparent_72%)] blur-md transition-[opacity,filter] duration-300"
+              className="pointer-events-none absolute inset-[-6px] rounded-[18px] bg-[radial-gradient(circle,var(--accent-action-glow-strong)_0%,var(--accent-action-glow-medium)_40%,transparent_72%)] blur-md transition-[opacity,filter] duration-300"
               style={{
                 opacity: discoveryRadioActive
                   ? 0.2 + discoveryGlowStrength * 0.64
@@ -194,9 +194,9 @@ function Sidebar() {
                 filter: discoveryRadioActive
                   ? `drop-shadow(0 0 ${
                       8 + discoveryGlowStrength * 14
-                    }px rgba(34,211,238,${
-                      0.16 + discoveryGlowStrength * 0.22
-                    }))`
+                    }px color-mix(in srgb, var(--accent-action) ${Math.round(
+                      (0.16 + discoveryGlowStrength * 0.22) * 100,
+                    )}%, transparent))`
                   : "none",
               }}
             />
@@ -283,8 +283,8 @@ function Sidebar() {
               expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
             } ${
               collectionOpen
-                ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-                : "text-white/40 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
             }`}
           >
             <Collection size={CRATE_ICON_SIZE.nav} />
@@ -307,8 +307,8 @@ function Sidebar() {
             <div
               className={`animate-submenu-in ${
                 expanded
-                  ? "mt-1 ml-3 border-l border-white/5 pl-3"
-                  : "absolute left-full top-0 ml-2 w-44 rounded-xl border border-white/10 bg-raised-surface py-2 shadow-2xl"
+                  ? "mt-1 ml-3 border-l border-border-quiet pl-3"
+                  : "absolute left-full top-0 ml-2 w-44 rounded-xl border border-border-floating bg-surface-elevated py-2 shadow-menu"
               }`}
             >
               {[
@@ -344,7 +344,7 @@ function Sidebar() {
                     navigate(to);
                     setCollectionOpen(false);
                   }}
-                  className={`flex items-center gap-3 rounded-lg transition-[color,filter,transform] w-full text-left text-white/40 hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)] ${
+                  className={`flex items-center gap-3 rounded-lg transition-[color,filter,transform] w-full text-left text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
                     expanded ? "px-3 py-1.5" : "px-4 py-2"
                   }`}
                 >
@@ -363,7 +363,7 @@ function Sidebar() {
           <button
             onClick={toggleExpanded}
             aria-label={t("nav.sidebar.expand")}
-            className="text-white/20 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)]"
+            className="text-text-faint transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
           >
             <PanelLeftOpen size={CRATE_ICON_SIZE.nav} />
           </button>
@@ -455,7 +455,7 @@ export function Shell() {
       ? "pt-0 pb-4"
       : "py-4 pt-[var(--listen-mobile-page-top)]";
   const headerChromeClass =
-    "border-b border-white/6 bg-app-surface/68 shadow-[0_12px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl";
+    "border-b border-border-quiet bg-surface-chrome shadow-chrome backdrop-blur-xl";
   const overlayHeaderChromeClass = desktopOverlayHeader
     ? "bg-transparent"
     : headerChromeClass;
@@ -478,7 +478,7 @@ export function Shell() {
   const sidebarLeft = sidebarExpanded ? "left-52" : "left-14";
   if (isDesktop) {
     return (
-      <div className="flex min-h-screen bg-app-surface">
+      <div className="flex min-h-screen bg-surface-canvas">
         <Sidebar />
 
         <div
@@ -489,7 +489,7 @@ export function Shell() {
           {homeDesktopOverlay ? (
             <div
               aria-hidden="true"
-              className="listen-home-top-scrim pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/65 via-black/30 to-transparent"
+              className="listen-home-top-scrim pointer-events-none absolute inset-x-0 top-0 h-24"
             />
           ) : null}
           <div className="relative z-10">
@@ -518,7 +518,7 @@ export function Shell() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-app-surface">
+    <div className="flex min-h-screen flex-col bg-surface-canvas">
       <div
         data-testid="listen-header"
         data-home-overlay={String(homeMobileOverlay)}
@@ -590,8 +590,8 @@ export function Shell() {
             className={({ isActive }) =>
               `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1.5 transition-[color,filter,transform] active:scale-[0.97] ${
                 isActive
-                  ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-                  : "text-white/[0.42] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                  ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                  : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
               }`
             }
           >
@@ -607,8 +607,8 @@ export function Shell() {
           onClick={() => setCollectionSheetOpen(true)}
           className={`flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1.5 transition-[color,filter,transform] active:scale-[0.97] ${
             collectionActive
-              ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-              : "text-white/[0.42] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+              ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+              : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
           }`}
         >
           <Collection size={CRATE_ICON_SIZE.navMobile} />
@@ -624,8 +624,8 @@ export function Shell() {
             className={({ isActive }) =>
               `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1.5 transition-[color,filter,transform] active:scale-[0.97] ${
                 isActive
-                  ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-                  : "text-white/[0.42] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                  ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                  : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
               }`
             }
           >
@@ -646,7 +646,7 @@ export function Shell() {
           className="max-h-[calc(100%-5rem)] overflow-y-auto pb-3"
         >
           <div className="px-4 pb-2 pt-2">
-            <h2 className="text-base font-semibold text-foreground">
+            <h2 className="text-base font-semibold text-text-primary">
               {t("nav.collection")}
             </h2>
           </div>
@@ -664,7 +664,7 @@ export function Shell() {
               >
                 <Icon
                   size={CRATE_ICON_SIZE.md}
-                  className="text-white/55 transition-colors group-hover:text-primary"
+                  className="text-text-secondary transition-colors group-hover:text-accent-action"
                 />
                 <span className="text-sm font-semibold">{t(labelKey)}</span>
               </AppMenuButton>

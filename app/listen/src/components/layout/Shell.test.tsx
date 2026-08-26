@@ -158,6 +158,25 @@ describe("Shell", () => {
     );
   });
 
+  it("uses semantic tokens for desktop shell surfaces and navigation", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />, { route: "/stats" });
+
+    expect(screen.getByRole("complementary")).toHaveClass(
+      "border-border-quiet",
+      "bg-surface-canvas",
+    );
+    expect(screen.getByTestId("listen-header")).toHaveClass(
+      "border-border-quiet",
+      "bg-surface-chrome",
+      "shadow-chrome",
+    );
+    expect(screen.getByRole("link", { name: "Stats" })).toHaveClass(
+      "text-accent-action",
+    );
+  });
+
   it("overlays the mobile Home header on the hero", () => {
     const { container } = renderWithListenProviders(<Shell />, { route: "/" });
 

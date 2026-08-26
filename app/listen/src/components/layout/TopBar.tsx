@@ -20,7 +20,7 @@ export function TopBar({ hideMobileActions = false }: TopBarProps) {
       <div className="flex flex-shrink-0 items-center gap-2 pointer-events-auto">
         <button
           onClick={() => navigate(-1)}
-          className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/60 transition-colors hover:text-white md:h-10 md:w-10"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-secondary transition-colors hover:text-text-primary md:h-10 md:w-10"
           aria-label={backLabel}
           title={backLabel}
         >
@@ -31,7 +31,7 @@ export function TopBar({ hideMobileActions = false }: TopBarProps) {
         </button>
         <button
           onClick={() => navigate(1)}
-          className="hidden h-10 w-10 items-center justify-center text-white/60 transition-colors hover:text-white md:flex"
+          className="hidden h-10 w-10 items-center justify-center text-text-secondary transition-colors hover:text-text-primary md:flex"
           aria-label={forwardLabel}
           title={forwardLabel}
         >
