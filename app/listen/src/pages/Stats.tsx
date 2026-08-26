@@ -341,7 +341,7 @@ export function Stats() {
             <NarrativeTile key={item.title} index={index} {...item} />
           ))
         ) : (
-          <div className="rounded-[12px] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-muted-foreground lg:col-span-3">
+          <div className="stats-card-empty rounded-[12px] border-dashed p-6 text-sm lg:col-span-3">
             {t("stats.empty.recap")}
           </div>
         )}
@@ -384,7 +384,7 @@ export function Stats() {
       <TopAlbumsPanel items={topAlbumItems} loading={dashboardLoading} />
 
       {!dashboardLoading && !hasStats ? (
-        <div className="mt-8 rounded-[12px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+        <div className="stats-card-empty mt-8 rounded-[12px] border-dashed p-8 text-center">
           <h2 className="text-xl font-black text-foreground">
             {t("stats.empty.title")}
           </h2>
@@ -413,7 +413,7 @@ function ScopeLink({
         "rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] transition-colors",
         active
           ? "border-primary/30 bg-primary/15 text-primary"
-          : "border-white/10 bg-white/[0.04] text-white/55 hover:bg-white/[0.08] hover:text-white/80",
+          : "stats-scope-link-inactive",
       )}
     >
       {children}
@@ -435,7 +435,7 @@ function AffinityCard({
   const bandKey = `stats.affinity.band.${affinity.affinity_band}`;
   const bandFallback = affinity.affinity_band.replace("_", " ");
   return (
-    <section className="mt-8 overflow-hidden rounded-[12px] border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.13),rgba(255,255,255,0.035)_45%,rgba(244,114,182,0.1))] p-5 shadow-2xl shadow-black/20 sm:p-6">
+    <section className="stats-affinity-card mt-8 overflow-hidden rounded-[12px] p-5 sm:p-6">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/15 text-primary">
@@ -457,7 +457,7 @@ function AffinityCard({
             </p>
           </div>
         </div>
-        <div className="rounded-full border border-white/10 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/65">
+        <div className="stats-muted-pill rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.18em]">
           {t(bandKey, { defaultValue: bandFallback })}
         </div>
       </div>
@@ -466,7 +466,7 @@ function AffinityCard({
           {reasons.map((reason) => (
             <span
               key={reason}
-              className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-semibold text-white/70"
+              className="stats-muted-chip rounded-full px-3 py-1.5 text-xs font-semibold"
             >
               {reason}
             </span>
@@ -562,7 +562,7 @@ function StorySignalCard({
   body: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
+    <div className="stats-card relative overflow-hidden rounded-[12px] p-5">
       <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative">
         <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
@@ -615,7 +615,7 @@ function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
           <div
             key={index}
             className={cn(
-              "relative min-h-40 overflow-hidden bg-white/[0.04]",
+              "stats-mosaic-cell relative min-h-40 overflow-hidden",
               index % 3 === 0 && "scale-105",
             )}
           >
@@ -627,9 +627,9 @@ function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
                 loading={index < 4 ? "eager" : "lazy"}
               />
             ) : (
-              <div className="h-full w-full bg-[radial-gradient(circle_at_30%_30%,rgba(34,211,238,0.35),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0.02))]" />
+              <div className="stats-mosaic-placeholder h-full w-full" />
             )}
-            <div className="absolute inset-0 bg-black/35" />
+            <div className="stats-mosaic-overlay absolute inset-0" />
           </div>
         );
       })}
@@ -652,10 +652,10 @@ function ReplayCard({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-[12px] border border-primary/20 bg-primary/[0.08] p-5 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
+    <div className="stats-replay-card rounded-[12px] p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-black/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+          <div className="stats-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]">
             <Repeat2 size={12} />
             {t("stats.replay.title")}
           </div>
@@ -688,7 +688,7 @@ function ReplayCard({
 
       <div className="mt-5 space-y-2">
         {loading ? (
-          <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
             {t("stats.replay.loading")}
           </div>
         ) : items.length ? (
@@ -696,7 +696,7 @@ function ReplayCard({
             <button
               key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
               onClick={() => onPlayTrack(item)}
-              className="flex w-full items-center gap-3 rounded-lg border border-transparent bg-black/15 px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
+              className="stats-replay-row flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
             >
               <TrackCover item={item} size="sm" />
               <div className="min-w-0 flex-1">
@@ -711,7 +711,7 @@ function ReplayCard({
             </button>
           ))
         ) : (
-          <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
             {t("stats.replay.empty")}
           </div>
         )}
@@ -722,8 +722,8 @@ function ReplayCard({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3">
-      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/40">
+    <div className="stats-dark-card rounded-lg px-4 py-3">
+      <div className="stats-muted-label text-[10px] font-black uppercase tracking-[0.18em]">
         {label}
       </div>
       <div className="mt-1 text-lg font-black text-foreground">{value}</div>
@@ -743,7 +743,7 @@ function SignalCard({
   body: string;
 }) {
   return (
-    <div className="rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
+    <div className="stats-card rounded-[12px] p-5">
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
         <Icon size={13} />
         {label}
@@ -767,19 +767,19 @@ function NarrativeTile({
 }) {
   const { t } = useTranslation();
   const tones = [
-    "from-cyan-400/18 via-white/[0.035] to-transparent",
-    "from-rose-400/16 via-white/[0.035] to-transparent",
-    "from-amber-300/16 via-white/[0.035] to-transparent",
+    "stats-narrative-tone-cool",
+    "stats-narrative-tone-warm",
+    "stats-narrative-tone-alert",
   ];
 
   return (
     <div
       className={cn(
-        "rounded-[12px] border border-white/10 bg-gradient-to-br p-5",
+        "stats-narrative-tile rounded-[12px] p-5",
         tones[index % tones.length],
       )}
     >
-      <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">
+      <div className="stats-muted-label text-[10px] font-black uppercase tracking-[0.22em]">
         {t("stats.narrative.signal", {
           number: String(index + 1).padStart(2, "0"),
         })}
@@ -805,7 +805,7 @@ function SoundProfileCard({
   const genreLabels = normalizeGenreLabels(genres);
 
   return (
-    <div className="rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
+    <div className="stats-card rounded-[12px] p-5">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
@@ -894,7 +894,7 @@ function ListeningPulseCard({
   const rhythm = story?.rhythm;
 
   return (
-    <div className="rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
+    <div className="stats-card rounded-[12px] p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
@@ -932,7 +932,7 @@ function ListeningPulseCard({
 
           <PulseConstellation points={points} />
 
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="stats-dark-card mt-4 rounded-xl p-4">
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
               {t("stats.rhythm.cadence")}
             </div>
@@ -976,7 +976,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
     .join(" ");
 
   return (
-    <div className="mt-5 rounded-[12px] border border-white/10 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.18))] p-4">
+    <div className="stats-pulse-surface mt-5 rounded-[12px] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
@@ -986,13 +986,13 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
             {t("stats.rhythm.dailySignalDescription")}
           </p>
         </div>
-        <div className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
+        <div className="stats-muted-pill rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em]">
           {t("stats.rhythm.dayCount", { count: visible.length })}
         </div>
       </div>
 
-      <div className="relative h-36 rounded-xl border border-white/[0.06] bg-black/20">
-        <div className="pointer-events-none absolute inset-3 rounded-xl bg-[linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:28px_28px] opacity-50" />
+      <div className="stats-pulse-plot relative h-36 rounded-xl">
+        <div className="stats-pulse-grid pointer-events-none absolute inset-3 rounded-xl opacity-50" />
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full"
           viewBox="0 0 100 100"
@@ -1002,7 +1002,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
           <polyline
             points={polyline}
             fill="none"
-            stroke="rgba(34,211,238,0.34)"
+            className="stats-pulse-line"
             strokeWidth="1.8"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -1032,7 +1032,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                   "relative flex h-10 w-10 items-center justify-center rounded-full outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
                   isActive
                     ? "text-primary hover:scale-110"
-                    : "text-white/18 hover:text-white/35",
+                    : "stats-pulse-point-idle",
                 )}
                 aria-label={`${formatTrendDay(
                   point.day,
@@ -1045,7 +1045,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                 <span
                   className={cn(
                     "absolute rounded-full blur-md transition",
-                    isActive ? "bg-primary/25" : "bg-white/5",
+                    isActive ? "bg-primary/25" : "stats-pulse-point-idle-glow",
                   )}
                   style={{
                     height: `${size * 1.45}rem`,
@@ -1056,8 +1056,8 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                   className={cn(
                     "relative rounded-full border transition",
                     isActive
-                      ? "border-primary/55 bg-primary shadow-[0_0_28px_rgba(34,211,238,0.28)]"
-                      : "border-white/15 bg-white/10",
+                      ? "stats-pulse-point-active border-primary/55 bg-primary"
+                      : "stats-pulse-point-idle-dot",
                   )}
                   style={{ height: `${size}rem`, width: `${size}rem` }}
                 />
@@ -1065,7 +1065,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
 
               <div
                 className={cn(
-                  "pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-[12px] border border-white/10 bg-[#0d0f15]/95 p-3 text-left opacity-0 shadow-2xl shadow-black/45 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
+                  "stats-pulse-tooltip pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-[12px] p-3 text-left opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
                   index < 2
                     ? "left-0 translate-x-0"
                     : index > coordinates.length - 3
@@ -1075,7 +1075,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-black text-white">
+                    <div className="stats-pulse-tooltip-title text-sm font-black">
                       {formatTrendDay(point.day, i18n.language)}
                     </div>
                     <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
@@ -1129,11 +1129,11 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
 
 function TooltipMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
-      <div className="text-[9px] font-black uppercase tracking-[0.16em] text-white/35">
+    <div className="stats-tooltip-metric rounded-xl px-2.5 py-2">
+      <div className="stats-tooltip-label text-[9px] font-black uppercase tracking-[0.16em]">
         {label}
       </div>
-      <div className="mt-1 text-sm font-black text-white">{value}</div>
+      <div className="stats-tooltip-value mt-1 text-sm font-black">{value}</div>
     </div>
   );
 }
@@ -1142,11 +1142,11 @@ function TooltipMeter({ label, value }: { label: string; value: number }) {
   const percent = Math.max(0, Math.min(100, Math.round(value * 100)));
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.12em] text-white/42">
+      <div className="stats-tooltip-meter-label mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.12em]">
         <span>{label}</span>
         <span>{percent}%</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
+      <div className="stats-tooltip-meter-track h-1.5 overflow-hidden rounded-full">
         <div
           className="h-full rounded-full bg-primary"
           style={{ width: `${Math.max(3, percent)}%` }}
@@ -1161,14 +1161,14 @@ function ProfileBar({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-xs">
-        <span className="font-bold uppercase tracking-[0.16em] text-white/45">
+        <span className="stats-profile-label font-bold uppercase tracking-[0.16em]">
           {label}
         </span>
         <span className="font-black text-foreground">{percent}%</span>
       </div>
-      <div className="h-3 overflow-hidden rounded-full bg-white/[0.06]">
+      <div className="stats-profile-track h-3 overflow-hidden rounded-full">
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,#22d3ee,#eab308,#fb7185)]"
+          className="stats-profile-fill h-full rounded-full"
           style={{ width: `${Math.max(3, percent)}%` }}
         />
       </div>
@@ -1249,7 +1249,7 @@ function TopTracksPanel({
             <button
               key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
               onClick={() => onPlayTrack(item)}
-              className="group flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
+              className="stats-list-row group flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
             >
               <div className="w-7 text-center text-xs font-black text-muted-foreground">
                 {index + 1}
@@ -1336,7 +1336,7 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
         artistSlug: item.artist_slug,
         artistName: item.artist_name,
       })}
-      className="group relative min-h-40 overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-primary/35"
+      className="stats-artist-card group relative min-h-40 overflow-hidden rounded-xl p-4 transition"
     >
       {photo ? (
         <CrateImage
@@ -1346,10 +1346,10 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
           loading="lazy"
         />
       ) : (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_26%_18%,rgba(34,211,238,0.28),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))]" />
+        <div className="stats-artist-placeholder absolute inset-0" />
       )}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,7,12,0.92),rgba(3,7,12,0.46)_58%,rgba(3,7,12,0.78)),linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.78))]" />
-      <div className="absolute -bottom-6 -right-1 text-[8.5rem] font-black leading-none tracking-[-0.12em] text-white/[0.14]">
+      <div className="stats-artist-overlay absolute inset-0" />
+      <div className="stats-artist-index absolute -bottom-6 -right-1 text-[8.5rem] font-black leading-none tracking-[-0.12em]">
         {String(index + 1).padStart(2, "0")}
       </div>
       <div className="relative z-10 flex min-h-32 flex-col justify-between">
@@ -1357,10 +1357,10 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
           {t("stats.rank", { rank: index + 1 })}
         </div>
         <div>
-          <div className="line-clamp-2 text-3xl font-black uppercase leading-[0.86] tracking-[-0.08em] text-white">
+          <div className="stats-artist-title line-clamp-2 text-3xl font-black uppercase leading-[0.86] tracking-[-0.08em]">
             {item.artist_name}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/62">
+          <div className="stats-artist-meta mt-3 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.12em]">
             <span>{t("common.playCount", { count: item.play_count })}</span>
             <span>{formatStatsMinutes(item.minutes_listened)}</span>
           </div>
@@ -1402,7 +1402,7 @@ function TopAlbumsPanel({
               })}
               className="group min-w-0"
             >
-              <div className="relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
+              <div className="stats-album-cover relative aspect-square overflow-hidden rounded-xl">
                 {albumCoverApiUrl(
                   {
                     albumId: item.album_id,
@@ -1435,7 +1435,7 @@ function TopAlbumsPanel({
                     <Disc3 size={28} />
                   </div>
                 )}
-                <div className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-1 text-[10px] font-black text-white">
+                <div className="stats-album-rank absolute left-2 top-2 rounded-full px-2 py-1 text-[10px] font-black">
                   #{index + 1}
                 </div>
               </div>
@@ -1469,12 +1469,7 @@ function StatsPanel({
   className?: string;
 }) {
   return (
-    <section
-      className={cn(
-        "rounded-[12px] border border-white/10 bg-white/[0.035] p-5",
-        className,
-      )}
-    >
+    <section className={cn("stats-card rounded-[12px] p-5", className)}>
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
@@ -1509,7 +1504,7 @@ function TrackCover({
   return (
     <div
       className={cn(
-        "shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]",
+        "stats-track-cover shrink-0 overflow-hidden rounded-xl",
         size === "sm" ? "h-10 w-10" : "h-12 w-12",
       )}
     >
@@ -1532,7 +1527,7 @@ function TrackCover({
 function PanelLoading() {
   const { t } = useTranslation();
   return (
-    <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+    <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
       {t("common.loadingShort")}
     </div>
   );
@@ -1540,7 +1535,7 @@ function PanelLoading() {
 
 function PanelEmpty({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
+    <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
       {text}
     </div>
   );

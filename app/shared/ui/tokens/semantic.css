@@ -373,6 +373,201 @@
     var(--text-primary) 45%,
     transparent
   );
+  --stats-card-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --stats-card-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3.5%,
+    transparent
+  );
+  --stats-card-empty-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3%,
+    transparent
+  );
+  --stats-card-dark-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 20%,
+    transparent
+  );
+  --stats-card-muted-text: color-mix(
+    in srgb,
+    var(--text-primary) 45%,
+    transparent
+  );
+  --stats-card-strong-text: color-mix(
+    in srgb,
+    var(--text-primary) 70%,
+    transparent
+  );
+  --stats-card-hover-surface: color-mix(
+    in srgb,
+    var(--text-primary) 8%,
+    transparent
+  );
+  --stats-affinity-surface: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 13%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent) 45%,
+    color-mix(in srgb, var(--stats-secondary-accent) 10%, transparent)
+  );
+  --stats-affinity-shadow: 0 25px 50px -12px color-mix(in srgb, var(
+          --surface-canvas
+        )
+        20%, transparent);
+  --stats-replay-surface: color-mix(
+    in srgb,
+    var(--accent-action) 8%,
+    transparent
+  );
+  --stats-replay-shadow: 0 0 40px
+    color-mix(in srgb, var(--accent-action) 8%, transparent);
+  --stats-replay-row-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 15%,
+    transparent
+  );
+  --stats-mosaic-placeholder: radial-gradient(
+      circle at 30% 30%,
+      color-mix(in srgb, var(--accent-action) 35%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 12%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
+  --stats-mosaic-overlay: color-mix(
+    in srgb,
+    var(--surface-canvas) 35%,
+    transparent
+  );
+  --stats-narrative-cool: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 18%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+    transparent
+  );
+  --stats-narrative-warm: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--stats-secondary-accent) 16%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+    transparent
+  );
+  --stats-narrative-alert: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-warning) 16%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+    transparent
+  );
+  --stats-pulse-surface: radial-gradient(
+      circle at 18% 18%,
+      color-mix(in srgb, var(--accent-action) 16%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent)
+    );
+  --stats-pulse-plot-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 20%,
+    transparent
+  );
+  --stats-pulse-grid: linear-gradient(
+      color-mix(in srgb, var(--text-primary) 5.5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--text-primary) 3.5%, transparent) 1px,
+      transparent 1px
+    );
+  --stats-pulse-line: color-mix(in srgb, var(--accent-action) 34%, transparent);
+  --stats-pulse-idle-text: color-mix(
+    in srgb,
+    var(--text-primary) 18%,
+    transparent
+  );
+  --stats-pulse-idle-hover-text: color-mix(
+    in srgb,
+    var(--text-primary) 35%,
+    transparent
+  );
+  --stats-pulse-idle-glow: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --stats-pulse-idle-dot-border: color-mix(
+    in srgb,
+    var(--text-primary) 15%,
+    transparent
+  );
+  --stats-pulse-idle-dot-surface: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --stats-pulse-active-shadow: 0 0 28px
+    color-mix(in srgb, var(--accent-action) 28%, transparent);
+  --stats-pulse-tooltip-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 95%,
+    transparent
+  );
+  --stats-pulse-tooltip-shadow: 0 25px 50px -12px color-mix(in srgb, var(
+          --surface-canvas
+        )
+        45%, transparent);
+  --stats-tooltip-track: color-mix(
+    in srgb,
+    var(--text-primary) 8%,
+    transparent
+  );
+  --stats-profile-gradient: linear-gradient(
+    90deg,
+    var(--accent-action),
+    var(--state-warning),
+    var(--state-danger)
+  );
+  --stats-artist-surface: color-mix(
+    in srgb,
+    var(--text-primary) 4%,
+    transparent
+  );
+  --stats-artist-placeholder: radial-gradient(
+      circle at 26% 18%,
+      color-mix(in srgb, var(--accent-action) 28%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 10%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
+  --stats-artist-overlay: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-canvas) 92%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 46%, transparent) 58%,
+      color-mix(in srgb, var(--surface-canvas) 78%, transparent)
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-canvas) 8%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 78%, transparent)
+    );
+  --stats-artist-index: color-mix(
+    in srgb,
+    var(--text-primary) 14%,
+    transparent
+  );
+  --stats-artist-meta: color-mix(in srgb, var(--text-primary) 62%, transparent);
+  --stats-album-rank-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 60%,
+    transparent
+  );
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -816,4 +1011,211 @@
 
 .stats-hero-metric-value {
   color: var(--text-primary);
+}
+
+.stats-card {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-card-surface);
+}
+
+.stats-card-empty {
+  border-color: var(--stats-card-border);
+  background: var(--stats-card-empty-surface);
+  color: var(--text-muted);
+}
+
+.stats-dark-card {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-card-dark-surface);
+}
+
+.stats-muted-label,
+.stats-profile-label,
+.stats-tooltip-label,
+.stats-tooltip-meter-label {
+  color: var(--stats-card-muted-text);
+}
+
+.stats-muted-pill,
+.stats-muted-chip {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-card-dark-surface);
+  color: var(--stats-card-strong-text);
+}
+
+.stats-muted-chip {
+  background: color-mix(in srgb, var(--text-primary) 20%, transparent);
+}
+
+.stats-scope-link-inactive {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-card-empty-surface);
+  color: var(--stats-card-strong-text);
+}
+
+.stats-scope-link-inactive:hover {
+  background: var(--stats-card-hover-surface);
+  color: var(--text-primary);
+}
+
+.stats-affinity-card {
+  border: 1px solid color-mix(in srgb, var(--accent-action) 20%, transparent);
+  background: var(--stats-affinity-surface);
+  box-shadow: var(--stats-affinity-shadow);
+}
+
+.stats-mosaic-cell,
+.stats-track-cover,
+.stats-album-cover {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-card-empty-surface);
+}
+
+.stats-mosaic-placeholder {
+  background: var(--stats-mosaic-placeholder);
+}
+
+.stats-mosaic-overlay {
+  background: var(--stats-mosaic-overlay);
+}
+
+.stats-replay-card {
+  border: 1px solid color-mix(in srgb, var(--accent-action) 20%, transparent);
+  background: var(--stats-replay-surface);
+  box-shadow: var(--stats-replay-shadow);
+}
+
+.stats-replay-badge {
+  border: 1px solid color-mix(in srgb, var(--accent-action) 25%, transparent);
+  background: var(--stats-card-dark-surface);
+  color: var(--accent-action);
+}
+
+.stats-replay-row {
+  background: var(--stats-replay-row-surface);
+}
+
+.stats-replay-row:hover,
+.stats-list-row:hover {
+  border-color: var(--stats-card-border);
+  background: var(--stats-card-hover-surface);
+}
+
+.stats-narrative-tile {
+  border: 1px solid var(--stats-card-border);
+}
+
+.stats-narrative-tone-cool {
+  background: var(--stats-narrative-cool);
+}
+
+.stats-narrative-tone-warm {
+  background: var(--stats-narrative-warm);
+}
+
+.stats-narrative-tone-alert {
+  background: var(--stats-narrative-alert);
+}
+
+.stats-pulse-surface {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-pulse-surface);
+}
+
+.stats-pulse-plot {
+  border: 1px solid color-mix(in srgb, var(--text-primary) 6%, transparent);
+  background: var(--stats-pulse-plot-surface);
+}
+
+.stats-pulse-grid {
+  background-image: var(--stats-pulse-grid);
+  background-size: 28px 28px;
+}
+
+.stats-pulse-line {
+  stroke: var(--stats-pulse-line);
+}
+
+.stats-pulse-point-idle {
+  color: var(--stats-pulse-idle-text);
+}
+
+.stats-pulse-point-idle:hover {
+  color: var(--stats-pulse-idle-hover-text);
+}
+
+.stats-pulse-point-idle-glow {
+  background: var(--stats-pulse-idle-glow);
+}
+
+.stats-pulse-point-idle-dot {
+  border-color: var(--stats-pulse-idle-dot-border);
+  background: var(--stats-pulse-idle-dot-surface);
+}
+
+.stats-pulse-point-active {
+  box-shadow: var(--stats-pulse-active-shadow);
+}
+
+.stats-pulse-tooltip {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-pulse-tooltip-surface);
+  box-shadow: var(--stats-pulse-tooltip-shadow);
+}
+
+.stats-pulse-tooltip-title,
+.stats-tooltip-value {
+  color: var(--text-primary);
+}
+
+.stats-tooltip-metric {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-card-empty-surface);
+}
+
+.stats-tooltip-meter-track,
+.stats-profile-track {
+  background: var(--stats-tooltip-track);
+}
+
+.stats-profile-fill {
+  background: var(--stats-profile-gradient);
+}
+
+.stats-list-row {
+  border-color: transparent;
+}
+
+.stats-artist-card {
+  border: 1px solid var(--stats-card-border);
+  background: var(--stats-artist-surface);
+}
+
+.stats-artist-card:hover {
+  border-color: color-mix(in srgb, var(--accent-action) 35%, transparent);
+}
+
+.stats-artist-placeholder {
+  background: var(--stats-artist-placeholder);
+}
+
+.stats-artist-overlay {
+  background: var(--stats-artist-overlay);
+}
+
+.stats-artist-index {
+  color: var(--stats-artist-index);
+}
+
+.stats-artist-title,
+.stats-album-rank {
+  color: var(--text-primary);
+}
+
+.stats-artist-meta {
+  color: var(--stats-artist-meta);
+}
+
+.stats-album-rank {
+  background: var(--stats-album-rank-surface);
 }
