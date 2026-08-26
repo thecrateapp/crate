@@ -1119,6 +1119,102 @@
     var(--text-primary) 65%,
     transparent
   );
+
+  --jam-card-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --jam-card-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --jam-card-strong-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --jam-card-hover-border: color-mix(
+    in srgb,
+    var(--accent-action) 25%,
+    transparent
+  );
+  --jam-focus-border: color-mix(in srgb, var(--accent-action) 50%, transparent);
+  --jam-focus-ring: color-mix(in srgb, var(--accent-action) 20%, transparent);
+  --jam-input-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 20%,
+    transparent
+  );
+  --jam-input-focus-border: color-mix(
+    in srgb,
+    var(--accent-action) 40%,
+    transparent
+  );
+  --jam-chip-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --jam-accent-border: color-mix(
+    in srgb,
+    var(--accent-action) 20%,
+    transparent
+  );
+  --jam-accent-surface: color-mix(
+    in srgb,
+    var(--accent-action) 10%,
+    transparent
+  );
+  --jam-accent-soft-surface: color-mix(
+    in srgb,
+    var(--accent-action) 4%,
+    transparent
+  );
+  --jam-accent-text: color-mix(
+    in srgb,
+    var(--accent-action) 82%,
+    var(--text-primary)
+  );
+  --jam-warning-border: color-mix(
+    in srgb,
+    var(--state-warning) 20%,
+    transparent
+  );
+  --jam-warning-surface: color-mix(
+    in srgb,
+    var(--state-warning) 10%,
+    transparent
+  );
+  --jam-warning-text: color-mix(
+    in srgb,
+    var(--state-warning) 82%,
+    var(--text-primary)
+  );
+  --jam-danger-border: color-mix(in srgb, var(--state-danger) 20%, transparent);
+  --jam-danger-surface: color-mix(
+    in srgb,
+    var(--state-danger) 10%,
+    transparent
+  );
+  --jam-danger-text: color-mix(
+    in srgb,
+    var(--state-danger) 82%,
+    var(--text-primary)
+  );
+  --jam-success-border: color-mix(
+    in srgb,
+    var(--state-success) 25%,
+    transparent
+  );
+  --jam-success-surface: color-mix(
+    in srgb,
+    var(--state-success) 10%,
+    transparent
+  );
+  --jam-success-text: color-mix(
+    in srgb,
+    var(--state-success) 82%,
+    var(--text-primary)
+  );
+  --jam-info-border: color-mix(in srgb, var(--state-info) 20%, transparent);
+  --jam-info-surface: color-mix(in srgb, var(--state-info) 10%, transparent);
+  --jam-info-text: color-mix(
+    in srgb,
+    var(--state-info) 82%,
+    var(--text-primary)
+  );
+  --jam-muted-text: color-mix(in srgb, var(--text-primary) 70%, transparent);
+  --jam-subtle-text: color-mix(in srgb, var(--text-primary) 40%, transparent);
 }
 
 @theme inline {
@@ -1461,6 +1557,189 @@
 
 .home-upcoming-show-prep-reminder {
   color: var(--home-upcoming-prep-reminder-text);
+}
+
+.jam-lobby-header,
+.jam-panel {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-card-strong-surface);
+}
+
+.jam-panel-muted,
+.jam-card {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-card-surface);
+}
+
+.jam-card-interactive {
+  border: 1px solid var(--jam-card-border);
+  background: color-mix(in srgb, var(--surface-canvas) 15%, transparent);
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    background-color var(--motion-duration-fast) ease;
+}
+
+.jam-card-interactive:hover {
+  border-color: var(--jam-card-hover-border);
+  background: var(--jam-card-strong-surface);
+}
+
+.jam-card-interactive:focus-visible {
+  outline: none;
+  border-color: var(--jam-focus-border);
+  box-shadow: 0 0 0 2px var(--jam-focus-ring);
+}
+
+.jam-hero-action {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-card-surface);
+}
+
+.jam-hero-action:hover {
+  border-color: var(--jam-card-hover-border);
+  background: var(--jam-card-strong-surface);
+}
+
+.jam-secondary-action {
+  border: 1px solid color-mix(in srgb, var(--text-primary) 15%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.jam-secondary-action:hover {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+
+.jam-queue-item {
+  border: 1px solid var(--jam-card-border);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+}
+
+.jam-avatar {
+  border: 1px solid var(--jam-card-border);
+}
+
+.jam-avatar-fallback {
+  border: 1px solid var(--jam-card-border);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--jam-muted-text);
+}
+
+.jam-chip {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-chip-surface);
+}
+
+.jam-accent-chip,
+.jam-accent-control {
+  border-color: var(--jam-accent-border);
+  background: var(--jam-accent-surface);
+  color: var(--jam-accent-text);
+}
+
+.jam-accent-control:hover {
+  background: color-mix(in srgb, var(--accent-action) 15%, transparent);
+}
+
+.jam-warning-chip,
+.jam-warning-panel {
+  border-color: var(--jam-warning-border);
+  background: var(--jam-warning-surface);
+  color: var(--jam-warning-text);
+}
+
+.jam-danger-control,
+.jam-danger-panel {
+  border-color: var(--jam-danger-border);
+  background: var(--jam-danger-surface);
+  color: var(--jam-danger-text);
+}
+
+.jam-danger-control:hover {
+  background: color-mix(in srgb, var(--state-danger) 15%, transparent);
+}
+
+.jam-success-chip {
+  border-color: var(--jam-success-border);
+  background: var(--jam-success-surface);
+  color: var(--jam-success-text);
+}
+
+.jam-info-chip {
+  border-color: var(--jam-info-border);
+  background: var(--jam-info-surface);
+  color: var(--jam-info-text);
+}
+
+.jam-input,
+.jam-select-trigger {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-input-surface);
+}
+
+.jam-input:focus,
+.jam-select-trigger:focus {
+  border-color: var(--jam-input-focus-border);
+  outline: none;
+}
+
+.jam-tag-input {
+  border: 1px solid var(--jam-accent-border);
+  background: var(--jam-accent-soft-surface);
+}
+
+.jam-tag-input:focus-within {
+  border-color: var(--jam-input-focus-border);
+}
+
+.jam-taxonomy-options {
+  border: 1px solid var(--jam-card-border);
+  background: var(--surface-overlay);
+}
+
+.jam-taxonomy-option {
+  color: var(--text-primary);
+}
+
+.jam-taxonomy-option:hover,
+.jam-taxonomy-option[data-active="true"] {
+  background: var(--jam-accent-surface);
+  color: var(--jam-accent-text);
+}
+
+.jam-toggle-card {
+  border: 1px solid var(--jam-accent-border);
+  background: var(--jam-accent-soft-surface);
+}
+
+.jam-toggle-option {
+  border: 1px solid var(--jam-card-border);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+}
+
+.jam-toggle-option[data-active="true"] {
+  border-color: var(--jam-focus-border);
+  background: var(--jam-accent-surface);
+  color: var(--jam-accent-text);
+}
+
+.jam-empty-state {
+  border: 1px dashed var(--jam-card-border);
+}
+
+.jam-danger-text {
+  color: var(--jam-danger-text);
+}
+
+.jam-accent-text {
+  color: var(--jam-accent-text);
+}
+
+.jam-muted-text {
+  color: var(--jam-muted-text);
+}
+
+.jam-subtle-text {
+  color: var(--jam-subtle-text);
 }
 
 .info-tab-artwork {

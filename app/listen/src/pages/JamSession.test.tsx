@@ -237,7 +237,7 @@ async function openRoomActionsMenu() {
 describe("JamSession lobby (no roomId)", () => {
   it("renders the lobby heading, create form, and open rooms section", () => {
     mockUseApiData.value = makeRoomsResponse([]);
-    renderWithListenProviders(<JamSession />);
+    const { container } = renderWithListenProviders(<JamSession />);
 
     expect(
       screen.getByRole("heading", { name: "Jam sessions" }),
@@ -248,6 +248,8 @@ describe("JamSession lobby (no roomId)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Open rooms")).toBeInTheDocument();
     expect(screen.getByText("Join from invite")).toBeInTheDocument();
+    expect(container.querySelector(".jam-lobby-header")).toBeInTheDocument();
+    expect(container.querySelector(".jam-panel")).toBeInTheDocument();
   });
 
   it("localizes the lobby chrome", () => {
