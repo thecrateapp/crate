@@ -1321,6 +1321,53 @@ describe("FullscreenPlayer", () => {
         expect(screen.getByLabelText("Show album cover")).toBeInTheDocument();
       });
     });
+
+    it("uses semantic tokens for secondary player actions", async () => {
+      const track = makeTrack();
+      localStorage.setItem("listen-eq-enabled", "true");
+      const user = userEvent.setup();
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Like track")).toBeInTheDocument();
+      });
+
+      for (const button of [
+        screen.getByLabelText("Like track"),
+        screen.getByLabelText("Equalizer"),
+        screen.getByLabelText("Show album cover"),
+      ]) {
+        expect(button).toHaveClass(
+          "border-border-subtle",
+          "bg-surface-control",
+          "text-text-secondary",
+          "active:bg-surface-control-hover",
+          "active:text-text-primary",
+        );
+        expect(button.className).not.toContain("white/");
+      }
+
+      const equalizer = screen.getByLabelText("Equalizer");
+      await user.click(equalizer);
+      expect(equalizer).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+      );
+
+      expect(screen.getByTestId("player-track-menu")).toHaveClass(
+        "border-border-subtle",
+        "bg-surface-control",
+        "text-text-secondary",
+        "active:bg-surface-control-hover",
+        "active:text-text-primary",
+      );
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════

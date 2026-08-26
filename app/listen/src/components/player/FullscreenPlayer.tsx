@@ -868,12 +868,12 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   void toggleLikeWithFeedback();
                 }}
                 aria-label={liked ? "Unlike track" : "Like track"}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
               >
                 {liked ? (
                   <HeartBold
                     size={19}
-                    className="animate-crate-icon-active-pulse text-primary"
+                    className="animate-crate-icon-active-pulse text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                   />
                 ) : (
                   <Heart size={19} />
@@ -887,10 +887,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                     setShowEqualizer((v) => !v);
                   }}
                   aria-label={t("player.equalizer")}
-                  className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition-colors active:bg-white/8 ${
+                  className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control transition-colors active:bg-surface-control-hover ${
                     showEqualizer
-                      ? "text-primary"
-                      : "text-white/55 active:text-white"
+                      ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                      : "text-text-secondary active:text-text-primary"
                   }`}
                 >
                   <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
@@ -904,7 +904,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 title={
                   surfaceMode === "cd" ? "Show album cover" : "Show spinning CD"
                 }
-                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
               >
                 {surfaceMode === "cd" ? (
                   <Square size={CRATE_ICON_SIZE.lg} />
@@ -914,7 +914,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               </button>
               <PlayerTrackMenu
                 currentTrack={currentTrack}
-                className="h-12 w-12 rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
+                className="h-12 w-12 rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
               />
             </div>
           </div>
