@@ -269,6 +269,32 @@
     var(--surface-canvas) 70%,
     transparent
   );
+  --fullscreen-player-surface: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-elevated) 88%, var(--surface-canvas)) 0%,
+    var(--surface-canvas) 100%
+  );
+  --fullscreen-player-handle: color-mix(
+    in srgb,
+    var(--text-primary) 20%,
+    transparent
+  );
+  --fullscreen-player-artwork-placeholder: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --fullscreen-player-artwork-icon: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --fullscreen-player-artwork-shadow-color: color-mix(
+    in srgb,
+    var(--surface-canvas) 60%,
+    transparent
+  );
+  --fullscreen-player-artwork-shadow: 0 25px 50px -12px var(--fullscreen-player-artwork-shadow-color);
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -624,4 +650,29 @@
 
 .listen-player-fullscreen-scrim {
   background: var(--player-fullscreen-scrim);
+}
+
+.fullscreen-player-surface {
+  background: var(--fullscreen-player-surface);
+}
+
+.fullscreen-player-handle {
+  background: var(--fullscreen-player-handle);
+}
+
+.fullscreen-player-artwork,
+.fullscreen-player-artwork-placeholder {
+  box-shadow: var(--fullscreen-player-artwork-shadow);
+}
+
+.fullscreen-player-artwork-placeholder {
+  background: var(--fullscreen-player-artwork-placeholder);
+}
+
+.fullscreen-player-artwork-icon {
+  color: var(--fullscreen-player-artwork-icon);
+}
+
+.fullscreen-player-time {
+  color: var(--text-muted);
 }

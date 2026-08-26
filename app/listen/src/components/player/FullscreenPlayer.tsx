@@ -598,11 +598,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   return (
     <div
       ref={fsRootRef}
-      className={`fixed inset-0 z-fullscreen-player flex flex-col ease-out ${
+      className={`fullscreen-player-surface fixed inset-0 z-fullscreen-player flex flex-col ease-out ${
         animating ? "opacity-100" : "opacity-0 translate-y-full"
       }`}
       style={{
-        background: "linear-gradient(180deg, #1a2030 0%, #0a0a0f 100%)",
         minHeight: "var(--listen-viewport-height)",
         height: "var(--listen-viewport-height)",
         transform: swipeY > 0 ? `translateY(${swipeY}px)` : undefined,
@@ -618,7 +617,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         className="flex justify-center pb-1"
         style={{ paddingTop: "calc(var(--listen-safe-top) + 0.75rem)" }}
       >
-        <div className="w-10 h-1 rounded-full bg-white/20" />
+        <div className="fullscreen-player-handle h-1 w-10 rounded-full" />
       </div>
 
       {/* Header: close + panel switches */}
@@ -726,7 +725,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                         <CrateImage
                           src={crossfadeTransition.outgoing.albumCover}
                           alt=""
-                          className="absolute inset-0 h-full w-full object-cover shadow-2xl shadow-black/60"
+                          className="fullscreen-player-artwork absolute inset-0 h-full w-full object-cover"
                           style={{
                             opacity: 1 - crossfadeProgress,
                           }}
@@ -736,7 +735,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                         <CrateImage
                           src={crossfadeTransition.incoming.albumCover}
                           alt=""
-                          className="absolute inset-0 h-full w-full object-cover shadow-2xl shadow-black/60"
+                          className="fullscreen-player-artwork absolute inset-0 h-full w-full object-cover"
                           style={{
                             opacity: crossfadeProgress,
                           }}
@@ -747,11 +746,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                     <CrateImage
                       src={currentTrack.albumCover}
                       alt=""
-                      className="h-full w-full object-cover shadow-2xl shadow-black/60"
+                      className="fullscreen-player-artwork h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-white/5 shadow-2xl shadow-black/60">
-                      <ListMusic size={64} className="text-white/10" />
+                    <div className="fullscreen-player-artwork-placeholder flex h-full w-full items-center justify-center">
+                      <ListMusic
+                        size={64}
+                        className="fullscreen-player-artwork-icon"
+                      />
                     </div>
                   )}
                 </div>
@@ -774,7 +776,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               albumClassName="text-xs"
             />
             <div className="mx-auto mt-4 w-full max-w-[360px]">
-              <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium tabular-nums text-muted-foreground">
+              <div className="fullscreen-player-time mb-1.5 flex items-center justify-between text-[11px] font-medium tabular-nums">
                 <span>{formatPlayerTime(displayedTime)}</span>
                 <span>-{formatPlayerTime(remainingTime)}</span>
               </div>
@@ -824,14 +826,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 {isBuffering ? (
                   <Loader2
                     size={CRATE_ICON_SIZE.xl}
-                    className="animate-spin text-white"
+                    className="animate-spin text-accent-action"
                   />
                 ) : isPlaying ? (
-                  <Pause size={26} className="text-white" />
+                  <Pause size={26} className="text-text-primary" />
                 ) : (
                   <Play
                     size={26}
-                    className="ml-1 text-white"
+                    className="ml-1 text-text-primary"
                     fill="currentColor"
                   />
                 )}

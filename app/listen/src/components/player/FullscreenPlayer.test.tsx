@@ -334,6 +334,46 @@ describe("FullscreenPlayer", () => {
         expect(screen.getByLabelText("Play")).toBeInTheDocument();
       });
     });
+
+    it("uses semantic tokens for fullscreen static surfaces", async () => {
+      const track = makeTrack({ albumCover: undefined });
+      const user = userEvent.setup();
+      const { container } = renderWithListenProviders(
+        <FullscreenPlayer open onClose={vi.fn()} />,
+        {
+          playerActions: createMockPlayerActions({
+            currentTrack: track,
+            queue: [track],
+            currentIndex: 0,
+          }),
+        },
+      );
+
+      expect(
+        container.querySelector(".fullscreen-player-surface"),
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector(".fullscreen-player-handle"),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByLabelText("Show album cover"));
+
+      await waitFor(() => {
+        expect(
+          container.querySelector(".fullscreen-player-artwork-placeholder"),
+        ).toBeInTheDocument();
+        expect(
+          container.querySelector(".fullscreen-player-artwork-icon"),
+        ).toBeInTheDocument();
+      });
+
+      expect(container.innerHTML).not.toContain("bg-white/20");
+      expect(container.innerHTML).not.toContain("bg-white/5");
+      expect(container.innerHTML).not.toContain("text-white");
+      expect(container.innerHTML).not.toContain("shadow-black/60");
+      expect(container.innerHTML).not.toContain("text-muted-foreground");
+      expect(container.innerHTML).not.toContain("#1a2030");
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -1304,10 +1344,9 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        const dragHandle = document.querySelector(".w-10.h-1");
+        const dragHandle = document.querySelector(".fullscreen-player-handle");
         expect(dragHandle).toBeInTheDocument();
         expect(dragHandle?.className).toContain("rounded-full");
-        expect(dragHandle?.className).toContain("bg-white/20");
       });
     });
 
