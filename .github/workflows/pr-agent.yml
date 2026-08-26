@@ -28,3 +28,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEEPSEEK.KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.draft == false && 'true' || 'false' }}
+          github_action_config.auto_improve: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.draft == false && 'true' || 'false' }}
