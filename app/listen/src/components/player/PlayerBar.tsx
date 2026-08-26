@@ -114,7 +114,7 @@ function getStoredFsOpen(): boolean {
   }
 }
 
-function PlayerSurfaceFallback({
+export function PlayerSurfaceFallback({
   fullscreen = false,
 }: {
   fullscreen?: boolean;
@@ -128,10 +128,10 @@ function PlayerSurfaceFallback({
           bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
         }}
       >
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/75 px-3 py-2 text-[11px] text-white/70 shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <div className="listen-player-surface-fallback flex items-center gap-2 rounded-full px-3 py-2 text-[11px] backdrop-blur-xl">
           <Loader2
             size={CRATE_ICON_SIZE.sm}
-            className="animate-spin text-primary"
+            className="animate-spin text-accent-action"
           />
           {t("player.loading")}
         </div>
@@ -139,8 +139,8 @@ function PlayerSurfaceFallback({
     );
   }
   return (
-    <div className="fixed inset-0 z-fullscreen-player flex items-center justify-center bg-black/70 backdrop-blur-xl">
-      <Loader2 size={24} className="animate-spin text-primary" />
+    <div className="listen-player-fullscreen-scrim fixed inset-0 z-fullscreen-player flex items-center justify-center backdrop-blur-xl">
+      <Loader2 size={24} className="animate-spin text-accent-action" />
     </div>
   );
 }

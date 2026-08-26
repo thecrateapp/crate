@@ -252,6 +252,23 @@
   );
   --player-liked-shadow: 0 0 10px
     color-mix(in srgb, var(--accent-action) 48%, transparent);
+  --player-fallback-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 75%,
+    transparent
+  );
+  --player-fallback-text: color-mix(
+    in srgb,
+    var(--text-primary) 70%,
+    transparent
+  );
+  --player-fallback-shadow: 0 12px 32px
+    color-mix(in srgb, var(--surface-canvas) 35%, transparent);
+  --player-fullscreen-scrim: color-mix(
+    in srgb,
+    var(--surface-canvas) 70%,
+    transparent
+  );
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -596,4 +613,15 @@
   background: var(--player-liked-surface);
   color: var(--accent-action);
   box-shadow: var(--player-liked-shadow);
+}
+
+.listen-player-surface-fallback {
+  border: 1px solid var(--border-floating);
+  background: var(--player-fallback-surface);
+  color: var(--player-fallback-text);
+  box-shadow: var(--player-fallback-shadow);
+}
+
+.listen-player-fullscreen-scrim {
+  background: var(--player-fullscreen-scrim);
 }

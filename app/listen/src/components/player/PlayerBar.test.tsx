@@ -7,7 +7,7 @@ import {
 } from "@/test/render-with-listen-providers";
 import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
 
-import { PlayerBar } from "./PlayerBar";
+import { PlayerBar, PlayerSurfaceFallback } from "./PlayerBar";
 
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => false));
 const isLikedMock = vi.hoisted(() => vi.fn(() => false));
@@ -143,6 +143,28 @@ describe("PlayerBar mobile mini-player", () => {
 
     expect(screen.queryByLabelText("Like track")).toBeNull();
     expect(screen.queryByTestId("player-track-menu")).toBeNull();
+  });
+
+  it("uses semantic tokens for player surface fallbacks", () => {
+    const mobileFallback = renderWithListenProviders(<PlayerSurfaceFallback />);
+    const fullscreenFallback = renderWithListenProviders(
+      <PlayerSurfaceFallback fullscreen />,
+    );
+
+    expect(
+      mobileFallback.container.querySelector(".listen-player-surface-fallback"),
+    ).toBeInTheDocument();
+    expect(
+      fullscreenFallback.container.querySelector(
+        ".listen-player-fullscreen-scrim",
+      ),
+    ).toBeInTheDocument();
+    expect(mobileFallback.container.innerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
+    expect(fullscreenFallback.container.innerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
   });
 
   it("leaves the mobile dock glass to the shared Shell backdrop", () => {
