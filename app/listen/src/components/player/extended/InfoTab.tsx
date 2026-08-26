@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,8 +31,7 @@ import { cn, formatCompact } from "@/lib/utils";
 type PaletteTriplet = [number, number, number];
 
 function cssColor(color: PaletteTriplet, alpha = 1) {
-  const [r, g, b] = color.map((value) => Math.round(value * 255));
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return `color(srgb ${color.join(" ")} / ${alpha})`;
 }
 
 function MetricBar({
@@ -41,29 +46,23 @@ function MetricBar({
   if (value == null) return null;
 
   const percent = Math.max(0, Math.min(value, 1)) * 100;
-  const barTone =
-    tone === "accent"
-      ? "from-cyan-300 to-sky-400"
-      : tone === "warm"
-        ? "from-amber-300 to-orange-400"
-        : "from-primary to-cyan-300";
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/45">
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-text-muted">
           {label}
         </span>
-        <span className="text-[11px] font-medium tabular-nums text-white/65">
+        <span className="text-[11px] font-medium tabular-nums text-text-secondary">
           {Math.round(percent)}%
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/6">
+      <div className="info-tab-metric-track h-2 overflow-hidden rounded-full">
         <div
           className={cn(
-            "h-full rounded-full bg-gradient-to-r transition-[width]",
-            barTone,
+            "info-tab-metric-fill h-full rounded-full transition-[width]",
           )}
+          data-tone={tone}
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -81,15 +80,15 @@ function StatCard({
   helper?: string;
 }) {
   return (
-    <div className="rounded-lg border border-white/8 bg-white/[0.04] px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+    <div className="info-tab-stat-card rounded-lg px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-subtle">
         {label}
       </p>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-white">
+      <p className="mt-1 text-lg font-semibold tabular-nums text-text-primary">
         {value}
       </p>
       {helper ? (
-        <p className="mt-1 text-[11px] text-white/45">{helper}</p>
+        <p className="mt-1 text-[11px] text-text-muted">{helper}</p>
       ) : null}
     </div>
   );
@@ -107,17 +106,17 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-[12px] border border-white/8 bg-white/[0.04] shadow-[0_12px_48px_rgba(0,0,0,0.24)]">
-      <div className="flex items-start justify-between gap-4 border-b border-white/6 px-4 py-3">
+    <section className="info-tab-section-card overflow-hidden rounded-[12px]">
+      <div className="info-tab-section-header flex items-start justify-between gap-4 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/42">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
             {title}
           </p>
           {subtitle ? (
-            <p className="mt-1 text-[12px] text-white/45">{subtitle}</p>
+            <p className="mt-1 text-[12px] text-text-muted">{subtitle}</p>
           ) : null}
         </div>
-        <div className="rounded-full border border-white/8 bg-white/[0.05] p-2 text-white/55">
+        <div className="info-tab-section-icon rounded-full p-2 text-text-secondary">
           <Icon size={CRATE_ICON_SIZE.md} />
         </div>
       </div>
@@ -134,7 +133,9 @@ function StarRating({ rating }: { rating: number }) {
           key={score}
           size={CRATE_ICON_SIZE.sm}
           className={
-            score <= rating ? "fill-amber-400 text-amber-400" : "text-white/12"
+            score <= rating
+              ? "fill-state-warning text-state-warning"
+              : "text-text-faint"
           }
         />
       ))}
@@ -273,7 +274,7 @@ export function InfoTab({ className }: { className?: string }) {
           className,
         )}
       >
-        <Loader2 size={20} className="animate-spin text-primary" />
+        <Loader2 size={20} className="animate-spin text-accent-action" />
       </div>
     );
   }
@@ -282,7 +283,7 @@ export function InfoTab({ className }: { className?: string }) {
     return (
       <div
         className={cn(
-          "flex h-full min-h-0 flex-1 items-center justify-center text-sm text-white/20",
+          "flex h-full min-h-0 flex-1 items-center justify-center text-sm text-text-faint",
           className,
         )}
       >
@@ -311,25 +312,20 @@ export function InfoTab({ className }: { className?: string }) {
     >
       <div className="space-y-4 pb-2">
         <section
-          className="relative overflow-hidden rounded-[12px] border border-white/8 px-4 py-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:px-5"
-          style={{
-            background: `linear-gradient(180deg, ${cssColor(
-              primary,
-              0.2,
-            )} 0%, rgba(15,18,26,0.92) 38%, rgba(10,12,18,0.98) 100%)`,
-          }}
+          className="info-tab-hero relative overflow-hidden rounded-[12px] px-4 py-4 sm:px-5"
+          style={
+            {
+              "--info-tab-palette-primary": cssColor(primary),
+              "--info-tab-palette-secondary": cssColor(secondary),
+              "--info-tab-palette-accent": cssColor(accent),
+            } as CSSProperties
+          }
         >
-          <div
-            className="pointer-events-none absolute -top-16 -right-12 h-40 w-40 rounded-full blur-3xl"
-            style={{ background: cssColor(secondary, 0.3) }}
-          />
-          <div
-            className="pointer-events-none absolute -bottom-12 left-0 h-32 w-32 rounded-full blur-3xl"
-            style={{ background: cssColor(accent, 0.18) }}
-          />
+          <div className="info-tab-hero-secondary pointer-events-none absolute -top-16 -right-12 h-40 w-40 rounded-full blur-3xl" />
+          <div className="info-tab-hero-accent pointer-events-none absolute -bottom-12 left-0 h-32 w-32 rounded-full blur-3xl" />
 
           <div className="relative flex items-start gap-4">
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-[0_12px_30px_rgba(0,0,0,0.4)] sm:h-28 sm:w-28">
+            <div className="info-tab-artwork relative h-24 w-24 shrink-0 overflow-hidden rounded-xl sm:h-28 sm:w-28">
               {currentTrack.albumCover ? (
                 <CrateImage
                   src={currentTrack.albumCover}
@@ -343,17 +339,17 @@ export function InfoTab({ className }: { className?: string }) {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-white/25">
+                <div className="flex h-full w-full items-center justify-center text-text-muted">
                   <Music4 size={28} />
                 </div>
               )}
             </div>
 
             <div className="min-w-0 flex-1 pt-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">
                 {t("player.info.nowInspecting")}
               </p>
-              <h3 className="mt-1 text-xl font-semibold leading-tight text-white text-balance">
+              <h3 className="mt-1 text-xl font-semibold leading-tight text-text-primary text-balance">
                 {info.title || currentTrack.title}
               </h3>
 
@@ -380,14 +376,14 @@ export function InfoTab({ className }: { className?: string }) {
                             }),
                       )
                     }
-                    className="min-w-0 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-white/82 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    className="min-w-0 rounded-full border border-border-floating bg-surface-glass-highlight px-3 py-1 text-text-primary transition-colors hover:bg-surface-glass-hover-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
                   >
                     <span className="block truncate">
                       {info.artist || currentTrack.artist}
                     </span>
                   </button>
                 ) : (
-                  <span className="truncate text-white/75">
+                  <span className="truncate text-text-secondary">
                     {info.artist || currentTrack.artist}
                   </span>
                 )}
@@ -417,14 +413,14 @@ export function InfoTab({ className }: { className?: string }) {
                             }),
                       )
                     }
-                    className="min-w-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-white/52 transition-colors hover:bg-white/[0.08] hover:text-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                    className="min-w-0 rounded-full border border-border-floating bg-surface-glass-highlight px-3 py-1 text-text-secondary transition-colors hover:bg-surface-glass-hover-highlight hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
                   >
                     <span className="block truncate">
                       {info.album || currentTrack.album}
                     </span>
                   </button>
                 ) : info.album || currentTrack.album ? (
-                  <span className="truncate text-white/50">
+                  <span className="truncate text-text-muted">
                     {info.album || currentTrack.album}
                   </span>
                 ) : null}
@@ -435,7 +431,7 @@ export function InfoTab({ className }: { className?: string }) {
                   {audioSummary.map((item) => (
                     <span
                       key={item}
-                      className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-white/68"
+                      className="info-tab-audio-pill rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-text-secondary"
                     >
                       {item}
                     </span>
@@ -445,8 +441,8 @@ export function InfoTab({ className }: { className?: string }) {
             </div>
 
             {info.rating != null && info.rating > 0 ? (
-              <div className="hidden shrink-0 rounded-lg border border-white/10 bg-black/20 px-3 py-2 sm:block">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+              <div className="info-tab-rating-card hidden shrink-0 rounded-lg px-3 py-2 sm:block">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-subtle">
                   {t("player.info.rating")}
                 </p>
                 <div className="mt-2">
@@ -491,9 +487,9 @@ export function InfoTab({ className }: { className?: string }) {
           </div>
 
           {info.rating != null && info.rating > 0 ? (
-            <div className="relative mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 sm:hidden">
+            <div className="info-tab-rating-card relative mt-3 rounded-lg px-3 py-2 sm:hidden">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-subtle">
                   {t("player.info.rating")}
                 </p>
                 <StarRating rating={Math.round(info.rating)} />
@@ -530,7 +526,7 @@ export function InfoTab({ className }: { className?: string }) {
                 />
               </>
             ) : (
-              <p className="text-sm text-white/40">
+              <p className="text-sm text-text-muted">
                 {t("player.info.sections.audioProfile.empty")}
               </p>
             )}
@@ -551,7 +547,7 @@ export function InfoTab({ className }: { className?: string }) {
                   {topMoods.map((mood) => (
                     <span
                       key={mood.label}
-                      className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-cyan-200"
+                      className="info-tab-mood-pill rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em]"
                     >
                       {mood.label} {Math.round(mood.value * 100)}%
                     </span>
@@ -609,7 +605,7 @@ export function InfoTab({ className }: { className?: string }) {
                 />
               </>
             ) : (
-              <p className="text-sm text-white/40">
+              <p className="text-sm text-text-muted">
                 {t("player.info.sections.bliss.empty")}
               </p>
             )}
@@ -646,7 +642,7 @@ export function InfoTab({ className }: { className?: string }) {
             {!qualityPills.length &&
             info.loudness == null &&
             info.dynamic_range == null ? (
-              <p className="text-sm text-white/40">
+              <p className="text-sm text-text-muted">
                 {t("player.info.sections.source.empty")}
               </p>
             ) : null}
@@ -686,7 +682,7 @@ export function InfoTab({ className }: { className?: string }) {
             info.lastfm_playcount ||
             info.popularity
           ) ? (
-            <p className="text-sm text-white/40">
+            <p className="text-sm text-text-muted">
               {t("player.info.sections.reach.empty")}
             </p>
           ) : null}
@@ -695,33 +691,33 @@ export function InfoTab({ className }: { className?: string }) {
         {info.loudness != null || info.dynamic_range != null ? (
           <div className="grid gap-3 sm:grid-cols-2">
             {info.loudness != null ? (
-              <div className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3">
+              <div className="info-tab-quiet-card rounded-lg px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-subtle">
                       {t("player.info.metric.loudness")}
                     </p>
-                    <p className="mt-1 text-lg font-semibold tabular-nums text-white">
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-text-primary">
                       {info.loudness.toFixed(1)} dB
                     </p>
                   </div>
-                  <Gauge size={18} className="text-white/45" />
+                  <Gauge size={18} className="text-text-muted" />
                 </div>
               </div>
             ) : null}
 
             {info.dynamic_range != null ? (
-              <div className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3">
+              <div className="info-tab-quiet-card rounded-lg px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-subtle">
                       {t("player.info.metric.dynamicRange")}
                     </p>
-                    <p className="mt-1 text-lg font-semibold tabular-nums text-white">
+                    <p className="mt-1 text-lg font-semibold tabular-nums text-text-primary">
                       {info.dynamic_range.toFixed(1)} dB
                     </p>
                   </div>
-                  <Activity size={18} className="text-white/45" />
+                  <Activity size={18} className="text-text-muted" />
                 </div>
               </div>
             ) : null}

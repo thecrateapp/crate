@@ -191,6 +191,43 @@
   );
   --quality-hi-res-glow: 0 0 8px
     color-mix(in srgb, var(--state-warning) 15%, transparent);
+  --info-panel-surface: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  --info-panel-border: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --info-panel-divider: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  --info-panel-icon-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --info-panel-shadow: 0 12px 48px
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
+  --info-hero-shadow: 0 24px 80px
+    color-mix(in srgb, var(--surface-canvas) 28%, transparent);
+  --info-artwork-shadow: 0 12px 30px
+    color-mix(in srgb, var(--surface-canvas) 40%, transparent);
+  --info-metric-track: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  --info-metric-primary: linear-gradient(
+    90deg,
+    var(--accent-action),
+    var(--state-info)
+  );
+  --info-metric-accent: linear-gradient(
+    90deg,
+    var(--state-info),
+    var(--accent-action)
+  );
+  --info-metric-warm: linear-gradient(
+    90deg,
+    var(--state-warning),
+    var(--accent-danger)
+  );
+  --info-mood-border: color-mix(in srgb, var(--state-info) 20%, transparent);
+  --info-mood-surface: color-mix(in srgb, var(--state-info) 10%, transparent);
+  --info-mood-text: color-mix(
+    in srgb,
+    var(--state-info) 85%,
+    var(--text-primary)
+  );
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -426,4 +463,91 @@
   background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   color: color-mix(in srgb, var(--text-primary) 68%, transparent);
   box-shadow: none;
+}
+
+.info-tab-hero {
+  border: 1px solid var(--info-panel-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(
+        in srgb,
+        var(--info-tab-palette-primary, var(--accent-action)) 20%,
+        transparent
+      )
+      0%,
+    color-mix(in srgb, var(--surface-canvas) 92%, transparent) 38%,
+    var(--surface-canvas) 100%
+  );
+  box-shadow: var(--info-hero-shadow);
+}
+
+.info-tab-hero-secondary {
+  background: color-mix(
+    in srgb,
+    var(--info-tab-palette-secondary, var(--state-info)) 30%,
+    transparent
+  );
+}
+
+.info-tab-hero-accent {
+  background: color-mix(
+    in srgb,
+    var(--info-tab-palette-accent, var(--state-warning)) 18%,
+    transparent
+  );
+}
+
+.info-tab-artwork {
+  border: 1px solid var(--border-floating);
+  background: var(--surface-glass-highlight);
+  box-shadow: var(--info-artwork-shadow);
+}
+
+.info-tab-audio-pill {
+  border: 1px solid var(--border-floating);
+  background: color-mix(in srgb, var(--surface-canvas) 20%, transparent);
+}
+
+.info-tab-rating-card,
+.info-tab-quiet-card,
+.info-tab-stat-card {
+  border: 1px solid var(--info-panel-border);
+  background: var(--info-panel-surface);
+}
+
+.info-tab-section-card {
+  border: 1px solid var(--info-panel-border);
+  background: var(--info-panel-surface);
+  box-shadow: var(--info-panel-shadow);
+}
+
+.info-tab-section-header {
+  border-bottom: 1px solid var(--info-panel-divider);
+}
+
+.info-tab-section-icon {
+  border: 1px solid var(--info-panel-border);
+  background: var(--info-panel-icon-surface);
+}
+
+.info-tab-metric-track {
+  background: var(--info-metric-track);
+}
+
+.info-tab-metric-fill[data-tone="primary"] {
+  background: var(--info-metric-primary);
+}
+
+.info-tab-metric-fill[data-tone="accent"] {
+  background: var(--info-metric-accent);
+}
+
+.info-tab-metric-fill[data-tone="warm"] {
+  background: var(--info-metric-warm);
+}
+
+.info-tab-mood-pill {
+  border: 1px solid var(--info-mood-border);
+  background: var(--info-mood-surface);
+  color: var(--info-mood-text);
 }
