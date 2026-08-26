@@ -79,14 +79,10 @@ function QueueTabRow({
       className={`group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${
         locked
           ? "cursor-not-allowed opacity-55"
-          : "hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          : "hover:bg-surface-control focus-visible:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40"
       } ${faded && !locked ? "opacity-50" : ""}`}
     >
-      <span
-        className={`w-4 shrink-0 text-right text-[10px] tabular-nums ${
-          faded || locked ? "text-white/15" : "text-white/20"
-        }`}
-      >
+      <span className="w-4 shrink-0 text-right text-[10px] tabular-nums text-text-faint">
         {indexLabel}
       </span>
       {track.albumCover ? (
@@ -99,30 +95,24 @@ function QueueTabRow({
           }`}
         />
       ) : (
-        <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
+        <div className="h-8 w-8 shrink-0 rounded bg-surface-control-hover" />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p
             className={`min-w-0 flex-1 truncate text-[12px] ${
-              faded || locked ? "text-white/50" : "text-white/80"
+              faded || locked ? "text-text-secondary" : "text-text-primary"
             }`}
           >
             {track.title}
           </p>
           {track.isSuggested ? (
-            <span className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-primary">
+            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-accent-action">
               {t("player.queue.suggested")}
             </span>
           ) : null}
         </div>
-        <p
-          className={`truncate text-[10px] ${
-            faded || locked ? "text-white/40" : "text-muted-foreground"
-          }`}
-        >
-          {track.artist}
-        </p>
+        <p className="truncate text-[10px] text-text-muted">{track.artist}</p>
       </div>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
@@ -199,7 +189,7 @@ export function QueueTab() {
       {jamQueueLocked ? <JamQueueLockedNotice /> : null}
       {history.length > 0 && (
         <div className="mb-4">
-          <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
+          <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">
             {t("player.queue.history")}
           </p>
           {history.map((track, i) => {
@@ -221,12 +211,12 @@ export function QueueTab() {
       {currentTrack && (
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between px-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
               {t("player.queue.nowPlayingFrom", { source: sourceName })}
             </p>
             {queue.length > 0 && (
               <button
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-white/40 transition-colors hover:bg-white/5 hover:text-muted-foreground"
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-text-muted transition-colors hover:bg-surface-control hover:text-text-secondary"
                 onClick={() => void handleSaveAsPlaylist()}
                 title={t("player.queue.saveAsPlaylist")}
               >
@@ -235,8 +225,8 @@ export function QueueTab() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3 rounded-lg bg-white/5 px-2 py-1.5">
-            <span className="w-4 shrink-0 text-right text-[10px] tabular-nums text-primary">
+          <div className="flex items-center gap-3 rounded-lg bg-surface-control px-2 py-1.5">
+            <span className="w-4 shrink-0 text-right text-[10px] tabular-nums text-accent-action">
               {currentIndex + 1}
             </span>
             {currentTrack.albumCover ? (
@@ -247,28 +237,28 @@ export function QueueTab() {
                 className="h-8 w-8 shrink-0 rounded object-cover"
               />
             ) : (
-              <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
+              <div className="h-8 w-8 shrink-0 rounded bg-surface-control-hover" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-medium text-primary">
+              <p className="truncate text-[12px] font-medium text-accent-action">
                 {currentTrack.title}
               </p>
-              <p className="truncate text-[10px] text-muted-foreground">
+              <p className="truncate text-[10px] text-text-muted">
                 {currentTrack.artist}
               </p>
             </div>
             {isPlaying && (
               <div className="flex h-4 shrink-0 items-end gap-0.5">
                 <div
-                  className="equalizer-bar w-[3px] rounded-sm bg-primary"
+                  className="equalizer-bar w-[3px] rounded-sm bg-accent-action"
                   style={{ animationDelay: "0ms" }}
                 />
                 <div
-                  className="equalizer-bar w-[3px] rounded-sm bg-primary"
+                  className="equalizer-bar w-[3px] rounded-sm bg-accent-action"
                   style={{ animationDelay: "200ms" }}
                 />
                 <div
-                  className="equalizer-bar w-[3px] rounded-sm bg-primary"
+                  className="equalizer-bar w-[3px] rounded-sm bg-accent-action"
                   style={{ animationDelay: "400ms" }}
                 />
               </div>
@@ -279,7 +269,7 @@ export function QueueTab() {
 
       {upcoming.length > 0 && (
         <div>
-          <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
+          <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">
             {t("player.queue.nextUpFrom", {
               source: sourceName,
               count: upcoming.length,
@@ -304,7 +294,7 @@ export function QueueTab() {
       )}
 
       {upcoming.length === 0 && !currentTrack ? (
-        <div className="py-12 text-center text-sm text-white/20">
+        <div className="py-12 text-center text-sm text-text-faint">
           {t("player.queue.empty")}
         </div>
       ) : null}

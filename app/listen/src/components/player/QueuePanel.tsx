@@ -80,14 +80,10 @@ function QueuePanelRow({
       className={`group flex w-full items-center gap-3 px-4 py-2 text-left transition-colors ${
         locked
           ? "cursor-not-allowed opacity-55"
-          : "hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          : "hover:bg-surface-control focus-visible:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40"
       } ${faded && !locked ? "opacity-50" : ""}`}
     >
-      <span
-        className={`w-5 shrink-0 text-right text-[11px] tabular-nums ${
-          faded || locked ? "text-white/15" : "text-white/20"
-        }`}
-      >
+      <span className="w-5 shrink-0 text-right text-[11px] tabular-nums text-text-faint">
         {indexLabel}
       </span>
       {track.albumCover ? (
@@ -100,30 +96,24 @@ function QueuePanelRow({
           }`}
         />
       ) : (
-        <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
+        <div className="h-8 w-8 shrink-0 rounded bg-surface-control-hover" />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p
             className={`min-w-0 flex-1 truncate text-[12px] ${
-              faded || locked ? "text-white/50" : "text-white/80"
+              faded || locked ? "text-text-secondary" : "text-text-primary"
             }`}
           >
             {track.title}
           </p>
           {track.isSuggested ? (
-            <span className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-primary">
+            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-accent-action">
               Suggested
             </span>
           ) : null}
         </div>
-        <p
-          className={`truncate text-[10px] ${
-            faded || locked ? "text-white/40" : "text-muted-foreground"
-          }`}
-        >
-          {track.artist}
-        </p>
+        <p className="truncate text-[10px] text-text-muted">{track.artist}</p>
       </div>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
@@ -173,12 +163,14 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   const content = (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <h2 className="text-sm font-bold text-white">{t("player.queue")}</h2>
+      <div className="flex items-center justify-between border-b border-border-quiet px-4 py-3">
+        <h2 className="text-sm font-bold text-text-primary">
+          {t("player.queue")}
+        </h2>
         <button
           onClick={onClose}
           aria-label={t("player.queue.close")}
-          className="flex size-10 items-center justify-center text-white/40 transition-colors hover:text-white"
+          className="flex size-10 items-center justify-center text-text-muted transition-colors hover:text-text-primary"
         >
           <X size={CRATE_ICON_SIZE.xl} />
         </button>
@@ -188,8 +180,8 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
 
       {/* Now Playing */}
       {currentTrack && (
-        <div className="px-4 py-3 border-b border-white/5">
-          <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
+        <div className="border-b border-border-quiet px-4 py-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
             {t("player.queue.nowPlaying")}
           </p>
           <div className="flex items-center gap-3">
@@ -200,28 +192,28 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                 className="w-10 h-10 rounded object-cover shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded bg-white/10 shrink-0" />
+              <div className="h-10 w-10 shrink-0 rounded bg-surface-control-hover" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-primary truncate">
+              <p className="truncate text-[13px] font-medium text-accent-action">
                 {currentTrack.title}
               </p>
-              <p className="text-[11px] text-muted-foreground truncate">
+              <p className="truncate text-[11px] text-text-muted">
                 {currentTrack.artist}
               </p>
             </div>
             {isPlaying && (
               <div className="flex gap-0.5 items-end h-4">
                 <div
-                  className="w-[3px] bg-primary rounded-sm equalizer-bar"
+                  className="equalizer-bar w-[3px] rounded-sm bg-accent-action"
                   style={{ animationDelay: "0ms" }}
                 />
                 <div
-                  className="w-[3px] bg-primary rounded-sm equalizer-bar"
+                  className="equalizer-bar w-[3px] rounded-sm bg-accent-action"
                   style={{ animationDelay: "200ms" }}
                 />
                 <div
-                  className="w-[3px] bg-primary rounded-sm equalizer-bar"
+                  className="equalizer-bar w-[3px] rounded-sm bg-accent-action"
                   style={{ animationDelay: "400ms" }}
                 />
               </div>
@@ -234,7 +226,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
       <div className="flex-1 overflow-y-auto">
         {upcoming.length > 0 && (
           <div className="px-4 pt-3">
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
               {t("player.queue.nextUp", { count: upcoming.length })}
             </p>
           </div>
@@ -254,7 +246,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
         })}
 
         {upcoming.length === 0 && (
-          <div className="px-4 py-8 text-center text-white/20 text-sm">
+          <div className="px-4 py-8 text-center text-sm text-text-faint">
             {t("player.queue.empty")}
           </div>
         )}
@@ -263,7 +255,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
         {played.length > 0 && (
           <>
             <div className="px-4 pt-4">
-              <p className="text-[10px] font-bold text-white/20 uppercase tracking-wider mb-2">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-text-faint">
                 {t("player.queue.previous")}
               </p>
             </div>
@@ -292,7 +284,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   }
 
   return (
-    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-white/10">
+    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-border-floating">
       {content}
     </div>
   );

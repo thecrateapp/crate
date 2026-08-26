@@ -128,7 +128,7 @@ function FullscreenQueueRow({
         }
       }}
       onContextMenu={actionMenu.handleContextMenu}
-      className="flex items-center gap-3 w-full py-2 text-left active:bg-white/5 rounded-lg transition-colors focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="flex w-full items-center gap-3 rounded-lg py-2 text-left transition-colors active:bg-surface-control focus-visible:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40"
     >
       {track.albumCover ? (
         <CrateImage
@@ -138,20 +138,20 @@ function FullscreenQueueRow({
           className="w-8 h-8 rounded object-cover shrink-0"
         />
       ) : (
-        <div className="w-8 h-8 rounded bg-white/10 shrink-0" />
+        <div className="h-8 w-8 shrink-0 rounded bg-surface-control-hover" />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 truncate text-sm text-white">
+          <p className="min-w-0 flex-1 truncate text-sm text-text-primary">
             {track.title}
           </p>
           {track.isSuggested ? (
-            <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-cyan-300">
+            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-accent-action">
               Suggested
             </span>
           ) : null}
         </div>
-        <p className="text-xs text-white/40 truncate">{track.artist}</p>
+        <p className="truncate text-xs text-text-muted">{track.artist}</p>
       </div>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
@@ -928,13 +928,13 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
           style={{ paddingBottom: scrollTabBottomClearance }}
         >
           <div className="px-4 py-3">
-            <p className="text-xs text-white/40 uppercase tracking-wider font-medium mb-2">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-text-muted">
               {t("player.queue.upNextTracks", {
                 count: upcomingTracks.length,
               })}
             </p>
             {upcomingTracks.length === 0 && (
-              <p className="text-sm text-white/20 py-2">
+              <p className="py-2 text-sm text-text-faint">
                 {t("player.queue.nothingQueued")}
               </p>
             )}

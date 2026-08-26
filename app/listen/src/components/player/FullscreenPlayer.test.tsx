@@ -1147,6 +1147,37 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Queue One"));
       expect(actions.jumpTo).toHaveBeenCalledWith(1);
     });
+
+    it("uses semantic tokens for queue rows", async () => {
+      const track = makeTrack();
+      const qTrack = makeQueueTrack({ title: "Queue One" }, 0);
+      const user = userEvent.setup();
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track, qTrack],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Queue")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Queue"));
+
+      const queueRow = await screen.findByText("Queue One");
+      const row = queueRow.closest('[role="button"]');
+
+      expect(row).toHaveClass(
+        "active:bg-surface-control",
+        "focus-visible:bg-surface-control",
+        "focus-visible:ring-focus-ring/40",
+      );
+      expect(queueRow).toHaveClass("text-text-primary");
+      expect(row?.className).not.toContain("white/");
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
