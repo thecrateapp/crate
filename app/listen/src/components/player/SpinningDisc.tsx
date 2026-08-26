@@ -379,11 +379,11 @@ export function SpinningDisc({
         disabled && "pointer-events-none grayscale opacity-60",
       )}
     >
-      <div className="absolute inset-[7%] rounded-full bg-primary/12 blur-3xl opacity-80" />
+      <div className="spinning-disc-ambient absolute inset-[7%] rounded-full blur-3xl opacity-80" />
       <div
         ref={discRef}
         className={cn(
-          "relative aspect-square w-full rounded-full border border-white/12 bg-[radial-gradient(circle_at_50%_40%,rgba(255,255,255,0.14),rgba(255,255,255,0.02)_26%,rgba(0,0,0,0.88)_68%,rgba(0,0,0,1))] shadow-[0_32px_90px_rgba(0,0,0,0.6),0_12px_32px_rgba(0,0,0,0.42)]",
+          "spinning-disc-surface relative aspect-square w-full rounded-full",
           jogEnabled && onSeek
             ? "cursor-grab touch-none active:cursor-grabbing"
             : "",
@@ -398,7 +398,7 @@ export function SpinningDisc({
         <div
           ref={rotorRef}
           className={cn(
-            "absolute inset-[5.5%] overflow-hidden rounded-full border border-white/10 bg-black/90 transition-transform duration-150",
+            "spinning-disc-rotor absolute inset-[5.5%] overflow-hidden rounded-full transition-transform duration-150",
             isJogging ? "" : "will-change-transform",
           )}
           style={{
@@ -430,31 +430,31 @@ export function SpinningDisc({
               className="absolute inset-0 h-full w-full object-cover"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/5">
-              <Disc3 size={88} className="text-white/12" />
+            <div className="spinning-disc-placeholder absolute inset-0 flex items-center justify-center">
+              <Disc3 size={88} className="spinning-disc-placeholder-icon" />
             </div>
           )}
         </div>
 
-        <div className="pointer-events-none absolute inset-[2%] rounded-full border border-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" />
+        <div className="spinning-disc-overlay pointer-events-none absolute inset-[2%] rounded-full" />
 
         <button
           type="button"
           onClick={onTogglePlay}
           disabled={disabled}
           onPointerDown={(event) => event.stopPropagation()}
-          className="absolute left-1/2 top-1/2 z-10 flex h-[26%] w-[26%] min-h-[72px] min-w-[72px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/14 bg-[radial-gradient(circle,rgba(15,23,42,0.96),rgba(2,6,12,0.98))] text-white shadow-[0_14px_34px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97]"
+          className="spinning-disc-control absolute left-1/2 top-1/2 z-10 flex h-[26%] w-[26%] min-h-[72px] min-w-[72px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-xl transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97]"
           aria-label={isPlaying ? "Pause" : "Play"}
         >
-          <span className="absolute inset-[10%] rounded-full border border-primary/18" />
+          <span className="spinning-disc-control-ring absolute inset-[10%] rounded-full" />
           {isBuffering ? (
-            <Loader2 size={22} className="animate-spin text-primary" />
+            <Loader2 size={22} className="animate-spin text-accent-action" />
           ) : isPlaying ? (
-            <Pause size={22} className="text-white" />
+            <Pause size={22} className="text-text-primary" />
           ) : (
             <Play
               size={22}
-              className="translate-x-[2px] fill-white text-white"
+              className="translate-x-[2px] fill-text-primary text-text-primary"
             />
           )}
         </button>

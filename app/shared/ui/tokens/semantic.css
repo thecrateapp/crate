@@ -142,6 +142,53 @@
     inset 0 -10px 24px var(--surface-glass-shadow);
   --play-button-icon-shadow: 0 0 4px
     color-mix(in srgb, var(--text-primary) 35%, transparent);
+  --disc-ambient-glow: color-mix(
+    in srgb,
+    var(--accent-action) 12%,
+    transparent
+  );
+  --disc-surface: radial-gradient(
+    circle at 50% 40%,
+    color-mix(in srgb, var(--text-primary) 14%, transparent),
+    color-mix(in srgb, var(--text-primary) 2%, transparent) 26%,
+    color-mix(in srgb, var(--surface-canvas) 88%, transparent) 68%,
+    var(--surface-canvas)
+  );
+  --disc-shadow: 0 32px 90px
+      color-mix(in srgb, var(--surface-canvas) 75%, transparent),
+    0 12px 32px color-mix(in srgb, var(--surface-canvas) 52%, transparent);
+  --disc-rotor-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --disc-overlay-border: color-mix(
+    in srgb,
+    var(--text-primary) 8%,
+    transparent
+  );
+  --disc-overlay-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --disc-placeholder: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --disc-placeholder-icon: color-mix(
+    in srgb,
+    var(--text-primary) 12%,
+    transparent
+  );
+  --disc-control-surface: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--surface-elevated) 96%, var(--state-info)),
+    color-mix(in srgb, var(--surface-canvas) 98%, var(--surface-elevated))
+  );
+  --disc-control-border: color-mix(
+    in srgb,
+    var(--text-primary) 14%,
+    transparent
+  );
+  --disc-control-shadow: 0 14px 34px
+      color-mix(in srgb, var(--surface-canvas) 65%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --disc-control-ring: color-mix(
+    in srgb,
+    var(--accent-action) 18%,
+    transparent
+  );
 
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
@@ -327,4 +374,43 @@
 .spectrum-play-button-icon {
   color: var(--text-primary);
   filter: drop-shadow(var(--play-button-icon-shadow));
+}
+
+.spinning-disc-ambient {
+  background: var(--disc-ambient-glow);
+}
+
+.spinning-disc-surface {
+  border: 1px solid var(--border-floating);
+  background: var(--disc-surface);
+  box-shadow: var(--disc-shadow);
+}
+
+.spinning-disc-rotor {
+  border: 1px solid var(--disc-rotor-border);
+  background: var(--surface-canvas);
+}
+
+.spinning-disc-overlay {
+  border: 1px solid var(--disc-overlay-border);
+  box-shadow: var(--disc-overlay-shadow);
+}
+
+.spinning-disc-placeholder {
+  background: var(--disc-placeholder);
+}
+
+.spinning-disc-placeholder-icon {
+  color: var(--disc-placeholder-icon);
+}
+
+.spinning-disc-control {
+  border: 1px solid var(--disc-control-border);
+  background: var(--disc-control-surface);
+  color: var(--text-primary);
+  box-shadow: var(--disc-control-shadow);
+}
+
+.spinning-disc-control-ring {
+  border: 1px solid var(--disc-control-ring);
 }
