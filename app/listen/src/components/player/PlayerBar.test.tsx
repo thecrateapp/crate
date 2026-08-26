@@ -192,6 +192,61 @@ describe("PlayerBar mobile mini-player", () => {
     expect(progress?.innerHTML).not.toContain("rgba(");
   });
 
+  it("uses semantic tokens for desktop transport controls", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Transport",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    for (const label of [
+      "Enable shuffle",
+      "Previous track",
+      "Next track",
+      "Repeat: off",
+    ]) {
+      const buttons = screen.getAllByRole("button", { name: label });
+
+      for (const button of buttons) {
+        expect(button.className).toContain("text-text-");
+        expect(button.className).toContain("hover:text-accent-action");
+        expect(button.className).toContain(
+          "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+        );
+        expect(button.className).not.toContain("text-white/");
+        expect(button.className).not.toContain("rgba(");
+      }
+    }
+  });
+
+  it("uses the accent token for active shuffle and repeat states", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Active Transport",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack: track,
+        queue: [track],
+        shuffle: true,
+        repeat: "one",
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "Disable shuffle" })).toHaveClass(
+      "text-accent-action",
+    );
+    expect(screen.getByRole("button", { name: "Repeat: one" })).toHaveClass(
+      "text-accent-action",
+    );
+  });
+
   it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
     useIsDesktopMock.mockReturnValue(true);
     localStorage.setItem("listen-eq-enabled", "true");

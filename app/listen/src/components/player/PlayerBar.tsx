@@ -1387,8 +1387,8 @@ export function PlayerBar() {
                     }
                     className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       shuffle
-                        ? "text-primary"
-                        : "text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+                        ? "text-accent-action"
+                        : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                     }`}
                   >
                     <Shuffle size={CRATE_ICON_SIZE.md} />
@@ -1397,7 +1397,7 @@ export function PlayerBar() {
                     onClick={handlePreviousTrack}
                     disabled={jamQueueLocked}
                     aria-label={t("player.previous")}
-                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-white/50"
+                    className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
                   >
                     <SkipBack size={CRATE_ICON_SIZE.lg} fill="currentColor" />
                   </button>
@@ -1427,7 +1427,7 @@ export function PlayerBar() {
                     onClick={handleNextTrack}
                     disabled={jamTransportDisabled}
                     aria-label={t("player.next")}
-                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-white/50"
+                    className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
                   >
                     <SkipForward
                       size={CRATE_ICON_SIZE.lg}
@@ -1440,8 +1440,8 @@ export function PlayerBar() {
                     aria-label={t("player.repeat", { mode: repeat })}
                     className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       repeat !== "off"
-                        ? "text-primary"
-                        : "text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+                        ? "text-accent-action"
+                        : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                     }`}
                   >
                     {repeat === "one" ? (
@@ -1556,7 +1556,7 @@ export function PlayerBar() {
                 onClick={handleNextTrack}
                 disabled={jamTransportDisabled}
                 aria-label={t("player.next")}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center text-white/50 transition-[color,filter,transform] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] active:scale-[0.96] active:text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:text-white/50 disabled:active:scale-100"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center text-text-secondary transition-[color,filter,transform] hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] active:scale-[0.96] active:text-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:text-text-secondary disabled:active:scale-100"
               >
                 <SkipForward
                   size={CRATE_ICON_SIZE.navMobile}
