@@ -64,6 +64,35 @@
   --surface-control-hover: var(--hover-bg-strong);
   --surface-icon-control: rgba(0, 0, 0, 0.55);
 
+  --lyrics-ambient-glow: radial-gradient(
+    circle at top,
+    color-mix(in srgb, var(--accent-action) 22%, transparent) 0%,
+    transparent 72%
+  );
+  --lyrics-surface-gradient: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-action) 12%, transparent) 0%,
+    transparent 28%,
+    transparent 72%,
+    color-mix(in srgb, var(--accent-action) 6%, transparent) 100%
+  );
+  --lyrics-fullscreen-backdrop: radial-gradient(
+      circle at 18% 20%,
+      color-mix(in srgb, var(--accent-action) 20%, transparent),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 84% 56%,
+      color-mix(in srgb, var(--state-info) 24%, transparent),
+      transparent 44%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 22%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 86%, transparent)
+    );
+  --lyrics-active-text-shadow: 0 0 20px var(--accent-action-glow);
+
   --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
     90deg,
@@ -201,4 +230,20 @@
   --shadow-icon-control: var(--icon-control-shadow);
   --shadow-chrome: var(--chrome-shadow);
   --shadow-menu: var(--menu-shadow);
+}
+
+.lyrics-ambient-glow {
+  background: var(--lyrics-ambient-glow);
+}
+
+.lyrics-surface-gradient {
+  background: var(--lyrics-surface-gradient);
+}
+
+.lyrics-fullscreen-backdrop {
+  background: var(--lyrics-fullscreen-backdrop);
+}
+
+.lyrics-active-line {
+  text-shadow: var(--lyrics-active-text-shadow);
 }

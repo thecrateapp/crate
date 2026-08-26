@@ -93,14 +93,14 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 size={20} className="animate-spin text-primary" />
+        <Loader2 size={20} className="animate-spin text-accent-action" />
       </div>
     );
   }
 
   if (!lyrics?.synced && !lyrics?.plain) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-white/20">
+      <div className="flex flex-1 items-center justify-center text-sm text-text-faint">
         {t("player.lyrics.empty")}
       </div>
     );
@@ -109,11 +109,7 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
   return (
     <div
       ref={containerRef}
-      className="lyrics-mask relative flex-1 overflow-y-auto pr-1"
-      style={{
-        background:
-          "linear-gradient(180deg, rgba(6,182,212,0.12) 0%, transparent 28%, transparent 72%, rgba(6,182,212,0.06) 100%)",
-      }}
+      className="lyrics-mask lyrics-surface-gradient relative flex-1 overflow-y-auto pr-1"
     >
       {lyrics?.synced ? (
         <div
@@ -130,18 +126,11 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
                 onClick={() => seek(line.time)}
                 className={`relative z-20 w-full rounded-md px-2 py-1 text-left transition-all duration-500 ${
                   isActive
-                    ? "bg-primary/10 text-[17px] font-semibold text-primary"
+                    ? "lyrics-active-line bg-accent-action/10 text-[17px] font-semibold text-accent-action"
                     : isPast
-                      ? "text-[14px] text-white/25"
-                      : "text-[14px] text-white/50"
+                      ? "text-[14px] text-text-faint"
+                      : "text-[14px] text-text-secondary"
                 }`}
-                style={
-                  isActive
-                    ? {
-                        textShadow: "0 0 20px rgba(6,182,212,0.28)",
-                      }
-                    : undefined
-                }
               >
                 {line.text}
               </button>
@@ -151,7 +140,7 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
       ) : null}
 
       {!lyrics?.synced && lyrics?.plain ? (
-        <pre className="whitespace-pre-wrap py-2 font-sans text-[14px] leading-relaxed text-muted-foreground">
+        <pre className="whitespace-pre-wrap py-2 font-sans text-[14px] leading-relaxed text-text-muted">
           {lyrics.plain}
         </pre>
       ) : null}

@@ -177,6 +177,37 @@ describe("Shell", () => {
     );
   });
 
+  it("keeps the discovery-active brand label on the accent token", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />, {
+      playerState: { isPlaying: true },
+      playerActions: {
+        currentTrack: {
+          id: "discovery-track",
+          title: "Discovery track",
+          artist: "Crate",
+        },
+        playSource: {
+          type: "radio",
+          name: "Discovery Radio",
+          radio: { seedType: "discovery" },
+        },
+      },
+    });
+
+    expect(screen.getByText("Crate")).toHaveClass("text-accent-action");
+    expect(screen.getByText("Crate")).not.toHaveClass("text-text-primary");
+  });
+
+  it("keeps the inactive brand label on the primary text token", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />);
+
+    expect(screen.getByText("Crate")).toHaveClass("text-text-primary");
+  });
+
   it("overlays the mobile Home header on the hero", () => {
     const { container } = renderWithListenProviders(<Shell />, { route: "/" });
 

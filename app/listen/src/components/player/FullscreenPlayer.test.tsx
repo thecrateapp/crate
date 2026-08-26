@@ -1280,8 +1280,10 @@ describe("FullscreenPlayer", () => {
       expect(activeLine).toHaveClass(
         "text-[1.9rem]",
         "font-extrabold",
-        "text-white",
+        "text-text-primary",
+        "lyrics-active-line",
       );
+      expect(activeLine.className).not.toContain("rgba(");
       expect(nextLine).toHaveClass("text-[1.55rem]");
       expect(nextLine.className).toContain("blur-[0.35px]");
     });

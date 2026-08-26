@@ -146,7 +146,11 @@ function Sidebar() {
               />
             </div>
             <span
-              className="text-sm font-bold flex-1 text-text-primary transition-[color,text-shadow] duration-300"
+              className={`text-sm font-bold flex-1 transition-[color,text-shadow] duration-300 ${
+                discoveryRadioActive
+                  ? "text-accent-action"
+                  : "text-text-primary"
+              }`}
               style={{
                 textShadow: discoveryRadioActive
                   ? `0 0 ${

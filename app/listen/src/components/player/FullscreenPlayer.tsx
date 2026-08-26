@@ -961,10 +961,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         >
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(34,211,238,0.2),transparent_32%),radial-gradient(circle_at_84%_56%,rgba(37,99,235,0.24),transparent_44%),linear-gradient(180deg,rgba(12,18,34,0.22),rgba(4,6,12,0.86))] opacity-70"
+            className="lyrics-fullscreen-backdrop pointer-events-none absolute inset-0 opacity-70"
           />
           {!lyrics ? (
-            <p className="relative z-10 mt-20 text-center text-sm text-white/40">
+            <p className="relative z-10 mt-20 text-center text-sm text-text-muted">
               {t("player.lyrics.loading")}
             </p>
           ) : lyrics.synced ? (
@@ -984,10 +984,10 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                     className={cn(
                       "w-full rounded-xl px-1 py-1 text-left font-extrabold tracking-normal transition-[color,filter,opacity,transform] duration-500",
                       active
-                        ? "text-[1.9rem] leading-[1.08] text-white opacity-100 drop-shadow-[0_0_20px_rgba(255,255,255,0.16)]"
+                        ? "lyrics-active-line text-[1.9rem] leading-[1.08] text-text-primary opacity-100"
                         : past
-                          ? "text-[1.55rem] leading-[1.12] text-white/18 opacity-75 blur-[0.7px]"
-                          : "text-[1.55rem] leading-[1.12] text-white/30 opacity-85 blur-[0.35px]",
+                          ? "text-[1.55rem] leading-[1.12] text-text-faint opacity-75 blur-[0.7px]"
+                          : "text-[1.55rem] leading-[1.12] text-text-subtle opacity-85 blur-[0.35px]",
                     )}
                   >
                     {line.text || "♪"}
@@ -996,11 +996,11 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               })}
             </div>
           ) : lyrics.plain ? (
-            <pre className="relative z-10 mx-auto max-w-[560px] whitespace-pre-wrap py-8 text-left text-[1.45rem] font-extrabold leading-[1.16] text-white/82">
+            <pre className="relative z-10 mx-auto max-w-[560px] whitespace-pre-wrap py-8 text-left text-[1.45rem] font-extrabold leading-[1.16] text-text-primary">
               {lyrics.plain}
             </pre>
           ) : (
-            <p className="relative z-10 mt-20 text-center text-sm text-white/40">
+            <p className="relative z-10 mt-20 text-center text-sm text-text-muted">
               {t("player.lyrics.unavailable")}
             </p>
           )}
