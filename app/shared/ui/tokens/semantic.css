@@ -667,6 +667,127 @@
   --menu-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   --scrim-hero-strong: rgba(0, 0, 0, 0.65);
   --scrim-hero-medium: rgba(0, 0, 0, 0.3);
+
+  --track-row-hover-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --track-row-active-surface: color-mix(
+    in srgb,
+    var(--accent-action) 10%,
+    transparent
+  );
+  --track-row-selected-surface: color-mix(
+    in srgb,
+    var(--accent-action) 12%,
+    transparent
+  );
+  --track-row-selected-border: color-mix(
+    in srgb,
+    var(--accent-action) 30%,
+    transparent
+  );
+  --track-row-disabled-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --track-row-disabled-text: color-mix(
+    in srgb,
+    var(--text-primary) 45%,
+    transparent
+  );
+  --track-row-cover-active-overlay: color-mix(
+    in srgb,
+    var(--surface-canvas) 40%,
+    transparent
+  );
+  --track-row-cover-hover-overlay: color-mix(
+    in srgb,
+    var(--surface-canvas) 45%,
+    transparent
+  );
+  --track-row-offline-ready: color-mix(
+    in srgb,
+    var(--state-info) 75%,
+    transparent
+  );
+  --track-row-offline-busy: color-mix(
+    in srgb,
+    var(--accent-action) 80%,
+    transparent
+  );
+  --track-row-offline-error: color-mix(
+    in srgb,
+    var(--state-warning) 80%,
+    transparent
+  );
+  --track-row-progress-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 62%,
+    transparent
+  );
+  --track-row-progress-shadow: 0 8px 22px
+      color-mix(in srgb, var(--surface-canvas) 40%, transparent),
+    0 0 12px var(--accent-action-glow-soft),
+    inset 0 1px 0 var(--surface-glass-highlight);
+  --track-row-progress-aura: radial-gradient(
+      ellipse 58% 46% at 46% 57%,
+      var(--accent-action-glow-strong) 0%,
+      var(--accent-action-glow-medium) 24%,
+      var(--accent-action-glow-soft) 42%,
+      transparent 64%
+    ),
+    radial-gradient(
+      ellipse 38% 32% at 68% 34%,
+      color-mix(in srgb, var(--text-primary) 22%, transparent) 0%,
+      color-mix(in srgb, var(--text-primary) 9%, transparent) 34%,
+      transparent 66%
+    ),
+    radial-gradient(
+      ellipse 34% 42% at 30% 66%,
+      color-mix(in srgb, var(--state-info) 25%, transparent) 0%,
+      color-mix(in srgb, var(--state-info) 9%, transparent) 38%,
+      transparent 68%
+    );
+  --track-row-progress-rim: radial-gradient(
+    circle at 48% 42%,
+    color-mix(in srgb, var(--text-primary) 18%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 16%, transparent) 28%,
+    color-mix(in srgb, var(--state-info) 8%, transparent) 54%,
+    transparent 74%
+  );
+  --track-row-progress-core: var(--surface-elevated);
+  --track-row-progress-core-shadow: inset 0 0 0 1px var(--surface-glass-border),
+    inset 0 -10px 24px var(--surface-glass-shadow);
+  --track-row-progress-track: color-mix(
+    in srgb,
+    var(--text-primary) 12%,
+    transparent
+  );
+  --track-row-progress-ring-start: color-mix(
+    in srgb,
+    var(--text-primary) 98%,
+    var(--accent-action)
+  );
+  --track-row-progress-ring-mid: color-mix(
+    in srgb,
+    var(--accent-action) 96%,
+    var(--text-primary)
+  );
+  --track-row-progress-ring-end: color-mix(
+    in srgb,
+    var(--accent-action) 72%,
+    var(--state-info)
+  );
+  --track-row-progress-ring-filter: drop-shadow(
+      0 0 5px var(--accent-action-glow-strong)
+    )
+    drop-shadow(0 0 12px var(--accent-action-glow-medium));
+  --track-row-progress-icon-shadow: drop-shadow(
+    0 0 4px color-mix(in srgb, var(--text-primary) 35%, transparent)
+  );
 }
 
 @theme inline {
@@ -927,6 +1048,113 @@
 
 .fullscreen-player-surface {
   background: var(--fullscreen-player-surface);
+}
+
+.track-row {
+  cursor: pointer;
+}
+
+.track-row:not([data-active="true"]):not([data-selected="true"]):not(
+    [data-disabled="true"]
+  ):hover {
+  background: var(--track-row-hover-surface);
+}
+
+.track-row[data-active="true"] {
+  background: var(--track-row-active-surface);
+}
+
+.track-row[data-selected="true"] {
+  background: var(--track-row-selected-surface);
+  box-shadow: 0 0 0 1px var(--track-row-selected-border);
+}
+
+.track-row[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.track-row-cover-overlay {
+  background: transparent;
+}
+
+.track-row[data-active="true"] .track-row-cover-overlay {
+  background: var(--track-row-cover-active-overlay);
+}
+
+.track-row:not([data-active="true"]):not([data-disabled="true"]):hover
+  .track-row-cover-overlay {
+  background: var(--track-row-cover-hover-overlay);
+}
+
+.track-row-cover-play-icon {
+  color: var(--text-primary);
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) ease;
+}
+
+.track-row:hover .track-row-cover-play-icon {
+  opacity: 1;
+}
+
+.track-row-disabled-badge {
+  border: 1px solid var(--track-row-disabled-border);
+  color: var(--track-row-disabled-text);
+}
+
+.track-row-offline-ready {
+  color: var(--track-row-offline-ready);
+}
+
+.track-row-offline-busy {
+  color: var(--track-row-offline-busy);
+}
+
+.track-row-offline-error {
+  color: var(--track-row-offline-error);
+}
+
+.track-row-playback-progress {
+  background: var(--track-row-progress-surface);
+  box-shadow: var(--track-row-progress-shadow);
+  color: var(--text-primary);
+}
+
+.track-row-playback-aura {
+  background: var(--track-row-progress-aura);
+}
+
+.track-row-playback-rim {
+  background: var(--track-row-progress-rim);
+}
+
+.track-row-playback-core {
+  background: var(--track-row-progress-core);
+  box-shadow: var(--track-row-progress-core-shadow);
+}
+
+.track-row-playback-gradient-start {
+  stop-color: var(--track-row-progress-ring-start);
+}
+
+.track-row-playback-gradient-mid {
+  stop-color: var(--track-row-progress-ring-mid);
+}
+
+.track-row-playback-gradient-end {
+  stop-color: var(--track-row-progress-ring-end);
+}
+
+.track-row-playback-track {
+  stroke: var(--track-row-progress-track);
+}
+
+.track-row-playback-ring {
+  filter: var(--track-row-progress-ring-filter);
+}
+
+.track-row-playback-icon {
+  filter: var(--track-row-progress-icon-shadow);
 }
 
 .fullscreen-player-handle {

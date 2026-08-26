@@ -126,27 +126,27 @@ function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
 
   return (
     <span
-      className="group/track-progress relative isolate flex h-10 w-10 items-center justify-center overflow-visible rounded-full bg-black/62 text-white shadow-[0_8px_22px_rgba(0,0,0,0.4),0_0_12px_rgba(34,211,238,0.2),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md"
+      className="group/track-progress track-row-playback-progress relative isolate flex h-10 w-10 items-center justify-center overflow-visible rounded-full backdrop-blur-md"
       data-testid="track-row-playback-progress"
     >
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute -inset-[13px] z-0 origin-[46%_57%] rounded-[45%_55%_49%_51%/53%_47%_56%_44%] bg-[radial-gradient(ellipse_58%_46%_at_46%_57%,rgba(34,211,238,0.38)_0%,rgba(34,211,238,0.22)_24%,rgba(34,211,238,0.09)_42%,transparent_64%),radial-gradient(ellipse_38%_32%_at_68%_34%,rgba(165,243,252,0.22)_0%,rgba(165,243,252,0.09)_34%,transparent_66%),radial-gradient(ellipse_34%_42%_at_30%_66%,rgba(8,145,178,0.25)_0%,rgba(8,145,178,0.09)_38%,transparent_68%)] opacity-[0.64] blur-[1px]",
+          "track-row-playback-aura pointer-events-none absolute -inset-[13px] z-0 origin-[46%_57%] rounded-[45%_55%_49%_51%/53%_47%_56%_44%] opacity-[0.64] blur-[1px]",
           isPlaying && "animate-crate-play-aura-pulse",
         )}
       />
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-[4px] z-10 rounded-full bg-[radial-gradient(circle_at_48%_42%,rgba(207,250,254,0.18)_0%,rgba(34,211,238,0.16)_28%,rgba(6,182,212,0.08)_54%,transparent_74%)] opacity-70",
+          "track-row-playback-rim pointer-events-none absolute inset-[4px] z-10 rounded-full opacity-70",
           isPlaying && "animate-crate-play-rim-pulse",
         )}
       />
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-[2px] z-20 rounded-full bg-[#121326] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08),inset_0_-10px_24px_rgba(0,0,0,0.48)]",
+          "track-row-playback-core pointer-events-none absolute inset-[2px] z-20 rounded-full",
           isPlaying && "animate-crate-play-core-pulse",
         )}
       />
@@ -157,9 +157,9 @@ function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="rgba(207,250,254,0.98)" />
-            <stop offset="48%" stopColor="rgba(34,211,238,0.96)" />
-            <stop offset="100%" stopColor="rgba(6,182,212,0.72)" />
+            <stop offset="0%" className="track-row-playback-gradient-start" />
+            <stop offset="48%" className="track-row-playback-gradient-mid" />
+            <stop offset="100%" className="track-row-playback-gradient-end" />
           </linearGradient>
         </defs>
         <circle
@@ -167,7 +167,7 @@ function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(255,255,255,0.12)"
+          className="track-row-playback-track"
           strokeWidth={stroke}
         />
         <circle
@@ -180,23 +180,19 @@ function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
           strokeDashoffset={circumference * (1 - progress)}
           strokeLinecap="round"
           strokeWidth={stroke}
-          className="transition-[stroke-dashoffset] duration-300 ease-linear"
-          style={{
-            filter:
-              "drop-shadow(0 0 5px rgba(34,211,238,0.84)) drop-shadow(0 0 12px rgba(6,182,212,0.42))",
-          }}
+          className="track-row-playback-ring transition-[stroke-dashoffset] duration-300 ease-linear"
         />
       </svg>
       {isPlaying ? (
         <Pause
           size={CRATE_ICON_SIZE.sm}
-          className="relative z-40 drop-shadow-[0_0_4px_rgba(255,255,255,0.35)]"
+          className="track-row-playback-icon relative z-40"
           fill="currentColor"
         />
       ) : (
         <Play
           size={CRATE_ICON_SIZE.sm}
-          className="relative z-40 ml-0.5 drop-shadow-[0_0_4px_rgba(255,255,255,0.35)]"
+          className="track-row-playback-icon relative z-40 ml-0.5"
           fill="currentColor"
         />
       )}
@@ -353,15 +349,11 @@ export const TrackRow = memo(function TrackRow({
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors cursor-pointer",
-        disabled
-          ? "cursor-not-allowed opacity-55"
-          : selected
-            ? "bg-primary/12 ring-1 ring-primary/30"
-            : isActive
-              ? "bg-primary/10"
-              : "hover:bg-white/5",
+        "group track-row flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors",
       )}
+      data-active={isActive}
+      data-disabled={disabled}
+      data-selected={selected}
       aria-selected={selectable ? selected : undefined}
       onContextMenu={(event) => {
         if (disabled) return;
@@ -389,7 +381,7 @@ export const TrackRow = memo(function TrackRow({
       {showCoverThumb ? (
         <button
           type="button"
-          className="relative h-12 w-12 flex-shrink-0 rounded-md border-0 bg-transparent p-0 text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:cursor-not-allowed"
+          className="relative h-12 w-12 flex-shrink-0 rounded-md border-0 bg-transparent p-0 text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/45 disabled:cursor-not-allowed"
           aria-label={playControlLabel}
           title={playControlLabel}
           disabled={disabled}
@@ -400,21 +392,13 @@ export const TrackRow = memo(function TrackRow({
             iconSize={CRATE_ICON_SIZE.md}
             className="absolute inset-0 rounded-md"
           />
-          <div
-            className={`absolute inset-0 flex items-center justify-center rounded-md transition-colors ${
-              isActive ? "bg-black/40" : "bg-black/0 group-hover:bg-black/45"
-            }`}
-          >
+          <div className="track-row-cover-overlay absolute inset-0 flex items-center justify-center rounded-md transition-colors">
             {disabled ? null : isActive ? (
               <TrackRowPlaybackProgress isPlaying={isPlaying} />
             ) : (
               <Play
                 size={CRATE_ICON_SIZE.md}
-                className={`text-white transition-opacity ${
-                  isActive
-                    ? "opacity-100"
-                    : "opacity-0 md:group-hover:opacity-100"
-                }`}
+                className="track-row-cover-play-icon"
                 fill="currentColor"
               />
             )}
@@ -423,26 +407,26 @@ export const TrackRow = memo(function TrackRow({
       ) : (
         <button
           type="button"
-          className="flex w-10 flex-shrink-0 justify-center rounded-full border-0 bg-transparent p-0 text-center text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:cursor-not-allowed"
+          className="flex w-10 flex-shrink-0 justify-center rounded-full border-0 bg-transparent p-0 text-center text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/45 disabled:cursor-not-allowed"
           aria-label={playControlLabel}
           title={playControlLabel}
           disabled={disabled}
           onClick={handlePlayControlClick}
         >
           {disabled ? (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-text-muted text-xs">
               {index != null ? index : track.track_number || "-"}
             </span>
           ) : isActive ? (
             <TrackRowPlaybackProgress isPlaying={isPlaying} />
           ) : (
             <>
-              <span className="text-xs text-muted-foreground md:group-hover:hidden">
+              <span className="text-text-muted text-xs md:group-hover:hidden">
                 {index != null ? index : track.track_number || "-"}
               </span>
               <Play
                 size={CRATE_ICON_SIZE.sm}
-                className="text-foreground mx-auto hidden md:group-hover:block"
+                className="text-text-primary mx-auto hidden md:group-hover:block"
               />
             </>
           )}
@@ -454,7 +438,7 @@ export const TrackRow = memo(function TrackRow({
         <div className="flex min-w-0 items-center gap-2">
           <div
             className={`min-w-0 truncate text-sm ${
-              isActive ? "text-primary font-medium" : "text-foreground"
+              isActive ? "text-accent-action font-medium" : "text-text-primary"
             }`}
           >
             {track.title || "Unknown"}
@@ -468,17 +452,17 @@ export const TrackRow = memo(function TrackRow({
             />
           ) : null}
           {disabled ? (
-            <span className="flex-shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-white/45">
+            <span className="track-row-disabled-badge flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
               Soon
             </span>
           ) : null}
         </div>
         {(showArtist || showAlbum || offlineLabel) && (
-          <div className="text-xs text-muted-foreground truncate">
+          <div className="text-text-muted truncate text-xs">
             {showArtist &&
               (globalArtistUid || track.artist_id ? (
                 <span
-                  className="hover:text-foreground hover:underline transition-colors cursor-pointer"
+                  className="text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(
@@ -507,7 +491,7 @@ export const TrackRow = memo(function TrackRow({
             {showAlbum &&
               (globalAlbumUid || track.album_id ? (
                 <span
-                  className="hover:text-foreground hover:underline transition-colors cursor-pointer"
+                  className="text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(
@@ -540,11 +524,11 @@ export const TrackRow = memo(function TrackRow({
               <span
                 className={cn(
                   offlineState === "ready"
-                    ? "text-cyan-300/75"
+                    ? "track-row-offline-ready"
                     : isOfflineBusy(offlineState)
-                      ? "text-primary/80"
+                      ? "track-row-offline-busy"
                       : offlineState === "error"
-                        ? "text-amber-300/80"
+                        ? "track-row-offline-error"
                         : undefined,
                 )}
               >
@@ -557,7 +541,7 @@ export const TrackRow = memo(function TrackRow({
 
       {/* Duration */}
       {track.duration != null && track.duration > 0 && (
-        <span className="text-xs text-muted-foreground flex-shrink-0 tabular-nums">
+        <span className="text-text-muted flex-shrink-0 text-xs tabular-nums">
           {formatDuration(track.duration)}
         </span>
       )}
