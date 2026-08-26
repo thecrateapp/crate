@@ -167,6 +167,43 @@ textarea {
   );
 }
 
+.listen-player-progress-track {
+  background: var(--control-track);
+}
+
+.listen-player-progress-glow {
+  background: var(--control-progress-glow-horizontal);
+}
+
+.listen-player-progress-glow--vertical {
+  background: var(--control-progress-glow-vertical);
+}
+
+.listen-player-progress-fill {
+  background: var(--control-progress-fill-horizontal);
+}
+
+.listen-player-progress-fill--vertical {
+  background: var(--control-progress-fill-vertical);
+}
+
+.listen-player-progress-thumb {
+  background: var(--control-thumb);
+  box-shadow: var(--control-thumb-shadow);
+}
+
+.listen-player-progress-thumb-active {
+  border-color: color-mix(in srgb, var(--accent-action) 80%, transparent);
+  background: var(--control-thumb);
+  box-shadow: var(--control-thumb-ring-shadow);
+}
+
+.listen-player-progress-tooltip {
+  border-color: var(--border-floating);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+}
+
 .listen-search-glass {
   --surface-glass-accent: color-mix(
     in srgb,

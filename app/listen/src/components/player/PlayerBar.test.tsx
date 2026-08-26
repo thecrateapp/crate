@@ -172,6 +172,26 @@ describe("PlayerBar mobile mini-player", () => {
     expect(container.querySelector(".listen-mobile-player-glass")).toBeNull();
   });
 
+  it("uses semantic tokens for the desktop progress control", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Progress",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    const progress = container.querySelector(".listen-player-progress");
+
+    expect(progress).toBeInTheDocument();
+    expect(
+      progress?.querySelector(".listen-player-progress-track"),
+    ).toBeInTheDocument();
+    expect(progress?.innerHTML).not.toContain("rgba(");
+  });
+
   it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
     useIsDesktopMock.mockReturnValue(true);
     localStorage.setItem("listen-eq-enabled", "true");

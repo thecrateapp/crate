@@ -120,7 +120,7 @@ export function PlayerVolumeControl({
         aria-label={
           volume === 0 ? t("player.volume.unmute") : t("player.volume.label")
         }
-        className="rounded-md p-1.5 text-white/30 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+        className="rounded-md p-1.5 text-text-muted transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
       >
         <span ref={volumeIconRef} className="block">
           {volume === 0 ? (
@@ -149,7 +149,7 @@ export function PlayerVolumeControl({
                 aria-valuemax={100}
                 aria-valuenow={Math.round(volumePct)}
                 tabIndex={0}
-                className="relative mx-auto h-28 w-6 cursor-pointer touch-none outline-none"
+                className="listen-player-progress relative mx-auto h-28 w-6 cursor-pointer touch-none outline-none"
                 onWheel={handleWheel}
                 onPointerDown={(event) => {
                   event.preventDefault();
@@ -179,20 +179,20 @@ export function PlayerVolumeControl({
                   }
                 }}
               >
-                <div className="absolute bottom-0 left-1/2 h-full w-[3px] -translate-x-1/2 rounded-full bg-white/10" />
+                <div className="listen-player-progress-track absolute bottom-0 left-1/2 h-full w-[3px] -translate-x-1/2 rounded-full" />
                 <div
                   className="pointer-events-none absolute bottom-0 left-1/2 w-3 -translate-x-1/2 overflow-hidden rounded-full opacity-65 transition-[height] duration-150"
                   style={{ height: `${volumePct}%` }}
                 >
-                  <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(6,182,212,0)_0%,rgba(6,182,212,0.08)_38%,rgba(34,211,238,0.28)_78%,rgba(165,243,252,0.55)_100%)] blur-[3px]" />
-                  <div className="absolute inset-x-[4px] inset-y-0 rounded-full bg-[linear-gradient(0deg,rgba(6,182,212,0.14),rgba(34,211,238,0.56),rgba(207,250,254,0.78))]" />
+                  <div className="listen-player-progress-glow--vertical absolute inset-0 blur-[3px]" />
+                  <div className="listen-player-progress-fill--vertical absolute inset-x-[4px] inset-y-0 rounded-full" />
                 </div>
                 <div
-                  className="absolute bottom-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-[linear-gradient(0deg,rgba(6,182,212,0.14),rgba(34,211,238,0.56),rgba(207,250,254,0.78))] transition-[height] duration-150"
+                  className="listen-player-progress-fill--vertical absolute bottom-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full transition-[height] duration-150"
                   style={{ height: `${volumePct}%` }}
                 />
                 <div
-                  className="pointer-events-none absolute left-1/2 h-2 w-2 -translate-x-1/2 translate-y-1/2 rounded-full bg-cyan-100 shadow-[0_0_6px_rgba(165,243,252,0.62),0_0_12px_rgba(34,211,238,0.34)] transition-[bottom,opacity] duration-150"
+                  className="listen-player-progress-thumb pointer-events-none absolute left-1/2 h-2 w-2 -translate-x-1/2 translate-y-1/2 rounded-full transition-[bottom,opacity] duration-150"
                   style={{
                     bottom: `${volumePct}%`,
                     opacity: volumePct > 0 ? 0.72 : 0.45,

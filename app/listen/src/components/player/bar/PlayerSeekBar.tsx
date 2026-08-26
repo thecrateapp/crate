@@ -47,8 +47,8 @@ export function PlayerSeekBar({
 
   const sliderStyle = useMemo(
     () => ({
-      accentColor: "#06b6d4",
-      background: `linear-gradient(90deg, rgba(6,182,212,0.95) 0%, rgba(6,182,212,0.95) ${progress}%, rgba(255,255,255,0.16) ${progress}%, rgba(255,255,255,0.16) 100%)`,
+      accentColor: "var(--accent-action)",
+      background: `linear-gradient(90deg, var(--accent-action) 0%, var(--accent-action) ${progress}%, var(--control-track) ${progress}%, var(--control-track) 100%)`,
     }),
     [progress],
   );
@@ -97,7 +97,7 @@ export function PlayerSeekBar({
         onTouchStart={stopPropagation}
       >
         {showTimes ? (
-          <div className="flex items-center justify-between text-[11px] tabular-nums text-muted-foreground">
+          <div className="flex items-center justify-between text-[11px] tabular-nums text-text-muted">
             <span>{formatPlayerTime(displayedTime)}</span>
             <span>{formatPlayerTime(safeDuration)}</span>
           </div>
@@ -105,41 +105,41 @@ export function PlayerSeekBar({
 
         <div
           ref={trackRef}
-          className="group relative py-3"
+          className="listen-player-progress group relative py-3"
           onPointerMove={handleHover}
           onPointerLeave={() => setHoverPercent(null)}
         >
           {hoverTime != null && hoverPercent != null && (
             <div
-              className="pointer-events-none absolute -top-6 -translate-x-1/2 rounded border border-white/10 bg-black/85 px-1.5 py-0.5 text-[10px] tabular-nums text-white/90"
+              className="listen-player-progress-tooltip pointer-events-none absolute -top-6 -translate-x-1/2 rounded border px-1.5 py-0.5 text-[10px] tabular-nums"
               style={{ left: `${hoverPercent * 100}%` }}
             >
               {hoverTime}
             </div>
           )}
           <div
-            className={`absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full bg-white/10 ${glowTrackClass}`}
+            className={`listen-player-progress-track absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full ${glowTrackClass}`}
           />
           <div
             className="pointer-events-none absolute left-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full opacity-65 transition-[width] duration-150"
             style={glowWidthStyle}
           >
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,182,212,0)_0%,rgba(6,182,212,0.08)_44%,rgba(34,211,238,0.28)_82%,rgba(165,243,252,0.55)_100%)] blur-[3px]" />
-            <div className="absolute inset-y-[5px] inset-x-0 rounded-full bg-[linear-gradient(90deg,rgba(6,182,212,0)_0%,rgba(6,182,212,0.18)_46%,rgba(34,211,238,0.58)_88%,rgba(207,250,254,0.78)_100%)]" />
+            <div className="listen-player-progress-glow absolute inset-0 blur-[3px]" />
+            <div className="listen-player-progress-fill absolute inset-y-[5px] inset-x-0 rounded-full" />
           </div>
           <div
-            className={`absolute left-0 top-1/2 -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,rgba(6,182,212,0.14),rgba(34,211,238,0.56),rgba(207,250,254,0.78))] transition-[width] duration-150 ${glowTrackClass}`}
+            className={`listen-player-progress-fill absolute left-0 top-1/2 -translate-y-1/2 rounded-full transition-[width] duration-150 ${glowTrackClass}`}
             style={glowWidthStyle}
           />
           <div
-            className="pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-cyan-100 shadow-[0_0_6px_rgba(165,243,252,0.62),0_0_12px_rgba(34,211,238,0.34)] transition-[left,opacity] duration-150"
+            className="listen-player-progress-thumb pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full transition-[left,opacity] duration-150"
             style={{
               ...glowLeftStyle,
               opacity: progress > 0 ? 0.62 : 0,
             }}
           />
           <div
-            className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-primary/80 bg-cyan-100 opacity-0 shadow-[0_0_0_3px_rgba(34,211,238,0.14)] transition-[left,opacity] duration-150 group-hover:opacity-100"
+            className="listen-player-progress-thumb-active absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-[left,opacity] duration-150 group-hover:opacity-100"
             style={{ left: `calc(${progress}% - 5px)` }}
           />
           <input
@@ -185,7 +185,7 @@ export function PlayerSeekBar({
       onTouchStart={stopPropagation}
     >
       {showTimes ? (
-        <div className="flex items-center justify-between text-[11px] tabular-nums text-muted-foreground">
+        <div className="flex items-center justify-between text-[11px] tabular-nums text-text-muted">
           <span>{formatPlayerTime(displayedTime)}</span>
           <span>{formatPlayerTime(safeDuration)}</span>
         </div>
@@ -199,7 +199,7 @@ export function PlayerSeekBar({
       >
         {hoverTime != null && hoverPercent != null && (
           <div
-            className="pointer-events-none absolute -top-8 -translate-x-1/2 rounded bg-black/80 px-1.5 py-0.5 text-[10px] tabular-nums text-white/90 border border-white/10"
+            className="listen-player-progress-tooltip pointer-events-none absolute -top-8 -translate-x-1/2 rounded border px-1.5 py-0.5 text-[10px] tabular-nums"
             style={{ left: `${hoverPercent * 100}%` }}
           >
             {hoverTime}

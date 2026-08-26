@@ -1453,11 +1453,11 @@ export function PlayerBar() {
                 </div>
 
                 <div className="relative mt-2 flex items-center gap-2 w-full">
-                  <span className="text-[10px] text-white/40 w-9 text-right tabular-nums font-mono">
+                  <span className="w-9 text-right font-mono text-[10px] tabular-nums text-text-muted">
                     {formatPlayerTime(effectiveDisplayedTime)}
                   </span>
                   <div
-                    className={`group relative flex-1 py-2 ${
+                    className={`listen-player-progress group relative flex-1 py-2 ${
                       jamQueueLocked
                         ? "pointer-events-none grayscale opacity-40"
                         : "cursor-pointer"
@@ -1488,37 +1488,37 @@ export function PlayerBar() {
                   >
                     {seekHover && effectiveDisplayedDuration > 0 && (
                       <div
-                        className="pointer-events-none absolute -top-6 -translate-x-1/2 rounded bg-black/85 px-1.5 py-0.5 text-[10px] tabular-nums text-white/90 border border-white/10"
+                        className="listen-player-progress-tooltip pointer-events-none absolute -top-6 -translate-x-1/2 rounded border px-1.5 py-0.5 text-[10px] tabular-nums"
                         style={{ left: `${seekHover.pct * 100}%` }}
                       >
                         {seekHover.time}
                       </div>
                     )}
-                    <div className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-white/10" />
+                    <div className="listen-player-progress-track absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full" />
                     <div
                       className="pointer-events-none absolute left-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full opacity-65 transition-[width] duration-150"
                       style={{ width: `${progressPct}%` }}
                     >
-                      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,182,212,0)_0%,rgba(6,182,212,0.08)_44%,rgba(34,211,238,0.28)_82%,rgba(165,243,252,0.55)_100%)] blur-[3px]" />
-                      <div className="absolute inset-y-[5px] inset-x-0 rounded-full bg-[linear-gradient(90deg,rgba(6,182,212,0)_0%,rgba(6,182,212,0.18)_46%,rgba(34,211,238,0.58)_88%,rgba(207,250,254,0.78)_100%)]" />
+                      <div className="listen-player-progress-glow absolute inset-0 blur-[3px]" />
+                      <div className="listen-player-progress-fill absolute inset-y-[5px] inset-x-0 rounded-full" />
                     </div>
                     <div
-                      className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-[linear-gradient(90deg,rgba(6,182,212,0.14),rgba(34,211,238,0.56),rgba(207,250,254,0.78))] transition-[width] duration-150"
+                      className="listen-player-progress-fill absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full transition-[width] duration-150"
                       style={{ width: `${progressPct}%` }}
                     />
                     <div
-                      className="pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-cyan-100 shadow-[0_0_6px_rgba(165,243,252,0.62),0_0_12px_rgba(34,211,238,0.34)] transition-[left,opacity] duration-150"
+                      className="listen-player-progress-thumb pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full transition-[left,opacity] duration-150"
                       style={{
                         left: `calc(${progressPct}% - 4px)`,
                         opacity: progressPct > 0 ? 0.62 : 0,
                       }}
                     />
                     <div
-                      className="absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-primary/80 bg-cyan-100 opacity-0 shadow-[0_0_0_3px_rgba(34,211,238,0.14)] transition-[left,opacity] duration-150 group-hover:opacity-100"
+                      className="listen-player-progress-thumb-active absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-[left,opacity] duration-150 group-hover:opacity-100"
                       style={{ left: `calc(${progressPct}% - 5px)` }}
                     />
                   </div>
-                  <span className="text-[10px] text-white/40 w-9 tabular-nums font-mono">
+                  <span className="w-9 font-mono text-[10px] tabular-nums text-text-muted">
                     {formatPlayerTime(effectiveDisplayedDuration)}
                   </span>
                 </div>
