@@ -8,6 +8,7 @@ import { initCapacitor } from "./lib/capacitor";
 import { primeOfflineRuntimeProfile } from "./lib/offline";
 import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
+import { initializeThemeSkin } from "@crate/ui/lib/theme-skin";
 import "./index.css";
 
 async function disableDevServiceWorker() {
@@ -87,6 +88,7 @@ async function bootstrap(): Promise<void> {
   startMediaAccessTicketRefresh();
   initCapacitor();
   void primeOfflineRuntimeProfile();
+  initializeThemeSkin();
 
   if (
     shouldRegisterServiceWorker &&

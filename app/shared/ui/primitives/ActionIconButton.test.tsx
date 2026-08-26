@@ -25,14 +25,14 @@ describe("ActionIconButton", () => {
     const { container } = render(
       <ActionIconButton active>Icon</ActionIconButton>,
     );
-    expect(container.querySelector("button")).toHaveClass("text-primary");
+    expect(container.querySelector("button")).toHaveClass("text-accent-action");
   });
 
   it("uses glow-only hover without framed hover backgrounds", () => {
     const { container } = render(<ActionIconButton>Icon</ActionIconButton>);
     const button = container.querySelector("button");
 
-    expect(button?.className).toContain("hover:text-primary");
+    expect(button?.className).toContain("hover:text-accent-action");
     expect(button?.className).toContain("hover:drop-shadow");
     expect(button?.className).not.toContain("hover:bg-");
   });

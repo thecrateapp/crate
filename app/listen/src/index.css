@@ -12,13 +12,13 @@
 html,
 body {
   overscroll-behavior: none;
-  background: #0a0a0f;
+  background: var(--surface-canvas);
   min-height: var(--listen-viewport-height);
 }
 
 #root {
   min-height: var(--listen-viewport-height);
-  background: #0a0a0f;
+  background: var(--surface-canvas);
 }
 
 @media (min-width: 768px) {

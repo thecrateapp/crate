@@ -1,0 +1,78 @@
+/* crate-ui — Semantic consumption layer
+   Features should consume these intent-based names instead of primitives. */
+
+:root {
+  --text-primary: var(--color-foreground);
+  --text-secondary: var(--idle-text);
+  --text-muted: var(--color-muted-foreground);
+  --text-subtle: var(--idle-text-subtle);
+
+  --surface-canvas: var(--surface-app);
+  --surface-container: var(--surface-panel);
+  --surface-elevated: var(--surface-raised);
+  --surface-overlay: var(--surface-modal);
+  --surface-control: var(--hover-bg);
+  --surface-control-hover: var(--hover-bg-strong);
+  --surface-icon-control: rgba(0, 0, 0, 0.55);
+
+  --border-subtle: var(--color-border);
+  --border-interactive: var(--hover-border);
+  --border-focus: var(--color-ring);
+
+  --accent-action: var(--color-primary);
+  --accent-action-foreground: var(--color-primary-foreground);
+  --accent-action-hover: color-mix(
+    in srgb,
+    var(--accent-action) 90%,
+    transparent
+  );
+  --accent-danger: var(--color-destructive);
+  --accent-danger-foreground: var(--text-primary);
+  --state-success: var(--color-success);
+  --state-warning: var(--color-warning);
+  --state-danger: var(--color-destructive);
+  --state-info: var(--color-info);
+  --focus-ring: var(--color-ring);
+
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 250ms;
+  --font-brand: "Poppins";
+  --action-shadow: 0 14px 28px
+    color-mix(in srgb, var(--accent-action) 22%, transparent);
+  --focus-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--border-focus) 8%, transparent);
+  --control-inset-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--text-primary) 4%, transparent);
+  --icon-control-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+@theme inline {
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-container: var(--surface-container);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-control: var(--surface-control);
+  --color-surface-control-hover: var(--surface-control-hover);
+  --color-surface-icon-control: var(--surface-icon-control);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-interactive: var(--border-interactive);
+  --color-border-focus: var(--border-focus);
+  --color-accent-action: var(--accent-action);
+  --color-accent-action-foreground: var(--accent-action-foreground);
+  --color-accent-action-hover: var(--accent-action-hover);
+  --color-accent-danger: var(--accent-danger);
+  --color-accent-danger-foreground: var(--accent-danger-foreground);
+  --color-state-success: var(--state-success);
+  --color-state-warning: var(--state-warning);
+  --color-state-danger: var(--state-danger);
+  --color-state-info: var(--state-info);
+  --color-focus-ring: var(--focus-ring);
+  --shadow-action: var(--action-shadow);
+  --shadow-focus: var(--focus-shadow);
+  --shadow-control-inset: var(--control-inset-shadow);
+  --shadow-icon-control: var(--icon-control-shadow);
+}

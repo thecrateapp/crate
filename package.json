@@ -1,6 +1,9 @@
 {
   "name": "crate",
   "private": true,
+  "scripts": {
+    "design-system:drift": "node scripts/design-system/drift-inventory.mjs"
+  },
   "workspaces": [
     "app/shared/ui",
     "app/ui",
