@@ -7,10 +7,26 @@ import {
   createMockTrack,
   renderWithListenProviders,
 } from "@/test/render-with-listen-providers";
+import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 
 import { ExtendedPlayer } from "./ExtendedPlayer";
 
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => true));
+type MockVisualizerConfig = {
+  surfaceMode: PlayerSurfaceMode;
+  useAlbumPalette: boolean;
+  trackVizProfile: { hasAnalysis: boolean; summary: string | null };
+  setSurfaceMode: (mode: PlayerSurfaceMode) => void;
+};
+
+const useVisualizerConfigMock = vi.hoisted(() =>
+  vi.fn<() => MockVisualizerConfig>(() => ({
+    surfaceMode: "cd",
+    useAlbumPalette: false,
+    trackVizProfile: { hasAnalysis: false, summary: null },
+    setSurfaceMode: vi.fn<(mode: PlayerSurfaceMode) => void>(),
+  })),
+);
 
 vi.mock("@crate/ui/lib/use-breakpoint", () => ({
   useIsDesktop: useIsDesktopMock,
@@ -61,12 +77,7 @@ vi.mock("@/components/player/visualizer/useMusicVisualizer", () => ({
 }));
 
 vi.mock("@/components/player/visualizer/useVisualizerConfig", () => ({
-  useVisualizerConfig: () => ({
-    surfaceMode: "cd",
-    useAlbumPalette: false,
-    trackVizProfile: { hasAnalysis: false, summary: null },
-    setSurfaceMode: vi.fn(),
-  }),
+  useVisualizerConfig: useVisualizerConfigMock,
 }));
 
 vi.mock("@/hooks/use-crossfade-progress", () => ({
@@ -183,5 +194,41 @@ describe("ExtendedPlayer", () => {
       "text-accent-action",
       "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
     );
+  });
+
+  it("uses semantic tokens for the artwork surface", () => {
+    useVisualizerConfigMock.mockReturnValue({
+      surfaceMode: "cover",
+      useAlbumPalette: false,
+      trackVizProfile: { hasAnalysis: true, summary: "Analyzed" },
+      setSurfaceMode: vi.fn(),
+    });
+    const track = createMockTrack({
+      id: "extended-artwork-track",
+      entityUid: "extended-artwork-track",
+      title: "Extended artwork",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(
+      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      },
+    );
+
+    expect(container.innerHTML).toContain("bg-accent-action/10");
+    expect(container.innerHTML).toContain("border-border-floating");
+    expect(container.innerHTML).toContain("bg-surface-glass-highlight");
+    expect(container.innerHTML).toContain("text-text-muted");
+    expect(container.innerHTML).not.toContain("bg-primary/10");
+    expect(container.innerHTML).not.toContain("border-white/10");
+    expect(container.innerHTML).not.toContain("bg-white/[0.02]");
+    expect(container.innerHTML).not.toContain("bg-white/5");
+    expect(container.innerHTML).not.toContain("text-white/40");
   });
 });

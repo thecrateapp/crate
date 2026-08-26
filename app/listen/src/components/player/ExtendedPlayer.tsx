@@ -324,8 +324,8 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
             />
           ) : (
             <>
-              <div className="absolute inset-6 rounded-xl bg-primary/10 opacity-70 blur-3xl" />
-              <div className="absolute inset-2 rounded-xl border border-white/10 bg-white/[0.02]" />
+              <div className="absolute inset-6 rounded-xl bg-accent-action/10 opacity-70 blur-3xl" />
+              <div className="absolute inset-2 rounded-xl border border-border-floating bg-surface-glass-highlight" />
               {crossfadeTransition ? (
                 <>
                   {crossfadeTransition.outgoing.albumCover ? (
@@ -367,7 +367,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                   }}
                 />
               ) : (
-                <div className="absolute inset-0 rounded-xl bg-white/5 shadow-[0_28px_100px_rgba(0,0,0,0.75)]" />
+                <div className="absolute inset-0 rounded-xl bg-surface-glass-highlight shadow-[0_28px_100px_rgba(0,0,0,0.75)]" />
               )}
             </>
           )}
@@ -415,7 +415,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
           />
           {vizCfg.trackVizProfile.hasAnalysis &&
           vizCfg.trackVizProfile.summary ? (
-            <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.22em] text-white/40">
+            <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.22em] text-text-muted">
               {vizCfg.trackVizProfile.summary}
             </p>
           ) : null}
