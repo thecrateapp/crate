@@ -239,11 +239,15 @@ describe("PlayerBar mobile mini-player", () => {
       },
     });
 
+    const activeGlow = "drop-shadow-[0_0_8px_var(--accent-action-glow)]";
+
     expect(screen.getByRole("button", { name: "Disable shuffle" })).toHaveClass(
       "text-accent-action",
+      activeGlow,
     );
     expect(screen.getByRole("button", { name: "Repeat: one" })).toHaveClass(
       "text-accent-action",
+      activeGlow,
     );
   });
 

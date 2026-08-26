@@ -1387,7 +1387,7 @@ export function PlayerBar() {
                     }
                     className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       shuffle
-                        ? "text-accent-action"
+                        ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                         : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                     }`}
                   >
@@ -1440,7 +1440,7 @@ export function PlayerBar() {
                     aria-label={t("player.repeat", { mode: repeat })}
                     className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       repeat !== "off"
-                        ? "text-accent-action"
+                        ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                         : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
                     }`}
                   >

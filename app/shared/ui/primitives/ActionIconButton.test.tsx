@@ -33,8 +33,32 @@ describe("ActionIconButton", () => {
     const button = container.querySelector("button");
 
     expect(button?.className).toContain("hover:text-accent-action");
-    expect(button?.className).toContain("hover:drop-shadow");
+    expect(button?.className).toContain(
+      "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+    );
     expect(button?.className).not.toContain("hover:bg-");
+    expect(button?.className).not.toContain("rgba(");
+  });
+
+  it("uses semantic glow tokens for each action tone", () => {
+    const { container } = render(
+      <>
+        <ActionIconButton aria-label="Primary" tone="primary">
+          Primary
+        </ActionIconButton>
+        <ActionIconButton aria-label="Danger" tone="danger">
+          Danger
+        </ActionIconButton>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Primary" })).toHaveClass(
+      "hover:drop-shadow-[0_0_8px_var(--accent-action-glow-strong)]",
+    );
+    expect(screen.getByRole("button", { name: "Danger" })).toHaveClass(
+      "hover:drop-shadow-[0_0_8px_var(--accent-danger-glow)]",
+    );
+    expect(container.innerHTML).not.toContain("rgba(");
   });
 
   it("adds a subtle pulse for active icon states", () => {

@@ -137,6 +137,11 @@
   );
   --accent-danger: var(--color-destructive);
   --accent-danger-foreground: var(--text-primary);
+  --accent-danger-glow: color-mix(
+    in srgb,
+    var(--accent-danger) 35%,
+    transparent
+  );
   --state-success: var(--color-success);
   --state-warning: var(--color-warning);
   --state-danger: var(--color-destructive);

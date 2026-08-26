@@ -16,14 +16,14 @@ function actionToneClassName(tone: ActionTone, disabled: boolean) {
   }
 
   if (tone === "primary") {
-    return "text-accent-action hover:text-accent-action hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.45)]";
+    return "text-accent-action hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow-strong)]";
   }
 
   if (tone === "danger") {
-    return "text-state-danger hover:text-state-danger hover:drop-shadow-[0_0_8px_rgba(248,113,113,0.35)]";
+    return "text-state-danger hover:text-state-danger hover:drop-shadow-[0_0_8px_var(--accent-danger-glow)]";
   }
 
-  return "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]";
+  return "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]";
 }
 
 function actionVariantClassName(variant: ActionVariant) {
