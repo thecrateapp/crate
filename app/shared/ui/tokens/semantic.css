@@ -1284,6 +1284,11 @@
   --color-border-interactive: var(--border-interactive);
   --color-border-focus: var(--border-focus);
   --color-accent-action: var(--accent-action);
+  --color-accent-danger: var(--accent-danger);
+  --color-state-success: var(--state-success);
+  --color-state-warning: var(--state-warning);
+  --color-state-danger: var(--state-danger);
+  --color-state-info: var(--state-info);
   --color-accent-action-foreground: var(--accent-action-foreground);
   --color-accent-action-hover: var(--accent-action-hover);
   --color-accent-danger: var(--accent-danger);
@@ -1428,6 +1433,24 @@
     var(--info-tab-palette-accent, var(--state-warning)) 18%,
     transparent
   );
+}
+
+.settings-section {
+  border: 1px solid var(--border-floating);
+  background: var(--surface-glass-highlight);
+}
+
+.settings-header {
+  color: var(--text-primary);
+}
+
+.settings-bandcamp-connected {
+  border: 1px solid color-mix(in srgb, var(--accent-action) 20%, transparent);
+  background: color-mix(in srgb, var(--accent-action) 10%, transparent);
+}
+
+.settings-range {
+  accent-color: var(--accent-action);
 }
 
 .home-playback-row:hover,

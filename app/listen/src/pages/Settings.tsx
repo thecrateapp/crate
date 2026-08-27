@@ -144,7 +144,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+    <section className="settings-section rounded-[12px] p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         {description ? (
@@ -188,7 +188,7 @@ function RangeRow({
             </p>
           ) : null}
         </div>
-        <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70">
+        <div className="rounded-full border border-border-floating/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
           {displayValue ?? value}
         </div>
       </div>
@@ -200,7 +200,7 @@ function RangeRow({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-cyan-400 disabled:cursor-not-allowed"
+        className="settings-range w-full disabled:cursor-not-allowed"
       />
     </div>
   );
@@ -234,12 +234,12 @@ function ToggleRow({
         onClick={() => onChange(!checked)}
         className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full border transition-colors ${
           checked
-            ? "border-cyan-400/50 bg-cyan-400/25"
-            : "border-white/10 bg-white/[0.03]"
+            ? "border-accent-action/50 bg-accent-action/25"
+            : "border-border-floating/10 bg-text-primary/[0.03]"
         }`}
       >
         <span
-          className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+          className={`inline-block h-5 w-5 rounded-full bg-text-primary shadow-sm transition-transform ${
             checked ? "translate-x-6" : "translate-x-1"
           }`}
         />
@@ -331,7 +331,7 @@ export function Settings() {
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="settings-header">
         <h1 className="text-3xl font-bold text-foreground">
           {t("settings.title")}
         </h1>
@@ -374,8 +374,8 @@ export function Settings() {
                   }}
                   className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                     selected
-                      ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
-                      : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+                      ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
+                      : "border-border-floating/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
                   }`}
                 >
                   <span className="block text-sm font-semibold">
@@ -472,8 +472,8 @@ export function Settings() {
         description={t("settings.offline.subtitle")}
       >
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+          <div className="rounded-xl border border-border-floating/10 bg-text-primary/[0.03] p-4">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("settings.offline.items")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
@@ -490,8 +490,8 @@ export function Settings() {
                 : ""}
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+          <div className="rounded-xl border border-border-floating/10 bg-text-primary/[0.03] p-4">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("common.tracks")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
@@ -501,8 +501,8 @@ export function Settings() {
               {t("settings.offline.mirrored")}
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+          <div className="rounded-xl border border-border-floating/10 bg-text-primary/[0.03] p-4">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("settings.offline.storage")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
@@ -534,7 +534,7 @@ export function Settings() {
                   );
                 });
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-accent-action/30 bg-accent-action/10 px-4 py-2 text-sm font-medium text-accent-action transition-colors hover:bg-accent-action/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {offlineSyncing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -562,16 +562,19 @@ export function Settings() {
                   );
                 });
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-red-400/25 bg-red-400/10 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-accent-danger/25 bg-accent-danger/10 px-4 py-2 text-sm font-medium text-accent-danger transition-colors hover:bg-accent-danger/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 size={16} />
             {t("settings.offline.removeCopies")}
           </button>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-border-floating/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
           <div className="flex items-start gap-3">
-            <ArrowDownToLine size={16} className="mt-0.5 text-white/50" />
+            <ArrowDownToLine
+              size={16}
+              className="mt-0.5 text-text-primary/50"
+            />
             <div>
               {offlineSupported
                 ? t("settings.offline.localMirrorDescription")
@@ -597,35 +600,35 @@ export function Settings() {
         <div className="flex flex-col gap-2">
           <Link
             to={publicProfilePath}
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-text-primary/5 transition-colors"
           >
             <Users size={18} className="text-muted-foreground" />{" "}
             {t("settings.links.profile")}
           </Link>
           <Link
             to="/people"
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-text-primary/5 transition-colors"
           >
             <Users size={18} className="text-muted-foreground" />{" "}
             {t("settings.links.people")}
           </Link>
           <Link
             to="/upload"
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-text-primary/5 transition-colors"
           >
             <Upload size={18} className="text-muted-foreground" />{" "}
             {t("upload.badge")}
           </Link>
           <Link
             to="/stats"
-            className="hidden items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground transition-colors hover:bg-white/5 md:flex"
+            className="hidden items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground transition-colors hover:bg-text-primary/5 md:flex"
           >
             <BarChart3 size={18} className="text-muted-foreground" />{" "}
             {t("settings.links.stats")}
           </Link>
           <button
             onClick={logout}
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors w-full text-left"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-accent-danger hover:bg-text-primary/5 transition-colors w-full text-left"
           >
             <LogOut size={18} /> {t("auth.logout")}
           </button>
@@ -681,8 +684,8 @@ function LanguageSection({
           onClick={() => changeLanguage("auto")}
           className={`rounded-lg border px-3 py-3 text-left transition-colors ${
             selection === "auto"
-              ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
-              : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+              ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
+              : "border-border-floating/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
           }`}
         >
           <span className="block text-sm font-semibold">
@@ -704,8 +707,8 @@ function LanguageSection({
               onClick={() => changeLanguage(option.value)}
               className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                 selected
-                  ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
-                  : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+                  ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
+                  : "border-border-floating/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
               }`}
             >
               <span className="block text-sm font-semibold">
@@ -719,8 +722,8 @@ function LanguageSection({
         })}
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
-        <Globe size={16} className="mt-0.5 text-cyan-300/80" />
+      <div className="flex items-start gap-3 rounded-lg border border-border-floating/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
+        <Globe size={16} className="mt-0.5 text-accent-action/80" />
         <span>
           {t("settings.language.current", {
             language: t(`settings.language.options.${activeLocale}`),
@@ -761,8 +764,8 @@ function SleepTimerSection() {
             onClick={() => startSleepTimer(mode, pause)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               timer.mode === mode
-                ? "bg-primary text-white"
-                : "bg-white/5 text-white/60 hover:bg-white/10"
+                ? "bg-primary text-primary-foreground"
+                : "bg-text-primary/5 text-text-primary/60 hover:bg-text-primary/10"
             }`}
           >
             {t(labelKey)}
@@ -782,7 +785,7 @@ function SleepTimerSection() {
           </div>
           <button
             onClick={cancelSleepTimer}
-            className="rounded-full px-3 py-1.5 text-xs font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+            className="rounded-full px-3 py-1.5 text-xs font-medium bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25 transition-colors"
           >
             {t("common.cancel")}
           </button>
@@ -989,7 +992,7 @@ function BandcampSection() {
 
   return (
     <Section title="Bandcamp" description={t("settings.bandcamp.description")}>
-      <div className="rounded-xl border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-4">
+      <div className="settings-bandcamp-connected rounded-xl p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             {status?.image_url ? (
@@ -1000,7 +1003,7 @@ function BandcampSection() {
                 className="h-11 w-11 rounded-full object-cover"
               />
             ) : (
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-primary">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-text-primary/10 text-primary">
                 <BandcampLogo size={20} />
               </div>
             )}
@@ -1025,7 +1028,7 @@ function BandcampSection() {
             <div className="flex flex-wrap gap-2">
               <Link
                 to="/library?tab=bandcamp"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-full border border-border-floating/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10"
               >
                 <BandcampLogo size={14} />
                 {t("settings.bandcamp.viewPurchases")}
@@ -1045,7 +1048,7 @@ function BandcampSection() {
               <button
                 onClick={disconnectBandcamp}
                 disabled={busy !== null}
-                className="rounded-full border border-red-400/25 px-4 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-400/10 disabled:opacity-50"
+                className="rounded-full border border-accent-danger/25 px-4 py-2 text-xs font-semibold text-accent-danger transition-colors hover:bg-accent-danger/10 disabled:opacity-50"
               >
                 {t("common.disconnect")}
               </button>
@@ -1053,18 +1056,18 @@ function BandcampSection() {
           ) : null}
         </div>
         {status?.last_error ? (
-          <p className="mt-3 text-xs text-red-300">{status.last_error}</p>
+          <p className="mt-3 text-xs text-accent-danger">{status.last_error}</p>
         ) : null}
       </div>
 
       {!status?.connected ? (
-        <div className="space-y-4 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4">
+        <div className="space-y-4 rounded-xl border border-state-warning/20 bg-state-warning/5 p-4">
           {isTauriRuntime ? (
             <div className="space-y-3">
-              <div className="flex items-start gap-3 text-xs leading-5 text-yellow-100/80">
+              <div className="flex items-start gap-3 text-xs leading-5 text-state-warning/80">
                 <Smartphone
                   size={16}
-                  className="mt-0.5 shrink-0 text-yellow-300"
+                  className="mt-0.5 shrink-0 text-state-warning"
                 />
                 <p>{t("settings.bandcamp.desktopConnectorDescription")}</p>
               </div>
@@ -1084,15 +1087,17 @@ function BandcampSection() {
           ) : null}
 
           <div className="space-y-3">
-            <div className="flex items-start gap-3 text-xs leading-5 text-yellow-100/80">
-              <Lock size={16} className="mt-0.5 shrink-0 text-yellow-300" />
+            <div className="flex items-start gap-3 text-xs leading-5 text-state-warning/80">
+              <Lock size={16} className="mt-0.5 shrink-0 text-state-warning" />
               <p>
                 {t("settings.bandcamp.cookieInstructionsPrefix")}{" "}
-                <span className="font-mono text-yellow-50">identity</span>{" "}
+                <span className="font-mono text-state-warning">identity</span>{" "}
                 {t("settings.bandcamp.cookieInstructionsFrom")}{" "}
-                <span className="font-mono text-yellow-50">bandcamp.com</span>.
-                {t("settings.bandcamp.cookieInstructionsSuffix")}{" "}
-                <span className="font-mono text-yellow-50">Cookie</span>{" "}
+                <span className="font-mono text-state-warning">
+                  bandcamp.com
+                </span>
+                .{t("settings.bandcamp.cookieInstructionsSuffix")}{" "}
+                <span className="font-mono text-state-warning">Cookie</span>{" "}
                 {t("settings.bandcamp.cookieInstructionsHeader")}{" "}
                 {t("settings.bandcamp.cookieInstructionsEnd")}
               </p>
@@ -1103,12 +1108,12 @@ function BandcampSection() {
               rows={3}
               spellCheck={false}
               placeholder={t("settings.bandcamp.cookiePlaceholder")}
-              className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-white/25 focus:border-primary/50"
+              className="w-full resize-none rounded-lg border border-border-floating/10 bg-surface-canvas/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/50"
             />
             <button
               onClick={() => void connectWithCookie(bandcampCookie)}
               disabled={busy !== null || !bandcampCookie.trim()}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full border border-border-floating/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === "cookie-connect" ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -1270,7 +1275,7 @@ function ScrobbleSection() {
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">Last.fm</p>
           {lastfm?.connected ? (
-            <p className="text-xs text-green-400">
+            <p className="text-xs text-state-success">
               {lastfm.username
                 ? t("settings.scrobbling.connectedAs", {
                     username: lastfm.username,
@@ -1286,7 +1291,7 @@ function ScrobbleSection() {
         {lastfm?.connected ? (
           <button
             onClick={() => handleDisconnect("lastfm")}
-            className="rounded-full px-4 py-2 text-xs font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+            className="rounded-full px-4 py-2 text-xs font-medium bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25 transition-colors"
           >
             {t("common.disconnect")}
           </button>
@@ -1308,7 +1313,7 @@ function ScrobbleSection() {
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">ListenBrainz</p>
           {listenbrainz?.connected ? (
-            <p className="text-xs text-green-400">
+            <p className="text-xs text-state-success">
               {listenbrainz.username
                 ? t("settings.scrobbling.connectedAs", {
                     username: listenbrainz.username,
@@ -1324,7 +1329,7 @@ function ScrobbleSection() {
         {listenbrainz?.connected ? (
           <button
             onClick={() => handleDisconnect("listenbrainz")}
-            className="rounded-full px-4 py-2 text-xs font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+            className="rounded-full px-4 py-2 text-xs font-medium bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25 transition-colors"
           >
             {t("common.disconnect")}
           </button>
@@ -1335,7 +1340,7 @@ function ScrobbleSection() {
               value={lbToken}
               onChange={(e) => setLbToken(e.target.value)}
               placeholder={t("settings.scrobbling.apiToken")}
-              className="w-36 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-foreground placeholder:text-white/40 focus:outline-none focus:border-primary/50"
+              className="w-36 rounded-lg bg-text-primary/5 border border-border-floating/10 px-3 py-1.5 text-xs text-foreground placeholder:text-text-primary/40 focus:outline-none focus:border-primary/50"
               onKeyDown={(e) =>
                 e.key === "Enter" && handleListenBrainzConnect()
               }
@@ -1495,7 +1500,7 @@ function AccountSection() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1 h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
+              className="flex-1 h-10 px-3 rounded-lg bg-text-primary/5 text-sm text-text-primary outline-none focus:bg-text-primary/8"
               placeholder={t("auth.register.namePlaceholder")}
             />
           </div>
@@ -1509,7 +1514,7 @@ function AccountSection() {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
-            className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
+            className="w-full h-10 px-3 rounded-lg bg-text-primary/5 text-sm text-text-primary outline-none focus:bg-text-primary/8"
             placeholder={t("settings.account.usernamePlaceholder")}
           />
           <p className="text-xs text-muted-foreground">
@@ -1524,7 +1529,7 @@ function AccountSection() {
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            className="min-h-24 w-full rounded-lg bg-white/5 px-3 py-3 text-sm text-white outline-none focus:bg-white/8"
+            className="min-h-24 w-full rounded-lg bg-text-primary/5 px-3 py-3 text-sm text-text-primary outline-none focus:bg-text-primary/8"
             placeholder={t("settings.account.bioPlaceholder")}
           />
         </div>
@@ -1538,7 +1543,7 @@ function AccountSection() {
                 username.trim() === (user?.username || "") &&
                 bio.trim() === (user?.bio || ""))
             }
-            className="h-10 px-4 rounded-lg bg-primary text-sm font-medium text-white disabled:opacity-40 transition-opacity"
+            className="h-10 px-4 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40 transition-opacity"
           >
             {saving ? t("common.saving") : t("settings.account.saveProfile")}
           </button>
@@ -1548,11 +1553,13 @@ function AccountSection() {
           <label className="text-xs text-muted-foreground">
             {t("common.email")}
           </label>
-          <p className="text-sm text-white/60 px-1">{user?.email || "—"}</p>
+          <p className="text-sm text-text-primary/60 px-1">
+            {user?.email || "—"}
+          </p>
         </div>
 
         {socialProviders.length > 0 ? (
-          <div className="space-y-3 rounded-xl bg-white/5 p-4">
+          <div className="space-y-3 rounded-xl bg-text-primary/5 p-4">
             <div>
               <div className="text-sm font-medium text-foreground">
                 {t("settings.account.connectedAccounts")}
@@ -1568,7 +1575,7 @@ function AccountSection() {
               return (
                 <div
                   key={provider}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-white/10 px-3 py-3"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-border-floating/10 px-3 py-3"
                 >
                   <div>
                     <div className="text-sm font-medium text-foreground capitalize">
@@ -1588,7 +1595,7 @@ function AccountSection() {
                         ? void handleUnlinkProvider(provider)
                         : void handleLinkProvider(provider)
                     }
-                    className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
+                    className="rounded-lg border border-border-floating/15 bg-text-primary/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-text-primary/10 transition-colors disabled:opacity-50"
                   >
                     {busy
                       ? t("common.working")
@@ -1605,7 +1612,7 @@ function AccountSection() {
         <ConnectDevicesSection />
 
         {authConfig.invite_only ? (
-          <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+          <div className="flex items-start gap-3 rounded-xl border border-accent-action/20 bg-accent-action/10 px-4 py-3 text-sm text-accent-action">
             <Shield size={16} className="mt-0.5 flex-shrink-0" />
             <div>{t("settings.account.inviteOnlyNotice")}</div>
           </div>
@@ -1619,13 +1626,13 @@ function AccountSection() {
             <Lock size={14} /> {t("settings.account.changePassword")}
           </button>
         ) : (
-          <div className="space-y-2 rounded-xl bg-white/5 p-4">
+          <div className="space-y-2 rounded-xl bg-text-primary/5 p-4">
             <input
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder={t("settings.account.currentPassword")}
-              className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
+              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 text-sm text-text-primary outline-none focus:bg-text-primary/8"
               autoComplete="current-password"
             />
             <input
@@ -1633,7 +1640,7 @@ function AccountSection() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder={t("settings.account.newPassword")}
-              className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
+              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 text-sm text-text-primary outline-none focus:bg-text-primary/8"
               autoComplete="new-password"
             />
             <input
@@ -1641,14 +1648,14 @@ function AccountSection() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder={t("settings.account.confirmPassword")}
-              className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
+              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 text-sm text-text-primary outline-none focus:bg-text-primary/8"
               autoComplete="new-password"
             />
             <div className="flex gap-2 pt-1">
               <button
                 onClick={handleChangePassword}
                 disabled={saving}
-                className="h-9 px-4 rounded-lg bg-primary text-sm font-medium text-white disabled:opacity-40"
+                className="h-9 px-4 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40"
               >
                 {t("settings.account.changePasswordAction")}
               </button>
@@ -1659,7 +1666,7 @@ function AccountSection() {
                   setNewPassword("");
                   setConfirmPassword("");
                 }}
-                className="h-9 px-4 rounded-lg bg-white/5 text-sm text-white/60"
+                className="h-9 px-4 rounded-lg bg-text-primary/5 text-sm text-text-primary/60"
               >
                 {t("common.cancel")}
               </button>
@@ -1841,12 +1848,14 @@ function ShowsLocationSection() {
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
               mode === "fixed"
                 ? "border-primary/30 bg-primary/8"
-                : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
+                : "border-border-floating/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
             }`}
           >
             <MapPin
               size={16}
-              className={mode === "fixed" ? "text-primary" : "text-white/40"}
+              className={
+                mode === "fixed" ? "text-primary" : "text-text-primary/40"
+              }
             />
             <div className="min-w-0 flex-1">
               <div
@@ -1868,11 +1877,11 @@ function ShowsLocationSection() {
               className={`h-4 w-4 rounded-full border-2 ${
                 mode === "fixed"
                   ? "border-primary bg-primary"
-                  : "border-white/20"
+                  : "border-border-floating/20"
               }`}
             >
               {mode === "fixed" && (
-                <div className="h-full w-full rounded-full bg-white scale-[0.4]" />
+                <div className="h-full w-full rounded-full bg-text-primary scale-[0.4]" />
               )}
             </div>
           </button>
@@ -1881,12 +1890,14 @@ function ShowsLocationSection() {
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
               mode === "near_me"
                 ? "border-primary/30 bg-primary/8"
-                : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
+                : "border-border-floating/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
             }`}
           >
             <Navigation
               size={16}
-              className={mode === "near_me" ? "text-primary" : "text-white/40"}
+              className={
+                mode === "near_me" ? "text-primary" : "text-text-primary/40"
+              }
             />
             <div className="min-w-0 flex-1">
               <div
@@ -1904,11 +1915,11 @@ function ShowsLocationSection() {
               className={`h-4 w-4 rounded-full border-2 ${
                 mode === "near_me"
                   ? "border-primary bg-primary"
-                  : "border-white/20"
+                  : "border-border-floating/20"
               }`}
             >
               {mode === "near_me" && (
-                <div className="h-full w-full rounded-full bg-white scale-[0.4]" />
+                <div className="h-full w-full rounded-full bg-text-primary scale-[0.4]" />
               )}
             </div>
           </button>
@@ -1945,21 +1956,21 @@ function ShowsLocationSection() {
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               placeholder={t("settings.shows.cityPlaceholder")}
-              className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white outline-none focus:border-primary/40 placeholder:text-white/40"
+              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 border border-border-floating/10 text-sm text-text-primary outline-none focus:border-primary/40 placeholder:text-text-primary/40"
             />
             {searching && (
               <Loader2
                 size={14}
-                className="absolute right-3 top-3 animate-spin text-white/40"
+                className="absolute right-3 top-3 animate-spin text-text-primary/40"
               />
             )}
             {showDropdown && searchResults.length > 0 && (
-              <div className="absolute inset-x-0 top-full z-app-dropdown mt-1 overflow-hidden rounded-xl border border-white/10 bg-[#1a1a2e] shadow-xl">
+              <div className="absolute inset-x-0 top-full z-app-dropdown mt-1 overflow-hidden rounded-xl border border-border-floating/10 bg-surface-overlay shadow-xl">
                 {searchResults.map((result) => (
                   <button
                     key={`${result.latitude}-${result.longitude}`}
                     onMouseDown={() => selectCity(result)}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-foreground hover:bg-white/5 transition-colors"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-foreground hover:bg-text-primary/5 transition-colors"
                   >
                     <MapPin
                       size={12}
@@ -1979,7 +1990,7 @@ function ShowsLocationSection() {
           <div className="text-sm font-medium text-foreground">
             {t("settings.shows.searchRadius")}
           </div>
-          <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70">
+          <div className="rounded-full border border-border-floating/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
             {radius} km
           </div>
         </div>
@@ -1990,8 +2001,8 @@ function ShowsLocationSection() {
               onClick={() => saveRadius(r)}
               className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
                 radius === r
-                  ? "bg-primary text-white"
-                  : "bg-white/5 text-muted-foreground hover:bg-white/10"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-text-primary/5 text-muted-foreground hover:bg-text-primary/10"
               }`}
             >
               {r} km
