@@ -71,24 +71,24 @@ function formatMinutes(minutes: number) {
 }
 
 function affinityTone(band: AffinityBand) {
-  if (band === "very_high") return "text-emerald-300";
-  if (band === "high") return "text-cyan-300";
-  if (band === "medium") return "text-amber-300";
-  return "text-white/70";
+  if (band === "very_high") return "profile-hover-affinity-very-high";
+  if (band === "high") return "profile-hover-affinity-high";
+  if (band === "medium") return "profile-hover-affinity-medium";
+  return "profile-hover-affinity-low";
 }
 
 function badgeTone(tone: string) {
   switch (tone) {
     case "gold":
-      return "border-amber-300/30 bg-amber-300/10 text-amber-200";
+      return "profile-hover-badge-gold";
     case "green":
-      return "border-emerald-300/30 bg-emerald-300/10 text-emerald-200";
+      return "profile-hover-badge-green";
     case "rose":
-      return "border-rose-300/30 bg-rose-300/10 text-rose-200";
+      return "profile-hover-badge-rose";
     case "cyan":
-      return "border-cyan-300/30 bg-cyan-300/10 text-cyan-200";
+      return "profile-hover-badge-cyan";
     default:
-      return "border-white/10 bg-white/[0.06] text-white/70";
+      return "profile-hover-badge-neutral";
   }
 }
 
@@ -117,13 +117,13 @@ function ProfileAvatar({ card }: { card: ProfileCardPayload }) {
         src={avatarUrl}
         alt=""
         onError={handleAvatarError}
-        className="h-16 w-16 rounded-xl object-cover shadow-[0_18px_44px_rgba(0,0,0,0.36)]"
+        className="profile-hover-avatar h-16 w-16 rounded-xl object-cover"
       />
     );
   }
 
   return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-2xl font-black text-cyan-200">
+    <div className="profile-hover-avatar-placeholder flex h-16 w-16 items-center justify-center rounded-xl border text-2xl font-black">
       {label.trim().charAt(0).toUpperCase() || "U"}
     </div>
   );
@@ -150,9 +150,9 @@ function ProfileCardBody({
   const following = card.relationship_state.following;
 
   return (
-    <div className="relative overflow-hidden rounded-[12px] border border-white/10 bg-[#080a10]/95 p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.20),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)]" />
-      <div className="pointer-events-none absolute -right-8 -top-8 text-[8rem] font-black leading-none text-white/[0.035]">
+    <div className="profile-hover-card relative overflow-hidden rounded-[12px] border p-4">
+      <div className="profile-hover-glow pointer-events-none absolute inset-0" />
+      <div className="profile-hover-watermark pointer-events-none absolute -right-8 -top-8 text-[8rem] font-black leading-none">
         {card.affinity_score}
       </div>
 
@@ -161,21 +161,21 @@ function ProfileCardBody({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <div className="min-w-0">
-              <div className="truncate text-base font-black text-white">
+              <div className="profile-hover-title truncate text-base font-black">
                 {cardLabel(card)}
               </div>
-              <div className="truncate text-xs text-white/45">
+              <div className="profile-hover-username truncate text-xs">
                 {username ? `@${username}` : t("profileHover.noUsername")}
               </div>
             </div>
             {card.relationship_state.is_friend ? (
-              <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+              <span className="profile-hover-friend rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em]">
                 {t("profileHover.friend")}
               </span>
             ) : null}
           </div>
 
-          <div className="mt-3 inline-flex rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-200">
+          <div className="profile-hover-main-badge mt-3 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]">
             {mainBadge(card)}
           </div>
         </div>
@@ -189,21 +189,21 @@ function ProfileCardBody({
           >
             {card.affinity_score}
           </div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+          <div className="profile-hover-score-label text-[10px] font-bold uppercase tracking-[0.18em]">
             Match
           </div>
         </div>
       </div>
 
-      <div className="relative mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+      <div className="profile-hover-top-panel relative mt-4 rounded-xl border p-3">
+        <div className="profile-hover-top-label text-[10px] font-bold uppercase tracking-[0.18em]">
           Top sound
         </div>
-        <div className="mt-1 truncate text-sm font-bold text-white">
+        <div className="profile-hover-top-genre mt-1 truncate text-sm font-bold">
           {topGenre}
         </div>
         {card.affinity_reasons.length ? (
-          <div className="mt-2 line-clamp-2 text-xs leading-5 text-white/55">
+          <div className="profile-hover-reasons mt-2 line-clamp-2 text-xs leading-5">
             {card.affinity_reasons.join(" · ")}
           </div>
         ) : null}
@@ -235,13 +235,13 @@ function ProfileCardBody({
       <div className="relative mt-4 flex items-center gap-2">
         <Link
           to={profilePath}
-          className="flex-1 rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-white/[0.10]"
+          className="profile-hover-secondary-control flex-1 rounded-full border px-3 py-2 text-center text-xs font-bold transition-colors"
         >
           View profile
         </Link>
         <Link
           to={statsPath}
-          className="flex-1 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-center text-xs font-bold text-cyan-200 transition-colors hover:bg-cyan-300/15"
+          className="profile-hover-accent-control flex-1 rounded-full border px-3 py-2 text-center text-xs font-bold transition-colors"
         >
           Listening DNA
         </Link>
@@ -250,10 +250,10 @@ function ProfileCardBody({
           onClick={onFollowToggle}
           disabled={busy}
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-full border transition-colors disabled:opacity-60",
+            "profile-hover-follow-control flex h-9 w-9 items-center justify-center rounded-full border transition-colors disabled:opacity-60",
             following
-              ? "border-white/10 bg-white/[0.06] text-white/75 hover:bg-white/[0.10]"
-              : "border-cyan-300/25 bg-cyan-300/15 text-cyan-200 hover:bg-cyan-300/20",
+              ? "profile-hover-following"
+              : "profile-hover-follow-default",
           )}
           title={following ? "Following" : "Follow"}
         >
@@ -272,9 +272,11 @@ function ProfileCardBody({
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-2">
-      <div className="truncate text-sm font-black text-white">{value}</div>
-      <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">
+    <div className="profile-hover-stat rounded-xl border px-2 py-2">
+      <div className="profile-hover-stat-value truncate text-sm font-black">
+        {value}
+      </div>
+      <div className="profile-hover-stat-label mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.14em]">
         {label}
       </div>
     </div>
@@ -287,9 +289,9 @@ function LoadingCard() {
     <div
       role="status"
       aria-label={t("profileHover.loading")}
-      className="flex h-40 w-[360px] items-center justify-center rounded-[12px] border border-white/10 bg-[#080a10]/95"
+      className="profile-hover-loading flex h-40 w-[360px] items-center justify-center rounded-[12px] border"
     >
-      <Loader2 size={18} className="animate-spin text-cyan-200" />
+      <Loader2 size={18} className="profile-hover-loading-icon animate-spin" />
     </div>
   );
 }
@@ -297,7 +299,7 @@ function LoadingCard() {
 function ErrorCard() {
   const { t } = useTranslation();
   return (
-    <div className="w-[320px] rounded-[12px] border border-white/10 bg-[#080a10]/95 p-4 text-sm text-white/60">
+    <div className="profile-hover-error w-[320px] rounded-[12px] border p-4 text-sm">
       {t("profileHover.loadFailed")}
     </div>
   );
@@ -483,7 +485,7 @@ export function ProfileHoverCard({
         ? createPortal(
             <AppPopover
               layer="popover"
-              className="fixed w-[360px] overflow-visible border-0 bg-transparent p-0 shadow-none backdrop-blur-0"
+              className="profile-hover-popover fixed w-[360px] overflow-visible p-0"
               style={{ left: position.left, top: position.top }}
               onPointerEnter={cancelClose}
               onPointerLeave={scheduleClose}

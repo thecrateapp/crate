@@ -1427,6 +1427,107 @@
   );
   --user-profile-badge-neutral-text: var(--user-profile-affinity-low-text);
 
+  --profile-hover-card-surface: var(--surface-overlay);
+  --profile-hover-card-border: var(--border-floating);
+  --profile-hover-card-shadow: 0 28px 90px var(--surface-glass-shadow);
+  --profile-hover-glow: radial-gradient(
+      circle at 18% 12%,
+      color-mix(in srgb, var(--accent-action) 20%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 8%, transparent),
+      transparent 42%
+    );
+  --profile-hover-watermark: color-mix(
+    in srgb,
+    var(--text-primary) 3.5%,
+    transparent
+  );
+  --profile-hover-avatar-shadow: 0 18px 44px
+    color-mix(in srgb, var(--surface-canvas) 36%, transparent);
+  --profile-hover-username: color-mix(
+    in srgb,
+    var(--text-primary) 45%,
+    transparent
+  );
+  --profile-hover-friend-border: color-mix(
+    in srgb,
+    var(--accent-action) 25%,
+    transparent
+  );
+  --profile-hover-friend-surface: color-mix(
+    in srgb,
+    var(--accent-action) 10%,
+    transparent
+  );
+  --profile-hover-friend-text: var(--user-profile-accent-text);
+  --profile-hover-main-badge-border: var(--border-floating);
+  --profile-hover-main-badge-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 30%,
+    transparent
+  );
+  --profile-hover-main-badge-text: var(--user-profile-accent-text);
+  --profile-hover-top-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3.5%,
+    transparent
+  );
+  --profile-hover-top-label: var(--text-subtle);
+  --profile-hover-reasons: color-mix(
+    in srgb,
+    var(--text-primary) 55%,
+    transparent
+  );
+  --profile-hover-secondary-control-surface: color-mix(
+    in srgb,
+    var(--text-primary) 6%,
+    transparent
+  );
+  --profile-hover-secondary-control-hover-surface: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --profile-hover-accent-control-border: color-mix(
+    in srgb,
+    var(--accent-action) 25%,
+    transparent
+  );
+  --profile-hover-accent-control-surface: color-mix(
+    in srgb,
+    var(--accent-action) 10%,
+    transparent
+  );
+  --profile-hover-accent-control-hover-surface: color-mix(
+    in srgb,
+    var(--accent-action) 15%,
+    transparent
+  );
+  --profile-hover-accent-control-text: var(--user-profile-accent-text);
+  --profile-hover-follow-default-surface: color-mix(
+    in srgb,
+    var(--accent-action) 15%,
+    transparent
+  );
+  --profile-hover-follow-default-hover-surface: color-mix(
+    in srgb,
+    var(--accent-action) 20%,
+    transparent
+  );
+  --profile-hover-following-text: color-mix(
+    in srgb,
+    var(--text-primary) 75%,
+    transparent
+  );
+  --profile-hover-error-text: color-mix(
+    in srgb,
+    var(--text-primary) 60%,
+    transparent
+  );
+
   --home-hero-scrim-horizontal: linear-gradient(
     90deg,
     color-mix(in srgb, var(--surface-canvas) 96%, transparent) 0%,
@@ -3015,6 +3116,183 @@
   border-color: var(--user-profile-badge-neutral-border);
   background: var(--user-profile-badge-neutral-surface);
   color: var(--user-profile-badge-neutral-text);
+}
+
+.profile-hover-popover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.profile-hover-card {
+  border-color: var(--profile-hover-card-border);
+  background: var(--profile-hover-card-surface);
+  box-shadow: var(--profile-hover-card-shadow);
+}
+
+.profile-hover-glow {
+  background: var(--profile-hover-glow);
+}
+
+.profile-hover-watermark {
+  color: var(--profile-hover-watermark);
+}
+
+.profile-hover-avatar {
+  box-shadow: var(--profile-hover-avatar-shadow);
+}
+
+.profile-hover-avatar-placeholder {
+  border-color: var(--user-profile-card-border);
+  background: var(--user-profile-accent-surface);
+  color: var(--user-profile-accent-text);
+}
+
+.profile-hover-title,
+.profile-hover-top-genre,
+.profile-hover-stat-value {
+  color: var(--text-primary);
+}
+
+.profile-hover-username {
+  color: var(--profile-hover-username);
+}
+
+.profile-hover-friend {
+  border-color: var(--profile-hover-friend-border);
+  background: var(--profile-hover-friend-surface);
+  color: var(--profile-hover-friend-text);
+}
+
+.profile-hover-main-badge {
+  border-color: var(--profile-hover-main-badge-border);
+  background: var(--profile-hover-main-badge-surface);
+  color: var(--profile-hover-main-badge-text);
+}
+
+.profile-hover-affinity-very-high {
+  color: var(--user-profile-affinity-very-high-text);
+}
+
+.profile-hover-affinity-high {
+  color: var(--user-profile-affinity-high-text);
+}
+
+.profile-hover-affinity-medium {
+  color: var(--user-profile-affinity-medium-text);
+}
+
+.profile-hover-affinity-low {
+  color: var(--user-profile-affinity-low-text);
+}
+
+.profile-hover-score-label,
+.profile-hover-top-label,
+.profile-hover-stat-label {
+  color: var(--text-subtle);
+}
+
+.profile-hover-top-panel {
+  border-color: var(--profile-hover-card-border);
+  background: var(--profile-hover-top-surface);
+}
+
+.profile-hover-reasons {
+  color: var(--profile-hover-reasons);
+}
+
+.profile-hover-stat {
+  border-color: var(--profile-hover-card-border);
+  background: var(--user-profile-stat-surface);
+}
+
+.profile-hover-secondary-control {
+  border-color: var(--profile-hover-card-border);
+  background: var(--profile-hover-secondary-control-surface);
+  color: var(--text-primary);
+}
+
+.profile-hover-secondary-control:hover {
+  background: var(--profile-hover-secondary-control-hover-surface);
+}
+
+.profile-hover-accent-control {
+  border-color: var(--profile-hover-accent-control-border);
+  background: var(--profile-hover-accent-control-surface);
+  color: var(--profile-hover-accent-control-text);
+}
+
+.profile-hover-accent-control:hover {
+  background: var(--profile-hover-accent-control-hover-surface);
+}
+
+.profile-hover-follow-control {
+  border-color: var(--profile-hover-card-border);
+}
+
+.profile-hover-following {
+  background: var(--profile-hover-secondary-control-surface);
+  color: var(--profile-hover-following-text);
+}
+
+.profile-hover-following:hover {
+  background: var(--profile-hover-secondary-control-hover-surface);
+}
+
+.profile-hover-follow-default {
+  border-color: var(--profile-hover-accent-control-border);
+  background: var(--profile-hover-follow-default-surface);
+  color: var(--profile-hover-accent-control-text);
+}
+
+.profile-hover-follow-default:hover {
+  background: var(--profile-hover-follow-default-hover-surface);
+}
+
+.profile-hover-badge-gold {
+  border-color: var(--user-profile-badge-gold-border);
+  background: var(--user-profile-badge-gold-surface);
+  color: var(--user-profile-badge-gold-text);
+}
+
+.profile-hover-badge-green {
+  border-color: var(--user-profile-badge-green-border);
+  background: var(--user-profile-badge-green-surface);
+  color: var(--user-profile-badge-green-text);
+}
+
+.profile-hover-badge-rose {
+  border-color: var(--user-profile-badge-rose-border);
+  background: var(--user-profile-badge-rose-surface);
+  color: var(--user-profile-badge-rose-text);
+}
+
+.profile-hover-badge-cyan {
+  border-color: var(--user-profile-badge-cyan-border);
+  background: var(--user-profile-badge-cyan-surface);
+  color: var(--user-profile-badge-cyan-text);
+}
+
+.profile-hover-badge-neutral {
+  border-color: var(--user-profile-badge-neutral-border);
+  background: var(--user-profile-badge-neutral-surface);
+  color: var(--user-profile-badge-neutral-text);
+}
+
+.profile-hover-loading {
+  border-color: var(--profile-hover-card-border);
+  background: var(--profile-hover-card-surface);
+}
+
+.profile-hover-loading-icon {
+  color: var(--profile-hover-accent-control-text);
+}
+
+.profile-hover-error {
+  border-color: var(--profile-hover-card-border);
+  background: var(--profile-hover-card-surface);
+  color: var(--profile-hover-error-text);
 }
 
 .home-legacy-hero {
