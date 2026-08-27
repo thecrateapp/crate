@@ -277,7 +277,7 @@ function parseTab(value: string | null): Tab {
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-16">
-      <Loader2 size={24} className="text-primary animate-spin" />
+      <Loader2 size={24} className="text-accent-action animate-spin" />
     </div>
   );
 }
@@ -292,7 +292,7 @@ function EmptyState({ message }: { message: string }) {
 
 function StatBox({ value, label }: { value: number; label: string }) {
   return (
-    <div className="flex-1 rounded-lg bg-white/5 px-3 py-2.5 text-center">
+    <div className="flex-1 rounded-lg bg-text-primary/5 px-3 py-2.5 text-center">
       <div className="text-lg font-bold text-foreground">{value ?? 0}</div>
       <div className="text-[11px] text-muted-foreground">{label}</div>
     </div>
@@ -336,17 +336,17 @@ function CollectionSortDropdown<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_0_18px_rgba(34,211,238,0.16)] focus-visible:border-primary/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_rgba(34,211,238,0.22)] ${
+        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-border-floating/10 px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-[0_0_18px_var(--accent-action-glow-soft)] focus-visible:border-accent-action/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_var(--accent-action-glow)] ${
           open
-            ? "border-primary/45 shadow-[0_0_20px_rgba(34,211,238,0.18)]"
-            : "border-white/10"
+            ? "border-accent-action/45 shadow-[0_0_20px_var(--accent-action-glow)]"
+            : ""
         }`}
       >
         <span className="truncate">{selectedLabel}</span>
         <ChevronDown
           size={16}
-          className={`shrink-0 text-white/55 transition-transform ${
-            open ? "rotate-180 text-primary" : ""
+          className={`shrink-0 text-text-primary/55 transition-transform ${
+            open ? "rotate-180 text-accent-action" : ""
           }`}
         />
       </button>
@@ -355,7 +355,7 @@ function CollectionSortDropdown<T extends string>({
         <div
           role="listbox"
           aria-label={label}
-          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-[12px] border border-white/10 p-1 shadow-[0_20px_48px_rgba(0,0,0,0.42)] animate-pop-in"
+          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-[12px] border border-border-floating/10 p-1 shadow-menu animate-pop-in"
         >
           {options.map((option) => {
             const selected = option.value === value;
@@ -371,8 +371,8 @@ function CollectionSortDropdown<T extends string>({
                 }}
                 className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold transition-[background-color,color,filter] ${
                   selected
-                    ? "bg-primary/14 text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.22)]"
-                    : "text-foreground hover:bg-white/7 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.18)]"
+                    ? "bg-accent-action/14 text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    : "text-foreground hover:bg-text-primary/7 hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow-soft)]"
                 }`}
               >
                 <span>{t(option.labelKey)}</span>
@@ -515,15 +515,15 @@ function PlaylistsTab() {
     <div className="space-y-3">
       <button
         onClick={() => openCreatePlaylist()}
-        className="flex items-center gap-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors px-4 py-2.5 text-sm font-medium text-foreground w-full"
+        className="library-new-playlist flex w-full items-center gap-2 rounded-lg bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-text-primary/10"
       >
-        <Plus size={16} className="text-primary" />
+        <Plus size={16} className="text-accent-action" />
         {t("library.playlists.new")}
       </button>
 
       {followedCurated && followedCurated.length > 0 ? (
         <div className="space-y-1">
-          <div className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-white/40">
+          <div className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-primary/40">
             {t("explore.fromCrate.title")}
           </div>
           {followedCurated.map((playlist) => (
@@ -562,7 +562,7 @@ function PlaylistsTab() {
         ) : null
       ) : (
         <div className="space-y-1">
-          <div className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-white/40">
+          <div className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-primary/40">
             {t("library.playlists.yours")}
           </div>
           {playlists.map((pl) => (
@@ -648,7 +648,7 @@ function PlaylistsTab() {
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
           <button
             type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-text-primary/5 hover:text-foreground"
             onClick={() => setDeletingPlaylist(null)}
             disabled={deleting}
           >
@@ -656,7 +656,7 @@ function PlaylistsTab() {
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-danger px-4 py-2.5 text-sm font-medium text-accent-danger-foreground transition-colors hover:bg-accent-danger/90 disabled:opacity-50"
             onClick={handleDeletePlaylist}
             disabled={deleting}
           >
@@ -711,7 +711,7 @@ function ArtistsTab() {
     <div className="space-y-4">
       {!isDesktop ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-text-primary/40">
             {t("library.sort.label")}
           </span>
           <CollectionSortDropdown
@@ -778,7 +778,7 @@ function AlbumsTab() {
     <div className="space-y-4">
       {!isDesktop ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-text-primary/40">
             {t("library.sort.label")}
           </span>
           <CollectionSortDropdown
@@ -895,10 +895,10 @@ function BandcampTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[12px] border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-5">
+      <div className="rounded-[12px] border border-accent-action/20 bg-accent-action/10 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#1da0c3]/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-primary">
+            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-accent-action">
               <BandcampLogo size={13} />
               Bandcamp
             </div>
@@ -929,7 +929,7 @@ function BandcampTab() {
       {importedContributions.length ? (
         <section className="space-y-3">
           <div>
-            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-primary">
+            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-accent-action">
               {t("library.bandcamp.imported.title")}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -940,9 +940,9 @@ function BandcampTab() {
             {importedContributions.map((contribution) => (
               <article
                 key={contribution.id}
-                className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3"
+                className="flex items-center gap-3 rounded-xl border border-text-primary/8 bg-text-primary/[0.03] p-3"
               >
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-text-primary/8 bg-text-primary/6">
                   {contribution.album_id ? (
                     <CrateImage
                       src={albumCoverApiUrl(
@@ -960,7 +960,7 @@ function BandcampTab() {
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
-                      <BandcampLogo size={20} className="text-primary/70" />
+                      <BandcampLogo size={20} className="text-accent-action/70" />
                     </div>
                   )}
                 </div>
@@ -976,7 +976,7 @@ function BandcampTab() {
                   type="button"
                   disabled={!contribution.album_id}
                   onClick={() => exportContribution(contribution)}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-floating px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
                 >
                   <Download size={14} />
                   {t("common.export")}
@@ -984,7 +984,7 @@ function BandcampTab() {
                 <button
                   type="button"
                   onClick={() => setWithdrawTarget(contribution)}
-                  className="inline-flex min-h-10 items-center rounded-full border border-red-400/20 px-3 text-xs font-bold text-red-300"
+                  className="inline-flex min-h-10 items-center rounded-full border border-accent-danger/20 px-3 text-xs font-bold text-accent-danger"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -999,7 +999,7 @@ function BandcampTab() {
           <EmptyState message={t("library.bandcamp.emptyPurchases")} />
           <Link
             to="/settings"
-            className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-sm font-bold text-black"
+            className="inline-flex min-h-11 items-center rounded-full bg-accent-action px-4 text-sm font-bold text-accent-action-foreground"
           >
             {t("library.bandcamp.openSettings")}
           </Link>
@@ -1012,9 +1012,9 @@ function BandcampTab() {
             return (
               <article
                 key={`${item.id}-${item.item_url}`}
-                className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3"
+                className="flex items-center gap-3 rounded-xl border border-text-primary/8 bg-text-primary/[0.03] p-3"
               >
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/8 bg-white/6">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-text-primary/8 bg-text-primary/6">
                   {coverUrl ? (
                     <CrateImage
                       src={coverUrl}
@@ -1023,7 +1023,7 @@ function BandcampTab() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <BandcampLogo size={22} className="text-primary/70" />
+                    <BandcampLogo size={22} className="text-accent-action/70" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -1035,7 +1035,7 @@ function BandcampTab() {
                   </p>
                 </div>
                 {item.latest_import_status === "completed" ? (
-                  <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                  <span className="rounded-full border border-state-success/25 bg-state-success/10 px-3 py-1 text-xs font-bold text-state-success">
                     {t("library.bandcamp.imported.badge")}
                   </span>
                 ) : item.downloadable ? (
@@ -1043,7 +1043,7 @@ function BandcampTab() {
                     type="button"
                     disabled={busyItemId === item.id}
                     onClick={() => void importItem(item)}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-3 text-xs font-black text-black disabled:opacity-50"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full bg-accent-action px-3 text-xs font-black text-accent-action-foreground disabled:opacity-50"
                   >
                     {busyItemId === item.id ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -1057,7 +1057,7 @@ function BandcampTab() {
                   <button
                     type="button"
                     onClick={() => window.open(item.item_url || "", "_blank")}
-                    className="inline-flex min-h-10 items-center rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground"
+                    className="inline-flex min-h-10 items-center rounded-full border border-border-floating px-3 text-xs font-bold text-muted-foreground"
                   >
                     <ExternalLink size={14} />
                   </button>
@@ -1095,7 +1095,7 @@ function BandcampTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-border-floating px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
           >
             {t("common.keepIt")}
           </button>
@@ -1103,7 +1103,7 @@ function BandcampTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => void withdrawContribution()}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-red-400 px-4 text-sm font-black text-black disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent-danger px-4 text-sm font-black text-accent-danger-foreground disabled:opacity-50"
           >
             {withdrawing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -1122,7 +1122,7 @@ function ContributionArtwork({
   contribution: LibraryContribution;
 }) {
   return (
-    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
+    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-text-primary/8 bg-text-primary/6">
       {contribution.album_id ? (
         <CrateImage
           src={albumCoverApiUrl(
@@ -1139,7 +1139,7 @@ function ContributionArtwork({
           className="h-full w-full object-cover"
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-primary/70">
+        <div className="flex h-full w-full items-center justify-center text-accent-action/70">
           {contribution.source === "bandcamp" ? (
             <BandcampLogo size={20} />
           ) : (
@@ -1201,7 +1201,7 @@ function ContributionsTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[12px] border border-white/10 bg-white/[0.04] p-5">
+      <div className="rounded-[12px] border border-border-floating bg-text-primary/[0.04] p-5">
         <h2 className="text-xl font-black text-foreground">
           {t("library.contributions.title")}
         </h2>
@@ -1217,7 +1217,7 @@ function ContributionsTab() {
           {contributions.map((contribution) => (
             <article
               key={contribution.id}
-              className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3"
+              className="flex items-center gap-3 rounded-xl border border-text-primary/8 bg-text-primary/[0.03] p-3"
             >
               <ContributionArtwork contribution={contribution} />
               <div className="min-w-0 flex-1">
@@ -1227,7 +1227,7 @@ function ContributionsTab() {
                 <p className="truncate text-xs text-muted-foreground">
                   {contribution.artist_name}
                 </p>
-                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary/80">
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent-action/80">
                   {contributionSourceLabel(contribution.source)}
                 </p>
               </div>
@@ -1235,7 +1235,7 @@ function ContributionsTab() {
                 type="button"
                 disabled={!contribution.album_id}
                 onClick={() => exportContribution(contribution)}
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-floating px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
               >
                 <Download size={14} />
                 {t("common.export")}
@@ -1243,7 +1243,7 @@ function ContributionsTab() {
               <button
                 type="button"
                 onClick={() => setWithdrawTarget(contribution)}
-                className="inline-flex min-h-10 items-center rounded-full border border-red-400/20 px-3 text-xs font-bold text-red-300"
+                className="inline-flex min-h-10 items-center rounded-full border border-accent-danger/20 px-3 text-xs font-bold text-accent-danger"
               >
                 <Trash2 size={14} />
               </button>
@@ -1279,7 +1279,7 @@ function ContributionsTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-border-floating px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
           >
             {t("common.keepIt")}
           </button>
@@ -1287,7 +1287,7 @@ function ContributionsTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => void withdrawContribution()}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-red-400 px-4 text-sm font-black text-black disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent-danger px-4 text-sm font-black text-accent-danger-foreground disabled:opacity-50"
           >
             {withdrawing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -1386,7 +1386,7 @@ function LikedTab() {
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={handlePlayAll}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
         >
           <Play size={16} fill="currentColor" />
           {filtered.length < tracks.length
@@ -1396,14 +1396,14 @@ function LikedTab() {
         <div className="relative min-w-[180px] flex-1">
           <Search
             size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-primary/40"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("library.liked.filterPlaceholder")}
-            className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 text-sm text-white placeholder:text-white/40 outline-none focus:bg-white/8"
+            className="h-10 w-full rounded-lg bg-text-primary/5 pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-primary/40 focus:bg-text-primary/8"
           />
         </div>
         <CollectionSortDropdown
@@ -1516,8 +1516,8 @@ export function Library() {
                 onClick={() => setTab(key)}
                 className={`flex min-h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   tab === key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                    ? "bg-accent-action text-accent-action-foreground"
+                    : "bg-text-primary/5 text-muted-foreground hover:bg-text-primary/10 hover:text-foreground"
                 }`}
               >
                 <Icon size={14} />
