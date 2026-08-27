@@ -43,7 +43,7 @@ function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
       <CrateImage
         src={item.imageUrl}
         alt=""
-        className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${
+        className={`h-8 w-8 shrink-0 bg-text-primary/5 object-cover ${
           item.type === "artist" ? "rounded-full" : "rounded"
         }`}
         onError={(e) => {
@@ -56,7 +56,7 @@ function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
     return (
       <User
         size={CRATE_ICON_SIZE.md}
-        className="h-8 w-8 shrink-0 rounded-full bg-white/5 p-1.5 text-white/30"
+        className="h-8 w-8 shrink-0 rounded-full bg-text-primary/5 p-1.5 text-text-primary/30"
       />
     );
   }
@@ -64,14 +64,14 @@ function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
     return (
       <Disc
         size={CRATE_ICON_SIZE.md}
-        className="h-8 w-8 shrink-0 rounded bg-white/5 p-1.5 text-white/30"
+        className="h-8 w-8 shrink-0 rounded bg-text-primary/5 p-1.5 text-text-primary/30"
       />
     );
   }
   return (
     <Music
       size={CRATE_ICON_SIZE.md}
-      className="h-8 w-8 shrink-0 rounded bg-white/5 p-1.5 text-white/30"
+      className="h-8 w-8 shrink-0 rounded bg-text-primary/5 p-1.5 text-text-primary/30"
     />
   );
 }
@@ -415,27 +415,29 @@ export function TopBarSearch() {
                     key={`${item.type}-${item.label}-${index}`}
                     onClick={() => void selectItem(item)}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                      index === activeIdx ? "bg-white/10" : "hover:bg-white/5"
+                      index === activeIdx
+                        ? "bg-text-primary/10"
+                        : "hover:bg-text-primary/5"
                     }`}
                   >
                     <SearchResultThumb item={item} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] text-white/80">
+                      <p className="truncate text-[13px] text-text-primary/80">
                         {item.label}
                       </p>
                       {item.sublabel ? (
-                        <p className="truncate text-[11px] text-white/40">
+                        <p className="truncate text-[11px] text-text-primary/40">
                           {item.sublabel}
                         </p>
                       ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
                       {item.origin === "remote" ? (
-                        <span className="rounded-full border border-cyan-300/15 bg-cyan-300/8 px-1.5 py-0.5 text-cyan-200/70">
+                        <span className="rounded-full border border-accent-action/15 bg-accent-action/8 px-1.5 py-0.5 text-accent-action/80">
                           {item.nodeName || t("search.remoteSource")}
                         </span>
                       ) : null}
-                      <span className="capitalize text-white/20">
+                      <span className="capitalize text-text-primary/20">
                         {t(`search.resultType.${item.type}`)}
                       </span>
                     </div>
@@ -443,24 +445,26 @@ export function TopBarSearch() {
                 ))}
                 {showSearchError ? (
                   <div className="px-4 py-5 text-center">
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/8 text-amber-100">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-state-warning/15 bg-state-warning/8 text-state-warning">
                       <Search size={CRATE_ICON_SIZE.md} />
                     </div>
-                    <p className="mt-3 text-sm font-semibold text-white/86">
+                    <p className="mt-3 text-sm font-semibold text-text-primary/86">
                       {t("search.unavailableTitle")}
                     </p>
-                    <p className="mt-1 text-xs text-white/45">{searchError}</p>
+                    <p className="mt-1 text-xs text-text-primary/45">
+                      {searchError}
+                    </p>
                   </div>
                 ) : null}
                 {showEmptyResults ? (
                   <div className="px-4 py-5 text-center">
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-accent-action/15 bg-accent-action/8 text-accent-action">
                       <Search size={CRATE_ICON_SIZE.md} />
                     </div>
-                    <p className="mt-3 text-sm font-semibold text-white/86">
+                    <p className="mt-3 text-sm font-semibold text-text-primary/86">
                       {t("search.noMusicTitle")}
                     </p>
-                    <p className="mt-1 text-xs text-white/45">
+                    <p className="mt-1 text-xs text-text-primary/45">
                       {t("search.noMusicSubtitle")}
                     </p>
                   </div>
@@ -475,7 +479,7 @@ export function TopBarSearch() {
                       setCompletedQuery(null);
                       setSearchError(null);
                     }}
-                    className="mt-1 w-full border-t border-white/5 px-3 py-2 text-center text-xs text-primary transition-colors hover:bg-white/5"
+                    className="mt-1 w-full border-t border-text-primary/5 px-3 py-2 text-center text-xs text-accent-action transition-colors hover:bg-text-primary/5"
                   >
                     {t("search.seeAllResults", { query: trimmedQuery })}
                   </button>
@@ -485,7 +489,7 @@ export function TopBarSearch() {
 
             {showRecents ? (
               <>
-                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-primary/40">
                   {t("search.recent")}
                 </p>
                 {recents.map((recent, index) => (
@@ -493,14 +497,16 @@ export function TopBarSearch() {
                     key={`${recent.type ?? "query"}:${recent.label}:${index}`}
                     onClick={() => selectRecent(recent)}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                      index === activeIdx ? "bg-white/10" : "hover:bg-white/5"
+                      index === activeIdx
+                        ? "bg-text-primary/10"
+                        : "hover:bg-text-primary/5"
                     }`}
                   >
                     <Search
                       size={CRATE_ICON_SIZE.xs}
-                      className="shrink-0 text-white/20"
+                      className="shrink-0 text-text-primary/20"
                     />
-                    <span className="truncate text-[13px] text-white/60">
+                    <span className="truncate text-[13px] text-text-primary/60">
                       {recent.label}
                     </span>
                   </button>
@@ -535,7 +541,7 @@ export function TopBarSearch() {
           "relative overflow-visible rounded-xl transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
           isDesktop
             ? searchOpen
-              ? "border border-white/8 bg-app-surface/68 shadow-[0_18px_42px_rgba(0,0,0,0.22)]"
+              ? "border border-text-primary/8 bg-surface-canvas/68 shadow-[0_18px_42px_var(--surface-glass-hover-shadow)]"
               : "border-0 bg-transparent shadow-none backdrop-blur-0"
             : "listen-glass-panel listen-search-glass",
           searchOpen ? "md:scale-x-[1.01]" : "md:scale-x-100",
@@ -555,8 +561,8 @@ export function TopBarSearch() {
             className={cn(
               "absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl border-0 bg-transparent shadow-none backdrop-blur-0 transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0",
               searchOpen
-                ? "w-12 justify-center px-0 text-white/42"
-                : "w-full justify-start gap-2 px-4 text-white/72 group-hover:scale-[1.03] group-hover:text-white/88",
+                ? "w-12 justify-center px-0 text-text-primary/42"
+                : "w-full justify-start gap-2 px-4 text-text-primary/72 group-hover:scale-[1.03] group-hover:text-text-primary/88",
             )}
           >
             <Search size={CRATE_ICON_SIZE.md} />
@@ -574,7 +580,7 @@ export function TopBarSearch() {
           {loading && searchOpen ? (
             <Loader2
               size={CRATE_ICON_SIZE.sm}
-              className="absolute right-4 animate-spin text-white/40"
+              className="absolute right-4 animate-spin text-text-primary/40"
             />
           ) : null}
           {!loading && query && searchOpen ? (
@@ -588,7 +594,7 @@ export function TopBarSearch() {
                 setShowDropdown(true);
                 focusInputSoon();
               }}
-              className="absolute right-3 z-20 flex size-9 touch-manipulation items-center justify-center text-white/30 hover:text-white/65"
+              className="absolute right-3 z-20 flex size-9 touch-manipulation items-center justify-center text-text-primary/30 hover:text-text-primary/65"
               aria-label={t("search.clear")}
             >
               <X size={CRATE_ICON_SIZE.lg} />
@@ -613,9 +619,9 @@ export function TopBarSearch() {
             onKeyDown={handleKeyDown}
             placeholder={t("search.placeholder")}
             className={cn(
-              "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-white outline-none md:h-11 md:pl-11 md:text-[15px]",
+              "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-text-primary outline-none md:h-11 md:pl-11 md:text-[15px]",
               "transition-[opacity,transform,box-shadow,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
-              "placeholder:text-white/40",
+              "placeholder:text-text-primary/40",
               searchOpen
                 ? "pointer-events-auto translate-x-0 scale-100 pr-11 opacity-100"
                 : "pointer-events-none translate-x-3 scale-[0.985] pr-4 opacity-0",

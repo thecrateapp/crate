@@ -235,9 +235,10 @@ describe("TopBarSearch", () => {
 
     await waitFor(() => {
       expect(api).toHaveBeenCalledWith("/api/catalog/search?q=high&limit=10");
-      expect(screen.getByText("High Vis")).toBeTruthy();
+    expect(screen.getByText("High Vis")).toBeTruthy();
     });
 
+    expect(screen.getByText("High Vis")).toHaveClass("text-text-primary/80");
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
       "listen-glass-panel",
       "rounded-[12px]",

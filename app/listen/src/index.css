@@ -225,7 +225,11 @@ textarea {
     var(--text-primary) 13%,
     transparent
   );
-  --surface-glass-shadow: rgba(0, 0, 0, 0.34);
+  --surface-glass-shadow: color-mix(
+    in srgb,
+    var(--surface-canvas) 34%,
+    transparent
+  );
   --surface-glass-highlight: color-mix(
     in srgb,
     var(--text-primary) 8%,
