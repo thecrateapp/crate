@@ -211,7 +211,7 @@ describe("HomeTasteHero", () => {
   });
 
   it("renders the legacy carousel when the device has no featured surface", () => {
-    renderWithListenProviders(
+    const { container } = renderWithListenProviders(
       <HomeTasteHero
         heroes={[heroFixture()]}
         heroSurfaces={{
@@ -233,6 +233,10 @@ describe("HomeTasteHero", () => {
 
     expect(screen.getByTestId("desktop-legacy-hero")).toBeInTheDocument();
     expect(screen.queryByTestId("desktop-hero-artwork")).toBeNull();
+    expect(container.querySelector(".home-legacy-hero")).toBeInTheDocument();
+    expect(
+      container.querySelector(".home-hero-scrim-horizontal"),
+    ).toBeInTheDocument();
   });
 
   it("renders the editorial Just Landed content without recommendation controls", () => {
@@ -1076,13 +1080,15 @@ describe("RadioStationCard", () => {
       artist_slug: "converge",
     };
 
-    renderWithListenProviders(
+    const { container } = renderWithListenProviders(
       <RadioStationCard station={station} onPlay={vi.fn()} />,
     );
 
     expect(screen.getByText("Artist Radio")).toBeInTheDocument();
     expect(screen.getByText("Converge")).toBeInTheDocument();
     expect(screen.queryByText("Based on your heavy rotation")).toBeNull();
+    expect(container.querySelector(".home-radio-card")).toBeInTheDocument();
+    expect(container.querySelector(".home-radio-badge")).toBeInTheDocument();
   });
 
   it("uses global artist artwork for remote radio stations", () => {

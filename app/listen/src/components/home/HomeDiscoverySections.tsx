@@ -120,12 +120,12 @@ function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
 }
 
 const HISTORY_TONES = [
-  "from-cyan-400/30 via-teal-950/65 to-black",
-  "from-amber-300/30 via-stone-950/70 to-black",
-  "from-indigo-400/30 via-slate-950/70 to-black",
-  "from-rose-300/30 via-red-950/60 to-black",
-  "from-lime-300/35 via-emerald-950/55 to-black",
-  "from-fuchsia-300/30 via-purple-950/65 to-black",
+  "home-history-tone-1",
+  "home-history-tone-2",
+  "home-history-tone-3",
+  "home-history-tone-4",
+  "home-history-tone-5",
+  "home-history-tone-6",
 ];
 
 function historyLabel(item: HomeListeningHistoryCard): string {
@@ -561,7 +561,7 @@ export function HomeTasteHero({
   return (
     <div
       data-testid="desktop-editorial-hero"
-      className="relative mx-auto aspect-[1480/600] min-h-[clamp(480px,38dvh,600px)] w-full max-w-[1480px] overflow-hidden bg-app-surface"
+      className="relative mx-auto aspect-[1480/600] min-h-[clamp(480px,38dvh,600px)] w-full max-w-[1480px] overflow-hidden bg-surface-canvas"
     >
       {surfaceHeroes.map((hero, index) => {
         const source =
@@ -650,7 +650,7 @@ function LegacyMobileFeaturedArtist({
   return (
     <section
       data-testid="mobile-legacy-hero"
-      className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-white/10 bg-app-surface"
+      className="home-legacy-hero relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-border-floating"
     >
       <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="mobile" />
       <button
@@ -694,7 +694,7 @@ function LegacyDesktopFeaturedArtist({
       data-testid="desktop-legacy-hero"
       aria-hidden={!active}
       className={cn(
-        "absolute inset-0 overflow-hidden rounded-[12px] border border-white/10 transition-opacity duration-500 ease-out",
+        "home-legacy-hero absolute inset-0 overflow-hidden rounded-[12px] border border-border-floating transition-opacity duration-500 ease-out",
         active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
       )}
     >
@@ -740,8 +740,8 @@ function LegacyHeroArtwork({
           className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
         />
       ) : null}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.96)_0%,rgba(5,7,11,0.78)_42%,rgba(5,7,11,0.2)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(0deg,rgba(5,7,11,0.98)_0%,rgba(5,7,11,0.18)_60%,rgba(5,7,11,0.45)_100%)]" />
+      <div className="home-hero-scrim-horizontal pointer-events-none absolute inset-0" />
+      <div className="home-hero-scrim-vertical pointer-events-none absolute inset-0" />
     </>
   );
 }
@@ -760,10 +760,10 @@ function LegacyHeroCopy({
   const { t } = useTranslation();
   return (
     <div className="pointer-events-auto">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-accent-action">
         {t("home.library.justLanded.title")}
       </p>
-      <h1 className="mt-2 truncate text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
+      <h1 className="home-hero-title mt-2 truncate text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
         {hero.name}
       </h1>
       <HeroGenres hero={hero} />
@@ -796,7 +796,7 @@ function LegacyDesktopHeroNavigation({
       <button
         type="button"
         aria-label={t("home.hero.previousArtist")}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/75 backdrop-blur-sm hover:text-white"
+        className="home-hero-nav-control flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm"
         onClick={onPrevious}
       >
         <ChevronLeft size={18} />
@@ -815,8 +815,8 @@ function LegacyDesktopHeroNavigation({
               className={cn(
                 "block h-1.5 rounded-full transition-all duration-300",
                 index === activeIndex
-                  ? "w-6 bg-primary"
-                  : "w-1.5 bg-white/35 hover:bg-white/60",
+                  ? "home-hero-pagination-active w-6"
+                  : "home-hero-pagination-inactive w-1.5",
               )}
             />
           </button>
@@ -825,7 +825,7 @@ function LegacyDesktopHeroNavigation({
       <button
         type="button"
         aria-label={t("home.hero.nextArtist")}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/75 backdrop-blur-sm hover:text-white"
+        className="home-hero-nav-control flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm"
         onClick={onNext}
       >
         <ChevronRight size={18} />
@@ -888,7 +888,7 @@ function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
         <GenrePill
           key={genre.name}
           item={genre}
-          className="max-w-[42vw] border-white/10 bg-black/30 text-white/80 backdrop-blur-sm sm:max-w-none"
+          className="home-hero-genre max-w-[42vw] backdrop-blur-sm sm:max-w-none"
         />
       ))}
     </div>
@@ -920,7 +920,7 @@ function HeroActions({
         type="button"
         aria-label={playLabel}
         className={cn(
-          "inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground shadow-[0_10px_28px_rgba(6,182,212,0.2)] transition-colors hover:bg-primary/90",
+          "home-discovery-play-button inline-flex h-11 items-center justify-center gap-2 rounded-md font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90",
           "px-5",
         )}
         onClick={(event) => {
@@ -935,7 +935,7 @@ function HeroActions({
       <FollowHeartButton
         aria-label={followLabel}
         className={cn(
-          "inline-flex h-11 w-11 items-center justify-center rounded-md border-0 bg-transparent text-white/80 transition-colors hover:bg-transparent hover:text-white",
+          "home-hero-follow inline-flex h-11 w-11 items-center justify-center rounded-md border-0 bg-transparent transition-colors hover:bg-transparent",
         )}
         following={following}
         heartTestId="hero-follow-heart"
@@ -967,7 +967,7 @@ function MobileFeaturedArtist({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden bg-app-surface">
+    <section className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden bg-surface-canvas">
       <ArtistHeroFrame
         composition="mobile"
         artworkBounds={heroArtworkBounds(hero, "mobile")}
@@ -1107,8 +1107,8 @@ function DesktopHeroNavigation({
               className={cn(
                 "block w-1 rounded-full transition-[height,background-color] duration-300",
                 index === activeIndex
-                  ? "h-6 bg-primary"
-                  : "h-1.5 bg-white/35 group-hover:bg-white/60",
+                  ? "home-hero-pagination-active h-6"
+                  : "home-hero-pagination-inactive h-1.5",
               )}
             />
           </button>
@@ -1118,7 +1118,7 @@ function DesktopHeroNavigation({
         <button
           type="button"
           aria-label={t("home.hero.previousArtist")}
-          className="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-white/55 shadow-none transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="home-hero-nav-control-plain flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 shadow-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action"
           onClick={onPrevious}
         >
           <ChevronUp size={20} />
@@ -1126,7 +1126,7 @@ function DesktopHeroNavigation({
         <button
           type="button"
           aria-label={t("home.hero.nextArtist")}
-          className="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-white/55 shadow-none transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="home-hero-nav-control-plain flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 shadow-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action"
           onClick={onNext}
         >
           <ChevronDown size={20} />
@@ -1288,10 +1288,10 @@ function RecentEntityRowFrame({
       onClick={onClick}
       onKeyDown={handleKeyDown}
       onContextMenu={actionMenu.handleContextMenu}
-      className="group flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition-colors hover:bg-white/[0.06]"
+      className="home-discovery-card group flex min-w-0 items-center gap-3 rounded-lg px-3 py-3 text-left"
       {...actionMenu.longPressHandlers}
     >
-      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white/5">
+      <div className="home-discovery-artwork relative h-12 w-12 shrink-0 overflow-hidden rounded-xl">
         {item.type === "playlist" ? (
           <PlaylistArtwork
             name={item.playlist_name}
@@ -1308,11 +1308,11 @@ function RecentEntityRowFrame({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-white/5">
+          <div className="home-discovery-artwork flex h-full w-full items-center justify-center">
             {item.type === "artist" ? (
-              <UserRound size={18} className="text-white/30" />
+              <UserRound size={18} className="home-discovery-placeholder-icon" />
             ) : (
-              <Disc3 size={18} className="text-white/30" />
+              <Disc3 size={18} className="home-discovery-placeholder-icon" />
             )}
           </div>
         )}
@@ -1482,18 +1482,18 @@ export function CustomMixCard({
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
       className={cn(
-        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
+        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
-      <div className="relative mb-2 overflow-hidden rounded-xl bg-white/5">
+      <div className="home-discovery-artwork relative mb-2 overflow-hidden rounded-xl">
         <MixArtwork
           item={item}
           className="aspect-square rounded-xl transition-transform group-hover:scale-[1.02]"
         />
-        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
+        <div className="home-discovery-artwork-overlay absolute inset-0 flex items-center justify-center">
           <button
-            className="flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
+            className="home-discovery-play-button flex h-10 w-10 translate-y-2 items-center justify-center rounded-full opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onPlayMix(item);
@@ -1501,8 +1501,8 @@ export function CustomMixCard({
           >
             <Play
               size={18}
-              fill="#0a0a0f"
-              className="ml-0.5 text-primary-foreground"
+              fill="currentColor"
+              className="ml-0.5 text-accent-action-foreground"
             />
           </button>
         </div>
@@ -1513,7 +1513,7 @@ export function CustomMixCard({
       <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
         {mixArtistSummary(item)}
       </div>
-      <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-white/40">
+      <div className="home-discovery-meta mt-2 text-[11px] uppercase tracking-[0.18em]">
         {t("common.trackCount", { count: item.track_count })}
       </div>
       <ItemActionMenu
@@ -1585,7 +1585,7 @@ function ListeningHistoryCard({
     <button
       type="button"
       onClick={() => onOpen(item)}
-      className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:w-56"
+      className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas lg:w-56"
     >
       <EditorialPlaylistArtwork
         title={historyLabel(item)}
@@ -1593,7 +1593,7 @@ function ListeningHistoryCard({
         tracks={item.artwork_tracks}
         variant="history"
         className={cn(
-          "aspect-[1.12] rounded-xl bg-gradient-to-br shadow-xl shadow-black/20 transition duration-300 group-hover:border-primary/30 group-hover:brightness-110",
+          "home-history-card aspect-[1.12] rounded-xl",
           HISTORY_TONES[index % HISTORY_TONES.length],
         )}
         textClassName={cn(
@@ -1609,7 +1609,7 @@ function ListeningHistoryCard({
         <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">
           {artists}
         </p>
-        <div className="mt-auto text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">
+        <div className="home-history-meta mt-auto text-[10px] font-bold uppercase tracking-[0.14em]">
           {t("common.playCount", { count: item.play_count })} ·{" "}
           {formatHistoryMinutes(item.minutes_listened)}
         </div>
@@ -1783,7 +1783,7 @@ export function RadioStationCard({
     <button
       onClick={onPlay}
       className={cn(
-        "group relative overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.04] text-left",
+        "home-radio-card group relative overflow-hidden rounded-[12px] text-left",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
@@ -1796,16 +1796,16 @@ export function RadioStationCard({
       ) : (
         <div className="aspect-square" />
       )}
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(6,8,12,0.92)_100%)]" />
-      <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-black/35 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary shadow-[0_0_18px_rgba(6,182,212,0.16)] backdrop-blur-md">
+      <div className="home-radio-overlay absolute inset-0" />
+      <div className="home-radio-badge absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] backdrop-blur-md">
         <Radio size={12} className="inline-block" /> {seedTypeLabel}
       </div>
       <div className="absolute inset-x-0 bottom-0 p-4">
-        <div className="truncate text-sm font-semibold text-white">
+        <div className="home-radio-title truncate text-sm font-semibold">
           {seedLabel}
         </div>
         {seedSubtitle ? (
-          <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
+          <div className="home-radio-subtitle mt-1 line-clamp-2 text-xs leading-5">
             {seedSubtitle}
           </div>
         ) : null}
@@ -1938,18 +1938,18 @@ export function CoreTracksPlaylistCard({
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
       className={cn(
-        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
+        "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
-      <div className="relative mb-2 overflow-hidden rounded-xl bg-white/5">
+      <div className="home-discovery-artwork relative mb-2 overflow-hidden rounded-xl">
         <CoreTracksArtwork
           item={item}
           className="aspect-square rounded-xl transition-transform group-hover:scale-[1.02]"
         />
-        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
+        <div className="home-discovery-artwork-overlay absolute inset-0 flex items-center justify-center">
           <button
-            className="flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
+            className="home-discovery-play-button flex h-10 w-10 translate-y-2 items-center justify-center rounded-full opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onPlayPlaylist(item);
@@ -1957,8 +1957,8 @@ export function CoreTracksPlaylistCard({
           >
             <Play
               size={18}
-              fill="#0a0a0f"
-              className="ml-0.5 text-primary-foreground"
+              fill="currentColor"
+              className="ml-0.5 text-accent-action-foreground"
             />
           </button>
         </div>

@@ -1426,6 +1426,173 @@
     transparent
   );
   --user-profile-badge-neutral-text: var(--user-profile-affinity-low-text);
+
+  --home-hero-scrim-horizontal: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--surface-canvas) 96%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 78%, transparent) 42%,
+    color-mix(in srgb, var(--surface-canvas) 20%, transparent) 100%
+  );
+  --home-hero-scrim-vertical: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--surface-canvas) 98%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 18%, transparent) 60%,
+    color-mix(in srgb, var(--surface-canvas) 45%, transparent) 100%
+  );
+  --home-hero-control-border: color-mix(
+    in srgb,
+    var(--text-primary) 15%,
+    transparent
+  );
+  --home-hero-control-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 35%,
+    transparent
+  );
+  --home-hero-control-text: color-mix(
+    in srgb,
+    var(--text-primary) 75%,
+    transparent
+  );
+  --home-hero-control-muted-text: color-mix(
+    in srgb,
+    var(--text-primary) 55%,
+    transparent
+  );
+  --home-hero-pagination-inactive: color-mix(
+    in srgb,
+    var(--text-primary) 35%,
+    transparent
+  );
+  --home-hero-pagination-hover: color-mix(
+    in srgb,
+    var(--text-primary) 60%,
+    transparent
+  );
+  --home-hero-genre-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --home-hero-genre-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 30%,
+    transparent
+  );
+  --home-hero-genre-text: color-mix(
+    in srgb,
+    var(--text-primary) 80%,
+    transparent
+  );
+  --home-hero-follow-text: color-mix(
+    in srgb,
+    var(--text-primary) 80%,
+    transparent
+  );
+  --home-hero-play-shadow: 0 10px 28px var(--accent-action-glow-soft);
+  --home-discovery-card-border: var(--border-floating);
+  --home-discovery-card-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3%,
+    transparent
+  );
+  --home-discovery-card-hover-surface: color-mix(
+    in srgb,
+    var(--text-primary) 6%,
+    transparent
+  );
+  --home-discovery-artwork-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --home-discovery-placeholder-icon: color-mix(
+    in srgb,
+    var(--text-primary) 30%,
+    transparent
+  );
+  --home-discovery-artwork-hover-overlay: color-mix(
+    in srgb,
+    var(--surface-canvas) 40%,
+    transparent
+  );
+  --home-discovery-meta: color-mix(
+    in srgb,
+    var(--text-primary) 40%,
+    transparent
+  );
+  --home-history-meta: color-mix(
+    in srgb,
+    var(--text-primary) 35%,
+    transparent
+  );
+  --home-history-shadow: 0 20px 25px -5px
+      color-mix(in srgb, var(--surface-canvas) 20%, transparent),
+    0 8px 10px -6px color-mix(in srgb, var(--surface-canvas) 20%, transparent);
+  --home-history-tone-1: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 30%, transparent),
+    color-mix(in srgb, var(--accent-action) 15%, var(--surface-canvas) 65%),
+    var(--surface-canvas)
+  );
+  --home-history-tone-2: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-warning) 30%, transparent),
+    color-mix(in srgb, var(--state-warning) 15%, var(--surface-canvas) 70%),
+    var(--surface-canvas)
+  );
+  --home-history-tone-3: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-info) 30%, transparent),
+    color-mix(in srgb, var(--state-info) 15%, var(--surface-canvas) 70%),
+    var(--surface-canvas)
+  );
+  --home-history-tone-4: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-danger) 30%, transparent),
+    color-mix(in srgb, var(--state-danger) 15%, var(--surface-canvas) 60%),
+    var(--surface-canvas)
+  );
+  --home-history-tone-5: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-success) 35%, transparent),
+    color-mix(in srgb, var(--state-success) 15%, var(--surface-canvas) 55%),
+    var(--surface-canvas)
+  );
+  --home-history-tone-6: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 30%, transparent),
+    color-mix(in srgb, var(--state-info) 15%, var(--surface-canvas) 65%),
+    var(--surface-canvas)
+  );
+  --home-radio-card-border: var(--border-floating);
+  --home-radio-card-surface: color-mix(
+    in srgb,
+    var(--text-primary) 4%,
+    transparent
+  );
+  --home-radio-overlay: linear-gradient(
+    180deg,
+    transparent 30%,
+    color-mix(in srgb, var(--surface-canvas) 92%, transparent) 100%
+  );
+  --home-radio-badge-border: color-mix(
+    in srgb,
+    var(--accent-action) 20%,
+    transparent
+  );
+  --home-radio-badge-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 35%,
+    transparent
+  );
+  --home-radio-badge-shadow: 0 0 18px
+    color-mix(in srgb, var(--accent-action) 16%, transparent);
+  --home-radio-subtitle: color-mix(
+    in srgb,
+    var(--text-primary) 60%,
+    transparent
+  );
 }
 
 @theme inline {
@@ -2848,4 +3015,165 @@
   border-color: var(--user-profile-badge-neutral-border);
   background: var(--user-profile-badge-neutral-surface);
   color: var(--user-profile-badge-neutral-text);
+}
+
+.home-legacy-hero {
+  background: var(--surface-canvas);
+}
+
+.home-hero-scrim-horizontal {
+  background: var(--home-hero-scrim-horizontal);
+}
+
+.home-hero-scrim-vertical {
+  background: var(--home-hero-scrim-vertical);
+}
+
+.home-hero-title {
+  color: var(--text-primary);
+}
+
+.home-hero-nav-control {
+  border: 1px solid var(--home-hero-control-border);
+  background: var(--home-hero-control-surface);
+  color: var(--home-hero-control-text);
+}
+
+.home-hero-nav-control:hover {
+  color: var(--text-primary);
+}
+
+.home-hero-nav-control-plain {
+  color: var(--home-hero-control-muted-text);
+  transition: color var(--motion-duration-fast) ease;
+}
+
+.home-hero-nav-control-plain:hover {
+  color: var(--text-primary);
+}
+
+.home-hero-pagination-active {
+  background: var(--accent-action);
+}
+
+.home-hero-pagination-inactive {
+  background: var(--home-hero-pagination-inactive);
+}
+
+.home-hero-pagination-inactive:hover {
+  background: var(--home-hero-pagination-hover);
+}
+
+.home-hero-genre {
+  border-color: var(--home-hero-genre-border);
+  background: var(--home-hero-genre-surface);
+  color: var(--home-hero-genre-text);
+}
+
+.home-hero-follow {
+  color: var(--home-hero-follow-text);
+}
+
+.home-hero-follow:hover {
+  color: var(--text-primary);
+}
+
+.home-discovery-card {
+  border: 1px solid var(--home-discovery-card-border);
+  background: var(--home-discovery-card-surface);
+  transition: background-color var(--motion-duration-fast) ease;
+}
+
+.home-discovery-card:hover {
+  background: var(--home-discovery-card-hover-surface);
+}
+
+.home-discovery-artwork {
+  background: var(--home-discovery-artwork-surface);
+}
+
+.home-discovery-artwork-overlay {
+  background: transparent;
+  transition: background-color var(--motion-duration-fast) ease;
+}
+
+.group:hover .home-discovery-artwork-overlay {
+  background: var(--home-discovery-artwork-hover-overlay);
+}
+
+.home-discovery-placeholder-icon {
+  color: var(--home-discovery-placeholder-icon);
+}
+
+.home-discovery-meta {
+  color: var(--home-discovery-meta);
+}
+
+.home-history-meta {
+  color: var(--home-history-meta);
+}
+
+.home-history-card {
+  box-shadow: var(--home-history-shadow);
+  transition:
+    border-color var(--motion-duration-normal) ease,
+    filter var(--motion-duration-normal) ease;
+}
+
+.home-history-card:hover {
+  border-color: color-mix(in srgb, var(--accent-action) 30%, transparent);
+  filter: brightness(1.1);
+}
+
+.home-history-tone-1 {
+  background: var(--home-history-tone-1);
+}
+
+.home-history-tone-2 {
+  background: var(--home-history-tone-2);
+}
+
+.home-history-tone-3 {
+  background: var(--home-history-tone-3);
+}
+
+.home-history-tone-4 {
+  background: var(--home-history-tone-4);
+}
+
+.home-history-tone-5 {
+  background: var(--home-history-tone-5);
+}
+
+.home-history-tone-6 {
+  background: var(--home-history-tone-6);
+}
+
+.home-discovery-play-button {
+  background: var(--accent-action);
+  box-shadow: var(--home-hero-play-shadow);
+}
+
+.home-radio-card {
+  border: 1px solid var(--home-radio-card-border);
+  background: var(--home-radio-card-surface);
+}
+
+.home-radio-overlay {
+  background: var(--home-radio-overlay);
+}
+
+.home-radio-badge {
+  border: 1px solid var(--home-radio-badge-border);
+  background: var(--home-radio-badge-surface);
+  color: var(--accent-action);
+  box-shadow: var(--home-radio-badge-shadow);
+}
+
+.home-radio-title {
+  color: var(--text-primary);
+}
+
+.home-radio-subtitle {
+  color: var(--home-radio-subtitle);
 }
