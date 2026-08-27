@@ -1260,6 +1260,172 @@
     var(--state-warning) 82%,
     var(--text-primary)
   );
+
+  --user-profile-hero-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --user-profile-card-border: var(--border-floating);
+  --user-profile-card-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3%,
+    transparent
+  );
+  --user-profile-item-surface: color-mix(
+    in srgb,
+    var(--text-primary) 2%,
+    transparent
+  );
+  --user-profile-item-hover-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --user-profile-stat-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 20%,
+    transparent
+  );
+  --user-profile-accent-border: color-mix(
+    in srgb,
+    var(--accent-action) 30%,
+    transparent
+  );
+  --user-profile-accent-surface: color-mix(
+    in srgb,
+    var(--accent-action) 10%,
+    transparent
+  );
+  --user-profile-accent-panel-border: color-mix(
+    in srgb,
+    var(--accent-action) 15%,
+    transparent
+  );
+  --user-profile-accent-panel-surface: color-mix(
+    in srgb,
+    var(--accent-action) 6%,
+    transparent
+  );
+  --user-profile-accent-text: color-mix(
+    in srgb,
+    var(--accent-action) 82%,
+    var(--text-primary)
+  );
+  --user-profile-copy: color-mix(in srgb, var(--text-primary) 75%, transparent);
+  --user-profile-muted-surface: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --user-profile-muted-text: color-mix(
+    in srgb,
+    var(--text-primary) 40%,
+    transparent
+  );
+  --user-profile-affinity-low-border: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --user-profile-affinity-low-surface: color-mix(
+    in srgb,
+    var(--text-primary) 3%,
+    transparent
+  );
+  --user-profile-affinity-low-text: color-mix(
+    in srgb,
+    var(--text-primary) 70%,
+    transparent
+  );
+  --user-profile-affinity-medium-border: color-mix(
+    in srgb,
+    var(--state-warning) 30%,
+    transparent
+  );
+  --user-profile-affinity-medium-surface: color-mix(
+    in srgb,
+    var(--state-warning) 10%,
+    transparent
+  );
+  --user-profile-affinity-medium-text: color-mix(
+    in srgb,
+    var(--state-warning) 82%,
+    var(--text-primary)
+  );
+  --user-profile-affinity-high-border: var(--user-profile-accent-border);
+  --user-profile-affinity-high-surface: var(--user-profile-accent-surface);
+  --user-profile-affinity-high-text: var(--user-profile-accent-text);
+  --user-profile-affinity-very-high-border: color-mix(
+    in srgb,
+    var(--state-success) 30%,
+    transparent
+  );
+  --user-profile-affinity-very-high-surface: color-mix(
+    in srgb,
+    var(--state-success) 10%,
+    transparent
+  );
+  --user-profile-affinity-very-high-text: color-mix(
+    in srgb,
+    var(--state-success) 82%,
+    var(--text-primary)
+  );
+  --user-profile-badge-gold-border: color-mix(
+    in srgb,
+    var(--state-warning) 30%,
+    transparent
+  );
+  --user-profile-badge-gold-surface: color-mix(
+    in srgb,
+    var(--state-warning) 10%,
+    transparent
+  );
+  --user-profile-badge-gold-text: color-mix(
+    in srgb,
+    var(--state-warning) 82%,
+    var(--text-primary)
+  );
+  --user-profile-badge-green-border: color-mix(
+    in srgb,
+    var(--state-success) 30%,
+    transparent
+  );
+  --user-profile-badge-green-surface: color-mix(
+    in srgb,
+    var(--state-success) 10%,
+    transparent
+  );
+  --user-profile-badge-green-text: color-mix(
+    in srgb,
+    var(--state-success) 82%,
+    var(--text-primary)
+  );
+  --user-profile-badge-rose-border: color-mix(
+    in srgb,
+    var(--state-danger) 30%,
+    transparent
+  );
+  --user-profile-badge-rose-surface: color-mix(
+    in srgb,
+    var(--state-danger) 10%,
+    transparent
+  );
+  --user-profile-badge-rose-text: color-mix(
+    in srgb,
+    var(--state-danger) 82%,
+    var(--text-primary)
+  );
+  --user-profile-badge-cyan-border: var(--user-profile-accent-border);
+  --user-profile-badge-cyan-surface: var(--user-profile-accent-surface);
+  --user-profile-badge-cyan-text: var(--user-profile-accent-text);
+  --user-profile-badge-neutral-border: var(--user-profile-card-border);
+  --user-profile-badge-neutral-surface: color-mix(
+    in srgb,
+    var(--text-primary) 4%,
+    transparent
+  );
+  --user-profile-badge-neutral-text: var(--user-profile-affinity-low-text);
 }
 
 @theme inline {
@@ -2561,4 +2727,125 @@
 
 .stats-album-rank {
   background: var(--stats-album-rank-surface);
+}
+
+.user-profile-hero {
+  border: 1px solid var(--user-profile-card-border);
+  background: var(--user-profile-hero-surface);
+}
+
+.user-profile-card {
+  border: 1px solid var(--user-profile-card-border);
+  background: var(--user-profile-card-surface);
+}
+
+.user-profile-item {
+  border: 1px solid var(--user-profile-card-border);
+  background: var(--user-profile-item-surface);
+  transition: background-color var(--motion-duration-fast) ease;
+}
+
+.user-profile-item:hover {
+  background: var(--user-profile-item-hover-surface);
+}
+
+.user-profile-stat {
+  border: 1px solid var(--user-profile-card-border);
+  background: var(--user-profile-stat-surface);
+}
+
+.user-profile-avatar-placeholder {
+  background: var(--user-profile-accent-surface);
+  color: var(--user-profile-accent-text);
+}
+
+.user-profile-copy {
+  color: var(--user-profile-copy);
+}
+
+.user-profile-accent-badge {
+  border: 1px solid var(--user-profile-accent-border);
+  background: var(--user-profile-accent-surface);
+  color: var(--user-profile-accent-text);
+}
+
+.user-profile-accent-panel {
+  border: 1px solid var(--user-profile-accent-panel-border);
+  background: var(--user-profile-accent-panel-surface);
+}
+
+.user-profile-accent-label,
+.user-profile-accent-icon,
+.user-profile-accent-link {
+  color: var(--user-profile-accent-text);
+}
+
+.user-profile-reason {
+  border: 1px solid var(--user-profile-card-border);
+  background: var(--user-profile-card-surface);
+  color: var(--user-profile-copy);
+}
+
+.user-profile-empty-state {
+  border: 1px dashed var(--user-profile-card-border);
+  background: var(--user-profile-card-surface);
+}
+
+.user-profile-placeholder {
+  background: var(--user-profile-muted-surface);
+  color: var(--user-profile-muted-text);
+}
+
+.user-profile-affinity-very-high {
+  border-color: var(--user-profile-affinity-very-high-border);
+  background: var(--user-profile-affinity-very-high-surface);
+  color: var(--user-profile-affinity-very-high-text);
+}
+
+.user-profile-affinity-high {
+  border-color: var(--user-profile-affinity-high-border);
+  background: var(--user-profile-affinity-high-surface);
+  color: var(--user-profile-affinity-high-text);
+}
+
+.user-profile-affinity-medium {
+  border-color: var(--user-profile-affinity-medium-border);
+  background: var(--user-profile-affinity-medium-surface);
+  color: var(--user-profile-affinity-medium-text);
+}
+
+.user-profile-affinity-low {
+  border-color: var(--user-profile-affinity-low-border);
+  background: var(--user-profile-affinity-low-surface);
+  color: var(--user-profile-affinity-low-text);
+}
+
+.user-profile-badge-gold {
+  border-color: var(--user-profile-badge-gold-border);
+  background: var(--user-profile-badge-gold-surface);
+  color: var(--user-profile-badge-gold-text);
+}
+
+.user-profile-badge-green {
+  border-color: var(--user-profile-badge-green-border);
+  background: var(--user-profile-badge-green-surface);
+  color: var(--user-profile-badge-green-text);
+}
+
+.user-profile-badge-rose {
+  border-color: var(--user-profile-badge-rose-border);
+  background: var(--user-profile-badge-rose-surface);
+  color: var(--user-profile-badge-rose-text);
+}
+
+.user-profile-badge-cyan {
+  border-color: var(--user-profile-badge-cyan-border);
+  background: var(--user-profile-badge-cyan-surface);
+  color: var(--user-profile-badge-cyan-text);
+}
+
+.user-profile-badge-neutral {
+  border-color: var(--user-profile-badge-neutral-border);
+  background: var(--user-profile-badge-neutral-surface);
+  color: var(--user-profile-badge-neutral-text);
 }

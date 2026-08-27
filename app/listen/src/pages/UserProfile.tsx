@@ -131,7 +131,7 @@ function UserAvatar({
   const initial = name.trim().charAt(0).toUpperCase() || "U";
   return (
     <div
-      className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center text-2xl font-semibold`}
+      className={`${className} user-profile-avatar-placeholder flex items-center justify-center rounded-full text-2xl font-semibold`}
     >
       {initial}
     </div>
@@ -151,28 +151,28 @@ function formatJoinedDate(value: string | null | undefined, locale: string) {
 function affinityTone(band?: string) {
   switch (band) {
     case "very_high":
-      return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
+      return "user-profile-affinity-very-high";
     case "high":
-      return "border-cyan-400/30 bg-cyan-400/10 text-cyan-300";
+      return "user-profile-affinity-high";
     case "medium":
-      return "border-amber-400/30 bg-amber-400/10 text-amber-300";
+      return "user-profile-affinity-medium";
     default:
-      return "border-white/10 bg-white/[0.03] text-white/70";
+      return "user-profile-affinity-low";
   }
 }
 
 function badgeTone(tone: string) {
   switch (tone) {
     case "gold":
-      return "border-amber-300/30 bg-amber-300/10 text-amber-200";
+      return "user-profile-badge-gold";
     case "green":
-      return "border-emerald-300/30 bg-emerald-300/10 text-emerald-200";
+      return "user-profile-badge-green";
     case "rose":
-      return "border-rose-300/30 bg-rose-300/10 text-rose-200";
+      return "user-profile-badge-rose";
     case "cyan":
-      return "border-cyan-300/30 bg-cyan-300/10 text-cyan-200";
+      return "user-profile-badge-cyan";
     default:
-      return "border-white/10 bg-white/[0.04] text-white/70";
+      return "user-profile-badge-neutral";
   }
 }
 
@@ -205,7 +205,7 @@ function affinityBandLabel(band: PublicProfile["affinity_band"], t: TFunction) {
 
 function ProfileMiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+    <div className="user-profile-stat rounded-xl px-3 py-2">
       <div className="truncate text-lg font-black text-foreground">{value}</div>
       <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
         {label}
@@ -253,7 +253,7 @@ function ContributionCard({
           className="h-14 w-14 rounded-xl object-cover"
         />
       ) : (
-        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 bg-cyan-300/10 text-cyan-200">
+        <div className="user-profile-accent-panel user-profile-accent-icon flex h-14 w-14 items-center justify-center rounded-xl">
           <Disc3 size={20} />
         </div>
       )}
@@ -264,7 +264,7 @@ function ContributionCard({
         <div className="truncate text-xs text-muted-foreground">
           {contribution.artist_name}
         </div>
-        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200/80">
+        <div className="user-profile-accent-label mt-1 text-[10px] font-bold uppercase tracking-[0.16em]">
           {t("userProfile.contributions.via", { source })}
         </div>
       </div>
@@ -273,7 +273,7 @@ function ContributionCard({
 
   if (!albumPath) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
+      <div className="user-profile-item flex items-center gap-3 rounded-lg px-4 py-3">
         {card}
       </div>
     );
@@ -282,7 +282,7 @@ function ContributionCard({
   return (
     <Link
       to={albumPath}
-      className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 transition-colors hover:bg-white/[0.05]"
+      className="user-profile-item flex items-center gap-3 rounded-lg px-4 py-3"
     >
       {card}
     </Link>
@@ -370,7 +370,7 @@ export function UserProfile() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[12px] border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="user-profile-hero rounded-[12px] p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             <UserAvatar
@@ -384,7 +384,7 @@ export function UserProfile() {
                   {displayName}
                 </h1>
                 {data.relationship_state.is_friend && !isOwnProfile ? (
-                  <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-medium text-cyan-300">
+                  <span className="user-profile-accent-badge inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium">
                     {t("people.friends")}
                   </span>
                 ) : null}
@@ -394,7 +394,7 @@ export function UserProfile() {
                 {t("userProfile.joined", { date: joinedDate })}
               </div>
               {data.bio ? (
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75">
+                <p className="user-profile-copy mt-3 max-w-2xl text-sm leading-6">
                   {data.bio}
                 </p>
               ) : null}
@@ -420,7 +420,7 @@ export function UserProfile() {
                 disabled={busy}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                   data.relationship_state.following
-                    ? "border border-white/15 bg-white/5 text-foreground hover:bg-white/10"
+                    ? "border border-border-floating/15 bg-text-primary/5 text-foreground hover:bg-text-primary/10"
                     : "bg-primary text-primary-foreground hover:bg-primary/90"
                 }`}
               >
@@ -438,7 +438,7 @@ export function UserProfile() {
             ) : (
               <Link
                 to="/settings"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-lg border border-border-floating/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-text-primary/10"
               >
                 {t("userProfile.actions.editAccount")}
               </Link>
@@ -447,7 +447,7 @@ export function UserProfile() {
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="user-profile-card rounded-xl p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.followers")}
             </div>
@@ -455,12 +455,12 @@ export function UserProfile() {
               to={
                 data.username ? `/users/${data.username}/followers` : "/people"
               }
-              className="mt-2 block text-2xl font-semibold text-foreground hover:text-cyan-300 transition-colors"
+              className="mt-2 block text-2xl font-semibold text-foreground transition-colors hover:text-accent-action"
             >
               {data.followers_count}
             </Link>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="user-profile-card rounded-xl p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.following")}
             </div>
@@ -468,12 +468,12 @@ export function UserProfile() {
               to={
                 data.username ? `/users/${data.username}/following` : "/people"
               }
-              className="mt-2 block text-2xl font-semibold text-foreground hover:text-cyan-300 transition-colors"
+              className="mt-2 block text-2xl font-semibold text-foreground transition-colors hover:text-accent-action"
             >
               {data.following_count}
             </Link>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="user-profile-card rounded-xl p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.friends")}
             </div>
@@ -499,8 +499,8 @@ export function UserProfile() {
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr]">
-          <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] p-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/80">
+          <div className="user-profile-accent-panel rounded-xl p-4">
+            <div className="user-profile-accent-label text-[10px] font-bold uppercase tracking-[0.18em]">
               {t("userProfile.topSound")}
             </div>
             <div className="mt-2 truncate text-lg font-black text-foreground">
@@ -517,7 +517,7 @@ export function UserProfile() {
                 : t("userProfile.needsMoreSignal")}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+          <div className="user-profile-card grid grid-cols-3 gap-2 rounded-xl p-3">
             <ProfileMiniStat
               label={t("userProfile.stats.plays30d")}
               value={String(stats.plays_30d)}
@@ -531,7 +531,7 @@ export function UserProfile() {
               value={String(stats.contributions)}
             />
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="user-profile-card rounded-xl p-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
               {t("userProfile.badges.title")}
             </div>
@@ -557,9 +557,9 @@ export function UserProfile() {
         </div>
       </div>
 
-      <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+      <section className="user-profile-card rounded-[12px] p-5 sm:p-6">
         <div className="flex items-center gap-2">
-          <Users size={16} className="text-cyan-300" />
+          <Users size={16} className="user-profile-accent-icon" />
           <h2 className="text-lg font-semibold text-foreground">
             {t("userProfile.match.title")}
           </h2>
@@ -573,7 +573,7 @@ export function UserProfile() {
             {data.affinity_reasons.map((reason) => (
               <span
                 key={reason}
-                className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white/70"
+                className="user-profile-reason rounded-full px-3 py-1.5 text-xs"
               >
                 {reason}
               </span>
@@ -588,9 +588,9 @@ export function UserProfile() {
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="space-y-6">
-          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center gap-2">
-              <PackagePlus size={16} className="text-cyan-300" />
+              <PackagePlus size={16} className="user-profile-accent-icon" />
               <h2 className="text-lg font-semibold text-foreground">
                 {t("userProfile.contributions.title")}
               </h2>
@@ -600,7 +600,7 @@ export function UserProfile() {
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {contributions.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground sm:col-span-2">
+                <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-muted-foreground sm:col-span-2">
                   {t("userProfile.contributions.empty")}
                 </div>
               ) : (
@@ -616,16 +616,16 @@ export function UserProfile() {
             </div>
           </div>
 
-          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center gap-2">
-              <Music4 size={16} className="text-cyan-300" />
+              <Music4 size={16} className="user-profile-accent-icon" />
               <h2 className="text-lg font-semibold text-foreground">
                 {t("userProfile.playlists.title")}
               </h2>
             </div>
             <div className="mt-4 space-y-3">
               {data.public_playlists.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-muted-foreground">
                   {t("userProfile.playlists.empty")}
                 </div>
               ) : (
@@ -638,7 +638,7 @@ export function UserProfile() {
                     <Link
                       key={playlist.id}
                       to={`/playlist/${playlist.id}`}
-                      className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                      className="user-profile-item flex items-center gap-4 rounded-lg px-4 py-3"
                     >
                       {coverUrl ? (
                         <CrateImage
@@ -647,7 +647,7 @@ export function UserProfile() {
                           className="h-14 w-14 rounded-xl object-cover"
                         />
                       ) : (
-                        <div className="h-14 w-14 rounded-xl bg-white/5 flex items-center justify-center text-lg font-semibold text-white/40">
+                        <div className="user-profile-placeholder flex h-14 w-14 items-center justify-center rounded-xl text-lg font-semibold">
                           {playlist.name.charAt(0).toUpperCase()}
                         </div>
                       )}
@@ -683,7 +683,7 @@ export function UserProfile() {
         </section>
 
         <section className="space-y-6">
-          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">
                 {t("people.followers")}
@@ -691,7 +691,7 @@ export function UserProfile() {
               {data.username ? (
                 <Link
                   to={`/users/${data.username}/followers`}
-                  className="text-xs text-cyan-300 hover:underline"
+                  className="user-profile-accent-link text-xs hover:underline"
                 >
                   {t("userProfile.seeAll")}
                 </Link>
@@ -707,7 +707,7 @@ export function UserProfile() {
                     key={`follower-${item.id}`}
                     username={item.username}
                     hoverClassName="block"
-                    className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
+                    className="user-profile-item flex items-center gap-3 rounded-lg px-3 py-2.5"
                   >
                     <UserAvatar
                       name={label}
@@ -736,7 +736,7 @@ export function UserProfile() {
             </div>
           </div>
 
-          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">
                 {t("people.following")}
@@ -744,7 +744,7 @@ export function UserProfile() {
               {data.username ? (
                 <Link
                   to={`/users/${data.username}/following`}
-                  className="text-xs text-cyan-300 hover:underline"
+                  className="user-profile-accent-link text-xs hover:underline"
                 >
                   {t("userProfile.seeAll")}
                 </Link>
@@ -760,7 +760,7 @@ export function UserProfile() {
                     key={`following-${item.id}`}
                     username={item.username}
                     hoverClassName="block"
-                    className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
+                    className="user-profile-item flex items-center gap-3 rounded-lg px-3 py-2.5"
                   >
                     <UserAvatar
                       name={label}
