@@ -749,7 +749,9 @@ describe("JamSession active room - host", () => {
   });
 
   it("localizes the active room chrome", async () => {
-    renderWithListenProviders(<JamSession />, { locale: "es" });
+    const { container } = renderWithListenProviders(<JamSession />, {
+      locale: "es",
+    });
 
     expect(screen.getByText("Sala Jam")).toBeInTheDocument();
     expect(screen.getByText("Conectando con la sala...")).toBeInTheDocument();
@@ -766,6 +768,11 @@ describe("JamSession active room - host", () => {
     expect(
       screen.getByPlaceholderText("Busca pistas para añadir a esta sala"),
     ).toBeInTheDocument();
+    expect(container.querySelector(".jam-room-header")).toBeInTheDocument();
+    expect(container.querySelector(".jam-now-playing")).toBeInTheDocument();
+    expect(container.querySelector(".jam-members-panel")).toBeInTheDocument();
+    expect(container.querySelector(".jam-queue-panel")).toBeInTheDocument();
+    expect(container.querySelector(".jam-activity-panel")).toBeInTheDocument();
 
     await openRoomActionsMenu();
     await userEvent.click(

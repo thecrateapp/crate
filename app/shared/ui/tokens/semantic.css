@@ -1215,6 +1215,51 @@
   );
   --jam-muted-text: color-mix(in srgb, var(--text-primary) 70%, transparent);
   --jam-subtle-text: color-mix(in srgb, var(--text-primary) 40%, transparent);
+  --jam-room-header-surface: var(--jam-card-strong-surface);
+  --jam-now-playing-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 20%,
+    transparent
+  );
+  --jam-progress-track: color-mix(
+    in srgb,
+    var(--text-primary) 10%,
+    transparent
+  );
+  --jam-progress-fill: var(--accent-action);
+  --jam-action-surface: color-mix(
+    in srgb,
+    var(--text-primary) 2.5%,
+    transparent
+  );
+  --jam-dark-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 25%,
+    transparent
+  );
+  --jam-artwork-placeholder: color-mix(
+    in srgb,
+    var(--text-primary) 6%,
+    transparent
+  );
+  --jam-artwork-icon: color-mix(in srgb, var(--text-primary) 35%, transparent);
+  --jam-artwork-shadow: 0 10px 25px
+    color-mix(in srgb, var(--surface-canvas) 30%, transparent);
+  --jam-request-border: color-mix(
+    in srgb,
+    var(--state-warning) 15%,
+    transparent
+  );
+  --jam-request-surface: color-mix(
+    in srgb,
+    var(--state-warning) 5%,
+    transparent
+  );
+  --jam-request-text: color-mix(
+    in srgb,
+    var(--state-warning) 82%,
+    var(--text-primary)
+  );
 }
 
 @theme inline {
@@ -1730,6 +1775,18 @@
   color: var(--jam-danger-text);
 }
 
+.jam-success-text {
+  color: var(--jam-success-text);
+}
+
+.jam-warning-text {
+  color: var(--jam-warning-text);
+}
+
+.jam-info-text {
+  color: var(--jam-info-text);
+}
+
 .jam-accent-text {
   color: var(--jam-accent-text);
 }
@@ -1740,6 +1797,82 @@
 
 .jam-subtle-text {
   color: var(--jam-subtle-text);
+}
+
+.jam-room-header {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-room-header-surface);
+}
+
+.jam-now-playing {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-now-playing-surface);
+}
+
+.jam-progress-track {
+  background: var(--jam-progress-track);
+}
+
+.jam-progress-fill {
+  background: var(--jam-progress-fill);
+}
+
+.jam-room-actions-panel {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-action-surface);
+}
+
+.jam-members-panel,
+.jam-queue-panel,
+.jam-activity-panel {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-card-surface);
+}
+
+.jam-request-panel {
+  border: 1px solid var(--jam-request-border);
+  background: var(--jam-request-surface);
+}
+
+.jam-request-count {
+  background: color-mix(in srgb, var(--state-warning) 10%, transparent);
+  color: var(--jam-request-text);
+}
+
+.jam-dark-surface {
+  background: var(--jam-dark-surface);
+}
+
+.jam-artwork-placeholder {
+  background: var(--jam-artwork-placeholder);
+  color: var(--jam-artwork-icon);
+}
+
+.jam-artwork-shadow {
+  box-shadow: var(--jam-artwork-shadow);
+}
+
+.jam-request-action {
+  background: color-mix(in srgb, var(--accent-action) 15%, transparent);
+  color: var(--jam-accent-text);
+}
+
+.jam-request-action:hover {
+  background: color-mix(in srgb, var(--accent-action) 25%, transparent);
+}
+
+.jam-activity-card {
+  border: 1px solid var(--jam-card-border);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+}
+
+.jam-queue-search-item:hover {
+  background: var(--jam-card-strong-surface);
+}
+
+.jam-qr-surface {
+  border: 1px solid var(--jam-card-border);
+  background: var(--jam-dark-surface);
 }
 
 .info-tab-artwork {
