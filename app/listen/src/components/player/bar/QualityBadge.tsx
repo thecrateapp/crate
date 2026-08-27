@@ -22,7 +22,7 @@ const tierStyles: Record<
     bg: "bg-transparent",
   },
   standard: {
-    border: "border-border-floating",
+    border: "border-surface-quiet",
     text: "text-text-muted",
     bg: "bg-transparent",
   },

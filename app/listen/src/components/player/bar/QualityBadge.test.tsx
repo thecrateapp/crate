@@ -47,7 +47,7 @@ describe("QualityBadge", () => {
 
     expect(container.querySelector("svg")).toBeNull();
     expect(badge).toHaveClass(
-      "border-border-floating",
+      "border-surface-quiet",
       "text-text-muted",
       "bg-transparent",
     );

@@ -420,7 +420,7 @@ export function UserProfile() {
                 disabled={busy}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                   data.relationship_state.following
-                    ? "border border-border-floating/15 bg-text-primary/5 text-foreground hover:bg-text-primary/10"
+                    ? "border border-surface-quiet/15 bg-text-primary/5 text-foreground hover:bg-text-primary/10"
                     : "bg-primary text-primary-foreground hover:bg-primary/90"
                 }`}
               >
@@ -438,7 +438,7 @@ export function UserProfile() {
             ) : (
               <Link
                 to="/settings"
-                className="inline-flex items-center gap-2 rounded-lg border border-border-floating/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-text-primary/10"
+                className="inline-flex items-center gap-2 rounded-lg border border-surface-quiet/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-text-primary/10"
               >
                 {t("userProfile.actions.editAccount")}
               </Link>

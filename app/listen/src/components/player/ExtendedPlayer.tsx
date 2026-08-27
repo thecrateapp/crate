@@ -325,7 +325,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
           ) : (
             <>
               <div className="absolute inset-6 rounded-xl bg-accent-action/10 opacity-70 blur-3xl" />
-              <div className="absolute inset-2 rounded-xl border border-border-floating bg-surface-glass-highlight" />
+              <div className="absolute inset-2 rounded-xl border border-surface-quiet bg-surface-quiet-subtle" />
               {crossfadeTransition ? (
                 <>
                   {crossfadeTransition.outgoing.albumCover ? (
@@ -367,7 +367,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                   }}
                 />
               ) : (
-                <div className="absolute inset-0 rounded-xl bg-surface-glass-highlight shadow-[0_28px_100px_rgba(0,0,0,0.75)]" />
+                <div className="absolute inset-0 rounded-xl bg-surface-quiet-subtle shadow-[0_28px_100px_rgba(0,0,0,0.75)]" />
               )}
             </>
           )}

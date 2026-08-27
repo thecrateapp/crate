@@ -10,6 +10,7 @@ on:
       - "app/listen-desktop/**"
       - "package.json"
       - "package-lock.json"
+      - "scripts/design-system/**"
       - ".github/workflows/test-frontend.yml"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -20,6 +21,7 @@ on:
       - "app/listen-desktop/**"
       - "package.json"
       - "package-lock.json"
+      - "scripts/design-system/**"
       - ".github/workflows/test-frontend.yml"
 
 jobs:
@@ -59,3 +61,6 @@ jobs:
 
       - name: Test listen app
         run: npm run --workspace=app/listen test
+
+      - name: Test design-system tooling
+        run: node --test scripts/design-system/*.test.mjs

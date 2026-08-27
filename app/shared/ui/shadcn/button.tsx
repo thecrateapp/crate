@@ -5,14 +5,14 @@ import { Slot } from "radix-ui";
 import { cn } from "@crate/ui/lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition-all outline-none disabled:pointer-events-none disabled:opacity-50 focus-visible:border-border-focus focus-visible:shadow-focus aria-invalid:border-accent-danger [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition-all outline-none disabled:pointer-events-none disabled:opacity-50 focus-visible:border-border-focus focus-visible:shadow-focus aria-invalid:border-state-danger [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
   {
     variants: {
       variant: {
         default:
           "rounded-md bg-accent-action text-accent-action-foreground shadow-action hover:bg-accent-action-hover",
         destructive:
-          "rounded-md bg-accent-danger text-accent-danger-foreground hover:bg-accent-danger/90 dark:bg-accent-danger/60",
+          "rounded-md bg-state-danger text-state-danger-foreground hover:bg-state-danger/90 dark:bg-state-danger/60",
         outline:
           "rounded-md border border-border-subtle bg-surface-control text-text-primary shadow-control-inset hover:bg-surface-control-hover hover:text-text-primary",
         secondary:

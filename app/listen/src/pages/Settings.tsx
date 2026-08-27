@@ -188,7 +188,7 @@ function RangeRow({
             </p>
           ) : null}
         </div>
-        <div className="rounded-full border border-border-floating/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
+        <div className="rounded-full border border-surface-quiet/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
           {displayValue ?? value}
         </div>
       </div>
@@ -235,7 +235,7 @@ function ToggleRow({
         className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full border transition-colors ${
           checked
             ? "border-accent-action/50 bg-accent-action/25"
-            : "border-border-floating/10 bg-text-primary/[0.03]"
+            : "border-surface-quiet/10 bg-text-primary/[0.03]"
         }`}
       >
         <span
@@ -375,7 +375,7 @@ export function Settings() {
                   className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                     selected
                       ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
-                      : "border-border-floating/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
+                      : "border-surface-quiet/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
                   }`}
                 >
                   <span className="block text-sm font-semibold">
@@ -472,7 +472,7 @@ export function Settings() {
         description={t("settings.offline.subtitle")}
       >
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-border-floating/10 bg-text-primary/[0.03] p-4">
+          <div className="rounded-xl border border-surface-quiet/10 bg-text-primary/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("settings.offline.items")}
             </div>
@@ -490,7 +490,7 @@ export function Settings() {
                 : ""}
             </p>
           </div>
-          <div className="rounded-xl border border-border-floating/10 bg-text-primary/[0.03] p-4">
+          <div className="rounded-xl border border-surface-quiet/10 bg-text-primary/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("common.tracks")}
             </div>
@@ -501,7 +501,7 @@ export function Settings() {
               {t("settings.offline.mirrored")}
             </p>
           </div>
-          <div className="rounded-xl border border-border-floating/10 bg-text-primary/[0.03] p-4">
+          <div className="rounded-xl border border-surface-quiet/10 bg-text-primary/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("settings.offline.storage")}
             </div>
@@ -562,14 +562,14 @@ export function Settings() {
                   );
                 });
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-accent-danger/25 bg-accent-danger/10 px-4 py-2 text-sm font-medium text-accent-danger transition-colors hover:bg-accent-danger/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-state-danger/25 bg-state-danger/10 px-4 py-2 text-sm font-medium text-state-danger transition-colors hover:bg-state-danger/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 size={16} />
             {t("settings.offline.removeCopies")}
           </button>
         </div>
 
-        <div className="rounded-lg border border-border-floating/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-surface-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
           <div className="flex items-start gap-3">
             <ArrowDownToLine
               size={16}
@@ -628,7 +628,7 @@ export function Settings() {
           </Link>
           <button
             onClick={logout}
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-accent-danger hover:bg-text-primary/5 transition-colors w-full text-left"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-state-danger hover:bg-text-primary/5 transition-colors w-full text-left"
           >
             <LogOut size={18} /> {t("auth.logout")}
           </button>
@@ -685,7 +685,7 @@ function LanguageSection({
           className={`rounded-lg border px-3 py-3 text-left transition-colors ${
             selection === "auto"
               ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
-              : "border-border-floating/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
+              : "border-surface-quiet/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
           }`}
         >
           <span className="block text-sm font-semibold">
@@ -708,7 +708,7 @@ function LanguageSection({
               className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                 selected
                   ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
-                  : "border-border-floating/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
+                  : "border-surface-quiet/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
               }`}
             >
               <span className="block text-sm font-semibold">
@@ -722,7 +722,7 @@ function LanguageSection({
         })}
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border border-border-floating/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
+      <div className="flex items-start gap-3 rounded-lg border border-surface-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
         <Globe size={16} className="mt-0.5 text-accent-action/80" />
         <span>
           {t("settings.language.current", {
@@ -785,7 +785,7 @@ function SleepTimerSection() {
           </div>
           <button
             onClick={cancelSleepTimer}
-            className="rounded-full px-3 py-1.5 text-xs font-medium bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25 transition-colors"
+            className="rounded-full px-3 py-1.5 text-xs font-medium bg-state-danger/15 text-state-danger hover:bg-state-danger/25 transition-colors"
           >
             {t("common.cancel")}
           </button>
@@ -1028,7 +1028,7 @@ function BandcampSection() {
             <div className="flex flex-wrap gap-2">
               <Link
                 to="/library?tab=bandcamp"
-                className="inline-flex items-center gap-2 rounded-full border border-border-floating/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10"
+                className="inline-flex items-center gap-2 rounded-full border border-surface-quiet/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10"
               >
                 <BandcampLogo size={14} />
                 {t("settings.bandcamp.viewPurchases")}
@@ -1048,7 +1048,7 @@ function BandcampSection() {
               <button
                 onClick={disconnectBandcamp}
                 disabled={busy !== null}
-                className="rounded-full border border-accent-danger/25 px-4 py-2 text-xs font-semibold text-accent-danger transition-colors hover:bg-accent-danger/10 disabled:opacity-50"
+                className="rounded-full border border-state-danger/25 px-4 py-2 text-xs font-semibold text-state-danger transition-colors hover:bg-state-danger/10 disabled:opacity-50"
               >
                 {t("common.disconnect")}
               </button>
@@ -1056,7 +1056,7 @@ function BandcampSection() {
           ) : null}
         </div>
         {status?.last_error ? (
-          <p className="mt-3 text-xs text-accent-danger">{status.last_error}</p>
+          <p className="mt-3 text-xs text-state-danger">{status.last_error}</p>
         ) : null}
       </div>
 
@@ -1108,12 +1108,12 @@ function BandcampSection() {
               rows={3}
               spellCheck={false}
               placeholder={t("settings.bandcamp.cookiePlaceholder")}
-              className="w-full resize-none rounded-lg border border-border-floating/10 bg-surface-canvas/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/50"
+              className="w-full resize-none rounded-lg border border-surface-quiet/10 bg-surface-canvas/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/50"
             />
             <button
               onClick={() => void connectWithCookie(bandcampCookie)}
               disabled={busy !== null || !bandcampCookie.trim()}
-              className="inline-flex items-center gap-2 rounded-full border border-border-floating/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full border border-surface-quiet/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === "cookie-connect" ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -1291,7 +1291,7 @@ function ScrobbleSection() {
         {lastfm?.connected ? (
           <button
             onClick={() => handleDisconnect("lastfm")}
-            className="rounded-full px-4 py-2 text-xs font-medium bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25 transition-colors"
+            className="rounded-full px-4 py-2 text-xs font-medium bg-state-danger/15 text-state-danger hover:bg-state-danger/25 transition-colors"
           >
             {t("common.disconnect")}
           </button>
@@ -1329,7 +1329,7 @@ function ScrobbleSection() {
         {listenbrainz?.connected ? (
           <button
             onClick={() => handleDisconnect("listenbrainz")}
-            className="rounded-full px-4 py-2 text-xs font-medium bg-accent-danger/15 text-accent-danger hover:bg-accent-danger/25 transition-colors"
+            className="rounded-full px-4 py-2 text-xs font-medium bg-state-danger/15 text-state-danger hover:bg-state-danger/25 transition-colors"
           >
             {t("common.disconnect")}
           </button>
@@ -1340,7 +1340,7 @@ function ScrobbleSection() {
               value={lbToken}
               onChange={(e) => setLbToken(e.target.value)}
               placeholder={t("settings.scrobbling.apiToken")}
-              className="w-36 rounded-lg bg-text-primary/5 border border-border-floating/10 px-3 py-1.5 text-xs text-foreground placeholder:text-text-primary/40 focus:outline-none focus:border-primary/50"
+              className="w-36 rounded-lg bg-text-primary/5 border border-surface-quiet/10 px-3 py-1.5 text-xs text-foreground placeholder:text-text-primary/40 focus:outline-none focus:border-primary/50"
               onKeyDown={(e) =>
                 e.key === "Enter" && handleListenBrainzConnect()
               }
@@ -1575,7 +1575,7 @@ function AccountSection() {
               return (
                 <div
                   key={provider}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-border-floating/10 px-3 py-3"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-surface-quiet/10 px-3 py-3"
                 >
                   <div>
                     <div className="text-sm font-medium text-foreground capitalize">
@@ -1595,7 +1595,7 @@ function AccountSection() {
                         ? void handleUnlinkProvider(provider)
                         : void handleLinkProvider(provider)
                     }
-                    className="rounded-lg border border-border-floating/15 bg-text-primary/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-text-primary/10 transition-colors disabled:opacity-50"
+                    className="rounded-lg border border-surface-quiet/15 bg-text-primary/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-text-primary/10 transition-colors disabled:opacity-50"
                   >
                     {busy
                       ? t("common.working")
@@ -1848,7 +1848,7 @@ function ShowsLocationSection() {
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
               mode === "fixed"
                 ? "border-primary/30 bg-primary/8"
-                : "border-border-floating/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
+                : "border-surface-quiet/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
             }`}
           >
             <MapPin
@@ -1877,7 +1877,7 @@ function ShowsLocationSection() {
               className={`h-4 w-4 rounded-full border-2 ${
                 mode === "fixed"
                   ? "border-primary bg-primary"
-                  : "border-border-floating/20"
+                  : "border-surface-quiet/20"
               }`}
             >
               {mode === "fixed" && (
@@ -1890,7 +1890,7 @@ function ShowsLocationSection() {
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
               mode === "near_me"
                 ? "border-primary/30 bg-primary/8"
-                : "border-border-floating/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
+                : "border-surface-quiet/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
             }`}
           >
             <Navigation
@@ -1915,7 +1915,7 @@ function ShowsLocationSection() {
               className={`h-4 w-4 rounded-full border-2 ${
                 mode === "near_me"
                   ? "border-primary bg-primary"
-                  : "border-border-floating/20"
+                  : "border-surface-quiet/20"
               }`}
             >
               {mode === "near_me" && (
@@ -1956,7 +1956,7 @@ function ShowsLocationSection() {
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               placeholder={t("settings.shows.cityPlaceholder")}
-              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 border border-border-floating/10 text-sm text-text-primary outline-none focus:border-primary/40 placeholder:text-text-primary/40"
+              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 border border-surface-quiet/10 text-sm text-text-primary outline-none focus:border-primary/40 placeholder:text-text-primary/40"
             />
             {searching && (
               <Loader2
@@ -1965,7 +1965,7 @@ function ShowsLocationSection() {
               />
             )}
             {showDropdown && searchResults.length > 0 && (
-              <div className="absolute inset-x-0 top-full z-app-dropdown mt-1 overflow-hidden rounded-xl border border-border-floating/10 bg-surface-overlay shadow-xl">
+              <div className="absolute inset-x-0 top-full z-app-dropdown mt-1 overflow-hidden rounded-xl border border-surface-quiet/10 bg-surface-overlay shadow-xl">
                 {searchResults.map((result) => (
                   <button
                     key={`${result.latitude}-${result.longitude}`}
@@ -1990,7 +1990,7 @@ function ShowsLocationSection() {
           <div className="text-sm font-medium text-foreground">
             {t("settings.shows.searchRadius")}
           </div>
-          <div className="rounded-full border border-border-floating/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
+          <div className="rounded-full border border-surface-quiet/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
             {radius} km
           </div>
         </div>

@@ -376,7 +376,7 @@ export function InfoTab({ className }: { className?: string }) {
                             }),
                       )
                     }
-                    className="min-w-0 rounded-full border border-border-floating bg-surface-glass-highlight px-3 py-1 text-text-primary transition-colors hover:bg-surface-glass-hover-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
+                    className="min-w-0 rounded-full border border-surface-quiet bg-surface-quiet-subtle px-3 py-1 text-text-primary transition-colors hover:bg-surface-quiet focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
                   >
                     <span className="block truncate">
                       {info.artist || currentTrack.artist}
@@ -413,7 +413,7 @@ export function InfoTab({ className }: { className?: string }) {
                             }),
                       )
                     }
-                    className="min-w-0 rounded-full border border-border-floating bg-surface-glass-highlight px-3 py-1 text-text-secondary transition-colors hover:bg-surface-glass-hover-highlight hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
+                    className="min-w-0 rounded-full border border-surface-quiet bg-surface-quiet-subtle px-3 py-1 text-text-secondary transition-colors hover:bg-surface-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
                   >
                     <span className="block truncate">
                       {info.album || currentTrack.album}

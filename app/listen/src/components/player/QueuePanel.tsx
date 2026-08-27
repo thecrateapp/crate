@@ -284,7 +284,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   }
 
   return (
-    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-border-floating">
+    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-surface-quiet">
       {content}
     </div>
   );

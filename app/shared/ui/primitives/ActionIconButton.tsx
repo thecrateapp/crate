@@ -20,7 +20,7 @@ function actionToneClassName(tone: ActionTone, disabled: boolean) {
   }
 
   if (tone === "danger") {
-    return "text-state-danger hover:text-state-danger hover:drop-shadow-[0_0_8px_var(--accent-danger-glow)]";
+    return "text-state-danger hover:text-state-danger hover:drop-shadow-[0_0_8px_var(--state-danger-glow)]";
   }
 
   return "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]";

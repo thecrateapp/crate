@@ -37,7 +37,7 @@ describe("PlayerSeekBar", () => {
     const slider = screen.getByRole("slider");
 
     expect(slider.getAttribute("style")).toContain("var(--accent-action)");
-    expect(slider.getAttribute("style")).toContain("var(--control-track)");
+    expect(slider.getAttribute("style")).toContain("var(--surface-quiet)");
     expect(slider.getAttribute("style")).not.toContain("rgba(");
   });
 

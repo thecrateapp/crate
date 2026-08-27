@@ -89,7 +89,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
   if (!open) return null;
 
   return (
-    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[480px] flex-col overflow-hidden border-l border-border-floating">
+    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[480px] flex-col overflow-hidden border-l border-surface-quiet">
       <div className="lyrics-ambient-glow pointer-events-none absolute inset-x-0 top-0 h-40 blur-3xl" />
       {/* Header */}
       <div className="relative flex items-center justify-between border-b border-border-quiet px-4 py-3">

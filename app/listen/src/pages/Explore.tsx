@@ -160,9 +160,7 @@ export function Explore() {
             ) : null}
           </>
         ) : (
-          <p className="text-muted-foreground text-sm">
-            {t("explore.noFilters")}
-          </p>
+          <p className="text-text-muted text-sm">{t("explore.noFilters")}</p>
         )}
       </div>
     </div>
@@ -170,14 +168,14 @@ export function Explore() {
 }
 
 const MOOD_COLORS: Record<string, string> = {
-  energetic: "bg-orange-500/20 text-orange-300 border-orange-500/30",
-  chill: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  dark: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  happy: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
-  melancholy: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-  intense: "bg-red-500/20 text-red-300 border-red-500/30",
-  groovy: "bg-green-500/20 text-green-300 border-green-500/30",
-  acoustic: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  energetic: "bg-state-warning/20 text-state-warning border-state-warning/30",
+  chill: "bg-state-info/20 text-state-info border-state-info/30",
+  dark: "bg-state-danger/20 text-state-danger border-state-danger/30",
+  happy: "bg-state-warning/20 text-state-warning border-state-warning/30",
+  melancholy: "bg-state-info/20 text-state-info border-state-info/30",
+  intense: "bg-state-danger/20 text-state-danger border-state-danger/30",
+  groovy: "bg-state-success/20 text-state-success border-state-success/30",
+  acoustic: "bg-state-warning/20 text-state-warning border-state-warning/30",
 };
 
 interface MoodPreset {
@@ -206,25 +204,25 @@ function ExploreFeatureCard({
     <button
       type="button"
       onClick={onClick}
-      className="group relative min-h-36 overflow-hidden rounded-[12px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.025))] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.24)] transition hover:border-primary/35 hover:bg-white/[0.07]"
+      className="explore-feature-card group relative min-h-36 overflow-hidden rounded-[12px] p-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(6,182,212,0.28),transparent_38%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.11),transparent_38%)] opacity-80 transition group-hover:opacity-100" />
+      <div className="explore-feature-card-aura absolute inset-0 opacity-80 transition group-hover:opacity-100" />
       <div className="relative flex h-full flex-col justify-between gap-8">
         <div className="flex items-center justify-between">
           <Icon
             size={24}
-            className="text-primary drop-shadow-[0_0_16px_rgba(6,182,212,0.35)]"
+            className="text-accent-action drop-shadow-[0_0_16px_var(--accent-action-glow-strong)]"
           />
           <ArrowRight
             size={18}
-            className="text-white/35 transition group-hover:translate-x-1 group-hover:text-primary"
+            className="text-text-primary/35 transition group-hover:translate-x-1 group-hover:text-accent-action"
           />
         </div>
         <div>
-          <div className="text-xl font-black tracking-[-0.035em] text-foreground">
+          <div className="text-xl font-black tracking-[-0.035em] text-text-primary">
             {title}
           </div>
-          <div className="mt-2 max-w-[28rem] text-sm leading-5 text-white/58">
+          <div className="mt-2 max-w-[28rem] text-sm leading-5 text-text-primary/58">
             {subtitle}
           </div>
         </div>
@@ -324,7 +322,7 @@ function GenreExplorer({
               key={genre.slug || genre.name}
               type="button"
               onClick={() => onOpen(getGenreSlug(genre))}
-              className="group relative min-h-36 overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-primary/30 hover:bg-white/[0.06]"
+              className="explore-genre-card group relative min-h-36 overflow-hidden rounded-[12px] p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
             >
               {resolvedCoverUrl ? (
                 <CrateImage
@@ -336,31 +334,30 @@ function GenreExplorer({
                 />
               ) : null}
               <div
-                className="absolute inset-0 opacity-80"
-                style={{
-                  background: resolvedCoverUrl
-                    ? "linear-gradient(180deg, rgba(3,6,10,0.16) 0%, rgba(3,6,10,0.82) 100%)"
-                    : `radial-gradient(circle at ${
-                        20 + (index % 4) * 18
-                      }% 20%, rgba(34, 211, 238, 0.24), transparent 36%), radial-gradient(circle at 85% 85%, rgba(255,255,255,0.1), transparent 38%)`,
-                }}
+                className={`explore-genre-card-overlay absolute inset-0 opacity-80 ${
+                  resolvedCoverUrl
+                    ? "explore-genre-card-overlay-image"
+                    : `explore-genre-card-overlay-placeholder explore-genre-card-overlay-position-${
+                        index % 4
+                      }`
+                }`}
               />
               <div className="relative flex h-full flex-col justify-between gap-5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary/90">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-action/90">
                     {t("explore.genreRooms.badge")}
                   </span>
                   <Radio
                     size={15}
-                    className="text-white/30 transition group-hover:text-primary"
+                    className="text-text-primary/30 transition group-hover:text-accent-action"
                   />
                 </div>
                 <div>
-                  <div className="text-lg font-black leading-none tracking-[-0.04em] text-foreground">
+                  <div className="text-lg font-black leading-none tracking-[-0.04em] text-text-primary">
                     {genre.name}
                   </div>
                   {detail ? (
-                    <div className="mt-2 line-clamp-2 text-xs leading-5 text-white/62">
+                    <div className="mt-2 line-clamp-2 text-xs leading-5 text-text-primary/62">
                       {detail}
                     </div>
                   ) : null}
@@ -456,7 +453,8 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
             onClick={() => playMood(m.name)}
             disabled={loadingMood !== null}
             className={`rounded-lg border px-4 py-3 text-left transition-colors ${
-              MOOD_COLORS[m.name] || "bg-white/5 text-white/70 border-white/10"
+              MOOD_COLORS[m.name] ||
+              "bg-text-primary/5 text-text-primary/70 border-surface-quiet"
             } active:scale-[0.98]`}
           >
             <span className="text-sm font-medium capitalize">

@@ -48,7 +48,7 @@ export function PlayerSeekBar({
   const sliderStyle = useMemo(
     () => ({
       accentColor: "var(--accent-action)",
-      background: `linear-gradient(90deg, var(--accent-action) 0%, var(--accent-action) ${progress}%, var(--control-track) ${progress}%, var(--control-track) 100%)`,
+      background: `linear-gradient(90deg, var(--accent-action) 0%, var(--accent-action) ${progress}%, var(--surface-quiet) ${progress}%, var(--surface-quiet) 100%)`,
     }),
     [progress],
   );

@@ -132,7 +132,7 @@ export function PlayerTrackIdentity({
           aria-label={`Go to ${currentTrack.artist}`}
           disabled={!artistClickable}
           className={cn(
-            "inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-glass-highlight px-2 py-1.5 transition-colors",
+            "inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-quiet-subtle px-2 py-1.5 transition-colors",
             artistClickable
               ? "active:bg-surface-control-hover"
               : "cursor-default",

@@ -42,7 +42,7 @@ describe("PlayerTrackIdentity", () => {
     });
     expect(artistButton).toHaveClass(
       "border-border-subtle",
-      "bg-surface-glass-highlight",
+      "bg-surface-quiet-subtle",
     );
     expect(artistButton.className).not.toContain("white/");
     expect(artistButton.className).not.toContain("black/");

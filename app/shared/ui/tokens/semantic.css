@@ -28,34 +28,25 @@
     var(--surface-canvas) 78%,
     transparent
   );
-  --surface-glass-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --surface-glass-highlight: color-mix(
+  --surface-quiet: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --surface-quiet-subtle: color-mix(
     in srgb,
     var(--text-primary) 6%,
     transparent
   );
   --surface-glass-shadow: rgba(0, 0, 0, 0.48);
-  --surface-glass-accent-shadow: color-mix(
+  --surface-accent-shadow: color-mix(
     in srgb,
     var(--accent-action) 6%,
     transparent
   );
-  --surface-glass-hover-border: color-mix(
+  --accent-action-glow: color-mix(
     in srgb,
     var(--accent-action) 28%,
     transparent
   );
-  --surface-glass-hover-highlight: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
   --surface-glass-hover-shadow: rgba(0, 0, 0, 0.38);
-  --surface-glass-hover-accent-shadow: color-mix(
+  --surface-accent-subtle: color-mix(
     in srgb,
     var(--accent-action) 12%,
     transparent
@@ -64,40 +55,6 @@
   --surface-control-hover: var(--hover-bg-strong);
   --surface-icon-control: rgba(0, 0, 0, 0.55);
 
-  --lyrics-ambient-glow: radial-gradient(
-    circle at top,
-    color-mix(in srgb, var(--accent-action) 22%, transparent) 0%,
-    transparent 72%
-  );
-  --lyrics-surface-gradient: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-action) 12%, transparent) 0%,
-    transparent 28%,
-    transparent 72%,
-    color-mix(in srgb, var(--accent-action) 6%, transparent) 100%
-  );
-  --lyrics-fullscreen-backdrop: radial-gradient(
-      circle at 18% 20%,
-      color-mix(in srgb, var(--accent-action) 20%, transparent),
-      transparent 32%
-    ),
-    radial-gradient(
-      circle at 84% 56%,
-      color-mix(in srgb, var(--state-info) 24%, transparent),
-      transparent 44%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-elevated) 22%, transparent),
-      color-mix(in srgb, var(--surface-canvas) 86%, transparent)
-    );
-  --lyrics-active-text-shadow: 0 0 20px var(--accent-action-glow);
-  --eq-smart-surface: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent-action) 14%, transparent),
-    color-mix(in srgb, var(--accent-action) 6%, transparent),
-    transparent
-  );
   --play-button-rim: conic-gradient(
     from 218deg,
     color-mix(in srgb, var(--state-info) 65%, var(--accent-action)) 0deg,
@@ -114,7 +71,7 @@
     color-mix(in srgb, var(--accent-action) 92%, var(--state-info)) 250deg,
     color-mix(in srgb, var(--state-info) 72%, var(--accent-action)) 360deg
   );
-  --play-button-aura: radial-gradient(
+  --playback-aura: radial-gradient(
       ellipse 58% 46% at 46% 57%,
       var(--accent-action-glow-strong) 0%,
       var(--accent-action-glow-medium) 24%,
@@ -137,16 +94,10 @@
     0 0 9px var(--accent-action-glow-soft);
   --play-button-active-shadow: 0 0 7px var(--accent-action-glow-strong),
     0 0 18px var(--accent-action-glow-medium);
-  --play-button-core: var(--surface-elevated);
-  --play-button-core-shadow: inset 0 0 0 1px var(--surface-glass-border),
+  --playback-core-shadow: inset 0 0 0 1px var(--surface-quiet),
     inset 0 -10px 24px var(--surface-glass-shadow);
   --play-button-icon-shadow: 0 0 4px
     color-mix(in srgb, var(--text-primary) 35%, transparent);
-  --disc-ambient-glow: color-mix(
-    in srgb,
-    var(--accent-action) 12%,
-    transparent
-  );
   --disc-surface: radial-gradient(
     circle at 50% 40%,
     color-mix(in srgb, var(--text-primary) 14%, transparent),
@@ -157,16 +108,14 @@
   --disc-shadow: 0 32px 90px
       color-mix(in srgb, var(--surface-canvas) 75%, transparent),
     0 12px 32px color-mix(in srgb, var(--surface-canvas) 52%, transparent);
-  --disc-rotor-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  --disc-overlay-border: color-mix(
-    in srgb,
-    var(--text-primary) 8%,
-    transparent
-  );
   --disc-overlay-shadow: inset 0 1px 0
     color-mix(in srgb, var(--text-primary) 8%, transparent);
-  --disc-placeholder: color-mix(in srgb, var(--text-primary) 5%, transparent);
-  --disc-placeholder-icon: color-mix(
+  --surface-placeholder: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --surface-control-muted: color-mix(
     in srgb,
     var(--text-primary) 12%,
     transparent
@@ -176,70 +125,26 @@
     color-mix(in srgb, var(--surface-elevated) 96%, var(--state-info)),
     color-mix(in srgb, var(--surface-canvas) 98%, var(--surface-elevated))
   );
-  --disc-control-border: color-mix(
-    in srgb,
-    var(--text-primary) 14%,
-    transparent
-  );
+  --border-control: color-mix(in srgb, var(--text-primary) 14%, transparent);
   --disc-control-shadow: 0 14px 34px
       color-mix(in srgb, var(--surface-canvas) 65%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
-  --disc-control-ring: color-mix(
+  --accent-action-glow-medium: color-mix(
     in srgb,
     var(--accent-action) 18%,
     transparent
   );
-  --quality-hi-res-glow: 0 0 8px
-    color-mix(in srgb, var(--state-warning) 15%, transparent);
-  --info-panel-surface: color-mix(in srgb, var(--text-primary) 4%, transparent);
-  --info-panel-border: color-mix(in srgb, var(--text-primary) 8%, transparent);
-  --info-panel-divider: color-mix(in srgb, var(--text-primary) 6%, transparent);
-  --info-panel-icon-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
+  --surface-card: color-mix(in srgb, var(--text-primary) 3%, transparent);
   --info-panel-shadow: 0 12px 48px
     color-mix(in srgb, var(--surface-canvas) 24%, transparent);
   --info-hero-shadow: 0 24px 80px
     color-mix(in srgb, var(--surface-canvas) 28%, transparent);
   --info-artwork-shadow: 0 12px 30px
     color-mix(in srgb, var(--surface-canvas) 40%, transparent);
-  --info-metric-track: color-mix(in srgb, var(--text-primary) 6%, transparent);
-  --info-metric-primary: linear-gradient(
-    90deg,
-    var(--accent-action),
-    var(--state-info)
-  );
-  --info-metric-accent: linear-gradient(
-    90deg,
-    var(--state-info),
-    var(--accent-action)
-  );
-  --info-metric-warm: linear-gradient(
-    90deg,
-    var(--state-warning),
-    var(--accent-danger)
-  );
-  --info-mood-border: color-mix(in srgb, var(--state-info) 20%, transparent);
-  --info-mood-surface: color-mix(in srgb, var(--state-info) 10%, transparent);
-  --info-mood-text: color-mix(
-    in srgb,
-    var(--state-info) 85%,
-    var(--text-primary)
-  );
-  --player-shell-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 68%,
-    transparent
-  );
+  --state-info-border: color-mix(in srgb, var(--state-info) 20%, transparent);
+  --state-info-surface: color-mix(in srgb, var(--state-info) 10%, transparent);
   --player-shell-shadow: 0 24px 56px
     color-mix(in srgb, var(--surface-canvas) 34%, transparent);
-  --player-artwork-placeholder: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
   --player-liked-border: color-mix(
     in srgb,
     var(--accent-action) 60%,
@@ -257,7 +162,7 @@
     var(--surface-canvas) 75%,
     transparent
   );
-  --player-fallback-text: color-mix(
+  --text-secondary-strong: color-mix(
     in srgb,
     var(--text-primary) 70%,
     transparent
@@ -274,27 +179,12 @@
     color-mix(in srgb, var(--surface-elevated) 88%, var(--surface-canvas)) 0%,
     var(--surface-canvas) 100%
   );
-  --fullscreen-player-handle: color-mix(
-    in srgb,
-    var(--text-primary) 20%,
-    transparent
-  );
-  --fullscreen-player-artwork-placeholder: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --fullscreen-player-artwork-icon: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --fullscreen-player-artwork-shadow-color: color-mix(
+  --surface-canvas-overlay: color-mix(
     in srgb,
     var(--surface-canvas) 60%,
     transparent
   );
-  --fullscreen-player-artwork-shadow: 0 25px 50px -12px var(--fullscreen-player-artwork-shadow-color);
+  --fullscreen-player-artwork-shadow: 0 25px 50px -12px var(--surface-canvas-overlay);
 
   --stats-secondary-accent: color-mix(
     in srgb,
@@ -330,7 +220,6 @@
     var(--surface-elevated) 86%,
     var(--surface-canvas)
   );
-  --stats-hero-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --stats-hero-shadow: 0 25px 50px -12px color-mix(in srgb, var(
           --surface-canvas
         )
@@ -351,57 +240,17 @@
       color-mix(in srgb, var(--surface-canvas) 18%, transparent),
       color-mix(in srgb, var(--surface-canvas) 90%, transparent)
     );
-  --stats-hero-muted-surface: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --stats-hero-muted-text: color-mix(
-    in srgb,
-    var(--text-primary) 70%,
-    transparent
-  );
   --stats-hero-badge-shadow: 0 0 30px
     color-mix(in srgb, var(--accent-action) 14%, transparent);
-  --stats-hero-metric-surface: color-mix(
+  --surface-canvas-control: color-mix(
     in srgb,
     var(--surface-canvas) 35%,
     transparent
   );
-  --stats-hero-metric-label: color-mix(
-    in srgb,
-    var(--text-primary) 45%,
-    transparent
-  );
-  --stats-card-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  --stats-card-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3.5%,
-    transparent
-  );
-  --stats-card-empty-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3%,
-    transparent
-  );
-  --stats-card-dark-surface: color-mix(
+  --text-muted-strong: color-mix(in srgb, var(--text-primary) 45%, transparent);
+  --surface-canvas-panel: color-mix(
     in srgb,
     var(--surface-canvas) 20%,
-    transparent
-  );
-  --stats-card-muted-text: color-mix(
-    in srgb,
-    var(--text-primary) 45%,
-    transparent
-  );
-  --stats-card-strong-text: color-mix(
-    in srgb,
-    var(--text-primary) 70%,
-    transparent
-  );
-  --stats-card-hover-surface: color-mix(
-    in srgb,
-    var(--text-primary) 8%,
     transparent
   );
   --stats-affinity-surface: linear-gradient(
@@ -414,7 +263,7 @@
           --surface-canvas
         )
         20%, transparent);
-  --stats-replay-surface: color-mix(
+  --accent-action-glow-soft: color-mix(
     in srgb,
     var(--accent-action) 8%,
     transparent
@@ -436,11 +285,6 @@
       color-mix(in srgb, var(--text-primary) 12%, transparent),
       color-mix(in srgb, var(--text-primary) 2%, transparent)
     );
-  --stats-mosaic-overlay: color-mix(
-    in srgb,
-    var(--surface-canvas) 35%,
-    transparent
-  );
   --stats-narrative-cool: linear-gradient(
     135deg,
     color-mix(in srgb, var(--accent-action) 18%, transparent),
@@ -469,11 +313,6 @@
       color-mix(in srgb, var(--text-primary) 3.5%, transparent),
       color-mix(in srgb, var(--surface-canvas) 18%, transparent)
     );
-  --stats-pulse-plot-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 20%,
-    transparent
-  );
   --stats-pulse-grid: linear-gradient(
       color-mix(in srgb, var(--text-primary) 5.5%, transparent) 1px,
       transparent 1px
@@ -483,32 +322,17 @@
       color-mix(in srgb, var(--text-primary) 3.5%, transparent) 1px,
       transparent 1px
     );
-  --stats-pulse-line: color-mix(in srgb, var(--accent-action) 34%, transparent);
+  --accent-action-glow-strong: color-mix(
+    in srgb,
+    var(--accent-action) 34%,
+    transparent
+  );
   --stats-pulse-idle-text: color-mix(
     in srgb,
     var(--text-primary) 18%,
     transparent
   );
-  --stats-pulse-idle-hover-text: color-mix(
-    in srgb,
-    var(--text-primary) 35%,
-    transparent
-  );
-  --stats-pulse-idle-glow: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --stats-pulse-idle-dot-border: color-mix(
-    in srgb,
-    var(--text-primary) 15%,
-    transparent
-  );
-  --stats-pulse-idle-dot-surface: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
+  --text-quiet: color-mix(in srgb, var(--text-primary) 35%, transparent);
   --stats-pulse-active-shadow: 0 0 28px
     color-mix(in srgb, var(--accent-action) 28%, transparent);
   --stats-pulse-tooltip-surface: color-mix(
@@ -520,21 +344,11 @@
           --surface-canvas
         )
         45%, transparent);
-  --stats-tooltip-track: color-mix(
-    in srgb,
-    var(--text-primary) 8%,
-    transparent
-  );
   --stats-profile-gradient: linear-gradient(
     90deg,
     var(--accent-action),
     var(--state-warning),
     var(--state-danger)
-  );
-  --stats-artist-surface: color-mix(
-    in srgb,
-    var(--text-primary) 4%,
-    transparent
   );
   --stats-artist-placeholder: radial-gradient(
       circle at 26% 18%,
@@ -557,19 +371,12 @@
       color-mix(in srgb, var(--surface-canvas) 8%, transparent),
       color-mix(in srgb, var(--surface-canvas) 78%, transparent)
     );
-  --stats-artist-index: color-mix(
+  --text-secondary-soft: color-mix(
     in srgb,
-    var(--text-primary) 14%,
-    transparent
-  );
-  --stats-artist-meta: color-mix(in srgb, var(--text-primary) 62%, transparent);
-  --stats-album-rank-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 60%,
+    var(--text-primary) 60%,
     transparent
   );
 
-  --control-track: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --control-progress-glow-horizontal: linear-gradient(
     90deg,
     color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
@@ -609,9 +416,8 @@
 
   --border-subtle: var(--color-border);
   --border-quiet: color-mix(in srgb, var(--text-primary) 5%, transparent);
-  --border-floating: color-mix(in srgb, var(--text-primary) 10%, transparent);
   --border-interactive: var(--hover-border);
-  --border-focus: var(--color-ring);
+  --focus-ring: var(--color-ring);
 
   --accent-action: var(--color-primary);
   --accent-action-foreground: var(--color-primary-foreground);
@@ -620,38 +426,12 @@
     var(--accent-action) 90%,
     transparent
   );
-  --accent-action-glow: color-mix(
-    in srgb,
-    var(--accent-action) 28%,
-    transparent
-  );
-  --accent-action-glow-strong: color-mix(
-    in srgb,
-    var(--accent-action) 34%,
-    transparent
-  );
-  --accent-action-glow-medium: color-mix(
-    in srgb,
-    var(--accent-action) 18%,
-    transparent
-  );
-  --accent-action-glow-soft: color-mix(
-    in srgb,
-    var(--accent-action) 8%,
-    transparent
-  );
-  --accent-danger: var(--color-destructive);
-  --accent-danger-foreground: var(--text-primary);
-  --accent-danger-glow: color-mix(
-    in srgb,
-    var(--accent-danger) 35%,
-    transparent
-  );
+  --state-danger: var(--color-destructive);
+  --state-danger-foreground: var(--text-primary);
+  --state-danger-glow: color-mix(in srgb, var(--state-danger) 35%, transparent);
   --state-success: var(--color-success);
   --state-warning: var(--color-warning);
-  --state-danger: var(--color-destructive);
   --state-info: var(--color-info);
-  --focus-ring: var(--color-ring);
 
   --motion-duration-fast: 150ms;
   --motion-duration-normal: 250ms;
@@ -659,7 +439,7 @@
   --action-shadow: 0 14px 28px
     color-mix(in srgb, var(--accent-action) 22%, transparent);
   --focus-shadow: 0 0 0 1px
-    color-mix(in srgb, var(--border-focus) 8%, transparent);
+    color-mix(in srgb, var(--focus-ring) 8%, transparent);
   --control-inset-shadow: inset 0 1px 0
     color-mix(in srgb, var(--text-primary) 4%, transparent);
   --icon-control-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
@@ -668,44 +448,11 @@
   --scrim-hero-strong: rgba(0, 0, 0, 0.65);
   --scrim-hero-medium: rgba(0, 0, 0, 0.3);
 
-  --track-row-hover-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --track-row-active-surface: color-mix(
-    in srgb,
-    var(--accent-action) 10%,
-    transparent
-  );
-  --track-row-selected-surface: color-mix(
-    in srgb,
-    var(--accent-action) 12%,
-    transparent
-  );
-  --track-row-selected-border: color-mix(
-    in srgb,
-    var(--accent-action) 30%,
-    transparent
-  );
-  --track-row-disabled-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --track-row-disabled-text: color-mix(
-    in srgb,
-    var(--text-primary) 45%,
-    transparent
-  );
-  --track-row-cover-active-overlay: color-mix(
+  --surface-accent: color-mix(in srgb, var(--accent-action) 10%, transparent);
+  --border-accent: color-mix(in srgb, var(--accent-action) 30%, transparent);
+  --surface-canvas-hover: color-mix(
     in srgb,
     var(--surface-canvas) 40%,
-    transparent
-  );
-  --track-row-cover-hover-overlay: color-mix(
-    in srgb,
-    var(--surface-canvas) 45%,
     transparent
   );
   --track-row-offline-ready: color-mix(
@@ -723,48 +470,16 @@
     var(--state-warning) 80%,
     transparent
   );
-  --track-row-progress-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 62%,
-    transparent
-  );
   --track-row-progress-shadow: 0 8px 22px
       color-mix(in srgb, var(--surface-canvas) 40%, transparent),
     0 0 12px var(--accent-action-glow-soft),
-    inset 0 1px 0 var(--surface-glass-highlight);
-  --track-row-progress-aura: radial-gradient(
-      ellipse 58% 46% at 46% 57%,
-      var(--accent-action-glow-strong) 0%,
-      var(--accent-action-glow-medium) 24%,
-      var(--accent-action-glow-soft) 42%,
-      transparent 64%
-    ),
-    radial-gradient(
-      ellipse 38% 32% at 68% 34%,
-      color-mix(in srgb, var(--text-primary) 22%, transparent) 0%,
-      color-mix(in srgb, var(--text-primary) 9%, transparent) 34%,
-      transparent 66%
-    ),
-    radial-gradient(
-      ellipse 34% 42% at 30% 66%,
-      color-mix(in srgb, var(--state-info) 25%, transparent) 0%,
-      color-mix(in srgb, var(--state-info) 9%, transparent) 38%,
-      transparent 68%
-    );
+    inset 0 1px 0 var(--surface-quiet-subtle);
   --track-row-progress-rim: radial-gradient(
     circle at 48% 42%,
     color-mix(in srgb, var(--text-primary) 18%, transparent) 0%,
     color-mix(in srgb, var(--accent-action) 16%, transparent) 28%,
     color-mix(in srgb, var(--state-info) 8%, transparent) 54%,
     transparent 74%
-  );
-  --track-row-progress-core: var(--surface-elevated);
-  --track-row-progress-core-shadow: inset 0 0 0 1px var(--surface-glass-border),
-    inset 0 -10px 24px var(--surface-glass-shadow);
-  --track-row-progress-track: color-mix(
-    in srgb,
-    var(--text-primary) 12%,
-    transparent
   );
   --track-row-progress-ring-start: color-mix(
     in srgb,
@@ -789,16 +504,6 @@
     0 0 4px color-mix(in srgb, var(--text-primary) 35%, transparent)
   );
 
-  --radio-card-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
-  --radio-card-border: color-mix(in srgb, var(--text-primary) 8%, transparent);
-  --radio-card-hover-border: color-mix(
-    in srgb,
-    var(--accent-action) 30%,
-    transparent
-  );
-  --radio-card-shadow: 0 18px 70px
-    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
-  --radio-card-hover-shadow: 0 18px 80px var(--accent-action-glow-soft);
   --radio-station-placeholder: radial-gradient(
       circle at 30% 20%,
       var(--accent-action-glow-medium),
@@ -815,152 +520,23 @@
     color-mix(in srgb, var(--surface-canvas) 35%, transparent),
     color-mix(in srgb, var(--surface-canvas) 10%, transparent)
   );
-  --radio-station-badge-border: color-mix(
-    in srgb,
-    var(--text-primary) 12%,
-    transparent
-  );
-  --radio-station-badge-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 35%,
-    transparent
-  );
-  --radio-station-badge-text: color-mix(
-    in srgb,
-    var(--text-primary) 65%,
-    transparent
-  );
-  --radio-station-count-text: color-mix(
-    in srgb,
-    var(--text-primary) 52%,
-    transparent
-  );
-  --radio-hero-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
-  --radio-hero-border: var(--radio-card-border);
-  --radio-hero-shadow: 0 24px 90px
-    color-mix(in srgb, var(--surface-canvas) 28%, transparent);
-  --radio-hero-glow: radial-gradient(
-      circle at 16% 18%,
-      color-mix(in srgb, var(--accent-action) 20%, transparent),
-      transparent 32%
-    ),
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--text-primary) 6%, transparent),
-      transparent 52%
-    );
-  --radio-hero-intro: color-mix(in srgb, var(--text-primary) 52%, transparent);
-  --radio-discovery-shadow: 0 0 28px var(--accent-action-glow-medium);
-  --radio-discovery-hover-shadow: 0 0 38px var(--accent-action-glow-strong);
-  --radio-session-border: color-mix(
+  --border-accent-subtle: color-mix(
     in srgb,
     var(--accent-action) 15%,
     transparent
   );
-  --radio-session-surface: color-mix(
-    in srgb,
-    var(--accent-action) 5%,
-    transparent
-  );
-  --radio-session-muted: color-mix(
-    in srgb,
-    var(--text-primary) 35%,
-    transparent
-  );
-  --radio-error-text: color-mix(in srgb, var(--text-primary) 45%, transparent);
-  --radio-seed-panel-surface: var(--radio-hero-surface);
-  --radio-seed-input-surface: color-mix(
+  --surface-canvas-raised: color-mix(
     in srgb,
     var(--surface-canvas) 30%,
     transparent
   );
-  --radio-seed-input-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --radio-seed-input-placeholder: color-mix(
-    in srgb,
-    var(--text-primary) 25%,
-    transparent
-  );
-  --radio-seed-input-focus-border: color-mix(
-    in srgb,
-    var(--accent-action) 35%,
-    transparent
-  );
-  --radio-seed-results-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 40%,
-    transparent
-  );
-  --radio-seed-result-text: color-mix(
-    in srgb,
-    var(--text-primary) 70%,
-    transparent
-  );
-  --radio-seed-result-hover-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --radio-seed-result-type: color-mix(
-    in srgb,
-    var(--text-primary) 30%,
-    transparent
-  );
-  --radio-seed-placeholder-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
 
-  --home-playback-row-hover: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --home-playback-row-focus-ring: color-mix(
+  --border-accent-focus: color-mix(
     in srgb,
     var(--accent-action) 40%,
     transparent
   );
-  --home-playback-cover-hover-overlay: color-mix(
-    in srgb,
-    var(--surface-canvas) 45%,
-    transparent
-  );
-  --home-playback-cover-play-text: var(--text-primary);
-  --home-playback-panel-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-playback-panel-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3%,
-    transparent
-  );
-  --home-playback-panel-kicker: color-mix(
-    in srgb,
-    var(--text-primary) 40%,
-    transparent
-  );
-  --home-playback-empty-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-playback-card-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-playback-card-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3%,
-    transparent
-  );
+  --text-meta: color-mix(in srgb, var(--text-primary) 40%, transparent);
   --home-playback-empty-gradient: radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 18%, transparent),
@@ -971,34 +547,11 @@
       color-mix(in srgb, var(--text-primary) 4%, transparent),
       color-mix(in srgb, var(--text-primary) 2%, transparent)
     );
-  --home-playback-badge-border: color-mix(
+  --border-accent-soft: color-mix(
     in srgb,
     var(--accent-action) 20%,
     transparent
   );
-  --home-playback-badge-surface: color-mix(
-    in srgb,
-    var(--accent-action) 10%,
-    transparent
-  );
-  --home-playback-badge-text: var(--accent-action);
-  --home-playback-count-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-playback-count-surface: color-mix(
-    in srgb,
-    var(--text-primary) 4%,
-    transparent
-  );
-  --home-playback-count-text: var(--text-muted);
-  --home-playback-album-text: color-mix(
-    in srgb,
-    var(--text-primary) 40%,
-    transparent
-  );
-  --home-replay-card-border: var(--home-playback-card-border);
   --home-replay-card-surface: radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 14%, transparent),
@@ -1010,27 +563,12 @@
       color-mix(in srgb, var(--text-primary) 2%, transparent)
     );
 
-  --home-upcoming-empty-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
   --home-upcoming-empty-surface: radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 16%, transparent),
       transparent 42%
     ),
     color-mix(in srgb, var(--text-primary) 3%, transparent);
-  --home-upcoming-muted-text: color-mix(
-    in srgb,
-    var(--text-primary) 60%,
-    transparent
-  );
-  --home-upcoming-feature-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
   --home-upcoming-feature-surface: color-mix(
     in srgb,
     var(--surface-canvas) 92%,
@@ -1057,378 +595,83 @@
       color-mix(in srgb, var(--surface-canvas) 90%, transparent),
       transparent 55%
     );
-  --home-upcoming-feature-copy: color-mix(
-    in srgb,
-    var(--text-primary) 70%,
-    transparent
-  );
-  --home-upcoming-meta-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-upcoming-meta-surface: color-mix(
-    in srgb,
-    var(--text-primary) 7%,
-    transparent
-  );
-  --home-upcoming-meta-label: color-mix(
-    in srgb,
-    var(--text-primary) 40%,
-    transparent
-  );
-  --home-upcoming-attending-border: color-mix(
-    in srgb,
-    var(--accent-action) 20%,
-    transparent
-  );
-  --home-upcoming-attending-surface: color-mix(
-    in srgb,
-    var(--accent-action) 12%,
-    transparent
-  );
-  --home-upcoming-panel-border: var(--home-playback-panel-border);
-  --home-upcoming-panel-surface: var(--home-playback-panel-surface);
-  --home-upcoming-panel-kicker: var(--home-playback-panel-kicker);
-  --home-upcoming-summary: var(--accent-action);
-  --home-upcoming-secondary-border: color-mix(
-    in srgb,
-    var(--text-primary) 12%,
-    transparent
-  );
-  --home-upcoming-secondary-surface: color-mix(
-    in srgb,
-    var(--text-primary) 6%,
-    transparent
-  );
-  --home-upcoming-secondary-hover-surface: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-upcoming-prep-border: var(--home-upcoming-empty-border);
-  --home-upcoming-prep-surface: var(--home-upcoming-empty-surface);
-  --home-upcoming-prep-subtitle: var(--home-upcoming-muted-text);
-  --home-upcoming-prep-reminder-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-upcoming-prep-reminder-text: color-mix(
-    in srgb,
-    var(--text-primary) 65%,
-    transparent
-  );
 
-  --jam-card-border: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  --jam-card-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
-  --jam-card-strong-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --jam-card-hover-border: color-mix(
+  --border-accent-hover: color-mix(
     in srgb,
     var(--accent-action) 25%,
     transparent
   );
   --jam-focus-border: color-mix(in srgb, var(--accent-action) 50%, transparent);
-  --jam-focus-ring: color-mix(in srgb, var(--accent-action) 20%, transparent);
-  --jam-input-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 20%,
-    transparent
-  );
-  --jam-input-focus-border: color-mix(
-    in srgb,
-    var(--accent-action) 40%,
-    transparent
-  );
-  --jam-chip-surface: color-mix(in srgb, var(--text-primary) 3%, transparent);
-  --jam-accent-border: color-mix(
-    in srgb,
-    var(--accent-action) 20%,
-    transparent
-  );
-  --jam-accent-surface: color-mix(
-    in srgb,
-    var(--accent-action) 10%,
-    transparent
-  );
   --jam-accent-soft-surface: color-mix(
     in srgb,
     var(--accent-action) 4%,
     transparent
   );
-  --jam-accent-text: color-mix(
+  --text-accent: color-mix(
     in srgb,
     var(--accent-action) 82%,
     var(--text-primary)
   );
-  --jam-warning-border: color-mix(
-    in srgb,
-    var(--state-warning) 20%,
-    transparent
-  );
-  --jam-warning-surface: color-mix(
+  --state-warning-surface: color-mix(
     in srgb,
     var(--state-warning) 10%,
     transparent
   );
-  --jam-warning-text: color-mix(
+  --state-warning-text: color-mix(
     in srgb,
     var(--state-warning) 82%,
     var(--text-primary)
   );
-  --jam-danger-border: color-mix(in srgb, var(--state-danger) 20%, transparent);
-  --jam-danger-surface: color-mix(
+  --state-danger-surface: color-mix(
     in srgb,
     var(--state-danger) 10%,
     transparent
   );
-  --jam-danger-text: color-mix(
+  --state-danger-text: color-mix(
     in srgb,
     var(--state-danger) 82%,
     var(--text-primary)
   );
-  --jam-success-border: color-mix(
-    in srgb,
-    var(--state-success) 25%,
-    transparent
-  );
-  --jam-success-surface: color-mix(
+  --state-success-surface: color-mix(
     in srgb,
     var(--state-success) 10%,
     transparent
   );
-  --jam-success-text: color-mix(
+  --state-success-text: color-mix(
     in srgb,
     var(--state-success) 82%,
     var(--text-primary)
   );
-  --jam-info-border: color-mix(in srgb, var(--state-info) 20%, transparent);
-  --jam-info-surface: color-mix(in srgb, var(--state-info) 10%, transparent);
   --jam-info-text: color-mix(
     in srgb,
     var(--state-info) 82%,
     var(--text-primary)
-  );
-  --jam-muted-text: color-mix(in srgb, var(--text-primary) 70%, transparent);
-  --jam-subtle-text: color-mix(in srgb, var(--text-primary) 40%, transparent);
-  --jam-room-header-surface: var(--jam-card-strong-surface);
-  --jam-now-playing-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 20%,
-    transparent
-  );
-  --jam-progress-track: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --jam-progress-fill: var(--accent-action);
-  --jam-action-surface: color-mix(
-    in srgb,
-    var(--text-primary) 2.5%,
-    transparent
   );
   --jam-dark-surface: color-mix(
     in srgb,
     var(--surface-canvas) 25%,
     transparent
   );
-  --jam-artwork-placeholder: color-mix(
-    in srgb,
-    var(--text-primary) 6%,
-    transparent
-  );
-  --jam-artwork-icon: color-mix(in srgb, var(--text-primary) 35%, transparent);
   --jam-artwork-shadow: 0 10px 25px
     color-mix(in srgb, var(--surface-canvas) 30%, transparent);
-  --jam-request-border: color-mix(
-    in srgb,
-    var(--state-warning) 15%,
-    transparent
-  );
-  --jam-request-surface: color-mix(
-    in srgb,
-    var(--state-warning) 5%,
-    transparent
-  );
-  --jam-request-text: color-mix(
-    in srgb,
-    var(--state-warning) 82%,
-    var(--text-primary)
-  );
 
-  --user-profile-hero-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --user-profile-card-border: var(--border-floating);
-  --user-profile-card-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3%,
-    transparent
-  );
-  --user-profile-item-surface: color-mix(
-    in srgb,
-    var(--text-primary) 2%,
-    transparent
-  );
-  --user-profile-item-hover-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --user-profile-stat-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 20%,
-    transparent
-  );
-  --user-profile-accent-border: color-mix(
-    in srgb,
-    var(--accent-action) 30%,
-    transparent
-  );
-  --user-profile-accent-surface: color-mix(
-    in srgb,
-    var(--accent-action) 10%,
-    transparent
-  );
-  --user-profile-accent-panel-border: color-mix(
-    in srgb,
-    var(--accent-action) 15%,
-    transparent
-  );
-  --user-profile-accent-panel-surface: color-mix(
-    in srgb,
-    var(--accent-action) 6%,
-    transparent
-  );
-  --user-profile-accent-text: color-mix(
-    in srgb,
-    var(--accent-action) 82%,
-    var(--text-primary)
-  );
-  --user-profile-copy: color-mix(in srgb, var(--text-primary) 75%, transparent);
-  --user-profile-muted-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --user-profile-muted-text: color-mix(
-    in srgb,
-    var(--text-primary) 40%,
-    transparent
-  );
-  --user-profile-affinity-low-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --user-profile-affinity-low-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3%,
-    transparent
-  );
-  --user-profile-affinity-low-text: color-mix(
-    in srgb,
-    var(--text-primary) 70%,
-    transparent
-  );
-  --user-profile-affinity-medium-border: color-mix(
+  --text-control: color-mix(in srgb, var(--text-primary) 75%, transparent);
+  --state-warning-border: color-mix(
     in srgb,
     var(--state-warning) 30%,
     transparent
   );
-  --user-profile-affinity-medium-surface: color-mix(
-    in srgb,
-    var(--state-warning) 10%,
-    transparent
-  );
-  --user-profile-affinity-medium-text: color-mix(
-    in srgb,
-    var(--state-warning) 82%,
-    var(--text-primary)
-  );
-  --user-profile-affinity-high-border: var(--user-profile-accent-border);
-  --user-profile-affinity-high-surface: var(--user-profile-accent-surface);
-  --user-profile-affinity-high-text: var(--user-profile-accent-text);
-  --user-profile-affinity-very-high-border: color-mix(
+  --state-success-border: color-mix(
     in srgb,
     var(--state-success) 30%,
     transparent
-  );
-  --user-profile-affinity-very-high-surface: color-mix(
-    in srgb,
-    var(--state-success) 10%,
-    transparent
-  );
-  --user-profile-affinity-very-high-text: color-mix(
-    in srgb,
-    var(--state-success) 82%,
-    var(--text-primary)
-  );
-  --user-profile-badge-gold-border: color-mix(
-    in srgb,
-    var(--state-warning) 30%,
-    transparent
-  );
-  --user-profile-badge-gold-surface: color-mix(
-    in srgb,
-    var(--state-warning) 10%,
-    transparent
-  );
-  --user-profile-badge-gold-text: color-mix(
-    in srgb,
-    var(--state-warning) 82%,
-    var(--text-primary)
-  );
-  --user-profile-badge-green-border: color-mix(
-    in srgb,
-    var(--state-success) 30%,
-    transparent
-  );
-  --user-profile-badge-green-surface: color-mix(
-    in srgb,
-    var(--state-success) 10%,
-    transparent
-  );
-  --user-profile-badge-green-text: color-mix(
-    in srgb,
-    var(--state-success) 82%,
-    var(--text-primary)
   );
   --user-profile-badge-rose-border: color-mix(
     in srgb,
     var(--state-danger) 30%,
     transparent
   );
-  --user-profile-badge-rose-surface: color-mix(
-    in srgb,
-    var(--state-danger) 10%,
-    transparent
-  );
-  --user-profile-badge-rose-text: color-mix(
-    in srgb,
-    var(--state-danger) 82%,
-    var(--text-primary)
-  );
-  --user-profile-badge-cyan-border: var(--user-profile-accent-border);
-  --user-profile-badge-cyan-surface: var(--user-profile-accent-surface);
-  --user-profile-badge-cyan-text: var(--user-profile-accent-text);
-  --user-profile-badge-neutral-border: var(--user-profile-card-border);
-  --user-profile-badge-neutral-surface: color-mix(
-    in srgb,
-    var(--text-primary) 4%,
-    transparent
-  );
-  --user-profile-badge-neutral-text: var(--user-profile-affinity-low-text);
 
-  --profile-hover-card-surface: var(--surface-overlay);
-  --profile-hover-card-border: var(--border-floating);
   --profile-hover-card-shadow: 0 28px 90px var(--surface-glass-shadow);
   --profile-hover-glow: radial-gradient(
       circle at 18% 12%,
@@ -1440,93 +683,8 @@
       color-mix(in srgb, var(--text-primary) 8%, transparent),
       transparent 42%
     );
-  --profile-hover-watermark: color-mix(
-    in srgb,
-    var(--text-primary) 3.5%,
-    transparent
-  );
   --profile-hover-avatar-shadow: 0 18px 44px
     color-mix(in srgb, var(--surface-canvas) 36%, transparent);
-  --profile-hover-username: color-mix(
-    in srgb,
-    var(--text-primary) 45%,
-    transparent
-  );
-  --profile-hover-friend-border: color-mix(
-    in srgb,
-    var(--accent-action) 25%,
-    transparent
-  );
-  --profile-hover-friend-surface: color-mix(
-    in srgb,
-    var(--accent-action) 10%,
-    transparent
-  );
-  --profile-hover-friend-text: var(--user-profile-accent-text);
-  --profile-hover-main-badge-border: var(--border-floating);
-  --profile-hover-main-badge-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 30%,
-    transparent
-  );
-  --profile-hover-main-badge-text: var(--user-profile-accent-text);
-  --profile-hover-top-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3.5%,
-    transparent
-  );
-  --profile-hover-top-label: var(--text-subtle);
-  --profile-hover-reasons: color-mix(
-    in srgb,
-    var(--text-primary) 55%,
-    transparent
-  );
-  --profile-hover-secondary-control-surface: color-mix(
-    in srgb,
-    var(--text-primary) 6%,
-    transparent
-  );
-  --profile-hover-secondary-control-hover-surface: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --profile-hover-accent-control-border: color-mix(
-    in srgb,
-    var(--accent-action) 25%,
-    transparent
-  );
-  --profile-hover-accent-control-surface: color-mix(
-    in srgb,
-    var(--accent-action) 10%,
-    transparent
-  );
-  --profile-hover-accent-control-hover-surface: color-mix(
-    in srgb,
-    var(--accent-action) 15%,
-    transparent
-  );
-  --profile-hover-accent-control-text: var(--user-profile-accent-text);
-  --profile-hover-follow-default-surface: color-mix(
-    in srgb,
-    var(--accent-action) 15%,
-    transparent
-  );
-  --profile-hover-follow-default-hover-surface: color-mix(
-    in srgb,
-    var(--accent-action) 20%,
-    transparent
-  );
-  --profile-hover-following-text: color-mix(
-    in srgb,
-    var(--text-primary) 75%,
-    transparent
-  );
-  --profile-hover-error-text: color-mix(
-    in srgb,
-    var(--text-primary) 60%,
-    transparent
-  );
 
   --home-hero-scrim-horizontal: linear-gradient(
     90deg,
@@ -1540,95 +698,11 @@
     color-mix(in srgb, var(--surface-canvas) 18%, transparent) 60%,
     color-mix(in srgb, var(--surface-canvas) 45%, transparent) 100%
   );
-  --home-hero-control-border: color-mix(
-    in srgb,
-    var(--text-primary) 15%,
-    transparent
-  );
-  --home-hero-control-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 35%,
-    transparent
-  );
-  --home-hero-control-text: color-mix(
-    in srgb,
-    var(--text-primary) 75%,
-    transparent
-  );
-  --home-hero-control-muted-text: color-mix(
-    in srgb,
-    var(--text-primary) 55%,
-    transparent
-  );
-  --home-hero-pagination-inactive: color-mix(
-    in srgb,
-    var(--text-primary) 35%,
-    transparent
-  );
-  --home-hero-pagination-hover: color-mix(
-    in srgb,
-    var(--text-primary) 60%,
-    transparent
-  );
-  --home-hero-genre-border: color-mix(
-    in srgb,
-    var(--text-primary) 10%,
-    transparent
-  );
-  --home-hero-genre-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 30%,
-    transparent
-  );
-  --home-hero-genre-text: color-mix(
-    in srgb,
-    var(--text-primary) 80%,
-    transparent
-  );
-  --home-hero-follow-text: color-mix(
-    in srgb,
-    var(--text-primary) 80%,
-    transparent
-  );
-  --home-hero-play-shadow: 0 10px 28px var(--accent-action-glow-soft);
-  --home-discovery-card-border: var(--border-floating);
-  --home-discovery-card-surface: color-mix(
-    in srgb,
-    var(--text-primary) 3%,
-    transparent
-  );
-  --home-discovery-card-hover-surface: color-mix(
-    in srgb,
-    var(--text-primary) 6%,
-    transparent
-  );
-  --home-discovery-artwork-surface: color-mix(
-    in srgb,
-    var(--text-primary) 5%,
-    transparent
-  );
-  --home-discovery-placeholder-icon: color-mix(
-    in srgb,
-    var(--text-primary) 30%,
-    transparent
-  );
-  --home-discovery-artwork-hover-overlay: color-mix(
-    in srgb,
-    var(--surface-canvas) 40%,
-    transparent
-  );
-  --home-discovery-meta: color-mix(
-    in srgb,
-    var(--text-primary) 40%,
-    transparent
-  );
-  --home-history-meta: color-mix(
-    in srgb,
-    var(--text-primary) 35%,
-    transparent
-  );
-  --home-history-shadow: 0 20px 25px -5px
-      color-mix(in srgb, var(--surface-canvas) 20%, transparent),
+  --text-hero: color-mix(in srgb, var(--text-primary) 80%, transparent);
+  --home-history-shadow: 0 20px 25px -5px color-mix(in srgb, var(
+            --surface-canvas
+          )
+          20%, transparent),
     0 8px 10px -6px color-mix(in srgb, var(--surface-canvas) 20%, transparent);
   --home-history-tone-1: linear-gradient(
     135deg,
@@ -1666,33 +740,55 @@
     color-mix(in srgb, var(--state-info) 15%, var(--surface-canvas) 65%),
     var(--surface-canvas)
   );
-  --home-radio-card-border: var(--border-floating);
-  --home-radio-card-surface: color-mix(
-    in srgb,
-    var(--text-primary) 4%,
-    transparent
-  );
   --home-radio-overlay: linear-gradient(
     180deg,
     transparent 30%,
     color-mix(in srgb, var(--surface-canvas) 92%, transparent) 100%
   );
-  --home-radio-badge-border: color-mix(
+
+  --explore-feature-surface: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--text-primary) 8%, transparent),
+    color-mix(in srgb, var(--text-primary) 2.5%, transparent)
+  );
+  --explore-feature-aura: radial-gradient(
+      circle at 18% 18%,
+      color-mix(in srgb, var(--accent-action) 28%, transparent),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at 90% 80%,
+      color-mix(in srgb, var(--text-primary) 11%, transparent),
+      transparent 38%
+    );
+  --explore-feature-shadow: 0 18px 60px
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
+  --explore-card-overlay: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-canvas) 16%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 82%, transparent) 100%
+  );
+  --explore-card-placeholder: radial-gradient(
+      circle at var(--explore-card-glow-position) 20%,
+      color-mix(in srgb, var(--accent-action) 24%, transparent),
+      transparent 36%
+    ),
+    radial-gradient(
+      circle at 85% 85%,
+      color-mix(in srgb, var(--text-primary) 10%, transparent),
+      transparent 38%
+    );
+  --explore-hero-scrim: color-mix(
     in srgb,
-    var(--accent-action) 20%,
+    var(--surface-canvas) 22%,
     transparent
   );
-  --home-radio-badge-surface: color-mix(
-    in srgb,
-    var(--surface-canvas) 35%,
-    transparent
-  );
-  --home-radio-badge-shadow: 0 0 18px
-    color-mix(in srgb, var(--accent-action) 16%, transparent);
-  --home-radio-subtitle: color-mix(
-    in srgb,
-    var(--text-primary) 60%,
-    transparent
+  --explore-hero-gradient: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 14%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 46%, transparent) 60%,
+    var(--surface-canvas) 100%
   );
 }
 
@@ -1707,30 +803,23 @@
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
   --color-surface-chrome: var(--surface-chrome);
-  --color-surface-glass-highlight: var(--surface-glass-highlight);
+  --color-surface-quiet: var(--surface-quiet);
+  --color-surface-quiet-subtle: var(--surface-quiet-subtle);
   --color-surface-control: var(--surface-control);
   --color-surface-control-hover: var(--surface-control-hover);
   --color-surface-icon-control: var(--surface-icon-control);
-  --color-control-track: var(--control-track);
   --color-border-subtle: var(--border-subtle);
   --color-border-quiet: var(--border-quiet);
-  --color-border-floating: var(--border-floating);
   --color-border-interactive: var(--border-interactive);
-  --color-border-focus: var(--border-focus);
+  --color-border-focus: var(--focus-ring);
   --color-accent-action: var(--accent-action);
-  --color-accent-danger: var(--accent-danger);
   --color-state-success: var(--state-success);
   --color-state-warning: var(--state-warning);
   --color-state-danger: var(--state-danger);
   --color-state-info: var(--state-info);
   --color-accent-action-foreground: var(--accent-action-foreground);
   --color-accent-action-hover: var(--accent-action-hover);
-  --color-accent-danger: var(--accent-danger);
-  --color-accent-danger-foreground: var(--accent-danger-foreground);
-  --color-state-success: var(--state-success);
-  --color-state-warning: var(--state-warning);
-  --color-state-danger: var(--state-danger);
-  --color-state-info: var(--state-info);
+  --color-state-danger-foreground: var(--state-danger-foreground);
   --color-focus-ring: var(--focus-ring);
   --shadow-action: var(--action-shadow);
   --shadow-focus: var(--focus-shadow);
@@ -1741,23 +830,57 @@
 }
 
 .lyrics-ambient-glow {
-  background: var(--lyrics-ambient-glow);
+  --_lyrics-ambient-glow: radial-gradient(
+    circle at top,
+    color-mix(in srgb, var(--accent-action) 22%, transparent) 0%,
+    transparent 72%
+  );
+  background: var(--_lyrics-ambient-glow);
 }
 
 .lyrics-surface-gradient {
-  background: var(--lyrics-surface-gradient);
+  --_lyrics-surface-gradient: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-action) 12%, transparent) 0%,
+    transparent 28%,
+    transparent 72%,
+    color-mix(in srgb, var(--accent-action) 6%, transparent) 100%
+  );
+  background: var(--_lyrics-surface-gradient);
 }
 
 .lyrics-fullscreen-backdrop {
-  background: var(--lyrics-fullscreen-backdrop);
+  --_lyrics-fullscreen-backdrop: radial-gradient(
+      circle at 18% 20%,
+      color-mix(in srgb, var(--accent-action) 20%, transparent),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 84% 56%,
+      color-mix(in srgb, var(--state-info) 24%, transparent),
+      transparent 44%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 22%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 86%, transparent)
+    );
+  background: var(--_lyrics-fullscreen-backdrop);
 }
 
 .lyrics-active-line {
-  text-shadow: var(--lyrics-active-text-shadow);
+  --_lyrics-active-text-shadow: 0 0 20px var(--accent-action-glow);
+  text-shadow: var(--_lyrics-active-text-shadow);
 }
 
 .eq-smart-surface {
-  background: var(--eq-smart-surface);
+  --_eq-smart-surface: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 6%, transparent),
+    transparent
+  );
+  background: var(--_eq-smart-surface);
 }
 
 .spectrum-play-button {
@@ -1770,7 +893,7 @@
 }
 
 .spectrum-play-button-aura {
-  background: var(--play-button-aura);
+  background: var(--playback-aura);
 }
 
 .spectrum-play-button-rim {
@@ -1778,8 +901,8 @@
 }
 
 .spectrum-play-button-core {
-  background: var(--play-button-core);
-  box-shadow: var(--play-button-core-shadow);
+  background: var(--surface-elevated);
+  box-shadow: var(--playback-core-shadow);
 }
 
 .spectrum-play-button-icon {
@@ -1788,57 +911,59 @@
 }
 
 .spinning-disc-ambient {
-  background: var(--disc-ambient-glow);
+  background: var(--surface-accent-subtle);
 }
 
 .spinning-disc-surface {
-  border: 1px solid var(--border-floating);
+  border: 1px solid var(--surface-quiet);
   background: var(--disc-surface);
   box-shadow: var(--disc-shadow);
 }
 
 .spinning-disc-rotor {
-  border: 1px solid var(--disc-rotor-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--surface-canvas);
 }
 
 .spinning-disc-overlay {
-  border: 1px solid var(--disc-overlay-border);
+  border: 1px solid var(--surface-quiet);
   box-shadow: var(--disc-overlay-shadow);
 }
 
 .spinning-disc-placeholder {
-  background: var(--disc-placeholder);
+  background: var(--surface-placeholder);
 }
 
 .spinning-disc-placeholder-icon {
-  color: var(--disc-placeholder-icon);
+  color: var(--surface-control-muted);
 }
 
 .spinning-disc-control {
-  border: 1px solid var(--disc-control-border);
+  border: 1px solid var(--border-control);
   background: var(--disc-control-surface);
   color: var(--text-primary);
   box-shadow: var(--disc-control-shadow);
 }
 
 .spinning-disc-control-ring {
-  border: 1px solid var(--disc-control-ring);
+  border: 1px solid var(--accent-action-glow-medium);
 }
 
 .quality-badge-hi-res-glow {
-  box-shadow: var(--quality-hi-res-glow);
+  --_quality-hi-res-glow: 0 0 8px
+    color-mix(in srgb, var(--state-warning) 15%, transparent);
+  box-shadow: var(--_quality-hi-res-glow);
 }
 
 .quality-badge-stream {
-  border-color: var(--border-floating);
+  border-color: var(--surface-quiet);
   background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   color: color-mix(in srgb, var(--text-primary) 68%, transparent);
   box-shadow: none;
 }
 
 .info-tab-hero {
-  border: 1px solid var(--info-panel-border);
+  border: 1px solid var(--surface-quiet);
   background: linear-gradient(
     180deg,
     color-mix(
@@ -1870,8 +995,8 @@
 }
 
 .settings-section {
-  border: 1px solid var(--border-floating);
-  background: var(--surface-glass-highlight);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-quiet-subtle);
 }
 
 .settings-header {
@@ -1889,13 +1014,13 @@
 
 .home-playback-row:hover,
 .home-playback-row:focus-visible {
-  background: var(--home-playback-row-hover);
+  background: var(--surface-placeholder);
 }
 
 .home-playback-row:focus-visible,
 .home-queue-card:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--home-playback-row-focus-ring);
+  box-shadow: 0 0 0 2px var(--border-accent-focus);
 }
 
 .home-playback-cover-overlay {
@@ -1905,11 +1030,11 @@
 
 .home-playback-row:hover .home-playback-cover-overlay,
 .home-queue-card:hover .home-playback-cover-overlay {
-  background: var(--home-playback-cover-hover-overlay);
+  background: var(--surface-canvas-hover);
 }
 
 .home-playback-cover-play-icon {
-  color: var(--home-playback-cover-play-text);
+  color: var(--text-primary);
   opacity: 0;
   transition: opacity var(--motion-duration-fast) ease;
 }
@@ -1921,74 +1046,74 @@
 
 .home-playback-panel,
 .home-replay-panel {
-  border: 1px solid var(--home-playback-panel-border);
-  background: var(--home-playback-panel-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .home-playback-panel-kicker,
 .home-replay-panel-kicker {
-  color: var(--home-playback-panel-kicker);
+  color: var(--text-meta);
 }
 
 .home-playback-empty-state {
-  border: 1px dashed var(--home-playback-empty-border);
+  border: 1px dashed var(--surface-quiet);
 }
 
 .home-playback-card,
 .home-queue-card {
-  border: 1px solid var(--home-playback-card-border);
-  background: var(--home-playback-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .home-playback-empty-card {
-  border: 1px solid var(--home-playback-card-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--home-playback-empty-gradient);
 }
 
 .home-playback-badge,
 .home-replay-badge {
-  border: 1px solid var(--home-playback-badge-border);
-  background: var(--home-playback-badge-surface);
-  color: var(--home-playback-badge-text);
+  border: 1px solid var(--border-accent-soft);
+  background: var(--surface-accent);
+  color: var(--accent-action);
 }
 
 .home-replay-count-badge {
-  border: 1px solid var(--home-playback-count-border);
-  background: var(--home-playback-count-surface);
-  color: var(--home-playback-count-text);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
+  color: var(--text-muted);
 }
 
 .home-playback-album-text {
-  color: var(--home-playback-album-text);
+  color: var(--text-meta);
 }
 
 .home-replay-card {
-  border: 1px solid var(--home-replay-card-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--home-replay-card-surface);
 }
 
 .home-replay-metric-card {
-  border: 1px solid var(--home-playback-card-border);
-  background: var(--home-playback-count-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .home-replay-metric-label {
-  color: var(--home-playback-count-text);
+  color: var(--text-muted);
 }
 
 .home-upcoming-empty-card {
-  border: 1px solid var(--home-upcoming-empty-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--home-upcoming-empty-surface);
 }
 
 .home-upcoming-empty-copy,
 .home-upcoming-feature-copy,
 .home-upcoming-show-prep-subtitle {
-  color: var(--home-upcoming-muted-text);
+  color: var(--text-secondary-soft);
 }
 
 .home-upcoming-feature {
-  border: 1px solid var(--home-upcoming-feature-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--home-upcoming-feature-surface);
 }
 
@@ -2002,79 +1127,79 @@
 
 .home-upcoming-badge,
 .home-upcoming-show-prep-badge {
-  border: 1px solid var(--home-playback-badge-border);
-  background: var(--home-playback-badge-surface);
-  color: var(--home-playback-badge-text);
+  border: 1px solid var(--border-accent-soft);
+  background: var(--surface-accent);
+  color: var(--accent-action);
 }
 
 .home-upcoming-meta-card {
-  border: 1px solid var(--home-upcoming-meta-border);
-  background: var(--home-upcoming-meta-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-quiet-subtle);
 }
 
 .home-upcoming-meta-label {
-  color: var(--home-upcoming-meta-label);
+  color: var(--text-meta);
 }
 
 .home-upcoming-attending {
-  border: 1px solid var(--home-upcoming-attending-border);
-  background: var(--home-upcoming-attending-surface);
-  color: var(--home-upcoming-summary);
+  border: 1px solid var(--border-accent-soft);
+  background: var(--surface-accent-subtle);
+  color: var(--accent-action);
 }
 
 .home-upcoming-panel {
-  border: 1px solid var(--home-upcoming-panel-border);
-  background: var(--home-upcoming-panel-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .home-upcoming-panel-kicker {
-  color: var(--home-upcoming-panel-kicker);
+  color: var(--text-meta);
 }
 
 .home-upcoming-summary {
-  color: var(--home-upcoming-summary);
+  color: var(--accent-action);
 }
 
 .home-upcoming-secondary-action,
 .home-upcoming-show-prep-reminder {
-  border: 1px solid var(--home-upcoming-secondary-border);
-  background: var(--home-upcoming-secondary-surface);
+  border: 1px solid var(--surface-control-muted);
+  background: var(--surface-quiet-subtle);
 }
 
 .home-upcoming-secondary-action:hover,
 .home-upcoming-show-prep-reminder:hover {
-  background: var(--home-upcoming-secondary-hover-surface);
+  background: var(--surface-quiet);
 }
 
 .home-upcoming-show-prep-card {
-  border: 1px solid var(--home-upcoming-prep-border);
-  background: var(--home-upcoming-prep-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--home-upcoming-empty-surface);
 }
 
 .home-upcoming-show-prep-heavy {
-  border: 1px solid var(--home-playback-badge-border);
-  background: var(--home-playback-badge-surface);
-  color: var(--home-playback-badge-text);
+  border: 1px solid var(--border-accent-soft);
+  background: var(--surface-accent);
+  color: var(--accent-action);
 }
 
 .home-upcoming-show-prep-reminder {
-  color: var(--home-upcoming-prep-reminder-text);
+  color: var(--text-secondary-strong);
 }
 
 .jam-lobby-header,
 .jam-panel {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-card-strong-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-placeholder);
 }
 
 .jam-panel-muted,
 .jam-card {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .jam-card-interactive {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
   background: color-mix(in srgb, var(--surface-canvas) 15%, transparent);
   transition:
     border-color var(--motion-duration-fast) ease,
@@ -2082,24 +1207,24 @@
 }
 
 .jam-card-interactive:hover {
-  border-color: var(--jam-card-hover-border);
-  background: var(--jam-card-strong-surface);
+  border-color: var(--border-accent-hover);
+  background: var(--surface-placeholder);
 }
 
 .jam-card-interactive:focus-visible {
   outline: none;
   border-color: var(--jam-focus-border);
-  box-shadow: 0 0 0 2px var(--jam-focus-ring);
+  box-shadow: 0 0 0 2px var(--border-accent-soft);
 }
 
 .jam-hero-action {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .jam-hero-action:hover {
-  border-color: var(--jam-card-hover-border);
-  background: var(--jam-card-strong-surface);
+  border-color: var(--border-accent-hover);
+  background: var(--surface-placeholder);
 }
 
 .jam-secondary-action {
@@ -2112,30 +1237,30 @@
 }
 
 .jam-queue-item {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
   background: color-mix(in srgb, var(--text-primary) 2%, transparent);
 }
 
 .jam-avatar {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
 }
 
 .jam-avatar-fallback {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
   background: color-mix(in srgb, var(--text-primary) 8%, transparent);
-  color: var(--jam-muted-text);
+  color: var(--text-secondary-strong);
 }
 
 .jam-chip {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-chip-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .jam-accent-chip,
 .jam-accent-control {
-  border-color: var(--jam-accent-border);
-  background: var(--jam-accent-surface);
-  color: var(--jam-accent-text);
+  border-color: var(--border-accent-soft);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .jam-accent-control:hover {
@@ -2144,16 +1269,26 @@
 
 .jam-warning-chip,
 .jam-warning-panel {
-  border-color: var(--jam-warning-border);
-  background: var(--jam-warning-surface);
-  color: var(--jam-warning-text);
+  --_jam-warning-border: color-mix(
+    in srgb,
+    var(--state-warning) 20%,
+    transparent
+  );
+  border-color: var(--_jam-warning-border);
+  background: var(--state-warning-surface);
+  color: var(--state-warning-text);
 }
 
 .jam-danger-control,
 .jam-danger-panel {
-  border-color: var(--jam-danger-border);
-  background: var(--jam-danger-surface);
-  color: var(--jam-danger-text);
+  --_jam-danger-border: color-mix(
+    in srgb,
+    var(--state-danger) 20%,
+    transparent
+  );
+  border-color: var(--_jam-danger-border);
+  background: var(--state-danger-surface);
+  color: var(--state-danger-text);
 }
 
 .jam-danger-control:hover {
@@ -2161,40 +1296,45 @@
 }
 
 .jam-success-chip {
-  border-color: var(--jam-success-border);
-  background: var(--jam-success-surface);
-  color: var(--jam-success-text);
+  --_jam-success-border: color-mix(
+    in srgb,
+    var(--state-success) 25%,
+    transparent
+  );
+  border-color: var(--_jam-success-border);
+  background: var(--state-success-surface);
+  color: var(--state-success-text);
 }
 
 .jam-info-chip {
-  border-color: var(--jam-info-border);
-  background: var(--jam-info-surface);
+  border-color: var(--state-info-border);
+  background: var(--state-info-surface);
   color: var(--jam-info-text);
 }
 
 .jam-input,
 .jam-select-trigger {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-input-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-panel);
 }
 
 .jam-input:focus,
 .jam-select-trigger:focus {
-  border-color: var(--jam-input-focus-border);
+  border-color: var(--border-accent-focus);
   outline: none;
 }
 
 .jam-tag-input {
-  border: 1px solid var(--jam-accent-border);
+  border: 1px solid var(--border-accent-soft);
   background: var(--jam-accent-soft-surface);
 }
 
 .jam-tag-input:focus-within {
-  border-color: var(--jam-input-focus-border);
+  border-color: var(--border-accent-focus);
 }
 
 .jam-taxonomy-options {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--surface-overlay);
 }
 
@@ -2204,40 +1344,40 @@
 
 .jam-taxonomy-option:hover,
 .jam-taxonomy-option[data-active="true"] {
-  background: var(--jam-accent-surface);
-  color: var(--jam-accent-text);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .jam-toggle-card {
-  border: 1px solid var(--jam-accent-border);
+  border: 1px solid var(--border-accent-soft);
   background: var(--jam-accent-soft-surface);
 }
 
 .jam-toggle-option {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
   background: color-mix(in srgb, var(--text-primary) 2%, transparent);
 }
 
 .jam-toggle-option[data-active="true"] {
   border-color: var(--jam-focus-border);
-  background: var(--jam-accent-surface);
-  color: var(--jam-accent-text);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .jam-empty-state {
-  border: 1px dashed var(--jam-card-border);
+  border: 1px dashed var(--surface-quiet);
 }
 
 .jam-danger-text {
-  color: var(--jam-danger-text);
+  color: var(--state-danger-text);
 }
 
 .jam-success-text {
-  color: var(--jam-success-text);
+  color: var(--state-success-text);
 }
 
 .jam-warning-text {
-  color: var(--jam-warning-text);
+  color: var(--state-warning-text);
 }
 
 .jam-info-text {
@@ -2245,55 +1385,65 @@
 }
 
 .jam-accent-text {
-  color: var(--jam-accent-text);
+  color: var(--text-accent);
 }
 
 .jam-muted-text {
-  color: var(--jam-muted-text);
+  color: var(--text-secondary-strong);
 }
 
 .jam-subtle-text {
-  color: var(--jam-subtle-text);
+  color: var(--text-meta);
 }
 
 .jam-room-header {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-room-header-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-placeholder);
 }
 
 .jam-now-playing {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-now-playing-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-panel);
 }
 
 .jam-progress-track {
-  background: var(--jam-progress-track);
+  background: var(--surface-quiet);
 }
 
 .jam-progress-fill {
-  background: var(--jam-progress-fill);
+  background: var(--accent-action);
 }
 
 .jam-room-actions-panel {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-action-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .jam-members-panel,
 .jam-queue-panel,
 .jam-activity-panel {
-  border: 1px solid var(--jam-card-border);
-  background: var(--jam-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .jam-request-panel {
-  border: 1px solid var(--jam-request-border);
-  background: var(--jam-request-surface);
+  --_jam-request-border: color-mix(
+    in srgb,
+    var(--state-warning) 15%,
+    transparent
+  );
+  --_jam-request-surface: color-mix(
+    in srgb,
+    var(--state-warning) 5%,
+    transparent
+  );
+  border: 1px solid var(--_jam-request-border);
+  background: var(--_jam-request-surface);
 }
 
 .jam-request-count {
   background: color-mix(in srgb, var(--state-warning) 10%, transparent);
-  color: var(--jam-request-text);
+  color: var(--state-warning-text);
 }
 
 .jam-dark-surface {
@@ -2301,8 +1451,8 @@
 }
 
 .jam-artwork-placeholder {
-  background: var(--jam-artwork-placeholder);
-  color: var(--jam-artwork-icon);
+  background: var(--surface-quiet-subtle);
+  color: var(--text-quiet);
 }
 
 .jam-artwork-shadow {
@@ -2311,7 +1461,7 @@
 
 .jam-request-action {
   background: color-mix(in srgb, var(--accent-action) 15%, transparent);
-  color: var(--jam-accent-text);
+  color: var(--text-accent);
 }
 
 .jam-request-action:hover {
@@ -2319,87 +1469,107 @@
 }
 
 .jam-activity-card {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
   background: color-mix(in srgb, var(--text-primary) 2%, transparent);
 }
 
 .jam-queue-search-item:hover {
-  background: var(--jam-card-strong-surface);
+  background: var(--surface-placeholder);
 }
 
 .jam-qr-surface {
-  border: 1px solid var(--jam-card-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--jam-dark-surface);
 }
 
 .info-tab-artwork {
-  border: 1px solid var(--border-floating);
-  background: var(--surface-glass-highlight);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-quiet-subtle);
   box-shadow: var(--info-artwork-shadow);
 }
 
 .info-tab-audio-pill {
-  border: 1px solid var(--border-floating);
+  border: 1px solid var(--surface-quiet);
   background: color-mix(in srgb, var(--surface-canvas) 20%, transparent);
 }
 
 .info-tab-rating-card,
 .info-tab-quiet-card,
 .info-tab-stat-card {
-  border: 1px solid var(--info-panel-border);
-  background: var(--info-panel-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .info-tab-section-card {
-  border: 1px solid var(--info-panel-border);
-  background: var(--info-panel-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
   box-shadow: var(--info-panel-shadow);
 }
 
 .info-tab-section-header {
-  border-bottom: 1px solid var(--info-panel-divider);
+  border-bottom: 1px solid var(--surface-quiet-subtle);
 }
 
 .info-tab-section-icon {
-  border: 1px solid var(--info-panel-border);
-  background: var(--info-panel-icon-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-placeholder);
 }
 
 .info-tab-metric-track {
-  background: var(--info-metric-track);
+  background: var(--surface-quiet-subtle);
 }
 
 .info-tab-metric-fill[data-tone="primary"] {
-  background: var(--info-metric-primary);
+  --_info-metric-primary: linear-gradient(
+    90deg,
+    var(--accent-action),
+    var(--state-info)
+  );
+  background: var(--_info-metric-primary);
 }
 
 .info-tab-metric-fill[data-tone="accent"] {
-  background: var(--info-metric-accent);
+  --_info-metric-accent: linear-gradient(
+    90deg,
+    var(--state-info),
+    var(--accent-action)
+  );
+  background: var(--_info-metric-accent);
 }
 
 .info-tab-metric-fill[data-tone="warm"] {
-  background: var(--info-metric-warm);
+  --_info-metric-warm: linear-gradient(
+    90deg,
+    var(--state-warning),
+    var(--state-danger)
+  );
+  background: var(--_info-metric-warm);
 }
 
 .info-tab-mood-pill {
-  border: 1px solid var(--info-mood-border);
-  background: var(--info-mood-surface);
-  color: var(--info-mood-text);
+  --_info-mood-text: color-mix(
+    in srgb,
+    var(--state-info) 85%,
+    var(--text-primary)
+  );
+  border: 1px solid var(--state-info-border);
+  background: var(--state-info-surface);
+  color: var(--_info-mood-text);
 }
 
 .listen-player-shell {
-  border: 1px solid var(--border-floating);
-  background: var(--player-shell-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-chrome);
   box-shadow: var(--player-shell-shadow);
   backdrop-filter: blur(24px);
 }
 
 .listen-player-artwork {
-  background: var(--surface-glass-highlight);
+  background: var(--surface-quiet-subtle);
 }
 
 .listen-player-artwork-placeholder {
-  background: var(--player-artwork-placeholder);
+  background: var(--surface-quiet);
 }
 
 .listen-player-liked-indicator {
@@ -2410,9 +1580,9 @@
 }
 
 .listen-player-surface-fallback {
-  border: 1px solid var(--border-floating);
+  border: 1px solid var(--surface-quiet);
   background: var(--player-fallback-surface);
-  color: var(--player-fallback-text);
+  color: var(--text-secondary-strong);
   box-shadow: var(--player-fallback-shadow);
 }
 
@@ -2431,16 +1601,16 @@
 .track-row:not([data-active="true"]):not([data-selected="true"]):not(
     [data-disabled="true"]
   ):hover {
-  background: var(--track-row-hover-surface);
+  background: var(--surface-placeholder);
 }
 
 .track-row[data-active="true"] {
-  background: var(--track-row-active-surface);
+  background: var(--surface-accent);
 }
 
 .track-row[data-selected="true"] {
-  background: var(--track-row-selected-surface);
-  box-shadow: 0 0 0 1px var(--track-row-selected-border);
+  background: var(--surface-accent-subtle);
+  box-shadow: 0 0 0 1px var(--border-accent);
 }
 
 .track-row[data-disabled="true"] {
@@ -2453,12 +1623,12 @@
 }
 
 .track-row[data-active="true"] .track-row-cover-overlay {
-  background: var(--track-row-cover-active-overlay);
+  background: var(--surface-canvas-hover);
 }
 
 .track-row:not([data-active="true"]):not([data-disabled="true"]):hover
   .track-row-cover-overlay {
-  background: var(--track-row-cover-hover-overlay);
+  background: var(--surface-canvas-hover);
 }
 
 .track-row-cover-play-icon {
@@ -2472,8 +1642,8 @@
 }
 
 .track-row-disabled-badge {
-  border: 1px solid var(--track-row-disabled-border);
-  color: var(--track-row-disabled-text);
+  border: 1px solid var(--surface-quiet);
+  color: var(--text-muted-strong);
 }
 
 .track-row-offline-ready {
@@ -2489,13 +1659,13 @@
 }
 
 .track-row-playback-progress {
-  background: var(--track-row-progress-surface);
+  background: var(--surface-canvas-overlay);
   box-shadow: var(--track-row-progress-shadow);
   color: var(--text-primary);
 }
 
 .track-row-playback-aura {
-  background: var(--track-row-progress-aura);
+  background: var(--playback-aura);
 }
 
 .track-row-playback-rim {
@@ -2503,8 +1673,8 @@
 }
 
 .track-row-playback-core {
-  background: var(--track-row-progress-core);
-  box-shadow: var(--track-row-progress-core-shadow);
+  background: var(--surface-elevated);
+  box-shadow: var(--playback-core-shadow);
 }
 
 .track-row-playback-gradient-start {
@@ -2520,7 +1690,7 @@
 }
 
 .track-row-playback-track {
-  stroke: var(--track-row-progress-track);
+  stroke: var(--surface-control-muted);
 }
 
 .track-row-playback-ring {
@@ -2532,14 +1702,17 @@
 }
 
 .radio-station-card {
-  border: 1px solid var(--radio-card-border);
-  background: var(--radio-card-surface);
-  box-shadow: var(--radio-card-shadow);
+  --_radio-card-shadow: 0 18px 70px
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
+  box-shadow: var(--_radio-card-shadow);
 }
 
 .radio-station-card:hover {
-  border-color: var(--radio-card-hover-border);
-  box-shadow: var(--radio-card-hover-shadow);
+  border-color: var(--border-accent);
+  --_radio-card-hover-shadow: 0 18px 80px var(--accent-action-glow-soft);
+  box-shadow: var(--_radio-card-hover-shadow);
 }
 
 .radio-station-card:disabled {
@@ -2560,9 +1733,9 @@
 }
 
 .radio-station-type {
-  border: 1px solid var(--radio-station-badge-border);
-  background: var(--radio-station-badge-surface);
-  color: var(--radio-station-badge-text);
+  border: 1px solid var(--surface-control-muted);
+  background: var(--surface-canvas-control);
+  color: var(--text-secondary-strong);
 }
 
 .radio-station-play {
@@ -2576,17 +1749,29 @@
 }
 
 .radio-station-count {
-  color: var(--radio-station-count-text);
+  color: var(--text-secondary-soft);
 }
 
 .radio-page-hero {
-  border: 1px solid var(--radio-hero-border);
-  background: var(--radio-hero-surface);
-  box-shadow: var(--radio-hero-shadow);
+  --_radio-hero-shadow: 0 24px 90px
+    color-mix(in srgb, var(--surface-canvas) 28%, transparent);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
+  box-shadow: var(--_radio-hero-shadow);
 }
 
 .radio-page-hero-glow {
-  background: var(--radio-hero-glow);
+  --_radio-hero-glow: radial-gradient(
+      circle at 16% 18%,
+      color-mix(in srgb, var(--accent-action) 20%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 6%, transparent),
+      transparent 52%
+    );
+  background: var(--_radio-hero-glow);
 }
 
 .radio-page-icon {
@@ -2596,17 +1781,19 @@
 }
 
 .radio-page-intro {
-  color: var(--radio-hero-intro);
+  color: var(--text-secondary-soft);
 }
 
 .radio-discovery-button {
+  --_radio-discovery-shadow: 0 0 28px var(--accent-action-glow-medium);
   background: var(--accent-action);
   color: var(--accent-action-foreground);
-  box-shadow: var(--radio-discovery-shadow);
+  box-shadow: var(--_radio-discovery-shadow);
 }
 
 .radio-discovery-button:hover {
-  box-shadow: var(--radio-discovery-hover-shadow);
+  --_radio-discovery-hover-shadow: 0 0 38px var(--accent-action-glow-strong);
+  box-shadow: var(--_radio-discovery-hover-shadow);
 }
 
 .radio-discovery-button:disabled {
@@ -2614,8 +1801,13 @@
 }
 
 .radio-session-status {
-  border: 1px solid var(--radio-session-border);
-  background: var(--radio-session-surface);
+  --_radio-session-surface: color-mix(
+    in srgb,
+    var(--accent-action) 5%,
+    transparent
+  );
+  border: 1px solid var(--border-accent-subtle);
+  background: var(--_radio-session-surface);
 }
 
 .radio-session-dot {
@@ -2628,18 +1820,18 @@
 }
 
 .radio-session-muted {
-  color: var(--radio-session-muted);
+  color: var(--text-quiet);
 }
 
 .radio-error {
-  border: 1px solid var(--radio-card-border);
+  border: 1px solid var(--surface-quiet);
   background: color-mix(in srgb, var(--text-primary) 2%, transparent);
-  color: var(--radio-error-text);
+  color: var(--text-muted-strong);
 }
 
 .radio-seed-panel {
-  border: 1px solid var(--radio-card-border);
-  background: var(--radio-seed-panel-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
   box-shadow: 0 18px 70px
     color-mix(in srgb, var(--surface-canvas) 22%, transparent);
 }
@@ -2653,17 +1845,27 @@
 }
 
 .radio-seed-input {
-  border: 1px solid var(--radio-seed-input-border);
-  background: var(--radio-seed-input-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-raised);
   color: var(--text-primary);
 }
 
 .radio-seed-input::placeholder {
-  color: var(--radio-seed-input-placeholder);
+  --_radio-seed-input-placeholder: color-mix(
+    in srgb,
+    var(--text-primary) 25%,
+    transparent
+  );
+  color: var(--_radio-seed-input-placeholder);
 }
 
 .radio-seed-input:focus {
-  border-color: var(--radio-seed-input-focus-border);
+  --_radio-seed-input-focus-border: color-mix(
+    in srgb,
+    var(--accent-action) 35%,
+    transparent
+  );
+  border-color: var(--_radio-seed-input-focus-border);
   outline: none;
 }
 
@@ -2672,16 +1874,16 @@
 }
 
 .radio-seed-results {
-  border: 1px solid var(--radio-card-border);
-  background: var(--radio-seed-results-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-hover);
 }
 
 .radio-seed-result {
-  color: var(--radio-seed-result-text);
+  color: var(--text-secondary-strong);
 }
 
 .radio-seed-result:hover {
-  background: var(--radio-seed-result-hover-surface);
+  background: var(--surface-placeholder);
   color: var(--text-primary);
 }
 
@@ -2690,7 +1892,7 @@
 }
 
 .radio-seed-result-image {
-  background: var(--radio-seed-placeholder-surface);
+  background: var(--surface-placeholder);
 }
 
 .radio-seed-result-placeholder {
@@ -2699,7 +1901,7 @@
 }
 
 .radio-seed-result-type {
-  color: var(--radio-seed-result-type);
+  color: var(--text-quiet);
 }
 
 .radio-seed-result-icon {
@@ -2707,7 +1909,7 @@
 }
 
 .fullscreen-player-handle {
-  background: var(--fullscreen-player-handle);
+  background: var(--text-faint);
 }
 
 .fullscreen-player-artwork,
@@ -2716,11 +1918,11 @@
 }
 
 .fullscreen-player-artwork-placeholder {
-  background: var(--fullscreen-player-artwork-placeholder);
+  background: var(--surface-placeholder);
 }
 
 .fullscreen-player-artwork-icon {
-  color: var(--fullscreen-player-artwork-icon);
+  color: var(--surface-quiet);
 }
 
 .fullscreen-player-time {
@@ -2756,7 +1958,7 @@
 }
 
 .stats-hero-surface {
-  border: 1px solid var(--stats-hero-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--stats-hero-surface);
   box-shadow: var(--stats-hero-shadow);
 }
@@ -2766,9 +1968,9 @@
 }
 
 .stats-hero-period-muted {
-  border: 1px solid var(--stats-hero-border);
-  background: var(--stats-hero-muted-surface);
-  color: var(--stats-hero-muted-text);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-quiet);
+  color: var(--text-secondary-strong);
 }
 
 .stats-hero-period-accent {
@@ -2778,12 +1980,12 @@
 }
 
 .stats-hero-metric {
-  border: 1px solid var(--stats-hero-border);
-  background: var(--stats-hero-metric-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-control);
 }
 
 .stats-hero-metric-label {
-  color: var(--stats-hero-metric-label);
+  color: var(--text-muted-strong);
 }
 
 .stats-hero-metric-value {
@@ -2791,33 +1993,33 @@
 }
 
 .stats-card {
-  border: 1px solid var(--stats-card-border);
-  background: var(--stats-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .stats-card-empty {
-  border-color: var(--stats-card-border);
-  background: var(--stats-card-empty-surface);
+  border-color: var(--surface-quiet);
+  background: var(--surface-card);
   color: var(--text-muted);
 }
 
 .stats-dark-card {
-  border: 1px solid var(--stats-card-border);
-  background: var(--stats-card-dark-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-panel);
 }
 
 .stats-muted-label,
 .stats-profile-label,
 .stats-tooltip-label,
 .stats-tooltip-meter-label {
-  color: var(--stats-card-muted-text);
+  color: var(--text-muted-strong);
 }
 
 .stats-muted-pill,
 .stats-muted-chip {
-  border: 1px solid var(--stats-card-border);
-  background: var(--stats-card-dark-surface);
-  color: var(--stats-card-strong-text);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-panel);
+  color: var(--text-secondary-strong);
 }
 
 .stats-muted-chip {
@@ -2825,13 +2027,13 @@
 }
 
 .stats-scope-link-inactive {
-  border: 1px solid var(--stats-card-border);
-  background: var(--stats-card-empty-surface);
-  color: var(--stats-card-strong-text);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
+  color: var(--text-secondary-strong);
 }
 
 .stats-scope-link-inactive:hover {
-  background: var(--stats-card-hover-surface);
+  background: var(--surface-quiet);
   color: var(--text-primary);
 }
 
@@ -2844,8 +2046,8 @@
 .stats-mosaic-cell,
 .stats-track-cover,
 .stats-album-cover {
-  border: 1px solid var(--stats-card-border);
-  background: var(--stats-card-empty-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .stats-mosaic-placeholder {
@@ -2853,18 +2055,18 @@
 }
 
 .stats-mosaic-overlay {
-  background: var(--stats-mosaic-overlay);
+  background: var(--surface-canvas-control);
 }
 
 .stats-replay-card {
   border: 1px solid color-mix(in srgb, var(--accent-action) 20%, transparent);
-  background: var(--stats-replay-surface);
+  background: var(--accent-action-glow-soft);
   box-shadow: var(--stats-replay-shadow);
 }
 
 .stats-replay-badge {
   border: 1px solid color-mix(in srgb, var(--accent-action) 25%, transparent);
-  background: var(--stats-card-dark-surface);
+  background: var(--surface-canvas-panel);
   color: var(--accent-action);
 }
 
@@ -2874,12 +2076,12 @@
 
 .stats-replay-row:hover,
 .stats-list-row:hover {
-  border-color: var(--stats-card-border);
-  background: var(--stats-card-hover-surface);
+  border-color: var(--surface-quiet);
+  background: var(--surface-quiet);
 }
 
 .stats-narrative-tile {
-  border: 1px solid var(--stats-card-border);
+  border: 1px solid var(--surface-quiet);
 }
 
 .stats-narrative-tone-cool {
@@ -2895,13 +2097,13 @@
 }
 
 .stats-pulse-surface {
-  border: 1px solid var(--stats-card-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--stats-pulse-surface);
 }
 
 .stats-pulse-plot {
   border: 1px solid color-mix(in srgb, var(--text-primary) 6%, transparent);
-  background: var(--stats-pulse-plot-surface);
+  background: var(--surface-canvas-panel);
 }
 
 .stats-pulse-grid {
@@ -2910,7 +2112,7 @@
 }
 
 .stats-pulse-line {
-  stroke: var(--stats-pulse-line);
+  stroke: var(--accent-action-glow-strong);
 }
 
 .stats-pulse-point-idle {
@@ -2918,16 +2120,16 @@
 }
 
 .stats-pulse-point-idle:hover {
-  color: var(--stats-pulse-idle-hover-text);
+  color: var(--text-quiet);
 }
 
 .stats-pulse-point-idle-glow {
-  background: var(--stats-pulse-idle-glow);
+  background: var(--surface-placeholder);
 }
 
 .stats-pulse-point-idle-dot {
-  border-color: var(--stats-pulse-idle-dot-border);
-  background: var(--stats-pulse-idle-dot-surface);
+  border-color: var(--border-control);
+  background: var(--surface-quiet);
 }
 
 .stats-pulse-point-active {
@@ -2935,7 +2137,7 @@
 }
 
 .stats-pulse-tooltip {
-  border: 1px solid var(--stats-card-border);
+  border: 1px solid var(--surface-quiet);
   background: var(--stats-pulse-tooltip-surface);
   box-shadow: var(--stats-pulse-tooltip-shadow);
 }
@@ -2946,13 +2148,13 @@
 }
 
 .stats-tooltip-metric {
-  border: 1px solid var(--stats-card-border);
-  background: var(--stats-card-empty-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .stats-tooltip-meter-track,
 .stats-profile-track {
-  background: var(--stats-tooltip-track);
+  background: var(--surface-quiet);
 }
 
 .stats-profile-fill {
@@ -2964,8 +2166,8 @@
 }
 
 .stats-artist-card {
-  border: 1px solid var(--stats-card-border);
-  background: var(--stats-artist-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .stats-artist-card:hover {
@@ -2981,7 +2183,7 @@
 }
 
 .stats-artist-index {
-  color: var(--stats-artist-index);
+  color: var(--border-control);
 }
 
 .stats-artist-title,
@@ -2990,132 +2192,132 @@
 }
 
 .stats-artist-meta {
-  color: var(--stats-artist-meta);
+  color: var(--text-secondary-soft);
 }
 
 .stats-album-rank {
-  background: var(--stats-album-rank-surface);
+  background: var(--surface-canvas-overlay);
 }
 
 .user-profile-hero {
-  border: 1px solid var(--user-profile-card-border);
-  background: var(--user-profile-hero-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-placeholder);
 }
 
 .user-profile-card {
-  border: 1px solid var(--user-profile-card-border);
-  background: var(--user-profile-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .user-profile-item {
-  border: 1px solid var(--user-profile-card-border);
-  background: var(--user-profile-item-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
   transition: background-color var(--motion-duration-fast) ease;
 }
 
 .user-profile-item:hover {
-  background: var(--user-profile-item-hover-surface);
+  background: var(--surface-placeholder);
 }
 
 .user-profile-stat {
-  border: 1px solid var(--user-profile-card-border);
-  background: var(--user-profile-stat-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-canvas-panel);
 }
 
 .user-profile-avatar-placeholder {
-  background: var(--user-profile-accent-surface);
-  color: var(--user-profile-accent-text);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .user-profile-copy {
-  color: var(--user-profile-copy);
+  color: var(--text-control);
 }
 
 .user-profile-accent-badge {
-  border: 1px solid var(--user-profile-accent-border);
-  background: var(--user-profile-accent-surface);
-  color: var(--user-profile-accent-text);
+  border: 1px solid var(--border-accent);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .user-profile-accent-panel {
-  border: 1px solid var(--user-profile-accent-panel-border);
-  background: var(--user-profile-accent-panel-surface);
+  border: 1px solid var(--border-accent-subtle);
+  background: var(--surface-accent-shadow);
 }
 
 .user-profile-accent-label,
 .user-profile-accent-icon,
 .user-profile-accent-link {
-  color: var(--user-profile-accent-text);
+  color: var(--text-accent);
 }
 
 .user-profile-reason {
-  border: 1px solid var(--user-profile-card-border);
-  background: var(--user-profile-card-surface);
-  color: var(--user-profile-copy);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
+  color: var(--text-control);
 }
 
 .user-profile-empty-state {
-  border: 1px dashed var(--user-profile-card-border);
-  background: var(--user-profile-card-surface);
+  border: 1px dashed var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .user-profile-placeholder {
-  background: var(--user-profile-muted-surface);
-  color: var(--user-profile-muted-text);
+  background: var(--surface-placeholder);
+  color: var(--text-meta);
 }
 
 .user-profile-affinity-very-high {
-  border-color: var(--user-profile-affinity-very-high-border);
-  background: var(--user-profile-affinity-very-high-surface);
-  color: var(--user-profile-affinity-very-high-text);
+  border-color: var(--state-success-border);
+  background: var(--state-success-surface);
+  color: var(--state-success-text);
 }
 
 .user-profile-affinity-high {
-  border-color: var(--user-profile-affinity-high-border);
-  background: var(--user-profile-affinity-high-surface);
-  color: var(--user-profile-affinity-high-text);
+  border-color: var(--border-accent);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .user-profile-affinity-medium {
-  border-color: var(--user-profile-affinity-medium-border);
-  background: var(--user-profile-affinity-medium-surface);
-  color: var(--user-profile-affinity-medium-text);
+  border-color: var(--state-warning-border);
+  background: var(--state-warning-surface);
+  color: var(--state-warning-text);
 }
 
 .user-profile-affinity-low {
-  border-color: var(--user-profile-affinity-low-border);
-  background: var(--user-profile-affinity-low-surface);
-  color: var(--user-profile-affinity-low-text);
+  border-color: var(--surface-quiet);
+  background: var(--surface-card);
+  color: var(--text-secondary-strong);
 }
 
 .user-profile-badge-gold {
-  border-color: var(--user-profile-badge-gold-border);
-  background: var(--user-profile-badge-gold-surface);
-  color: var(--user-profile-badge-gold-text);
+  border-color: var(--state-warning-border);
+  background: var(--state-warning-surface);
+  color: var(--state-warning-text);
 }
 
 .user-profile-badge-green {
-  border-color: var(--user-profile-badge-green-border);
-  background: var(--user-profile-badge-green-surface);
-  color: var(--user-profile-badge-green-text);
+  border-color: var(--state-success-border);
+  background: var(--state-success-surface);
+  color: var(--state-success-text);
 }
 
 .user-profile-badge-rose {
   border-color: var(--user-profile-badge-rose-border);
-  background: var(--user-profile-badge-rose-surface);
-  color: var(--user-profile-badge-rose-text);
+  background: var(--state-danger-surface);
+  color: var(--state-danger-text);
 }
 
 .user-profile-badge-cyan {
-  border-color: var(--user-profile-badge-cyan-border);
-  background: var(--user-profile-badge-cyan-surface);
-  color: var(--user-profile-badge-cyan-text);
+  border-color: var(--border-accent);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .user-profile-badge-neutral {
-  border-color: var(--user-profile-badge-neutral-border);
-  background: var(--user-profile-badge-neutral-surface);
-  color: var(--user-profile-badge-neutral-text);
+  border-color: var(--surface-quiet);
+  background: var(--surface-card);
+  color: var(--text-secondary-strong);
 }
 
 .profile-hover-popover {
@@ -3126,8 +2328,8 @@
 }
 
 .profile-hover-card {
-  border-color: var(--profile-hover-card-border);
-  background: var(--profile-hover-card-surface);
+  border-color: var(--surface-quiet);
+  background: var(--surface-overlay);
   box-shadow: var(--profile-hover-card-shadow);
 }
 
@@ -3136,7 +2338,7 @@
 }
 
 .profile-hover-watermark {
-  color: var(--profile-hover-watermark);
+  color: var(--surface-card);
 }
 
 .profile-hover-avatar {
@@ -3144,9 +2346,9 @@
 }
 
 .profile-hover-avatar-placeholder {
-  border-color: var(--user-profile-card-border);
-  background: var(--user-profile-accent-surface);
-  color: var(--user-profile-accent-text);
+  border-color: var(--surface-quiet);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .profile-hover-title,
@@ -3156,35 +2358,35 @@
 }
 
 .profile-hover-username {
-  color: var(--profile-hover-username);
+  color: var(--text-muted-strong);
 }
 
 .profile-hover-friend {
-  border-color: var(--profile-hover-friend-border);
-  background: var(--profile-hover-friend-surface);
-  color: var(--profile-hover-friend-text);
+  border-color: var(--border-accent-hover);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .profile-hover-main-badge {
-  border-color: var(--profile-hover-main-badge-border);
-  background: var(--profile-hover-main-badge-surface);
-  color: var(--profile-hover-main-badge-text);
+  border-color: var(--surface-quiet);
+  background: var(--surface-canvas-raised);
+  color: var(--text-accent);
 }
 
 .profile-hover-affinity-very-high {
-  color: var(--user-profile-affinity-very-high-text);
+  color: var(--state-success-text);
 }
 
 .profile-hover-affinity-high {
-  color: var(--user-profile-affinity-high-text);
+  color: var(--text-accent);
 }
 
 .profile-hover-affinity-medium {
-  color: var(--user-profile-affinity-medium-text);
+  color: var(--state-warning-text);
 }
 
 .profile-hover-affinity-low {
-  color: var(--user-profile-affinity-low-text);
+  color: var(--text-secondary-strong);
 }
 
 .profile-hover-score-label,
@@ -3194,105 +2396,105 @@
 }
 
 .profile-hover-top-panel {
-  border-color: var(--profile-hover-card-border);
-  background: var(--profile-hover-top-surface);
+  border-color: var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .profile-hover-reasons {
-  color: var(--profile-hover-reasons);
+  color: var(--text-secondary-soft);
 }
 
 .profile-hover-stat {
-  border-color: var(--profile-hover-card-border);
-  background: var(--user-profile-stat-surface);
+  border-color: var(--surface-quiet);
+  background: var(--surface-canvas-panel);
 }
 
 .profile-hover-secondary-control {
-  border-color: var(--profile-hover-card-border);
-  background: var(--profile-hover-secondary-control-surface);
+  border-color: var(--surface-quiet);
+  background: var(--surface-quiet-subtle);
   color: var(--text-primary);
 }
 
 .profile-hover-secondary-control:hover {
-  background: var(--profile-hover-secondary-control-hover-surface);
+  background: var(--surface-quiet);
 }
 
 .profile-hover-accent-control {
-  border-color: var(--profile-hover-accent-control-border);
-  background: var(--profile-hover-accent-control-surface);
-  color: var(--profile-hover-accent-control-text);
+  border-color: var(--border-accent-hover);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .profile-hover-accent-control:hover {
-  background: var(--profile-hover-accent-control-hover-surface);
+  background: var(--border-accent-subtle);
 }
 
 .profile-hover-follow-control {
-  border-color: var(--profile-hover-card-border);
+  border-color: var(--surface-quiet);
 }
 
 .profile-hover-following {
-  background: var(--profile-hover-secondary-control-surface);
-  color: var(--profile-hover-following-text);
+  background: var(--surface-quiet-subtle);
+  color: var(--text-control);
 }
 
 .profile-hover-following:hover {
-  background: var(--profile-hover-secondary-control-hover-surface);
+  background: var(--surface-quiet);
 }
 
 .profile-hover-follow-default {
-  border-color: var(--profile-hover-accent-control-border);
-  background: var(--profile-hover-follow-default-surface);
-  color: var(--profile-hover-accent-control-text);
+  border-color: var(--border-accent-hover);
+  background: var(--border-accent-subtle);
+  color: var(--text-accent);
 }
 
 .profile-hover-follow-default:hover {
-  background: var(--profile-hover-follow-default-hover-surface);
+  background: var(--border-accent-soft);
 }
 
 .profile-hover-badge-gold {
-  border-color: var(--user-profile-badge-gold-border);
-  background: var(--user-profile-badge-gold-surface);
-  color: var(--user-profile-badge-gold-text);
+  border-color: var(--state-warning-border);
+  background: var(--state-warning-surface);
+  color: var(--state-warning-text);
 }
 
 .profile-hover-badge-green {
-  border-color: var(--user-profile-badge-green-border);
-  background: var(--user-profile-badge-green-surface);
-  color: var(--user-profile-badge-green-text);
+  border-color: var(--state-success-border);
+  background: var(--state-success-surface);
+  color: var(--state-success-text);
 }
 
 .profile-hover-badge-rose {
   border-color: var(--user-profile-badge-rose-border);
-  background: var(--user-profile-badge-rose-surface);
-  color: var(--user-profile-badge-rose-text);
+  background: var(--state-danger-surface);
+  color: var(--state-danger-text);
 }
 
 .profile-hover-badge-cyan {
-  border-color: var(--user-profile-badge-cyan-border);
-  background: var(--user-profile-badge-cyan-surface);
-  color: var(--user-profile-badge-cyan-text);
+  border-color: var(--border-accent);
+  background: var(--surface-accent);
+  color: var(--text-accent);
 }
 
 .profile-hover-badge-neutral {
-  border-color: var(--user-profile-badge-neutral-border);
-  background: var(--user-profile-badge-neutral-surface);
-  color: var(--user-profile-badge-neutral-text);
+  border-color: var(--surface-quiet);
+  background: var(--surface-card);
+  color: var(--text-secondary-strong);
 }
 
 .profile-hover-loading {
-  border-color: var(--profile-hover-card-border);
-  background: var(--profile-hover-card-surface);
+  border-color: var(--surface-quiet);
+  background: var(--surface-overlay);
 }
 
 .profile-hover-loading-icon {
-  color: var(--profile-hover-accent-control-text);
+  color: var(--text-accent);
 }
 
 .profile-hover-error {
-  border-color: var(--profile-hover-card-border);
-  background: var(--profile-hover-card-surface);
-  color: var(--profile-hover-error-text);
+  border-color: var(--surface-quiet);
+  background: var(--surface-overlay);
+  color: var(--text-secondary-soft);
 }
 
 .home-legacy-hero {
@@ -3312,9 +2514,9 @@
 }
 
 .home-hero-nav-control {
-  border: 1px solid var(--home-hero-control-border);
-  background: var(--home-hero-control-surface);
-  color: var(--home-hero-control-text);
+  border: 1px solid var(--border-control);
+  background: var(--surface-canvas-control);
+  color: var(--text-control);
 }
 
 .home-hero-nav-control:hover {
@@ -3322,7 +2524,7 @@
 }
 
 .home-hero-nav-control-plain {
-  color: var(--home-hero-control-muted-text);
+  color: var(--text-secondary-soft);
   transition: color var(--motion-duration-fast) ease;
 }
 
@@ -3335,21 +2537,21 @@
 }
 
 .home-hero-pagination-inactive {
-  background: var(--home-hero-pagination-inactive);
+  background: var(--text-quiet);
 }
 
 .home-hero-pagination-inactive:hover {
-  background: var(--home-hero-pagination-hover);
+  background: var(--text-secondary-soft);
 }
 
 .home-hero-genre {
-  border-color: var(--home-hero-genre-border);
-  background: var(--home-hero-genre-surface);
-  color: var(--home-hero-genre-text);
+  border-color: var(--surface-quiet);
+  background: var(--surface-canvas-raised);
+  color: var(--text-hero);
 }
 
 .home-hero-follow {
-  color: var(--home-hero-follow-text);
+  color: var(--text-hero);
 }
 
 .home-hero-follow:hover {
@@ -3357,17 +2559,17 @@
 }
 
 .home-discovery-card {
-  border: 1px solid var(--home-discovery-card-border);
-  background: var(--home-discovery-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
   transition: background-color var(--motion-duration-fast) ease;
 }
 
 .home-discovery-card:hover {
-  background: var(--home-discovery-card-hover-surface);
+  background: var(--surface-quiet-subtle);
 }
 
 .home-discovery-artwork {
-  background: var(--home-discovery-artwork-surface);
+  background: var(--surface-placeholder);
 }
 
 .home-discovery-artwork-overlay {
@@ -3376,19 +2578,19 @@
 }
 
 .group:hover .home-discovery-artwork-overlay {
-  background: var(--home-discovery-artwork-hover-overlay);
+  background: var(--surface-canvas-hover);
 }
 
 .home-discovery-placeholder-icon {
-  color: var(--home-discovery-placeholder-icon);
+  color: var(--text-quiet);
 }
 
 .home-discovery-meta {
-  color: var(--home-discovery-meta);
+  color: var(--text-meta);
 }
 
 .home-history-meta {
-  color: var(--home-history-meta);
+  color: var(--text-quiet);
 }
 
 .home-history-card {
@@ -3429,12 +2631,13 @@
 
 .home-discovery-play-button {
   background: var(--accent-action);
-  box-shadow: var(--home-hero-play-shadow);
+  --_home-hero-play-shadow: 0 10px 28px var(--accent-action-glow-soft);
+  box-shadow: var(--_home-hero-play-shadow);
 }
 
 .home-radio-card {
-  border: 1px solid var(--home-radio-card-border);
-  background: var(--home-radio-card-surface);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
 }
 
 .home-radio-overlay {
@@ -3442,10 +2645,12 @@
 }
 
 .home-radio-badge {
-  border: 1px solid var(--home-radio-badge-border);
-  background: var(--home-radio-badge-surface);
+  --_home-radio-badge-shadow: 0 0 18px
+    color-mix(in srgb, var(--accent-action) 16%, transparent);
+  border: 1px solid var(--border-accent-soft);
+  background: var(--surface-canvas-control);
   color: var(--accent-action);
-  box-shadow: var(--home-radio-badge-shadow);
+  box-shadow: var(--_home-radio-badge-shadow);
 }
 
 .home-radio-title {
@@ -3453,5 +2658,77 @@
 }
 
 .home-radio-subtitle {
-  color: var(--home-radio-subtitle);
+  color: var(--text-secondary-soft);
+}
+
+.explore-feature-card {
+  border: 1px solid var(--surface-quiet);
+  background: var(--explore-feature-surface);
+  box-shadow: var(--explore-feature-shadow);
+}
+
+.explore-feature-card:hover {
+  border-color: var(--border-accent);
+  background: var(--surface-quiet-subtle);
+}
+
+.explore-feature-card-aura {
+  background: var(--explore-feature-aura);
+}
+
+.explore-genre-card {
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
+}
+
+.explore-genre-card:hover {
+  border-color: var(--border-accent);
+  background: var(--surface-quiet-subtle);
+}
+
+.explore-genre-card-overlay-image,
+.explore-related-genre-overlay {
+  background: var(--explore-card-overlay);
+}
+
+.explore-genre-card-overlay-placeholder {
+  background: var(--explore-card-placeholder);
+}
+
+.explore-genre-card-overlay-position-0 {
+  --explore-card-glow-position: 20%;
+}
+
+.explore-genre-card-overlay-position-1 {
+  --explore-card-glow-position: 38%;
+}
+
+.explore-genre-card-overlay-position-2 {
+  --explore-card-glow-position: 56%;
+}
+
+.explore-genre-card-overlay-position-3 {
+  --explore-card-glow-position: 74%;
+}
+
+.explore-genre-hero-scrim {
+  background: var(--explore-hero-scrim);
+}
+
+.explore-genre-hero-gradient {
+  background: var(--explore-hero-gradient);
+}
+
+.explore-related-genre-card {
+  --_explore-related-shadow: 0 18px 46px
+    color-mix(in srgb, var(--surface-canvas) 22%, transparent);
+  border: 1px solid var(--surface-quiet);
+  background: var(--surface-card);
+  box-shadow: var(--_explore-related-shadow);
+}
+
+.explore-related-genre-card:hover {
+  --_explore-related-hover-glow: 0 0 14px var(--accent-action-glow);
+  border-color: var(--border-accent);
+  filter: drop-shadow(var(--_explore-related-hover-glow));
 }

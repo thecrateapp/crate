@@ -54,7 +54,7 @@ import {
 } from "@/lib/library-routes";
 
 const GENRE_SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_10px_var(--accent-action-glow-medium)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export function ExplorePill({
   label,
@@ -68,11 +68,11 @@ export function ExplorePill({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 transition-colors hover:border-primary/40 hover:bg-primary/5"
+      className="inline-flex items-center gap-2 rounded-full border border-surface-quiet px-4 py-2 transition-colors hover:border-accent-action/40 hover:bg-accent-action/5"
     >
-      <span className="text-sm font-medium text-primary">{label}</span>
+      <span className="text-sm font-medium text-accent-action">{label}</span>
       {count != null && count > 0 ? (
-        <span className="text-xs text-muted-foreground">{count}</span>
+        <span className="text-xs text-text-muted">{count}</span>
       ) : null}
     </button>
   );
@@ -92,15 +92,15 @@ export function ExploreSectionHeader({
   return (
     <div className="flex items-end justify-between gap-4">
       <div>
-        <h2 className="text-lg font-bold text-foreground">{title}</h2>
+        <h2 className="text-lg font-bold text-text-primary">{title}</h2>
         {subtitle ? (
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+          <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
         ) : null}
       </div>
       {actionLabel && onAction ? (
         <button
           onClick={onAction}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex items-center gap-1 text-sm text-text-muted transition-colors hover:text-text-primary"
         >
           {actionLabel}
           <ArrowRight size={15} />
@@ -121,7 +121,7 @@ export function ExploreSectionRail({ children }: { children: ReactNode }) {
 export function ExploreLoadingState() {
   return (
     <div className="flex items-center justify-center py-16">
-      <Loader2 size={24} className="animate-spin text-primary" />
+      <Loader2 size={24} className="animate-spin text-accent-action" />
     </div>
   );
 }
@@ -144,7 +144,7 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
 
   if (!hasArtists && !hasAlbums && !hasTracks) {
     return (
-      <p className="mt-8 text-sm text-muted-foreground">
+      <p className="mt-8 text-sm text-text-muted">
         {t("explore.search.noResults")}
       </p>
     );
@@ -200,7 +200,7 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
       {hasTracks ? (
         <div className="space-y-3">
           <h2 className="px-1 text-lg font-bold">{t("common.tracks")}</h2>
-          <div className="rounded-xl border border-white/5 bg-white/[0.02]">
+          <div className="rounded-xl border border-border-quiet bg-text-primary/[0.02]">
             {trackRows.map((row, index) => (
               <TrackRow
                 key={`${row.artist}-${row.title}-${index}`}
@@ -333,9 +333,7 @@ export function GenreDetailView({
 
   if (loading) return <CrateLoader label={t("genre.loading")} />;
   if (!data)
-    return (
-      <p className="text-sm text-muted-foreground">{t("genre.notFound")}</p>
-    );
+    return <p className="text-sm text-text-muted">{t("genre.notFound")}</p>;
 
   const description =
     data.description ||
@@ -379,7 +377,7 @@ export function GenreDetailView({
               ref={genreMenu.triggerRef}
               type="button"
               data-testid="genre-mobile-hero-menu"
-              className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
+              className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_10px_var(--accent-action-glow-medium)]"
               onClick={genreMenu.openFromTrigger}
               onContextMenu={genreMenu.handleContextMenu}
               aria-label={t("common.more")}
@@ -438,31 +436,25 @@ export function GenreDetailView({
               }}
             />
           ) : null}
-          <div className="absolute inset-0 bg-black/22" />
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.14) 34%, rgba(8, 10, 14, 0.46) 60%, var(--surface-app) 100%)",
-            }}
-          />
+          <div className="explore-genre-hero-scrim absolute inset-0" />
+          <div className="explore-genre-hero-gradient absolute inset-0" />
           <div className="relative mx-auto flex h-full w-full max-w-[1480px] flex-col px-4 pb-6 pt-[var(--listen-mobile-page-top)] sm:px-6 sm:pt-6">
             <div className="mt-auto max-w-3xl pb-1">
-              <h1 className="text-4xl font-black leading-none tracking-tight text-white sm:text-6xl">
+              <h1 className="text-4xl font-black leading-none tracking-tight text-text-primary sm:text-6xl">
                 {data.name}
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/68 sm:text-base sm:leading-7">
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-text-primary/68 sm:text-base sm:leading-7">
                 {description}
               </p>
-              <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/56">
+              <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-primary/56">
                 <span>
                   {t("common.artistCountLabel", { count: artistCount })}
                 </span>
-                <span className="text-white/20">/</span>
+                <span className="text-text-primary/20">/</span>
                 <span>
                   {t("common.albumCountLabel", { count: albumCount })}
                 </span>
-                <span className="text-white/20">/</span>
+                <span className="text-text-primary/20">/</span>
                 <span>
                   {t("common.trackCountLabel", { count: trackCount })}
                 </span>
@@ -483,7 +475,7 @@ export function GenreDetailView({
                 onClick={() => void handlePlayGenreRadio()}
                 disabled={startingRadio}
                 aria-label={t("genre.actions.playRadio")}
-                className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] disabled:cursor-wait disabled:opacity-70 md:px-7 md:text-[15px]"
+                className="explore-genre-primary-action flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-[0_0_18px_var(--accent-action-glow)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-accent-action/90 hover:shadow-[0_0_24px_var(--accent-action-glow-strong)] disabled:cursor-wait disabled:opacity-70 md:px-7 md:text-[15px]"
               >
                 {startingRadio ? (
                   <Loader2 size={17} className="animate-spin" />
@@ -497,7 +489,7 @@ export function GenreDetailView({
                   type="button"
                   onClick={() => openGenreRadar(nextShow)}
                   aria-label={t("genre.actions.openNextGenreShow")}
-                  className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
+                  className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-[inset_0_0_0_1px_var(--surface-quiet)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] md:w-auto md:px-7"
                 >
                   <Calendar size={17} />
                   <span>{t("genre.actions.nextShow")}</span>
@@ -565,7 +557,7 @@ export function GenreDetailView({
                 <h2 className="text-lg font-bold">
                   {t("genre.related.title")}
                 </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-text-muted">
                   {t("genre.related.subtitle")}
                 </p>
               </div>
@@ -711,7 +703,7 @@ function RelatedGenreCard({
     <button
       type="button"
       onClick={onOpen}
-      className="group relative isolate min-h-[132px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.045] p-3 text-left shadow-[0_18px_46px_rgba(0,0,0,0.22)] transition-[border-color,filter,transform] hover:-translate-y-px hover:border-primary/35 hover:drop-shadow-[0_0_14px_rgba(34,211,238,0.18)]"
+      className="explore-related-genre-card group relative isolate min-h-[132px] overflow-hidden rounded-lg p-3 text-left transition-[border-color,filter,transform] hover:-translate-y-px"
     >
       {coverUrl ? (
         <CrateImage
@@ -729,23 +721,23 @@ function RelatedGenreCard({
           }}
         />
       ) : null}
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(5,8,12,0.18)_0%,rgba(5,8,12,0.82)_100%)]" />
+      <div className="explore-related-genre-overlay absolute inset-0 -z-10" />
       <div className="flex h-full min-h-[108px] flex-col justify-between gap-4">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/85">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-action/85">
             {genre.relation_label}
           </div>
-          <div className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-foreground">
+          <div className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-text-primary">
             {genre.name}
           </div>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-[11px] text-muted-foreground">
+          <span className="truncate text-[11px] text-text-muted">
             {contentLabel}
           </span>
           <ArrowRight
             size={14}
-            className="shrink-0 text-white/35 transition group-hover:translate-x-0.5 group-hover:text-primary"
+            className="shrink-0 text-text-primary/35 transition group-hover:translate-x-0.5 group-hover:text-accent-action"
           />
         </div>
       </div>
@@ -898,13 +890,13 @@ export function DecadeDetailView({
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+          className="rounded-lg p-2 text-text-primary/50 transition-colors hover:bg-text-primary/5 hover:text-text-primary"
         >
           <ArrowLeft size={20} />
         </button>
         <div>
           <h1 className="text-2xl font-bold">{decade}</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-muted">
             {t("common.artistCountLabel", { count: data?.total ?? 0 })}
           </p>
         </div>
@@ -929,9 +921,7 @@ export function DecadeDetailView({
           ))}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          {t("explore.decade.empty")}
-        </p>
+        <p className="text-sm text-text-muted">{t("explore.decade.empty")}</p>
       )}
     </div>
   );
@@ -988,13 +978,13 @@ export function PlaylistCategoryView({
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+          className="rounded-lg p-2 text-text-primary/50 transition-colors hover:bg-text-primary/5 hover:text-text-primary"
         >
           <ArrowLeft size={20} />
         </button>
         <div>
           <h1 className="text-2xl font-bold capitalize">{category}</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-muted">
             {t("common.playlistCountLabel", { count: data?.length ?? 0 })}
           </p>
         </div>
@@ -1036,7 +1026,7 @@ export function PlaylistCategoryView({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-surface-quiet px-4 py-6 text-sm text-text-muted">
           {t("explore.playlistCategory.empty")}
         </div>
       )}

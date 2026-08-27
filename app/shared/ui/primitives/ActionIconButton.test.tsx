@@ -56,7 +56,7 @@ describe("ActionIconButton", () => {
       "hover:drop-shadow-[0_0_8px_var(--accent-action-glow-strong)]",
     );
     expect(screen.getByRole("button", { name: "Danger" })).toHaveClass(
-      "hover:drop-shadow-[0_0_8px_var(--accent-danger-glow)]",
+      "hover:drop-shadow-[0_0_8px_var(--state-danger-glow)]",
     );
     expect(container.innerHTML).not.toContain("rgba(");
   });

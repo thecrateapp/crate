@@ -650,7 +650,7 @@ function LegacyMobileFeaturedArtist({
   return (
     <section
       data-testid="mobile-legacy-hero"
-      className="home-legacy-hero relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-border-floating"
+      className="home-legacy-hero relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-surface-quiet"
     >
       <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="mobile" />
       <button
@@ -694,7 +694,7 @@ function LegacyDesktopFeaturedArtist({
       data-testid="desktop-legacy-hero"
       aria-hidden={!active}
       className={cn(
-        "home-legacy-hero absolute inset-0 overflow-hidden rounded-[12px] border border-border-floating transition-opacity duration-500 ease-out",
+        "home-legacy-hero absolute inset-0 overflow-hidden rounded-[12px] border border-surface-quiet transition-opacity duration-500 ease-out",
         active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
       )}
     >
@@ -1310,7 +1310,10 @@ function RecentEntityRowFrame({
         ) : (
           <div className="home-discovery-artwork flex h-full w-full items-center justify-center">
             {item.type === "artist" ? (
-              <UserRound size={18} className="home-discovery-placeholder-icon" />
+              <UserRound
+                size={18}
+                className="home-discovery-placeholder-icon"
+              />
             ) : (
               <Disc3 size={18} className="home-discovery-placeholder-icon" />
             )}

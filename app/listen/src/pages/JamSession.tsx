@@ -2620,7 +2620,7 @@ export function JamSession() {
               ) : null}
             </div>
             {queueSearchResults.length > 0 ? (
-              <div className="jam-dark-surface overflow-hidden rounded-xl border border-border-floating">
+              <div className="jam-dark-surface overflow-hidden rounded-xl border border-surface-quiet">
                 {queueSearchResults.map((track) => {
                   const playable = searchTrackToTrack(track);
                   const alreadyQueued = queueItems.some((item) =>
@@ -2747,7 +2747,7 @@ export function JamSession() {
                               },
                             )}
                             iconSize={18}
-                            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-surface-glass-highlight disabled:cursor-default disabled:opacity-45"
+                            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-surface-quiet-subtle disabled:cursor-default disabled:opacity-45"
                           />
                           <span
                             aria-label={t("jam.room.queueVoteCount", {
@@ -2770,7 +2770,7 @@ export function JamSession() {
                               handleMoveInRoomQueue(item.id, index, index - 1)
                             }
                             disabled={index === 0}
-                            className="jam-chip rounded-full p-1.5 text-muted-foreground hover:bg-surface-glass-highlight disabled:opacity-30"
+                            className="jam-chip rounded-full p-1.5 text-muted-foreground hover:bg-surface-quiet-subtle disabled:opacity-30"
                           >
                             <ArrowUp size={13} />
                           </button>
@@ -2783,7 +2783,7 @@ export function JamSession() {
                               handleMoveInRoomQueue(item.id, index, index + 1)
                             }
                             disabled={index === queueItems.length - 1}
-                            className="jam-chip rounded-full p-1.5 text-muted-foreground hover:bg-surface-glass-highlight disabled:opacity-30"
+                            className="jam-chip rounded-full p-1.5 text-muted-foreground hover:bg-surface-quiet-subtle disabled:opacity-30"
                           >
                             <ArrowDown size={13} />
                           </button>

@@ -312,7 +312,7 @@ function Sidebar() {
               className={`animate-submenu-in ${
                 expanded
                   ? "mt-1 ml-3 border-l border-border-quiet pl-3"
-                  : "absolute left-full top-0 ml-2 w-44 rounded-xl border border-border-floating bg-surface-elevated py-2 shadow-menu"
+                  : "absolute left-full top-0 ml-2 w-44 rounded-xl border border-surface-quiet bg-surface-elevated py-2 shadow-menu"
               }`}
             >
               {[
