@@ -149,7 +149,7 @@ export function ContinuePlaybackPrompt() {
   return (
     <div className="listen-glass-panel fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+7.25rem)] z-app-modal mx-auto max-w-xl rounded-xl p-3 sm:bottom-24">
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-lg border border-cyan-400/25 bg-cyan-400/10 p-2 text-cyan-200">
+        <div className="mt-0.5 rounded-lg border border-accent-action/25 bg-accent-action/10 p-2 text-text-accent">
           <MonitorSpeaker size={18} />
         </div>
         <div className="min-w-0 flex-1">
@@ -168,7 +168,7 @@ export function ContinuePlaybackPrompt() {
               type="button"
               onClick={() => void continueHere()}
               disabled={transferring}
-              className="rounded-lg bg-cyan-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-cyan-300"
+              className="rounded-lg bg-accent-action px-3 py-1.5 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action-hover"
             >
               {transferring
                 ? t("player.continue.transferring")
@@ -179,7 +179,7 @@ export function ContinuePlaybackPrompt() {
             <button
               type="button"
               onClick={() => setDismissed(true)}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              className="rounded-lg border border-border-quiet px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-text-primary/10 hover:text-foreground"
             >
               {t("player.continue.notNow")}
             </button>

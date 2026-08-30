@@ -246,12 +246,12 @@ export function PlaylistListRow({
       className={cn(
         "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         offlineState === "ready"
-          ? "bg-cyan-400/[0.04] hover:bg-cyan-400/[0.08] focus-visible:bg-cyan-400/[0.08]"
+          ? "bg-accent-action/[0.04] hover:bg-accent-action/[0.08] focus-visible:bg-accent-action/[0.08]"
           : isOfflineBusy(offlineState)
             ? "bg-primary/[0.05] hover:bg-primary/[0.09] focus-visible:bg-primary/[0.09]"
             : offlineState === "error"
-              ? "bg-amber-400/[0.05] hover:bg-amber-400/[0.09] focus-visible:bg-amber-400/[0.09]"
-              : "hover:bg-white/5 focus-visible:bg-white/5",
+              ? "bg-state-warning/[0.05] hover:bg-state-warning/[0.09] focus-visible:bg-state-warning/[0.09]"
+              : "hover:bg-text-primary/5 focus-visible:bg-text-primary/5",
       )}
     >
       <PlaylistArtwork
@@ -283,11 +283,11 @@ export function PlaylistListRow({
               className={cn(
                 "ml-1.5",
                 offlineState === "ready"
-                  ? "text-cyan-300/90"
+                  ? "text-text-accent/90"
                   : isOfflineBusy(offlineState)
                     ? "text-primary"
                     : offlineState === "error"
-                      ? "text-amber-300/90"
+                      ? "text-state-warning-text/90"
                       : undefined,
               )}
             >
@@ -296,7 +296,7 @@ export function PlaylistListRow({
           ) : null}
         </div>
         {description ? (
-          <div className="mt-1 truncate text-[11px] text-white/40">
+          <div className="mt-1 truncate text-[11px] text-text-primary/40">
             {description}
           </div>
         ) : null}

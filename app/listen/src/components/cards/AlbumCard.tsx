@@ -198,12 +198,12 @@ export const AlbumCard = memo(function AlbumCard({
           ? "listen-deferred-grid-item w-full min-w-0"
           : `flex-shrink-0 ${compact ? "w-[120px]" : "w-[160px]"}`,
         offlineState === "ready"
-          ? "bg-cyan-400/[0.04]"
+          ? "bg-accent-action/[0.04]"
           : isOfflineBusy(offlineState)
             ? "bg-primary/[0.05]"
             : offlineState === "error"
-              ? "bg-amber-400/[0.05]"
-              : "hover:bg-white/5",
+              ? "bg-state-warning/[0.05]"
+              : "hover:bg-text-primary/5",
       )}
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
@@ -222,9 +222,9 @@ export const AlbumCard = memo(function AlbumCard({
           sizes: coverArtwork.srcSet ? coverSizes : undefined,
         }}
         alt={album}
-        className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5"
+        className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-text-primary/5"
         fallback={
-          <div className="grid h-full w-full place-items-center bg-[#171922] text-white/35">
+          <div className="grid h-full w-full place-items-center bg-surface-elevated text-text-primary/35">
             <Disc3 size={CRATE_ICON_SIZE.xl} />
           </div>
         }
@@ -233,7 +233,7 @@ export const AlbumCard = memo(function AlbumCard({
       >
         {(albumId != null || globalAlbumUid) && (
           <FollowHeartButton
-            className={`absolute top-2 right-2 z-10 flex h-9 min-h-11 w-9 min-w-11 items-center justify-center rounded-full border border-[var(--idle-border)] bg-black/55 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-[color,filter,transform] hover:-translate-y-px md:min-h-0 md:min-w-0 ${
+            className={`absolute top-2 right-2 z-10 flex h-9 min-h-11 w-9 min-w-11 items-center justify-center rounded-full border border-[var(--idle-border)] bg-surface-canvas/55 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-[color,filter,transform] hover:-translate-y-px md:min-h-0 md:min-w-0 ${
               saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
             following={saved}
@@ -259,11 +259,11 @@ export const AlbumCard = memo(function AlbumCard({
           className="absolute left-2 top-2 z-10"
         />
         {isPreRelease ? (
-          <span className="absolute left-2 bottom-2 z-10 rounded-full border border-primary/25 bg-black/55 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-primary backdrop-blur-sm">
+          <span className="absolute left-2 bottom-2 z-10 rounded-full border border-primary/25 bg-surface-canvas/55 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-primary backdrop-blur-sm">
             Pre-release
           </span>
         ) : null}
-        <div className="absolute inset-0 hidden bg-black/0 transition-colors md:flex md:items-center md:justify-center md:p-0 md:group-hover:bg-black/40">
+        <div className="absolute inset-0 hidden bg-surface-canvas/0 transition-colors md:flex md:items-center md:justify-center md:p-0 md:group-hover:bg-surface-canvas/40">
           <button
             className="flex h-11 w-11 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all md:translate-y-2 md:group-hover:translate-y-0 md:group-hover:opacity-100"
             onClick={handlePlayOverlay}
@@ -300,11 +300,11 @@ export const AlbumCard = memo(function AlbumCard({
             className={cn(
               "ml-1.5",
               offlineState === "ready"
-                ? "text-cyan-300/90"
+                ? "text-text-accent/90"
                 : isOfflineBusy(offlineState)
                   ? "text-primary"
                   : offlineState === "error"
-                    ? "text-amber-300/90"
+                    ? "text-state-warning-text/90"
                     : undefined,
             )}
           >

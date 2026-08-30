@@ -218,9 +218,9 @@ function ArtistAlbumItem({
           artistName,
           albumName: album.display_name || album.name,
         })}
-        className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-text-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
-        <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
+        <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-text-primary/5">
           {cover ? (
             <CrateImage
               src={cover}
@@ -233,7 +233,7 @@ function ArtistAlbumItem({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <Disc3 size={32} className="text-white/25" />
+              <Disc3 size={32} className="text-text-primary/25" />
             </div>
           )}
         </div>
@@ -365,7 +365,7 @@ export function ArtistShowsSection({
                     year: "numeric",
                   })}
                 </p>
-                <p className="mt-3 text-sm leading-6 text-white/70">
+                <p className="mt-3 text-sm leading-6 text-text-primary/70">
                   {nextAttendingShow.probable_setlist?.length
                     ? t("artist.sections.attendingWithSetlist")
                     : t("artist.sections.attendingWithoutSetlist")}
@@ -384,7 +384,7 @@ export function ArtistShowsSection({
                 ) : null}
                 <button
                   onClick={() => onToggleExpand(itemKey(nextAttendingShow, 0))}
-                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:text-foreground"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-4 py-2 text-sm text-text-primary/65 transition-colors hover:border-text-primary/20 hover:text-foreground"
                 >
                   {t("artist.sections.viewShowDetails")}
                 </button>

@@ -222,7 +222,7 @@ describe("ExtendedPlayer", () => {
     );
 
     expect(container.innerHTML).toContain("bg-accent-action/10");
-    expect(container.innerHTML).toContain("border-surface-quiet");
+    expect(container.innerHTML).toContain("border-border-quiet");
     expect(container.innerHTML).toContain("bg-surface-quiet-subtle");
     expect(container.innerHTML).toContain("text-text-muted");
     expect(container.innerHTML).not.toContain("bg-primary/10");

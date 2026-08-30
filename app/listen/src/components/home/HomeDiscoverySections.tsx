@@ -650,7 +650,7 @@ function LegacyMobileFeaturedArtist({
   return (
     <section
       data-testid="mobile-legacy-hero"
-      className="home-legacy-hero relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-surface-quiet"
+      className="home-legacy-hero relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-border-quiet"
     >
       <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="mobile" />
       <button
@@ -694,7 +694,7 @@ function LegacyDesktopFeaturedArtist({
       data-testid="desktop-legacy-hero"
       aria-hidden={!active}
       className={cn(
-        "home-legacy-hero absolute inset-0 overflow-hidden rounded-[12px] border border-surface-quiet transition-opacity duration-500 ease-out",
+        "home-legacy-hero absolute inset-0 overflow-hidden rounded-[12px] border border-border-quiet transition-opacity duration-500 ease-out",
         active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
       )}
     >

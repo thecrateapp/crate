@@ -57,7 +57,7 @@ function UserAvatar({
   const initial = name.trim().charAt(0).toUpperCase() || "U";
   return (
     <div
-      className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center font-semibold`}
+      className={`${className} rounded-full bg-accent-action/15 text-text-accent flex items-center justify-center font-semibold`}
     >
       {initial}
     </div>
@@ -116,7 +116,7 @@ export function People() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[12px] border border-white/10 bg-white/5 p-5 sm:p-6">
+      <div className="rounded-[12px] border border-border-quiet bg-text-primary/5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
@@ -131,9 +131,9 @@ export function People() {
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <Link
             to={ownProfileHref}
-            className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4 hover:bg-cyan-400/10 transition-colors"
+            className="rounded-xl border border-accent-action/15 bg-accent-action/5 p-4 hover:bg-accent-action/10 transition-colors"
           >
-            <div className="text-xs uppercase tracking-wide text-cyan-300/70">
+            <div className="text-xs uppercase tracking-wide text-text-accent/70">
               {t("people.summary.yourProfile")}
             </div>
             <div className="mt-2 text-lg font-semibold text-foreground">
@@ -150,7 +150,7 @@ export function People() {
           </Link>
           <Link
             to={ownFollowersHref}
-            className="rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
+            className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4 hover:bg-text-primary/[0.05] transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.followers")}
@@ -161,7 +161,7 @@ export function People() {
           </Link>
           <Link
             to={ownFollowingHref}
-            className="rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
+            className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4 hover:bg-text-primary/[0.05] transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.following")}
@@ -170,7 +170,7 @@ export function People() {
               {data?.following_count ?? "—"}
             </div>
           </Link>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               {t("people.friends")}
             </div>
@@ -181,14 +181,14 @@ export function People() {
         </div>
       </div>
 
-      <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-4 py-3">
+      <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
+        <div className="flex items-center gap-3 rounded-lg border border-border-quiet bg-surface-canvas/20 px-4 py-3">
           <Search size={16} className="text-muted-foreground" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("people.search.placeholder")}
-            className="h-7 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-white/40"
+            className="h-7 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-text-primary/40"
           />
         </div>
 
@@ -201,13 +201,13 @@ export function People() {
           ) : null}
 
           {!query.trim() ? (
-            <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-muted-foreground">
               {t("people.search.emptyPrompt")}
             </div>
           ) : null}
 
           {query.trim() && !searching && results.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-muted-foreground">
               {t("people.search.noMatches", { query: query.trim() })}
             </div>
           ) : null}
@@ -220,7 +220,7 @@ export function People() {
                 key={item.id}
                 username={item.username}
                 hoverClassName="block"
-                className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                className="flex items-center gap-4 rounded-lg border border-border-quiet bg-text-primary/[0.02] px-4 py-3 hover:bg-text-primary/[0.05] transition-colors"
               >
                 <UserAvatar
                   name={label}
@@ -242,7 +242,7 @@ export function People() {
                     </div>
                   ) : null}
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/65">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border-quiet px-3 py-1.5 text-xs text-text-primary/65">
                   <UserRoundPlus size={13} />
                   {t("people.viewProfile")}
                 </div>

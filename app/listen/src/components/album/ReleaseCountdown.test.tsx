@@ -44,7 +44,7 @@ describe("ReleaseCountdown", () => {
       "bg-[#0b1520]/45",
       "backdrop-blur-2xl",
       "backdrop-saturate-150",
-      "border-white/20",
+      "border-text-primary/20",
     );
     expect(screen.getByTestId("release-countdown-glass-sheen")).toHaveClass(
       "sm:hidden",

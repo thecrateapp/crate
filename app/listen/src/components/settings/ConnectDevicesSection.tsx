@@ -167,7 +167,7 @@ function ConnectDevicesSectionContent() {
   }
 
   return (
-    <div className="space-y-3 rounded-xl bg-white/5 p-4">
+    <div className="space-y-3 rounded-xl bg-text-primary/5 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-sm font-medium text-foreground">
@@ -185,8 +185,8 @@ function ConnectDevicesSectionContent() {
           onClick={() => void handleToggleConnect()}
           className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
             connectEnabled
-              ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200"
-              : "border-white/10 bg-white/5 text-white/55"
+              ? "border-accent-action/30 bg-accent-action/10 text-text-accent"
+              : "border-border-quiet bg-text-primary/5 text-text-primary/55"
           } disabled:cursor-wait disabled:opacity-70`}
         >
           {updatingPreference ? (
@@ -194,7 +194,7 @@ function ConnectDevicesSectionContent() {
           ) : (
             <span
               className={`h-2 w-2 rounded-full ${
-                connectEnabled ? "bg-cyan-300" : "bg-white/35"
+                connectEnabled ? "bg-accent-action" : "bg-text-primary/35"
               }`}
             />
           )}
@@ -219,7 +219,7 @@ function ConnectDevicesSectionContent() {
             return (
               <div
                 key={device.device_id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-white/10 px-3 py-3"
+                className="flex items-start justify-between gap-4 rounded-lg border border-border-quiet px-3 py-3"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -231,15 +231,15 @@ function ConnectDevicesSectionContent() {
                       <span className="truncate">{label}</span>
                     </div>
                     {isCurrent ? (
-                      <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300">
+                      <span className="rounded-full border border-accent-action/30 bg-accent-action/10 px-2 py-0.5 text-[11px] font-medium text-text-accent">
                         {t("common.current")}
                       </span>
                     ) : null}
                     <span
                       className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                         device.active
-                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-                          : "border-white/10 bg-white/5 text-white/50"
+                          ? "border-state-success/30 bg-state-success/10 text-state-success-text"
+                          : "border-border-quiet bg-text-primary/5 text-text-primary/50"
                       }`}
                     >
                       {device.active ? t("common.active") : t("common.recent")}
@@ -251,7 +251,9 @@ function ConnectDevicesSectionContent() {
                     })}
                   </div>
                   {meta ? (
-                    <div className="mt-1 text-[11px] text-white/40">{meta}</div>
+                    <div className="mt-1 text-[11px] text-text-primary/40">
+                      {meta}
+                    </div>
                   ) : null}
                 </div>
                 <button
@@ -261,7 +263,7 @@ function ConnectDevicesSectionContent() {
                   })}
                   disabled={busy || isCurrent}
                   onClick={() => void revokeDevice(device)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-state-danger/20 bg-state-danger/10 px-3 py-2 text-xs font-medium text-state-danger-text transition-colors hover:bg-state-danger/15 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? (
                     <Loader2 size={13} className="animate-spin" />

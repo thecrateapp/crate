@@ -454,7 +454,7 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
             disabled={loadingMood !== null}
             className={`rounded-lg border px-4 py-3 text-left transition-colors ${
               MOOD_COLORS[m.name] ||
-              "bg-text-primary/5 text-text-primary/70 border-surface-quiet"
+              "bg-text-primary/5 text-text-primary/70 border-border-quiet"
             } active:scale-[0.98]`}
           >
             <span className="text-sm font-medium capitalize">

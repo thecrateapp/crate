@@ -185,7 +185,7 @@ export function UpcomingPreviewRow({
   return (
     <button
       onClick={onClick}
-      className="group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/5"
+      className="group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-border-quiet hover:bg-text-primary/5"
     >
       {artworkUrl ? (
         <CrateImage
@@ -199,8 +199,8 @@ export function UpcomingPreviewRow({
         />
       ) : null}
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,16,22,0.96),rgba(15,16,22,0.72)_55%,rgba(15,16,22,0.35))]" />
-      <div className="relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
-        <span className="text-[10px] uppercase tracking-wide text-white/40">
+      <div className="relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.03]">
+        <span className="text-[10px] uppercase tracking-wide text-text-primary/40">
           {dateLabel.split(" ")[0]}
         </span>
         <span className="text-sm font-semibold text-foreground">
@@ -306,7 +306,7 @@ export function FeaturedPlaylistCard({
         <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
           {description || meta}
         </div>
-        <div className="mt-2 text-[11px] uppercase tracking-wider text-white/40">
+        <div className="mt-2 text-[11px] uppercase tracking-wider text-text-primary/40">
           {meta}
         </div>
       </div>
@@ -337,7 +337,7 @@ export function ContinueListeningCard({
   onPlay: () => void;
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-[12px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+    <div className="group relative overflow-hidden rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-3 sm:p-4">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.18),transparent_55%)]" />
       <div className="relative flex items-center gap-3 sm:gap-4">
         <TrackCoverThumb
@@ -346,7 +346,7 @@ export function ContinueListeningCard({
           className="h-16 w-16 shrink-0 rounded-xl sm:h-20 sm:w-20"
         />
         <div className="min-w-0 flex-1">
-          <div className="mb-2 inline-flex max-w-full items-center gap-2 truncate rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="mb-2 inline-flex max-w-full items-center gap-2 truncate rounded-full border border-border-quiet bg-text-primary/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
             <Clock3 size={11} />
             Continue listening
           </div>
@@ -357,7 +357,9 @@ export function ContinueListeningCard({
             {track.artist}
           </p>
           {track.album ? (
-            <p className="mt-1 truncate text-xs text-white/40">{track.album}</p>
+            <p className="mt-1 truncate text-xs text-text-primary/40">
+              {track.album}
+            </p>
           ) : null}
         </div>
         <button

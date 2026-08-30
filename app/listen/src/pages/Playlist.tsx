@@ -561,11 +561,11 @@ export function Playlist() {
       iconClassName: offlineBusy ? "animate-spin" : undefined,
       className:
         offlineState === "ready"
-          ? "text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+          ? "text-text-accent drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
           : offlineBusy
             ? "text-primary"
             : offlineState === "error"
-              ? "text-amber-300/90"
+              ? "text-state-warning-text/90"
               : undefined,
       disabled: !offlineSupported || data.is_smart || offlineBusy,
       title: offlineButtonLabel,
@@ -696,13 +696,13 @@ export function Playlist() {
                 {t("playlist.badges.smart")}
               </span>
             ) : null}
-            <span className="inline-flex items-center rounded-md border border-white/10 px-1.5 py-0 text-[10px] font-medium text-white/60">
+            <span className="inline-flex items-center rounded-md border border-border-quiet px-1.5 py-0 text-[10px] font-medium text-text-primary/60">
               {data.visibility === "public"
                 ? t("playlist.visibility.public")
                 : t("playlist.visibility.private")}
             </span>
             {data.is_collaborative ? (
-              <span className="inline-flex items-center rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0 text-[10px] font-medium text-cyan-300">
+              <span className="inline-flex items-center rounded-md border border-accent-action/20 bg-accent-action/10 px-1.5 py-0 text-[10px] font-medium text-text-accent">
                 {t("playlist.badges.collaborative")}
               </span>
             ) : null}
@@ -824,7 +824,7 @@ export function Playlist() {
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
           <button
             type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-text-primary/5 transition-colors"
             onClick={() => setDeleteOpen(false)}
             disabled={deleting}
           >
@@ -832,7 +832,7 @@ export function Playlist() {
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-state-danger px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-state-danger/90 transition-colors disabled:opacity-50"
             onClick={handleDeletePlaylist}
             disabled={deleting}
           >
@@ -862,7 +862,7 @@ export function Playlist() {
         </ModalHeader>
         <ModalBody className="space-y-5 px-5 py-5">
           {data.is_collaborative && isOwner ? (
-            <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4">
+            <div className="rounded-xl border border-accent-action/15 bg-accent-action/5 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-foreground">
@@ -892,17 +892,17 @@ export function Playlist() {
                     <QrCodeImage
                       value={inviteLink}
                       size={160}
-                      className="rounded-xl border border-white/10 bg-[#0f1116] p-3"
+                      className="rounded-xl border border-border-quiet bg-surface-canvas p-3"
                     />
                   </div>
                   <div className="space-y-3">
-                    <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-xs text-muted-foreground break-all">
+                    <div className="rounded-lg border border-border-quiet bg-surface-canvas/20 px-4 py-3 text-xs text-muted-foreground break-all">
                       {inviteLink}
                     </div>
                     <button
                       type="button"
                       onClick={handleCopyInviteLink}
-                      className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-lg border border-text-primary/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-text-primary/10 transition-colors"
                     >
                       <Copy size={15} />
                       {t("playlist.collaborators.copyInvite")}
@@ -923,7 +923,7 @@ export function Playlist() {
               return (
                 <div
                   key={`${member.playlist_id}-${member.user_id}`}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border-quiet bg-text-primary/[0.03] px-4 py-3"
                 >
                   <div className="min-w-0">
                     {member.username ? (
@@ -947,7 +947,7 @@ export function Playlist() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <div className="rounded-full border border-border-quiet px-2.5 py-1 text-[11px] text-muted-foreground">
                       {member.role === "owner"
                         ? t("playlist.collaborators.owner")
                         : t("playlist.collaborators.collab")}
@@ -957,7 +957,7 @@ export function Playlist() {
                         type="button"
                         onClick={() => handleRemoveMember(member.user_id)}
                         disabled={removingMemberId === member.user_id}
-                        className="inline-flex items-center gap-1 rounded-full border border-red-500/20 px-2.5 py-1 text-[11px] text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-60"
+                        className="inline-flex items-center gap-1 rounded-full border border-state-danger/20 px-2.5 py-1 text-[11px] text-state-danger-text hover:bg-state-danger/10 transition-colors disabled:opacity-60"
                       >
                         {removingMemberId === member.user_id ? (
                           <Loader2 size={12} className="animate-spin" />

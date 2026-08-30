@@ -99,7 +99,7 @@ export function RemoteImportAction({
   if (confirming) {
     return (
       <div
-        className="max-w-xl rounded-xl border border-white/10 bg-white/[0.04] p-4"
+        className="max-w-xl rounded-xl border border-border-quiet bg-text-primary/[0.04] p-4"
         role="group"
         aria-label={t("album.remoteImport.confirmTitle")}
       >
@@ -125,7 +125,7 @@ export function RemoteImportAction({
           </button>
           <button
             type="button"
-            className="rounded-full bg-white/[0.08] px-4 py-2 text-sm font-semibold text-foreground"
+            className="rounded-full bg-text-primary/[0.08] px-4 py-2 text-sm font-semibold text-foreground"
             onClick={() => setConfirming(false)}
           >
             {t("common.cancel")}

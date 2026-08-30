@@ -50,7 +50,7 @@ interface PlaylistHeroSectionProps {
 }
 
 const SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export function PlaylistHeroSection({
   title,
@@ -103,7 +103,7 @@ export function PlaylistHeroSection({
         <button
           ref={menuController.anchorRef}
           data-testid="playlist-mobile-hero-menu"
-          className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleMenu}
           aria-label={t("common.more")}
         >
@@ -133,7 +133,7 @@ export function PlaylistHeroSection({
         <div className="absolute inset-0 scale-[1.02] opacity-[0.82] sm:grayscale sm:brightness-[0.5] sm:opacity-[0.45]">
           {artwork("h-full w-full rounded-none")}
         </div>
-        <div className="absolute inset-0 bg-black/12 sm:bg-black/36" />
+        <div className="absolute inset-0 bg-surface-canvas/12 sm:bg-surface-canvas/36" />
         <div
           className="absolute inset-0 sm:hidden"
           style={{
@@ -153,7 +153,7 @@ export function PlaylistHeroSection({
           <div className="flex w-full flex-col gap-5 sm:flex-row sm:items-end">
             <div className="hidden w-[200px] flex-shrink-0 sm:block lg:w-[240px]">
               {artwork(
-                "aspect-square rounded-xl bg-white/5 shadow-2xl ring-1 ring-white/10",
+                "aspect-square rounded-xl bg-text-primary/5 shadow-2xl ring-1 ring-text-primary/10",
               )}
             </div>
 
@@ -167,7 +167,7 @@ export function PlaylistHeroSection({
                 {title}
               </h1>
               {description ? (
-                <p className="mt-3 line-clamp-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-white/70">
+                <p className="mt-3 line-clamp-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-text-primary/70">
                   {description}
                 </p>
               ) : null}
@@ -200,7 +200,7 @@ export function PlaylistHeroSection({
               <span>{t("player.play")}</span>
             </button>
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
               onClick={onShuffle}
               disabled={shuffleDisabled}
               aria-label={t("player.shuffle")}
@@ -224,7 +224,7 @@ export function PlaylistHeroSection({
                     SECONDARY_ACTION_CLASS,
                     action.active
                       ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-                      : "text-white/62",
+                      : "text-text-primary/62",
                     action.className,
                   )}
                   onClick={action.onClick}

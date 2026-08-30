@@ -87,7 +87,7 @@ export function UpcomingShowCard({
               featured &&
                 "border-primary/25 shadow-[0_18px_60px_rgba(6,182,212,0.14)]",
             )
-          : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-white/[0.03]",
+          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-text-primary/[0.03]",
       )}
       style={{ height: cardHeight }}
       onClick={!expanded ? onToggle : undefined}

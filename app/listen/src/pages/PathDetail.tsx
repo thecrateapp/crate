@@ -137,7 +137,7 @@ export function PathDetail() {
     <div className="animate-page-in px-4 py-6 sm:px-6">
       <button
         onClick={() => navigate("/paths")}
-        className="mb-5 flex items-center gap-1.5 text-sm text-white/40 transition hover:text-white"
+        className="mb-5 flex items-center gap-1.5 text-sm text-text-primary/40 transition hover:text-text-primary"
       >
         <ArrowLeft size={14} /> {t("paths.back")}
       </button>
@@ -146,15 +146,15 @@ export function PathDetail() {
       <div className="mb-6 flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{path.name}</h1>
-          <div className="mt-1.5 flex items-center gap-2 text-[12px] text-white/40">
+          <div className="mt-1.5 flex items-center gap-2 text-[12px] text-text-primary/40">
             <span className="font-medium text-primary/70">
               {path.origin.label}
             </span>
-            <span className="text-white/15">→</span>
+            <span className="text-text-primary/15">→</span>
             <span className="font-medium text-primary/70">
               {path.destination.label}
             </span>
-            <span className="text-white/15">·</span>
+            <span className="text-text-primary/15">·</span>
             <span>
               {t("common.trackCountLabel", { count: path.tracks.length })}
             </span>
@@ -169,7 +169,7 @@ export function PathDetail() {
       </div>
 
       {/* Route visualization */}
-      <div className="mb-6 rounded-xl border border-white/8 bg-black/20 p-4">
+      <div className="mb-6 rounded-xl border border-text-primary/8 bg-surface-canvas/20 p-4">
         <div className="mb-2 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.14em]">
           <span className="flex items-center gap-1 text-primary/60">
             <MapPin size={9} /> {path.origin.label}
@@ -181,7 +181,7 @@ export function PathDetail() {
 
         <div className="relative py-5">
           <div className="relative mx-3">
-            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/8" />
+            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-text-primary/8" />
             <div
               className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full ${
                 animate ? "transition-[width] duration-[1200ms] ease-out" : ""
@@ -210,7 +210,7 @@ export function PathDetail() {
                           ? "h-3 w-3 bg-primary shadow-[0_0_12px_rgba(6,182,212,0.6)]"
                           : isPast
                             ? "h-1.5 w-1.5 bg-primary/60"
-                            : "h-1.5 w-1.5 bg-white/20 group-hover:bg-white/40"
+                            : "h-1.5 w-1.5 bg-text-primary/20 group-hover:bg-text-primary/40"
                       }`}
                     />
                   </button>
@@ -247,14 +247,14 @@ export function PathDetail() {
                     { size: 80 },
                   )}
                   alt=""
-                  className="h-10 w-10 flex-shrink-0 rounded-lg bg-white/5 object-cover shadow-md"
+                  className="h-10 w-10 flex-shrink-0 rounded-lg bg-text-primary/5 object-cover shadow-md"
                 />
               )}
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-foreground">
                   {path.tracks[activeStep]!.title}
                 </div>
-                <div className="truncate text-[11px] text-white/50">
+                <div className="truncate text-[11px] text-text-primary/50">
                   {path.tracks[activeStep]!.artist}
                   {path.tracks[activeStep]!.album && (
                     <> · {path.tracks[activeStep]!.album}</>
@@ -274,7 +274,7 @@ export function PathDetail() {
         <button
           onClick={regenerate}
           disabled={regenerating}
-          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white/60 transition hover:border-white/20 hover:text-white disabled:opacity-30"
+          className="flex items-center gap-1.5 rounded-full border border-border-quiet bg-text-primary/5 px-3 py-1.5 text-[11px] font-medium text-text-primary/60 transition hover:border-text-primary/20 hover:text-text-primary disabled:opacity-30"
         >
           {regenerating ? (
             <Loader2 size={11} className="animate-spin" />
@@ -289,7 +289,7 @@ export function PathDetail() {
             toast.success(t("paths.toasts.deleted"));
             navigate("/paths");
           }}
-          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white/60 transition hover:border-red-400/30 hover:text-red-300"
+          className="flex items-center gap-1.5 rounded-full border border-border-quiet bg-text-primary/5 px-3 py-1.5 text-[11px] font-medium text-text-primary/60 transition hover:border-state-danger/30 hover:text-state-danger-text"
         >
           <Trash2 size={11} /> {t("common.delete")}
         </button>
@@ -307,14 +307,14 @@ export function PathDetail() {
               className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
                 isActive
                   ? "border-primary/30 bg-primary/10"
-                  : "border-transparent hover:bg-white/[0.03]"
+                  : "border-transparent hover:bg-text-primary/[0.03]"
               }`}
             >
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center">
                 {isActive ? (
                   <div className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
                 ) : (
-                  <span className="font-mono text-[10px] tabular-nums text-white/20">
+                  <span className="font-mono text-[10px] tabular-nums text-text-primary/20">
                     {i + 1}
                   </span>
                 )}
@@ -331,11 +331,11 @@ export function PathDetail() {
                     { size: 80 },
                   )}
                   alt=""
-                  className="h-10 w-10 flex-shrink-0 rounded-md bg-white/5 object-cover"
+                  className="h-10 w-10 flex-shrink-0 rounded-md bg-text-primary/5 object-cover"
                 />
               ) : (
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-white/5">
-                  <MapPin size={14} className="text-white/15" />
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-text-primary/5">
+                  <MapPin size={14} className="text-text-primary/15" />
                 </div>
               )}
 
@@ -347,13 +347,13 @@ export function PathDetail() {
                 >
                   {t.title}
                 </div>
-                <div className="truncate text-[11px] text-white/40">
+                <div className="truncate text-[11px] text-text-primary/40">
                   {t.artist}
                   {t.album && <> · {t.album}</>}
                 </div>
               </div>
 
-              <span className="flex-shrink-0 rounded-full border border-white/6 bg-white/[0.02] px-2 py-0.5 font-mono text-[9px] tabular-nums text-white/25">
+              <span className="flex-shrink-0 rounded-full border border-text-primary/6 bg-text-primary/[0.02] px-2 py-0.5 font-mono text-[9px] tabular-nums text-text-primary/25">
                 {t.distance.toFixed(3)}
               </span>
             </div>

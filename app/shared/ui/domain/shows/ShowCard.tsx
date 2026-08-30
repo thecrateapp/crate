@@ -53,7 +53,7 @@ function CollapsedView({
       onClick={onToggle}
     >
       <PreloadBackground url={show.backgroundUrl} />
-      <div className="h-full w-[88px] flex-shrink-0 bg-white/5">
+      <div className="h-full w-[88px] flex-shrink-0 bg-text-primary/5">
         {show.artistPhotoUrl ? (
           <img
             src={show.artistPhotoUrl}
@@ -71,18 +71,18 @@ function CollapsedView({
         <div className="truncate text-[13px] font-semibold text-foreground">
           {show.primaryArtist?.name ?? show.title}
         </div>
-        <div className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
+        <div className="mt-1 flex items-center gap-1 text-[11px] text-text-primary/40">
           <MapPin size={10} className="flex-shrink-0 text-primary/60" />
           <span className="truncate">{show.venue}</span>
           {show.city ? (
             <>
-              <span className="text-white/15">&middot;</span>
+              <span className="text-text-primary/15">&middot;</span>
               <span className="flex-shrink-0">{show.city}</span>
             </>
           ) : null}
         </div>
         {support.length > 0 ? (
-          <div className="mt-0.5 truncate text-[10px] text-white/40">
+          <div className="mt-0.5 truncate text-[10px] text-text-primary/40">
             w/{" "}
             {support
               .slice(0, 3)
@@ -100,7 +100,7 @@ function CollapsedView({
         <span className="text-[20px] font-black leading-tight text-primary">
           {dayLabel}
         </span>
-        <span className="text-[8px] font-medium leading-none text-white/40">
+        <span className="text-[8px] font-medium leading-none text-text-primary/40">
           {weekdayLabel}
         </span>
       </div>
@@ -114,7 +114,7 @@ function CollapsedView({
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               title="Open tickets"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-text-primary/30 transition-colors hover:bg-text-primary/8 hover:text-text-primary/70"
             >
               <ExternalLink size={CRATE_ICON_SIZE.md} />
             </a>
@@ -160,7 +160,7 @@ function ExpandedView({
             }}
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-surface-canvas via-surface-canvas/65 to-transparent" />
       </div>
 
       <div className="relative h-[136px] flex-shrink-0">
@@ -168,7 +168,7 @@ function ExpandedView({
           <button
             type="button"
             onClick={onClose}
-            className="absolute left-2.5 top-2.5 z-10 flex size-10 items-center justify-center text-white/60 transition-colors hover:text-white"
+            className="absolute left-2.5 top-2.5 z-10 flex size-10 items-center justify-center text-text-primary/60 transition-colors hover:text-text-primary"
             aria-label="Close show details"
           >
             <X size={CRATE_ICON_SIZE.xl} />
@@ -180,7 +180,7 @@ function ExpandedView({
             {dateLabel}
           </div>
           {timeLabel ? (
-            <div className="text-[10px] text-white/40">{timeLabel}</div>
+            <div className="text-[10px] text-text-primary/40">{timeLabel}</div>
           ) : null}
         </div>
 
@@ -200,17 +200,17 @@ function ExpandedView({
               {artistHref ? (
                 <Link
                   to={artistHref}
-                  className="block truncate text-sm font-bold text-white transition-colors hover:text-primary"
+                  className="block truncate text-sm font-bold text-text-primary transition-colors hover:text-primary"
                 >
                   {show.primaryArtist?.name ?? show.title}
                 </Link>
               ) : (
-                <div className="truncate text-sm font-bold text-white">
+                <div className="truncate text-sm font-bold text-text-primary">
                   {show.primaryArtist?.name ?? show.title}
                 </div>
               )}
               {support.length > 0 ? (
-                <div className="truncate text-[10px] text-white/40">
+                <div className="truncate text-[10px] text-text-primary/40">
                   w/{" "}
                   {support
                     .slice(0, 4)
@@ -228,12 +228,14 @@ function ExpandedView({
         <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
           <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
           <div className="min-w-0">
-            <span className="font-medium text-white/70">{show.venue}</span>
+            <span className="font-medium text-text-primary/70">
+              {show.venue}
+            </span>
             {addressLabel ? (
-              <span className="text-white/40"> · {addressLabel}</span>
+              <span className="text-text-primary/40"> · {addressLabel}</span>
             ) : null}
             {locationLabel ? (
-              <div className="text-white/40">{locationLabel}</div>
+              <div className="text-text-primary/40">{locationLabel}</div>
             ) : null}
           </div>
         </div>
@@ -243,7 +245,7 @@ function ExpandedView({
             {show.genres.slice(0, 3).map((genre) => (
               <span
                 key={genre}
-                className="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/40"
+                className="rounded-full border border-border-quiet px-1.5 py-0.5 text-[9px] text-text-primary/40"
               >
                 {genre}
               </span>
@@ -256,7 +258,7 @@ function ExpandedView({
             {artistHref ? (
               <Link
                 to={artistHref}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-white/10 py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border-quiet py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
               >
                 <MapPin size={13} />
                 Open Artist
@@ -271,7 +273,7 @@ function ExpandedView({
               >
                 <Ticket size={13} />
                 Get Tickets
-                <span className="h-[5px] w-[5px] rounded-full bg-green-400" />
+                <span className="h-[5px] w-[5px] rounded-full bg-state-success" />
               </a>
             ) : null}
           </div>
@@ -329,7 +331,7 @@ export function ShowCard({
     return (
       <div
         className={cn(
-          "relative w-[340px] overflow-hidden rounded-md border border-white/[0.06] bg-panel-surface shadow-[0_20px_48px_rgba(0,0,0,0.28)]",
+          "relative w-[340px] overflow-hidden rounded-md border border-text-primary/[0.06] bg-panel-surface shadow-[0_20px_48px_rgba(0,0,0,0.28)]",
           className,
         )}
       >
@@ -354,7 +356,7 @@ export function ShowCard({
         "relative w-full overflow-hidden rounded-md border",
         expanded
           ? "border-primary/20 shadow-[0_12px_40px_rgba(6,182,212,0.10)] transition-[height,border-color,box-shadow] duration-400 ease-out"
-          : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-white/[0.03]",
+          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-text-primary/[0.03]",
         className,
       )}
       style={{ height: cardHeight }}

@@ -157,7 +157,7 @@ export function TopBarUserMenu() {
           aria-expanded={actionMenu.open}
           aria-haspopup="menu"
           aria-label={t("userMenu.label")}
-          className="flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/30 text-sm font-medium text-white/70 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
+          className="flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-border-quiet bg-surface-canvas/30 text-sm font-medium text-text-primary/70 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-surface-canvas/50 hover:text-text-primary"
           {...actionMenu.longPressHandlers}
         >
           {avatarUrl ? (
@@ -205,7 +205,7 @@ export function TopBarUserMenu() {
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
                       {t("userMenu.suggest.badge")}
                     </p>
-                    <h2 className="mt-1 text-lg font-semibold text-white">
+                    <h2 className="mt-1 text-lg font-semibold text-text-primary">
                       {t("userMenu.suggest.title")}
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -220,7 +220,7 @@ export function TopBarUserMenu() {
               </ModalHeader>
               <ModalBody className="space-y-4 px-5 py-5">
                 <label className="block space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white/45">
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-text-primary/45">
                     {t("userMenu.suggest.artistLabel")}
                   </span>
                   <input
@@ -231,7 +231,7 @@ export function TopBarUserMenu() {
                     aria-describedby={
                       suggestArtistError ? "artist-suggestion-error" : undefined
                     }
-                    className="h-11 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none transition-colors placeholder:text-white/25 focus:border-primary/60"
+                    className="h-11 w-full rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/60"
                     required
                     minLength={2}
                     maxLength={200}
@@ -239,33 +239,33 @@ export function TopBarUserMenu() {
                   {suggestArtistError ? (
                     <span
                       id="artist-suggestion-error"
-                      className="block text-xs text-red-300"
+                      className="block text-xs text-state-danger-text"
                     >
                       {suggestArtistError}
                     </span>
                   ) : null}
                 </label>
                 <label className="block space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white/45">
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-text-primary/45">
                     {t("userMenu.suggest.linkLabel")}
                   </span>
                   <input
                     value={suggestUrl}
                     onChange={(event) => setSuggestUrl(event.target.value)}
                     placeholder="Bandcamp, Tidal, Spotify, YouTube..."
-                    className="h-11 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none transition-colors placeholder:text-white/25 focus:border-primary/60"
+                    className="h-11 w-full rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/60"
                     maxLength={500}
                   />
                 </label>
                 <label className="block space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white/45">
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-text-primary/45">
                     {t("userMenu.suggest.noteLabel")}
                   </span>
                   <textarea
                     value={suggestNote}
                     onChange={(event) => setSuggestNote(event.target.value)}
                     placeholder={t("userMenu.suggest.notePlaceholder")}
-                    className="min-h-24 w-full resize-none rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-white/25 focus:border-primary/60"
+                    className="min-h-24 w-full resize-none rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/60"
                     maxLength={1000}
                   />
                 </label>
@@ -274,7 +274,7 @@ export function TopBarUserMenu() {
                 <button
                   type="button"
                   onClick={() => setSuggestOpen(false)}
-                  className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:bg-white/5 hover:text-white"
+                  className="rounded-lg border border-border-quiet px-4 py-2 text-sm text-text-primary/65 transition-colors hover:bg-text-primary/5 hover:text-text-primary"
                   disabled={suggesting}
                 >
                   {t("common.cancel")}

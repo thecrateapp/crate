@@ -48,7 +48,7 @@ interface ArtistHeroSectionProps {
 }
 
 const SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export function ArtistHeroSection({
   artist,
@@ -136,7 +136,7 @@ export function ArtistHeroSection({
         <button
           ref={menuController.anchorRef}
           data-testid="artist-mobile-hero-menu"
-          className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleMenu}
           aria-label={t("common.more")}
         >
@@ -195,7 +195,7 @@ export function ArtistHeroSection({
             className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 opacity-[0.45] hidden sm:block"
           />
         ) : null}
-        <div className="absolute inset-0 bg-black/10 sm:bg-black/32" />
+        <div className="absolute inset-0 bg-surface-canvas/10 sm:bg-surface-canvas/32" />
         <div
           className="absolute inset-0 sm:hidden"
           style={{
@@ -212,7 +212,7 @@ export function ArtistHeroSection({
         />
         <div className="relative mx-auto flex h-full w-full max-w-[1480px] items-end px-4 pb-6 sm:px-6">
           <div className="flex w-full flex-col gap-5 sm:flex-row sm:items-end">
-            <div className="hidden h-40 w-40 flex-shrink-0 overflow-hidden rounded-full bg-white/5 shadow-2xl ring-2 ring-white/10 sm:block">
+            <div className="hidden h-40 w-40 flex-shrink-0 overflow-hidden rounded-full bg-text-primary/5 shadow-2xl ring-2 ring-text-primary/10 sm:block">
               <CrateImage
                 src={photoUrl}
                 alt={artist.name}
@@ -250,7 +250,7 @@ export function ArtistHeroSection({
 
               {bio ? (
                 <div className="mt-3 max-w-2xl">
-                  <p className="line-clamp-2 whitespace-pre-line text-sm leading-relaxed text-white/70 sm:line-clamp-3">
+                  <p className="line-clamp-2 whitespace-pre-line text-sm leading-relaxed text-text-primary/70 sm:line-clamp-3">
                     {bio}
                   </p>
                   {bio.length > 200 ? (
@@ -284,7 +284,7 @@ export function ArtistHeroSection({
               <span>{t("player.play")}</span>
             </button>
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-text-primary/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
               onClick={onShuffle}
               aria-label={t("player.shuffle")}
             >
@@ -319,7 +319,7 @@ export function ArtistHeroSection({
               className={`${SECONDARY_ACTION_CLASS} ${
                 following
                   ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-                  : "text-white/62"
+                  : "text-text-primary/62"
               }`}
               following={following}
               iconSize={CRATE_ICON_SIZE.lg}

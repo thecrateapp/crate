@@ -68,7 +68,7 @@ export function ExplorePill({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-full border border-surface-quiet px-4 py-2 transition-colors hover:border-accent-action/40 hover:bg-accent-action/5"
+      className="inline-flex items-center gap-2 rounded-full border border-border-quiet px-4 py-2 transition-colors hover:border-accent-action/40 hover:bg-accent-action/5"
     >
       <span className="text-sm font-medium text-accent-action">{label}</span>
       {count != null && count > 0 ? (
@@ -489,7 +489,7 @@ export function GenreDetailView({
                   type="button"
                   onClick={() => openGenreRadar(nextShow)}
                   aria-label={t("genre.actions.openNextGenreShow")}
-                  className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-[inset_0_0_0_1px_var(--surface-quiet)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] md:w-auto md:px-7"
+                  className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-[inset_0_0_0_1px_var(--border-quiet)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] md:w-auto md:px-7"
                 >
                   <Calendar size={17} />
                   <span>{t("genre.actions.nextShow")}</span>
@@ -1026,7 +1026,7 @@ export function PlaylistCategoryView({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-surface-quiet px-4 py-6 text-sm text-text-muted">
+        <div className="rounded-lg border border-dashed border-border-quiet px-4 py-6 text-sm text-text-muted">
           {t("explore.playlistCategory.empty")}
         </div>
       )}

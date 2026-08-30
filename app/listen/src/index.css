@@ -150,10 +150,10 @@ textarea {
       var(--surface-glass-top),
       var(--surface-glass-bottom)
     );
-  border: 1px solid var(--surface-quiet);
+  border: 1px solid var(--border-quiet);
   box-shadow:
     0 28px 90px var(--surface-glass-shadow),
-    inset 0 1px 0 var(--surface-quiet-subtle);
+    inset 0 1px 0 var(--border-quiet-subtle);
   backdrop-filter: blur(24px) saturate(1.18);
   -webkit-backdrop-filter: blur(24px) saturate(1.18);
 }
@@ -199,7 +199,7 @@ textarea {
 }
 
 .listen-player-progress-tooltip {
-  border-color: var(--surface-quiet);
+  border-color: var(--border-quiet);
   background: var(--surface-overlay);
   color: var(--text-primary);
 }
@@ -220,13 +220,13 @@ textarea {
     var(--surface-canvas) 70%,
     transparent
   );
-  --surface-quiet: color-mix(in srgb, var(--text-primary) 13%, transparent);
+  --border-quiet: color-mix(in srgb, var(--text-primary) 13%, transparent);
   --surface-glass-shadow: color-mix(
     in srgb,
     var(--surface-canvas) 34%,
     transparent
   );
-  --surface-quiet-subtle: color-mix(
+  --border-quiet-subtle: color-mix(
     in srgb,
     var(--text-primary) 8%,
     transparent
@@ -250,7 +250,7 @@ textarea {
   box-shadow:
     0 22px 58px var(--surface-glass-hover-shadow),
     0 0 22px var(--surface-accent-subtle),
-    inset 0 1px 0 var(--surface-quiet);
+    inset 0 1px 0 var(--border-quiet);
 }
 
 .listen-mobile-dock-glass {
@@ -269,14 +269,14 @@ textarea {
     var(--surface-canvas) 92%,
     transparent
   );
-  --surface-quiet: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  --border-quiet: color-mix(in srgb, var(--text-primary) 14%, transparent);
   --surface-glass-shadow: rgba(0, 0, 0, 0.58);
   --surface-accent-shadow: color-mix(
     in srgb,
     var(--accent-action) 6%,
     transparent
   );
-  --surface-quiet-subtle: color-mix(
+  --border-quiet-subtle: color-mix(
     in srgb,
     var(--text-primary) 9%,
     transparent
@@ -294,7 +294,7 @@ textarea {
   box-shadow:
     0 24px 72px var(--surface-glass-shadow),
     0 0 22px var(--surface-accent-shadow),
-    inset 0 1px 0 var(--surface-quiet-subtle);
+    inset 0 1px 0 var(--border-quiet-subtle);
   backdrop-filter: blur(38px) saturate(1.28) brightness(0.72) contrast(0.88);
   -webkit-backdrop-filter: blur(38px) saturate(1.28) brightness(0.72)
     contrast(0.88);
@@ -316,14 +316,14 @@ textarea {
     var(--surface-canvas) 70%,
     transparent
   );
-  --surface-quiet: color-mix(in srgb, var(--text-primary) 13%, transparent);
+  --border-quiet: color-mix(in srgb, var(--text-primary) 13%, transparent);
   --surface-glass-shadow: rgba(0, 0, 0, 0.56);
-  --surface-quiet-subtle: color-mix(
+  --border-quiet-subtle: color-mix(
     in srgb,
     var(--text-primary) 10%,
     transparent
   );
-  border: 1px solid var(--surface-quiet);
+  border: 1px solid var(--border-quiet);
   background: radial-gradient(
       circle at 16% 0%,
       var(--surface-glass-accent),
@@ -336,7 +336,7 @@ textarea {
     );
   box-shadow:
     0 24px 64px var(--surface-glass-shadow),
-    inset 0 1px 0 var(--surface-quiet-subtle);
+    inset 0 1px 0 var(--border-quiet-subtle);
   backdrop-filter: blur(28px) saturate(1.14) brightness(0.68) contrast(0.92);
   -webkit-backdrop-filter: blur(28px) saturate(1.14) brightness(0.68)
     contrast(0.92);

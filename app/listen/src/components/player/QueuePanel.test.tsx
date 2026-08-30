@@ -108,7 +108,7 @@ describe("QueuePanel", () => {
     const panel = screen.getByText("Queue").closest(".listen-glass-panel");
     const nextRow = screen.getByText("Next").closest('[role="button"]');
 
-    expect(panel).toHaveClass("border-l", "border-surface-quiet");
+    expect(panel).toHaveClass("border-l", "border-border-quiet");
     expect(screen.getByText("Queue")).toHaveClass("text-text-primary");
     expect(nextRow).toHaveClass(
       "hover:bg-surface-control",

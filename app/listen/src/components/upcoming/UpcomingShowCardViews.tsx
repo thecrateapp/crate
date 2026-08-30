@@ -185,7 +185,7 @@ export function UpcomingShowCollapsedView({
       {/* Preload hero background into browser cache while collapsed */}
       <PreloadBackground item={item} />
       {/* Artist photo */}
-      <div className="h-full w-[88px] flex-shrink-0 bg-white/5">
+      <div className="h-full w-[88px] flex-shrink-0 bg-text-primary/5">
         {artistImageUrl && (
           <CrateImage
             src={artistImageUrl}
@@ -212,18 +212,18 @@ export function UpcomingShowCollapsedView({
             />
           )}
         </div>
-        <div className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
+        <div className="mt-1 flex items-center gap-1 text-[11px] text-text-primary/40">
           <MapPin size={10} className="flex-shrink-0 text-primary/60" />
           <span className="truncate">{item.venue}</span>
           {item.city && (
             <>
-              <span className="text-white/15">&middot;</span>
+              <span className="text-text-primary/15">&middot;</span>
               <span className="flex-shrink-0">{item.city}</span>
             </>
           )}
         </div>
         {support.length > 0 && (
-          <div className="mt-0.5 truncate text-[10px] text-white/40">
+          <div className="mt-0.5 truncate text-[10px] text-text-primary/40">
             {t("radar.show.withSupportPrefix")} {support.slice(0, 3).join(", ")}
             {support.length > 3 && ` +${support.length - 3}`}
           </div>
@@ -238,7 +238,7 @@ export function UpcomingShowCollapsedView({
         <span className="text-[20px] font-black leading-tight text-primary">
           {dayStr}
         </span>
-        <span className="text-[8px] font-medium leading-none text-white/40">
+        <span className="text-[8px] font-medium leading-none text-text-primary/40">
           {dowStr}
         </span>
       </div>
@@ -256,7 +256,7 @@ export function UpcomingShowCollapsedView({
               ? t("radar.show.attending")
               : t("actions.show.markAttending")
           }
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/8 hover:text-white/60 disabled:opacity-30"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-text-primary/30 transition-colors hover:bg-text-primary/8 hover:text-text-primary/60 disabled:opacity-30"
         >
           {savingAttendance ? (
             <Loader2 size={15} className="animate-spin" />
@@ -345,7 +345,7 @@ export function UpcomingShowExpandedView({
             }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-surface-canvas via-surface-canvas/60 to-transparent" />
       </div>
 
       {/* Top section — close button, date, artist overlay */}
@@ -355,7 +355,7 @@ export function UpcomingShowExpandedView({
           <button
             onClick={onClose}
             aria-label={t("radar.show.closeDetails")}
-            className="absolute top-2.5 left-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
+            className="absolute top-2.5 left-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-surface-canvas/40 text-text-primary/60 backdrop-blur-sm transition-colors hover:text-text-primary"
           >
             <X size={14} />
           </button>
@@ -372,7 +372,7 @@ export function UpcomingShowExpandedView({
             {dateLabel}
           </div>
           {timeLabel && (
-            <div className="text-[10px] text-white/40">{timeLabel}</div>
+            <div className="text-[10px] text-text-primary/40">{timeLabel}</div>
           )}
         </div>
 
@@ -395,12 +395,12 @@ export function UpcomingShowExpandedView({
                   artistId: item.artist_id,
                   artistSlug: item.artist_slug,
                 })}
-                className="block truncate text-sm font-bold text-white transition-colors hover:text-primary"
+                className="block truncate text-sm font-bold text-text-primary transition-colors hover:text-primary"
               >
                 {item.artist}
               </Link>
               {support.length > 0 && (
-                <div className="truncate text-[10px] text-white/40">
+                <div className="truncate text-[10px] text-text-primary/40">
                   {t("radar.show.withSupportPrefix")}{" "}
                   {support.slice(0, 4).join(" · ")}
                   {support.length > 4 && ` +${support.length - 4}`}
@@ -416,12 +416,14 @@ export function UpcomingShowExpandedView({
         <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
           <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
           <div className="min-w-0">
-            <span className="font-medium text-white/70">{item.venue}</span>
+            <span className="font-medium text-text-primary/70">
+              {item.venue}
+            </span>
             {addressLabel && (
-              <span className="text-white/40"> · {addressLabel}</span>
+              <span className="text-text-primary/40"> · {addressLabel}</span>
             )}
             {locationLabel && (
-              <div className="text-white/40">{locationLabel}</div>
+              <div className="text-text-primary/40">{locationLabel}</div>
             )}
           </div>
         </div>
@@ -444,7 +446,7 @@ export function UpcomingShowExpandedView({
             className={`flex items-center justify-center gap-1.5 rounded-lg border py-2.5 text-[11px] font-semibold transition-colors ${
               attending
                 ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-white/10 text-muted-foreground hover:border-primary/20 hover:text-primary"
+                : "border-border-quiet text-muted-foreground hover:border-primary/20 hover:text-primary"
             }`}
           >
             {savingAttendance ? (
@@ -473,7 +475,7 @@ export function UpcomingShowExpandedView({
               href={directionsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border-quiet py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
             >
               <MapPin size={13} />
               {t("radar.show.directions")}
@@ -491,7 +493,7 @@ export function UpcomingShowExpandedView({
             <ExternalLink size={13} />
             {t("radar.show.getTickets")}
             {item.status === "onsale" && (
-              <span className="h-[5px] w-[5px] rounded-full bg-green-400" />
+              <span className="h-[5px] w-[5px] rounded-full bg-state-success" />
             )}
           </a>
         </div>

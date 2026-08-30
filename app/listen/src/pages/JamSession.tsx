@@ -2620,7 +2620,7 @@ export function JamSession() {
               ) : null}
             </div>
             {queueSearchResults.length > 0 ? (
-              <div className="jam-dark-surface overflow-hidden rounded-xl border border-surface-quiet">
+              <div className="jam-dark-surface overflow-hidden rounded-xl border border-border-quiet">
                 {queueSearchResults.map((track) => {
                   const playable = searchTrackToTrack(track);
                   const alreadyQueued = queueItems.some((item) =>

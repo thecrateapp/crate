@@ -19,7 +19,7 @@ describe("EqualizerPopover", () => {
     );
 
     expect(screen.getByRole("dialog", { name: "Equalizer" })).toHaveClass(
-      "border-surface-quiet",
+      "border-border-quiet",
       "bg-surface-overlay",
       "shadow-menu",
     );

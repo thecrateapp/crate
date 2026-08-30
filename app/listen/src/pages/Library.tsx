@@ -336,7 +336,7 @@ function CollectionSortDropdown<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-surface-quiet/10 px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-[0_0_18px_var(--accent-action-glow-soft)] focus-visible:border-accent-action/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_var(--accent-action-glow)] ${
+        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-border-quiet/10 px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-[0_0_18px_var(--accent-action-glow-soft)] focus-visible:border-accent-action/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_var(--accent-action-glow)] ${
           open
             ? "border-accent-action/45 shadow-[0_0_20px_var(--accent-action-glow)]"
             : ""
@@ -355,7 +355,7 @@ function CollectionSortDropdown<T extends string>({
         <div
           role="listbox"
           aria-label={label}
-          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-[12px] border border-surface-quiet/10 p-1 shadow-menu animate-pop-in"
+          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-[12px] border border-border-quiet/10 p-1 shadow-menu animate-pop-in"
         >
           {options.map((option) => {
             const selected = option.value === value;
@@ -979,7 +979,7 @@ function BandcampTab() {
                   type="button"
                   disabled={!contribution.album_id}
                   onClick={() => exportContribution(contribution)}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-surface-quiet px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
                 >
                   <Download size={14} />
                   {t("common.export")}
@@ -1060,7 +1060,7 @@ function BandcampTab() {
                   <button
                     type="button"
                     onClick={() => window.open(item.item_url || "", "_blank")}
-                    className="inline-flex min-h-10 items-center rounded-full border border-surface-quiet px-3 text-xs font-bold text-muted-foreground"
+                    className="inline-flex min-h-10 items-center rounded-full border border-border-quiet px-3 text-xs font-bold text-muted-foreground"
                   >
                     <ExternalLink size={14} />
                   </button>
@@ -1098,7 +1098,7 @@ function BandcampTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-surface-quiet px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
           >
             {t("common.keepIt")}
           </button>
@@ -1204,7 +1204,7 @@ function ContributionsTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[12px] border border-surface-quiet bg-text-primary/[0.04] p-5">
+      <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-5">
         <h2 className="text-xl font-black text-foreground">
           {t("library.contributions.title")}
         </h2>
@@ -1238,7 +1238,7 @@ function ContributionsTab() {
                 type="button"
                 disabled={!contribution.album_id}
                 onClick={() => exportContribution(contribution)}
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-surface-quiet px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
               >
                 <Download size={14} />
                 {t("common.export")}
@@ -1282,7 +1282,7 @@ function ContributionsTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-surface-quiet px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
           >
             {t("common.keepIt")}
           </button>

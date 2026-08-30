@@ -17,9 +17,9 @@ interface EditorialPlaylistArtworkProps {
 }
 
 const VARIANT_TONES: Record<EditorialVariant, string> = {
-  core: "from-cyan-400/28 via-slate-950/12 to-slate-950",
-  history: "from-teal-300/24 via-slate-950/10 to-slate-950",
-  crate: "from-sky-300/22 via-slate-950/12 to-slate-950",
+  core: "from-accent-action/28 via-surface-canvas/12 to-surface-canvas",
+  history: "from-accent-action/24 via-surface-canvas/10 to-surface-canvas",
+  crate: "from-state-info/22 via-surface-canvas/12 to-surface-canvas",
 };
 
 const VARIANT_RADIALS: Record<EditorialVariant, string> = {
@@ -68,7 +68,7 @@ export function EditorialPlaylistArtwork({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-[3px] border border-white/10 bg-slate-950 [container-type:inline-size]",
+        "relative isolate overflow-hidden rounded-[3px] border border-border-quiet bg-surface-canvas [container-type:inline-size]",
         className,
       )}
     >
@@ -112,7 +112,7 @@ export function EditorialPlaylistArtwork({
       <div
         className={cn("absolute inset-x-[7%] bottom-[7%] z-[4]", textClassName)}
       >
-        <div className="max-w-[96%] text-[clamp(1.25rem,21cqw,4.35rem)] font-black uppercase leading-[0.78] tracking-[-0.09em] text-white text-pretty drop-shadow-[0_2px_18px_rgba(0,0,0,0.6)]">
+        <div className="max-w-[96%] text-[clamp(1.25rem,21cqw,4.35rem)] font-black uppercase leading-[0.78] tracking-[-0.09em] text-text-primary text-pretty drop-shadow-[0_2px_18px_rgba(0,0,0,0.6)]">
           {title}
         </div>
         {kicker ? (

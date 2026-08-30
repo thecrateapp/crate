@@ -102,7 +102,7 @@ export function SuggestedTab() {
 
   if (tracks.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-white/20">
+      <div className="flex flex-1 items-center justify-center text-sm text-text-primary/20">
         {t("player.suggested.empty")}
       </div>
     );
@@ -118,7 +118,7 @@ export function SuggestedTab() {
             !currentTrack ||
             !hasPlayableTrackReference(currentTrack)
           }
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-full border border-border-quiet bg-text-primary/5 px-3 py-1.5 text-[11px] font-medium text-text-primary/80 transition hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {startingRadio ? (
             <Loader2 size={12} className="animate-spin" />
@@ -146,22 +146,24 @@ export function SuggestedTab() {
               },
             )
           }
-          className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5"
+          className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-text-primary/5"
         >
-          <span className="w-4 shrink-0 text-right text-[10px] tabular-nums text-white/20">
+          <span className="w-4 shrink-0 text-right text-[10px] tabular-nums text-text-primary/20">
             {index + 1}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] text-white/80">{track.title}</p>
-            <p className="truncate text-[10px] text-white/40">
+            <p className="truncate text-[12px] text-text-primary/80">
+              {track.title}
+            </p>
+            <p className="truncate text-[10px] text-text-primary/40">
               {track.artist} — {track.album}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[10px] tabular-nums text-white/40">
+            <span className="text-[10px] tabular-nums text-text-primary/40">
               {formatDuration(track.duration)}
             </span>
-            <div className="h-1 w-12 overflow-hidden rounded-full bg-white/5">
+            <div className="h-1 w-12 overflow-hidden rounded-full bg-text-primary/5">
               <div
                 className="h-full rounded-full bg-primary/60"
                 style={{ width: `${Math.min(track.score * 100, 100)}%` }}

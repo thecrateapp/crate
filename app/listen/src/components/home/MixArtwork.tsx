@@ -36,7 +36,7 @@ export function MixArtwork({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl bg-white/5",
+        "relative overflow-hidden rounded-xl bg-text-primary/5",
         className,
       )}
     >

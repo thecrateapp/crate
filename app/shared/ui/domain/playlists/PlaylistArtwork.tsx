@@ -93,7 +93,9 @@ export function PlaylistArtwork({
 
   if (coverDataUrl) {
     return (
-      <div className={`relative overflow-hidden bg-white/5 ${className}`}>
+      <div
+        className={`relative overflow-hidden bg-text-primary/5 ${className}`}
+      >
         {artworkImage({
           src: coverDataUrl,
           alt: name,
@@ -107,7 +109,9 @@ export function PlaylistArtwork({
   if (collageSources.length > 0) {
     if (collageSources.length === 1) {
       return (
-        <div className={`relative overflow-hidden bg-white/5 ${className}`}>
+        <div
+          className={`relative overflow-hidden bg-text-primary/5 ${className}`}
+        >
           {artworkImage({
             src: collageSources[0],
             alt: name,
@@ -124,7 +128,9 @@ export function PlaylistArtwork({
         : "grid-cols-2 grid-rows-2";
 
     return (
-      <div className={`relative overflow-hidden bg-white/5 ${className}`}>
+      <div
+        className={`relative overflow-hidden bg-text-primary/5 ${className}`}
+      >
         <div className={`grid h-full w-full ${collageClassName} gap-[2px]`}>
           {collageSources.map((source, index) =>
             artworkImage({
@@ -147,7 +153,7 @@ export function PlaylistArtwork({
       className={`relative overflow-hidden flex items-center justify-center ${className}`}
       style={{ background: playlistGradient(name) }}
     >
-      <ListMusic size={24} className="text-white/60" />
+      <ListMusic size={24} className="text-text-primary/60" />
       {crateMark}
     </div>
   );

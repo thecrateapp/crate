@@ -78,7 +78,7 @@ function SmartEqReadout({
 
   if (status === "unavailable" || !eq) {
     return (
-      <div className="rounded-lg border border-surface-quiet bg-surface-control px-3 py-2 text-[11px] text-text-muted">
+      <div className="rounded-lg border border-border-quiet bg-surface-control px-3 py-2 text-[11px] text-text-muted">
         {t("player.equalizer.smart.waiting")}
       </div>
     );
@@ -148,14 +148,14 @@ function AdaptiveFeatureChips({
   const { t } = useTranslation();
   if (status === "loading") {
     return (
-      <div className="rounded-md border border-surface-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
+      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.adaptive.loading")}
       </div>
     );
   }
   if (status === "unavailable" || !features) {
     return (
-      <div className="rounded-md border border-surface-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
+      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.adaptive.unavailable")}
       </div>
     );
@@ -236,7 +236,7 @@ function AdaptiveFeatureChips({
 
   if (chips.length === 0) {
     return (
-      <div className="rounded-md border border-surface-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
+      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.adaptive.empty")}
       </div>
     );
@@ -269,14 +269,14 @@ function GenreResolutionChip({
   const { t } = useTranslation();
   if (status === "loading") {
     return (
-      <div className="rounded-md border border-surface-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
+      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.genre.loading")}
       </div>
     );
   }
   if (status === "unavailable" || !genre?.primary) {
     return (
-      <div className="rounded-md border border-surface-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
+      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
         {t("player.equalizer.genre.unavailable")}
       </div>
     );
@@ -288,7 +288,7 @@ function GenreResolutionChip({
 
   if (!canonical) {
     return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-surface-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
         <Tag size={10} className="opacity-70" />
         <span className="font-medium capitalize text-text-primary/80">
           {primaryName}
@@ -302,7 +302,7 @@ function GenreResolutionChip({
 
   if (!preset) {
     return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-surface-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
         <Tag size={10} className="opacity-70" />
         <span className="font-medium capitalize text-text-primary/80">
           {primaryName}
@@ -455,7 +455,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
       {smart ? (
         <SmartEqReadout eq={effectiveEq} status={smartStatus} />
       ) : (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-surface-quiet bg-surface-control px-2.5 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border-quiet bg-surface-control px-2.5 py-2">
           <span className="mr-1 text-[9px] uppercase tracking-[0.18em] text-text-subtle">
             {t("player.equalizer.manualHelpers")}
           </span>
@@ -515,7 +515,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             {t("player.equalizer.genreActive")}
           </span>
         ) : preset === "custom" ? (
-          <span className="rounded-full border border-surface-quiet bg-surface-control px-2 py-0.5 text-[10px] text-text-secondary">
+          <span className="rounded-full border border-border-quiet bg-surface-control px-2 py-0.5 text-[10px] text-text-secondary">
             {t("player.equalizer.custom")}
           </span>
         ) : (
@@ -547,7 +547,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             type="button"
             disabled={!manualControlsEnabled}
             onClick={resetToFlat}
-            className={`inline-flex items-center gap-1 rounded-full border border-surface-quiet bg-surface-control px-2.5 py-0.5 text-[10px] text-text-secondary hover:border-border-interactive hover:text-text-primary ${
+            className={`inline-flex items-center gap-1 rounded-full border border-border-quiet bg-surface-control px-2.5 py-0.5 text-[10px] text-text-secondary hover:border-border-interactive hover:text-text-primary ${
               !manualControlsEnabled ? "cursor-not-allowed opacity-40" : ""
             }`}
           >
@@ -575,7 +575,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
       ) : null}
 
       {/* Band sliders */}
-      <div className="rounded-xl border border-surface-quiet bg-surface-canvas p-3">
+      <div className="rounded-xl border border-border-quiet bg-surface-canvas p-3">
         <EqBands
           gains={gains}
           onBandChange={manualControlsEnabled ? updateBand : undefined}

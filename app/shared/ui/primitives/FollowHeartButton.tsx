@@ -216,7 +216,7 @@ export function FollowHeartButton({
         className,
         isActive
           ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-          : "text-white/80",
+          : "text-text-primary/80",
       )}
       onClick={handleClick}
     >

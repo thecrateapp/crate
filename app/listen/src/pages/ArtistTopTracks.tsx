@@ -110,7 +110,7 @@ export function ArtistTopTracks() {
                 }),
               )
             }
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-border-quiet text-text-primary/70 transition-colors hover:bg-text-primary/5 hover:text-text-primary"
           >
             <ArrowLeft size={18} />
           </button>
@@ -131,7 +131,7 @@ export function ArtistTopTracks() {
         </button>
       </div>
 
-      <div className="rounded-xl border border-white/5 bg-white/[0.02]">
+      <div className="rounded-xl border border-text-primary/5 bg-text-primary/[0.02]">
         {(topTracks || []).map((track, index) => (
           <TrackRow
             key={`${track.id}-${index}`}

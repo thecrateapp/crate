@@ -63,7 +63,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
   });
 
   return (
-    <article className="group relative overflow-hidden rounded-[12px] border border-primary/10 bg-white/[0.025] p-4 text-left transition-colors hover:border-primary/25 hover:bg-white/[0.04]">
+    <article className="group relative overflow-hidden rounded-[12px] border border-primary/10 bg-text-primary/[0.025] p-4 text-left transition-colors hover:border-primary/25 hover:bg-text-primary/[0.04]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_20%,rgba(6,182,212,0.22),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.06),transparent_58%)]" />
       {coverUrl ? (
         <CrateImage
@@ -80,7 +80,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
 
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/5">
             {coverUrl ? (
               <CrateImage
                 src={coverUrl}
@@ -113,7 +113,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
               >
                 {item.artist}
               </Link>
-              <span className="text-white/20">&middot;</span>
+              <span className="text-text-primary/20">&middot;</span>
               <span className="truncate">{item.subtitle}</span>
             </div>
           </div>
@@ -121,7 +121,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
 
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2 md:justify-end">
           {dateStr ? (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-border-quiet bg-text-primary/[0.06] px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
               <Calendar size={14} />
               {dateStr}
             </div>

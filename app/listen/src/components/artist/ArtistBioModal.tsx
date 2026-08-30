@@ -122,7 +122,7 @@ export function ArtistBioModal({
       open={open}
       onClose={onClose}
       maxWidthClassName="sm:max-w-2xl"
-      overlayClassName="bg-black/58"
+      overlayClassName="bg-surface-canvas/58"
       panelClassName="listen-glass-panel flex min-h-0 w-full max-w-2xl flex-col overflow-hidden border-0 sm:max-h-[92vh]"
       mobileSafeArea
     >
@@ -132,7 +132,7 @@ export function ArtistBioModal({
       >
         <div className="flex items-start justify-between gap-4 px-5 py-5 sm:px-6">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-white/5 shadow-xl">
+            <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-text-primary/5 shadow-xl">
               <CrateImage
                 src={photoUrl}
                 alt={artist.name}
@@ -173,7 +173,7 @@ export function ArtistBioModal({
           </div>
           <ModalCloseButton
             onClick={onClose}
-            className="flex-shrink-0 text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.34)]"
+            className="flex-shrink-0 text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.34)]"
           />
         </div>
       </ModalHeader>
@@ -184,34 +184,42 @@ export function ArtistBioModal({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {listeners > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">
+                <div className="text-xl font-bold text-text-primary/90">
                   {formatCompact(listeners)}
                 </div>
-                <div className="text-[11px] text-white/40">listeners</div>
+                <div className="text-[11px] text-text-primary/40">
+                  listeners
+                </div>
               </div>
             )}
             {playcount > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">
+                <div className="text-xl font-bold text-text-primary/90">
                   {formatCompact(playcount)}
                 </div>
-                <div className="text-[11px] text-white/40">scrobbles</div>
+                <div className="text-[11px] text-text-primary/40">
+                  scrobbles
+                </div>
               </div>
             )}
             {spotifyFollowers > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">
+                <div className="text-xl font-bold text-text-primary/90">
                   {formatCompact(spotifyFollowers)}
                 </div>
-                <div className="text-[11px] text-white/40">followers</div>
+                <div className="text-[11px] text-text-primary/40">
+                  followers
+                </div>
               </div>
             )}
             {spotifyPopularity > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">
+                <div className="text-xl font-bold text-text-primary/90">
                   {spotifyPopularity}%
                 </div>
-                <div className="text-[11px] text-white/40">popularity</div>
+                <div className="text-[11px] text-text-primary/40">
+                  popularity
+                </div>
               </div>
             )}
           </div>
@@ -220,7 +228,7 @@ export function ArtistBioModal({
         {/* Bio */}
         {bio && (
           <div>
-            <p className="whitespace-pre-line text-sm leading-7 text-white/70 sm:text-[15px]">
+            <p className="whitespace-pre-line text-sm leading-7 text-text-primary/70 sm:text-[15px]">
               {displayBio}
               {!bioExpanded && bio.length > 500 && "..."}
             </p>
@@ -246,24 +254,26 @@ export function ArtistBioModal({
         {/* Members */}
         {members.length > 0 && (
           <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-primary/40">
               Members
             </h3>
             <div className="space-y-1">
               {members.map((m, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0"
+                  className="flex items-center justify-between py-1.5 border-b border-text-primary/5 last:border-0"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-white/80">{m.name}</span>
+                    <span className="text-sm text-text-primary/80">
+                      {m.name}
+                    </span>
                     {m.attributes && m.attributes.length > 0 && (
-                      <span className="text-[11px] text-white/30">
+                      <span className="text-[11px] text-text-primary/30">
                         {m.attributes.join(", ")}
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-white/25">
+                  <span className="text-[11px] text-text-primary/25">
                     {m.begin ?? "?"} - {m.end ?? "present"}
                   </span>
                 </div>
@@ -273,17 +283,21 @@ export function ArtistBioModal({
         )}
 
         {/* Library stats */}
-        <div className="flex gap-6 text-[11px] text-white/35">
+        <div className="flex gap-6 text-[11px] text-text-primary/35">
           <span>
-            <strong className="text-white/60">{artist.albums.length}</strong>{" "}
+            <strong className="text-text-primary/60">
+              {artist.albums.length}
+            </strong>{" "}
             albums
           </span>
           <span>
-            <strong className="text-white/60">{artist.total_tracks}</strong>{" "}
+            <strong className="text-text-primary/60">
+              {artist.total_tracks}
+            </strong>{" "}
             tracks
           </span>
           <span>
-            <strong className="text-white/60">
+            <strong className="text-text-primary/60">
               {artist.total_size_mb > 1024
                 ? `${(artist.total_size_mb / 1024).toFixed(1)} GB`
                 : `${artist.total_size_mb} MB`}
@@ -304,7 +318,7 @@ export function ArtistBioModal({
                   event.preventDefault();
                   void openExternalUrl(link.url);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-white/50 hover:border-white/20 hover:bg-white/5 hover:text-white/70 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border-quiet px-2.5 py-1 text-[11px] text-text-primary/50 hover:border-text-primary/20 hover:bg-text-primary/5 hover:text-text-primary/70 transition-colors"
               >
                 <Globe size={11} /> {linkLabel(link.type, link.url)}
               </a>

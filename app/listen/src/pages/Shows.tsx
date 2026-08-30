@@ -177,7 +177,7 @@ export function Shows() {
         </section>
       ) : null}
 
-      <div className="flex flex-col gap-3 rounded-[12px] border border-white/5 bg-white/[0.02] p-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 rounded-[12px] border border-text-primary/5 bg-text-primary/[0.02] p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {(["all", "shows", "releases"] as const).map((value) => (
             <button
@@ -187,7 +187,7 @@ export function Shows() {
                 "rounded-full border px-4 py-2 text-sm transition-colors",
                 filter === value
                   ? "border-primary/40 bg-primary/15 text-primary"
-                  : "border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground",
+                  : "border-border-quiet text-muted-foreground hover:border-text-primary/20 hover:text-foreground",
               )}
             >
               {value === "all"
@@ -205,7 +205,7 @@ export function Shows() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t("radar.searchPlaceholder")}
-            className="h-11 w-full rounded-lg border border-white/10 bg-input px-4 text-sm text-foreground placeholder:text-white/40 focus:border-primary/40 focus:outline-none"
+            className="h-11 w-full rounded-lg border border-border-quiet bg-input px-4 text-sm text-foreground placeholder:text-text-primary/40 focus:border-primary/40 focus:outline-none"
           />
         </div>
       </div>
@@ -306,12 +306,15 @@ function SummaryPill({
   const accentClass =
     accent === "cyan"
       ? "border-primary/20 text-primary"
-      : "border-white/10 text-white/60";
+      : "border-border-quiet text-text-primary/60";
 
   return (
     <div
       role="listitem"
-      className={cn("rounded-lg border bg-white/[0.03] px-3 py-2", accentClass)}
+      className={cn(
+        "rounded-lg border bg-text-primary/[0.03] px-3 py-2",
+        accentClass,
+      )}
     >
       <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">
         {label}
@@ -341,8 +344,8 @@ function EmptyState({
   body: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-[12px] border border-white/5 bg-white/[0.02] px-6 py-16 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+    <div className="flex flex-col items-center justify-center rounded-[12px] border border-text-primary/5 bg-text-primary/[0.02] px-6 py-16 text-center">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/5">
         {icon}
       </div>
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>

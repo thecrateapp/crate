@@ -9,14 +9,15 @@ import {
 
 test("counts raw colors, arbitrary utilities, inline styles and imports", () => {
   const metrics = analyzeContent(`
-    <div className="bg-[#0a0a0f] text-white border-cyan-500" style={{ color: "#fff" }} />
+    <div className="bg-[#0a0a0f] bg-[rgba(0,0,0,0.5)] text-white border-cyan-500 text-[10px] bg-[var(--surface-card)]" style={{ color: "#fff" }} />
     import { Button } from "@crate/ui/shadcn/button";
     background: rgba(0, 0, 0, 0.5);
   `);
 
   assert.deepEqual(metrics, {
-    rawColors: 3,
-    hardcodedUtilities: 3,
+    rawColors: 4,
+    arbitraryUtilities: 4,
+    hardcodedColorUtilities: 4,
     inlineStyles: 1,
     directShadcnImports: 1,
   });
@@ -73,8 +74,29 @@ test("classifies token layers and counts external consumers", () => {
   assert.deepEqual(metrics.unreferencedTokens, ["--unused-recipe"]);
 });
 
+test("detects surface tokens used in border and text declarations", () => {
+  const metrics = analyzeSemanticTokens(`
+    :root {
+      --surface-quiet: color-mix(in srgb, white 10%, transparent);
+    }
+    .card {
+      border: 1px solid var(--surface-quiet);
+      color: var(--surface-quiet);
+      background-color: var(--surface-quiet);
+      background: var(--surface-quiet);
+    }
+  `);
+
+  assert.deepEqual(metrics.roleViolations, [
+    { property: "border", token: "--surface-quiet" },
+    { property: "color", token: "--surface-quiet" },
+  ]);
+});
+
 test("enforces the normalized semantic token budget", () => {
-  const metrics = buildDriftInventory().semanticTokens;
+  const inventory = buildDriftInventory();
+  assert.equal(inventory.version, 2);
+  const metrics = inventory.semanticTokens;
 
   assert.deepEqual(metrics.nonFoundationAliases, []);
   assert.ok(
@@ -94,11 +116,18 @@ test("enforces the normalized semantic token budget", () => {
     0,
     `unreferenced semantic tokens: ${metrics.unreferencedTokens.join(", ")}`,
   );
+  assert.deepEqual(
+    metrics.roleViolations,
+    [],
+    `semantic role violations: ${JSON.stringify(metrics.roleViolations)}`,
+  );
+  assert.ok(
+    inventory.totals.hardcodedColorUtilities <= 25,
+    `hardcoded color utilities grew to ${inventory.totals.hardcodedColorUtilities}`,
+  );
   assert.ok(
     metrics.duplicateDefinitions <= 1,
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,
   );
-  assert.deepEqual(metrics.duplicateTokenGroups, [
-    ["--surface-placeholder", "--border-quiet"],
-  ]);
+  assert.deepEqual(metrics.duplicateTokenGroups, []);
 });

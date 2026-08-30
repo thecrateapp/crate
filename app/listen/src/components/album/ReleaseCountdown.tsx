@@ -73,7 +73,7 @@ export function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
       aria-label={t("album.releaseCountdown.ariaLabel", {
         date: formattedDate,
       })}
-      className="relative mt-5 w-full max-w-[34rem] overflow-hidden rounded-[12px] border border-white/20 bg-[#0b1520]/45 px-4 pb-4 pt-3 shadow-[0_14px_38px_rgba(0,0,0,0.22)] backdrop-blur-2xl backdrop-saturate-150 sm:mt-4 sm:border-white/10 sm:bg-[#101419]/88 sm:px-5 sm:backdrop-blur-none sm:backdrop-saturate-100"
+      className="relative mt-5 w-full max-w-[34rem] overflow-hidden rounded-[12px] border border-text-primary/20 bg-[#0b1520]/45 px-4 pb-4 pt-3 shadow-[0_14px_38px_rgba(0,0,0,0.22)] backdrop-blur-2xl backdrop-saturate-150 sm:mt-4 sm:border-border-quiet sm:bg-[#101419]/88 sm:px-5 sm:backdrop-blur-none sm:backdrop-saturate-100"
     >
       <div
         data-testid="release-countdown-glass-sheen"
@@ -82,7 +82,7 @@ export function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
       />
       <div className="relative flex items-baseline justify-between gap-3 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
         <span>{t("album.releaseCountdown.title")}</span>
-        <time dateTime={releaseDate} className="shrink-0 text-white/55">
+        <time dateTime={releaseDate} className="shrink-0 text-text-primary/55">
           {formattedDate}
         </time>
       </div>
@@ -93,14 +93,14 @@ export function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
               <div
                 data-testid="release-countdown-separator"
                 aria-hidden="true"
-                className="mx-1.5 h-9 w-px shrink-0 self-center bg-white/12 sm:mx-2"
+                className="mx-1.5 h-9 w-px shrink-0 self-center bg-text-primary/12 sm:mx-2"
               />
             ) : null}
             <div className="min-w-0 flex-1 px-0.5 text-center">
               <dd className="font-mono text-[clamp(1.75rem,9vw,2.75rem)] font-bold leading-none tracking-[-0.075em] text-foreground tabular-nums">
                 {pad(unit.value)}
               </dd>
-              <dt className="mt-2 truncate font-mono text-[9px] font-medium uppercase tracking-[0.13em] text-white/48 sm:text-[10px]">
+              <dt className="mt-2 truncate font-mono text-[9px] font-medium uppercase tracking-[0.13em] text-text-primary/48 sm:text-[10px]">
                 {unit.label}
               </dt>
             </div>

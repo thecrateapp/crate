@@ -113,15 +113,15 @@ export function PlaylistCard({
         "group cursor-pointer rounded-xl p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-[160px] flex-shrink-0",
         offlineState === "ready"
-          ? "bg-cyan-400/[0.04]"
+          ? "bg-accent-action/[0.04]"
           : isOfflineBusy(offlineState)
             ? "bg-primary/[0.05]"
             : offlineState === "error"
-              ? "bg-amber-400/[0.05]"
-              : "hover:bg-white/5",
+              ? "bg-state-warning/[0.05]"
+              : "hover:bg-text-primary/5",
       )}
     >
-      <div className="relative mb-2 overflow-hidden rounded-lg bg-white/5">
+      <div className="relative mb-2 overflow-hidden rounded-lg bg-text-primary/5">
         {crateManaged ? (
           <EditorialPlaylistArtwork
             title={editorialLabel.title}
@@ -165,7 +165,7 @@ export function PlaylistCard({
           </ActionIconButton>
         ) : null}
         {onPlay ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
+          <div className="absolute inset-0 flex items-center justify-center bg-surface-canvas/0 transition-colors group-hover:bg-surface-canvas/40">
             <button
               className="flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
               onClick={async (event) => {
@@ -216,11 +216,11 @@ export function PlaylistCard({
             className={cn(
               "ml-1.5",
               offlineState === "ready"
-                ? "text-cyan-300/90"
+                ? "text-text-accent/90"
                 : isOfflineBusy(offlineState)
                   ? "text-primary"
                   : offlineState === "error"
-                    ? "text-amber-300/90"
+                    ? "text-state-warning-text/90"
                     : undefined,
             )}
           >

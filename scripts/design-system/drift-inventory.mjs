@@ -12,8 +12,14 @@ const IGNORED_DIRECTORIES = new Set([
 ]);
 
 const RAW_COLOR_PATTERN = /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?)\(/gi;
-const HARDCODED_UTILITY_PATTERN =
-  /\b(?:bg|text|border|ring|outline|from|via|to|fill|stroke)-(?:\[[^\]]+\]|(?:black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)(?:-\d{2,3})?(?:\/\d{1,3})?)(?=[\s"'`]|$)/g;
+const COLOR_UTILITY_NAMES =
+  "black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
+const UTILITY_PATTERN = new RegExp(
+  `\\b(?:bg|text|border|ring|outline|from|via|to|fill|stroke)-(?<value>\\[[^\\]]+\\]|(?:${COLOR_UTILITY_NAMES})(?:-\\d{2,3})?(?:\\/\\d{1,3})?)(?=[\\s"'\`]|$)`,
+  "g",
+);
+const HARDCODED_COLOR_VALUE_PATTERN =
+  /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?)\(|\b(?:black|white|transparent|currentColor)\b/i;
 const INLINE_STYLE_PATTERN = /\bstyle\s*=\s*\{\{/g;
 const DIRECT_SHADCN_IMPORT_PATTERN =
   /(?:from\s+|import\s*\(\s*)["']@crate\/ui\/shadcn\/[^"']+["']/g;
@@ -51,15 +57,35 @@ const DOMAIN_TOKEN_PREFIXES = [
   "track-row-",
   "user-profile-",
 ];
+const SURFACE_ROLE_PATTERNS = [
+  /(?<!-)\b(?<property>border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
+  /(?<!-)\b(?<property>color|fill|stroke)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
+];
 
 function countMatches(content, pattern) {
   return content.match(pattern)?.length ?? 0;
 }
 
+function analyzeUtilityDrift(content) {
+  const utilities = [...content.matchAll(UTILITY_PATTERN)];
+  const arbitraryUtilities = utilities.filter(({ groups }) =>
+    groups.value.startsWith("["),
+  ).length;
+  const hardcodedColorUtilities = utilities.filter(({ groups }) =>
+    groups.value.startsWith("[")
+      ? HARDCODED_COLOR_VALUE_PATTERN.test(groups.value)
+      : true,
+  ).length;
+
+  return { arbitraryUtilities, hardcodedColorUtilities };
+}
+
 export function analyzeContent(content) {
+  const utilityDrift = analyzeUtilityDrift(content);
+
   return {
     rawColors: countMatches(content, RAW_COLOR_PATTERN),
-    hardcodedUtilities: countMatches(content, HARDCODED_UTILITY_PATTERN),
+    ...utilityDrift,
     inlineStyles: countMatches(content, INLINE_STYLE_PATTERN),
     directShadcnImports: countMatches(content, DIRECT_SHADCN_IMPORT_PATTERN),
   };
@@ -115,6 +141,15 @@ function countTokenReferences(content, name) {
   );
 }
 
+function findSurfaceRoleViolations(content) {
+  return SURFACE_ROLE_PATTERNS.flatMap((pattern) =>
+    [...content.matchAll(pattern)].map((match) => ({
+      property: match.groups.property,
+      token: match.groups.token,
+    })),
+  );
+}
+
 export function analyzeSemanticTokens(content, consumerContents = [content]) {
   const definitions = extractRootTokenDefinitions(content);
   const values = new Map();
@@ -134,6 +169,7 @@ export function analyzeSemanticTokens(content, consumerContents = [content]) {
         .map(({ name }) => name),
     );
   const allConsumerContent = consumerContents.join("\n");
+  const roleViolations = findSurfaceRoleViolations(allConsumerContent);
   const tokenConsumers = Object.fromEntries(
     definitions.map(({ name }) => [
       name,
@@ -161,6 +197,7 @@ export function analyzeSemanticTokens(content, consumerContents = [content]) {
       .map(({ name }) => name),
     tokenConsumers,
     oneShotTokens,
+    roleViolations,
     unreferencedTokens: definitions
       .filter(({ name }) => tokenConsumers[name] === 0)
       .map(({ name }) => name),
@@ -211,7 +248,8 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
   const totals = files.reduce(
     (result, file) => {
       result.rawColors += file.rawColors;
-      result.hardcodedUtilities += file.hardcodedUtilities;
+      result.arbitraryUtilities += file.arbitraryUtilities;
+      result.hardcodedColorUtilities += file.hardcodedColorUtilities;
       result.inlineStyles += file.inlineStyles;
       result.directShadcnImports += file.directShadcnImports;
       return result;
@@ -219,14 +257,15 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
     {
       files: files.length,
       rawColors: 0,
-      hardcodedUtilities: 0,
+      arbitraryUtilities: 0,
+      hardcodedColorUtilities: 0,
       inlineStyles: 0,
       directShadcnImports: 0,
     },
   );
 
   return {
-    version: 1,
+    version: 2,
     roots: SOURCE_DIRECTORIES,
     semanticTokens: statSync(semanticTokenPath, { throwIfNoEntry: false })
       ? analyzeSemanticTokens(

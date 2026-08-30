@@ -18,14 +18,14 @@ function DefaultFallback({
   onReset: () => void;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-app-surface text-white">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-app-surface text-text-primary">
       <p className="text-lg font-medium">Something went wrong</p>
       <p className="max-w-md text-center text-sm text-muted-foreground">
         {error.message}
       </p>
       <button
         onClick={onReset}
-        className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm text-white"
+        className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground"
       >
         Go home
       </button>

@@ -59,12 +59,12 @@ export function ArtistSetlistModal({
       onClose={onClose}
       maxWidthClassName="max-w-md"
       mobileSafeArea
-      overlayClassName="bg-black/58"
+      overlayClassName="bg-surface-canvas/58"
       panelClassName="listen-glass-panel flex min-h-0 flex-col overflow-hidden border-0 pb-4 sm:max-h-[92vh]"
     >
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-text-primary/5 px-5 py-4">
           <div className="flex items-center gap-3">
             <ListMusic size={18} className="text-primary" />
             <div>
@@ -79,7 +79,7 @@ export function ArtistSetlistModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-full p-1.5 text-text-primary/40 transition-colors hover:bg-text-primary/10 hover:text-text-primary"
           >
             <X size={16} />
           </button>
@@ -90,9 +90,9 @@ export function ArtistSetlistModal({
           {setlist.map((track, i) => (
             <div
               key={`${track.title}-${i}`}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-white/[0.03]"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-text-primary/[0.03]"
             >
-              <span className="w-5 shrink-0 text-right text-xs tabular-nums text-white/20">
+              <span className="w-5 shrink-0 text-right text-xs tabular-nums text-text-primary/20">
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
@@ -106,11 +106,11 @@ export function ArtistSetlistModal({
                       style={{ width: `${Math.round(track.frequency * 100)}%` }}
                     />
                   </div>
-                  <span className="text-[10px] tabular-nums text-white/40">
+                  <span className="text-[10px] tabular-nums text-text-primary/40">
                     {Math.round(track.frequency * 100)}%
                   </span>
                   {track.play_count > 0 && (
-                    <span className="text-[10px] text-white/20">
+                    <span className="text-[10px] text-text-primary/20">
                       {t("common.playCount", { count: track.play_count })}
                     </span>
                   )}
@@ -121,7 +121,7 @@ export function ArtistSetlistModal({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 border-t border-white/5 px-5 py-4">
+        <div className="flex gap-2 border-t border-text-primary/5 px-5 py-4">
           <button
             onClick={handlePlay}
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary/15 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25"
@@ -132,7 +132,7 @@ export function ArtistSetlistModal({
           <button
             onClick={handleExport}
             disabled={saving || !artistId}
-            className="flex items-center justify-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-white/5 disabled:opacity-40"
+            className="flex items-center justify-center gap-2 rounded-lg border border-border-quiet px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-text-primary/5 disabled:opacity-40"
           >
             <Save size={14} />
             {saving ? t("common.saving") : t("artist.setlist.export")}

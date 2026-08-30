@@ -157,7 +157,7 @@ export function Bandcamp() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-8 px-4 py-6 md:px-8">
-      <section className="relative overflow-hidden rounded-[12px] border border-white/8 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.18),transparent_34%),linear-gradient(135deg,rgba(17,18,25,0.98),rgba(7,8,11,0.98))] p-6 md:p-8">
+      <section className="relative overflow-hidden rounded-[12px] border border-text-primary/8 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.18),transparent_34%),linear-gradient(135deg,rgba(17,18,25,0.98),rgba(7,8,11,0.98))] p-6 md:p-8">
         <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.045))]" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -165,10 +165,10 @@ export function Bandcamp() {
               <BandcampLogo className="h-3.5 w-3.5" />
               Bandcamp
             </div>
-            <h1 className="mt-5 text-4xl font-black tracking-tight text-white md:text-6xl">
+            <h1 className="mt-5 text-4xl font-black tracking-tight text-text-primary md:text-6xl">
               {t("bandcamp.title")}
             </h1>
-            <p className="mt-3 max-w-2xl text-base text-slate-400 md:text-lg">
+            <p className="mt-3 max-w-2xl text-base text-text-secondary md:text-lg">
               {t("bandcamp.subtitle")}
             </p>
             <ConnectionLine
@@ -189,7 +189,7 @@ export function Bandcamp() {
                   t("bandcamp.tasks.sync"),
                 )
               }
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-black text-black transition hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-black text-accent-action-foreground transition hover:bg-primary/90 disabled:opacity-50"
             >
               {busyAction === "sync" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -208,7 +208,7 @@ export function Bandcamp() {
                   t("bandcamp.tasks.radar"),
                 )
               }
-              className="inline-flex h-11 items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 text-sm font-black text-white transition hover:bg-white/10 disabled:opacity-50"
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-text-primary/12 bg-text-primary/5 px-5 text-sm font-black text-text-primary transition hover:bg-text-primary/10 disabled:opacity-50"
             >
               <Radar className="h-4 w-4" />
               {t("bandcamp.actions.refreshRadar")}
@@ -277,24 +277,24 @@ function ConnectionLine({
   const { t } = useTranslation();
   if (loading && !connected) {
     return (
-      <p className="mt-5 text-sm text-slate-500">
+      <p className="mt-5 text-sm text-text-muted">
         {t("bandcamp.connection.checking")}
       </p>
     );
   }
   if (!connected) {
     return (
-      <p className="mt-5 text-sm text-amber-200">
+      <p className="mt-5 text-sm text-state-warning-text">
         {t("bandcamp.connection.notConnected")}
       </p>
     );
   }
   return (
-    <p className="mt-5 text-sm text-slate-400">
+    <p className="mt-5 text-sm text-text-secondary">
       {t("bandcamp.connection.connectedAs")}{" "}
-      <span className="font-bold text-white">{profileName}</span>
+      <span className="font-bold text-text-primary">{profileName}</span>
       {error ? (
-        <span className="text-red-300">
+        <span className="text-state-danger-text">
           {" · "}
           {t("bandcamp.connection.lastError", { error })}
         </span>
@@ -313,14 +313,14 @@ function StatCard({
   icon: LucideIcon | typeof BandcampLogo;
 }) {
   return (
-    <div className="rounded-[12px] border border-white/8 bg-white/[0.035] p-5">
+    <div className="rounded-[12px] border border-text-primary/8 bg-text-primary/[0.035] p-5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
+        <span className="text-xs font-black uppercase tracking-[0.24em] text-text-muted">
           {label}
         </span>
         <Icon className="h-4 w-4 text-primary" />
       </div>
-      <div className="mt-5 text-4xl font-black text-white">
+      <div className="mt-5 text-4xl font-black text-text-primary">
         {value.toLocaleString()}
       </div>
     </div>
@@ -337,10 +337,10 @@ function Rail({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[12px] border border-white/8 bg-[#111117]/90 p-5">
+    <section className="rounded-[12px] border border-text-primary/8 bg-surface-elevated/90 p-5">
       <div className="mb-5">
-        <h2 className="text-2xl font-black text-white">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        <h2 className="text-2xl font-black text-text-primary">{title}</h2>
+        <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
       </div>
       {children}
     </section>
@@ -410,14 +410,14 @@ function BandcampCard({
 }) {
   const { t } = useTranslation();
   return (
-    <article className="group overflow-hidden rounded-[12px] border border-white/8 bg-black/18">
+    <article className="group overflow-hidden rounded-[12px] border border-text-primary/8 bg-surface-canvas/18">
       <Cover item={item} />
       <div className="space-y-3 p-4">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-black text-white">
+          <h3 className="truncate text-base font-black text-text-primary">
             {itemTitle(item, t("bandcamp.itemFallback"))}
           </h3>
-          <p className="truncate text-sm text-slate-500">{item.artist_name}</p>
+          <p className="truncate text-sm text-text-muted">{item.artist_name}</p>
         </div>
         <ItemActions item={item} busyAction={busyAction} onImport={onImport} />
       </div>
@@ -436,13 +436,13 @@ function BandcampListItem({
 }) {
   const { t } = useTranslation();
   return (
-    <article className="flex items-center gap-3 rounded-xl border border-white/8 bg-black/18 p-3">
+    <article className="flex items-center gap-3 rounded-xl border border-text-primary/8 bg-surface-canvas/18 p-3">
       <Cover item={item} compact />
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-black text-white">
+        <h3 className="truncate text-sm font-black text-text-primary">
           {itemTitle(item, t("bandcamp.itemFallback"))}
         </h3>
-        <p className="truncate text-xs text-slate-500">{item.artist_name}</p>
+        <p className="truncate text-xs text-text-muted">{item.artist_name}</p>
       </div>
       <ItemActions
         item={item}
@@ -477,7 +477,7 @@ function ItemActions({
           type="button"
           disabled={busyAction !== null}
           onClick={() => onImport(item)}
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-3 text-xs font-black text-black transition hover:bg-primary/90 disabled:opacity-50"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-3 text-xs font-black text-accent-action-foreground transition hover:bg-primary/90 disabled:opacity-50"
         >
           {busyAction === `import:${item.id}` ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -491,7 +491,7 @@ function ItemActions({
         <button
           type="button"
           onClick={() => window.open(item.item_url || "", "_blank")}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-black text-white transition hover:bg-white/10"
+          className="inline-flex h-9 items-center gap-2 rounded-full border border-border-quiet bg-text-primary/5 px-3 text-xs font-black text-text-primary transition hover:bg-text-primary/10"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           {!compact ? t("common.open") : null}
@@ -515,9 +515,9 @@ function Cover({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden bg-white/6",
+        "flex shrink-0 items-center justify-center overflow-hidden bg-text-primary/6",
         compact
-          ? "h-14 w-14 rounded-xl border border-white/8"
+          ? "h-14 w-14 rounded-xl border border-text-primary/8"
           : "aspect-square w-full",
       )}
     >
@@ -530,7 +530,7 @@ function Cover({
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
         />
       ) : (
-        <span className="text-xl font-black text-slate-600">
+        <span className="text-xl font-black text-text-muted/70">
           {title.slice(0, 2).toUpperCase()}
         </span>
       )}
@@ -540,7 +540,7 @@ function Cover({
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-white/10 bg-black/16 p-6 text-sm text-slate-500">
+    <div className="rounded-lg border border-dashed border-border-quiet bg-surface-canvas/16 p-6 text-sm text-text-muted">
       {label}
     </div>
   );

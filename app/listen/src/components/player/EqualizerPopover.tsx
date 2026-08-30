@@ -29,7 +29,7 @@ export function EqualizerPopover({ open, onClose }: EqualizerPopoverProps) {
       ref={panelRef}
       role="dialog"
       aria-label="Equalizer"
-      className="z-app-player-drawer fixed bottom-[calc(var(--listen-mobile-bottom-chrome-height)+0.75rem)] right-3 w-[min(calc(100vw-1.5rem),560px)] animate-fade-in rounded-[12px] border border-surface-quiet bg-surface-overlay p-4 shadow-menu backdrop-blur-2xl md:bottom-[92px]"
+      className="z-app-player-drawer fixed bottom-[calc(var(--listen-mobile-bottom-chrome-height)+0.75rem)] right-3 w-[min(calc(100vw-1.5rem),560px)] animate-fade-in rounded-[12px] border border-border-quiet bg-surface-overlay p-4 shadow-menu backdrop-blur-2xl md:bottom-[92px]"
     >
       <EqualizerPanel onClose={onClose} />
     </div>

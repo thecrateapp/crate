@@ -144,7 +144,7 @@ export function ArtistCard({
       <ArtworkSurface
         source={photoArtwork}
         alt={name}
-        className="relative mx-auto mb-2 aspect-square overflow-hidden rounded-full bg-white/5"
+        className="relative mx-auto mb-2 aspect-square overflow-hidden rounded-full bg-text-primary/5"
         style={{
           width: layout === "grid" ? "100%" : imageSize,
           maxWidth: layout === "grid" && fillGrid ? "none" : imageSize,
@@ -155,9 +155,9 @@ export function ArtistCard({
             aria-hidden="true"
             data-testid="artist-artwork-placeholder"
             data-placeholder-style="flat-disc"
-            className="grid h-full w-full place-items-center rounded-full bg-[#171922]"
+            className="grid h-full w-full place-items-center rounded-full bg-surface-elevated"
           >
-            <span className="text-sm font-semibold text-white/75">
+            <span className="text-sm font-semibold text-text-primary/75">
               {monogram}
             </span>
           </div>
@@ -174,7 +174,7 @@ export function ArtistCard({
       >
         {!external && hasPlayableArtist && canUseInlineHoverActions ? (
           <>
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/42">
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-surface-canvas/0 transition-colors group-hover:bg-surface-canvas/42">
               <div className="pointer-events-none flex translate-y-2 items-center justify-center gap-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
                 <button
                   type="button"
@@ -224,7 +224,7 @@ export function ArtistCard({
                     "pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-sm",
                     following
                       ? "border-primary/30 bg-primary/15 text-primary"
-                      : "border-white/16 bg-black/35 text-white",
+                      : "border-text-primary/16 bg-surface-canvas/35 text-text-primary",
                   )}
                   onClick={async (event) => {
                     event.stopPropagation();

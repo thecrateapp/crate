@@ -216,7 +216,7 @@ function EndpointPanel({
       className={`relative flex-1 overflow-hidden rounded-xl border transition-colors ${
         selected
           ? "border-primary/30 bg-primary/5"
-          : "border-white/8 bg-white/[0.02]"
+          : "border-text-primary/8 bg-text-primary/[0.02]"
       }`}
     >
       {/* Background cover */}
@@ -227,7 +227,7 @@ function EndpointPanel({
             alt=""
             className="h-full w-full object-cover opacity-20 blur-sm"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/70 to-black/50" />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface-canvas/90 via-surface-canvas/70 to-surface-canvas/50" />
         </div>
       )}
 
@@ -240,7 +240,7 @@ function EndpointPanel({
         {selected ? (
           <div>
             {coverUrl && (
-              <div className="mb-3 h-24 w-24 overflow-hidden rounded-xl bg-white/5 shadow-lg">
+              <div className="mb-3 h-24 w-24 overflow-hidden rounded-xl bg-text-primary/5 shadow-lg">
                 <CrateImage
                   src={coverUrl}
                   alt=""
@@ -260,7 +260,7 @@ function EndpointPanel({
                 setQuery("");
                 setResults([]);
               }}
-              className="mt-3 text-[11px] text-white/40 underline-offset-2 hover:text-white/60 hover:underline"
+              className="mt-3 text-[11px] text-text-primary/40 underline-offset-2 hover:text-text-primary/60 hover:underline"
             >
               {t("common.change")}
             </button>
@@ -275,13 +275,13 @@ function EndpointPanel({
                 void search(e.target.value);
               }}
               placeholder={t("paths.endpoint.placeholder")}
-              className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/30 focus:outline-none"
+              className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/30 px-4 text-sm text-foreground placeholder:text-text-primary/25 focus:border-primary/30 focus:outline-none"
             />
             {searching && (
               <Loader2 size={14} className="mt-2 animate-spin text-primary" />
             )}
             {results.length > 0 && (
-              <div className="mt-2 space-y-0.5 rounded-xl border border-white/8 bg-black/40 p-1.5">
+              <div className="mt-2 space-y-0.5 rounded-xl border border-text-primary/8 bg-surface-canvas/40 p-1.5">
                 {results.map((r) => (
                   <button
                     key={`${r.type}-${r.value}`}
@@ -290,13 +290,13 @@ function EndpointPanel({
                       setQuery("");
                       setResults([]);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/5 hover:text-white"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-text-primary/70 transition hover:bg-text-primary/5 hover:text-text-primary"
                   >
                     {r.imageUrl ? (
                       <CrateImage
                         src={r.imageUrl}
                         alt=""
-                        className={`h-8 w-8 flex-shrink-0 bg-white/5 object-cover ${
+                        className={`h-8 w-8 flex-shrink-0 bg-text-primary/5 object-cover ${
                           r.type === "artist" ? "rounded-full" : "rounded-md"
                         }`}
                       />
@@ -307,7 +307,9 @@ function EndpointPanel({
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px]">{r.label}</div>
-                      <div className="text-[10px] text-white/30">{r.type}</div>
+                      <div className="text-[10px] text-text-primary/30">
+                        {r.type}
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -336,7 +338,7 @@ function PathCard({
   return (
     <div
       onClick={() => navigate(`/paths/${path.id}`)}
-      className="group cursor-pointer rounded-xl border border-white/6 bg-white/[0.02] p-4 transition hover:border-primary/20 hover:bg-white/[0.04]"
+      className="group cursor-pointer rounded-xl border border-text-primary/6 bg-text-primary/[0.02] p-4 transition hover:border-primary/20 hover:bg-text-primary/[0.04]"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -346,7 +348,7 @@ function PathCard({
           <div className="truncate text-sm font-semibold text-foreground">
             {path.name}
           </div>
-          <div className="mt-0.5 text-[11px] text-white/40">
+          <div className="mt-0.5 text-[11px] text-text-primary/40">
             {t("common.trackCountLabel", { count: path.track_count })} ·{" "}
             {new Date(path.created_at).toLocaleDateString()}
           </div>
@@ -365,7 +367,7 @@ function PathCard({
             e.stopPropagation();
             onDelete();
           }}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-white/15 transition hover:bg-white/5 hover:text-white/40"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-text-primary/15 transition hover:bg-text-primary/5 hover:text-text-primary/40"
         >
           <Trash2 size={13} />
         </button>
@@ -454,7 +456,9 @@ export function Paths() {
           <h1 className="text-2xl font-bold text-foreground">
             {t("paths.title")}
           </h1>
-          <p className="text-[13px] text-white/40">{t("paths.subtitle")}</p>
+          <p className="text-[13px] text-text-primary/40">
+            {t("paths.subtitle")}
+          </p>
         </div>
       </div>
 
@@ -480,7 +484,7 @@ export function Paths() {
       {/* Steps slider + create button */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
         <div className="flex-1">
-          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/35">
+          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-text-primary/35">
             {t("paths.length")}
           </div>
           <div className="flex items-center gap-3">
@@ -492,7 +496,7 @@ export function Paths() {
               onChange={(e) => setSteps(Number(e.target.value))}
               className="flex-1 accent-primary"
             />
-            <span className="w-16 text-right font-mono text-[12px] tabular-nums text-white/50">
+            <span className="w-16 text-right font-mono text-[12px] tabular-nums text-text-primary/50">
               {t("common.trackCountLabel", { count: steps })}
             </span>
           </div>
@@ -514,7 +518,7 @@ export function Paths() {
       {/* Saved paths */}
       {paths && paths.length > 0 && (
         <div className="space-y-2 pt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-white/30">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-text-primary/30">
             {t("paths.saved")}
           </div>
           {paths.map((p) => (

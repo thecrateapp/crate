@@ -272,7 +272,7 @@ export function PlaybackTargetMenu({
                               "mt-0.5 rounded-lg border p-1.5",
                               target.active
                                 ? "border-border-interactive bg-surface-control text-accent-action"
-                                : "border-surface-quiet bg-surface-control text-text-muted",
+                                : "border-border-quiet bg-surface-control text-text-muted",
                             )}
                           >
                             <TargetIcon target={target} />
@@ -301,7 +301,7 @@ export function PlaybackTargetMenu({
                               target.active
                                 ? "border-border-interactive bg-surface-control text-accent-action"
                                 : target.available
-                                  ? "border-surface-quiet bg-surface-control text-text-secondary"
+                                  ? "border-border-quiet bg-surface-control text-text-secondary"
                                   : "border-border-quiet bg-surface-canvas text-text-subtle",
                             )}
                           >

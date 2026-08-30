@@ -201,9 +201,9 @@ export function SearchResults() {
 
   if (!query)
     return (
-      <div className="mx-auto max-w-2xl rounded-[12px] border border-white/10 bg-white/[0.035] p-6 shadow-[0_22px_70px_rgba(0,0,0,0.24)] sm:p-8">
+      <div className="mx-auto max-w-2xl rounded-[12px] border border-border-quiet bg-text-primary/[0.035] p-6 shadow-[0_22px_70px_rgba(0,0,0,0.24)] sm:p-8">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent-action/15 bg-accent-action/8 text-text-accent">
             <Search size={18} />
           </div>
           <div>
@@ -229,7 +229,7 @@ export function SearchResults() {
             onChange={(event) => setEmptyQuery(event.target.value)}
             placeholder={t("search.placeholder")}
             aria-label={t("search.placeholder")}
-            className="h-11 min-w-0 flex-1 rounded-md border border-white/12 bg-black/20 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-primary/50"
+            className="h-11 min-w-0 flex-1 rounded-md border border-text-primary/12 bg-surface-canvas/20 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-primary/50"
           />
           <button
             type="submit"
@@ -250,8 +250,8 @@ export function SearchResults() {
         <h1 className="text-2xl font-bold">
           {t("search.resultsFor", { query })}
         </h1>
-        <div className="mx-auto max-w-sm rounded-[12px] border border-amber-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/8 text-amber-100">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-state-warning/12 bg-text-primary/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-state-warning/15 bg-state-warning/8 text-state-warning-text">
             <Search size={18} />
           </div>
           <p className="mt-4 text-base font-semibold text-foreground">
@@ -344,9 +344,9 @@ export function SearchResults() {
                     artistName: a.artist,
                     albumName: a.name,
                   })}
-                  className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl"
+                  className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-text-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl"
                 >
-                  <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
+                  <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-text-primary/5">
                     {a.has_cover ? (
                       <CrateImage
                         src={
@@ -366,7 +366,7 @@ export function SearchResults() {
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <Disc3 size={32} className="text-white/25" />
+                        <Disc3 size={32} className="text-text-primary/25" />
                       </div>
                     )}
                   </div>
@@ -408,7 +408,7 @@ export function SearchResults() {
                   name: t("search.playSource", { query }),
                 })
               }
-              className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white"
+              className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
             >
               <Play size={12} fill="currentColor" /> {t("search.playAll")}
             </button>
@@ -430,8 +430,8 @@ export function SearchResults() {
       )}
 
       {noResults ? (
-        <div className="mx-auto max-w-sm rounded-[12px] border border-cyan-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-accent-action/12 bg-text-primary/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-accent-action/15 bg-accent-action/8 text-text-accent">
             <Search size={18} />
           </div>
           <p className="mt-4 text-base font-semibold text-foreground">

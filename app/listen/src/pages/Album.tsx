@@ -96,7 +96,7 @@ function albumGenreSlug(name: string) {
 }
 
 const SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 const ALBUM_MOBILE_INFO_ACTION_GAP_PX = 20;
 
@@ -1181,7 +1181,7 @@ export function Album() {
         <button
           ref={albumMenuController.anchorRef}
           data-testid="album-mobile-hero-menu"
-          className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleAlbumMenu}
           aria-label={t("common.more")}
         >
@@ -1236,7 +1236,7 @@ export function Album() {
             }}
           />
         ) : null}
-        <div className="absolute inset-0 bg-black/10 sm:bg-black/32" />
+        <div className="absolute inset-0 bg-surface-canvas/10 sm:bg-surface-canvas/32" />
         <div
           className="absolute inset-0 sm:hidden"
           style={{
@@ -1265,7 +1265,7 @@ export function Album() {
               />
               <div
                 data-testid="album-desktop-cover"
-                className="hidden aspect-square overflow-hidden rounded-xl bg-white/5 shadow-2xl ring-1 ring-white/10 sm:block"
+                className="hidden aspect-square overflow-hidden rounded-xl bg-text-primary/5 shadow-2xl ring-1 ring-text-primary/10 sm:block"
               >
                 {data.has_cover || data.cover_url ? (
                   <CrateImage
@@ -1278,7 +1278,7 @@ export function Album() {
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
-                    <Disc size={64} className="text-white/10" />
+                    <Disc size={64} className="text-text-primary/10" />
                   </div>
                 )}
               </div>
@@ -1325,7 +1325,7 @@ export function Album() {
                   )
                 }
               >
-                <span className="h-6 w-6 flex-shrink-0 overflow-hidden rounded-full bg-white/5">
+                <span className="h-6 w-6 flex-shrink-0 overflow-hidden rounded-full bg-text-primary/5">
                   <CrateImage
                     src={artistPhotoUrl}
                     alt={data.artist}
@@ -1385,7 +1385,7 @@ export function Album() {
 
               {visibleContributor ? (
                 <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white/8 ring-1 ring-white/10">
+                  <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-text-primary/8 ring-1 ring-text-primary/10">
                     {visibleContributor.user_avatar ? (
                       <CrateImage
                         src={visibleContributor.user_avatar}
@@ -1466,7 +1466,7 @@ export function Album() {
               <span>{t("player.play")}</span>
             </button>
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
               onClick={handleShuffle}
               disabled={playerTracks.length === 0}
               aria-label={t("player.shuffle")}
@@ -1495,12 +1495,12 @@ export function Album() {
               <button
                 className={`${SECONDARY_ACTION_CLASS} ${
                   offlineState === "ready"
-                    ? "text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                    ? "text-text-accent drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
                     : offlineBusy
                       ? "text-primary"
                       : offlineState === "error"
-                        ? "text-amber-300/90"
-                        : "text-white/62"
+                        ? "text-state-warning-text/90"
+                        : "text-text-primary/62"
                 }`}
                 onClick={handleToggleOffline}
                 disabled={!offlineSupported || offlineBusy}
@@ -1528,7 +1528,7 @@ export function Album() {
                 className={`${SECONDARY_ACTION_CLASS} ${
                   saved
                     ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-                    : "text-white/62"
+                    : "text-text-primary/62"
                 }`}
                 onClick={handleToggleSaved}
                 aria-label={
@@ -1640,7 +1640,7 @@ export function Album() {
             </div>
             <div className="relative">
               <button
-                className="inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3 text-xs font-medium text-foreground transition-colors hover:bg-white/10"
+                className="inline-flex h-9 items-center gap-2 rounded-full border border-text-primary/12 bg-text-primary/6 px-3 text-xs font-medium text-foreground transition-colors hover:bg-text-primary/10"
                 onClick={handleToggleSelectionPlaylistPicker}
               >
                 <ListPlus size={14} />
@@ -1650,7 +1650,7 @@ export function Album() {
                 <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-[12px]">
                   <div className="p-1.5">
                     <button
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-white/5"
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-text-primary/5"
                       onClick={handleCreatePlaylistFromSelection}
                     >
                       {t("playlist.actions.addNew")}
@@ -1661,7 +1661,7 @@ export function Album() {
                     {playlists.map((playlist) => (
                       <button
                         key={playlist.id}
-                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-text-primary/5 hover:text-foreground"
                         onClick={() =>
                           void handleAddSelectedToPlaylist(playlist.id)
                         }
@@ -1674,13 +1674,13 @@ export function Album() {
               ) : null}
             </div>
             <button
-              className="inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3 text-xs font-medium text-foreground transition-colors hover:bg-white/10"
+              className="inline-flex h-9 items-center gap-2 rounded-full border border-text-primary/12 bg-text-primary/6 px-3 text-xs font-medium text-foreground transition-colors hover:bg-text-primary/10"
               onClick={handleCreatePlaylistFromSelection}
             >
               {t("playlist.actions.create")}
             </button>
             <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/6 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-text-primary/12 bg-text-primary/6 text-muted-foreground transition-colors hover:bg-text-primary/10 hover:text-foreground"
               onClick={clearTrackSelection}
               aria-label={t("album.selection.clear")}
             >

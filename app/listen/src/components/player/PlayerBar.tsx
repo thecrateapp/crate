@@ -1412,13 +1412,19 @@ export function PlayerBar() {
                     className="disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:scale-100"
                   >
                     {effectiveIsBuffering ? (
-                      <Loader2 size={17} className="animate-spin text-white" />
+                      <Loader2
+                        size={17}
+                        className="animate-spin text-text-primary"
+                      />
                     ) : effectiveIsPlaying ? (
-                      <Pause size={CRATE_ICON_SIZE.md} className="text-white" />
+                      <Pause
+                        size={CRATE_ICON_SIZE.md}
+                        className="text-text-primary"
+                      />
                     ) : (
                       <Play
                         size={CRATE_ICON_SIZE.md}
-                        className="ml-0.5 text-white"
+                        className="ml-0.5 text-text-primary"
                         fill="currentColor"
                       />
                     )}
@@ -1540,14 +1546,17 @@ export function PlayerBar() {
                 {effectiveIsBuffering ? (
                   <Loader2
                     size={CRATE_ICON_SIZE.md}
-                    className="animate-spin text-white"
+                    className="animate-spin text-text-primary"
                   />
                 ) : effectiveIsPlaying ? (
-                  <Pause size={CRATE_ICON_SIZE.lg} className="text-white" />
+                  <Pause
+                    size={CRATE_ICON_SIZE.lg}
+                    className="text-text-primary"
+                  />
                 ) : (
                   <Play
                     size={CRATE_ICON_SIZE.lg}
-                    className="ml-0.5 text-white"
+                    className="ml-0.5 text-text-primary"
                     fill="currentColor"
                   />
                 )}
