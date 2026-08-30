@@ -345,7 +345,7 @@ export function ArtistShowsSection({
         </div>
 
         {nextAttendingShow ? (
-          <div className="rounded-[12px] border border-primary/15 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.14),transparent_40%),rgba(255,255,255,0.03)] p-5">
+          <div className="artist-show-prep-surface rounded-[12px] border border-primary/15 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">

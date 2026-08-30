@@ -95,6 +95,8 @@ textarea {
   --gradient-bg-90: rgba(10, 10, 15, 0.9);
   --gradient-bg-40: rgba(10, 10, 15, 0.4);
   --gradient-bg-50: rgba(10, 10, 15, 0.5);
+  --bandcamp-brand: #1da0c3;
+  --bandcamp-brand-foreground: #7ee7ff;
 
   --listen-viewport-height: 100vh;
   --listen-safe-top: env(safe-area-inset-top, 0px);
@@ -137,6 +139,26 @@ textarea {
     var(--listen-safe-bottom) + 2rem
   );
   --listen-mobile-fullscreen-eq-top: calc(var(--listen-safe-top) + 5.25rem);
+}
+
+.bandcamp-support-owned,
+.bandcamp-support-action {
+  border: 1px solid color-mix(in srgb, var(--bandcamp-brand) 30%, transparent);
+  background: color-mix(in srgb, var(--bandcamp-brand) 10%, transparent);
+  color: var(--bandcamp-brand-foreground);
+}
+
+.bandcamp-support-owned {
+  border-color: color-mix(in srgb, var(--bandcamp-brand) 25%, transparent);
+  color: color-mix(in srgb, var(--bandcamp-brand-foreground) 90%, transparent);
+}
+
+.bandcamp-support-action {
+  transition: background-color var(--motion-duration-fast) ease;
+}
+
+.bandcamp-support-action:hover {
+  background: color-mix(in srgb, var(--bandcamp-brand) 15%, transparent);
 }
 
 .listen-glass-panel {

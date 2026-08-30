@@ -156,7 +156,7 @@ export function TrendChart({
   }
 
   return (
-    <div className="h-72 rounded-xl border border-border-quiet bg-[radial-gradient(circle_at_20%_12%,rgba(34,211,238,0.10),transparent_30%),rgba(0,0,0,0.24)] p-3">
+    <div className="stats-trend-chart h-72 rounded-xl border border-border-quiet p-3">
       <ResponsiveLine
         data={data}
         margin={{ top: 22, right: 22, bottom: 40, left: 48 }}
@@ -170,33 +170,52 @@ export function TrendChart({
         }}
         axisTop={null}
         axisRight={null}
-        colors={["#22d3ee"]}
+        colors={["var(--accent-action)"]}
         enableGridX={false}
         enableArea
         areaOpacity={0.18}
         pointSize={8}
-        pointColor="#22d3ee"
+        pointColor="var(--accent-action)"
         pointBorderWidth={2}
-        pointBorderColor="#071017"
+        pointBorderColor="var(--surface-canvas)"
         lineWidth={3}
         curve="monotoneX"
         useMesh
         theme={{
-          text: { fill: "rgba(255,255,255,0.5)", fontSize: 11 },
-          axis: {
-            ticks: { text: { fill: "rgba(255,255,255,0.38)" } },
-            legend: { text: { fill: "rgba(255,255,255,0.35)" } },
-            domain: { line: { stroke: "rgba(255,255,255,0.08)" } },
+          text: {
+            fill: "color-mix(in srgb, var(--text-primary) 50%, transparent)",
+            fontSize: 11,
           },
-          grid: { line: { stroke: "rgba(255,255,255,0.06)" } },
+          axis: {
+            ticks: {
+              text: {
+                fill: "color-mix(in srgb, var(--text-primary) 38%, transparent)",
+              },
+            },
+            legend: {
+              text: {
+                fill: "color-mix(in srgb, var(--text-primary) 35%, transparent)",
+              },
+            },
+            domain: { line: { stroke: "var(--border-quiet)" } },
+          },
+          grid: {
+            line: {
+              stroke: "color-mix(in srgb, var(--text-primary) 6%, transparent)",
+            },
+          },
           crosshair: {
-            line: { stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 },
+            line: {
+              stroke:
+                "color-mix(in srgb, var(--text-primary) 20%, transparent)",
+              strokeWidth: 1,
+            },
           },
           tooltip: {
             container: {
-              background: "#0f1117",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "var(--surface-elevated)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-quiet)",
               borderRadius: "14px",
             },
           },

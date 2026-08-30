@@ -205,7 +205,7 @@ export function BandcampSupportButton({
   if (ownedAlbum && !canImport) {
     return (
       <span
-        className={`inline-flex h-10 items-center rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 text-sm font-medium text-[#7ee7ff]/90 ${
+        className={`bandcamp-support-owned inline-flex h-10 items-center rounded-full text-sm font-medium ${
           iconOnly ? "w-10 justify-center px-0" : "gap-2 px-4"
         } ${className}`}
         aria-label={ownedLabel}
@@ -229,9 +229,9 @@ export function BandcampSupportButton({
     <button
       onClick={handleClick}
       disabled={busy}
-      className={`inline-flex h-10 items-center ${
+      className={`bandcamp-support-action inline-flex h-10 items-center ${
         iconOnly ? "w-10 justify-center px-0" : "gap-2 px-4"
-      } rounded-full border border-[#1da0c3]/30 bg-[#1da0c3]/10 text-sm font-medium text-[#7ee7ff] transition-colors hover:bg-[#1da0c3]/15 disabled:opacity-50 ${className}`}
+      } rounded-full text-sm font-medium disabled:opacity-50 ${className}`}
       aria-label={ownedAlbum && !canImport ? ownedLabel : label}
     >
       {busy ? (

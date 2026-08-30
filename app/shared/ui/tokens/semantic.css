@@ -835,6 +835,238 @@
   --shadow-menu: var(--menu-shadow);
 }
 
+.release-countdown-surface {
+  background: color-mix(
+    in srgb,
+    var(--surface-canvas) 88%,
+    var(--state-info) 12%
+  );
+}
+
+.release-countdown-sheen {
+  background: linear-gradient(
+    118deg,
+    color-mix(in srgb, var(--text-primary) 14%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent) 38%,
+    transparent 66%
+  );
+}
+
+@media (min-width: 640px) {
+  .release-countdown-surface {
+    background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  }
+}
+
+.artist-show-prep-surface {
+  background: radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent-action) 14%, transparent),
+      transparent 40%
+    ),
+    color-mix(in srgb, var(--surface-card) 97%, transparent);
+}
+
+.upcoming-event-row-atmosphere {
+  background: radial-gradient(
+      circle at 16% 20%,
+      color-mix(in srgb, var(--accent-action) 22%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--text-primary) 6%, transparent),
+      transparent 58%
+    );
+}
+
+.upcoming-event-row-scrim {
+  background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-canvas) 96%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 78%, transparent) 48%,
+      color-mix(in srgb, var(--surface-canvas) 38%, transparent)
+    ),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--surface-canvas) 84%, transparent),
+      transparent 55%
+    );
+}
+
+.home-upcoming-row-scrim {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--surface-canvas) 96%, transparent),
+    color-mix(in srgb, var(--surface-canvas) 72%, transparent) 55%,
+    color-mix(in srgb, var(--surface-canvas) 35%, transparent)
+  );
+}
+
+.home-continue-listening-atmosphere {
+  background: radial-gradient(
+    circle at top left,
+    color-mix(in srgb, var(--accent-action) 18%, transparent),
+    transparent 55%
+  );
+}
+
+.mix-artwork-tile {
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface-canvas) 82%, var(--state-danger) 18%),
+    var(--surface-canvas)
+  );
+}
+
+.mix-artwork-tile-scrim {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-canvas) 18%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 55%, transparent) 100%
+  );
+}
+
+.mix-artwork-scrim {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-canvas) 4%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent) 48%,
+    color-mix(in srgb, var(--surface-canvas) 84%, transparent) 100%
+  );
+}
+
+.mix-artwork-accent {
+  background: radial-gradient(
+    circle at top left,
+    color-mix(in srgb, var(--accent-action) 16%, transparent),
+    transparent 42%
+  );
+}
+
+.editorial-playlist-overlay {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-canvas) 5%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 32%, transparent) 45%,
+    color-mix(in srgb, var(--surface-canvas) 90%, transparent) 100%
+  );
+}
+
+.editorial-playlist-radial-core {
+  background: radial-gradient(
+    circle at 16% 12%,
+    color-mix(in srgb, var(--accent-action) 30%, transparent),
+    transparent 32%
+  );
+}
+
+.editorial-playlist-radial-history {
+  background: radial-gradient(
+    circle at 20% 18%,
+    color-mix(in srgb, var(--state-success) 26%, var(--state-warning) 12%),
+    transparent 34%
+  );
+}
+
+.editorial-playlist-radial-crate {
+  background: radial-gradient(
+    circle at 18% 14%,
+    color-mix(in srgb, var(--state-info) 24%, transparent),
+    transparent 34%
+  );
+}
+
+.editorial-playlist-texture {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--text-primary) 16%, transparent) 0 1px,
+    transparent 1px 12px
+  );
+}
+
+.stats-trend-chart {
+  background: radial-gradient(
+      circle at 20% 12%,
+      color-mix(in srgb, var(--accent-action) 10%, transparent),
+      transparent 30%
+    ),
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
+}
+
+.path-progress-fill {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 10%, transparent),
+    color-mix(in srgb, var(--accent-action) 50%, transparent)
+  );
+  box-shadow: 0 0 8px var(--accent-action-glow);
+}
+
+.path-node-active {
+  box-shadow: 0 0 12px var(--accent-action-glow-medium);
+}
+
+.path-traveler-node {
+  box-shadow: 0 0 20px var(--accent-action-glow-strong);
+}
+
+.crate-loader-mark {
+  background: var(--play-button-rim);
+  box-shadow: var(--play-button-shadow);
+}
+
+.crate-loader-aura {
+  background: var(--playback-aura);
+}
+
+.crate-loader-rim {
+  background: var(--play-button-rim-surface);
+}
+
+.crate-loader-core {
+  background: var(--surface-elevated);
+  box-shadow: var(--playback-core-shadow);
+}
+
+.crate-loader-logo {
+  filter: drop-shadow(var(--play-button-icon-shadow));
+}
+
+.server-setup-atmosphere {
+  background: radial-gradient(
+      circle at 50% -10%,
+      color-mix(in srgb, var(--accent-action) 18%, transparent),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 12% 70%,
+      color-mix(in srgb, var(--state-info) 8%, transparent),
+      transparent 28%
+    );
+}
+
+.bandcamp-page-surface {
+  background: radial-gradient(
+      circle at 18% 18%,
+      color-mix(in srgb, var(--accent-action) 18%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface-elevated) 98%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 98%, transparent)
+    );
+}
+
+.bandcamp-page-sheen {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--text-primary) 4.5%, transparent)
+  );
+}
+
 .lyrics-ambient-glow {
   --_lyrics-ambient-glow: radial-gradient(
     circle at top,

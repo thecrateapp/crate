@@ -157,8 +157,8 @@ export function Bandcamp() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-8 px-4 py-6 md:px-8">
-      <section className="relative overflow-hidden rounded-[12px] border border-text-primary/8 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.18),transparent_34%),linear-gradient(135deg,rgba(17,18,25,0.98),rgba(7,8,11,0.98))] p-6 md:p-8">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.045))]" />
+      <section className="bandcamp-page-surface relative overflow-hidden rounded-[12px] border border-text-primary/8 p-6 md:p-8">
+        <div className="bandcamp-page-sheen pointer-events-none absolute inset-y-0 right-0 w-1/2" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-primary">

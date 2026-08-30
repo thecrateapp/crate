@@ -23,11 +23,9 @@ const VARIANT_TONES: Record<EditorialVariant, string> = {
 };
 
 const VARIANT_RADIALS: Record<EditorialVariant, string> = {
-  core: "bg-[radial-gradient(circle_at_16%_12%,rgba(6,182,212,0.3),transparent_32%)]",
-  history:
-    "bg-[radial-gradient(circle_at_20%_18%,rgba(190,242,100,0.26),transparent_34%)]",
-  crate:
-    "bg-[radial-gradient(circle_at_18%_14%,rgba(56,189,248,0.24),transparent_34%)]",
+  core: "editorial-playlist-radial-core",
+  history: "editorial-playlist-radial-history",
+  crate: "editorial-playlist-radial-crate",
 };
 
 export function editorialPlaylistLabel(
@@ -97,9 +95,9 @@ export function EditorialPlaylistArtwork({
           VARIANT_TONES[variant],
         )}
       />
-      <div className="absolute inset-0 z-[2] bg-[linear-gradient(180deg,rgba(2,6,10,0.05)_0%,rgba(2,6,10,0.32)_45%,rgba(2,6,10,0.9)_100%)]" />
+      <div className="editorial-playlist-overlay absolute inset-0 z-[2]" />
       <div className={cn("absolute inset-0 z-[2]", VARIANT_RADIALS[variant])} />
-      <div className="absolute inset-0 z-[2] opacity-35 [background-image:linear-gradient(135deg,rgba(255,255,255,0.16)_0_1px,transparent_1px_12px)]" />
+      <div className="editorial-playlist-texture absolute inset-0 z-[2] opacity-35" />
 
       <img
         src="/icons/logo.svg"

@@ -64,7 +64,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
 
   return (
     <article className="group relative overflow-hidden rounded-[12px] border border-primary/10 bg-text-primary/[0.025] p-4 text-left transition-colors hover:border-primary/25 hover:bg-text-primary/[0.04]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_20%,rgba(6,182,212,0.22),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.06),transparent_58%)]" />
+      <div className="upcoming-event-row-atmosphere absolute inset-0" />
       {coverUrl ? (
         <CrateImage
           src={coverUrl}
@@ -76,7 +76,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
           }}
         />
       ) : null}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,11,16,0.96),rgba(10,11,16,0.78)_48%,rgba(10,11,16,0.38)),linear-gradient(0deg,rgba(10,11,16,0.84),transparent_55%)]" />
+      <div className="upcoming-event-row-scrim absolute inset-0" />
 
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-center gap-4">

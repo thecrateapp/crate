@@ -31,7 +31,7 @@ describe("ReleaseCountdown", () => {
     renderWithListenProviders(<ReleaseCountdown releaseDate="2026-08-02" />);
 
     expect(screen.getByTestId("release-countdown")).toHaveClass(
-      "sm:bg-[#101419]/88",
+      "release-countdown-surface",
       "sm:backdrop-blur-none",
       "sm:backdrop-saturate-100",
     );
@@ -41,12 +41,13 @@ describe("ReleaseCountdown", () => {
     renderWithListenProviders(<ReleaseCountdown releaseDate="2026-08-02" />);
 
     expect(screen.getByTestId("release-countdown")).toHaveClass(
-      "bg-[#0b1520]/45",
+      "release-countdown-surface",
       "backdrop-blur-2xl",
       "backdrop-saturate-150",
       "border-text-primary/20",
     );
     expect(screen.getByTestId("release-countdown-glass-sheen")).toHaveClass(
+      "release-countdown-sheen",
       "sm:hidden",
     );
   });

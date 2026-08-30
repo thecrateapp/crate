@@ -121,7 +121,7 @@ export function ServerSetup() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-surface-canvas px-6 py-10 text-text-primary">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(6,182,212,0.18),transparent_34%),radial-gradient(circle_at_12%_70%,rgba(20,184,166,0.08),transparent_28%)]" />
+      <div className="server-setup-atmosphere pointer-events-none absolute inset-0" />
       <form
         onSubmit={handleSubmit}
         className="relative w-full max-w-[560px] rounded-[12px] border border-border-quiet bg-surface-elevated/90 p-8 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-10"

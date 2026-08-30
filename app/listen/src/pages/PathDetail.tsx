@@ -183,14 +183,11 @@ export function PathDetail() {
           <div className="relative mx-3">
             <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-text-primary/8" />
             <div
-              className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full ${
+              className={`path-progress-fill absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full ${
                 animate ? "transition-[width] duration-[1200ms] ease-out" : ""
               }`}
               style={{
                 width: `${(travelerPos / Math.max(1, nodeCount - 1)) * 100}%`,
-                background:
-                  "linear-gradient(90deg, rgba(6,182,212,0.1), rgba(6,182,212,0.5))",
-                boxShadow: "0 0 8px rgba(6,182,212,0.3)",
               }}
             />
             <div className="relative flex items-center justify-between">
@@ -207,7 +204,7 @@ export function PathDetail() {
                     <div
                       className={`rounded-full transition-all duration-300 ${
                         isActive
-                          ? "h-3 w-3 bg-primary shadow-[0_0_12px_rgba(6,182,212,0.6)]"
+                          ? "path-node-active h-3 w-3 bg-primary"
                           : isPast
                             ? "h-1.5 w-1.5 bg-primary/60"
                             : "h-1.5 w-1.5 bg-text-primary/20 group-hover:bg-text-primary/40"
@@ -226,7 +223,7 @@ export function PathDetail() {
               }}
             >
               <div className="absolute -inset-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/20 blur-md" />
-              <div className="h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_20px_rgba(6,182,212,0.7)]" />
+              <div className="path-traveler-node h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
             </div>
           </div>
         </div>
@@ -312,7 +309,7 @@ export function PathDetail() {
             >
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center">
                 {isActive ? (
-                  <div className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+                  <div className="path-node-active h-2.5 w-2.5 rounded-full bg-primary" />
                 ) : (
                   <span className="font-mono text-[10px] tabular-nums text-text-primary/20">
                     {i + 1}

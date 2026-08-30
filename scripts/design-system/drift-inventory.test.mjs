@@ -122,7 +122,7 @@ test("enforces the normalized semantic token budget", () => {
     `semantic role violations: ${JSON.stringify(metrics.roleViolations)}`,
   );
   assert.ok(
-    inventory.totals.hardcodedColorUtilities <= 25,
+    inventory.totals.hardcodedColorUtilities <= 0,
     `hardcoded color utilities grew to ${inventory.totals.hardcodedColorUtilities}`,
   );
   assert.ok(

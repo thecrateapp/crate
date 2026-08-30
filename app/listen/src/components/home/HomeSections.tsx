@@ -198,7 +198,7 @@ export function UpcomingPreviewRow({
           }}
         />
       ) : null}
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,16,22,0.96),rgba(15,16,22,0.72)_55%,rgba(15,16,22,0.35))]" />
+      <div className="home-upcoming-row-scrim absolute inset-0" />
       <div className="relative flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.03]">
         <span className="text-[10px] uppercase tracking-wide text-text-primary/40">
           {dateLabel.split(" ")[0]}
@@ -338,7 +338,7 @@ export function ContinueListeningCard({
 }) {
   return (
     <div className="group relative overflow-hidden rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-3 sm:p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.18),transparent_55%)]" />
+      <div className="home-continue-listening-atmosphere absolute inset-0" />
       <div className="relative flex items-center gap-3 sm:gap-4">
         <TrackCoverThumb
           src={track.albumCover}
