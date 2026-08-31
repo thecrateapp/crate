@@ -201,7 +201,7 @@ export function SearchResults() {
 
   if (!query)
     return (
-      <div className="mx-auto max-w-2xl rounded-[12px] border border-border-quiet bg-text-primary/[0.035] p-6 shadow-[0_22px_70px_rgba(0,0,0,0.24)] sm:p-8">
+      <div className="mx-auto max-w-2xl rounded-[12px] border border-border-quiet bg-text-primary/[0.035] p-6 shadow-card sm:p-8">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent-action/15 bg-accent-action/8 text-text-accent">
             <Search size={18} />
@@ -250,7 +250,7 @@ export function SearchResults() {
         <h1 className="text-2xl font-bold">
           {t("search.resultsFor", { query })}
         </h1>
-        <div className="mx-auto max-w-sm rounded-[12px] border border-state-warning/12 bg-text-primary/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-state-warning/12 bg-text-primary/[0.035] px-6 py-10 text-center shadow-card">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-state-warning/15 bg-state-warning/8 text-state-warning-text">
             <Search size={18} />
           </div>
@@ -430,7 +430,7 @@ export function SearchResults() {
       )}
 
       {noResults ? (
-        <div className="mx-auto max-w-sm rounded-[12px] border border-accent-action/12 bg-text-primary/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+        <div className="mx-auto max-w-sm rounded-[12px] border border-accent-action/12 bg-text-primary/[0.035] px-6 py-10 text-center shadow-card">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-accent-action/15 bg-accent-action/8 text-text-accent">
             <Search size={18} />
           </div>
