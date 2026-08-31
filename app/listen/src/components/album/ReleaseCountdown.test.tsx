@@ -32,6 +32,7 @@ describe("ReleaseCountdown", () => {
 
     expect(screen.getByTestId("release-countdown")).toHaveClass(
       "release-countdown-surface",
+      "shadow-card",
       "sm:backdrop-blur-none",
       "sm:backdrop-saturate-100",
     );

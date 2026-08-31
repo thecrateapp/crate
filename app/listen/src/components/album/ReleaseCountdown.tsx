@@ -73,7 +73,7 @@ export function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
       aria-label={t("album.releaseCountdown.ariaLabel", {
         date: formattedDate,
       })}
-      className="release-countdown-surface relative mt-5 w-full max-w-[34rem] overflow-hidden rounded-[12px] border border-text-primary/20 px-4 pb-4 pt-3 shadow-[0_14px_38px_rgba(0,0,0,0.22)] backdrop-blur-2xl backdrop-saturate-150 sm:mt-4 sm:border-border-quiet sm:px-5 sm:backdrop-blur-none sm:backdrop-saturate-100"
+      className="release-countdown-surface relative mt-5 w-full max-w-[34rem] overflow-hidden rounded-[12px] border border-text-primary/20 px-4 pb-4 pt-3 shadow-card backdrop-blur-2xl backdrop-saturate-150 sm:mt-4 sm:border-border-quiet sm:px-5 sm:backdrop-blur-none sm:backdrop-saturate-100"
     >
       <div
         data-testid="release-countdown-glass-sheen"

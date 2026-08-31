@@ -21,7 +21,7 @@ export function OpsPanel({
   return (
     <section
       className={cn(
-        "rounded-md border border-border-quiet bg-panel-surface/90 shadow-[0_24px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl",
+        "rounded-md border border-border-quiet bg-panel-surface/90 shadow-card backdrop-blur-xl",
         className,
       )}
     >

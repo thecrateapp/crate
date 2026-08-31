@@ -60,7 +60,7 @@ export function OpsStatTile({
   return (
     <div
       className={cn(
-        "rounded-md border border-text-primary/8 bg-surface-canvas/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]",
+        "rounded-md border border-text-primary/8 bg-surface-canvas/20 p-4 shadow-card",
         className,
       )}
     >

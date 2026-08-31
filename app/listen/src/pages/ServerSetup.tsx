@@ -124,7 +124,7 @@ export function ServerSetup() {
       <div className="server-setup-atmosphere pointer-events-none absolute inset-0" />
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-[560px] rounded-[12px] border border-border-quiet bg-surface-elevated/90 p-8 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-10"
+        className="relative w-full max-w-[560px] rounded-[12px] border border-border-quiet bg-surface-elevated/90 p-8 shadow-card backdrop-blur-xl sm:p-10"
       >
         <div className="flex flex-col items-center text-center">
           <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-xl border border-accent-action/20 bg-accent-action/10 shadow-[0_0_50px_-24px_rgba(34,211,238,0.9)]">
@@ -156,7 +156,7 @@ export function ServerSetup() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://api.your-crate.com"
-              className="h-14 w-full rounded-lg border border-border-quiet bg-text-primary/[0.04] pl-12 pr-4 text-base text-text-primary outline-none transition placeholder:text-text-muted/70 hover:border-text-primary/20 focus:border-accent-action/70 focus:bg-text-primary/[0.06] focus:shadow-[0_0_0_4px_rgba(34,211,238,0.08)]"
+              className="h-14 w-full rounded-lg border border-border-quiet bg-text-primary/[0.04] pl-12 pr-4 text-base text-text-primary outline-none transition placeholder:text-text-muted/70 hover:border-text-primary/20 focus:border-accent-action/70 focus:bg-text-primary/[0.06] focus:shadow-focus"
               required
             />
           </div>
@@ -169,7 +169,7 @@ export function ServerSetup() {
           <button
             type="submit"
             disabled={probeState.status === "probing"}
-            className="group flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-[0_0_34px_-12px_rgba(34,211,238,0.75)] transition hover:bg-accent-action-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="group flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid transition hover:bg-accent-action-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             {probeState.status === "probing" ? (
               <>

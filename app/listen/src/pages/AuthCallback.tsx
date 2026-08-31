@@ -73,7 +73,7 @@ export function AuthCallback() {
   if (desktopDeepLink) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-app-surface px-6 text-text-primary">
-        <div className="w-full max-w-md rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-8 text-center shadow-[0_24px_80px_-48px_rgba(0,0,0,0.9)]">
+        <div className="w-full max-w-md rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-8 text-center shadow-card">
           <img
             src="/icons/logo.svg"
             alt="Crate"

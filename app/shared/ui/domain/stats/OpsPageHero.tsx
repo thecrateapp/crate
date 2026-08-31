@@ -21,7 +21,7 @@ export function OpsPageHero({
   return (
     <section
       className={cn(
-        "rounded-md border border-border-quiet bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl",
+        "rounded-md border border-border-quiet bg-panel-surface/95 p-5 shadow-card backdrop-blur-xl",
         className,
       )}
     >
