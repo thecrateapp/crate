@@ -46,6 +46,9 @@ describe("SearchResults", () => {
       "Search artists, albums, tracks...",
     );
     await user.type(input, "Converge");
+    expect(screen.getByRole("button", { name: "Search" })).toHaveClass(
+      "shadow-action",
+    );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
     await waitFor(() => {

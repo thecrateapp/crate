@@ -166,12 +166,17 @@ describe("PlaylistHeroSection", () => {
     const primary = screen.getByRole("group", {
       name: "Primary playlist actions",
     });
-    expect(
-      within(primary).getByRole("button", { name: "Play" }),
-    ).toHaveTextContent("Play");
-    expect(
-      within(primary).getByRole("button", { name: "Shuffle" }),
-    ).toHaveTextContent("Shuffle");
+    const playButton = within(primary).getByRole("button", { name: "Play" });
+    expect(playButton).toHaveTextContent("Play");
+    expect(playButton).toHaveClass(
+      "shadow-action-solid",
+      "hover:shadow-action-solid-hover",
+    );
+    const shuffleButton = within(primary).getByRole("button", {
+      name: "Shuffle",
+    });
+    expect(shuffleButton).toHaveTextContent("Shuffle");
+    expect(shuffleButton).toHaveClass("shadow-control-inset");
 
     const secondary = screen.getByRole("group", {
       name: "Secondary playlist actions",

@@ -837,6 +837,10 @@
   --color-state-danger-foreground: var(--state-danger-foreground);
   --color-focus-ring: var(--focus-ring);
   --shadow-action: var(--action-shadow);
+  --shadow-action-solid: 0 0 18px
+    color-mix(in srgb, var(--accent-action) 24%, transparent);
+  --shadow-action-solid-hover: 0 0 24px
+    color-mix(in srgb, var(--accent-action) 34%, transparent);
   --shadow-focus: var(--focus-shadow);
   --shadow-control-inset: var(--control-inset-shadow);
   --shadow-icon-control: var(--icon-control-shadow);

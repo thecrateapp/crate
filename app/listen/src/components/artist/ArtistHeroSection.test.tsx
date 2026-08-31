@@ -164,12 +164,16 @@ describe("ArtistHeroSection", () => {
     });
     const playButton = within(primary).getByRole("button", { name: "Play" });
     expect(playButton).toHaveTextContent("Play");
-    expect(playButton).toHaveClass("rounded-lg");
+    expect(playButton).toHaveClass(
+      "rounded-lg",
+      "shadow-action-solid",
+      "hover:shadow-action-solid-hover",
+    );
     const shuffleButton = within(primary).getByRole("button", {
       name: "Shuffle",
     });
     expect(shuffleButton).toHaveTextContent("Shuffle");
-    expect(shuffleButton).toHaveClass("rounded-lg");
+    expect(shuffleButton).toHaveClass("rounded-lg", "shadow-control-inset");
 
     const actionRail = primary.parentElement;
     expect(actionRail).not.toBeNull();

@@ -234,7 +234,7 @@ export function SearchResults() {
           <button
             type="submit"
             disabled={!emptyQuery.trim()}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-[0_14px_28px_rgba(6,182,212,0.22)] transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-action transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
           >
             <Search size={17} />
             {t("search.label")}
