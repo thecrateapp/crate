@@ -16,14 +16,14 @@ function actionToneClassName(tone: ActionTone, disabled: boolean) {
   }
 
   if (tone === "primary") {
-    return "text-accent-action hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow-strong)]";
+    return "text-accent-action hover:text-accent-action hover:drop-shadow-accent-action-active";
   }
 
   if (tone === "danger") {
-    return "text-state-danger hover:text-state-danger hover:drop-shadow-[0_0_8px_var(--state-danger-glow)]";
+    return "text-state-danger hover:text-state-danger hover:drop-shadow-state-danger";
   }
 
-  return "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]";
+  return "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action";
 }
 
 function actionVariantClassName(variant: ActionVariant) {

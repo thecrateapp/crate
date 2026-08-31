@@ -162,7 +162,7 @@ export function PathDetail() {
         </div>
         <button
           onClick={() => playFromStep(0)}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_20px_rgba(6,182,212,0.4)] transition hover:bg-primary/90"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-accent-action-strong transition hover:bg-primary/90"
         >
           <Play size={18} className="ml-0.5 fill-current" />
         </button>

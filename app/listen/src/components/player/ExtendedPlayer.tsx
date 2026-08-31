@@ -261,7 +261,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                 aria-label={t("player.equalizer")}
                 className={`rounded-full p-2 backdrop-blur-sm transition-colors ${
                   showEqualizer
-                    ? "bg-accent-action/18 text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    ? "bg-accent-action/18 text-accent-action drop-shadow-accent-action"
                     : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary"
                 }`}
               >
@@ -277,7 +277,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                 !isVisualizerMode
                   ? "bg-surface-icon-control text-text-faint"
                   : showVizSettings
-                    ? "bg-accent-action/18 text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    ? "bg-accent-action/18 text-accent-action drop-shadow-accent-action"
                     : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary"
               }`}
             >

@@ -173,7 +173,7 @@ export function ArtistBioModal({
           </div>
           <ModalCloseButton
             onClick={onClose}
-            className="flex-shrink-0 text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.34)]"
+            className="flex-shrink-0 text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-accent-action-strong"
           />
         </div>
       </ModalHeader>

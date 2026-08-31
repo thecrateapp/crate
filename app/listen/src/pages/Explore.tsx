@@ -211,7 +211,7 @@ function ExploreFeatureCard({
         <div className="flex items-center justify-between">
           <Icon
             size={24}
-            className="text-accent-action drop-shadow-[0_0_16px_var(--accent-action-glow-strong)]"
+            className="text-accent-action drop-shadow-accent-action-feature"
           />
           <ArrowRight
             size={18}

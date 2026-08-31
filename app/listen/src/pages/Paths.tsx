@@ -504,7 +504,7 @@ export function Paths() {
         <button
           onClick={create}
           disabled={!canCreate}
-          className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_rgba(6,182,212,0.3)] transition hover:bg-primary/90 disabled:opacity-25 disabled:shadow-none"
+          className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-accent-action transition hover:bg-primary/90 disabled:opacity-25 disabled:shadow-none"
         >
           {creating ? (
             <Loader2 size={15} className="animate-spin" />

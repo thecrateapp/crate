@@ -541,7 +541,7 @@ export function TopBarSearch() {
           "relative overflow-visible rounded-xl transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
           isDesktop
             ? searchOpen
-              ? "border border-text-primary/8 bg-surface-canvas/68 shadow-[0_18px_42px_var(--surface-glass-hover-shadow)]"
+              ? "border border-text-primary/8 bg-surface-canvas/68 shadow-glass-hover"
               : "border-0 bg-transparent shadow-none backdrop-blur-0"
             : "listen-glass-panel listen-search-glass",
           searchOpen ? "md:scale-x-[1.01]" : "md:scale-x-100",

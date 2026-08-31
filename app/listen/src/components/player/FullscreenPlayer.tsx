@@ -646,7 +646,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 className={cn(
                   "group relative flex h-14 min-w-14 touch-manipulation flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold leading-none transition-[color,filter,transform] active:scale-[0.96]",
                   selected
-                    ? "text-accent-action drop-shadow-[0_0_12px_var(--accent-action-glow)]"
+                    ? "text-accent-action drop-shadow-accent-action-icon"
                     : "text-text-muted active:text-text-secondary",
                 )}
               >
@@ -660,7 +660,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   className={cn(
                     "absolute bottom-0 h-0.5 w-4 rounded-full transition-[opacity,box-shadow]",
                     selected
-                      ? "bg-accent-action opacity-100 shadow-[0_0_10px_var(--accent-action-glow-strong)]"
+                      ? "bg-accent-action opacity-100 shadow-accent-action-indicator-active"
                       : "opacity-0",
                   )}
                 />
@@ -801,7 +801,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 }
                 className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                   shuffle
-                    ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    ? "text-accent-action drop-shadow-accent-action"
                     : "text-text-muted active:text-text-secondary"
                 }`}
               >
@@ -852,7 +852,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 aria-label={t("player.repeat", { mode: repeat })}
                 className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                   repeat !== "off"
-                    ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    ? "text-accent-action drop-shadow-accent-action"
                     : "text-text-muted active:text-text-secondary"
                 }`}
               >
@@ -875,7 +875,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 {liked ? (
                   <HeartBold
                     size={19}
-                    className="animate-crate-icon-active-pulse text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                    className="animate-crate-icon-active-pulse text-accent-action drop-shadow-accent-action"
                   />
                 ) : (
                   <Heart size={19} />
@@ -891,7 +891,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   aria-label={t("player.equalizer")}
                   className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control transition-colors active:bg-surface-control-hover ${
                     showEqualizer
-                      ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                      ? "text-accent-action drop-shadow-accent-action"
                       : "text-text-secondary active:text-text-primary"
                   }`}
                 >

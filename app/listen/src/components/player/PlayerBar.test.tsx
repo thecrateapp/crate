@@ -236,9 +236,7 @@ describe("PlayerBar mobile mini-player", () => {
       for (const button of buttons) {
         expect(button.className).toContain("text-text-");
         expect(button.className).toContain("hover:text-accent-action");
-        expect(button.className).toContain(
-          "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
-        );
+        expect(button.className).toContain("hover:drop-shadow-accent-action");
         expect(button.className).not.toContain("text-white/");
         expect(button.className).not.toContain("rgba(");
       }
@@ -286,7 +284,7 @@ describe("PlayerBar mobile mini-player", () => {
       },
     });
 
-    const activeGlow = "drop-shadow-[0_0_8px_var(--accent-action-glow)]";
+    const activeGlow = "drop-shadow-accent-action";
 
     expect(screen.getByRole("button", { name: "Disable shuffle" })).toHaveClass(
       "text-accent-action",
@@ -315,9 +313,7 @@ describe("PlayerBar mobile mini-player", () => {
       for (const button of buttons) {
         expect(button.className).toContain("text-text-");
         expect(button.className).toContain("hover:text-accent-action");
-        expect(button.className).toContain(
-          "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
-        );
+        expect(button.className).toContain("hover:drop-shadow-accent-action");
         expect(button.className).not.toContain("text-white/");
         expect(button.className).not.toContain("rgba(");
       }

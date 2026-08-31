@@ -103,8 +103,8 @@ function Sidebar() {
 
   function navClass(isActive: boolean) {
     return isActive
-      ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-      : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]";
+      ? "text-accent-action drop-shadow-accent-action"
+      : "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action";
   }
 
   return (
@@ -166,7 +166,7 @@ function Sidebar() {
             <button
               onClick={toggleExpanded}
               aria-label={t("nav.sidebar.collapse")}
-              className="text-text-subtle transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+              className="text-text-subtle transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
             >
               <PanelLeftClose size={CRATE_ICON_SIZE.nav} />
             </button>
@@ -177,7 +177,7 @@ function Sidebar() {
               toggleExpanded();
               navigate("/");
             }}
-            className="relative flex h-10 w-10 items-center justify-center transition-[filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+            className="relative flex h-10 w-10 items-center justify-center transition-[filter,transform] hover:-translate-y-px hover:drop-shadow-accent-action"
             aria-label={t("nav.sidebar.expand")}
           >
             <span
@@ -287,8 +287,8 @@ function Sidebar() {
               expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
             } ${
               collectionOpen
-                ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-                : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                ? "text-accent-action drop-shadow-accent-action"
+                : "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
             }`}
           >
             <Collection size={CRATE_ICON_SIZE.nav} />
@@ -348,7 +348,7 @@ function Sidebar() {
                     navigate(to);
                     setCollectionOpen(false);
                   }}
-                  className={`flex items-center gap-3 rounded-lg transition-[color,filter,transform] w-full text-left text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                  className={`flex items-center gap-3 rounded-lg transition-[color,filter,transform] w-full text-left text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
                     expanded ? "px-3 py-1.5" : "px-4 py-2"
                   }`}
                 >
@@ -367,7 +367,7 @@ function Sidebar() {
           <button
             onClick={toggleExpanded}
             aria-label={t("nav.sidebar.expand")}
-            className="text-text-faint transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+            className="text-text-faint transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
           >
             <PanelLeftOpen size={CRATE_ICON_SIZE.nav} />
           </button>
@@ -594,8 +594,8 @@ export function Shell() {
             className={({ isActive }) =>
               `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1.5 transition-[color,filter,transform] active:scale-[0.97] ${
                 isActive
-                  ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-                  : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                  ? "text-accent-action drop-shadow-accent-action"
+                  : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
               }`
             }
           >
@@ -611,8 +611,8 @@ export function Shell() {
           onClick={() => setCollectionSheetOpen(true)}
           className={`flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1.5 transition-[color,filter,transform] active:scale-[0.97] ${
             collectionActive
-              ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-              : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+              ? "text-accent-action drop-shadow-accent-action"
+              : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
           }`}
         >
           <Collection size={CRATE_ICON_SIZE.navMobile} />
@@ -628,8 +628,8 @@ export function Shell() {
             className={({ isActive }) =>
               `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1.5 transition-[color,filter,transform] active:scale-[0.97] ${
                 isActive
-                  ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-                  : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                  ? "text-accent-action drop-shadow-accent-action"
+                  : "text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
               }`
             }
           >

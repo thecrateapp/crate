@@ -211,15 +211,15 @@ export function PlaybackTargetMenu({
           onOverlayChange?.(nextOpen);
         }}
         className={cn(
-          "relative inline-flex items-center gap-1.5 rounded-md p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+          "relative inline-flex items-center gap-1.5 rounded-md p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action",
           open || (activeTarget && activeTarget.kind !== "local")
-            ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+            ? "text-accent-action drop-shadow-accent-action"
             : "text-text-muted",
         )}
       >
         <Airplay size={CRATE_ICON_SIZE.md} />
         {activeTarget && activeTarget.kind !== "local" ? (
-          <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-accent-action shadow-[0_0_8px_var(--accent-action-glow-strong)]" />
+          <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-accent-action shadow-accent-action-indicator-active" />
         ) : null}
       </button>
 

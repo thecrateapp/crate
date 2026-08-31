@@ -561,7 +561,7 @@ export function Playlist() {
       iconClassName: offlineBusy ? "animate-spin" : undefined,
       className:
         offlineState === "ready"
-          ? "text-text-accent drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+          ? "text-text-accent drop-shadow-accent-action"
           : offlineBusy
             ? "text-primary"
             : offlineState === "error"

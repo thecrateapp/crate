@@ -96,7 +96,7 @@ function albumGenreSlug(name: string) {
 }
 
 const SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 const ALBUM_MOBILE_INFO_ACTION_GAP_PX = 20;
 
@@ -1181,7 +1181,7 @@ export function Album() {
         <button
           ref={albumMenuController.anchorRef}
           data-testid="album-mobile-hero-menu"
-          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-accent-action-hover"
           onClick={handleToggleAlbumMenu}
           aria-label={t("common.more")}
         >
@@ -1466,7 +1466,7 @@ export function Album() {
               <span>{t("player.play")}</span>
             </button>
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-primary hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
               onClick={handleShuffle}
               disabled={playerTracks.length === 0}
               aria-label={t("player.shuffle")}
@@ -1495,7 +1495,7 @@ export function Album() {
               <button
                 className={`${SECONDARY_ACTION_CLASS} ${
                   offlineState === "ready"
-                    ? "text-text-accent drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                    ? "text-text-accent drop-shadow-accent-action"
                     : offlineBusy
                       ? "text-primary"
                       : offlineState === "error"
@@ -1527,7 +1527,7 @@ export function Album() {
               <FollowHeartButton
                 className={`${SECONDARY_ACTION_CLASS} ${
                   saved
-                    ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                    ? "text-primary drop-shadow-accent-action"
                     : "text-text-primary/62"
                 }`}
                 onClick={handleToggleSaved}

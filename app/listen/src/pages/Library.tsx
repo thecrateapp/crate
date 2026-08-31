@@ -336,10 +336,8 @@ function CollectionSortDropdown<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-border-quiet/10 px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-[0_0_18px_var(--accent-action-glow-soft)] focus-visible:border-accent-action/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_var(--accent-action-glow)] ${
-          open
-            ? "border-accent-action/45 shadow-[0_0_20px_var(--accent-action-glow)]"
-            : ""
+        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-border-quiet/10 px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-accent-action-soft focus-visible:border-accent-action/70 focus-visible:outline-none focus-visible:shadow-accent-action ${
+          open ? "border-accent-action/45 shadow-accent-action" : ""
         }`}
       >
         <span className="truncate">{selectedLabel}</span>
@@ -371,8 +369,8 @@ function CollectionSortDropdown<T extends string>({
                 }}
                 className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold transition-[background-color,color,filter] ${
                   selected
-                    ? "bg-accent-action/14 text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-                    : "text-foreground hover:bg-text-primary/7 hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow-soft)]"
+                    ? "bg-accent-action/14 text-accent-action drop-shadow-accent-action"
+                    : "text-foreground hover:bg-text-primary/7 hover:text-accent-action hover:drop-shadow-accent-action-soft"
                 }`}
               >
                 <span>{t(option.labelKey)}</span>

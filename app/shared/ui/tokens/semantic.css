@@ -833,6 +833,25 @@
   --shadow-icon-control: var(--icon-control-shadow);
   --shadow-chrome: var(--chrome-shadow);
   --shadow-menu: var(--menu-shadow);
+  --shadow-accent-action: 0 0 20px var(--accent-action-glow);
+  --shadow-accent-action-glow: 0 0 18px var(--accent-action-glow);
+  --shadow-accent-action-soft: 0 0 18px var(--accent-action-glow-soft);
+  --shadow-accent-action-medium: 0 0 18px var(--accent-action-glow-medium);
+  --shadow-accent-action-strong: 0 0 24px var(--accent-action-glow-strong);
+  --shadow-accent-action-indicator: 0 0 10px var(--accent-action-glow);
+  --shadow-accent-action-indicator-active: 0 0 8px
+    var(--accent-action-glow-strong);
+  --shadow-glass-hover: 0 18px 42px var(--surface-glass-hover-shadow);
+  --shadow-border-soft: 0 0 0 1px
+    color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --drop-shadow-accent-action: 0 0 8px var(--accent-action-glow);
+  --drop-shadow-accent-action-soft: 0 0 8px var(--accent-action-glow-soft);
+  --drop-shadow-accent-action-active: 0 0 8px var(--accent-action-glow-strong);
+  --drop-shadow-accent-action-icon: 0 0 12px var(--accent-action-glow);
+  --drop-shadow-accent-action-feature: 0 0 16px var(--accent-action-glow-strong);
+  --drop-shadow-accent-action-hover: 0 0 10px var(--accent-action-glow-medium);
+  --drop-shadow-accent-action-strong: 0 0 10px var(--accent-action-glow-strong);
+  --drop-shadow-state-danger: 0 0 8px var(--state-danger-glow);
 }
 
 .release-countdown-surface {

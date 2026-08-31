@@ -192,7 +192,7 @@ describe("ExtendedPlayer", () => {
     expect(equalizerButton).toHaveClass(
       "bg-accent-action/18",
       "text-accent-action",
-      "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+      "drop-shadow-accent-action",
     );
   });
 

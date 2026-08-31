@@ -47,7 +47,7 @@ export function SearchBar({
     <div
       className={cn(
         "relative flex items-center rounded-xl border border-text-primary/8 bg-surface-canvas/25 shadow-sm transition-[background-color,border-color,box-shadow]",
-        "focus-within:border-accent-action/25 focus-within:bg-surface-canvas/40 focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.08)]",
+        "focus-within:border-accent-action/25 focus-within:bg-surface-canvas/40 focus-within:shadow-focus",
         className,
       )}
     >

@@ -120,7 +120,7 @@ export function PlayerVolumeControl({
         aria-label={
           volume === 0 ? t("player.volume.unmute") : t("player.volume.label")
         }
-        className="rounded-md p-1.5 text-text-muted transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+        className="rounded-md p-1.5 text-text-muted transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
       >
         <span ref={volumeIconRef} className="block">
           {volume === 0 ? (

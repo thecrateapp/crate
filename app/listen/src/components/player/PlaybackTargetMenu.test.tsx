@@ -96,9 +96,7 @@ describe("PlaybackTargetMenu", () => {
     const outputButton = screen.getByRole("button", { name: "Output" });
     expect(outputButton.className).not.toContain("hover:bg");
     expect(outputButton.className).toContain("hover:text-accent-action");
-    expect(outputButton.className).toContain(
-      "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
-    );
+    expect(outputButton.className).toContain("hover:drop-shadow-accent-action");
     expect(outputButton.className).not.toContain("text-white/30");
     expect(outputButton.className).not.toContain("rgba(");
 

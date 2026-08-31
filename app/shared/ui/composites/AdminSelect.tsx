@@ -32,7 +32,7 @@ interface AdminSelectProps {
 }
 
 const DEFAULT_TRIGGER_CLASS =
-  "flex h-11 min-w-[140px] max-w-[220px] items-center gap-2 rounded-md border border-border-quiet bg-surface-canvas/25 px-4 text-sm text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm transition-[background-color,border-color,box-shadow] hover:border-text-primary/20 hover:bg-surface-canvas/35";
+  "flex h-11 min-w-[140px] max-w-[220px] items-center gap-2 rounded-md border border-border-quiet bg-surface-canvas/25 px-4 text-sm text-foreground shadow-control-inset backdrop-blur-sm transition-[background-color,border-color,box-shadow] hover:border-text-primary/20 hover:bg-surface-canvas/35";
 
 export function AdminSelect({
   value,

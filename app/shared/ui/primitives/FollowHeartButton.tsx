@@ -215,7 +215,7 @@ export function FollowHeartButton({
         "relative inline-flex items-center justify-center gap-1.5 transition-[color,filter,transform]",
         className,
         isActive
-          ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+          ? "text-primary drop-shadow-accent-action"
           : "text-text-primary/80",
       )}
       onClick={handleClick}

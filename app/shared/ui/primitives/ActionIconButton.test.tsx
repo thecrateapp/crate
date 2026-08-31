@@ -33,9 +33,7 @@ describe("ActionIconButton", () => {
     const button = container.querySelector("button");
 
     expect(button?.className).toContain("hover:text-accent-action");
-    expect(button?.className).toContain(
-      "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
-    );
+    expect(button?.className).toContain("hover:drop-shadow-accent-action");
     expect(button?.className).not.toContain("hover:bg-");
     expect(button?.className).not.toContain("rgba(");
   });
@@ -53,10 +51,10 @@ describe("ActionIconButton", () => {
     );
 
     expect(screen.getByRole("button", { name: "Primary" })).toHaveClass(
-      "hover:drop-shadow-[0_0_8px_var(--accent-action-glow-strong)]",
+      "hover:drop-shadow-accent-action-active",
     );
     expect(screen.getByRole("button", { name: "Danger" })).toHaveClass(
-      "hover:drop-shadow-[0_0_8px_var(--state-danger-glow)]",
+      "hover:drop-shadow-state-danger",
     );
     expect(container.innerHTML).not.toContain("rgba(");
   });

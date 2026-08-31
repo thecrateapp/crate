@@ -922,11 +922,11 @@ describe("FullscreenPlayer", () => {
       const repeat = screen.getByRole("button", { name: "Repeat: one" });
       expect(shuffle).toHaveClass(
         "text-accent-action",
-        "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+        "drop-shadow-accent-action",
       );
       expect(repeat).toHaveClass(
         "text-accent-action",
-        "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+        "drop-shadow-accent-action",
       );
 
       const queueSwitch = screen.getByRole("button", { name: "Queue" });
@@ -939,11 +939,11 @@ describe("FullscreenPlayer", () => {
 
       expect(queueSwitch).toHaveClass(
         "text-accent-action",
-        "drop-shadow-[0_0_12px_var(--accent-action-glow)]",
+        "drop-shadow-accent-action-icon",
       );
       expect(queueSwitch.querySelector('[aria-hidden="true"]')).toHaveClass(
         "bg-accent-action",
-        "shadow-[0_0_10px_var(--accent-action-glow-strong)]",
+        "shadow-accent-action-indicator-active",
       );
     });
   });
@@ -1429,7 +1429,7 @@ describe("FullscreenPlayer", () => {
       await user.click(equalizer);
       expect(equalizer).toHaveClass(
         "text-accent-action",
-        "drop-shadow-[0_0_8px_var(--accent-action-glow)]",
+        "drop-shadow-accent-action",
       );
 
       expect(screen.getByTestId("player-track-menu")).toHaveClass(

@@ -1337,7 +1337,7 @@ export function PlayerBar() {
                     ) : (
                       <Heart
                         size={CRATE_ICON_SIZE.md}
-                        className="text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                        className="text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
                       />
                     )}
                   </button>
@@ -1387,8 +1387,8 @@ export function PlayerBar() {
                     }
                     className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       shuffle
-                        ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-                        : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                        ? "text-accent-action drop-shadow-accent-action"
+                        : "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
                     }`}
                   >
                     <Shuffle size={CRATE_ICON_SIZE.md} />
@@ -1397,7 +1397,7 @@ export function PlayerBar() {
                     onClick={handlePreviousTrack}
                     disabled={jamQueueLocked}
                     aria-label={t("player.previous")}
-                    className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
+                    className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
                   >
                     <SkipBack size={CRATE_ICON_SIZE.lg} fill="currentColor" />
                   </button>
@@ -1433,7 +1433,7 @@ export function PlayerBar() {
                     onClick={handleNextTrack}
                     disabled={jamTransportDisabled}
                     aria-label={t("player.next")}
-                    className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
+                    className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
                   >
                     <SkipForward
                       size={CRATE_ICON_SIZE.lg}
@@ -1446,8 +1446,8 @@ export function PlayerBar() {
                     aria-label={t("player.repeat", { mode: repeat })}
                     className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
                       repeat !== "off"
-                        ? "text-accent-action drop-shadow-[0_0_8px_var(--accent-action-glow)]"
-                        : "text-text-muted hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]"
+                        ? "text-accent-action drop-shadow-accent-action"
+                        : "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
                     }`}
                   >
                     {repeat === "one" ? (
@@ -1565,7 +1565,7 @@ export function PlayerBar() {
                 onClick={handleNextTrack}
                 disabled={jamTransportDisabled}
                 aria-label={t("player.next")}
-                className="flex h-12 w-12 touch-manipulation items-center justify-center text-text-secondary transition-[color,filter,transform] hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] active:scale-[0.96] active:text-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:text-text-secondary disabled:active:scale-100"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center text-text-secondary transition-[color,filter,transform] hover:text-accent-action hover:drop-shadow-accent-action active:scale-[0.96] active:text-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:text-text-secondary disabled:active:scale-100"
               >
                 <SkipForward
                   size={CRATE_ICON_SIZE.navMobile}
@@ -1612,7 +1612,7 @@ export function PlayerBar() {
                     onMouseEnter={prepareEqualizerPopover}
                     onFocus={prepareEqualizerPopover}
                     aria-label={t("player.equalizer")}
-                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
                       showEqualizer ? "text-accent-action" : "text-text-muted"
                     }`}
                   >
@@ -1626,7 +1626,7 @@ export function PlayerBar() {
                     onClick={handleToggleQueue}
                     onMouseEnter={prepareQueuePanel}
                     onFocus={prepareQueuePanel}
-                    className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                    className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
                       showQueue ? "text-accent-action" : "text-text-muted"
                     }`}
                     aria-label={t("player.queue")}
@@ -1646,7 +1646,7 @@ export function PlayerBar() {
                     onClick={handleToggleLyrics}
                     onMouseEnter={prepareLyricsPanel}
                     onFocus={prepareLyricsPanel}
-                    className={`hidden p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] xl:block ${
+                    className={`hidden p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action xl:block ${
                       showLyrics ? "text-accent-action" : "text-text-muted"
                     }`}
                     aria-label={t("player.lyrics")}
@@ -1661,7 +1661,7 @@ export function PlayerBar() {
                     onClick={handleToggleExtendedPlayer}
                     onMouseEnter={prepareExtendedPlayer}
                     onFocus={prepareExtendedPlayer}
-                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
                       extendedOpen ? "text-accent-action" : "text-text-muted"
                     }`}
                     aria-label={t("player.expand")}
@@ -1680,7 +1680,7 @@ export function PlayerBar() {
                   onMouseEnter={prepareQueuePanel}
                   onFocus={prepareQueuePanel}
                   aria-label={t("player.queue")}
-                  className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                  className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
                     showQueue ? "text-accent-action" : "text-text-muted"
                   }`}
                 >
@@ -1693,7 +1693,7 @@ export function PlayerBar() {
                   onMouseEnter={prepareExtendedPlayer}
                   onFocus={prepareExtendedPlayer}
                   aria-label={t("player.expand")}
-                  className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] ${
+                  className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
                     extendedOpen ? "text-accent-action" : "text-text-muted"
                   }`}
                 >

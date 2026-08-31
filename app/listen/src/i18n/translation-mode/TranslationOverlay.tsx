@@ -29,7 +29,7 @@ export function TranslationOverlay() {
       <div className="pointer-events-none absolute inset-0">
         {hoveredRect ? (
           <div
-            className="absolute rounded-[4px] border border-accent-action/40 bg-accent-action/[0.06] shadow-[0_0_18px_rgba(34,211,238,0.18)]"
+            className="absolute rounded-[4px] border border-accent-action/40 bg-accent-action/[0.06] shadow-accent-action-medium"
             style={{
               height: hoveredRect.height,
               transform: `translate(${hoveredRect.left}px, ${hoveredRect.top}px)`,
@@ -68,7 +68,7 @@ export function TranslationOverlay() {
               type="button"
               aria-label="Close translation editor"
               onClick={closeEditor}
-              className="text-text-primary/45 transition-[color,filter] hover:text-text-accent hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+              className="text-text-primary/45 transition-[color,filter] hover:text-text-accent hover:drop-shadow-accent-action"
             >
               <X size={18} />
             </button>

@@ -54,7 +54,7 @@ import {
 } from "@/lib/library-routes";
 
 const GENRE_SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_10px_var(--accent-action-glow-medium)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export function ExplorePill({
   label,
@@ -377,7 +377,7 @@ export function GenreDetailView({
               ref={genreMenu.triggerRef}
               type="button"
               data-testid="genre-mobile-hero-menu"
-              className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-[0_0_10px_var(--accent-action-glow-medium)]"
+              className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover"
               onClick={genreMenu.openFromTrigger}
               onContextMenu={genreMenu.handleContextMenu}
               aria-label={t("common.more")}
@@ -475,7 +475,7 @@ export function GenreDetailView({
                 onClick={() => void handlePlayGenreRadio()}
                 disabled={startingRadio}
                 aria-label={t("genre.actions.playRadio")}
-                className="explore-genre-primary-action flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-[0_0_18px_var(--accent-action-glow)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-accent-action/90 hover:shadow-[0_0_24px_var(--accent-action-glow-strong)] disabled:cursor-wait disabled:opacity-70 md:px-7 md:text-[15px]"
+                className="explore-genre-primary-action flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-accent-action-glow transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-accent-action/90 hover:shadow-accent-action-strong disabled:cursor-wait disabled:opacity-70 md:px-7 md:text-[15px]"
               >
                 {startingRadio ? (
                   <Loader2 size={17} className="animate-spin" />
@@ -489,7 +489,7 @@ export function GenreDetailView({
                   type="button"
                   onClick={() => openGenreRadar(nextShow)}
                   aria-label={t("genre.actions.openNextGenreShow")}
-                  className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-[inset_0_0_0_1px_var(--border-quiet)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-[0_0_8px_var(--accent-action-glow)] md:w-auto md:px-7"
+                  className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-[inset_0_0_0_1px_var(--border-quiet)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action md:w-auto md:px-7"
                 >
                   <Calendar size={17} />
                   <span>{t("genre.actions.nextShow")}</span>

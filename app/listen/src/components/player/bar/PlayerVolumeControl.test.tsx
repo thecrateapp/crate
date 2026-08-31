@@ -18,9 +18,7 @@ describe("PlayerVolumeControl", () => {
     expect(button.className).not.toContain("hover:bg");
     expect(button.className).toContain("text-text-muted");
     expect(button.className).toContain("hover:text-accent-action");
-    expect(button.className).toContain(
-      "hover:drop-shadow-[0_0_8px_var(--accent-action-glow)]",
-    );
+    expect(button.className).toContain("hover:drop-shadow-accent-action");
     expect(button.className).not.toContain("text-white/30");
     expect(button.className).not.toContain("rgba(");
   });
