@@ -10,25 +10,25 @@ function toneClasses(tone: OpsTone) {
     case "primary":
       return {
         iconWrap:
-          "border-accent-action/20 bg-accent-action/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]",
+          "border-accent-action/20 bg-accent-action/12 text-primary shadow-accent-action-status",
         value: "text-text-primary",
       };
     case "success":
       return {
         iconWrap:
-          "border-state-success/20 bg-state-success/12 text-state-success-text shadow-[0_18px_40px_rgba(16,185,129,0.14)]",
+          "border-state-success/20 bg-state-success/12 text-state-success-text shadow-state-success",
         value: "text-state-success-text",
       };
     case "warning":
       return {
         iconWrap:
-          "border-state-warning/20 bg-state-warning/12 text-state-warning-text shadow-[0_18px_40px_rgba(245,158,11,0.14)]",
+          "border-state-warning/20 bg-state-warning/12 text-state-warning-text shadow-state-warning",
         value: "text-state-warning-text",
       };
     case "danger":
       return {
         iconWrap:
-          "border-state-danger/20 bg-state-danger/12 text-state-danger-text shadow-[0_18px_40px_rgba(239,68,68,0.14)]",
+          "border-state-danger/20 bg-state-danger/12 text-state-danger-text shadow-state-danger",
         value: "text-state-danger-text",
       };
     default:

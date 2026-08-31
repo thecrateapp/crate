@@ -20,6 +20,9 @@ describe("stats surface shadows", () => {
     expect(
       screen.getByRole("heading", { name: "Operations" }).closest("section"),
     ).toHaveClass("shadow-card");
+    expect(document.querySelector(".shadow-accent-action-status")).toHaveClass(
+      "shadow-accent-action-status",
+    );
   });
 
   it("uses the semantic card shadow for panels", () => {
@@ -40,5 +43,23 @@ describe("stats surface shadows", () => {
     expect(screen.getByText("Shows").closest(".shadow-card")).toHaveClass(
       "shadow-card",
     );
+  });
+
+  it.each([
+    ["primary", "shadow-accent-action-status"],
+    ["success", "shadow-state-success"],
+    ["warning", "shadow-state-warning"],
+    ["danger", "shadow-state-danger"],
+  ] as const)("uses the semantic %s status glow", (tone, shadowClass) => {
+    render(
+      <OpsStatTile
+        icon={MapPin}
+        label={`${tone} metric`}
+        value="12"
+        tone={tone}
+      />,
+    );
+
+    expect(document.querySelector(`.${shadowClass}`)).toHaveClass(shadowClass);
   });
 });
