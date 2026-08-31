@@ -7,7 +7,7 @@ import {
 import { cn } from "@crate/ui/lib/cn";
 
 export const APP_FLOATING_SURFACE_BASE =
-  "rounded-md border border-[var(--idle-border)] bg-popover-surface shadow-[0_24px_64px_rgba(0,0,0,0.42)] backdrop-blur-xl animate-pop-in";
+  "rounded-md border border-[var(--idle-border)] bg-popover-surface shadow-popover backdrop-blur-xl animate-pop-in";
 export const APP_POPOVER_SURFACE = `z-app-popover ${APP_FLOATING_SURFACE_BASE}`;
 export const APP_CONTEXT_MENU_SURFACE = `z-app-context-menu ${APP_FLOATING_SURFACE_BASE}`;
 export const APP_DROPDOWN_SURFACE = `z-app-dropdown ${APP_FLOATING_SURFACE_BASE}`;

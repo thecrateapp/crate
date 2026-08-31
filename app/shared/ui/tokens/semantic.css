@@ -833,6 +833,14 @@
   --shadow-icon-control: var(--icon-control-shadow);
   --shadow-chrome: var(--chrome-shadow);
   --shadow-menu: var(--menu-shadow);
+  --shadow-card: 0 24px 64px
+    color-mix(in srgb, var(--surface-glass-shadow) 46%, transparent);
+  --shadow-popover: 0 24px 64px
+    color-mix(in srgb, var(--surface-glass-shadow) 88%, transparent);
+  --shadow-modal: 0 32px 80px
+    color-mix(in srgb, var(--surface-glass-shadow) 96%, transparent);
+  --shadow-sheet: 0 32px 80px
+    color-mix(in srgb, var(--surface-glass-shadow) 88%, transparent);
   --shadow-accent-action: 0 0 20px var(--accent-action-glow);
   --shadow-accent-action-glow: 0 0 18px var(--accent-action-glow);
   --shadow-accent-action-soft: 0 0 18px var(--accent-action-glow-soft);
