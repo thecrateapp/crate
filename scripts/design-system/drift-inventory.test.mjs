@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -130,4 +131,15 @@ test("enforces the normalized semantic token budget", () => {
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,
   );
   assert.deepEqual(metrics.duplicateTokenGroups, []);
+});
+
+test("keeps shared animation colors skin-aware", () => {
+  const animations = readFileSync(
+    new URL("../../app/shared/ui/tokens/animations.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(animations, /#[0-9a-f]{3,8}\b|rgba?\(/i);
+  assert.match(animations, /var\(--accent-action\)/);
+  assert.match(animations, /var\(--surface-glass-shadow\)/);
 });

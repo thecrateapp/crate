@@ -45,7 +45,11 @@
     var(--accent-action) 28%,
     transparent
   );
-  --surface-glass-hover-shadow: rgba(0, 0, 0, 0.38);
+  --surface-glass-hover-shadow: color-mix(
+    in srgb,
+    var(--surface-glass-shadow) 79%,
+    transparent
+  );
   --surface-accent-subtle: color-mix(
     in srgb,
     var(--accent-action) 12%,
@@ -443,9 +447,14 @@
     color-mix(in srgb, var(--focus-ring) 8%, transparent);
   --control-inset-shadow: inset 0 1px 0
     color-mix(in srgb, var(--text-primary) 4%, transparent);
-  --icon-control-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  --chrome-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
-  --menu-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --icon-control-shadow: 0 8px 24px
+    color-mix(in srgb, var(--surface-glass-shadow) 58%, transparent);
+  --chrome-shadow: 0 12px 32px
+    color-mix(in srgb, var(--surface-glass-shadow) 38%, transparent);
+  --menu-shadow: 0 25px 50px -12px color-mix(in srgb, var(
+          --surface-glass-shadow
+        )
+        52%, transparent);
   --scrim-hero-strong: rgba(0, 0, 0, 0.65);
   --scrim-hero-medium: rgba(0, 0, 0, 0.3);
 
