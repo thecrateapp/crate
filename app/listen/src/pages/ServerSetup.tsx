@@ -127,7 +127,7 @@ export function ServerSetup() {
         className="relative w-full max-w-[560px] rounded-[12px] border border-border-quiet bg-surface-elevated/90 p-8 shadow-card backdrop-blur-xl sm:p-10"
       >
         <div className="flex flex-col items-center text-center">
-          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-xl border border-accent-action/20 bg-accent-action/10 shadow-[0_0_50px_-24px_rgba(34,211,238,0.9)]">
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-xl border border-accent-action/20 bg-accent-action/10 shadow-accent-action-strong">
             <img src="/icons/logo.svg" alt="Crate" className="h-14 w-14" />
           </div>
           <h1 className="text-balance text-3xl font-bold tracking-[-0.04em] text-text-primary sm:text-4xl">

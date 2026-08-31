@@ -81,6 +81,9 @@ describe("AlbumCard", () => {
       <AlbumCard artist="Hum" album="Inlet" albumId={42} layout="grid" />,
     );
 
+    expect(
+      screen.getByRole("button", { name: "Add to collection" }),
+    ).toHaveClass("shadow-icon-control");
     const image = screen.getByAltText("Inlet");
     expect(image).toHaveAttribute("sizes");
     expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);

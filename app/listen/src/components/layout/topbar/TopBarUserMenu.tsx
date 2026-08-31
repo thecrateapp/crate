@@ -157,7 +157,7 @@ export function TopBarUserMenu() {
           aria-expanded={actionMenu.open}
           aria-haspopup="menu"
           aria-label={t("userMenu.label")}
-          className="flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-border-quiet bg-surface-canvas/30 text-sm font-medium text-text-primary/70 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-surface-canvas/50 hover:text-text-primary"
+          className="flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-border-quiet bg-surface-canvas/30 text-sm font-medium text-text-primary/70 shadow-icon-control backdrop-blur-sm transition-colors hover:bg-surface-canvas/50 hover:text-text-primary"
           {...actionMenu.longPressHandlers}
         >
           {avatarUrl ? (

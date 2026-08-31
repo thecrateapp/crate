@@ -233,7 +233,7 @@ export const AlbumCard = memo(function AlbumCard({
       >
         {(albumId != null || globalAlbumUid) && (
           <FollowHeartButton
-            className={`absolute top-2 right-2 z-10 flex h-9 min-h-11 w-9 min-w-11 items-center justify-center rounded-full border border-[var(--idle-border)] bg-surface-canvas/55 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-[color,filter,transform] hover:-translate-y-px md:min-h-0 md:min-w-0 ${
+            className={`absolute top-2 right-2 z-10 flex h-9 min-h-11 w-9 min-w-11 items-center justify-center rounded-full border border-[var(--idle-border)] bg-surface-canvas/55 shadow-icon-control backdrop-blur-md transition-[color,filter,transform] hover:-translate-y-px md:min-h-0 md:min-w-0 ${
               saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
             following={saved}

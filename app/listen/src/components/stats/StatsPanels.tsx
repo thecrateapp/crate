@@ -75,7 +75,7 @@ export function WindowPicker({
           onClick={() => onChange(option.value)}
           className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-black uppercase tracking-[0.12em] transition-all ${
             value === option.value
-              ? "bg-primary text-primary-foreground shadow-[0_0_24px_rgba(34,211,238,0.28)]"
+              ? "bg-primary text-primary-foreground shadow-accent-action"
               : "text-muted-foreground hover:bg-text-primary/5 hover:text-text-primary"
           }`}
         >
