@@ -83,9 +83,10 @@ export function UpcomingShowCard({
         "relative overflow-hidden rounded-xl border",
         expanded
           ? cn(
-              "border-primary/20 shadow-[0_12px_40px_rgba(6,182,212,0.10)] transition-[height,border-color,box-shadow] duration-400 ease-out",
-              featured &&
-                "border-primary/25 shadow-[0_18px_60px_rgba(6,182,212,0.14)]",
+              featured
+                ? "border-primary/25 shadow-accent-action-card-featured"
+                : "border-primary/20 shadow-accent-action-card",
+              "transition-[height,border-color,box-shadow] duration-400 ease-out",
             )
           : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-text-primary/[0.03]",
       )}

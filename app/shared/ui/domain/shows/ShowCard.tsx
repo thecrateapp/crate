@@ -331,7 +331,7 @@ export function ShowCard({
     return (
       <div
         className={cn(
-          "relative w-[340px] overflow-hidden rounded-md border border-text-primary/[0.06] bg-panel-surface shadow-[0_20px_48px_rgba(0,0,0,0.28)]",
+          "relative w-[340px] overflow-hidden rounded-md border border-text-primary/[0.06] bg-panel-surface shadow-card",
           className,
         )}
       >
@@ -355,7 +355,7 @@ export function ShowCard({
       className={cn(
         "relative w-full overflow-hidden rounded-md border",
         expanded
-          ? "border-primary/20 shadow-[0_12px_40px_rgba(6,182,212,0.10)] transition-[height,border-color,box-shadow] duration-400 ease-out"
+          ? "border-primary/20 shadow-accent-action-card transition-[height,border-color,box-shadow] duration-400 ease-out"
           : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-text-primary/[0.03]",
         className,
       )}

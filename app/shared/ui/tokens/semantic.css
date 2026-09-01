@@ -856,6 +856,10 @@
     color-mix(in srgb, var(--state-warning) 14%, transparent);
   --shadow-state-danger: 0 18px 40px
     color-mix(in srgb, var(--state-danger) 14%, transparent);
+  --shadow-accent-action-card: 0 12px 40px
+    color-mix(in srgb, var(--accent-action) 10%, transparent);
+  --shadow-accent-action-card-featured: 0 18px 60px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
   --shadow-popover: 0 24px 64px
     color-mix(in srgb, var(--surface-glass-shadow) 88%, transparent);
   --shadow-modal: 0 32px 80px
