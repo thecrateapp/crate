@@ -38,14 +38,14 @@ export function TranslationOverlay() {
           />
         ) : null}
         {hoveredMarker ? (
-          <div className="absolute right-4 bottom-4 rounded-md border border-accent-action/25 bg-surface-canvas/55 px-3 py-2 text-xs text-text-accent shadow-[0_18px_48px_rgba(0,0,0,0.42),0_0_18px_rgba(34,211,238,0.18)] backdrop-blur-xl">
+          <div className="absolute right-4 bottom-4 rounded-md border border-accent-action/25 bg-surface-canvas/55 px-3 py-2 text-xs text-text-accent shadow-translation-marker backdrop-blur-xl">
             <div className="font-semibold">Translation Mode</div>
             <code className="mt-1 block font-mono text-[11px] text-text-accent/85">
               {hoveredMarker.key}
             </code>
           </div>
         ) : (
-          <div className="absolute right-4 bottom-4 rounded-md border border-border-quiet bg-surface-canvas/45 px-3 py-2 text-xs text-text-primary/65 shadow-[0_18px_48px_rgba(0,0,0,0.36)] backdrop-blur-xl">
+          <div className="absolute right-4 bottom-4 rounded-md border border-border-quiet bg-surface-canvas/45 px-3 py-2 text-xs text-text-primary/65 shadow-translation-marker-muted backdrop-blur-xl">
             Translation Mode
           </div>
         )}
@@ -55,7 +55,7 @@ export function TranslationOverlay() {
         <section
           role="dialog"
           aria-label="Edit translation"
-          className="pointer-events-auto absolute right-4 bottom-20 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-accent-action/20 bg-surface-canvas/82 text-text-primary shadow-[0_24px_80px_rgba(0,0,0,0.52),0_0_28px_rgba(34,211,238,0.14)] backdrop-blur-2xl"
+          className="pointer-events-auto absolute right-4 bottom-20 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-accent-action/20 bg-surface-canvas/82 text-text-primary shadow-translation-editor backdrop-blur-2xl"
         >
           <div className="flex items-start justify-between gap-3 border-b border-border-quiet px-4 py-3">
             <div className="min-w-0">

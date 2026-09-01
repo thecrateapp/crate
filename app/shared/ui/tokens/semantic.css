@@ -860,6 +860,14 @@
     color-mix(in srgb, var(--accent-action) 10%, transparent);
   --shadow-accent-action-card-featured: 0 18px 60px
     color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --shadow-translation-marker: 0 18px 48px
+      color-mix(in srgb, var(--surface-glass-shadow) 87.5%, transparent),
+    0 0 18px var(--accent-action-glow-medium);
+  --shadow-translation-marker-muted: 0 18px 48px
+    color-mix(in srgb, var(--surface-glass-shadow) 75%, transparent);
+  --shadow-translation-editor: 0 24px 80px
+      color-mix(in srgb, var(--surface-glass-shadow) 92.31%, black 7.69%),
+    0 0 28px color-mix(in srgb, var(--accent-action) 14%, transparent);
   --shadow-popover: 0 24px 64px
     color-mix(in srgb, var(--surface-glass-shadow) 88%, transparent);
   --shadow-modal: 0 32px 80px
