@@ -1684,22 +1684,24 @@ export function Tasks() {
     }
 
     if (nextHighlights.length > 0) {
+      for (const item of nextHighlights) {
+        const existingTimer = highlightTimersRef.current[item.id];
+        if (existingTimer != null) {
+          window.clearTimeout(existingTimer);
+        }
+        highlightTimersRef.current[item.id] = window.setTimeout(() => {
+          setSettledHighlights((current) => {
+            const updated = { ...current };
+            delete updated[item.id];
+            return updated;
+          });
+          delete highlightTimersRef.current[item.id];
+        }, 8000);
+      }
       setSettledHighlights((prev) => {
         const next = { ...prev };
         for (const item of nextHighlights) {
           next[item.id] = { status: item.status };
-          const existingTimer = highlightTimersRef.current[item.id];
-          if (existingTimer != null) {
-            window.clearTimeout(existingTimer);
-          }
-          highlightTimersRef.current[item.id] = window.setTimeout(() => {
-            setSettledHighlights((current) => {
-              const updated = { ...current };
-              delete updated[item.id];
-              return updated;
-            });
-            delete highlightTimersRef.current[item.id];
-          }, 8000);
         }
         return next;
       });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { ArrowRight, MapPin, Play, Plus, Route } from "lucide-react";
 
 // ── Data ──────────────────────────────────────────────────────────
@@ -247,31 +247,60 @@ const DEMO_PATHS: Record<
 
 const PATH_KEYS = Object.keys(DEMO_PATHS) as Array<keyof typeof DEMO_PATHS>;
 
+interface PathPlaybackState {
+  activeStep: number;
+  animationReset: number;
+}
+
+type PathPlaybackAction =
+  | { type: "advance"; nodeCount: number }
+  | { type: "select"; index: number }
+  | { type: "reset" };
+
+function pathPlaybackReducer(
+  state: PathPlaybackState,
+  action: PathPlaybackAction,
+): PathPlaybackState {
+  if (action.type === "reset") {
+    return {
+      activeStep: 0,
+      animationReset: state.animationReset + 1,
+    };
+  }
+
+  if (action.type === "select") {
+    return { ...state, activeStep: action.index };
+  }
+
+  const nextStep = state.activeStep + 1;
+  if (nextStep >= action.nodeCount) {
+    return {
+      activeStep: 0,
+      animationReset: state.animationReset + 1,
+    };
+  }
+
+  return { ...state, activeStep: nextStep };
+}
+
 // ── Component ─────────────────────────────────────────────────────
 
 export function MusicPaths() {
   const [activePathKey, setActivePathKey] =
     useState<keyof typeof DEMO_PATHS>("nyhc-crank");
-  const [activeStep, setActiveStep] = useState(0);
+  const [playback, dispatchPlayback] = useReducer(pathPlaybackReducer, {
+    activeStep: 0,
+    animationReset: 0,
+  });
   const [playing, setPlaying] = useState(true);
   // Disable transition briefly when resetting to step 0 to avoid backward slide
   const [animate, setAnimate] = useState(true);
   const path = DEMO_PATHS[activePathKey]!;
   const nodeCount = path.nodes.length;
+  const { activeStep } = playback;
 
   const advance = useCallback(() => {
-    setActiveStep((prev) => {
-      const next = prev + 1;
-      if (next >= nodeCount) {
-        // Reset to start — disable transition so it doesn't slide backward
-        setAnimate(false);
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => setAnimate(true)),
-        );
-        return 0;
-      }
-      return next;
-    });
+    dispatchPlayback({ type: "advance", nodeCount });
   }, [nodeCount]);
 
   useEffect(() => {
@@ -281,10 +310,20 @@ export function MusicPaths() {
   }, [playing, advance]);
 
   useEffect(() => {
-    setAnimate(false);
-    setActiveStep(0);
-    requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
+    dispatchPlayback({ type: "reset" });
   }, [activePathKey]);
+
+  useEffect(() => {
+    setAnimate(false);
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => setAnimate(true));
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [playback.animationReset]);
 
   return (
     <section className="relative mx-auto max-w-[1400px] px-5 py-20 sm:px-8 sm:py-28">
@@ -420,7 +459,9 @@ export function MusicPaths() {
                   return (
                     <button
                       key={i}
-                      onClick={() => setActiveStep(i)}
+                      onClick={() =>
+                        dispatchPlayback({ type: "select", index: i })
+                      }
                       className="group relative flex h-4 w-4 flex-shrink-0 items-center justify-center"
                       title={`${node.track} — ${node.artist}`}
                     >

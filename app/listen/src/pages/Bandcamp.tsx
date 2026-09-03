@@ -490,7 +490,9 @@ function ItemActions({
       {item.item_url ? (
         <button
           type="button"
-          onClick={() => window.open(item.item_url || "", "_blank")}
+          onClick={() =>
+            window.open(item.item_url || "", "_blank", "noopener,noreferrer")
+          }
           className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-black text-white transition hover:bg-white/10"
         >
           <ExternalLink className="h-3.5 w-3.5" />
