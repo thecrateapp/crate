@@ -84,10 +84,14 @@ export function responsiveImageSrcSet(
   buildUrl: (size: number) => string,
 ): string | undefined {
   const candidates = [...new Set(widths)]
-    .filter((width) => Number.isFinite(width) && width > 0)
-    .sort((left, right) => left - right)
-    .map((width) => [Math.round(width), buildUrl(Math.round(width))] as const)
-    .filter(([, url]) => Boolean(url));
+    .reduce<Array<readonly [number, string]>>((items, width) => {
+      if (!Number.isFinite(width) || width <= 0) return items;
+      const roundedWidth = Math.round(width);
+      const url = buildUrl(roundedWidth);
+      if (url) items.push([roundedWidth, url]);
+      return items;
+    }, [])
+    .sort(([left], [right]) => left - right);
 
   return candidates.length
     ? candidates.map(([width, url]) => `${url} ${width}w`).join(", ")

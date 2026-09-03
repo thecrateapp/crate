@@ -437,9 +437,14 @@ export function useJamWebSocket({
 
           if (payload.type === "state_sync" && payload.room) {
             dispatch({ type: "APPLY_ROOM_DATA", payload: payload.room });
-            const eventIds = (payload.room.events || [])
-              .map((roomEvent) => Number(roomEvent.id))
-              .filter((eventId) => Number.isFinite(eventId) && eventId > 0);
+            const eventIds = (payload.room.events || []).reduce<number[]>(
+              (ids, roomEvent) => {
+                const eventId = Number(roomEvent.id);
+                if (Number.isFinite(eventId) && eventId > 0) ids.push(eventId);
+                return ids;
+              },
+              [],
+            );
             roomRevisionRef.current = Math.max(0, ...eventIds);
             seenEventIdsRef.current = new Set(eventIds);
             roomNameRef.current = payload.room.name;

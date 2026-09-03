@@ -431,14 +431,13 @@ function useHeroBackgroundPreloader(
     immediate.forEach((src) => loadSource(src, "high"));
 
     const cancelBackgroundWork = requestBackgroundWork(() => {
-      sources
-        .filter((src) => !immediate.has(src))
-        .forEach((src, index) => {
-          const timeout = window.setTimeout(() => {
-            if (!cancelled) loadSource(src, "low");
-          }, index * 220);
-          timeouts.push(timeout);
-        });
+      sources.forEach((src, index) => {
+        if (immediate.has(src)) return;
+        const timeout = window.setTimeout(() => {
+          if (!cancelled) loadSource(src, "low");
+        }, index * 220);
+        timeouts.push(timeout);
+      });
     });
 
     return () => {
@@ -878,7 +877,10 @@ function HeroBackdrop({
 
 function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
   const genres =
-    hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
+    hero.genres?.reduce<Array<{ name: string }>>((items, name) => {
+      if (name) items.push({ name });
+      return items;
+    }, []) ?? [];
 
   if (genres.length === 0) return null;
 

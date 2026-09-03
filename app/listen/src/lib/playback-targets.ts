@@ -279,35 +279,35 @@ export const crateConnectTargetProvider: PlaybackTargetProvider = {
     const currentDeviceId = getListenDeviceId();
     const activeConnectDeviceId = context?.activeConnectDeviceId;
     const response = await fetchConnectDevices();
-    return response.devices
-      .filter((device) => device.device_id !== currentDeviceId)
-      .map((device) => {
-        const available =
-          device.capabilities?.can_play !== false &&
-          device.capabilities?.can_receive_commands === true;
-        const active = activeConnectDeviceId === device.device_id;
-        return {
-          id: `crate:${device.device_id}`,
-          providerId: "crate-connect",
-          kind: "crate-device" as const,
-          name: connectDeviceName(device),
-          subtitle: active
-            ? "Playing through Crate Connect"
-            : device.active
-              ? "Active Crate device"
-              : "Recent Crate device",
-          active,
-          available,
-          unavailableReason: available
-            ? undefined
-            : connectDeviceUnavailableReason(device),
-          capabilities: {
-            canPlay: device.capabilities?.can_play !== false,
-            canSeek: available,
-            canSetVolume: device.capabilities?.can_set_volume === true,
-          },
-        };
+    return response.devices.reduce<PlaybackTarget[]>((targets, device) => {
+      if (device.device_id === currentDeviceId) return targets;
+      const available =
+        device.capabilities?.can_play !== false &&
+        device.capabilities?.can_receive_commands === true;
+      const active = activeConnectDeviceId === device.device_id;
+      targets.push({
+        id: `crate:${device.device_id}`,
+        providerId: "crate-connect",
+        kind: "crate-device" as const,
+        name: connectDeviceName(device),
+        subtitle: active
+          ? "Playing through Crate Connect"
+          : device.active
+            ? "Active Crate device"
+            : "Recent Crate device",
+        active,
+        available,
+        unavailableReason: available
+          ? undefined
+          : connectDeviceUnavailableReason(device),
+        capabilities: {
+          canPlay: device.capabilities?.can_play !== false,
+          canSeek: available,
+          canSetVolume: device.capabilities?.can_set_volume === true,
+        },
       });
+      return targets;
+    }, []);
   },
   selectTarget: async (target, context) => {
     if (isWsCrateConnectContext(context)) {

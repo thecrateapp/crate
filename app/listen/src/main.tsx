@@ -27,9 +27,11 @@ async function disableDevServiceWorker() {
   try {
     const cacheNames = await caches.keys();
     await Promise.all(
-      cacheNames
-        .filter((cacheName) => cacheName.startsWith("crate-listen"))
-        .map((cacheName) => caches.delete(cacheName)),
+      cacheNames.map((cacheName) =>
+        cacheName.startsWith("crate-listen")
+          ? caches.delete(cacheName)
+          : Promise.resolve(false),
+      ),
     );
   } catch {
     // Ignore cache cleanup failures; the next hard refresh can finish the reset.

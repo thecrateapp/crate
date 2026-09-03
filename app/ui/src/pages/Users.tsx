@@ -199,9 +199,9 @@ function toggleRole(current: string[], role: string) {
     if (current.length === 1) return current;
     return current.filter((candidate) => candidate !== role);
   }
-  const next = [...current, role];
+  const next = new Set([...current, role]);
   return ROLE_OPTIONS.map((option) => option.value).filter((candidate) =>
-    next.includes(candidate),
+    next.has(candidate),
   );
 }
 

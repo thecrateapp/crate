@@ -443,18 +443,23 @@ export function CommandPalette() {
                     icon: Settings,
                     capabilities: ["settings.manage"],
                   },
-                ]
-                  .filter((item) => hasAnyCapability(item.capabilities))
-                  .map((item) => (
-                    <Command.Item
-                      key={item.path}
-                      onSelect={() => go(item.path)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                    >
-                      <item.icon size={14} className="text-muted-foreground" />
-                      {item.label}
-                    </Command.Item>
-                  ))}
+                ].flatMap((item) =>
+                  hasAnyCapability(item.capabilities)
+                    ? [
+                        <Command.Item
+                          key={item.path}
+                          onSelect={() => go(item.path)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
+                        >
+                          <item.icon
+                            size={14}
+                            className="text-muted-foreground"
+                          />
+                          {item.label}
+                        </Command.Item>,
+                      ]
+                    : [],
+                )}
               </Command.Group>
             )}
 

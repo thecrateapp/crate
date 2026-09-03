@@ -961,6 +961,7 @@ export function DownloadPage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                          aria-label={`Add ${track.title} to wishlist`}
                           onClick={() =>
                             addToWishlist({
                               url: track.url,
@@ -977,6 +978,7 @@ export function DownloadPage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
+                          aria-label={`Download ${track.title}`}
                           onClick={() =>
                             startDownload(
                               track.url,
@@ -1381,6 +1383,7 @@ function QueueRow({
           variant="ghost"
           size="icon"
           className="h-7 w-7"
+          aria-label="Download now"
           onClick={() => onPromote(item.id)}
           title="Download now"
         >
@@ -1391,6 +1394,7 @@ function QueueRow({
         variant="ghost"
         size="icon"
         className="h-7 w-7 text-muted-foreground hover:text-destructive"
+        aria-label="Remove download"
         onClick={() => onRemove(item.id)}
       >
         <Trash2 size={12} />
@@ -1484,9 +1488,11 @@ function TidalArtistBrowser({
             size="sm"
             className="ml-auto"
             onClick={() => {
-              albums
-                .filter((a) => a.status === "available")
-                .forEach((a) => onDownload(a.url, `${a.artist} - ${a.title}`));
+              for (const album of albums) {
+                if (album.status === "available") {
+                  onDownload(album.url, `${album.artist} - ${album.title}`);
+                }
+              }
             }}
           >
             <Download size={12} className="mr-1" /> Download all missing (

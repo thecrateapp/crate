@@ -1470,11 +1470,10 @@ function AccountSection() {
   }
 
   const connectedAccounts = user?.connected_accounts || [];
-  const linkedProviders = new Set(
-    connectedAccounts
-      .filter((item) => item.status !== "unlinked")
-      .map((item) => item.provider),
-  );
+  const linkedProviders = connectedAccounts.reduce((providers, item) => {
+    if (item.status !== "unlinked") providers.add(item.provider);
+    return providers;
+  }, new Set<string>());
   const socialProviders = Object.entries(providers).filter(
     ([provider, state]) =>
       provider !== "password" && state.configured && state.enabled,

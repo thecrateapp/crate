@@ -2,6 +2,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -516,7 +517,10 @@ export function PlaylistEditor() {
   const basePlaylist = surface?.playlist ?? null;
   const isSmart = basePlaylist?.is_smart ?? false;
   const persistedSmartRules = basePlaylist?.smart_rules;
-  const currentSmartRules = { match, rules, limit, sort };
+  const currentSmartRules = useMemo(
+    () => ({ match, rules, limit, sort }),
+    [limit, match, rules, sort],
+  );
   const smartRulesChanged =
     isSmart &&
     JSON.stringify(currentSmartRules) !==

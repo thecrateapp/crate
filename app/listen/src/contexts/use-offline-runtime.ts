@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import type {
@@ -131,7 +138,9 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     return deriveOfflineProfileKey(user.id, origin);
   }, [supported, user?.id]);
   const activeProfileRef = useRef(profileKey);
-  activeProfileRef.current = profileKey;
+  useLayoutEffect(() => {
+    activeProfileRef.current = profileKey;
+  }, [profileKey]);
 
   const commitSnapshot = useCallback(
     (next: OfflineSnapshot, flush = false) => {
@@ -276,6 +285,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         },
       });
 
+      const readyKeys = new Set(midItem.readyAssetKeys || []);
       const pendingTracks = manifestTracks.filter((track) => {
         const assetKey = getOfflineTrackAssetKey(track);
         if (!assetKey) {
@@ -283,9 +293,8 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
           failureMessage = "One or more tracks are missing entity identifiers";
           return false;
         }
-        return !midItem.readyAssetKeys?.includes(assetKey);
+        return !readyKeys.has(assetKey);
       });
-      const readyKeys = new Set(midItem.readyAssetKeys || []);
       transferAbortRef.current?.abort();
       const transferController = new AbortController();
       transferAbortRef.current = transferController;

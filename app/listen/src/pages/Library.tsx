@@ -1056,7 +1056,13 @@ function BandcampTab() {
                 {item.item_url ? (
                   <button
                     type="button"
-                    onClick={() => window.open(item.item_url || "", "_blank")}
+                    onClick={() =>
+                      window.open(
+                        item.item_url || "",
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                    }
                     className="inline-flex min-h-10 items-center rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground"
                   >
                     <ExternalLink size={14} />

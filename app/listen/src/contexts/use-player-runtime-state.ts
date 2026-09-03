@@ -82,11 +82,10 @@ export function usePlayerRuntimeState() {
   const prevRestartTrackKeyRef = useRef<string | null>(null);
   const prevRestartedAtRef = useRef(0);
   const callbacksRef = useRef<GaplessPlayerCallbacks>({});
-  const engineInitRef = useRef(false);
+  const engineRef = useRef<ReturnType<typeof initGaplessPlayer> | null>(null);
 
-  if (!engineInitRef.current) {
-    engineInitRef.current = true;
-    initGaplessPlayer({
+  if (engineRef.current === null) {
+    engineRef.current = initGaplessPlayer({
       onTimeUpdate: (ms, idx) => callbacksRef.current.onTimeUpdate?.(ms, idx),
       onDurationChange: (ms) => callbacksRef.current.onDurationChange?.(ms),
       onLoad: (path, full, ms) => callbacksRef.current.onLoad?.(path, full, ms),

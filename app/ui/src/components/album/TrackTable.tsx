@@ -603,6 +603,7 @@ function TrackAudioInfo({ track }: { track: AudioAnalysisTrack }) {
             variant="ghost"
             size="icon-xs"
             className="text-muted-foreground hover:text-primary"
+            aria-label="Show audio profile"
           >
             <BarChart3 size={13} />
           </Button>

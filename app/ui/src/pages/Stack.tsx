@@ -116,6 +116,12 @@ function displayImage(image: string) {
   return image.split("@")[0] || image;
 }
 
+function createStackEventSource() {
+  return new EventSource("/api/admin/stack-stream", {
+    withCredentials: true,
+  });
+}
+
 function formatLogTimestamp(line: string) {
   const tsMatch = line.match(
     /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^ ]*)\s*/,
@@ -378,9 +384,7 @@ export function Stack() {
 
     const connect = () => {
       if (closed) return;
-      stream = new EventSource("/api/admin/stack-stream", {
-        withCredentials: true,
-      });
+      stream = createStackEventSource();
       stream.onmessage = (event) => {
         try {
           setSnapshot(JSON.parse(event.data) as StackSnapshotData);
