@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import type {
@@ -131,7 +138,9 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     return deriveOfflineProfileKey(user.id, origin);
   }, [supported, user?.id]);
   const activeProfileRef = useRef(profileKey);
-  activeProfileRef.current = profileKey;
+  useLayoutEffect(() => {
+    activeProfileRef.current = profileKey;
+  }, [profileKey]);
 
   const commitSnapshot = useCallback(
     (next: OfflineSnapshot, flush = false) => {

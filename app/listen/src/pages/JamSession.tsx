@@ -1,6 +1,7 @@
 import {
   useDeferredValue,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -644,20 +645,22 @@ export function JamSession() {
     isPlaying,
     playSource,
   });
-  playerActionsRef.current = {
-    play,
-    playAll,
-    pause,
-    resume,
-    seek,
-    setPlaybackRate,
-    syncJamQueue,
-    currentTrack,
-    isPlaying,
-    playSource,
-  };
   const currentTimeRef = useRef(currentTime);
-  currentTimeRef.current = currentTime;
+  useLayoutEffect(() => {
+    playerActionsRef.current = {
+      play,
+      playAll,
+      pause,
+      resume,
+      seek,
+      setPlaybackRate,
+      syncJamQueue,
+      currentTrack,
+      isPlaying,
+      playSource,
+    };
+    currentTimeRef.current = currentTime;
+  });
 
   const prevQualityRef = useRef<PlaybackDeliveryPreference | null>(null);
 

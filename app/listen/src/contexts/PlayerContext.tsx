@@ -2,6 +2,7 @@ import {
   useContext,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -563,50 +564,52 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     markSeekPosition,
   });
 
-  recoverActiveTrackRef.current = async () => {
-    const recoveryQueue = queueRef.current;
-    if (recoveryQueue.length === 0) return false;
-    const recoveryIndex = clampIndex(
-      currentIndexRef.current,
-      recoveryQueue.length,
-    );
-    const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
-    const nativePlayerActive = shouldUseAndroidNativePlayer();
-    const engineTracks = await toStartupEngineTracks(
-      recoveryQueue,
-      recoveryIndex,
-      undefined,
-      nativePlayerActive ? { target: "android-native" } : undefined,
-    );
-
-    if (nativePlayerActive) {
-      await androidNativeEngine.loadQueue({
-        revision: createQueueRevision(),
-        tracks: engineTracks,
-        currentIndex: recoveryIndex,
-        positionMs,
-        autoplay: true,
-        repeat: repeatRef.current,
-        crossfadeMs: effectiveCrossfadeMsRef.current,
-        volume: lastNonZeroVolumeRef.current,
-      });
-      return true;
-    }
-
-    gpLoadQueue(
-      buildEngineUrls(
+  useLayoutEffect(() => {
+    recoverActiveTrackRef.current = async () => {
+      const recoveryQueue = queueRef.current;
+      if (recoveryQueue.length === 0) return false;
+      const recoveryIndex = clampIndex(
+        currentIndexRef.current,
+        recoveryQueue.length,
+      );
+      const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+      const nativePlayerActive = shouldUseAndroidNativePlayer();
+      const engineTracks = await toStartupEngineTracks(
         recoveryQueue,
-        engineTracks.map((track) => track.url),
-      ),
-      recoveryIndex,
-      { restartIfSameIndex: true },
-    );
-    if (positionMs > 0) {
-      gpSeekTo(positionMs);
-    }
-    await gpPlay();
-    return true;
-  };
+        recoveryIndex,
+        undefined,
+        nativePlayerActive ? { target: "android-native" } : undefined,
+      );
+
+      if (nativePlayerActive) {
+        await androidNativeEngine.loadQueue({
+          revision: createQueueRevision(),
+          tracks: engineTracks,
+          currentIndex: recoveryIndex,
+          positionMs,
+          autoplay: true,
+          repeat: repeatRef.current,
+          crossfadeMs: effectiveCrossfadeMsRef.current,
+          volume: lastNonZeroVolumeRef.current,
+        });
+        return true;
+      }
+
+      gpLoadQueue(
+        buildEngineUrls(
+          recoveryQueue,
+          engineTracks.map((track) => track.url),
+        ),
+        recoveryIndex,
+        { restartIfSameIndex: true },
+      );
+      if (positionMs > 0) {
+        gpSeekTo(positionMs);
+      }
+      await gpPlay();
+      return true;
+    };
+  });
 
   const preResolveNextTrack = useCallback(() => {
     if (shouldUseAndroidNativePlayer()) return;
@@ -1811,7 +1814,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     restoreQueueSnapshot(snapshot);
   }, [commitJamQueueLocked, restoreQueueSnapshot]);
 
-  ensureJamQueueLockedRef.current = enterJamSession;
+  useLayoutEffect(() => {
+    ensureJamQueueLockedRef.current = enterJamSession;
+  }, [enterJamSession]);
 
   const clearQueueRef = useRef(clearQueue);
   useEffect(() => {
