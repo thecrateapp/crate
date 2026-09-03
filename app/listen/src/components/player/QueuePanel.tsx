@@ -243,7 +243,11 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
           const idx = currentIndex + 1 + i;
           return (
             <QueuePanelRow
-              key={`${track.id}-${idx}`}
+              key={
+                track.id ??
+                track.path ??
+                `${track.artist}-${track.album}-${track.title}`
+              }
               track={track}
               indexLabel={String(i + 1)}
               onJump={() => jumpTo(idx)}
@@ -269,7 +273,11 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
             </div>
             {played.map((track, i) => (
               <QueuePanelRow
-                key={`${track.id}-prev-${i}`}
+                key={`${
+                  track.id ??
+                  track.path ??
+                  `${track.artist}-${track.album}-${track.title}`
+                }-prev`}
                 track={track}
                 indexLabel={String(i + 1)}
                 onJump={() => jumpTo(i)}

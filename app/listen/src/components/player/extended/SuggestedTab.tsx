@@ -130,7 +130,12 @@ export function SuggestedTab() {
       </div>
       {tracks.map((track, index) => (
         <button
-          key={`${track.path}-${index}`}
+          key={
+            track.track_entity_uid ??
+            track.track_id ??
+            track.path ??
+            `${track.artist}-${track.album}-${track.title}`
+          }
           onClick={() =>
             play(
               toPlayableTrack({

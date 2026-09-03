@@ -561,10 +561,14 @@ export function Browse() {
 }
 
 function GridSkeletonBlock() {
+  const skeletonKeys = Array.from(
+    { length: 24 },
+    (_, index) => `browse-grid-skeleton-${index}`,
+  );
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-      {Array.from({ length: 24 }, (_, i) => (
-        <div key={i} className="bg-card border border-border rounded-md p-3">
+      {skeletonKeys.map((key) => (
+        <div key={key} className="bg-card border border-border rounded-md p-3">
           <Skeleton className="w-full aspect-square rounded-md mb-2" />
           <Skeleton className="h-4 w-3/4 mb-1" />
           <Skeleton className="h-3 w-1/2" />
@@ -575,10 +579,14 @@ function GridSkeletonBlock() {
 }
 
 function ListSkeletonBlock() {
+  const skeletonKeys = Array.from(
+    { length: 20 },
+    (_, index) => `browse-list-skeleton-${index}`,
+  );
   return (
     <div className="flex flex-col divide-y divide-border">
-      {Array.from({ length: 20 }, (_, i) => (
-        <div key={i} className="flex items-center gap-3 px-3 py-2">
+      {skeletonKeys.map((key) => (
+        <div key={key} className="flex items-center gap-3 px-3 py-2">
           <Skeleton className="w-10 h-10 rounded-md" />
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-3 w-16 ml-auto" />

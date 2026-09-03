@@ -360,18 +360,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto py-3">
-        {visibleNavItems.map((item, index) => {
+        {visibleNavItems.map((item) => {
           if ("section" in item) {
             return expanded ? (
               <div
-                key={`${item.section}-${index}`}
+                key={`section-${item.section}`}
                 className="px-4 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[0.18em] text-white/25"
               >
                 {item.section}
               </div>
             ) : (
               <div
-                key={`${item.section}-${index}`}
+                key={`divider-${item.section}`}
                 className="mx-4 my-3 border-t border-white/5"
               />
             );

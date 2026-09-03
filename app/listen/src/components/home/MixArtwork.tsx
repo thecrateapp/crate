@@ -10,6 +10,8 @@ import type {
 
 type MixLike = HomeGeneratedPlaylistSummary | HomeGeneratedPlaylistDetail;
 
+const MIX_TILE_KEYS = ["top-left", "top-right", "bottom-left", "bottom-right"];
+
 function tilePhoto(artist: HomeArtworkArtist): string | null {
   return (
     artistPhotoApiUrl(
@@ -41,12 +43,12 @@ export function MixArtwork({
       )}
     >
       <div className="grid h-full w-full grid-cols-2 grid-rows-2">
-        {Array.from({ length: 4 }).map((_, index) => {
+        {MIX_TILE_KEYS.map((key, index) => {
           const artist = artists[index];
           const photoUrl = artist ? tilePhoto(artist) : null;
           return (
             <div
-              key={`${artist?.artist_id ?? artist?.artist_name ?? index}`}
+              key={key}
               className="relative overflow-hidden bg-[linear-gradient(145deg,rgba(30,16,22,0.96),rgba(10,12,16,1))]"
             >
               {photoUrl ? (

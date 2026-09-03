@@ -327,7 +327,11 @@ export function HomePlaylist() {
           <div className="space-y-1">
             {trackRows.map((row, index) => (
               <TrackRow
-                key={row.id ?? `${row.path}-${index}`}
+                key={
+                  row.id ??
+                  row.path ??
+                  `${row.artist}-${row.album}-${row.title}`
+                }
                 track={row}
                 index={index + 1}
                 showCoverThumb

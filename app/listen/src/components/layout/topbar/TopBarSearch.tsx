@@ -412,7 +412,9 @@ export function TopBarSearch() {
               <>
                 {results.map((item, index) => (
                   <button
-                    key={`${item.type}-${item.label}-${index}`}
+                    key={`${item.type}-${item.navigateTo ?? item.label}-${
+                      item.nodeName ?? ""
+                    }`}
                     onClick={() => void selectItem(item)}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
                       index === activeIdx ? "bg-white/10" : "hover:bg-white/5"
@@ -490,7 +492,9 @@ export function TopBarSearch() {
                 </p>
                 {recents.map((recent, index) => (
                   <button
-                    key={`${recent.type ?? "query"}:${recent.label}:${index}`}
+                    key={`${recent.type ?? "query"}:${
+                      recent.navigateTo ?? recent.label
+                    }`}
                     onClick={() => selectRecent(recent)}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
                       index === activeIdx ? "bg-white/10" : "hover:bg-white/5"

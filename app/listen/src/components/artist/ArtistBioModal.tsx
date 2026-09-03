@@ -250,9 +250,11 @@ export function ArtistBioModal({
               Members
             </h3>
             <div className="space-y-1">
-              {members.map((m, i) => (
+              {members.map((m) => (
                 <div
-                  key={i}
+                  key={`${m.name}-${m.begin ?? ""}-${m.end ?? ""}-${
+                    m.attributes?.join(",") ?? ""
+                  }`}
                   className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0"
                 >
                   <div className="flex items-center gap-2">
@@ -294,9 +296,9 @@ export function ArtistBioModal({
         {/* External links */}
         {urls.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {urls.map((link, i) => (
+            {urls.map((link) => (
               <a
-                key={i}
+                key={link.url}
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"

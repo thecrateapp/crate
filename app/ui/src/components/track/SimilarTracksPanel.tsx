@@ -85,7 +85,7 @@ export function SimilarTracksPanel({
           )}
           {tracks.map((t, i) => (
             <button
-              key={t.path || i}
+              key={t.path || `${t.artist}-${t.album}-${t.title}`}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors text-left group"
               onClick={() => {
                 if (t.album) {

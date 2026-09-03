@@ -1013,9 +1013,9 @@ export function DownloadPage() {
             <div>
               {soulseekResults && soulseekResults.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {soulseekResults.map((r, i) => (
+                  {soulseekResults.map((r) => (
                     <SlskResultCard
-                      key={i}
+                      key={`${r.username}-${r.artist}-${r.album}-${r.totalSize}`}
                       result={r}
                       onDownload={() => downloadFromSoulseek(r)}
                     />
@@ -1186,9 +1186,9 @@ export function DownloadPage() {
                     onRemove={removeQueueItem}
                   />
                 ))}
-                {slskDownloads.map((d, i) => (
+                {slskDownloads.map((d) => (
                   <div
-                    key={`slsk-${i}`}
+                    key={`slsk-${d.username}-${d.artist}-${d.album}-${d.filename}`}
                     className="flex items-center gap-3 p-3 bg-card border border-border rounded-md"
                   >
                     <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center flex-shrink-0">
@@ -1936,7 +1936,7 @@ function SlskResultCard({
                 f.filename.replace(/\\/g, "/").split("/").pop() ?? f.filename;
               return (
                 <div
-                  key={i}
+                  key={`${f.filename}-${f.size}-${f.length}`}
                   className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-secondary/50"
                 >
                   <span className="text-[11px] text-muted-foreground w-5 text-right font-mono">

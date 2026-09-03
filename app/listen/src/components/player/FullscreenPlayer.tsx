@@ -975,7 +975,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
 
                 return (
                   <button
-                    key={i}
+                    key={`${line.time}-${line.text}`}
                     ref={active ? activeLyricRef : null}
                     onClick={() => {
                       triggerHaptic("selection");

@@ -379,7 +379,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
             </div>
             {items.map((item, index) => (
               <button
-                key={`${item.type}-${item.label}-${index}`}
+                key={`${item.type}-${item.path}`}
                 type="button"
                 onClick={() => go(item.path)}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${

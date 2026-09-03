@@ -1029,7 +1029,7 @@ function CreateSmartPlaylistPanel({
 
               return (
                 <div
-                  key={`${rule.field}-${index}`}
+                  key={`${rule.field}-${rule.op}-${rule.value}-${rule.rangeMin}-${rule.rangeMax}`}
                   className="rounded-md border border-white/10 bg-card/60 p-3"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">

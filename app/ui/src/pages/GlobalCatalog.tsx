@@ -320,9 +320,16 @@ export function GlobalCatalog() {
                     </span>
                   </div>
                   <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {candidate.sources.map((source, index) => (
+                    {candidate.sources.map((source) => (
                       <div
-                        key={`${source.source_kind}-${index}`}
+                        key={`${source.source_kind}-${
+                          source.node_uid ??
+                          source.local_entity_uid ??
+                          source.remote_entity_uid ??
+                          source.global_entity_uid ??
+                          source.match_method ??
+                          "source"
+                        }`}
                         className="rounded-md bg-white/[0.03] p-3 text-xs text-muted-foreground"
                       >
                         <div className="font-medium text-foreground">

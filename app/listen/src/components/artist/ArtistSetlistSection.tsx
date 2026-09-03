@@ -89,7 +89,7 @@ export function ArtistSetlistModal({
         <div className="flex-1 overflow-y-auto px-2 py-2">
           {setlist.map((track, i) => (
             <div
-              key={`${track.title}-${i}`}
+              key={`${track.title}-${track.frequency}-${track.play_count}`}
               className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-white/[0.03]"
             >
               <span className="w-5 shrink-0 text-right text-xs tabular-nums text-white/20">

@@ -54,6 +54,16 @@ const WINDOW_COPY_KEYS: Record<StatsWindow, { title: string; label: string }> =
   };
 
 const STATS_WINDOWS: StatsWindow[] = ["7d", "30d", "90d", "365d", "all_time"];
+const STATS_MOSAIC_TILE_KEYS = [
+  "top-left",
+  "top-right",
+  "middle-left",
+  "middle-right",
+  "bottom-left",
+  "bottom-right",
+  "last-left",
+  "last-right",
+];
 
 function normalizeWindowParam(value: string | null): StatsWindow {
   return STATS_WINDOWS.includes(value as StatsWindow)
@@ -609,11 +619,11 @@ function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
 
   return (
     <div className="absolute inset-0 grid grid-cols-2 opacity-80 sm:grid-cols-4">
-      {Array.from({ length: 8 }).map((_, index) => {
+      {STATS_MOSAIC_TILE_KEYS.map((key, index) => {
         const cover = covers[index % Math.max(covers.length, 1)];
         return (
           <div
-            key={index}
+            key={key}
             className={cn(
               "relative min-h-40 overflow-hidden bg-white/[0.04]",
               index % 3 === 0 && "scale-105",
@@ -694,7 +704,13 @@ function ReplayCard({
         ) : items.length ? (
           items.slice(0, 5).map((item, index) => (
             <button
-              key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
+              key={
+                item.track_id ??
+                item.global_track_uid ??
+                item.track_entity_uid ??
+                item.track_path ??
+                `${item.artist}-${item.album}-${item.title}`
+              }
               onClick={() => onPlayTrack(item)}
               className="flex w-full items-center gap-3 rounded-lg border border-transparent bg-black/15 px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
             >
@@ -1247,7 +1263,13 @@ function TopTracksPanel({
         ) : items.length ? (
           items.map((item, index) => (
             <button
-              key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
+              key={
+                item.track_id ??
+                item.global_track_uid ??
+                item.track_entity_uid ??
+                item.track_path ??
+                `${item.artist}-${item.album}-${item.title}`
+              }
               onClick={() => onPlayTrack(item)}
               className="group flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left transition hover:border-white/10 hover:bg-white/5"
             >
@@ -1303,7 +1325,12 @@ function TopArtistsPanel({
             .slice(0, 6)
             .map((item, index) => (
               <TopArtistCard
-                key={`${item.artist_name}-${index}`}
+                key={
+                  item.artist_id ??
+                  item.global_artist_uid ??
+                  item.artist_slug ??
+                  item.artist_name
+                }
                 item={item}
                 index={index}
               />
@@ -1391,7 +1418,7 @@ function TopAlbumsPanel({
         ) : items.length ? (
           items.slice(0, 12).map((item, index) => (
             <Link
-              key={`${item.artist}-${item.album}-${index}`}
+              key={item.global_album_uid ?? `${item.artist}-${item.album}`}
               to={albumPagePath({
                 albumId: item.album_id,
                 globalAlbumUid: item.global_album_uid,

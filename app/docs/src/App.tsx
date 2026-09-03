@@ -557,8 +557,8 @@ function Breadcrumbs() {
   return (
     <div className="mb-5 flex flex-wrap items-center gap-2 font-mono text-[12px] uppercase text-white/32">
       <Home size={14} />
-      {labels.map((label, index) => (
-        <div key={`${label}-${index}`} className="flex items-center gap-2">
+      {labels.map((label) => (
+        <div key={label} className="flex items-center gap-2">
           <ChevronRight size={12} />
           <span>{label}</span>
         </div>

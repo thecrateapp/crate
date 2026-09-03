@@ -106,6 +106,24 @@ function heroSelectionKey(hero: HomeHeroArtist): string {
   return hero.entity_uid || String(hero.id);
 }
 
+export function homeRecentItemKey(item: HomeRecentItem): string {
+  if (item.type === "playlist") return `playlist-${item.playlist_id}`;
+  if (item.type === "artist") {
+    return `artist-${
+      item.artist_id ??
+      item.artist_entity_uid ??
+      item.global_artist_uid ??
+      item.artist_name
+    }`;
+  }
+  return `album-${
+    item.album_id ??
+    item.album_entity_uid ??
+    item.global_album_uid ??
+    `${item.artist_name}-${item.album_name}`
+  }`;
+}
+
 function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
   const names = (item.artwork_artists || [])
     .map((artist) => artist.artist_name?.trim())
@@ -1384,9 +1402,9 @@ export function RecentlyPlayedSection({
             className="min-w-full snap-start"
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {pageItems.map((item, index) => (
+              {pageItems.map((item) => (
                 <RecentEntityRow
-                  key={`${item.type}-${pageIndex}-${index}`}
+                  key={homeRecentItemKey(item)}
                   item={item}
                   onClick={() => onOpenItem(item)}
                 />
@@ -1741,11 +1759,14 @@ export function RecommendedTracksSection({
             className="min-w-full snap-start"
           >
             <div className="grid gap-2 xl:grid-cols-3">
-              {pageTracks.map((track, index) => (
+              {pageTracks.map((track) => (
                 <TrackRow
-                  key={`${
-                    track.library_track_id ?? track.path ?? track.title
-                  }-${pageIndex}-${index}`}
+                  key={
+                    track.id ??
+                    track.entity_uid ??
+                    track.path ??
+                    `${track.artist}-${track.album}-${track.title}`
+                  }
                   track={track}
                   showArtist
                   showAlbum

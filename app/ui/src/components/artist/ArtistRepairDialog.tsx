@@ -656,7 +656,7 @@ export function ArtistRepairDialog({
             </div>
           ) : (
             <div className="space-y-3">
-              {(plan?.items ?? []).map((item, index) => {
+              {(plan?.items ?? []).map((item) => {
                 const severityTone =
                   SEVERITY_TONES[item.severity || "low"] || SEVERITY_TONES.low;
                 const detailsSummary = issueDetailsSummary(item.details);
@@ -668,7 +668,7 @@ export function ArtistRepairDialog({
                 const isSelected = selectedItemKeySet.has(planItemId);
                 return (
                   <div
-                    key={`${item.check_type}-${item.issue_id ?? index}`}
+                    key={itemKey}
                     className={`rounded-md border p-4 ${runStateTone(
                       runState.state,
                     )}`}

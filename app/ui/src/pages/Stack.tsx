@@ -315,11 +315,8 @@ function ServiceCard({
               {logs.logs
                 .split("\n")
                 .filter(Boolean)
-                .map((line, index) => (
-                  <StackLogLine
-                    key={`${container.name}-${index}`}
-                    line={line}
-                  />
+                .map((line) => (
+                  <StackLogLine key={`${container.name}-${line}`} line={line} />
                 ))}
             </div>
           ) : (

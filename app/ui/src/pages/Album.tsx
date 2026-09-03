@@ -610,9 +610,7 @@ export function SplitAlbumDialog({
               const checked = trackId != null && selectedTrackIds.has(trackId);
               return (
                 <label
-                  key={`${
-                    track.entity_uid || track.id || track.filename
-                  }-${index}`}
+                  key={track.entity_uid ?? String(track.id ?? track.filename)}
                   className="flex cursor-pointer items-center gap-3 border-b border-white/8 px-4 py-3 last:border-b-0 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-45"
                 >
                   <input
@@ -1006,8 +1004,11 @@ export function Album() {
         <div className="mx-auto w-full max-w-[1480px] px-4 pt-6 md:px-8">
           <Skeleton className="mb-4 h-6 w-48" />
           <div className="space-y-2">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+            {Array.from(
+              { length: 6 },
+              (_, index) => `album-track-skeleton-${index}`,
+            ).map((key) => (
+              <Skeleton key={key} className="h-10 w-full" />
             ))}
           </div>
         </div>
@@ -1204,9 +1205,9 @@ export function Album() {
                 No matches found on MusicBrainz
               </div>
             ) : (
-              matches.map((m, i) => (
+              matches.map((m) => (
                 <MatchCard
-                  key={i}
+                  key={`${m.title}-${m.artist}-${m.date ?? ""}`}
                   match={m}
                   onApply={() => setPendingMatch(m)}
                 />

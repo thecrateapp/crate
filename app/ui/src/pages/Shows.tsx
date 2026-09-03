@@ -380,9 +380,9 @@ export function Shows() {
         <div>
           {controls}
           <div className="space-y-2">
-            {filteredEvents.map((e, i) => (
+            {filteredEvents.map((e) => (
               <ShowListItem
-                key={e.id || i}
+                key={e.id || `${e.date}-${e.artist_name}-${e.venue}`}
                 show={e}
                 onClick={() => setSelectedShow(e)}
               />
@@ -463,11 +463,11 @@ function LiveMarkers({ events }: { events: ShowEvent[] }) {
   return (
     <>
       <PopupCenterer />
-      {events.map((e, i) => {
+      {events.map((e) => {
         const color = getGenreColor(e.artist_genres);
         return (
           <Marker
-            key={e.id || i}
+            key={e.id || `${e.date}-${e.artist_name}-${e.venue}`}
             position={[parseFloat(e.latitude!), parseFloat(e.longitude!)]}
             icon={coloredIcon(color)}
           >
@@ -501,11 +501,17 @@ function CalendarGrid({
     today.getMonth() + 1,
   ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-  const cells: (number | null)[] = [];
+  const cells: Array<{ key: string; day: number | null }> = [];
   const offset = (firstDay + 6) % 7;
-  for (let i = 0; i < offset; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
+  for (let slot = 0; slot < offset; slot++) {
+    cells.push({ key: `${year}-${month}-leading-${slot}`, day: null });
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push({ key: `${year}-${month}-${day}`, day });
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push({ key: `${year}-${month}-trailing-${cells.length}`, day: null });
+  }
 
   return (
     <div className="grid grid-cols-7 gap-px bg-border rounded-md overflow-hidden">
@@ -517,7 +523,8 @@ function CalendarGrid({
           {d}
         </div>
       ))}
-      {cells.map((day, i) => {
+      {cells.map((cell) => {
+        const day = cell.day;
         const dateStr = day
           ? `${year}-${String(month + 1).padStart(2, "0")}-${String(
               day,
@@ -527,7 +534,7 @@ function CalendarGrid({
         const isToday = dateStr === todayStr;
         return (
           <div
-            key={i}
+            key={cell.key}
             className={`bg-card min-h-[80px] p-1.5 ${
               !day ? "opacity-30" : ""
             } ${isToday ? "ring-1 ring-primary/40" : ""}`}
@@ -542,9 +549,9 @@ function CalendarGrid({
                   {day}
                 </div>
                 <div className="space-y-0.5">
-                  {dayEvents.slice(0, 3).map((e, j) => (
+                  {dayEvents.slice(0, 3).map((e) => (
                     <button
-                      key={j}
+                      key={e.id || `${e.date}-${e.artist_name}-${e.venue}`}
                       className="w-full text-left"
                       onClick={() => onSelectShow(e)}
                     >

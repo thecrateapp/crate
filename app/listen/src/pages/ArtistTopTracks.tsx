@@ -134,7 +134,11 @@ export function ArtistTopTracks() {
       <div className="rounded-xl border border-white/5 bg-white/[0.02]">
         {(topTracks || []).map((track, index) => (
           <TrackRow
-            key={`${track.id}-${index}`}
+            key={
+              track.id ??
+              track.track_entity_uid ??
+              `${track.artist}-${track.album}-${track.title}`
+            }
             track={trackRows[index]!}
             index={track.track || index + 1}
             showAlbum

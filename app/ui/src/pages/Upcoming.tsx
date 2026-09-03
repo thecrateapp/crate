@@ -92,9 +92,9 @@ interface UpcomingArtistRef {
 type ViewMode = "list" | "calendar";
 type TypeFilter = "all" | "releases" | "shows";
 
-function itemKey(item: UpcomingItem, index: number): string {
+function itemKey(item: UpcomingItem): string {
   return `${item.type}-${item.artist}-${
-    item.release_id ?? item.venue ?? index
+    item.release_id ?? item.url ?? item.venue ?? item.title
   }-${item.date}`;
 }
 
@@ -495,9 +495,9 @@ export function Upcoming() {
           }
           onDownload={releaseDownload}
           onDismiss={releaseDismiss}
-          onShowClick={(item, idx) => {
+          onShowClick={(item) => {
             setView("list");
-            setExpandedId(itemKey(item, idx));
+            setExpandedId(itemKey(item));
           }}
         />
       )}
@@ -539,8 +539,8 @@ function MonthGroup({
         <CrateChip>{items.length} items</CrateChip>
       </div>
       <div className="space-y-2">
-        {items.map((item, i) => {
-          const key = itemKey(item, i);
+        {items.map((item) => {
+          const key = itemKey(item);
           const isExpanded = expandedId === key;
           return (
             <div key={key}>
@@ -732,7 +732,7 @@ function CalendarView({
   onMonthChange: (dir: number) => void;
   onDownload?: (id: number) => void;
   onDismiss?: (id: number) => void;
-  onShowClick: (item: UpcomingItem, index: number) => void;
+  onShowClick: (item: UpcomingItem) => void;
 }) {
   const year = month.getFullYear();
   const m = month.getMonth();
@@ -795,12 +795,14 @@ function CalendarView({
 
       {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-px">
-        {Array.from({ length: startOffset }, (_, i) => (
-          <div
-            key={`empty-${i}`}
-            className="min-h-[92px] rounded-md border border-white/5 bg-white/[0.02]"
-          />
-        ))}
+        {Array.from({ length: startOffset }, (_, slot) => `empty-${slot}`).map(
+          (key) => (
+            <div
+              key={key}
+              className="min-h-[92px] rounded-md border border-white/5 bg-white/[0.02]"
+            />
+          ),
+        )}
         {Array.from({ length: daysInMonth }, (_, i) => {
           const day = i + 1;
           const dayItems = byDay.get(day) || [];
@@ -825,13 +827,13 @@ function CalendarView({
                 {day}
               </div>
               <div className="space-y-0.5">
-                {dayItems.slice(0, 3).map((item, idx) => (
+                {dayItems.slice(0, 3).map((item) => (
                   <CalendarPill
-                    key={idx}
+                    key={itemKey(item)}
                     item={item}
                     onDownload={onDownload}
                     onDismiss={onDismiss}
-                    onShowClick={() => onShowClick(item, idx)}
+                    onShowClick={() => onShowClick(item)}
                   />
                 ))}
                 {dayItems.length > 3 && (

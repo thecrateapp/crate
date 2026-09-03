@@ -11,6 +11,7 @@ import { CrateLoader } from "@/components/ui/CrateLoader";
 import {
   CoreTracksPlaylistCard,
   CustomMixCard,
+  homeRecentItemKey,
   RadioStationCard,
   RecentEntityRow,
   openRecentItemPath,
@@ -219,9 +220,9 @@ export function HomeSection() {
 
       {data.id === "recently-played" ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {data.items.map((item, index) => (
+          {data.items.map((item) => (
             <RecentEntityRow
-              key={`${item.type}-${index}`}
+              key={homeRecentItemKey(item)}
               item={item}
               onClick={() => navigate(openRecentItemPath(item))}
             />
@@ -273,9 +274,13 @@ export function HomeSection() {
 
       {data.id === "recommended-tracks" ? (
         <div className="space-y-2">
-          {recommendedTracks.map((track, index) => (
+          {recommendedTracks.map((track) => (
             <TrackRow
-              key={track.id ?? `${track.path}-${index}`}
+              key={
+                track.id ??
+                track.path ??
+                `${track.artist}-${track.album}-${track.title}`
+              }
               track={track}
               showArtist
               showAlbum

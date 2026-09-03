@@ -289,7 +289,11 @@ export function QueueTab() {
             const idx = currentIndex + 1 + i;
             return (
               <QueueTabRow
-                key={`next-${track.id}-${idx}`}
+                key={`next-${
+                  track.id ??
+                  track.path ??
+                  `${track.artist}-${track.album}-${track.title}`
+                }`}
                 track={track}
                 indexLabel={String(i + 1)}
                 onJump={() => jumpTo(idx)}
