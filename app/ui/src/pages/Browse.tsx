@@ -409,6 +409,7 @@ export function Browse() {
             variant={view === "grid" ? "secondary" : "ghost"}
             size="icon"
             className="h-9 w-9 rounded-none"
+            aria-label="Grid view"
             onClick={() => setView("grid")}
           >
             <LayoutGrid size={16} />
@@ -417,6 +418,7 @@ export function Browse() {
             variant={view === "list" ? "secondary" : "ghost"}
             size="icon"
             className="h-9 w-9 rounded-none"
+            aria-label="List view"
             onClick={() => setView("list")}
           >
             <List size={16} />
