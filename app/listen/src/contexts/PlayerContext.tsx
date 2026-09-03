@@ -81,6 +81,7 @@ import {
   androidNativeEngine,
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
+import { subscribeNativePlayerEvents } from "@/contexts/subscribe-native-player-events";
 import type {
   EngineEventMap,
   EngineEventName,
@@ -1494,88 +1495,49 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!shouldUseAndroidNativePlayer()) return;
     let disposed = false;
-    const removers: Array<() => void> = [];
-    const addListeners = async () => {
-      const positionRemove = await androidNativeEngine.on(
-        "positionChanged",
-        (event) => {
+    const nativeEventSubscription = subscribeNativePlayerEvents(
+      androidNativeEngine,
+      {
+        positionChanged: (event) => {
           if (disposed) return;
           applyNativePosition(event);
         },
-      );
-      removers.push(positionRemove);
-
-      const checkpointRemove = await androidNativeEngine.on(
-        "playEventCheckpoint",
-        (event) => {
+        playEventCheckpoint: (event) => {
           if (disposed) return;
           applyNativePosition(event);
         },
-      );
-      removers.push(checkpointRemove);
-
-      const stateRemove = await androidNativeEngine.on(
-        "stateChanged",
-        (event) => {
+        stateChanged: (event) => {
           if (disposed) return;
           applyNativeState(event);
         },
-      );
-      removers.push(stateRemove);
-
-      const trackRemove = await androidNativeEngine.on(
-        "trackChanged",
-        (event) => {
+        trackChanged: (event) => {
           if (disposed) return;
           applyNativeTrackChange(event);
         },
-      );
-      removers.push(trackRemove);
-
-      const bufferingRemove = await androidNativeEngine.on(
-        "bufferingChanged",
-        (event) => {
+        bufferingChanged: (event) => {
           if (disposed) return;
           handleNativeEvent("bufferingChanged", event);
         },
-      );
-      removers.push(bufferingRemove);
-
-      const nearEndRemove = await androidNativeEngine.on(
-        "nearQueueEnd",
-        (event) => {
+        nearQueueEnd: (event) => {
           if (disposed) return;
           handleNativeEvent("nearQueueEnd", event);
         },
-      );
-      removers.push(nearEndRemove);
-
-      const queueEndedRemove = await androidNativeEngine.on(
-        "queueEnded",
-        (event) => {
+        queueEnded: (event) => {
           if (disposed) return;
           handleNativeEvent("queueEnded", event);
         },
-      );
-      removers.push(queueEndedRemove);
-
-      const resumeAuthorizationRemove = await androidNativeEngine.on(
-        "resumeAuthorizationRequired",
-        (event) => {
+        resumeAuthorizationRequired: (event) => {
           if (disposed) return;
           handleNativeEvent("resumeAuthorizationRequired", event);
         },
-      );
-      removers.push(resumeAuthorizationRemove);
+        error: (event) => {
+          if (disposed) return;
+          handleNativeEvent("error", event);
+        },
+      },
+    );
 
-      const errorRemove = await androidNativeEngine.on("error", (event) => {
-        if (disposed) return;
-        handleNativeEvent("error", event);
-      });
-      removers.push(errorRemove);
-    };
-
-    void addListeners().catch((error) => {
+    void nativeEventSubscription.ready.catch((error) => {
       console.error("[native-player] failed to attach listeners:", error);
     });
 
@@ -1611,9 +1573,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       disposed = true;
       window.removeEventListener("crate:app-resumed", onNativeResume);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      for (const remove of removers) {
-        remove();
-      }
+      nativeEventSubscription.dispose();
     };
   }, [
     applyNativePosition,
