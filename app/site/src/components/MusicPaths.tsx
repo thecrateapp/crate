@@ -458,7 +458,7 @@ export function MusicPaths() {
 
                   return (
                     <button
-                      key={i}
+                      key={`${node.artist}-${node.track}`}
                       onClick={() =>
                         dispatchPlayback({ type: "select", index: i })
                       }
@@ -466,7 +466,7 @@ export function MusicPaths() {
                       title={`${node.track} — ${node.artist}`}
                     >
                       <div
-                        className={`rounded-full transition-all duration-300 ${
+                        className={`rounded-full transition-[background-color,height,width] duration-300 ${
                           isPast || isActive
                             ? "h-2 w-2 bg-cyan-400/70"
                             : "h-1.5 w-1.5 bg-white/20 group-hover:bg-white/40"
@@ -502,7 +502,7 @@ export function MusicPaths() {
           </div>
 
           {/* Current track card */}
-          <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 transition-all duration-300">
+          <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 transition-colors duration-300">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-cyan-400/15">
                 <Play
@@ -529,7 +529,7 @@ export function MusicPaths() {
                 {/* Energy bar */}
                 <div className="flex h-1 w-12 overflow-hidden rounded-full bg-white/10">
                   <div
-                    className="h-full rounded-full bg-cyan-400/60 transition-all duration-500"
+                    className="h-full rounded-full bg-cyan-400/60 transition-[width] duration-500"
                     style={{
                       width: `${path.nodes[activeStep]!.energy * 100}%`,
                     }}
