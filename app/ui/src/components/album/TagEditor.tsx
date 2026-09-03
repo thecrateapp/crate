@@ -127,8 +127,9 @@ export function TagEditor({
     );
   }
 
+  const currentGenreSet = new Set(currentGenres);
   const suggestedGenres = availableGenres.filter(
-    (g) => !currentGenres.includes(g.toLowerCase()),
+    (g) => !currentGenreSet.has(g.toLowerCase()),
   );
 
   return (

@@ -237,9 +237,10 @@ export function ArtistRepairDialog({
       const nextExecutableKeys = data.items
         .filter((item) => item.executable)
         .map((item) => repairPlanItemId(item));
+      const nextExecutableKeySet = new Set(nextExecutableKeys);
       setSelectedItemKeys((prev) => {
         const preserved = prev.filter((itemKey) =>
-          nextExecutableKeys.includes(itemKey),
+          nextExecutableKeySet.has(itemKey),
         );
         return preserved.length > 0 ? preserved : nextExecutableKeys;
       });
@@ -427,12 +428,16 @@ export function ArtistRepairDialog({
       ),
     [plan?.items],
   );
+  const selectedItemKeySet = useMemo(
+    () => new Set(selectedItemKeys),
+    [selectedItemKeys],
+  );
   const selectedExecutableItems = useMemo(
     () =>
       executableItems.filter((item) =>
-        selectedItemKeys.includes(repairPlanItemId(item)),
+        selectedItemKeySet.has(repairPlanItemId(item)),
       ),
-    [executableItems, selectedItemKeys],
+    [executableItems, selectedItemKeySet],
   );
 
   function repairStateForItem(item: RepairPlanItem): ItemRunState {
@@ -654,7 +659,7 @@ export function ArtistRepairDialog({
                 const isRunning =
                   runningItemKey != null && runningItemKey === itemKey;
                 const runState = repairStateForItem(item);
-                const isSelected = selectedItemKeys.includes(planItemId);
+                const isSelected = selectedItemKeySet.has(planItemId);
                 return (
                   <div
                     key={`${item.check_type}-${item.issue_id ?? index}`}

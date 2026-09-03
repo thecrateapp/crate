@@ -74,10 +74,12 @@ export function PlaylistArtwork({
   renderImage,
 }: PlaylistArtworkProps) {
   const collageSources: string[] = [];
+  const collageSourceSet = new Set<string>();
   for (const track of tracks) {
     const source = buildCoverUrl(track);
-    if (source && !collageSources.includes(source)) {
+    if (source && !collageSourceSet.has(source)) {
       collageSources.push(source);
+      collageSourceSet.add(source);
     }
     if (collageSources.length >= 4) break;
   }

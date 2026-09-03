@@ -285,6 +285,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         },
       });
 
+      const readyKeys = new Set(midItem.readyAssetKeys || []);
       const pendingTracks = manifestTracks.filter((track) => {
         const assetKey = getOfflineTrackAssetKey(track);
         if (!assetKey) {
@@ -292,9 +293,8 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
           failureMessage = "One or more tracks are missing entity identifiers";
           return false;
         }
-        return !midItem.readyAssetKeys?.includes(assetKey);
+        return !readyKeys.has(assetKey);
       });
-      const readyKeys = new Set(midItem.readyAssetKeys || []);
       transferAbortRef.current?.abort();
       const transferController = new AbortController();
       transferAbortRef.current = transferController;
