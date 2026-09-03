@@ -269,10 +269,10 @@ function TaxonomyRelationField({
   const normalizedQuery = query.trim().toLowerCase();
   const suggestions = useMemo(() => {
     const candidates = options
-      .filter(
-        (option) => option.slug !== sourceSlug && !selected.has(option.slug),
-      )
       .filter((option) => {
+        if (option.slug === sourceSlug || selected.has(option.slug)) {
+          return false;
+        }
         if (!normalizedQuery) return true;
         return (
           option.slug.includes(normalizedQuery) ||
@@ -1144,8 +1144,11 @@ function GenreList() {
   const filtered = useMemo(() => {
     if (!genres) return [];
     return genres
-      .filter((g) => g.name.toLowerCase().includes(filter.toLowerCase()))
-      .filter((g) => !hideEmpty || g.artist_count > 0 || g.album_count > 0)
+      .filter(
+        (g) =>
+          g.name.toLowerCase().includes(filter.toLowerCase()) &&
+          (!hideEmpty || g.artist_count > 0 || g.album_count > 0),
+      )
       .sort((a, b) => b.artist_count - a.artist_count);
   }, [genres, filter, hideEmpty]);
 

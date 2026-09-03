@@ -1488,9 +1488,11 @@ function TidalArtistBrowser({
             size="sm"
             className="ml-auto"
             onClick={() => {
-              albums
-                .filter((a) => a.status === "available")
-                .forEach((a) => onDownload(a.url, `${a.artist} - ${a.title}`));
+              for (const album of albums) {
+                if (album.status === "available") {
+                  onDownload(album.url, `${album.artist} - ${album.title}`);
+                }
+              }
             }}
           >
             <Download size={12} className="mr-1" /> Download all missing (

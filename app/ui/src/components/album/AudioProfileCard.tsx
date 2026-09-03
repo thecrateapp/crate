@@ -65,9 +65,14 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
     }),
   );
 
-  const barData = Object.entries(features)
-    .filter(([, v]) => v > 0)
-    .map(([name, value]) => ({ name, value: Math.round(value * 100) }));
+  const barData = Object.entries(features).reduce<
+    Array<{ name: string; value: number }>
+  >((items, [name, value]) => {
+    if (value > 0) {
+      items.push({ name, value: Math.round(value * 100) });
+    }
+    return items;
+  }, []);
 
   const hasRadarData = radarDataFormatted.some((d) => d.value > 0);
 

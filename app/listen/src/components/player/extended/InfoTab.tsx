@@ -165,11 +165,16 @@ function parseMoodEntries(input: TrackInfo["mood_json"]) {
   }
 
   return Object.entries(source)
-    .map(([label, raw]) => ({
-      label: prettyLabel(label),
-      value: typeof raw === "number" ? raw : Number.NaN,
-    }))
-    .filter((entry) => Number.isFinite(entry.value) && entry.value > 0.04)
+    .reduce<Array<{ label: string; value: number }>>(
+      (entries, [label, raw]) => {
+        const value = typeof raw === "number" ? raw : Number.NaN;
+        if (Number.isFinite(value) && value > 0.04) {
+          entries.push({ label: prettyLabel(label), value });
+        }
+        return entries;
+      },
+      [],
+    )
     .sort((a, b) => b.value - a.value);
 }
 

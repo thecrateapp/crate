@@ -234,9 +234,10 @@ export function ArtistRepairDialog({
     try {
       const data = await api<ArtistRepairPlanResponse>(endpoint);
       setPlan(data);
-      const nextExecutableKeys = data.items
-        .filter((item) => item.executable)
-        .map((item) => repairPlanItemId(item));
+      const nextExecutableKeys = data.items.reduce<string[]>((keys, item) => {
+        if (item.executable) keys.push(repairPlanItemId(item));
+        return keys;
+      }, []);
       const nextExecutableKeySet = new Set(nextExecutableKeys);
       setSelectedItemKeys((prev) => {
         const preserved = prev.filter((itemKey) =>
@@ -462,9 +463,14 @@ export function ArtistRepairDialog({
   }
 
   async function executeRepair(items: RepairPlanItem[], mode: "one" | "all") {
-    const issues = items
-      .map((item) => item.issue)
-      .filter((issue) => issue && Object.keys(issue).length > 0);
+    const issues = items.reduce<Array<NonNullable<RepairPlanItem["issue"]>>>(
+      (issues, item) => {
+        const issue = item.issue;
+        if (issue && Object.keys(issue).length > 0) issues.push(issue);
+        return issues;
+      },
+      [],
+    );
     if (issues.length === 0) {
       toast.error("No executable fixes in this selection");
       return;

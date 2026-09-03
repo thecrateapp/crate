@@ -825,21 +825,37 @@ function CreateSmartPlaylistPanel({
 
   async function submit() {
     if (!name.trim()) return;
-    const payloadRules = rules.filter(ruleHasValue).map((rule) => {
+    const payloadRules = rules.reduce<
+      Array<{
+        field: string;
+        op: string;
+        value: string | number | [number, number];
+      }>
+    >((payloadRules, rule) => {
+      if (!ruleHasValue(rule)) return payloadRules;
       if (rule.op === "between") {
         const min = rule.rangeMin.trim() ? Number(rule.rangeMin) : 0;
         const max = rule.rangeMax.trim() ? Number(rule.rangeMax) : 9999;
-        return {
+        payloadRules.push({
           field: rule.field,
           op: "between",
-          value: [min, max] as [number, number],
-        };
+          value: [min, max],
+        });
+      } else if (getFieldType(rule.field) === "number") {
+        payloadRules.push({
+          field: rule.field,
+          op: rule.op,
+          value: Number(rule.value),
+        });
+      } else {
+        payloadRules.push({
+          field: rule.field,
+          op: rule.op,
+          value: rule.value.trim(),
+        });
       }
-      if (getFieldType(rule.field) === "number") {
-        return { field: rule.field, op: rule.op, value: Number(rule.value) };
-      }
-      return { field: rule.field, op: rule.op, value: rule.value.trim() };
-    });
+      return payloadRules;
+    }, []);
 
     if (payloadRules.length === 0) {
       toast.error("Add at least one smart rule");

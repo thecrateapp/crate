@@ -61,20 +61,20 @@ export function Shows() {
     : data?.summary;
 
   const filtered = useMemo(() => {
-    let next = items;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      next = next.filter(
-        (item) =>
-          item.artist.toLowerCase().includes(q) ||
-          item.title.toLowerCase().includes(q) ||
-          item.subtitle.toLowerCase().includes(q),
-      );
-    }
-    if (filter === "shows") next = next.filter((item) => item.type === "show");
-    if (filter === "releases")
-      next = next.filter((item) => item.type === "release");
-    return next;
+    const query = search.trim().toLowerCase();
+    return items.filter((item) => {
+      if (
+        query &&
+        !item.artist.toLowerCase().includes(query) &&
+        !item.title.toLowerCase().includes(query) &&
+        !item.subtitle.toLowerCase().includes(query)
+      ) {
+        return false;
+      }
+      if (filter === "shows") return item.type === "show";
+      if (filter === "releases") return item.type === "release";
+      return true;
+    });
   }, [filter, items, search]);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -96,9 +96,11 @@ export function Shows() {
     filtered.some((item) => isSameUpcomingItem(item, featuredCandidate))
       ? featuredCandidate
       : null;
-  const comingUp = filtered
-    .filter((item) => item.is_upcoming || item.date >= today)
-    .filter((item) => !featuredShow || !isSameUpcomingItem(item, featuredShow));
+  const comingUp = filtered.filter(
+    (item) =>
+      (item.is_upcoming || item.date >= today) &&
+      (!featuredShow || !isSameUpcomingItem(item, featuredShow)),
+  );
   const recentlyReleased = filtered
     .filter(
       (item) =>

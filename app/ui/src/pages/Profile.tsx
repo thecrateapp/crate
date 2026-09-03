@@ -20,11 +20,10 @@ export function Profile() {
   const [changingPw, setChangingPw] = useState(false);
 
   const connectedAccounts = user?.connected_accounts || [];
-  const linkedProviders = new Set(
-    connectedAccounts
-      .filter((item) => item.status !== "unlinked")
-      .map((item) => item.provider),
-  );
+  const linkedProviders = connectedAccounts.reduce((providers, item) => {
+    if (item.status !== "unlinked") providers.add(item.provider);
+    return providers;
+  }, new Set<string>());
 
   async function handleSaveProfile(e: FormEvent) {
     e.preventDefault();

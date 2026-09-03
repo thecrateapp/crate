@@ -144,32 +144,37 @@ export const AlbumCard = memo(function AlbumCard({
     setPlaying(true);
     try {
       const data = await api<AlbumData>(albumApiPath(albumRouteInput));
-      const playerTracks: Track[] = (data.tracks || [])
-        .filter((track) => track.is_available !== false)
-        .map((track) =>
-          toPlayableTrack(
-            {
-              id: track.id,
-              entity_uid: track.entity_uid,
-              globalTrackUid:
-                track.globalTrackUid ??
-                track.global_track_uid ??
-                track.global_uid,
-              global_artist_uid: data.global_artist_uid,
-              global_album_uid:
-                data.global_album_uid ?? globalAlbumUid ?? undefined,
-              title: track.tags?.title || track.filename || "Unknown",
-              artist: data.artist,
-              album: data.display_name || data.name,
-              path: track.path,
-              library_track_id:
-                typeof track.id === "number" && track.id > 0
-                  ? track.id
-                  : undefined,
-            },
-            { cover: coverUrl },
-          ),
-        );
+      const playerTracks = (data.tracks || []).reduce<Track[]>(
+        (tracks, track) => {
+          if (track.is_available === false) return tracks;
+          tracks.push(
+            toPlayableTrack(
+              {
+                id: track.id,
+                entity_uid: track.entity_uid,
+                globalTrackUid:
+                  track.globalTrackUid ??
+                  track.global_track_uid ??
+                  track.global_uid,
+                global_artist_uid: data.global_artist_uid,
+                global_album_uid:
+                  data.global_album_uid ?? globalAlbumUid ?? undefined,
+                title: track.tags?.title || track.filename || "Unknown",
+                artist: data.artist,
+                album: data.display_name || data.name,
+                path: track.path,
+                library_track_id:
+                  typeof track.id === "number" && track.id > 0
+                    ? track.id
+                    : undefined,
+              },
+              { cover: coverUrl },
+            ),
+          );
+          return tracks;
+        },
+        [],
+      );
       if (playerTracks.length > 0) {
         playAll(playerTracks, 0, {
           type: "album",
