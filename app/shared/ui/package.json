@@ -42,6 +42,10 @@
       "types": "./domain/*.tsx",
       "default": "./domain/*.tsx"
     },
+    "./domain/shows/show-types": {
+      "types": "./domain/shows/show-types.ts",
+      "default": "./domain/shows/show-types.ts"
+    },
     "./domain/actions": {
       "types": "./domain/actions/index.ts",
       "default": "./domain/actions/index.ts"
@@ -153,6 +157,10 @@
       "./domain/*": {
         "types": "./dist/domain/*.d.ts",
         "default": "./dist/domain/*.js"
+      },
+      "./domain/shows/show-types": {
+        "types": "./dist/domain/shows/show-types.d.ts",
+        "default": "./dist/domain/shows/show-types.js"
       },
       "./domain/actions": {
         "types": "./dist/domain/actions/index.d.ts",

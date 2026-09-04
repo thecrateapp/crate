@@ -437,6 +437,27 @@
   --state-success: var(--color-success);
   --state-warning: var(--color-warning);
   --state-info: var(--color-info);
+  --genre-tone-default: var(--accent-action);
+  --genre-tone-ink: color-mix(
+    in srgb,
+    var(--surface-canvas) 80%,
+    var(--text-primary)
+  );
+  --genre-tone-ink-strong: color-mix(
+    in srgb,
+    var(--surface-canvas) 70%,
+    var(--text-primary)
+  );
+  --genre-tone-warm: var(--state-warning);
+  --genre-tone-warm-strong: var(--state-danger);
+  --genre-tone-cool: var(--state-info);
+  --genre-tone-cool-accent: color-mix(
+    in srgb,
+    var(--state-info) 58%,
+    var(--accent-action)
+  );
+  --genre-tone-muted: var(--text-muted);
+  --genre-tone-success: var(--state-success);
   --visualizer-ribbon-stop-0: color-mix(
     in srgb,
     var(--accent-action) 0%,
