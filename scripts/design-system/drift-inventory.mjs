@@ -11,7 +11,15 @@ const IGNORED_DIRECTORIES = new Set([
   "node_modules",
 ]);
 
-const RAW_COLOR_PATTERN = /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?)\(/gi;
+const RAW_COLOR_PATTERN = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(/gi;
+const FOUNDATION_TOKEN_PATH_PATTERN = /^app\/shared\/ui\/tokens\//;
+const RAW_COLOR_ALLOWLIST = new Map([
+  [
+    "app/shared/ui/domain/auth/OAuthButtons.tsx",
+    /fill="#(?:4285F4|34A853|FBBC05|EA4335)"/gi,
+  ],
+  ["app/listen/src/lib/capacitor-init.ts", /color:\s*"#00000000"/gi],
+]);
 const COLOR_UTILITY_NAMES =
   "black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 const UTILITY_PATTERN = new RegExp(
@@ -91,6 +99,25 @@ export function analyzeContent(content) {
     ...utilityDrift,
     inlineStyles: countMatches(content, INLINE_STYLE_PATTERN),
     directShadcnImports: countMatches(content, DIRECT_SHADCN_IMPORT_PATTERN),
+  };
+}
+
+export function analyzeRawColorDrift(path, content) {
+  const rawColors = countMatches(content, RAW_COLOR_PATTERN);
+  const foundationRawColors = FOUNDATION_TOKEN_PATH_PATTERN.test(path)
+    ? rawColors
+    : 0;
+  const allowlistedRawColors = foundationRawColors
+    ? 0
+    : Math.min(
+        rawColors,
+        countMatches(content, RAW_COLOR_ALLOWLIST.get(path) ?? /$^/g),
+      );
+
+  return {
+    foundationRawColors,
+    allowlistedRawColors,
+    actionableRawColors: rawColors - foundationRawColors - allowlistedRawColors,
   };
 }
 
@@ -225,9 +252,11 @@ function collectFiles(directory, repoRoot, output) {
     if (/\.test\.[^.]+$/.test(entry.name)) continue;
 
     const content = readFileSync(filePath, "utf8");
+    const path = relative(repoRoot, filePath);
     output.push({
-      path: relative(repoRoot, filePath),
+      path,
       ...analyzeContent(content),
+      ...analyzeRawColorDrift(path, content),
     });
   }
 }
@@ -255,6 +284,9 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
   const totals = files.reduce(
     (result, file) => {
       result.rawColors += file.rawColors;
+      result.foundationRawColors += file.foundationRawColors;
+      result.allowlistedRawColors += file.allowlistedRawColors;
+      result.actionableRawColors += file.actionableRawColors;
       result.arbitraryUtilities += file.arbitraryUtilities;
       result.hardcodedColorUtilities += file.hardcodedColorUtilities;
       result.inlineStyles += file.inlineStyles;
@@ -264,6 +296,9 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
     {
       files: files.length,
       rawColors: 0,
+      foundationRawColors: 0,
+      allowlistedRawColors: 0,
+      actionableRawColors: 0,
       arbitraryUtilities: 0,
       hardcodedColorUtilities: 0,
       inlineStyles: 0,

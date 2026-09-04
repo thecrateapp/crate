@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   analyzeContent,
+  analyzeRawColorDrift,
   analyzeSemanticTokens,
   buildDriftInventory,
 } from "./drift-inventory.mjs";
@@ -13,6 +14,8 @@ test("counts raw colors, arbitrary utilities, inline styles and imports", () => 
     <div className="bg-[#0a0a0f] bg-[rgba(0,0,0,0.5)] text-white border-cyan-500 text-[10px] bg-[var(--surface-card)]" style={{ color: "#fff" }} />
     import { Button } from "@crate/ui/shadcn/button";
     background: rgba(0, 0, 0, 0.5);
+    function rgbToHsl() {}
+    function hslToRgb() {}
   `);
 
   assert.deepEqual(metrics, {
@@ -91,6 +94,30 @@ test("counts quoted token references used by runtime readers", () => {
   ]);
 });
 
+test("separates foundation and intentional raw colors from product drift", () => {
+  assert.deepEqual(
+    analyzeRawColorDrift(
+      "app/shared/ui/tokens/colors.css",
+      "--color-primary: #06b6d4;",
+    ),
+    { foundationRawColors: 1, allowlistedRawColors: 0, actionableRawColors: 0 },
+  );
+  assert.deepEqual(
+    analyzeRawColorDrift(
+      "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      'fill="#4285F4" fill="#34A853" fill="#FBBC05" fill="#EA4335"',
+    ),
+    { foundationRawColors: 0, allowlistedRawColors: 4, actionableRawColors: 0 },
+  );
+  assert.deepEqual(
+    analyzeRawColorDrift(
+      "app/listen/src/components/Example.tsx",
+      'style={{ color: "#123456" }}',
+    ),
+    { foundationRawColors: 0, allowlistedRawColors: 0, actionableRawColors: 1 },
+  );
+});
+
 test("detects surface tokens used in border and text declarations", () => {
   const metrics = analyzeSemanticTokens(`
     :root {
@@ -142,6 +169,7 @@ test("enforces the normalized semantic token budget", () => {
     inventory.totals.hardcodedColorUtilities <= 0,
     `hardcoded color utilities grew to ${inventory.totals.hardcodedColorUtilities}`,
   );
+  assert.equal(inventory.totals.actionableRawColors, 0);
   assert.ok(
     metrics.duplicateDefinitions <= 8,
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,
