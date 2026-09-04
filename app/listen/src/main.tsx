@@ -8,6 +8,7 @@ import { initCapacitor } from "./lib/capacitor";
 import { primeOfflineRuntimeProfile } from "./lib/offline";
 import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
+import { renderSecureSessionError } from "./lib/secure-session-error";
 import { initializeThemeSkin } from "@crate/ui/lib/theme-skin";
 import "./index.css";
 
@@ -64,24 +65,12 @@ function renderApp(): void {
   );
 }
 
-function renderSecureSessionError(): void {
-  const root = document.getElementById("root");
-  if (!root) return;
-  root.innerHTML = `
-    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#08090d;color:#f4f6fb;font-family:system-ui,sans-serif">
-      <section style="max-width:420px;text-align:center">
-        <h1 style="font-size:1.25rem;margin:0 0 12px">Unable to unlock this session</h1>
-        <p style="color:#98a2b8;margin:0 0 20px">Crate could not access the device secure storage. Restart the app and try again.</p>
-        <button type="button" onclick="window.location.reload()" style="border:0;border-radius:999px;padding:10px 18px;background:#13bde2;color:#061017;font-weight:700">Retry</button>
-      </section>
-    </main>`;
-}
-
 async function bootstrap(): Promise<void> {
   try {
     await bootstrapNativeSessionStore();
   } catch {
-    renderSecureSessionError();
+    const root = document.getElementById("root");
+    if (root) renderSecureSessionError(root);
     return;
   }
 

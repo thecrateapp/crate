@@ -21,6 +21,45 @@ body {
   background: var(--surface-canvas);
 }
 
+.listen-secure-session-error {
+  min-height: var(--listen-viewport-height);
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-brand), system-ui, sans-serif;
+}
+
+.listen-secure-session-error__content {
+  max-width: 26.25rem;
+  text-align: center;
+}
+
+.listen-secure-session-error__content h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.listen-secure-session-error__message {
+  margin: 0 0 1.25rem;
+  color: var(--text-muted);
+}
+
+.listen-secure-session-error__retry {
+  border: 0;
+  border-radius: 9999px;
+  padding: 0.625rem 1.125rem;
+  background: var(--accent-action);
+  color: var(--accent-action-foreground);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.listen-secure-session-error__retry:hover {
+  background: var(--accent-action-hover);
+}
+
 @media (min-width: 768px) {
   html {
     scrollbar-gutter: stable;
