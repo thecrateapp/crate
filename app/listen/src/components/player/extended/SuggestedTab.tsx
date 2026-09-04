@@ -95,7 +95,7 @@ export function SuggestedTab() {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 size={20} className="animate-spin text-primary" />
+        <Loader2 size={20} className="animate-spin text-accent-action" />
       </div>
     );
   }
@@ -165,7 +165,7 @@ export function SuggestedTab() {
             </span>
             <div className="h-1 w-12 overflow-hidden rounded-full bg-text-primary/5">
               <div
-                className="h-full rounded-full bg-primary/60"
+                className="h-full rounded-full bg-accent-action/60"
                 style={{ width: `${Math.min(track.score * 100, 100)}%` }}
               />
             </div>

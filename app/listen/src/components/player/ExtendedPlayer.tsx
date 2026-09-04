@@ -225,7 +225,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
 
   return (
     <div
-      className={`z-app-extended-player fixed inset-0 flex bg-app-surface transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform ${
+      className={`z-app-extended-player fixed inset-0 flex bg-surface-canvas transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform ${
         open
           ? "translate-y-0 opacity-100"
           : "pointer-events-none translate-y-full opacity-0"
@@ -233,7 +233,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     >
       <div
         ref={panelRef}
-        className="relative flex w-1/2 flex-col items-center justify-center overflow-hidden bg-app-surface"
+        className="relative flex w-1/2 flex-col items-center justify-center overflow-hidden bg-surface-canvas"
       >
         <div className="z-app-header absolute top-4 right-4 left-4 flex justify-between">
           <button
@@ -431,7 +431,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         </div>
       </div>
 
-      <div className="flex w-1/2 flex-col bg-app-surface">
+      <div className="flex w-1/2 flex-col bg-surface-canvas">
         <div className="flex items-center gap-1.5 px-5 pt-5 pb-3">
           {TABS.map((item) => (
             <button

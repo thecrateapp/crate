@@ -255,7 +255,7 @@ export function Artist() {
   if (status === 404) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">{t("artist.notFound")}</p>
+        <p className="text-text-muted">{t("artist.notFound")}</p>
       </div>
     );
   }
@@ -263,7 +263,7 @@ export function Artist() {
   if (error) {
     return (
       <div className="flex flex-col items-center gap-4 py-20 text-center">
-        <p className="text-muted-foreground">{t("artist.unavailable")}</p>
+        <p className="text-text-muted">{t("artist.unavailable")}</p>
         <Button className="rounded-lg" variant="outline" onClick={refetch}>
           {t("common.retry")}
         </Button>
@@ -274,7 +274,7 @@ export function Artist() {
   if (!data) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">{t("artist.notFound")}</p>
+        <p className="text-text-muted">{t("artist.notFound")}</p>
       </div>
     );
   }

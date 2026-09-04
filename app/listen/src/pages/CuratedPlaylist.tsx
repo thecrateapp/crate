@@ -396,9 +396,7 @@ export function CuratedPlaylist() {
   if (!data) {
     return (
       <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-muted-foreground">
-          {t("playlist.notFound")}
-        </p>
+        <p className="text-sm text-text-muted">{t("playlist.notFound")}</p>
       </div>
     );
   }
@@ -493,7 +491,7 @@ export function CuratedPlaylist() {
         offlineState === "ready"
           ? "text-text-accent drop-shadow-accent-action"
           : offlineBusy
-            ? "text-primary"
+            ? "text-accent-action"
             : offlineState === "error"
               ? "text-state-warning-text/90"
               : undefined,
@@ -612,7 +610,7 @@ export function CuratedPlaylist() {
 
       <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
         {offlineStatusDetail ? (
-          <p className="text-xs text-muted-foreground">{offlineStatusDetail}</p>
+          <p className="text-xs text-text-muted">{offlineStatusDetail}</p>
         ) : null}
 
         <PlaylistTrackFilterBar
@@ -624,13 +622,13 @@ export function CuratedPlaylist() {
 
         {data.tracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-text-muted">
               {t("playlist.empty.noTracks")}
             </p>
           </div>
         ) : filteredTracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-text-muted">
               {t("playlist.empty.noFilter")}
             </p>
           </div>

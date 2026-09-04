@@ -62,7 +62,7 @@ export function RadioFeedback({
           onClick={handleLike}
           className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
             liked
-              ? "bg-primary/15 text-primary"
+              ? "bg-accent-action/15 text-accent-action"
               : "text-text-primary/30 hover:bg-text-primary/5 hover:text-text-primary/60"
           }`}
           title={t("player.radio.moreLikeThis")}

@@ -64,12 +64,10 @@ function HomeTrackRowAction({
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">
+        <div className="truncate text-sm font-medium text-text-primary">
           {track.title}
         </div>
-        <div className="truncate text-xs text-muted-foreground">
-          {track.artist}
-        </div>
+        <div className="truncate text-xs text-text-muted">{track.artist}</div>
       </div>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
@@ -160,12 +158,10 @@ function HomeReplayRowAction({
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">
+        <div className="truncate text-sm font-medium text-text-primary">
           {item.title}
         </div>
-        <div className="truncate text-xs text-muted-foreground">
-          {item.artist}
-        </div>
+        <div className="truncate text-xs text-text-muted">{item.artist}</div>
       </div>
       <span className="home-replay-count-badge shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
         {item.play_count}×
@@ -242,10 +238,10 @@ function HomeQueueCardAction({
           </div>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-foreground">
+          <div className="truncate text-sm font-semibold text-text-primary">
             {track.title}
           </div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">
+          <div className="mt-1 truncate text-xs text-text-muted">
             {track.artist}
           </div>
           {track.album ? (
@@ -315,10 +311,10 @@ export function ContinueListeningSection({
             <Sparkles size={12} />
             Start listening
           </div>
-          <h2 className="text-2xl font-bold text-foreground">
+          <h2 className="text-2xl font-bold text-text-primary">
             Your home should feel alive as soon as playback starts.
           </h2>
-          <p className="text-sm leading-6 text-muted-foreground">
+          <p className="text-sm leading-6 text-text-muted">
             Play an album, a playlist, or a curated mix and this screen will
             turn into your real listening surface: continuity, smart picks, and
             system playlists from Crate.
@@ -352,7 +348,7 @@ export function ContinueListeningSection({
                 />
               ))
           ) : (
-            <div className="home-playback-empty-state rounded-lg px-4 py-5 text-sm text-muted-foreground">
+            <div className="home-playback-empty-state rounded-lg px-4 py-5 text-sm text-text-muted">
               Start playing music and your listening history will show up here.
             </div>
           )}
@@ -397,10 +393,10 @@ export function HomeReplaySection({
             <Sparkles size={12} />
             Crate DNA
           </div>
-          <h2 className="mt-4 text-2xl font-bold text-foreground">
+          <h2 className="mt-4 text-2xl font-bold text-text-primary">
             {replay?.title || "This month"}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          <p className="mt-2 text-sm leading-6 text-text-muted">
             {replay?.subtitle || "A playable recap of your current month."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -408,7 +404,7 @@ export function HomeReplaySection({
               <div className="home-replay-metric-label text-[10px] uppercase tracking-[0.16em]">
                 Tracks
               </div>
-              <div className="mt-1 text-sm font-semibold text-foreground">
+              <div className="mt-1 text-sm font-semibold text-text-primary">
                 {replay?.track_count ?? 0}
               </div>
             </div>
@@ -416,14 +412,14 @@ export function HomeReplaySection({
               <div className="home-replay-metric-label text-[10px] uppercase tracking-[0.16em]">
                 Time listened
               </div>
-              <div className="mt-1 text-sm font-semibold text-foreground">
+              <div className="mt-1 text-sm font-semibold text-text-primary">
                 {Math.round(replay?.minutes_listened ?? 0)}m
               </div>
             </div>
           </div>
           <button
             onClick={onPlayReplay}
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
           >
             <Play size={15} fill="currentColor" />
             Play month replay

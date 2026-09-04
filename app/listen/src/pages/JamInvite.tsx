@@ -38,14 +38,12 @@ export function JamInvite() {
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
-      <Loader2 size={22} className="animate-spin text-primary" />
+      <Loader2 size={22} className="animate-spin text-accent-action" />
       <div>
-        <p className="text-lg font-medium text-foreground">
+        <p className="text-lg font-medium text-text-primary">
           {t("jamInvite.title")}
         </p>
-        <p className="text-sm text-muted-foreground">
-          {t("jamInvite.subtitle")}
-        </p>
+        <p className="text-sm text-text-muted">{t("jamInvite.subtitle")}</p>
       </div>
     </div>
   );

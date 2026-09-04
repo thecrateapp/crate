@@ -206,8 +206,10 @@ function affinityBandLabel(band: PublicProfile["affinity_band"], t: TFunction) {
 function ProfileMiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="user-profile-stat rounded-xl px-3 py-2">
-      <div className="truncate text-lg font-black text-foreground">{value}</div>
-      <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="truncate text-lg font-black text-text-primary">
+        {value}
+      </div>
+      <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.14em] text-text-muted">
         {label}
       </div>
     </div>
@@ -258,10 +260,10 @@ function ContributionCard({
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-foreground">
+        <div className="truncate text-sm font-semibold text-text-primary">
           {contribution.album_name}
         </div>
-        <div className="truncate text-xs text-muted-foreground">
+        <div className="truncate text-xs text-text-muted">
           {contribution.artist_name}
         </div>
         <div className="user-profile-accent-label mt-1 text-[10px] font-bold uppercase tracking-[0.16em]">
@@ -338,12 +340,12 @@ export function UserProfile() {
   if (!data) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <p className="text-lg font-medium text-foreground">
+        <p className="text-lg font-medium text-text-primary">
           {t("userProfile.notFound")}
         </p>
         <Link
           to="/people"
-          className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+          className="inline-flex items-center gap-2 text-sm text-accent-action hover:underline"
         >
           <ArrowLeft size={14} />
           {t("userProfile.backToPeople")}
@@ -380,7 +382,7 @@ export function UserProfile() {
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-3xl font-bold text-foreground">
+                <h1 className="truncate text-3xl font-bold text-text-primary">
                   {displayName}
                 </h1>
                 {data.relationship_state.is_friend && !isOwnProfile ? (
@@ -389,7 +391,7 @@ export function UserProfile() {
                   </span>
                 ) : null}
               </div>
-              <div className="mt-1 text-sm text-muted-foreground">
+              <div className="mt-1 text-sm text-text-muted">
                 {data.username ? `@${data.username}` : t("people.noUsername")} ·{" "}
                 {t("userProfile.joined", { date: joinedDate })}
               </div>
@@ -408,7 +410,7 @@ export function UserProfile() {
                   ? "/stats"
                   : `/users/${data.username || username}/stats`
               }
-              className="inline-flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-action/25 bg-accent-action/10 px-4 py-2.5 text-sm font-semibold text-accent-action transition-colors hover:bg-accent-action/15"
             >
               <BarChart3 size={15} />
               {t("userProfile.actions.viewListeningDna")}
@@ -420,8 +422,8 @@ export function UserProfile() {
                 disabled={busy}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                   data.relationship_state.following
-                    ? "border border-border-quiet/15 bg-text-primary/5 text-foreground hover:bg-text-primary/10"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    ? "border border-border-quiet/15 bg-text-primary/5 text-text-primary hover:bg-text-primary/10"
+                    : "bg-accent-action text-accent-action-foreground hover:bg-accent-action/90"
                 }`}
               >
                 {busy ? (
@@ -438,7 +440,7 @@ export function UserProfile() {
             ) : (
               <Link
                 to="/settings"
-                className="inline-flex items-center gap-2 rounded-lg border border-border-quiet/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-text-primary/10"
+                className="inline-flex items-center gap-2 rounded-lg border border-border-quiet/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/10"
               >
                 {t("userProfile.actions.editAccount")}
               </Link>
@@ -448,36 +450,36 @@ export function UserProfile() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <div className="user-profile-card rounded-xl p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-text-muted">
               {t("people.followers")}
             </div>
             <Link
               to={
                 data.username ? `/users/${data.username}/followers` : "/people"
               }
-              className="mt-2 block text-2xl font-semibold text-foreground transition-colors hover:text-accent-action"
+              className="mt-2 block text-2xl font-semibold text-text-primary transition-colors hover:text-accent-action"
             >
               {data.followers_count}
             </Link>
           </div>
           <div className="user-profile-card rounded-xl p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-text-muted">
               {t("people.following")}
             </div>
             <Link
               to={
                 data.username ? `/users/${data.username}/following` : "/people"
               }
-              className="mt-2 block text-2xl font-semibold text-foreground transition-colors hover:text-accent-action"
+              className="mt-2 block text-2xl font-semibold text-text-primary transition-colors hover:text-accent-action"
             >
               {data.following_count}
             </Link>
           </div>
           <div className="user-profile-card rounded-xl p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-text-muted">
               {t("people.friends")}
             </div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="mt-2 text-2xl font-semibold text-text-primary">
               {data.friends_count}
             </div>
           </div>
@@ -503,10 +505,10 @@ export function UserProfile() {
             <div className="user-profile-accent-label text-[10px] font-bold uppercase tracking-[0.18em]">
               {t("userProfile.topSound")}
             </div>
-            <div className="mt-2 truncate text-lg font-black text-foreground">
+            <div className="mt-2 truncate text-lg font-black text-text-primary">
               {data.top_genre?.name || t("userProfile.stillMapping")}
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">
+            <div className="mt-1 text-xs text-text-muted">
               {data.top_genre
                 ? t("userProfile.topGenreStats", {
                     plays: t("common.playCount", {
@@ -532,7 +534,7 @@ export function UserProfile() {
             />
           </div>
           <div className="user-profile-card rounded-xl p-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-muted">
               {t("userProfile.badges.title")}
             </div>
             {badges.length ? (
@@ -549,7 +551,7 @@ export function UserProfile() {
                 ))}
               </div>
             ) : (
-              <div className="mt-2 text-sm text-muted-foreground">
+              <div className="mt-2 text-sm text-text-muted">
                 {t("userProfile.badges.empty")}
               </div>
             )}
@@ -560,12 +562,12 @@ export function UserProfile() {
       <section className="user-profile-card rounded-[12px] p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Users size={16} className="user-profile-accent-icon" />
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-text-primary">
             {t("userProfile.match.title")}
           </h2>
         </div>
         {isOwnProfile ? (
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm text-text-muted">
             {t("userProfile.match.ownProfile")}
           </p>
         ) : data.affinity_reasons.length > 0 ? (
@@ -580,7 +582,7 @@ export function UserProfile() {
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm text-text-muted">
             {t("userProfile.match.notEnough")}
           </p>
         )}
@@ -591,16 +593,16 @@ export function UserProfile() {
           <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <PackagePlus size={16} className="user-profile-accent-icon" />
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-text-primary">
                 {t("userProfile.contributions.title")}
               </h2>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-text-muted">
               {t("userProfile.contributions.subtitle")}
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {contributions.length === 0 ? (
-                <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-muted-foreground sm:col-span-2">
+                <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-text-muted sm:col-span-2">
                   {t("userProfile.contributions.empty")}
                 </div>
               ) : (
@@ -619,13 +621,13 @@ export function UserProfile() {
           <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <Music4 size={16} className="user-profile-accent-icon" />
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-text-primary">
                 {t("userProfile.playlists.title")}
               </h2>
             </div>
             <div className="mt-4 space-y-3">
               {data.public_playlists.length === 0 ? (
-                <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-muted-foreground">
+                <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-text-muted">
                   {t("userProfile.playlists.empty")}
                 </div>
               ) : (
@@ -652,10 +654,10 @@ export function UserProfile() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-foreground">
+                        <div className="truncate text-sm font-medium text-text-primary">
                           {playlist.name}
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
+                        <div className="mt-1 text-xs text-text-muted">
                           {t("common.trackCountLabel", {
                             count: playlist.track_count,
                           })}
@@ -669,7 +671,7 @@ export function UserProfile() {
                             : ""}
                         </div>
                         {playlist.description ? (
-                          <div className="mt-1 truncate text-xs text-muted-foreground">
+                          <div className="mt-1 truncate text-xs text-text-muted">
                             {playlist.description}
                           </div>
                         ) : null}
@@ -685,7 +687,7 @@ export function UserProfile() {
         <section className="space-y-6">
           <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-text-primary">
                 {t("people.followers")}
               </h2>
               {data.username ? (
@@ -716,10 +718,10 @@ export function UserProfile() {
                       className="h-10 w-10"
                     />
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-foreground">
+                      <div className="truncate text-sm font-medium text-text-primary">
                         {label}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">
+                      <div className="truncate text-xs text-text-muted">
                         {item.username
                           ? `@${item.username}`
                           : t("userProfile.profile")}
@@ -729,7 +731,7 @@ export function UserProfile() {
                 );
               })}
               {!followers || followers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-text-muted">
                   {t("userProfile.followers.empty")}
                 </p>
               ) : null}
@@ -738,7 +740,7 @@ export function UserProfile() {
 
           <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-text-primary">
                 {t("people.following")}
               </h2>
               {data.username ? (
@@ -769,10 +771,10 @@ export function UserProfile() {
                       className="h-10 w-10"
                     />
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-foreground">
+                      <div className="truncate text-sm font-medium text-text-primary">
                         {label}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">
+                      <div className="truncate text-xs text-text-muted">
                         {item.username
                           ? `@${item.username}`
                           : t("userProfile.profile")}
@@ -782,7 +784,7 @@ export function UserProfile() {
                 );
               })}
               {!following || following.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-text-muted">
                   {t("userProfile.following.empty")}
                 </p>
               ) : null}

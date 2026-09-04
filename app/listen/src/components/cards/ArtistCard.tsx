@@ -178,7 +178,7 @@ export function ArtistCard({
               <div className="pointer-events-none flex translate-y-2 items-center justify-center gap-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
                 <button
                   type="button"
-                  className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+                  className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-lg"
                   onClick={async (event) => {
                     event.stopPropagation();
                     if (!hasPlayableArtist) return;
@@ -223,7 +223,7 @@ export function ArtistCard({
                   className={cn(
                     "pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-sm",
                     following
-                      ? "border-primary/30 bg-primary/15 text-primary"
+                      ? "border-accent-action/30 bg-accent-action/15 text-accent-action"
                       : "border-text-primary/16 bg-surface-canvas/35 text-text-primary",
                   )}
                   onClick={async (event) => {
@@ -252,11 +252,11 @@ export function ArtistCard({
           </>
         ) : null}
       </ArtworkSurface>
-      <div className="truncate text-sm font-medium text-foreground text-center">
+      <div className="truncate text-sm font-medium text-text-primary text-center">
         {name}
       </div>
       {subtitle && (
-        <div className="truncate text-xs text-muted-foreground text-center">
+        <div className="truncate text-xs text-text-muted text-center">
           {subtitle}
         </div>
       )}

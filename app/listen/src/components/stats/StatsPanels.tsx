@@ -23,12 +23,10 @@ export function OverviewCard({
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-text-primary/40">
             {label}
           </p>
-          <p className="mt-3 text-2xl font-bold text-foreground">{value}</p>
-          {hint ? (
-            <p className="mt-2 text-sm text-muted-foreground">{hint}</p>
-          ) : null}
+          <p className="mt-3 text-2xl font-bold text-text-primary">{value}</p>
+          {hint ? <p className="mt-2 text-sm text-text-muted">{hint}</p> : null}
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-accent-action/15 bg-accent-action/10 text-accent-action">
           <Icon size={18} />
         </div>
       </div>
@@ -48,9 +46,9 @@ export function StatsSection({
   return (
     <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <div className="mb-5">
-        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
         {subtitle ? (
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+          <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
         ) : null}
       </div>
       {children}
@@ -75,8 +73,8 @@ export function WindowPicker({
           onClick={() => onChange(option.value)}
           className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-black uppercase tracking-[0.12em] transition-all ${
             value === option.value
-              ? "bg-primary text-primary-foreground shadow-accent-action"
-              : "text-muted-foreground hover:bg-text-primary/5 hover:text-text-primary"
+              ? "bg-accent-action text-accent-action-foreground shadow-accent-action"
+              : "text-text-muted hover:bg-text-primary/5 hover:text-text-primary"
           }`}
         >
           {t(option.label)}
@@ -102,16 +100,14 @@ export function TopList({
 
   return (
     <div className="rounded-xl border border-border-quiet bg-surface-canvas/10 p-4">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
       <div className="mt-3 space-y-2">
         {loading ? (
-          <p className="text-sm text-muted-foreground">
-            {t("common.loadingShort")}
-          </p>
+          <p className="text-sm text-text-muted">{t("common.loadingShort")}</p>
         ) : hasVisibleItems ? (
           children
         ) : (
-          <p className="text-sm text-muted-foreground">{emptyText}</p>
+          <p className="text-sm text-text-muted">{emptyText}</p>
         )}
       </div>
     </div>
@@ -141,7 +137,7 @@ export function TrendChart({
 
   if (loading) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-border-quiet bg-surface-canvas/20 text-sm text-muted-foreground">
+      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-border-quiet bg-surface-canvas/20 text-sm text-text-muted">
         {t("stats.trend.loading")}
       </div>
     );
@@ -149,7 +145,7 @@ export function TrendChart({
 
   if (points.length === 0) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-border-quiet bg-surface-canvas/20 text-sm text-muted-foreground">
+      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-border-quiet bg-surface-canvas/20 text-sm text-text-muted">
         {t("stats.trend.empty")}
       </div>
     );

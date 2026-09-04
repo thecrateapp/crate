@@ -114,7 +114,7 @@ export function EditorialPlaylistArtwork({
           {title}
         </div>
         {kicker ? (
-          <div className="mt-[2.5cqw] text-[clamp(0.58rem,5.2cqw,1.05rem)] font-black uppercase leading-none tracking-[0.13em] text-primary drop-shadow-artwork-kicker">
+          <div className="mt-[2.5cqw] text-[clamp(0.58rem,5.2cqw,1.05rem)] font-black uppercase leading-none tracking-[0.13em] text-accent-action drop-shadow-artwork-kicker">
             {kicker}
           </div>
         ) : null}

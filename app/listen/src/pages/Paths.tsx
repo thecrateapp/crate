@@ -215,7 +215,7 @@ function EndpointPanel({
     <div
       className={`relative flex-1 overflow-hidden rounded-xl border transition-colors ${
         selected
-          ? "border-primary/30 bg-primary/5"
+          ? "border-accent-action/30 bg-accent-action/5"
           : "border-text-primary/8 bg-text-primary/[0.02]"
       }`}
     >
@@ -232,7 +232,7 @@ function EndpointPanel({
       )}
 
       <div className="relative p-5">
-        <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/60">
+        <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-action/60">
           <MapPin size={10} className="mr-1 inline" />
           {label}
         </div>
@@ -248,10 +248,10 @@ function EndpointPanel({
                 />
               </div>
             )}
-            <div className="text-lg font-bold text-foreground">
+            <div className="text-lg font-bold text-text-primary">
               {selected.label}
             </div>
-            <div className="mt-0.5 text-[11px] text-primary/70">
+            <div className="mt-0.5 text-[11px] text-accent-action/70">
               {selected.type}
             </div>
             <button
@@ -275,10 +275,13 @@ function EndpointPanel({
                 void search(e.target.value);
               }}
               placeholder={t("paths.endpoint.placeholder")}
-              className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/30 px-4 text-sm text-foreground placeholder:text-text-primary/25 focus:border-primary/30 focus:outline-none"
+              className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/30 px-4 text-sm text-text-primary placeholder:text-text-primary/25 focus:border-accent-action/30 focus:outline-none"
             />
             {searching && (
-              <Loader2 size={14} className="mt-2 animate-spin text-primary" />
+              <Loader2
+                size={14}
+                className="mt-2 animate-spin text-accent-action"
+              />
             )}
             {results.length > 0 && (
               <div className="mt-2 space-y-0.5 rounded-xl border border-text-primary/8 bg-surface-canvas/40 p-1.5">
@@ -301,7 +304,7 @@ function EndpointPanel({
                         }`}
                       />
                     ) : (
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-accent-action/10 text-accent-action">
                         <Music size={14} />
                       </div>
                     )}
@@ -338,14 +341,14 @@ function PathCard({
   return (
     <div
       onClick={() => navigate(`/paths/${path.id}`)}
-      className="group cursor-pointer rounded-xl border border-text-primary/6 bg-text-primary/[0.02] p-4 transition hover:border-primary/20 hover:bg-text-primary/[0.04]"
+      className="group cursor-pointer rounded-xl border border-text-primary/6 bg-text-primary/[0.02] p-4 transition hover:border-accent-action/20 hover:bg-text-primary/[0.04]"
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
           <Route size={16} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-foreground">
+          <div className="truncate text-sm font-semibold text-text-primary">
             {path.name}
           </div>
           <div className="mt-0.5 text-[11px] text-text-primary/40">
@@ -358,7 +361,7 @@ function PathCard({
             e.stopPropagation();
             onPlay();
           }}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary transition hover:bg-primary/25"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-action/15 text-accent-action transition hover:bg-accent-action/25"
         >
           <Play size={14} className="ml-0.5 fill-current" />
         </button>
@@ -451,9 +454,9 @@ export function Paths() {
     <div className="animate-page-in space-y-6 px-4 py-6 sm:px-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Route size={22} className="text-primary" />
+        <Route size={22} className="text-accent-action" />
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold text-text-primary">
             {t("paths.title")}
           </h1>
           <p className="text-[13px] text-text-primary/40">
@@ -470,7 +473,7 @@ export function Paths() {
         <div className="flex items-center justify-center sm:py-8">
           <ArrowRight
             size={20}
-            className="text-primary/40 rotate-90 sm:rotate-0"
+            className="text-accent-action/40 rotate-90 sm:rotate-0"
           />
         </div>
 
@@ -504,7 +507,7 @@ export function Paths() {
         <button
           onClick={create}
           disabled={!canCreate}
-          className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-accent-action transition hover:bg-primary/90 disabled:opacity-25 disabled:shadow-none"
+          className="flex items-center justify-center gap-2 rounded-lg bg-accent-action px-6 py-3 text-sm font-semibold text-accent-action-foreground shadow-accent-action transition hover:bg-accent-action/90 disabled:opacity-25 disabled:shadow-none"
         >
           {creating ? (
             <Loader2 size={15} className="animate-spin" />

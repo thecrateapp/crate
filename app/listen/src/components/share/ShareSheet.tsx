@@ -97,16 +97,16 @@ export function ShareSheetHost() {
         <div className="relative flex items-start gap-3 border-b border-text-primary/8 bg-surface-canvas/[0.08] px-4 py-4">
           <SharePreviewImage payload={payload} />
           <div className="min-w-0 flex-1 pt-0.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-action">
               {t("share.title", {
                 kind: t(`share.kind.${payload.kind}`),
               })}
             </p>
-            <h2 className="mt-1 truncate text-lg font-black text-foreground">
+            <h2 className="mt-1 truncate text-lg font-black text-text-primary">
               {payload.title}
             </h2>
             {payload.subtitle ? (
-              <p className="truncate text-sm text-muted-foreground">
+              <p className="truncate text-sm text-text-muted">
                 {payload.subtitle}
               </p>
             ) : null}
@@ -171,7 +171,7 @@ function SharePreviewImage({ payload }: { payload: SharePayload }) {
     );
   }
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-share-preview">
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-accent-action/20 bg-accent-action/10 text-accent-action shadow-share-preview">
       <span className="text-lg font-black">C</span>
     </div>
   );
@@ -204,12 +204,14 @@ function ShareAction({
           "cursor-not-allowed opacity-45 hover:border-border-quiet hover:bg-surface-canvas/20",
       )}
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.06] text-primary shadow-share-action-icon backdrop-blur">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.06] text-accent-action shadow-share-action-icon backdrop-blur">
         <Icon size={19} className={spinning ? "animate-spin" : ""} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold text-foreground">{title}</span>
-        <span className="block truncate text-xs text-muted-foreground">
+        <span className="block text-sm font-bold text-text-primary">
+          {title}
+        </span>
+        <span className="block truncate text-xs text-text-muted">
           {subtitle}
         </span>
       </span>

@@ -84,11 +84,11 @@ export function UpcomingShowCard({
         expanded
           ? cn(
               featured
-                ? "border-primary/25 shadow-accent-action-card-featured"
-                : "border-primary/20 shadow-accent-action-card",
+                ? "border-accent-action/25 shadow-accent-action-card-featured"
+                : "border-accent-action/20 shadow-accent-action-card",
               "transition-[height,border-color,box-shadow] duration-400 ease-out",
             )
-          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-text-primary/[0.03]",
+          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-accent-action/15 hover:bg-text-primary/[0.03]",
       )}
       style={{ height: cardHeight }}
       onClick={!expanded ? onToggle : undefined}

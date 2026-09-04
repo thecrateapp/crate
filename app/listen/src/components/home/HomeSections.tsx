@@ -63,9 +63,9 @@ export function SectionHeader({
   return (
     <div className="flex items-end justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="text-lg font-bold text-foreground">{title}</h2>
+        <h2 className="text-lg font-bold text-text-primary">{title}</h2>
         {subtitle ? (
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+          <p className="mt-1 line-clamp-2 text-sm text-text-muted">
             {subtitle}
           </p>
         ) : null}
@@ -74,7 +74,7 @@ export function SectionHeader({
         {actionLabel && onAction ? (
           <button
             onClick={onAction}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1 text-sm text-text-muted transition-colors hover:text-text-primary"
           >
             {actionLabel}
             <ArrowRight size={15} />
@@ -161,7 +161,7 @@ export function SectionRail({
 export function SectionLoading() {
   return (
     <div className="flex items-center justify-center py-10">
-      <Loader2 size={20} className="animate-spin text-primary" />
+      <Loader2 size={20} className="animate-spin text-accent-action" />
     </div>
   );
 }
@@ -203,28 +203,28 @@ export function UpcomingPreviewRow({
         <span className="text-[10px] uppercase tracking-wide text-text-primary/40">
           {dateLabel.split(" ")[0]}
         </span>
-        <span className="text-sm font-semibold text-foreground">
+        <span className="text-sm font-semibold text-text-primary">
           {dateLabel.split(" ")[1] || ""}
         </span>
       </div>
       <div className="relative min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
+          <span className="truncate text-sm font-medium text-text-primary">
             {item.type === "show" ? item.artist : item.title}
           </span>
           {item.user_attending && item.type === "show" ? (
-            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-2 py-0.5 text-[10px] font-medium text-accent-action">
               {t("radar.show.going")}
             </span>
           ) : null}
         </div>
-        <div className="truncate text-xs text-muted-foreground">
+        <div className="truncate text-xs text-text-muted">
           {item.type === "show"
             ? `${item.title} · ${item.subtitle}`
             : `${item.artist} · ${item.title}`}
         </div>
       </div>
-      <div className="relative shrink-0 rounded-full border border-primary/15 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
+      <div className="relative shrink-0 rounded-full border border-accent-action/15 bg-accent-action/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-accent-action">
         {item.type === "show"
           ? t("home.radar.itemType.show")
           : t("home.radar.itemType.release")}
@@ -302,8 +302,10 @@ export function FeaturedPlaylistCard({
         />
       </div>
       <div className="px-1 pt-3">
-        <div className="truncate text-sm font-bold text-foreground">{name}</div>
-        <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
+        <div className="truncate text-sm font-bold text-text-primary">
+          {name}
+        </div>
+        <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-text-muted">
           {description || meta}
         </div>
         <div className="mt-2 text-[11px] uppercase tracking-wider text-text-primary/40">
@@ -346,14 +348,14 @@ export function ContinueListeningCard({
           className="h-16 w-16 shrink-0 rounded-xl sm:h-20 sm:w-20"
         />
         <div className="min-w-0 flex-1">
-          <div className="mb-2 inline-flex max-w-full items-center gap-2 truncate rounded-full border border-border-quiet bg-text-primary/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="mb-2 inline-flex max-w-full items-center gap-2 truncate rounded-full border border-border-quiet bg-text-primary/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-wider text-text-muted">
             <Clock3 size={11} />
             Continue listening
           </div>
-          <h2 className="truncate text-xl font-bold text-foreground">
+          <h2 className="truncate text-xl font-bold text-text-primary">
             {track.title}
           </h2>
-          <p className="mt-1 truncate text-sm text-muted-foreground">
+          <p className="mt-1 truncate text-sm text-text-muted">
             {track.artist}
           </p>
           {track.album ? (
@@ -364,7 +366,7 @@ export function ContinueListeningCard({
         </div>
         <button
           onClick={onPlay}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform group-hover:scale-105 sm:h-11 sm:w-11"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-lg transition-transform group-hover:scale-105 sm:h-11 sm:w-11"
         >
           <Play size={18} fill="currentColor" className="ml-0.5" />
         </button>

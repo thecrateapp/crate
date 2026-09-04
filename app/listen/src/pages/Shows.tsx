@@ -116,8 +116,8 @@ export function Shows() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Radar</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <h1 className="text-3xl font-bold text-text-primary">Radar</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-text-muted">
             {headingCopy}
           </p>
         </div>
@@ -162,8 +162,8 @@ export function Shows() {
       {featuredShow ? (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
-            <Calendar size={15} className="text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+            <Calendar size={15} className="text-accent-action" />
+            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-action">
               {t("radar.sections.nextShow")}
             </h2>
           </div>
@@ -186,8 +186,8 @@ export function Shows() {
               className={cn(
                 "rounded-full border px-4 py-2 text-sm transition-colors",
                 filter === value
-                  ? "border-primary/40 bg-primary/15 text-primary"
-                  : "border-border-quiet text-muted-foreground hover:border-text-primary/20 hover:text-foreground",
+                  ? "border-accent-action/40 bg-accent-action/15 text-accent-action"
+                  : "border-border-quiet text-text-muted hover:border-text-primary/20 hover:text-text-primary",
               )}
             >
               {value === "all"
@@ -205,20 +205,20 @@ export function Shows() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t("radar.searchPlaceholder")}
-            className="h-11 w-full rounded-lg border border-border-quiet bg-input px-4 text-sm text-foreground placeholder:text-text-primary/40 focus:border-primary/40 focus:outline-none"
+            className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/25 px-4 text-sm text-text-primary placeholder:text-text-primary/40 focus:border-accent-action/40 focus:outline-none"
           />
         </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-24">
-          <Loader2 size={24} className="animate-spin text-primary" />
+          <Loader2 size={24} className="animate-spin text-accent-action" />
         </div>
       ) : null}
 
       {!loading && isGenreRadar && items.length === 0 ? (
         <EmptyState
-          icon={<Calendar size={22} className="text-primary" />}
+          icon={<Calendar size={22} className="text-accent-action" />}
           title={t("radar.empty.genreTitle")}
           body={t("radar.empty.genreBody")}
         />
@@ -226,7 +226,7 @@ export function Shows() {
 
       {!loading && !isGenreRadar && !hasFollowedArtists ? (
         <EmptyState
-          icon={<Sparkles size={22} className="text-primary" />}
+          icon={<Sparkles size={22} className="text-accent-action" />}
           title={t("radar.empty.followTitle")}
           body={t("radar.empty.followBody")}
         />
@@ -237,7 +237,7 @@ export function Shows() {
       items.length > 0 &&
       filtered.length === 0 ? (
         <EmptyState
-          icon={<Calendar size={22} className="text-primary" />}
+          icon={<Calendar size={22} className="text-accent-action" />}
           title={t("radar.empty.filteredTitle")}
           body={t("radar.empty.filteredBody")}
         />
@@ -248,8 +248,8 @@ export function Shows() {
           {comingUp.length > 0 ? (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
-                <Sparkles size={15} className="text-primary" />
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+                <Sparkles size={15} className="text-accent-action" />
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-action">
                   {t("radar.sections.comingUp")}
                 </h2>
               </div>
@@ -270,8 +270,8 @@ export function Shows() {
           {recentlyReleased.length > 0 ? (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
-                <Calendar size={15} className="text-muted-foreground" />
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <Calendar size={15} className="text-text-muted" />
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-text-muted">
                   {t("radar.sections.recentlyReleased")}
                 </h2>
               </div>
@@ -305,7 +305,7 @@ function SummaryPill({
 }) {
   const accentClass =
     accent === "cyan"
-      ? "border-primary/20 text-primary"
+      ? "border-accent-action/20 text-accent-action"
       : "border-border-quiet text-text-primary/60";
 
   return (
@@ -348,10 +348,8 @@ function EmptyState({
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/5">
         {icon}
       </div>
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-        {body}
-      </p>
+      <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
+      <p className="mt-2 max-w-md text-sm leading-6 text-text-muted">{body}</p>
     </div>
   );
 }

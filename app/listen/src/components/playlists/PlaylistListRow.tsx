@@ -248,7 +248,7 @@ export function PlaylistListRow({
         offlineState === "ready"
           ? "bg-accent-action/[0.04] hover:bg-accent-action/[0.08] focus-visible:bg-accent-action/[0.08]"
           : isOfflineBusy(offlineState)
-            ? "bg-primary/[0.05] hover:bg-primary/[0.09] focus-visible:bg-primary/[0.09]"
+            ? "bg-accent-action/[0.05] hover:bg-accent-action/[0.09] focus-visible:bg-accent-action/[0.09]"
             : offlineState === "error"
               ? "bg-state-warning/[0.05] hover:bg-state-warning/[0.09] focus-visible:bg-state-warning/[0.09]"
               : "hover:bg-text-primary/5 focus-visible:bg-text-primary/5",
@@ -264,18 +264,18 @@ export function PlaylistListRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
+          <span className="truncate text-sm font-medium text-text-primary">
             {name}
           </span>
           {badgeLabel ? (
-            <span className="inline-flex items-center rounded-md border border-primary/30 px-1.5 py-0 text-[10px] font-medium text-primary">
+            <span className="inline-flex items-center rounded-md border border-accent-action/30 px-1.5 py-0 text-[10px] font-medium text-accent-action">
               <Sparkles size={10} className="mr-0.5" />
               {badgeLabel}
             </span>
           ) : null}
           <OfflineBadge state={offlineState} compact />
         </div>
-        <div className="truncate text-xs text-muted-foreground">
+        <div className="truncate text-xs text-text-muted">
           {trackCount} track{trackCount !== 1 ? "s" : ""}
           {meta ? ` · ${meta}` : ""}
           {offlineMeta ? (
@@ -285,7 +285,7 @@ export function PlaylistListRow({
                 offlineState === "ready"
                   ? "text-text-accent/90"
                   : isOfflineBusy(offlineState)
-                    ? "text-primary"
+                    ? "text-accent-action"
                     : offlineState === "error"
                       ? "text-state-warning-text/90"
                       : undefined,

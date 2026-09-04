@@ -20,6 +20,8 @@ const RAW_COLOR_ALLOWLIST = new Map([
   ],
   ["app/listen/src/lib/capacitor-init.ts", /color:\s*"#00000000"/gi],
 ]);
+const LEGACY_SEMANTIC_UTILITY_PATTERN =
+  /(?<![A-Za-z0-9_-])(?:bg|text|border|fill|stroke|from|via|to)-(?:app-surface|primary(?:-foreground)?|foreground|muted-foreground|destructive|card|secondary|accent|border|input)(?![A-Za-z0-9_-])/g;
 const COLOR_UTILITY_NAMES =
   "black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 const UTILITY_PATTERN = new RegExp(
@@ -96,6 +98,10 @@ export function analyzeContent(content) {
 
   return {
     rawColors: countMatches(content, RAW_COLOR_PATTERN),
+    legacySemanticUtilities: countMatches(
+      content,
+      LEGACY_SEMANTIC_UTILITY_PATTERN,
+    ),
     ...utilityDrift,
     inlineStyles: countMatches(content, INLINE_STYLE_PATTERN),
     directShadcnImports: countMatches(content, DIRECT_SHADCN_IMPORT_PATTERN),
@@ -284,6 +290,7 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
   const totals = files.reduce(
     (result, file) => {
       result.rawColors += file.rawColors;
+      result.legacySemanticUtilities += file.legacySemanticUtilities;
       result.foundationRawColors += file.foundationRawColors;
       result.allowlistedRawColors += file.allowlistedRawColors;
       result.actionableRawColors += file.actionableRawColors;
@@ -296,6 +303,7 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
     {
       files: files.length,
       rawColors: 0,
+      legacySemanticUtilities: 0,
       foundationRawColors: 0,
       allowlistedRawColors: 0,
       actionableRawColors: 0,
@@ -307,7 +315,7 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
   );
 
   return {
-    version: 2,
+    version: 3,
     roots: SOURCE_DIRECTORIES,
     semanticTokens: statSync(semanticTokenPath, { throwIfNoEntry: false })
       ? analyzeSemanticTokens(

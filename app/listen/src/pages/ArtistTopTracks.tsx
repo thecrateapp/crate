@@ -115,15 +115,17 @@ export function ArtistTopTracks() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{artistName}</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-2xl font-bold text-text-primary">
+              {artistName}
+            </h1>
+            <p className="text-sm text-text-muted">
               {t("artist.sections.topTracks")}
             </p>
           </div>
         </div>
 
         <button
-          className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="flex items-center gap-2 rounded-lg bg-accent-action px-5 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
           onClick={handlePlayAll}
         >
           <Play size={15} fill="currentColor" />

@@ -285,7 +285,7 @@ function Spinner() {
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="flex items-center justify-center py-16">
-      <p className="text-sm text-muted-foreground">{message}</p>
+      <p className="text-sm text-text-muted">{message}</p>
     </div>
   );
 }
@@ -293,8 +293,8 @@ function EmptyState({ message }: { message: string }) {
 function StatBox({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex-1 rounded-lg bg-text-primary/5 px-3 py-2.5 text-center">
-      <div className="text-lg font-bold text-foreground">{value ?? 0}</div>
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="text-lg font-bold text-text-primary">{value ?? 0}</div>
+      <div className="text-[11px] text-text-muted">{label}</div>
     </div>
   );
 }
@@ -336,7 +336,7 @@ function CollectionSortDropdown<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-border-quiet/10 px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-accent-action-soft focus-visible:border-accent-action/70 focus-visible:outline-none focus-visible:shadow-accent-action ${
+        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-border-quiet/10 px-4 text-sm font-semibold text-text-primary transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-accent-action-soft focus-visible:border-accent-action/70 focus-visible:outline-none focus-visible:shadow-accent-action ${
           open ? "border-accent-action/45 shadow-accent-action" : ""
         }`}
       >
@@ -370,7 +370,7 @@ function CollectionSortDropdown<T extends string>({
                 className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold transition-[background-color,color,filter] ${
                   selected
                     ? "bg-accent-action/14 text-accent-action drop-shadow-accent-action"
-                    : "text-foreground hover:bg-text-primary/7 hover:text-accent-action hover:drop-shadow-accent-action-soft"
+                    : "text-text-primary hover:bg-text-primary/7 hover:text-accent-action hover:drop-shadow-accent-action-soft"
                 }`}
               >
                 <span>{t(option.labelKey)}</span>
@@ -513,7 +513,7 @@ function PlaylistsTab() {
     <div className="space-y-3">
       <button
         onClick={() => openCreatePlaylist()}
-        className="library-new-playlist flex w-full items-center gap-2 rounded-lg bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-text-primary/10"
+        className="library-new-playlist flex w-full items-center gap-2 rounded-lg bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/10"
       >
         <Plus size={16} className="text-accent-action" />
         {t("library.playlists.new")}
@@ -622,10 +622,10 @@ function PlaylistsTab() {
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-text-primary">
               {t("playlist.delete.title")}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-muted">
               {t("playlist.delete.subtitle")}
             </p>
           </div>
@@ -635,9 +635,9 @@ function PlaylistsTab() {
           />
         </ModalHeader>
         <ModalBody className="px-5 py-5">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-muted">
             {t("playlist.delete.confirmPrefix")}{" "}
-            <span className="font-medium text-foreground">
+            <span className="font-medium text-text-primary">
               {deletingPlaylist?.name}
             </span>{" "}
             {t("playlist.delete.confirmSuffix")}
@@ -646,7 +646,7 @@ function PlaylistsTab() {
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
           <button
             type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-text-primary/5 hover:text-foreground"
+            className="rounded-lg px-4 py-2.5 text-sm text-text-muted transition-colors hover:bg-text-primary/5 hover:text-text-primary"
             onClick={() => setDeletingPlaylist(null)}
             disabled={deleting}
           >
@@ -900,10 +900,10 @@ function BandcampTab() {
               <BandcampLogo size={13} />
               Bandcamp
             </div>
-            <h2 className="mt-3 text-xl font-black text-foreground">
+            <h2 className="mt-3 text-xl font-black text-text-primary">
               {t("library.bandcamp.title")}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-text-muted">
               {t("library.bandcamp.description")}
             </p>
           </div>
@@ -930,7 +930,7 @@ function BandcampTab() {
             <h3 className="text-sm font-black uppercase tracking-[0.18em] text-accent-action">
               {t("library.bandcamp.imported.title")}
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-text-muted">
               {t("library.bandcamp.imported.description")}
             </p>
           </div>
@@ -966,10 +966,10 @@ function BandcampTab() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h4 className="truncate text-sm font-black text-foreground">
+                  <h4 className="truncate text-sm font-black text-text-primary">
                     {contribution.album_name}
                   </h4>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-text-muted">
                     {contribution.artist_name}
                   </p>
                 </div>
@@ -977,7 +977,7 @@ function BandcampTab() {
                   type="button"
                   disabled={!contribution.album_id}
                   onClick={() => exportContribution(contribution)}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted disabled:opacity-40"
                 >
                   <Download size={14} />
                   {t("common.export")}
@@ -1028,10 +1028,10 @@ function BandcampTab() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-black text-foreground">
+                  <h3 className="truncate text-sm font-black text-text-primary">
                     {bandcampItemTitle(item, t("bandcamp.itemFallback"))}
                   </h3>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-text-muted">
                     {item.artist_name || t("bandcamp.titleLabel")}
                   </p>
                 </div>
@@ -1058,7 +1058,7 @@ function BandcampTab() {
                   <button
                     type="button"
                     onClick={() => window.open(item.item_url || "", "_blank")}
-                    className="inline-flex min-h-10 items-center rounded-full border border-border-quiet px-3 text-xs font-bold text-muted-foreground"
+                    className="inline-flex min-h-10 items-center rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted"
                   >
                     <ExternalLink size={14} />
                   </button>
@@ -1076,7 +1076,7 @@ function BandcampTab() {
         }}
       >
         <ModalHeader>
-          <h2 className="text-lg font-black text-foreground">
+          <h2 className="text-lg font-black text-text-primary">
             {t("library.bandcamp.withdraw.title")}
           </h2>
           <ModalCloseButton
@@ -1085,7 +1085,7 @@ function BandcampTab() {
           />
         </ModalHeader>
         <ModalBody>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-muted">
             {t("library.bandcamp.withdraw.description", {
               album: withdrawTarget?.album_name,
             })}
@@ -1096,7 +1096,7 @@ function BandcampTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-text-muted disabled:opacity-50"
           >
             {t("common.keepIt")}
           </button>
@@ -1203,10 +1203,10 @@ function ContributionsTab() {
   return (
     <div className="space-y-5">
       <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-5">
-        <h2 className="text-xl font-black text-foreground">
+        <h2 className="text-xl font-black text-text-primary">
           {t("library.contributions.title")}
         </h2>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-text-muted">
           {t("library.contributions.description")}
         </p>
       </div>
@@ -1222,10 +1222,10 @@ function ContributionsTab() {
             >
               <ContributionArtwork contribution={contribution} />
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-black text-foreground">
+                <h3 className="truncate text-sm font-black text-text-primary">
                   {contribution.album_name}
                 </h3>
-                <p className="truncate text-xs text-muted-foreground">
+                <p className="truncate text-xs text-text-muted">
                   {contribution.artist_name}
                 </p>
                 <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-accent-action/80">
@@ -1236,7 +1236,7 @@ function ContributionsTab() {
                 type="button"
                 disabled={!contribution.album_id}
                 onClick={() => exportContribution(contribution)}
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted disabled:opacity-40"
               >
                 <Download size={14} />
                 {t("common.export")}
@@ -1260,7 +1260,7 @@ function ContributionsTab() {
         }}
       >
         <ModalHeader>
-          <h2 className="text-lg font-black text-foreground">
+          <h2 className="text-lg font-black text-text-primary">
             {t("library.contributions.withdraw.title")}
           </h2>
           <ModalCloseButton
@@ -1269,7 +1269,7 @@ function ContributionsTab() {
           />
         </ModalHeader>
         <ModalBody>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-muted">
             {t("library.contributions.withdraw.description", {
               album: withdrawTarget?.album_name,
             })}
@@ -1280,7 +1280,7 @@ function ContributionsTab() {
             type="button"
             disabled={withdrawing}
             onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-text-muted disabled:opacity-50"
           >
             {t("common.keepIt")}
           </button>
@@ -1518,7 +1518,7 @@ export function Library() {
                 className={`flex min-h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   tab === key
                     ? "bg-accent-action text-accent-action-foreground"
-                    : "bg-text-primary/5 text-muted-foreground hover:bg-text-primary/10 hover:text-foreground"
+                    : "bg-text-primary/5 text-text-muted hover:bg-text-primary/10 hover:text-text-primary"
                 }`}
               >
                 <Icon size={14} />

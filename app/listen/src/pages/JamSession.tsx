@@ -128,7 +128,7 @@ function HeroActionButton({
       aria-label={label}
       title={label}
       disabled={disabled || loading}
-      className={`jam-hero-action h-11 w-11 text-muted-foreground disabled:opacity-35 ${className}`}
+      className={`jam-hero-action h-11 w-11 text-text-muted disabled:opacity-35 ${className}`}
       {...props}
     >
       {loading ? <Loader2 size={16} className="animate-spin" /> : children}
@@ -214,7 +214,7 @@ function SortableJamQueueItem({
         type="button"
         aria-label={dragLabel}
         title={dragLabel}
-        className="shrink-0 touch-none cursor-grab text-muted-foreground/60 hover:text-foreground active:cursor-grabbing"
+        className="shrink-0 touch-none cursor-grab text-text-muted/60 hover:text-text-primary active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
@@ -1510,16 +1510,16 @@ export function JamSession() {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="truncate text-base font-semibold text-foreground">
+              <div className="truncate text-base font-semibold text-text-primary">
                 {listedRoom.name}
               </div>
               {listedRoom.description ? (
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-text-muted">
                   {listedRoom.description}
                 </p>
               ) : null}
               <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                <span className="jam-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-muted-foreground">
+                <span className="jam-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-text-muted">
                   {listedRoom.visibility === "public" ? (
                     <Globe2 size={11} />
                   ) : (
@@ -1543,7 +1543,7 @@ export function JamSession() {
                 {(listedRoom.tags || []).slice(0, 5).map((tag) => (
                   <span
                     key={`${listedRoom.id}-${tag}`}
-                    className="jam-chip rounded-full px-2 py-0.5 text-muted-foreground"
+                    className="jam-chip rounded-full px-2 py-0.5 text-text-muted"
                   >
                     {tag}
                   </span>
@@ -1551,7 +1551,7 @@ export function JamSession() {
               </div>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-2 pr-12">
-              <div className="jam-chip flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground">
+              <div className="jam-chip flex h-9 w-9 items-center justify-center rounded-full text-text-muted">
                 {isJoining ? (
                   <Loader2 size={15} className="jam-accent-text animate-spin" />
                 ) : (
@@ -1575,14 +1575,14 @@ export function JamSession() {
                 );
               })}
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-text-muted">
               {t("jam.roomCard.memberCount", {
                 count: listedRoom.member_count || listedRoom.members.length,
               })}
             </div>
           </div>
           {latestEvent ? (
-            <div className="mt-3 truncate text-xs text-muted-foreground">
+            <div className="mt-3 truncate text-xs text-text-muted">
               {eventActivityText(latestEvent, latestActor?.name, t)}
             </div>
           ) : null}
@@ -1617,10 +1617,10 @@ export function JamSession() {
     >
       <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-text-primary">
             {t("jam.delete.modalTitle")}
           </h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-text-muted">
             {t("jam.delete.modalDescription")}
           </p>
         </div>
@@ -1633,7 +1633,7 @@ export function JamSession() {
       <ModalBody className="px-5 py-5">
         <div className="space-y-4">
           <div className="jam-danger-panel rounded-lg px-4 py-3">
-            <div className="text-sm font-medium text-foreground">
+            <div className="text-sm font-medium text-text-primary">
               {deleteTargetRoom?.name || t("jam.delete.roomFallback")}
             </div>
             <div className="jam-danger-text mt-1 text-xs">
@@ -1645,7 +1645,7 @@ export function JamSession() {
               type="button"
               onClick={() => setDeleteTargetRoom(null)}
               disabled={Boolean(deletingRoomId)}
-              className="jam-secondary-action rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors disabled:opacity-60"
+              className="jam-secondary-action rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors disabled:opacity-60"
             >
               {t("common.cancel")}
             </button>
@@ -1673,20 +1673,20 @@ export function JamSession() {
       <>
         <div className="space-y-6">
           <div className="jam-lobby-header rounded-[12px] p-5 sm:p-6">
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-3xl font-bold text-text-primary">
               {t("jam.lobby.title")}
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            <p className="mt-1 max-w-2xl text-sm text-text-muted">
               {t("jam.lobby.subtitle")}
             </p>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
             <section className="jam-panel rounded-[12px] p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-text-primary">
                 {t("jam.lobby.startTitle")}
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-text-muted">
                 {t("jam.lobby.startSubtitle")}
               </p>
               <div className="mt-4 space-y-3">
@@ -1694,23 +1694,23 @@ export function JamSession() {
                   value={roomName}
                   onChange={(event) => setRoomName(event.target.value)}
                   placeholder={t("jam.lobby.namePlaceholder")}
-                  className="jam-input h-11 w-full rounded-lg px-4 text-sm text-foreground"
+                  className="jam-input h-11 w-full rounded-lg px-4 text-sm text-text-primary"
                 />
                 <textarea
                   value={roomDescription}
                   onChange={(event) => setRoomDescription(event.target.value)}
                   placeholder={t("jam.lobby.descriptionPlaceholder")}
                   rows={3}
-                  className="jam-input w-full resize-none rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground"
+                  className="jam-input w-full resize-none rounded-lg px-4 py-3 text-sm text-text-primary placeholder:text-text-muted"
                 />
                 <input
                   value={roomTagsInput}
                   onChange={(event) => setRoomTagsInput(event.target.value)}
                   placeholder={t("jam.lobby.tagsPlaceholder")}
-                  className="jam-input h-11 w-full rounded-lg px-4 text-sm text-foreground placeholder:text-muted-foreground"
+                  className="jam-input h-11 w-full rounded-lg px-4 text-sm text-text-primary placeholder:text-text-muted"
                 />
-                <label className="flex flex-col gap-2 text-sm text-foreground">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                <label className="flex flex-col gap-2 text-sm text-text-primary">
+                  <span className="text-xs uppercase tracking-wide text-text-muted">
                     {t("jam.lobby.playbackMode")}
                   </span>
                   <Select
@@ -1757,7 +1757,7 @@ export function JamSession() {
                           ))}
                           <Search
                             size={16}
-                            className="ml-1 shrink-0 text-muted-foreground"
+                            className="ml-1 shrink-0 text-text-muted"
                           />
                           <input
                             role="combobox"
@@ -1805,7 +1805,7 @@ export function JamSession() {
                               }
                             }}
                             placeholder={t("jam.lobby.genreFiltersPlaceholder")}
-                            className="h-8 min-w-[12rem] flex-1 bg-transparent px-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                            className="h-8 min-w-[12rem] flex-1 bg-transparent px-1 text-sm text-text-primary outline-none placeholder:text-text-muted"
                           />
                         </div>
                         {roomGenreFiltersInput.trim() ? (
@@ -1815,7 +1815,7 @@ export function JamSession() {
                             className="jam-taxonomy-options absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg p-1 shadow-2xl"
                           >
                             {taxonomyLoading ? (
-                              <div className="px-3 py-2 text-xs text-muted-foreground">
+                              <div className="px-3 py-2 text-xs text-text-muted">
                                 {t("jam.lobby.genreFiltersLoading")}
                               </div>
                             ) : genreSuggestions.length ? (
@@ -1837,7 +1837,7 @@ export function JamSession() {
                                   }
                                 >
                                   <span className="truncate">{node.name}</span>
-                                  <span className="ml-3 shrink-0 text-xs text-muted-foreground">
+                                  <span className="ml-3 shrink-0 text-xs text-text-muted">
                                     {node.slug}
                                   </span>
                                 </button>
@@ -1845,7 +1845,7 @@ export function JamSession() {
                             ) : (
                               <div
                                 role="status"
-                                className="px-3 py-2 text-xs text-muted-foreground"
+                                className="px-3 py-2 text-xs text-text-muted"
                               >
                                 {t("jam.lobby.genreFiltersNoResults")}
                               </div>
@@ -1853,11 +1853,11 @@ export function JamSession() {
                           </div>
                         ) : null}
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-text-muted">
                         {t("jam.lobby.genreFiltersHint")}
                       </p>
                     </div>
-                    <label className="jam-toggle-card flex cursor-pointer items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-foreground">
+                    <label className="jam-toggle-card flex cursor-pointer items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-text-primary">
                       <span>{t("jam.lobby.autoDjVoting")}</span>
                       <input
                         type="checkbox"
@@ -1875,9 +1875,7 @@ export function JamSession() {
                     type="button"
                     onClick={() => setRoomVisibility("private")}
                     className={`jam-toggle-option flex items-center gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors ${
-                      roomVisibility === "private"
-                        ? ""
-                        : "text-muted-foreground"
+                      roomVisibility === "private" ? "" : "text-text-muted"
                     }`}
                     data-active={
                       roomVisibility === "private" ? "true" : "false"
@@ -1890,7 +1888,7 @@ export function JamSession() {
                     type="button"
                     onClick={() => setRoomVisibility("public")}
                     className={`jam-toggle-option flex items-center gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors ${
-                      roomVisibility === "public" ? "" : "text-muted-foreground"
+                      roomVisibility === "public" ? "" : "text-text-muted"
                     }`}
                     data-active={roomVisibility === "public" ? "true" : "false"}
                   >
@@ -1898,7 +1896,7 @@ export function JamSession() {
                     {t("jam.visibility.public")}
                   </button>
                 </div>
-                <label className="jam-toggle-option flex cursor-pointer items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-foreground">
+                <label className="jam-toggle-option flex cursor-pointer items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-text-primary">
                   <span className="inline-flex items-center gap-2">
                     <Pin size={15} className="jam-accent-text" />
                     {t("jam.lobby.permanentRoom")}
@@ -1914,7 +1912,7 @@ export function JamSession() {
                   type="button"
                   onClick={handleCreateRoom}
                   disabled={creating}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground hover:bg-accent-action/90 transition-colors disabled:opacity-60"
                 >
                   {creating ? (
                     <Loader2 size={15} className="animate-spin" />
@@ -1929,35 +1927,38 @@ export function JamSession() {
             <section className="jam-panel rounded-[12px] p-5 sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">
+                  <h2 className="text-lg font-semibold text-text-primary">
                     {t("jam.lobby.openRoomsTitle")}
                   </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm text-text-muted">
                     {t("jam.lobby.openRoomsSubtitle")}
                   </p>
                 </div>
                 {roomsLoading ? (
-                  <Loader2 size={18} className="animate-spin text-primary" />
+                  <Loader2
+                    size={18}
+                    className="animate-spin text-accent-action"
+                  />
                 ) : null}
               </div>
 
               <div className="jam-input mt-4 flex items-center gap-2 rounded-lg px-3 py-2">
-                <Search size={15} className="text-muted-foreground" />
+                <Search size={15} className="text-text-muted" />
                 <input
                   value={roomSearch}
                   onChange={(event) => setRoomSearch(event.target.value)}
                   placeholder={t("jam.lobby.searchPlaceholder")}
-                  className="h-8 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="h-8 min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
                 />
               </div>
 
               <div className="mt-5 space-y-6">
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-foreground">
+                    <h3 className="text-sm font-semibold text-text-primary">
                       {t("jam.lobby.yourRooms")}
                     </h3>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-text-muted">
                       {memberRooms.length}
                     </span>
                   </div>
@@ -1966,7 +1967,7 @@ export function JamSession() {
                       renderRoomCard(listedRoom, "member"),
                     )}
                     {!roomsLoading && memberRooms.length === 0 ? (
-                      <div className="jam-empty-state rounded-lg p-5 text-sm text-muted-foreground">
+                      <div className="jam-empty-state rounded-lg p-5 text-sm text-text-muted">
                         {t("jam.lobby.emptyMemberRooms")}
                       </div>
                     ) : null}
@@ -1975,10 +1976,10 @@ export function JamSession() {
 
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-foreground">
+                    <h3 className="text-sm font-semibold text-text-primary">
                       {t("jam.lobby.publicRooms")}
                     </h3>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-text-muted">
                       {publicRooms.length}
                     </span>
                   </div>
@@ -1987,7 +1988,7 @@ export function JamSession() {
                       renderRoomCard(listedRoom, "public"),
                     )}
                     {!roomsLoading && publicRooms.length === 0 ? (
-                      <div className="jam-empty-state rounded-lg p-5 text-sm text-muted-foreground">
+                      <div className="jam-empty-state rounded-lg p-5 text-sm text-text-muted">
                         {t("jam.lobby.emptyPublicRooms")}
                       </div>
                     ) : null}
@@ -1998,10 +1999,10 @@ export function JamSession() {
           </div>
 
           <section className="jam-panel rounded-[12px] p-5 sm:p-6">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-text-primary">
               {t("jam.lobby.joinInviteTitle")}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-text-muted">
               {t("jam.lobby.joinInviteSubtitle")}
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -2009,7 +2010,7 @@ export function JamSession() {
                 value={inviteInput}
                 onChange={(event) => setInviteInput(event.target.value)}
                 placeholder={t("jam.lobby.invitePlaceholder")}
-                className="jam-input h-11 min-w-0 flex-1 rounded-lg px-4 text-sm text-foreground"
+                className="jam-input h-11 min-w-0 flex-1 rounded-lg px-4 text-sm text-text-primary"
               />
               <button
                 type="button"
@@ -2021,7 +2022,7 @@ export function JamSession() {
                   }
                   navigate(`/jam/invite/${token}`);
                 }}
-                className="jam-secondary-action inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors"
+                className="jam-secondary-action inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
               >
                 <Users size={15} />
                 {t("jam.lobby.joinRoom")}
@@ -2037,7 +2038,7 @@ export function JamSession() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 size={22} className="animate-spin text-primary" />
+        <Loader2 size={22} className="animate-spin text-accent-action" />
       </div>
     );
   }
@@ -2045,15 +2046,15 @@ export function JamSession() {
   if (!room) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <p className="text-lg font-medium text-foreground">
+        <p className="text-lg font-medium text-text-primary">
           {t("jam.room.unavailableTitle")}
         </p>
-        <p className="max-w-md text-sm text-muted-foreground">
+        <p className="max-w-md text-sm text-text-muted">
           {error || t("jam.room.unavailableDescription")}
         </p>
         <Link
           to="/jam"
-          className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors"
+          className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
         >
           {t("jam.room.backToJam")}
         </Link>
@@ -2075,7 +2076,7 @@ export function JamSession() {
                 {t("jam.room.eyebrow")}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2.5">
-                <h1 className="text-3xl font-bold text-foreground">
+                <h1 className="text-3xl font-bold text-text-primary">
                   {room.name}
                 </h1>
                 <div className="jam-accent-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
@@ -2086,7 +2087,7 @@ export function JamSession() {
                       ? t("jam.room.autoMode")
                       : t("jam.room.djMode")}
                 </div>
-                <div className="jam-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground">
+                <div className="jam-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-text-muted">
                   {room.visibility === "public" ? (
                     <Globe2 size={12} />
                   ) : (
@@ -2103,7 +2104,7 @@ export function JamSession() {
                   </div>
                 ) : null}
               </div>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              <p className="mt-2 max-w-2xl text-sm text-text-muted">
                 {room.description ||
                   t("jam.room.defaultDescription", {
                     count: room.members.length,
@@ -2142,7 +2143,7 @@ export function JamSession() {
                 {(room.tags || []).map((tag) => (
                   <div
                     key={tag}
-                    className="jam-chip inline-flex rounded-full px-3 py-1 text-xs font-medium text-muted-foreground"
+                    className="jam-chip inline-flex rounded-full px-3 py-1 text-xs font-medium text-text-muted"
                   >
                     {tag}
                   </div>
@@ -2205,16 +2206,16 @@ export function JamSession() {
                 </div>
                 {roomNowPlaying ? (
                   <>
-                    <div className="mt-1 truncate text-lg font-semibold text-foreground sm:text-xl">
+                    <div className="mt-1 truncate text-lg font-semibold text-text-primary sm:text-xl">
                       {roomNowPlaying.title}
                     </div>
-                    <div className="truncate text-sm text-muted-foreground">
+                    <div className="truncate text-sm text-text-muted">
                       {roomNowPlaying.artist}
                       {roomNowPlaying.album ? ` · ${roomNowPlaying.album}` : ""}
                     </div>
                   </>
                 ) : (
-                  <div className="mt-1 text-sm text-muted-foreground">
+                  <div className="mt-1 text-sm text-text-muted">
                     {t("jam.toasts.roomQueueEmpty")}
                   </div>
                 )}
@@ -2234,7 +2235,7 @@ export function JamSession() {
                       }}
                     />
                   </div>
-                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                  <span className="shrink-0 text-[11px] tabular-nums text-text-muted">
                     {formatDuration(currentTime)} / {formatDuration(duration)}
                   </span>
                 </div>
@@ -2290,7 +2291,7 @@ export function JamSession() {
                         ? t("jam.room.catchingUp")
                         : t("jam.room.waitingForHost")
                   }
-                  className="jam-chip inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs text-muted-foreground"
+                  className="jam-chip inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs text-text-muted"
                 >
                   <Zap size={15} className="jam-accent-text" />
                   {syncStatus === "synced"
@@ -2304,10 +2305,10 @@ export function JamSession() {
           {roomActionsOpen && isHost ? (
             <div className="jam-room-actions-panel flex flex-col gap-3 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-sm font-medium text-foreground">
+                <div className="text-sm font-medium text-text-primary">
                   {t("jam.room.actions.editProfile")}
                 </div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
+                <div className="mt-0.5 text-xs text-text-muted">
                   {t("jam.room.members")} · {room.members.length}
                 </div>
               </div>
@@ -2395,7 +2396,7 @@ export function JamSession() {
 
       <div className="grid min-h-0 min-w-0 gap-6 xl:grid-cols-[0.85fr_1.1fr_1.1fr]">
         <section className="jam-members-panel min-h-0 min-w-0 overflow-hidden rounded-[12px] p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-text-primary">
             {t("jam.room.members")}
           </h2>
           {pendingRequests.length > 0 ? (
@@ -2415,10 +2416,10 @@ export function JamSession() {
                     className="jam-queue-item flex items-center gap-2 rounded-lg px-2.5 py-2"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-medium text-foreground">
+                      <div className="truncate text-xs font-medium text-text-primary">
                         {request.track.title}
                       </div>
-                      <div className="truncate text-[11px] text-muted-foreground">
+                      <div className="truncate text-[11px] text-text-muted">
                         {request.track.artist}
                         {request.requester_name
                           ? ` · ${request.requester_name}`
@@ -2439,7 +2440,7 @@ export function JamSession() {
                           onClick={() =>
                             handleResolveRequest(request.id, false)
                           }
-                          className="jam-secondary-action rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors"
+                          className="jam-secondary-action rounded-md px-2 py-1 text-[11px] text-text-muted transition-colors"
                         >
                           {t("jam.room.rejectRequest")}
                         </button>
@@ -2471,10 +2472,10 @@ export function JamSession() {
                     size="sm"
                   />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">
+                    <div className="truncate text-sm font-medium text-text-primary">
                       {displayName(member)}
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div className="truncate text-xs text-text-muted">
                       {member.username
                         ? `@${member.username}`
                         : t("jam.room.profile")}{" "}
@@ -2482,7 +2483,7 @@ export function JamSession() {
                     </div>
                   </div>
                 </div>
-                <div className="jam-chip rounded-full px-2.5 py-1 text-[11px] text-muted-foreground">
+                <div className="jam-chip rounded-full px-2.5 py-1 text-[11px] text-text-muted">
                   {member.user_id === room.host_user_id
                     ? t("jam.room.roles.host")
                     : t("jam.room.roles.collab")}
@@ -2495,10 +2496,10 @@ export function JamSession() {
         <section className="jam-queue-panel min-h-0 min-w-0 overflow-hidden rounded-[12px] p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-text-primary">
                 {t("jam.room.sharedQueue")}
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-text-muted">
                 {queueMode === "auto_dj"
                   ? t("jam.room.autoDjQueueSubtitle")
                   : queueMode === "auto"
@@ -2507,7 +2508,7 @@ export function JamSession() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="jam-chip rounded-full px-2.5 py-1 text-[11px] text-muted-foreground">
+              <div className="jam-chip rounded-full px-2.5 py-1 text-[11px] text-text-muted">
                 {t("jam.room.queueTrackCount", { count: queueItems.length })}
               </div>
             </div>
@@ -2587,10 +2588,10 @@ export function JamSession() {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-medium text-foreground">
+                      <div className="truncate text-xs font-medium text-text-primary">
                         {track.title}
                       </div>
-                      <div className="truncate text-[11px] text-muted-foreground">
+                      <div className="truncate text-[11px] text-text-muted">
                         {track.artist}
                       </div>
                     </div>
@@ -2602,7 +2603,7 @@ export function JamSession() {
 
           <div className="mt-4 space-y-2">
             <div className="jam-input flex items-center gap-2 rounded-lg px-3 py-2">
-              <Search size={15} className="text-muted-foreground" />
+              <Search size={15} className="text-text-muted" />
               <input
                 ref={queueSearchInputRef}
                 value={queueSearch}
@@ -2613,10 +2614,13 @@ export function JamSession() {
                     ? t("jam.room.queueSearchPlaceholder")
                     : t("jam.room.queueSearchDisabledPlaceholder")
                 }
-                className="h-8 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
+                className="h-8 min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted disabled:opacity-60"
               />
               {queueSearchLoading ? (
-                <Loader2 size={15} className="animate-spin text-primary" />
+                <Loader2
+                  size={15}
+                  className="animate-spin text-accent-action"
+                />
               ) : null}
             </div>
             {queueSearchResults.length > 0 ? (
@@ -2655,10 +2659,10 @@ export function JamSession() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-foreground">
+                        <div className="truncate text-sm font-medium text-text-primary">
                           {playable.title}
                         </div>
-                        <div className="truncate text-xs text-muted-foreground">
+                        <div className="truncate text-xs text-text-muted">
                           {playable.artist}
                           {playable.album ? ` · ${playable.album}` : ""}
                         </div>
@@ -2714,10 +2718,10 @@ export function JamSession() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-foreground">
+                        <div className="truncate text-sm font-medium text-text-primary">
                           {track.title}
                         </div>
-                        <div className="truncate text-xs text-muted-foreground">
+                        <div className="truncate text-xs text-text-muted">
                           {track.artist}
                           {track.album ? ` · ${track.album}` : ""}
                         </div>
@@ -2747,13 +2751,13 @@ export function JamSession() {
                               },
                             )}
                             iconSize={18}
-                            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-surface-quiet-subtle disabled:cursor-default disabled:opacity-45"
+                            className="rounded-full p-1 text-text-muted transition-colors hover:bg-surface-quiet-subtle disabled:cursor-default disabled:opacity-45"
                           />
                           <span
                             aria-label={t("jam.room.queueVoteCount", {
                               count: item.vote_count,
                             })}
-                            className="min-w-4 text-center text-xs tabular-nums text-muted-foreground"
+                            className="min-w-4 text-center text-xs tabular-nums text-text-muted"
                           >
                             {item.vote_count}
                           </span>
@@ -2770,7 +2774,7 @@ export function JamSession() {
                               handleMoveInRoomQueue(item.id, index, index - 1)
                             }
                             disabled={index === 0}
-                            className="jam-chip rounded-full p-1.5 text-muted-foreground hover:bg-surface-quiet-subtle disabled:opacity-30"
+                            className="jam-chip rounded-full p-1.5 text-text-muted hover:bg-surface-quiet-subtle disabled:opacity-30"
                           >
                             <ArrowUp size={13} />
                           </button>
@@ -2783,7 +2787,7 @@ export function JamSession() {
                               handleMoveInRoomQueue(item.id, index, index + 1)
                             }
                             disabled={index === queueItems.length - 1}
-                            className="jam-chip rounded-full p-1.5 text-muted-foreground hover:bg-surface-quiet-subtle disabled:opacity-30"
+                            className="jam-chip rounded-full p-1.5 text-text-muted hover:bg-surface-quiet-subtle disabled:opacity-30"
                           >
                             <ArrowDown size={13} />
                           </button>
@@ -2806,7 +2810,7 @@ export function JamSession() {
             </DndContext>
             {queueItems.length === 0 ? (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-text-muted">
                   {t("jam.room.emptyQueuePrefix")}{" "}
                   <b>{queuePrimaryActionLabel}</b>{" "}
                   {t("jam.room.emptyQueueSuffix")}
@@ -2816,7 +2820,7 @@ export function JamSession() {
                   variant="outline"
                   size="default"
                   onClick={focusQueueSearch}
-                  className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors"
+                  className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
                 >
                   <Search size={15} />
                   {t("jam.room.browseLibrary")}
@@ -2827,7 +2831,7 @@ export function JamSession() {
         </section>
 
         <section className="jam-activity-panel min-h-0 min-w-0 overflow-hidden rounded-[12px] p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-text-primary">
             {t("jam.room.recentActivity")}
           </h2>
           <div className="mt-4 max-h-[min(42rem,calc(100vh-18rem))] space-y-3 overflow-y-auto overscroll-contain pr-1">
@@ -2857,10 +2861,10 @@ export function JamSession() {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
-                          <div className="truncate text-sm font-medium text-foreground">
+                          <div className="truncate text-sm font-medium text-text-primary">
                             {eventActivityText(event, actor.name, t)}
                           </div>
-                          <div className="shrink-0 text-[11px] text-muted-foreground">
+                          <div className="shrink-0 text-[11px] text-text-muted">
                             {new Date(event.created_at).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -2881,10 +2885,10 @@ export function JamSession() {
                               </div>
                             )}
                             <div className="min-w-0">
-                              <div className="truncate text-xs font-medium text-foreground">
+                              <div className="truncate text-xs font-medium text-text-primary">
                                 {track.title}
                               </div>
-                              <div className="truncate text-[11px] text-muted-foreground">
+                              <div className="truncate text-[11px] text-text-muted">
                                 {track.artist}
                               </div>
                             </div>
@@ -2896,7 +2900,7 @@ export function JamSession() {
                 );
               })}
             {room.events.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-text-muted">
                 {t("jam.room.noEvents")}
               </p>
             ) : null}
@@ -2913,10 +2917,10 @@ export function JamSession() {
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-text-primary">
               {t("jam.room.profileModalTitle")}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-muted">
               {t("jam.room.profileModalDescription")}
             </p>
           </div>
@@ -2925,7 +2929,7 @@ export function JamSession() {
         <ModalBody className="px-5 py-5">
           <div className="space-y-4">
             <label className="block">
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-text-muted">
                 {t("jam.room.descriptionLabel")}
               </span>
               <textarea
@@ -2933,25 +2937,25 @@ export function JamSession() {
                 onChange={(event) => setMetadataDescription(event.target.value)}
                 rows={4}
                 placeholder={t("jam.room.descriptionPlaceholder")}
-                className="jam-input mt-2 w-full resize-none rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground"
+                className="jam-input mt-2 w-full resize-none rounded-lg px-4 py-3 text-sm text-text-primary placeholder:text-text-muted"
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-text-muted">
                 {t("jam.room.tagsLabel")}
               </span>
               <input
                 value={metadataTagsInput}
                 onChange={(event) => setMetadataTagsInput(event.target.value)}
                 placeholder={t("jam.room.tagsPlaceholder")}
-                className="jam-input mt-2 h-11 w-full rounded-lg px-4 text-sm text-foreground placeholder:text-muted-foreground"
+                className="jam-input mt-2 h-11 w-full rounded-lg px-4 text-sm text-text-primary placeholder:text-text-muted"
               />
             </label>
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setMetadataModalOpen(false)}
-                className="jam-secondary-action rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors"
+                className="jam-secondary-action rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
               >
                 {t("common.cancel")}
               </button>
@@ -2959,7 +2963,7 @@ export function JamSession() {
                 type="button"
                 onClick={() => void saveRoomMetadata()}
                 disabled={updatingRoomField === "metadata"}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground hover:bg-accent-action/90 transition-colors disabled:opacity-60"
               >
                 {updatingRoomField === "metadata" ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -2980,10 +2984,10 @@ export function JamSession() {
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-text-primary">
               {t("jam.room.inviteModalTitle")}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-muted">
               {t("jam.room.inviteModalDescription")}
             </p>
           </div>
@@ -2999,14 +3003,14 @@ export function JamSession() {
                   className="jam-qr-surface rounded-xl p-3"
                 />
               </div>
-              <div className="jam-input rounded-lg px-4 py-3 text-xs text-muted-foreground break-all">
+              <div className="jam-input rounded-lg px-4 py-3 text-xs text-text-muted break-all">
                 {inviteLink}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => copyInviteLink(inviteLink)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground hover:bg-accent-action/90 transition-colors"
                 >
                   <Copy size={15} />
                   {t("jam.room.copyLink")}
@@ -3017,7 +3021,7 @@ export function JamSession() {
                     void copyInviteLink(inviteLink);
                     setInviteModalOpen(false);
                   }}
-                  className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors"
+                  className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
                 >
                   <QrCode size={15} />
                   {t("jam.room.done")}

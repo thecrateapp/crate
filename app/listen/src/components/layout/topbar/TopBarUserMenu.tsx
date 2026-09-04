@@ -202,13 +202,13 @@ export function TopBarUserMenu() {
               <ModalHeader className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-action">
                       {t("userMenu.suggest.badge")}
                     </p>
                     <h2 className="mt-1 text-lg font-semibold text-text-primary">
                       {t("userMenu.suggest.title")}
                     </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="mt-1 text-sm text-text-muted">
                       {t("userMenu.suggest.description")}
                     </p>
                   </div>
@@ -231,7 +231,7 @@ export function TopBarUserMenu() {
                     aria-describedby={
                       suggestArtistError ? "artist-suggestion-error" : undefined
                     }
-                    className="h-11 w-full rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/60"
+                    className="h-11 w-full rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-accent-action/60"
                     required
                     minLength={2}
                     maxLength={200}
@@ -253,7 +253,7 @@ export function TopBarUserMenu() {
                     value={suggestUrl}
                     onChange={(event) => setSuggestUrl(event.target.value)}
                     placeholder="Bandcamp, Tidal, Spotify, YouTube..."
-                    className="h-11 w-full rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/60"
+                    className="h-11 w-full rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-accent-action/60"
                     maxLength={500}
                   />
                 </label>
@@ -265,7 +265,7 @@ export function TopBarUserMenu() {
                     value={suggestNote}
                     onChange={(event) => setSuggestNote(event.target.value)}
                     placeholder={t("userMenu.suggest.notePlaceholder")}
-                    className="min-h-24 w-full resize-none rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/60"
+                    className="min-h-24 w-full resize-none rounded-md border border-border-quiet bg-text-primary/[0.04] px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-accent-action/60"
                     maxLength={1000}
                   />
                 </label>
@@ -282,7 +282,7 @@ export function TopBarUserMenu() {
                 <button
                   type="submit"
                   disabled={suggesting || suggestArtistName.length < 2}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2 text-sm font-semibold text-accent-action-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send size={CRATE_ICON_SIZE.sm} />
                   {suggesting

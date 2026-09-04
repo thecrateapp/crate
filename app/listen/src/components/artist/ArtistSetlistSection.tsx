@@ -66,12 +66,12 @@ export function ArtistSetlistModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-text-primary/5 px-5 py-4">
           <div className="flex items-center gap-3">
-            <ListMusic size={18} className="text-primary" />
+            <ListMusic size={18} className="text-accent-action" />
             <div>
-              <h3 className="text-sm font-semibold text-foreground">
+              <h3 className="text-sm font-semibold text-text-primary">
                 {t("artist.setlist.title")}
               </h3>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-text-muted">
                 {artistName} ·{" "}
                 {t("artist.setlist.songCount", { count: setlist.length })}
               </p>
@@ -96,13 +96,13 @@ export function ArtistSetlistModal({
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-foreground">
+                <span className="block truncate text-sm text-text-primary">
                   {track.title}
                 </span>
                 <div className="mt-1 flex items-center gap-2">
-                  <div className="relative h-1 w-16 rounded-full bg-primary/15">
+                  <div className="relative h-1 w-16 rounded-full bg-accent-action/15">
                     <div
-                      className="absolute inset-y-0 left-0 rounded-full bg-primary/70"
+                      className="absolute inset-y-0 left-0 rounded-full bg-accent-action/70"
                       style={{ width: `${Math.round(track.frequency * 100)}%` }}
                     />
                   </div>
@@ -124,7 +124,7 @@ export function ArtistSetlistModal({
         <div className="flex gap-2 border-t border-text-primary/5 px-5 py-4">
           <button
             onClick={handlePlay}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary/15 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-accent-action/15 py-2.5 text-sm font-medium text-accent-action transition-colors hover:bg-accent-action/25"
           >
             <Play size={14} fill="currentColor" />
             {t("artist.setlist.play")}
@@ -132,7 +132,7 @@ export function ArtistSetlistModal({
           <button
             onClick={handleExport}
             disabled={saving || !artistId}
-            className="flex items-center justify-center gap-2 rounded-lg border border-border-quiet px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-text-primary/5 disabled:opacity-40"
+            className="flex items-center justify-center gap-2 rounded-lg border border-border-quiet px-4 py-2.5 text-sm text-text-primary transition-colors hover:bg-text-primary/5 disabled:opacity-40"
           >
             <Save size={14} />
             {saving ? t("common.saving") : t("artist.setlist.export")}

@@ -58,7 +58,7 @@ describe("ReleaseCountdown", () => {
 
     const countdown = screen.getByTestId("release-countdown");
     const hasCyanTopRule = Array.from(countdown.querySelectorAll("*")).some(
-      (element) => element.classList.contains("bg-primary/90"),
+      (element) => element.classList.contains("bg-accent-action/90"),
     );
 
     expect(hasCyanTopRule).toBe(false);

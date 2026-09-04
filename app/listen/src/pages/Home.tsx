@@ -570,10 +570,10 @@ export function Home() {
 
   const homeIntro = (
     <div>
-      <h1 className="text-3xl font-bold text-foreground">
+      <h1 className="text-3xl font-bold text-text-primary">
         {getHomeGreeting(t)}
       </h1>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="mt-1 text-sm text-text-muted">
         {getHomeDateString(i18n.language)}
       </p>
     </div>

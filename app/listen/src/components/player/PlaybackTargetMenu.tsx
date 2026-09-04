@@ -241,7 +241,7 @@ export function PlaybackTargetMenu({
                 </div>
               </div>
               {loading ? (
-                <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 px-3 py-4 text-sm text-text-muted">
                   <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
                   {t("player.output.loading")}
                 </div>
@@ -290,7 +290,7 @@ export function PlaybackTargetMenu({
                               ) : null}
                             </span>
                             {target.subtitle ? (
-                              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              <span className="mt-0.5 block truncate text-xs text-text-muted">
                                 {target.subtitle}
                               </span>
                             ) : null}
@@ -310,14 +310,14 @@ export function PlaybackTargetMenu({
                         </button>
                       ))}
                       {group.error ? (
-                        <div className="px-3 py-2 text-xs text-muted-foreground">
+                        <div className="px-3 py-2 text-xs text-text-muted">
                           {group.error}
                         </div>
                       ) : null}
                     </div>
                   ))}
                   {groups.length === 0 ? (
-                    <div className="px-3 py-4 text-sm text-muted-foreground">
+                    <div className="px-3 py-4 text-sm text-text-muted">
                       {t("player.output.empty")}
                     </div>
                   ) : null}

@@ -119,10 +119,10 @@ export function People() {
       <div className="rounded-[12px] border border-border-quiet bg-text-primary/5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-3xl font-bold text-text-primary">
               {t("people.title")}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-text-muted">
               {t("people.subtitle")}
             </p>
           </div>
@@ -136,13 +136,13 @@ export function People() {
             <div className="text-xs uppercase tracking-wide text-text-accent/70">
               {t("people.summary.yourProfile")}
             </div>
-            <div className="mt-2 text-lg font-semibold text-foreground">
+            <div className="mt-2 text-lg font-semibold text-text-primary">
               {data?.profile.display_name ||
                 user?.name ||
                 user?.email ||
                 t("people.fallback.you")}
             </div>
-            <div className="mt-1 text-sm text-muted-foreground">
+            <div className="mt-1 text-sm text-text-muted">
               {data?.profile.username
                 ? `@${data.profile.username}`
                 : t("people.summary.setUsername")}
@@ -152,10 +152,10 @@ export function People() {
             to={ownFollowersHref}
             className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4 hover:bg-text-primary/[0.05] transition-colors"
           >
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-text-muted">
               {t("people.followers")}
             </div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="mt-2 text-2xl font-semibold text-text-primary">
               {data?.followers_count ?? "—"}
             </div>
           </Link>
@@ -163,18 +163,18 @@ export function People() {
             to={ownFollowingHref}
             className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4 hover:bg-text-primary/[0.05] transition-colors"
           >
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-text-muted">
               {t("people.following")}
             </div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="mt-2 text-2xl font-semibold text-text-primary">
               {data?.following_count ?? "—"}
             </div>
           </Link>
           <div className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-text-muted">
               {t("people.friends")}
             </div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="mt-2 text-2xl font-semibold text-text-primary">
               {data?.friends_count ?? "—"}
             </div>
           </div>
@@ -183,31 +183,31 @@ export function People() {
 
       <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
         <div className="flex items-center gap-3 rounded-lg border border-border-quiet bg-surface-canvas/20 px-4 py-3">
-          <Search size={16} className="text-muted-foreground" />
+          <Search size={16} className="text-text-muted" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("people.search.placeholder")}
-            className="h-7 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-text-primary/40"
+            className="h-7 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-primary/40"
           />
         </div>
 
         <div className="mt-4 space-y-3">
           {query.trim() && searching ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-text-muted">
               <Loader2 size={15} className="animate-spin" />
               {t("people.search.loading")}
             </div>
           ) : null}
 
           {!query.trim() ? (
-            <div className="rounded-lg border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-text-muted">
               {t("people.search.emptyPrompt")}
             </div>
           ) : null}
 
           {query.trim() && !searching && results.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-text-muted">
               {t("people.search.noMatches", { query: query.trim() })}
             </div>
           ) : null}
@@ -228,16 +228,16 @@ export function People() {
                   userId={item.id}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-foreground">
+                  <div className="truncate text-sm font-medium text-text-primary">
                     {label}
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">
+                  <div className="truncate text-xs text-text-muted">
                     {item.username
                       ? `@${item.username}`
                       : t("people.noUsername")}
                   </div>
                   {item.bio ? (
-                    <div className="mt-1 truncate text-xs text-muted-foreground">
+                    <div className="mt-1 truncate text-xs text-text-muted">
                       {item.bio}
                     </div>
                   ) : null}
@@ -253,7 +253,7 @@ export function People() {
       </section>
 
       {loading ? (
-        <div className="flex items-center justify-center py-6 text-muted-foreground">
+        <div className="flex items-center justify-center py-6 text-text-muted">
           <Loader2 size={18} className="animate-spin" />
         </div>
       ) : null}

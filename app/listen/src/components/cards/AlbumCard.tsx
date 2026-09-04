@@ -200,7 +200,7 @@ export const AlbumCard = memo(function AlbumCard({
         offlineState === "ready"
           ? "bg-accent-action/[0.04]"
           : isOfflineBusy(offlineState)
-            ? "bg-primary/[0.05]"
+            ? "bg-accent-action/[0.05]"
             : offlineState === "error"
               ? "bg-state-warning/[0.05]"
               : "hover:bg-text-primary/5",
@@ -259,34 +259,34 @@ export const AlbumCard = memo(function AlbumCard({
           className="absolute left-2 top-2 z-10"
         />
         {isPreRelease ? (
-          <span className="absolute left-2 bottom-2 z-10 rounded-full border border-primary/25 bg-surface-canvas/55 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-primary backdrop-blur-sm">
+          <span className="absolute left-2 bottom-2 z-10 rounded-full border border-accent-action/25 bg-surface-canvas/55 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-accent-action backdrop-blur-sm">
             Pre-release
           </span>
         ) : null}
         <div className="absolute inset-0 hidden bg-surface-canvas/0 transition-colors md:flex md:items-center md:justify-center md:p-0 md:group-hover:bg-surface-canvas/40">
           <button
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all md:translate-y-2 md:group-hover:translate-y-0 md:group-hover:opacity-100"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-action opacity-0 shadow-lg transition-all md:translate-y-2 md:group-hover:translate-y-0 md:group-hover:opacity-100"
             onClick={handlePlayOverlay}
           >
             {playing ? (
               <Loader2
                 size={CRATE_ICON_SIZE.lg}
-                className="text-primary-foreground animate-spin"
+                className="text-accent-action-foreground animate-spin"
               />
             ) : (
               <Play
                 size={CRATE_ICON_SIZE.lg}
                 fill="currentColor"
-                className="text-primary-foreground ml-0.5"
+                className="text-accent-action-foreground ml-0.5"
               />
             )}
           </button>
         </div>
       </ArtworkSurface>
-      <div className="truncate text-sm font-medium text-foreground">
+      <div className="truncate text-sm font-medium text-text-primary">
         {album}
       </div>
-      <div className="truncate text-xs text-muted-foreground">
+      <div className="truncate text-xs text-text-muted">
         {isPreRelease && releaseDate
           ? `Releases ${new Date(`${releaseDate}T12:00:00`).toLocaleDateString(
               "en-US",
@@ -302,7 +302,7 @@ export const AlbumCard = memo(function AlbumCard({
               offlineState === "ready"
                 ? "text-text-accent/90"
                 : isOfflineBusy(offlineState)
-                  ? "text-primary"
+                  ? "text-accent-action"
                   : offlineState === "error"
                     ? "text-state-warning-text/90"
                     : undefined,

@@ -146,9 +146,9 @@ function Section({
   return (
     <section className="settings-section rounded-[12px] p-5 sm:p-6">
       <div className="mb-5">
-        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
         {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1 text-sm text-text-muted">{description}</p>
         ) : null}
       </div>
       <div className="space-y-5">{children}</div>
@@ -181,9 +181,9 @@ function RangeRow({
     <div className={`space-y-2 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm font-medium text-foreground">{label}</div>
+          <div className="text-sm font-medium text-text-primary">{label}</div>
           {description ? (
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            <p className="mt-1 text-xs leading-5 text-text-muted">
               {description}
             </p>
           ) : null}
@@ -220,9 +220,9 @@ function ToggleRow({
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <div className="text-sm font-medium text-foreground">{label}</div>
+        <div className="text-sm font-medium text-text-primary">{label}</div>
         {description ? (
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          <p className="mt-1 text-xs leading-5 text-text-muted">
             {description}
           </p>
         ) : null}
@@ -332,12 +332,10 @@ export function Settings() {
   return (
     <div className="space-y-8">
       <div className="settings-header">
-        <h1 className="text-3xl font-bold text-foreground">
+        <h1 className="text-3xl font-bold text-text-primary">
           {t("settings.title")}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("settings.subtitle")}
-        </p>
+        <p className="mt-1 text-sm text-text-muted">{t("settings.subtitle")}</p>
       </div>
 
       <LanguageSection i18n={i18n} />
@@ -348,10 +346,10 @@ export function Settings() {
       >
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium text-foreground">
+            <div className="text-sm font-medium text-text-primary">
               {t("settings.playback.streamQuality")}
             </div>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            <p className="mt-1 text-xs leading-5 text-text-muted">
               {t("settings.playback.streamQualityDescription")}
             </p>
           </div>
@@ -381,7 +379,7 @@ export function Settings() {
                   <span className="block text-sm font-semibold">
                     {t(option.labelKey)}
                   </span>
-                  <span className="mt-1 block text-xs text-muted-foreground">
+                  <span className="mt-1 block text-xs text-text-muted">
                     {t(option.descriptionKey)}
                   </span>
                 </button>
@@ -476,10 +474,10 @@ export function Settings() {
             <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("settings.offline.items")}
             </div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="mt-2 text-2xl font-semibold text-text-primary">
               {offlineSummary.itemCount}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-text-muted">
               {t("settings.offline.readyItems", {
                 count: offlineSummary.readyItemCount,
               })}
@@ -494,10 +492,10 @@ export function Settings() {
             <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("common.tracks")}
             </div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="mt-2 text-2xl font-semibold text-text-primary">
               {offlineSummary.readyTrackCount}/{offlineSummary.trackCount}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-text-muted">
               {t("settings.offline.mirrored")}
             </p>
           </div>
@@ -505,10 +503,10 @@ export function Settings() {
             <div className="text-[11px] uppercase tracking-[0.2em] text-text-primary/40">
               {t("settings.offline.storage")}
             </div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="mt-2 text-2xl font-semibold text-text-primary">
               {formatBytes(offlineSummary.totalBytes)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-text-muted">
               {t("settings.offline.footprint")}
             </p>
           </div>
@@ -569,7 +567,7 @@ export function Settings() {
           </button>
         </div>
 
-        <div className="rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted">
           <div className="flex items-start gap-3">
             <ArrowDownToLine
               size={16}
@@ -600,30 +598,29 @@ export function Settings() {
         <div className="flex flex-col gap-2">
           <Link
             to={publicProfilePath}
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-text-primary/5 transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-text-primary hover:bg-text-primary/5 transition-colors"
           >
-            <Users size={18} className="text-muted-foreground" />{" "}
+            <Users size={18} className="text-text-muted" />{" "}
             {t("settings.links.profile")}
           </Link>
           <Link
             to="/people"
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-text-primary/5 transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-text-primary hover:bg-text-primary/5 transition-colors"
           >
-            <Users size={18} className="text-muted-foreground" />{" "}
+            <Users size={18} className="text-text-muted" />{" "}
             {t("settings.links.people")}
           </Link>
           <Link
             to="/upload"
-            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-text-primary/5 transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-text-primary hover:bg-text-primary/5 transition-colors"
           >
-            <Upload size={18} className="text-muted-foreground" />{" "}
-            {t("upload.badge")}
+            <Upload size={18} className="text-text-muted" /> {t("upload.badge")}
           </Link>
           <Link
             to="/stats"
-            className="hidden items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground transition-colors hover:bg-text-primary/5 md:flex"
+            className="hidden items-center gap-3 rounded-xl px-3 py-3 text-sm text-text-primary transition-colors hover:bg-text-primary/5 md:flex"
           >
-            <BarChart3 size={18} className="text-muted-foreground" />{" "}
+            <BarChart3 size={18} className="text-text-muted" />{" "}
             {t("settings.links.stats")}
           </Link>
           <button
@@ -691,7 +688,7 @@ function LanguageSection({
           <span className="block text-sm font-semibold">
             {t("settings.language.auto")}
           </span>
-          <span className="mt-1 block text-xs text-muted-foreground">
+          <span className="mt-1 block text-xs text-text-muted">
             {t("settings.language.autoDescription")}
           </span>
         </button>
@@ -714,7 +711,7 @@ function LanguageSection({
               <span className="block text-sm font-semibold">
                 {t(option.labelKey)}
               </span>
-              <span className="mt-1 block text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="mt-1 block text-xs uppercase tracking-[0.18em] text-text-muted">
                 {option.value}
               </span>
             </button>
@@ -722,7 +719,7 @@ function LanguageSection({
         })}
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-muted-foreground">
+      <div className="flex items-start gap-3 rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted">
         <Globe size={16} className="mt-0.5 text-accent-action/80" />
         <span>
           {t("settings.language.current", {
@@ -764,7 +761,7 @@ function SleepTimerSection() {
             onClick={() => startSleepTimer(mode, pause)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               timer.mode === mode
-                ? "bg-primary text-primary-foreground"
+                ? "bg-accent-action text-accent-action-foreground"
                 : "bg-text-primary/5 text-text-primary/60 hover:bg-text-primary/10"
             }`}
           >
@@ -773,12 +770,12 @@ function SleepTimerSection() {
         ))}
       </div>
       {timer.active && timer.remainingSeconds > 0 ? (
-        <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+        <div className="flex items-center justify-between rounded-lg border border-accent-action/20 bg-accent-action/5 px-4 py-3">
           <div className="flex items-center gap-2">
-            <Moon size={16} className="text-primary" />
-            <span className="text-sm text-foreground">
+            <Moon size={16} className="text-accent-action" />
+            <span className="text-sm text-text-primary">
               {t("settings.sleep.pausingIn")}{" "}
-              <span className="font-mono font-semibold text-primary">
+              <span className="font-mono font-semibold text-accent-action">
                 {formatRemaining(timer.remainingSeconds)}
               </span>
             </span>
@@ -1003,15 +1000,15 @@ function BandcampSection() {
                 className="h-11 w-11 rounded-full object-cover"
               />
             ) : (
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-text-primary/10 text-primary">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-text-primary/10 text-accent-action">
                 <BandcampLogo size={20} />
               </div>
             )}
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">
+              <p className="truncate text-sm font-semibold text-text-primary">
                 {status?.connected ? connectedName : t("common.notConnected")}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text-muted">
                 {status?.connected
                   ? t("settings.bandcamp.summary", {
                       collection: counts.collection,
@@ -1028,7 +1025,7 @@ function BandcampSection() {
             <div className="flex flex-wrap gap-2">
               <Link
                 to="/library?tab=bandcamp"
-                className="inline-flex items-center gap-2 rounded-full border border-border-quiet/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10"
+                className="inline-flex items-center gap-2 rounded-full border border-border-quiet/10 px-4 py-2 text-xs font-semibold text-text-primary transition-colors hover:bg-text-primary/10"
               >
                 <BandcampLogo size={14} />
                 {t("settings.bandcamp.viewPurchases")}
@@ -1036,7 +1033,7 @@ function BandcampSection() {
               <button
                 onClick={syncBandcamp}
                 disabled={busy !== null}
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-50"
               >
                 {busy === "sync" ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -1074,7 +1071,7 @@ function BandcampSection() {
               <button
                 onClick={openTauriBandcampInterceptor}
                 disabled={busy !== null}
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-50"
               >
                 {busy === "tauri-connect" ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -1108,12 +1105,12 @@ function BandcampSection() {
               rows={3}
               spellCheck={false}
               placeholder={t("settings.bandcamp.cookiePlaceholder")}
-              className="w-full resize-none rounded-lg border border-border-quiet/10 bg-surface-canvas/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-text-primary/25 focus:border-primary/50"
+              className="w-full resize-none rounded-lg border border-border-quiet/10 bg-surface-canvas/30 px-3 py-2 font-mono text-xs leading-5 text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-accent-action/50"
             />
             <button
               onClick={() => void connectWithCookie(bandcampCookie)}
               disabled={busy !== null || !bandcampCookie.trim()}
-              className="inline-flex items-center gap-2 rounded-full border border-border-quiet/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full border border-border-quiet/10 px-4 py-2 text-xs font-semibold text-text-primary transition-colors hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy === "cookie-connect" ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -1273,7 +1270,7 @@ function ScrobbleSection() {
       {/* Last.fm */}
       <div className="flex items-center justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">Last.fm</p>
+          <p className="text-sm font-medium text-text-primary">Last.fm</p>
           {lastfm?.connected ? (
             <p className="text-xs text-state-success">
               {lastfm.username
@@ -1283,7 +1280,7 @@ function ScrobbleSection() {
                 : t("common.connected")}
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-muted">
               {t("common.notConnected")}
             </p>
           )}
@@ -1299,7 +1296,7 @@ function ScrobbleSection() {
           <button
             onClick={handleLastfmConnect}
             disabled={connecting === "lastfm"}
-            className="rounded-full px-4 py-2 text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors disabled:opacity-50"
+            className="rounded-full px-4 py-2 text-xs font-medium bg-accent-action/15 text-accent-action hover:bg-accent-action/25 transition-colors disabled:opacity-50"
           >
             {connecting === "lastfm"
               ? t("common.connecting")
@@ -1311,7 +1308,7 @@ function ScrobbleSection() {
       {/* ListenBrainz */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">ListenBrainz</p>
+          <p className="text-sm font-medium text-text-primary">ListenBrainz</p>
           {listenbrainz?.connected ? (
             <p className="text-xs text-state-success">
               {listenbrainz.username
@@ -1321,7 +1318,7 @@ function ScrobbleSection() {
                 : t("common.connected")}
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-muted">
               {t("common.notConnected")}
             </p>
           )}
@@ -1340,7 +1337,7 @@ function ScrobbleSection() {
               value={lbToken}
               onChange={(e) => setLbToken(e.target.value)}
               placeholder={t("settings.scrobbling.apiToken")}
-              className="w-36 rounded-lg bg-text-primary/5 border border-border-quiet/10 px-3 py-1.5 text-xs text-foreground placeholder:text-text-primary/40 focus:outline-none focus:border-primary/50"
+              className="w-36 rounded-lg bg-text-primary/5 border border-border-quiet/10 px-3 py-1.5 text-xs text-text-primary placeholder:text-text-primary/40 focus:outline-none focus:border-accent-action/50"
               onKeyDown={(e) =>
                 e.key === "Enter" && handleListenBrainzConnect()
               }
@@ -1348,7 +1345,7 @@ function ScrobbleSection() {
             <button
               onClick={handleListenBrainzConnect}
               disabled={connecting === "listenbrainz" || !lbToken.trim()}
-              className="rounded-full px-4 py-2 text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors disabled:opacity-50"
+              className="rounded-full px-4 py-2 text-xs font-medium bg-accent-action/15 text-accent-action hover:bg-accent-action/25 transition-colors disabled:opacity-50"
             >
               {connecting === "listenbrainz" ? "..." : t("common.connect")}
             </button>
@@ -1492,7 +1489,7 @@ function AccountSection() {
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">
+          <label className="text-xs text-text-muted">
             {t("settings.account.displayName")}
           </label>
           <div className="flex gap-2">
@@ -1507,7 +1504,7 @@ function AccountSection() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">
+          <label className="text-xs text-text-muted">
             {t("settings.account.username")}
           </label>
           <input
@@ -1517,13 +1514,13 @@ function AccountSection() {
             className="w-full h-10 px-3 rounded-lg bg-text-primary/5 text-sm text-text-primary outline-none focus:bg-text-primary/8"
             placeholder={t("settings.account.usernamePlaceholder")}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-text-muted">
             {t("settings.account.usernameDescription")}
           </p>
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">
+          <label className="text-xs text-text-muted">
             {t("settings.account.bio")}
           </label>
           <textarea
@@ -1543,16 +1540,14 @@ function AccountSection() {
                 username.trim() === (user?.username || "") &&
                 bio.trim() === (user?.bio || ""))
             }
-            className="h-10 px-4 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40 transition-opacity"
+            className="h-10 px-4 rounded-lg bg-accent-action text-sm font-medium text-accent-action-foreground disabled:opacity-40 transition-opacity"
           >
             {saving ? t("common.saving") : t("settings.account.saveProfile")}
           </button>
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">
-            {t("common.email")}
-          </label>
+          <label className="text-xs text-text-muted">{t("common.email")}</label>
           <p className="text-sm text-text-primary/60 px-1">
             {user?.email || "—"}
           </p>
@@ -1561,10 +1556,10 @@ function AccountSection() {
         {socialProviders.length > 0 ? (
           <div className="space-y-3 rounded-xl bg-text-primary/5 p-4">
             <div>
-              <div className="text-sm font-medium text-foreground">
+              <div className="text-sm font-medium text-text-primary">
                 {t("settings.account.connectedAccounts")}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-text-muted">
                 {t("settings.account.connectedAccountsDescription")}
               </p>
             </div>
@@ -1578,10 +1573,10 @@ function AccountSection() {
                   className="flex items-center justify-between gap-4 rounded-lg border border-border-quiet/10 px-3 py-3"
                 >
                   <div>
-                    <div className="text-sm font-medium text-foreground capitalize">
+                    <div className="text-sm font-medium text-text-primary capitalize">
                       {provider}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-text-muted">
                       {linked
                         ? t("settings.account.linked")
                         : t("settings.account.notLinked")}
@@ -1595,7 +1590,7 @@ function AccountSection() {
                         ? void handleUnlinkProvider(provider)
                         : void handleLinkProvider(provider)
                     }
-                    className="rounded-lg border border-border-quiet/15 bg-text-primary/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-text-primary/10 transition-colors disabled:opacity-50"
+                    className="rounded-lg border border-border-quiet/15 bg-text-primary/5 px-3 py-2 text-xs font-medium text-text-primary hover:bg-text-primary/10 transition-colors disabled:opacity-50"
                   >
                     {busy
                       ? t("common.working")
@@ -1621,7 +1616,7 @@ function AccountSection() {
         {!showPassword ? (
           <button
             onClick={() => setShowPassword(true)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors"
           >
             <Lock size={14} /> {t("settings.account.changePassword")}
           </button>
@@ -1655,7 +1650,7 @@ function AccountSection() {
               <button
                 onClick={handleChangePassword}
                 disabled={saving}
-                className="h-9 px-4 rounded-lg bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40"
+                className="h-9 px-4 rounded-lg bg-accent-action text-sm font-medium text-accent-action-foreground disabled:opacity-40"
               >
                 {t("settings.account.changePasswordAction")}
               </button>
@@ -1839,7 +1834,7 @@ function ShowsLocationSection() {
       description={t("settings.shows.description")}
     >
       <div className="space-y-3">
-        <div className="text-sm font-medium text-foreground">
+        <div className="text-sm font-medium text-text-primary">
           {t("settings.shows.location")}
         </div>
         <div className="flex flex-col gap-2">
@@ -1847,25 +1842,25 @@ function ShowsLocationSection() {
             onClick={() => saveMode("fixed")}
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
               mode === "fixed"
-                ? "border-primary/30 bg-primary/8"
+                ? "border-accent-action/30 bg-accent-action/8"
                 : "border-border-quiet/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
             }`}
           >
             <MapPin
               size={16}
               className={
-                mode === "fixed" ? "text-primary" : "text-text-primary/40"
+                mode === "fixed" ? "text-accent-action" : "text-text-primary/40"
               }
             />
             <div className="min-w-0 flex-1">
               <div
                 className={`text-sm font-medium ${
-                  mode === "fixed" ? "text-primary" : "text-foreground"
+                  mode === "fixed" ? "text-accent-action" : "text-text-primary"
                 }`}
               >
                 {t("settings.shows.fixedCity")}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-text-muted">
                 {displayCity
                   ? `${displayCity}${
                       displayCountry ? `, ${displayCountry}` : ""
@@ -1876,7 +1871,7 @@ function ShowsLocationSection() {
             <div
               className={`h-4 w-4 rounded-full border-2 ${
                 mode === "fixed"
-                  ? "border-primary bg-primary"
+                  ? "border-accent-action bg-accent-action"
                   : "border-border-quiet/20"
               }`}
             >
@@ -1889,32 +1884,36 @@ function ShowsLocationSection() {
             onClick={() => saveMode("near_me")}
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
               mode === "near_me"
-                ? "border-primary/30 bg-primary/8"
+                ? "border-accent-action/30 bg-accent-action/8"
                 : "border-border-quiet/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
             }`}
           >
             <Navigation
               size={16}
               className={
-                mode === "near_me" ? "text-primary" : "text-text-primary/40"
+                mode === "near_me"
+                  ? "text-accent-action"
+                  : "text-text-primary/40"
               }
             />
             <div className="min-w-0 flex-1">
               <div
                 className={`text-sm font-medium ${
-                  mode === "near_me" ? "text-primary" : "text-foreground"
+                  mode === "near_me"
+                    ? "text-accent-action"
+                    : "text-text-primary"
                 }`}
               >
                 {t("settings.shows.nearMe")}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-text-muted">
                 {t("settings.shows.nearMeDescription")}
               </div>
             </div>
             <div
               className={`h-4 w-4 rounded-full border-2 ${
                 mode === "near_me"
-                  ? "border-primary bg-primary"
+                  ? "border-accent-action bg-accent-action"
                   : "border-border-quiet/20"
               }`}
             >
@@ -1929,13 +1928,13 @@ function ShowsLocationSection() {
       {mode === "fixed" && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs text-muted-foreground">
+            <label className="text-xs text-text-muted">
               {t("settings.shows.city")}
             </label>
             <button
               onClick={() => detectFromIp()}
               disabled={detecting}
-              className="flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-50"
+              className="flex items-center gap-1 text-[11px] text-accent-action hover:underline disabled:opacity-50"
             >
               {detecting ? (
                 <Loader2 size={10} className="animate-spin" />
@@ -1956,7 +1955,7 @@ function ShowsLocationSection() {
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               placeholder={t("settings.shows.cityPlaceholder")}
-              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 border border-border-quiet/10 text-sm text-text-primary outline-none focus:border-primary/40 placeholder:text-text-primary/40"
+              className="w-full h-10 px-3 rounded-lg bg-text-primary/5 border border-border-quiet/10 text-sm text-text-primary outline-none focus:border-accent-action/40 placeholder:text-text-primary/40"
             />
             {searching && (
               <Loader2
@@ -1970,11 +1969,11 @@ function ShowsLocationSection() {
                   <button
                     key={`${result.latitude}-${result.longitude}`}
                     onMouseDown={() => selectCity(result)}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-foreground hover:bg-text-primary/5 transition-colors"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-primary hover:bg-text-primary/5 transition-colors"
                   >
                     <MapPin
                       size={12}
-                      className="flex-shrink-0 text-primary/60"
+                      className="flex-shrink-0 text-accent-action/60"
                     />
                     <span>{result.display_name}</span>
                   </button>
@@ -1987,7 +1986,7 @@ function ShowsLocationSection() {
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-medium text-foreground">
+          <div className="text-sm font-medium text-text-primary">
             {t("settings.shows.searchRadius")}
           </div>
           <div className="rounded-full border border-border-quiet/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
@@ -2001,8 +2000,8 @@ function ShowsLocationSection() {
               onClick={() => saveRadius(r)}
               className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
                 radius === r
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-text-primary/5 text-muted-foreground hover:bg-text-primary/10"
+                  ? "bg-accent-action text-accent-action-foreground"
+                  : "bg-text-primary/5 text-text-muted hover:bg-text-primary/10"
               }`}
             >
               {r} km

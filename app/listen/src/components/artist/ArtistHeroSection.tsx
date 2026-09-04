@@ -48,7 +48,7 @@ interface ArtistHeroSectionProps {
 }
 
 const SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export function ArtistHeroSection({
   artist,
@@ -136,7 +136,7 @@ export function ArtistHeroSection({
         <button
           ref={menuController.anchorRef}
           data-testid="artist-mobile-hero-menu"
-          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-accent-action-hover"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover"
           onClick={handleToggleMenu}
           aria-label={t("common.more")}
         >
@@ -216,10 +216,10 @@ export function ArtistHeroSection({
               />
             </div>
             <div className="max-w-3xl pb-1">
-              <h1 className="mb-1 text-3xl font-bold text-foreground sm:mb-2 sm:text-4xl">
+              <h1 className="mb-1 text-3xl font-bold text-text-primary sm:mb-2 sm:text-4xl">
                 {artist.name}
               </h1>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
                 {artistInfo?.listeners ? (
                   <span className="flex items-center gap-1">
                     <Users size={14} />
@@ -251,7 +251,7 @@ export function ArtistHeroSection({
                   </p>
                   {bio.length > 200 ? (
                     <button
-                      className="mt-2 flex items-center gap-1 text-xs text-primary hover:underline"
+                      className="mt-2 flex items-center gap-1 text-xs text-accent-action hover:underline"
                       onClick={onOpenBio}
                     >
                       {t("common.showMore")} <ChevronDown size={12} />
@@ -272,7 +272,7 @@ export function ArtistHeroSection({
             className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
           >
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-action-solid transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-action-solid-hover md:px-7 md:text-[15px]"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-accent-action/90 hover:shadow-action-solid-hover md:px-7 md:text-[15px]"
               onClick={onPlay}
               aria-label={t("player.play")}
             >
@@ -280,7 +280,7 @@ export function ArtistHeroSection({
               <span>{t("player.play")}</span>
             </button>
             <button
-              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-text-primary/[0.08] px-5 text-sm font-semibold text-foreground shadow-control-inset transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-primary hover:drop-shadow-accent-action md:w-auto md:px-7"
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-control-inset transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action md:w-auto md:px-7"
               onClick={onShuffle}
               aria-label={t("player.shuffle")}
             >
@@ -314,7 +314,7 @@ export function ArtistHeroSection({
             <FollowHeartButton
               className={`${SECONDARY_ACTION_CLASS} ${
                 following
-                  ? "text-primary drop-shadow-accent-action"
+                  ? "text-accent-action drop-shadow-accent-action"
                   : "text-text-primary/62"
               }`}
               following={following}

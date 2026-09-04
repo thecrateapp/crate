@@ -184,9 +184,7 @@ export function HomeSection() {
   if (!data) {
     return (
       <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-muted-foreground">
-          {t("home.section.notFound")}
-        </p>
+        <p className="text-sm text-text-muted">{t("home.section.notFound")}</p>
       </div>
     );
   }
@@ -195,23 +193,23 @@ export function HomeSection() {
     <div className="space-y-6">
       <button
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex items-center gap-2 text-sm text-text-muted transition-colors hover:text-text-primary"
       >
         <ArrowLeft size={16} />
         {t("common.back")}
       </button>
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">{data.title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{data.subtitle}</p>
+        <h1 className="text-3xl font-bold text-text-primary">{data.title}</h1>
+        <p className="mt-2 text-sm text-text-muted">{data.subtitle}</p>
       </div>
 
       {!data.items.length ? (
         <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] px-5 py-12 text-center">
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-sm font-medium text-text-primary">
             {t("home.section.empty.title")}
           </p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          <p className="mx-auto mt-2 max-w-md text-sm text-text-muted">
             {t("home.section.empty.description")}
           </p>
         </div>

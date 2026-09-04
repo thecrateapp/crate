@@ -153,12 +153,12 @@ export function ContinuePlaybackPrompt() {
           <MonitorSpeaker size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-foreground">
+          <div className="text-sm font-semibold text-text-primary">
             {activeRemote
               ? t("player.continue.playingOn", { device: label })
               : t("player.continue.fromDevice", { device: label })}
           </div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">
+          <div className="mt-1 truncate text-xs text-text-muted">
             {promptState.artist ? `${promptState.artist} - ` : ""}
             {promptState.title || t("player.continue.unknownTrack")} -{" "}
             {formatPosition(promptState.position_ms)}
@@ -179,7 +179,7 @@ export function ContinuePlaybackPrompt() {
             <button
               type="button"
               onClick={() => setDismissed(true)}
-              className="rounded-lg border border-border-quiet px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-text-primary/10 hover:text-foreground"
+              className="rounded-lg border border-border-quiet px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary"
             >
               {t("player.continue.notNow")}
             </button>
@@ -189,7 +189,7 @@ export function ContinuePlaybackPrompt() {
           type="button"
           aria-label={t("player.continue.dismiss")}
           onClick={() => setDismissed(true)}
-          className="flex size-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+          className="flex size-9 items-center justify-center text-text-muted transition-colors hover:text-text-primary"
         >
           <X size={CRATE_ICON_SIZE.lg} />
         </button>

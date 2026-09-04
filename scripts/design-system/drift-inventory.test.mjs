@@ -20,6 +20,7 @@ test("counts raw colors, arbitrary utilities, inline styles and imports", () => 
 
   assert.deepEqual(metrics, {
     rawColors: 4,
+    legacySemanticUtilities: 0,
     arbitraryUtilities: 4,
     hardcodedColorUtilities: 4,
     inlineStyles: 1,
@@ -139,7 +140,7 @@ test("detects surface tokens used in border and text declarations", () => {
 
 test("enforces the normalized semantic token budget", () => {
   const inventory = buildDriftInventory();
-  assert.equal(inventory.version, 2);
+  assert.equal(inventory.version, 3);
   const metrics = inventory.semanticTokens;
 
   assert.deepEqual(metrics.nonFoundationAliases, []);
@@ -170,6 +171,13 @@ test("enforces the normalized semantic token budget", () => {
     `hardcoded color utilities grew to ${inventory.totals.hardcodedColorUtilities}`,
   );
   assert.equal(inventory.totals.actionableRawColors, 0);
+  assert.equal(
+    inventory.files
+      .filter(({ path }) => path.startsWith("app/listen/src/"))
+      .reduce((total, file) => total + file.legacySemanticUtilities, 0),
+    0,
+    "Listen still contains legacy semantic utilities",
+  );
   assert.ok(
     metrics.duplicateDefinitions <= 8,
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,

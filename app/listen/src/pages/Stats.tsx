@@ -385,10 +385,10 @@ export function Stats() {
 
       {!dashboardLoading && !hasStats ? (
         <div className="stats-card-empty mt-8 rounded-[12px] border-dashed p-8 text-center">
-          <h2 className="text-xl font-black text-foreground">
+          <h2 className="text-xl font-black text-text-primary">
             {t("stats.empty.title")}
           </h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+          <p className="mx-auto mt-2 max-w-xl text-sm text-text-muted">
             {t("stats.empty.body")}
           </p>
         </div>
@@ -412,7 +412,7 @@ function ScopeLink({
       className={cn(
         "rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] transition-colors",
         active
-          ? "border-primary/30 bg-primary/15 text-primary"
+          ? "border-accent-action/30 bg-accent-action/15 text-accent-action"
           : "stats-scope-link-inactive",
       )}
     >
@@ -438,19 +438,19 @@ function AffinityCard({
     <section className="stats-affinity-card mt-8 overflow-hidden rounded-[12px] p-5 sm:p-6">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/15 text-primary">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-accent-action/25 bg-accent-action/15 text-accent-action">
             <Users size={20} />
           </div>
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
               {t("stats.affinity.title")}
             </div>
-            <h2 className="mt-2 text-3xl font-black uppercase leading-none tracking-[-0.06em] text-foreground">
+            <h2 className="mt-2 text-3xl font-black uppercase leading-none tracking-[-0.06em] text-text-primary">
               {t("stats.affinity.score", {
                 score: affinity.affinity_score,
               })}
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-text-muted">
               {subject
                 ? t("stats.affinity.subjectBody", { subject })
                 : t("stats.affinity.listenerBody")}
@@ -563,15 +563,15 @@ function StorySignalCard({
 }) {
   return (
     <div className="stats-card relative overflow-hidden rounded-[12px] p-5">
-      <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-primary/10 blur-3xl" />
+      <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-accent-action/10 blur-3xl" />
       <div className="relative">
-        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
           {label}
         </div>
-        <div className="mt-3 line-clamp-2 text-2xl font-black uppercase leading-[0.9] tracking-[-0.07em] text-foreground">
+        <div className="mt-3 line-clamp-2 text-2xl font-black uppercase leading-[0.9] tracking-[-0.07em] text-text-primary">
           {title}
         </div>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{body}</p>
+        <p className="mt-3 text-sm leading-6 text-text-muted">{body}</p>
       </div>
     </div>
   );
@@ -659,17 +659,17 @@ function ReplayCard({
             <Repeat2 size={12} />
             {t("stats.replay.title")}
           </div>
-          <h2 className="mt-3 text-2xl font-black tracking-[-0.06em] text-foreground">
+          <h2 className="mt-3 text-2xl font-black tracking-[-0.06em] text-text-primary">
             {replay?.title || t("stats.replay.title")}
           </h2>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          <p className="mt-1 text-sm leading-6 text-text-muted">
             {replay?.subtitle || t("stats.replay.defaultSubtitle")}
           </p>
         </div>
         <button
           onClick={onPlay}
           disabled={!items.length}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/20 transition hover:scale-105 disabled:opacity-50"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-xl shadow-primary/20 transition hover:scale-105 disabled:opacity-50"
         >
           <Play size={18} fill="currentColor" />
         </button>
@@ -700,14 +700,16 @@ function ReplayCard({
             >
               <TrackCover item={item} size="sm" />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-foreground">
+                <div className="truncate text-sm font-semibold text-text-primary">
                   {item.title}
                 </div>
-                <div className="truncate text-xs text-muted-foreground">
+                <div className="truncate text-xs text-text-muted">
                   {item.artist}
                 </div>
               </div>
-              <div className="text-xs font-bold text-primary">{index + 1}</div>
+              <div className="text-xs font-bold text-accent-action">
+                {index + 1}
+              </div>
             </button>
           ))
         ) : (
@@ -726,7 +728,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
       <div className="stats-muted-label text-[10px] font-black uppercase tracking-[0.18em]">
         {label}
       </div>
-      <div className="mt-1 text-lg font-black text-foreground">{value}</div>
+      <div className="mt-1 text-lg font-black text-text-primary">{value}</div>
     </div>
   );
 }
@@ -744,14 +746,14 @@ function SignalCard({
 }) {
   return (
     <div className="stats-card rounded-[12px] p-5">
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-accent-action">
         <Icon size={13} />
         {label}
       </div>
-      <div className="mt-3 text-xl font-black tracking-[-0.05em] text-foreground">
+      <div className="mt-3 text-xl font-black tracking-[-0.05em] text-text-primary">
         {title}
       </div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+      <p className="mt-2 text-sm leading-6 text-text-muted">{body}</p>
     </div>
   );
 }
@@ -784,10 +786,10 @@ function NarrativeTile({
           number: String(index + 1).padStart(2, "0"),
         })}
       </div>
-      <div className="mt-3 text-xl font-black tracking-[-0.05em] text-foreground">
+      <div className="mt-3 text-xl font-black tracking-[-0.05em] text-text-primary">
         {title}
       </div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+      <p className="mt-2 text-sm leading-6 text-text-muted">{body}</p>
     </div>
   );
 }
@@ -808,14 +810,14 @@ function SoundProfileCard({
     <div className="stats-card rounded-[12px] p-5">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
+          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
             {t("stats.soundProfile.title")}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-text-muted">
             {t("stats.soundProfile.subtitle")}
           </p>
         </div>
-        <Activity className="text-primary" size={22} />
+        <Activity className="text-accent-action" size={22} />
       </div>
 
       <div className="space-y-4">
@@ -848,13 +850,13 @@ function SoundProfileCard({
         {genreLabels.map((genre) => (
           <span
             key={genre}
-            className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold text-primary"
+            className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs font-bold text-accent-action"
           >
             {genre}
           </span>
         ))}
         {!genreLabels.length ? (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-text-muted">
             {t("stats.soundProfile.genreEmpty")}
           </span>
         ) : null}
@@ -897,14 +899,14 @@ function ListeningPulseCard({
     <div className="stats-card rounded-[12px] p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
+          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
             {t("stats.rhythm.title")}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-text-muted">
             {t("stats.rhythm.subtitle")}
           </p>
         </div>
-        <CalendarDays className="text-primary" size={22} />
+        <CalendarDays className="text-accent-action" size={22} />
       </div>
 
       {loading ? (
@@ -933,10 +935,10 @@ function ListeningPulseCard({
           <PulseConstellation points={points} />
 
           <div className="stats-dark-card mt-4 rounded-xl p-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
               {t("stats.rhythm.cadence")}
             </div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <p className="mt-2 text-sm leading-6 text-text-muted">
               {t("stats.rhythm.activityDays", {
                 percent: formatStatsPercent(consistency),
               })}
@@ -979,10 +981,10 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
     <div className="stats-pulse-surface mt-5 rounded-[12px] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
             {t("stats.rhythm.dailySignalMap")}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-text-muted">
             {t("stats.rhythm.dailySignalDescription")}
           </p>
         </div>
@@ -1031,7 +1033,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                 className={cn(
                   "relative flex h-10 w-10 items-center justify-center rounded-full outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
                   isActive
-                    ? "text-primary hover:scale-110"
+                    ? "text-accent-action hover:scale-110"
                     : "stats-pulse-point-idle",
                 )}
                 aria-label={`${formatTrendDay(
@@ -1045,7 +1047,9 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                 <span
                   className={cn(
                     "absolute rounded-full blur-md transition",
-                    isActive ? "bg-primary/25" : "stats-pulse-point-idle-glow",
+                    isActive
+                      ? "bg-accent-action/25"
+                      : "stats-pulse-point-idle-glow",
                   )}
                   style={{
                     height: `${size * 1.45}rem`,
@@ -1056,7 +1060,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                   className={cn(
                     "relative rounded-full border transition",
                     isActive
-                      ? "stats-pulse-point-active border-primary/55 bg-primary"
+                      ? "stats-pulse-point-active border-accent-action/55 bg-accent-action"
                       : "stats-pulse-point-idle-dot",
                   )}
                   style={{ height: `${size}rem`, width: `${size}rem` }}
@@ -1078,11 +1082,11 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                     <div className="stats-pulse-tooltip-title text-sm font-black">
                       {formatTrendDay(point.day, i18n.language)}
                     </div>
-                    <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                    <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-accent-action">
                       {formatShortWeekday(point.day, i18n.language)}
                     </div>
                   </div>
-                  <div className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">
+                  <div className="rounded-full border border-accent-action/20 bg-accent-action/10 px-2.5 py-1 text-[10px] font-black text-accent-action">
                     {formatStatsMinutes(point.minutes_listened)}
                   </div>
                 </div>
@@ -1110,7 +1114,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                     value={skipRate}
                   />
                 </div>
-                <div className="mt-3 text-xs leading-5 text-muted-foreground">
+                <div className="mt-3 text-xs leading-5 text-text-muted">
                   {isActive
                     ? t("stats.rhythm.completedAcross", {
                         complete: point.complete_play_count,
@@ -1148,7 +1152,7 @@ function TooltipMeter({ label, value }: { label: string; value: number }) {
       </div>
       <div className="stats-tooltip-meter-track h-1.5 overflow-hidden rounded-full">
         <div
-          className="h-full rounded-full bg-primary"
+          className="h-full rounded-full bg-accent-action"
           style={{ width: `${Math.max(3, percent)}%` }}
         />
       </div>
@@ -1164,7 +1168,7 @@ function ProfileBar({ label, value }: { label: string; value: number }) {
         <span className="stats-profile-label font-bold uppercase tracking-[0.16em]">
           {label}
         </span>
-        <span className="font-black text-foreground">{percent}%</span>
+        <span className="font-black text-text-primary">{percent}%</span>
       </div>
       <div className="stats-profile-track h-3 overflow-hidden rounded-full">
         <div
@@ -1251,23 +1255,23 @@ function TopTracksPanel({
               onClick={() => onPlayTrack(item)}
               className="stats-list-row group flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
             >
-              <div className="w-7 text-center text-xs font-black text-muted-foreground">
+              <div className="w-7 text-center text-xs font-black text-text-muted">
                 {index + 1}
               </div>
               <TrackCover item={item} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-foreground">
+                <div className="truncate text-sm font-semibold text-text-primary">
                   {item.title}
                 </div>
-                <div className="truncate text-xs text-muted-foreground">
+                <div className="truncate text-xs text-text-muted">
                   {item.artist} · {item.album}
                 </div>
               </div>
               <div className="shrink-0 text-right">
-                <div className="text-sm font-black text-foreground">
+                <div className="text-sm font-black text-text-primary">
                   {item.play_count}
                 </div>
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-[11px] text-text-muted">
                   {formatStatsMinutes(item.minutes_listened)}
                 </div>
               </div>
@@ -1353,7 +1357,7 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
         {String(index + 1).padStart(2, "0")}
       </div>
       <div className="relative z-10 flex min-h-32 flex-col justify-between">
-        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
           {t("stats.rank", { rank: index + 1 })}
         </div>
         <div>
@@ -1431,7 +1435,7 @@ function TopAlbumsPanel({
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-primary">
+                  <div className="flex h-full w-full items-center justify-center text-accent-action">
                     <Disc3 size={28} />
                   </div>
                 )}
@@ -1439,10 +1443,10 @@ function TopAlbumsPanel({
                   #{index + 1}
                 </div>
               </div>
-              <div className="mt-2 truncate text-sm font-semibold text-foreground">
+              <div className="mt-2 truncate text-sm font-semibold text-text-primary">
                 {item.album}
               </div>
-              <div className="truncate text-xs text-muted-foreground">
+              <div className="truncate text-xs text-text-muted">
                 {item.artist}
               </div>
             </Link>
@@ -1472,12 +1476,12 @@ function StatsPanel({
     <section className={cn("stats-card rounded-[12px] p-5", className)}>
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
+          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
             {title}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+          <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
         </div>
-        <Icon className="text-primary" size={22} />
+        <Icon className="text-accent-action" size={22} />
       </div>
       {children}
     </section>
@@ -1516,7 +1520,7 @@ function TrackCover({
           loading="lazy"
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-primary">
+        <div className="flex h-full w-full items-center justify-center text-accent-action">
           <Music2 size={size === "sm" ? 16 : 18} />
         </div>
       )}

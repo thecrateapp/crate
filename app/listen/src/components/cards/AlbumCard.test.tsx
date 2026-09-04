@@ -58,10 +58,9 @@ describe("AlbumCard", () => {
       <AlbumCard artist="Hum" album="Inlet" albumId={42} layout="grid" />,
     );
 
-    expect(container.querySelector("button.bg-primary svg")).toHaveAttribute(
-      "fill",
-      "currentColor",
-    );
+    expect(
+      container.querySelector("button.bg-accent-action svg"),
+    ).toHaveAttribute("fill", "currentColor");
   });
 
   it("resolves API cover paths for configurable native servers", () => {

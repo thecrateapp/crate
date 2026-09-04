@@ -66,7 +66,7 @@ export function HomeUpcomingSection({
           onAction={onOpenUpcoming}
         />
         <div className="home-upcoming-empty-card rounded-[12px] p-5">
-          <h2 className="text-lg font-bold text-foreground">
+          <h2 className="text-lg font-bold text-text-primary">
             {t("radar.empty.followTitle")}
           </h2>
           <p className="home-upcoming-empty-copy mt-1 max-w-2xl text-sm leading-6">
@@ -158,7 +158,7 @@ export function HomeUpcomingSection({
                   : t("home.radar.badge.nextRelease")}
               </div>
 
-              <h2 className="max-w-3xl text-3xl font-extrabold leading-none tracking-tight text-foreground sm:text-4xl">
+              <h2 className="max-w-3xl text-3xl font-extrabold leading-none tracking-tight text-text-primary sm:text-4xl">
                 {isShow ? nextUpcoming.artist : nextUpcoming.title}
               </h2>
               <p className="home-upcoming-feature-copy mt-3 max-w-2xl text-sm leading-6">
@@ -175,7 +175,7 @@ export function HomeUpcomingSection({
                     <div className="home-upcoming-meta-label text-[10px] uppercase tracking-[0.16em]">
                       {t("home.radar.meta.date")}
                     </div>
-                    <div className="mt-1 text-sm font-semibold text-foreground">
+                    <div className="mt-1 text-sm font-semibold text-text-primary">
                       {nextUpcomingDate}
                     </div>
                   </div>
@@ -185,8 +185,8 @@ export function HomeUpcomingSection({
                     <div className="home-upcoming-meta-label text-[10px] uppercase tracking-[0.16em]">
                       {t("home.radar.meta.venue")}
                     </div>
-                    <div className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-foreground">
-                      <MapPin size={12} className="text-primary" />
+                    <div className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-text-primary">
+                      <MapPin size={12} className="text-accent-action" />
                       {nextUpcoming.venue}
                     </div>
                   </div>
@@ -203,7 +203,7 @@ export function HomeUpcomingSection({
                   <button
                     onClick={() => onPlaySetlist(nextUpcoming)}
                     disabled={!nextUpcoming.probable_setlist?.length}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Play size={15} className="fill-current" />
                     {t("radar.show.playSetlist")}
@@ -212,7 +212,7 @@ export function HomeUpcomingSection({
                 {!isShow && releasePath ? (
                   <Link
                     to={releasePath}
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
                   >
                     <Play size={15} className="fill-current" />
                     {t("home.radar.openAlbum")}
@@ -220,7 +220,7 @@ export function HomeUpcomingSection({
                 ) : null}
                 <button
                   onClick={onOpenUpcoming}
-                  className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-foreground transition-colors"
+                  className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-text-primary transition-colors"
                 >
                   <Calendar size={15} />
                   {t("home.radar.viewRadar")}
@@ -228,7 +228,7 @@ export function HomeUpcomingSection({
                 {isShow && artistPath ? (
                   <Link
                     to={artistPath}
-                    className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-foreground transition-colors"
+                    className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-text-primary transition-colors"
                   >
                     {t("common.artist")}
                   </Link>
@@ -301,7 +301,7 @@ export function HomeShowPrepSection({
                   <Sparkles size={12} />
                   {insightLabel(insight.type, t)}
                 </div>
-                <h3 className="mt-3 text-lg font-bold text-foreground">
+                <h3 className="mt-3 text-lg font-bold text-text-primary">
                   {insight.title}
                 </h3>
                 <p className="home-upcoming-show-prep-subtitle mt-1 text-sm">
@@ -315,7 +315,7 @@ export function HomeShowPrepSection({
               ) : null}
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+            <p className="mt-4 text-sm leading-6 text-text-muted">
               {insight.message}
             </p>
 
@@ -323,7 +323,7 @@ export function HomeShowPrepSection({
               {insight.has_setlist ? (
                 <button
                   onClick={() => onPlaySetlist(insight)}
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
                 >
                   <Play size={14} fill="currentColor" />
                   {t("radar.show.playSetlist")}

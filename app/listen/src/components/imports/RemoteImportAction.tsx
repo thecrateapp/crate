@@ -34,7 +34,7 @@ export function RemoteImportAction({
 
   if (status === "completed") {
     return (
-      <p className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+      <p className="inline-flex items-center gap-2 text-sm font-medium text-accent-action">
         <ArrowDownToLine size={16} />
         {t("album.remoteImport.completed")}
       </p>
@@ -43,7 +43,7 @@ export function RemoteImportAction({
 
   if (["awaiting_approval", "requested", "approved"].includes(status)) {
     return (
-      <p className="text-sm text-muted-foreground" role="status">
+      <p className="text-sm text-text-muted" role="status">
         {status === "approved"
           ? t("album.remoteImport.approved")
           : t("album.remoteImport.awaitingApproval")}
@@ -54,7 +54,7 @@ export function RemoteImportAction({
   if (["reserving", "downloading", "verifying", "importing"].includes(status)) {
     return (
       <p
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground"
+        className="inline-flex items-center gap-2 text-sm text-text-muted"
         role="status"
       >
         <Loader2 size={16} className="animate-spin" />
@@ -79,12 +79,12 @@ export function RemoteImportAction({
   if (terminalMessage && !confirming) {
     return (
       <div className="flex flex-wrap items-center gap-3 text-sm" role="status">
-        <span className="inline-flex items-center gap-2 text-muted-foreground">
+        <span className="inline-flex items-center gap-2 text-text-muted">
           <AlertCircle size={16} /> {terminalMessage}
         </span>
         <button
           type="button"
-          className="font-semibold text-primary hover:text-primary/80"
+          className="font-semibold text-accent-action hover:text-accent-action/80"
           onClick={() => {
             reset();
             setConfirming(true);
@@ -103,10 +103,10 @@ export function RemoteImportAction({
         role="group"
         aria-label={t("album.remoteImport.confirmTitle")}
       >
-        <p className="text-sm font-semibold text-foreground">
+        <p className="text-sm font-semibold text-text-primary">
           {t("album.remoteImport.confirmTitle")}
         </p>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-text-muted">
           {t("album.remoteImport.confirmBody", {
             source: sourceName || t("album.remoteImport.remoteNode"),
             size: estimatedSize || t("album.remoteImport.unknownSize"),
@@ -115,7 +115,7 @@ export function RemoteImportAction({
         <div className="mt-3 flex gap-3">
           <button
             type="button"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            className="rounded-full bg-accent-action px-4 py-2 text-sm font-semibold text-accent-action-foreground"
             onClick={() => {
               setConfirming(false);
               void start();
@@ -125,7 +125,7 @@ export function RemoteImportAction({
           </button>
           <button
             type="button"
-            className="rounded-full bg-text-primary/[0.08] px-4 py-2 text-sm font-semibold text-foreground"
+            className="rounded-full bg-text-primary/[0.08] px-4 py-2 text-sm font-semibold text-text-primary"
             onClick={() => setConfirming(false)}
           >
             {t("common.cancel")}
@@ -138,7 +138,7 @@ export function RemoteImportAction({
   return (
     <button
       type="button"
-      className="inline-flex h-11 items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15 disabled:cursor-wait disabled:opacity-60"
+      className="inline-flex h-11 items-center gap-2 rounded-full border border-accent-action/25 bg-accent-action/10 px-5 text-sm font-semibold text-accent-action transition-colors hover:bg-accent-action/15 disabled:cursor-wait disabled:opacity-60"
       disabled={status === "requesting"}
       onClick={() => setConfirming(true)}
     >

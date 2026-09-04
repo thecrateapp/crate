@@ -67,7 +67,7 @@ export function UserConnections() {
       <div className="rounded-[12px] border border-border-quiet bg-text-primary/5 p-5 sm:p-6">
         <Link
           to={username ? `/users/${username}` : "/people"}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors"
         >
           <ArrowLeft size={14} />
           {t("userConnections.backToProfile")}
@@ -75,8 +75,8 @@ export function UserConnections() {
         <div className="mt-4 flex items-center gap-3">
           <Users size={18} className="text-text-accent" />
           <div>
-            <h1 className="text-3xl font-bold text-foreground">{title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h1 className="text-3xl font-bold text-text-primary">{title}</h1>
+            <p className="mt-1 text-sm text-text-muted">
               {t("userConnections.subtitle", { username })}
             </p>
           </div>
@@ -85,7 +85,7 @@ export function UserConnections() {
 
       <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">
+          <div className="flex items-center justify-center py-12 text-text-muted">
             <Loader2 size={18} className="animate-spin" />
           </div>
         ) : data && data.length > 0 ? (
@@ -106,10 +106,10 @@ export function UserConnections() {
                     userId={item.id}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-foreground">
+                    <div className="truncate text-sm font-medium text-text-primary">
                       {label}
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div className="truncate text-xs text-text-muted">
                       {item.username
                         ? `@${item.username}`
                         : t("people.noUsername")}
@@ -124,7 +124,7 @@ export function UserConnections() {
             })}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-border-quiet px-4 py-10 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border-quiet px-4 py-10 text-center text-sm text-text-muted">
             {mode === "following"
               ? t("userConnections.empty.following")
               : t("userConnections.empty.followers")}

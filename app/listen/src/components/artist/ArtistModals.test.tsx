@@ -131,7 +131,7 @@ describe("artist mobile modals", () => {
     expect(hardcore).not.toHaveClass("rounded-full", "bg-white/8");
     expect(header).toHaveClass("border-b-0", "bg-transparent");
     expect(header).not.toHaveClass("backdrop-blur-xl");
-    expect(close).toHaveClass("hover:text-primary");
+    expect(close).toHaveClass("hover:text-accent-action");
     expect(close.className).not.toContain("bg-white/5");
     expect(close.className).not.toContain("border-white/10");
   });

@@ -434,7 +434,7 @@ describe("ArtistHeroSection", () => {
       name: "Artist Radio",
     });
     expect(radio).toHaveTextContent("Radio");
-    expect(radio).toHaveClass("hover:text-primary");
+    expect(radio).toHaveClass("hover:text-accent-action");
     expect(radio.className).toContain("hover:drop-shadow");
     expect(radio).not.toHaveClass("rounded-lg");
 

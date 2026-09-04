@@ -60,12 +60,12 @@ export function ArtistTopTracksSection({
   return (
     <section>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold text-foreground">
+        <h2 className="text-lg font-semibold text-text-primary">
           {t("artist.sections.topTracks")}
         </h2>
         {topTracksPath ? (
           <button
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-accent-action hover:underline"
             onClick={() => navigate(topTracksPath)}
           >
             {t("common.viewAll")}
@@ -237,10 +237,10 @@ function ArtistAlbumItem({
             </div>
           )}
         </div>
-        <p className="truncate text-sm font-medium text-foreground">
+        <p className="truncate text-sm font-medium text-text-primary">
           {album.display_name || album.name}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="truncate text-xs text-text-muted">
           {album.year
             ? `${album.year.slice(0, 4)} · ${artistName}`
             : artistName}
@@ -287,7 +287,7 @@ export function ArtistAlbumsSection({
     <div className="space-y-10">
       {groupedAlbums.map((group) => (
         <section key={group.category}>
-          <h2 className="mb-4 text-lg font-semibold text-foreground">
+          <h2 className="mb-4 text-lg font-semibold text-text-primary">
             {t(group.labelKey)}
           </h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -334,28 +334,28 @@ export function ArtistShowsSection({
     <section>
       <div className="mb-4 space-y-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-text-primary">
             {t("artist.sections.shows")}
           </h2>
           {artistHotNow ? (
-            <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-primary">
+            <div className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-accent-action">
               {t("artist.sections.heavyRotation")}
             </div>
           ) : null}
         </div>
 
         {nextAttendingShow ? (
-          <div className="artist-show-prep-surface rounded-[12px] border border-primary/15 p-5">
+          <div className="artist-show-prep-surface rounded-[12px] border border-accent-action/15 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
+                <div className="inline-flex items-center gap-2 rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-accent-action">
                   <Calendar size={12} />
                   {t("artist.sections.showPrep")}
                 </div>
-                <h3 className="mt-3 text-xl font-bold text-foreground">
+                <h3 className="mt-3 text-xl font-bold text-text-primary">
                   {nextAttendingShow.title}
                 </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-sm text-text-muted">
                   {nextAttendingShow.subtitle} ·{" "}
                   {new Date(
                     `${nextAttendingShow.date}T12:00:00`,
@@ -376,7 +376,7 @@ export function ArtistShowsSection({
                 {nextAttendingShow.probable_setlist?.length ? (
                   <button
                     onClick={onPlayProbableSetlist}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
                   >
                     <Play size={14} fill="currentColor" />
                     {t("artist.sections.playProbableSetlist")}
@@ -384,7 +384,7 @@ export function ArtistShowsSection({
                 ) : null}
                 <button
                   onClick={() => onToggleExpand(itemKey(nextAttendingShow, 0))}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-4 py-2 text-sm text-text-primary/65 transition-colors hover:border-text-primary/20 hover:text-foreground"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-4 py-2 text-sm text-text-primary/65 transition-colors hover:border-text-primary/20 hover:text-text-primary"
                 >
                   {t("artist.sections.viewShowDetails")}
                 </button>
@@ -427,7 +427,7 @@ export function RelatedArtistsSection({ artists }: RelatedArtistsSectionProps) {
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-foreground">
+      <h2 className="mb-4 text-lg font-semibold text-text-primary">
         {t("artist.sections.relatedArtists")}
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -487,7 +487,7 @@ export function ArtistAppearsOnSection({
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-foreground">
+      <h2 className="mb-4 text-lg font-semibold text-text-primary">
         {t("artist.sections.appearsOn")}
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

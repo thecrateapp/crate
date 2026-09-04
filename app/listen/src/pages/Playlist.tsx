@@ -521,9 +521,7 @@ export function Playlist() {
   if (!data) {
     return (
       <div className="flex items-center justify-center py-16">
-        <p className="text-sm text-muted-foreground">
-          {t("playlist.notFound")}
-        </p>
+        <p className="text-sm text-text-muted">{t("playlist.notFound")}</p>
       </div>
     );
   }
@@ -563,7 +561,7 @@ export function Playlist() {
         offlineState === "ready"
           ? "text-text-accent drop-shadow-accent-action"
           : offlineBusy
-            ? "text-primary"
+            ? "text-accent-action"
             : offlineState === "error"
               ? "text-state-warning-text/90"
               : undefined,
@@ -691,7 +689,7 @@ export function Playlist() {
           <>
             <OfflineBadge state={offlineState} />
             {data.is_smart ? (
-              <span className="inline-flex items-center rounded-md border border-primary/30 px-1.5 py-0 text-[10px] font-medium text-primary">
+              <span className="inline-flex items-center rounded-md border border-accent-action/30 px-1.5 py-0 text-[10px] font-medium text-accent-action">
                 <Sparkles size={10} className="mr-0.5" />
                 {t("playlist.badges.smart")}
               </span>
@@ -728,7 +726,7 @@ export function Playlist() {
 
       <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
         {offlineStatusDetail ? (
-          <p className="text-xs text-muted-foreground">{offlineStatusDetail}</p>
+          <p className="text-xs text-text-muted">{offlineStatusDetail}</p>
         ) : null}
 
         <PlaylistTrackFilterBar
@@ -741,13 +739,13 @@ export function Playlist() {
         {/* Track list */}
         {data.tracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-text-muted">
               {t("playlist.empty.noTracks")}
             </p>
           </div>
         ) : filteredTracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-text-muted">
               {t("playlist.empty.noFilter")}
             </p>
           </div>
@@ -802,10 +800,10 @@ export function Playlist() {
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-text-primary">
               {t("playlist.delete.title")}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-muted">
               {t("playlist.delete.subtitle")}
             </p>
           </div>
@@ -815,16 +813,16 @@ export function Playlist() {
           />
         </ModalHeader>
         <ModalBody className="px-5 py-5">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-muted">
             {t("playlist.delete.confirmPrefix")}{" "}
-            <span className="text-foreground font-medium">{data.name}</span>{" "}
+            <span className="text-text-primary font-medium">{data.name}</span>{" "}
             {t("playlist.delete.confirmSuffix")}
           </p>
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
           <button
             type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-text-primary/5 transition-colors"
+            className="rounded-lg px-4 py-2.5 text-sm text-text-muted hover:text-text-primary hover:bg-text-primary/5 transition-colors"
             onClick={() => setDeleteOpen(false)}
             disabled={deleting}
           >
@@ -849,10 +847,10 @@ export function Playlist() {
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-text-primary">
               {t("playlist.collaborators.title")}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text-muted">
               {data.is_collaborative
                 ? t("playlist.collaborators.subtitle")
                 : t("playlist.collaborators.notCollaborative")}
@@ -865,10 +863,10 @@ export function Playlist() {
             <div className="rounded-xl border border-accent-action/15 bg-accent-action/5 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-foreground">
+                  <div className="text-sm font-medium text-text-primary">
                     {t("playlist.collaborators.inviteTitle")}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-xs text-text-muted">
                     {t("playlist.collaborators.inviteSubtitle")}
                   </div>
                 </div>
@@ -876,7 +874,7 @@ export function Playlist() {
                   type="button"
                   onClick={handleCreateCollaboratorInvite}
                   disabled={creatingInvite}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground hover:bg-accent-action/90 transition-colors disabled:opacity-60"
                 >
                   {creatingInvite ? (
                     <Loader2 size={15} className="animate-spin" />
@@ -896,13 +894,13 @@ export function Playlist() {
                     />
                   </div>
                   <div className="space-y-3">
-                    <div className="rounded-lg border border-border-quiet bg-surface-canvas/20 px-4 py-3 text-xs text-muted-foreground break-all">
+                    <div className="rounded-lg border border-border-quiet bg-surface-canvas/20 px-4 py-3 text-xs text-text-muted break-all">
                       {inviteLink}
                     </div>
                     <button
                       type="button"
                       onClick={handleCopyInviteLink}
-                      className="inline-flex items-center gap-2 rounded-lg border border-text-primary/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-text-primary/10 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-lg border border-text-primary/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-text-primary hover:bg-text-primary/10 transition-colors"
                     >
                       <Copy size={15} />
                       {t("playlist.collaborators.copyInvite")}
@@ -930,16 +928,16 @@ export function Playlist() {
                       <UserProfileLink
                         username={member.username}
                         hoverClassName="block"
-                        className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
+                        className="block truncate text-sm font-medium text-text-primary transition-colors hover:text-accent-action"
                       >
                         {label}
                       </UserProfileLink>
                     ) : (
-                      <div className="truncate text-sm font-medium text-foreground">
+                      <div className="truncate text-sm font-medium text-text-primary">
                         {label}
                       </div>
                     )}
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div className="truncate text-xs text-text-muted">
                       {member.username
                         ? `@${member.username}`
                         : t("playlist.collaborators.profile")}{" "}
@@ -947,7 +945,7 @@ export function Playlist() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="rounded-full border border-border-quiet px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <div className="rounded-full border border-border-quiet px-2.5 py-1 text-[11px] text-text-muted">
                       {member.role === "owner"
                         ? t("playlist.collaborators.owner")
                         : t("playlist.collaborators.collab")}

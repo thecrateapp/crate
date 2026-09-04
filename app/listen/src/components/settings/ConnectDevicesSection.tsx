@@ -170,10 +170,10 @@ function ConnectDevicesSectionContent() {
     <div className="space-y-3 rounded-xl bg-text-primary/5 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-sm font-medium text-foreground">
+          <div className="text-sm font-medium text-text-primary">
             {t("settings.connectDevices.title")}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-text-muted">
             {t("settings.connectDevices.description")}
           </p>
         </div>
@@ -203,7 +203,7 @@ function ConnectDevicesSectionContent() {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-text-muted">
           <Loader2 size={14} className="animate-spin" />
           {t("settings.connectDevices.loading")}
         </div>
@@ -223,11 +223,8 @@ function ConnectDevicesSectionContent() {
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                      <MonitorSpeaker
-                        size={14}
-                        className="text-muted-foreground"
-                      />
+                    <div className="inline-flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <MonitorSpeaker size={14} className="text-text-muted" />
                       <span className="truncate">{label}</span>
                     </div>
                     {isCurrent ? (
@@ -245,7 +242,7 @@ function ConnectDevicesSectionContent() {
                       {device.active ? t("common.active") : t("common.recent")}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-xs text-text-muted">
                     {t("settings.connectDevices.lastSeen", {
                       value: formatSeenAt(lastSeen, t("common.recently")),
                     })}
@@ -276,7 +273,7 @@ function ConnectDevicesSectionContent() {
             );
           })}
           {devices.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-text-muted">
               {t("settings.connectDevices.empty")}
             </div>
           ) : null}

@@ -161,7 +161,7 @@ export function Bandcamp() {
         <div className="bandcamp-page-sheen pointer-events-none absolute inset-y-0 right-0 w-1/2" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-primary">
+            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/10 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-accent-action">
               <BandcampLogo className="h-3.5 w-3.5" />
               Bandcamp
             </div>
@@ -189,7 +189,7 @@ export function Bandcamp() {
                   t("bandcamp.tasks.sync"),
                 )
               }
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-black text-accent-action-foreground transition hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-accent-action px-5 text-sm font-black text-accent-action-foreground transition hover:bg-accent-action/90 disabled:opacity-50"
             >
               {busyAction === "sync" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -318,7 +318,7 @@ function StatCard({
         <span className="text-xs font-black uppercase tracking-[0.24em] text-text-muted">
           {label}
         </span>
-        <Icon className="h-4 w-4 text-primary" />
+        <Icon className="h-4 w-4 text-accent-action" />
       </div>
       <div className="mt-5 text-4xl font-black text-text-primary">
         {value.toLocaleString()}
@@ -477,7 +477,7 @@ function ItemActions({
           type="button"
           disabled={busyAction !== null}
           onClick={() => onImport(item)}
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-3 text-xs font-black text-accent-action-foreground transition hover:bg-primary/90 disabled:opacity-50"
+          className="inline-flex h-9 items-center gap-2 rounded-full bg-accent-action px-3 text-xs font-black text-accent-action-foreground transition hover:bg-accent-action/90 disabled:opacity-50"
         >
           {busyAction === `import:${item.id}` ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

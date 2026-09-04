@@ -71,9 +71,9 @@ export function ServersSection() {
     <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
         <Server size={16} className="text-accent-action" />
-        <h2 className="text-sm font-semibold text-foreground">Servers</h2>
+        <h2 className="text-sm font-semibold text-text-primary">Servers</h2>
       </div>
-      <p className="mb-4 text-[12px] text-muted-foreground">
+      <p className="mb-4 text-[12px] text-text-muted">
         Crate servers this app can talk to. Switching drops you back to the
         login screen for the new host.
       </p>
@@ -111,15 +111,13 @@ export function ServersSection() {
                     </span>
                   ) : null}
                 </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {server.url}
-                </div>
+                <div className="text-[11px] text-text-muted">{server.url}</div>
               </button>
               <button
                 type="button"
                 onClick={() => handleRemove(server)}
                 aria-label={`Remove ${server.label}`}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-quiet text-muted-foreground transition hover:border-state-danger/40 hover:bg-state-danger/10 hover:text-state-danger-text"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-quiet text-text-muted transition hover:border-state-danger/40 hover:bg-state-danger/10 hover:text-state-danger-text"
               >
                 <Trash2 size={14} />
               </button>

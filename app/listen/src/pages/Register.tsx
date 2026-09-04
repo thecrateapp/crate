@@ -81,7 +81,7 @@ export function Register() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-app-surface px-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-canvas px-4">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
         <div className="flex flex-col items-center pb-4">
           <img src="/icons/logo.svg" alt="Crate" className="h-16 w-16 mb-2" />
@@ -178,7 +178,7 @@ export function Register() {
           {t("auth.register.hasAccount")}{" "}
           <Link
             to={`/login?return_to=${encodeURIComponent(returnTo)}`}
-            className="text-primary hover:underline"
+            className="text-accent-action hover:underline"
           >
             {t("auth.login.submit")}
           </Link>

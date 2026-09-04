@@ -145,13 +145,13 @@ export function PathDetail() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{path.name}</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{path.name}</h1>
           <div className="mt-1.5 flex items-center gap-2 text-[12px] text-text-primary/40">
-            <span className="font-medium text-primary/70">
+            <span className="font-medium text-accent-action/70">
               {path.origin.label}
             </span>
             <span className="text-text-primary/15">→</span>
-            <span className="font-medium text-primary/70">
+            <span className="font-medium text-accent-action/70">
               {path.destination.label}
             </span>
             <span className="text-text-primary/15">·</span>
@@ -162,7 +162,7 @@ export function PathDetail() {
         </div>
         <button
           onClick={() => playFromStep(0)}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-accent-action-strong transition hover:bg-primary/90"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-accent-action-strong transition hover:bg-accent-action/90"
         >
           <Play size={18} className="ml-0.5 fill-current" />
         </button>
@@ -171,10 +171,10 @@ export function PathDetail() {
       {/* Route visualization */}
       <div className="mb-6 rounded-xl border border-text-primary/8 bg-surface-canvas/20 p-4">
         <div className="mb-2 flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.14em]">
-          <span className="flex items-center gap-1 text-primary/60">
+          <span className="flex items-center gap-1 text-accent-action/60">
             <MapPin size={9} /> {path.origin.label}
           </span>
-          <span className="flex items-center gap-1 text-primary/60">
+          <span className="flex items-center gap-1 text-accent-action/60">
             {path.destination.label} <MapPin size={9} />
           </span>
         </div>
@@ -204,9 +204,9 @@ export function PathDetail() {
                     <div
                       className={`rounded-full transition-all duration-300 ${
                         isActive
-                          ? "path-node-active h-3 w-3 bg-primary"
+                          ? "path-node-active h-3 w-3 bg-accent-action"
                           : isPast
-                            ? "h-1.5 w-1.5 bg-primary/60"
+                            ? "h-1.5 w-1.5 bg-accent-action/60"
                             : "h-1.5 w-1.5 bg-text-primary/20 group-hover:bg-text-primary/40"
                       }`}
                     />
@@ -222,15 +222,15 @@ export function PathDetail() {
                 left: `${(travelerPos / Math.max(1, nodeCount - 1)) * 100}%`,
               }}
             >
-              <div className="absolute -inset-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/20 blur-md" />
-              <div className="path-traveler-node h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
+              <div className="absolute -inset-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-action/20 blur-md" />
+              <div className="path-traveler-node h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-action" />
             </div>
           </div>
         </div>
 
         {/* Now playing card */}
         {activeStep >= 0 && path.tracks[activeStep] && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <div className="rounded-xl border border-accent-action/20 bg-accent-action/5 p-3">
             <div className="flex items-center gap-3">
               {path.tracks[activeStep]!.album_id && (
                 <CrateImage
@@ -248,7 +248,7 @@ export function PathDetail() {
                 />
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-foreground">
+                <div className="truncate text-sm font-semibold text-text-primary">
                   {path.tracks[activeStep]!.title}
                 </div>
                 <div className="truncate text-[11px] text-text-primary/50">
@@ -258,7 +258,7 @@ export function PathDetail() {
                   )}
                 </div>
               </div>
-              <span className="font-mono text-[10px] tabular-nums text-primary/70">
+              <span className="font-mono text-[10px] tabular-nums text-accent-action/70">
                 {activeStep + 1}/{nodeCount}
               </span>
             </div>
@@ -303,13 +303,13 @@ export function PathDetail() {
               onClick={() => playFromStep(i)}
               className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
                 isActive
-                  ? "border-primary/30 bg-primary/10"
+                  ? "border-accent-action/30 bg-accent-action/10"
                   : "border-transparent hover:bg-text-primary/[0.03]"
               }`}
             >
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center">
                 {isActive ? (
-                  <div className="path-node-active h-2.5 w-2.5 rounded-full bg-primary" />
+                  <div className="path-node-active h-2.5 w-2.5 rounded-full bg-accent-action" />
                 ) : (
                   <span className="font-mono text-[10px] tabular-nums text-text-primary/20">
                     {i + 1}
@@ -339,7 +339,9 @@ export function PathDetail() {
               <div className="min-w-0 flex-1">
                 <div
                   className={`truncate text-sm ${
-                    isActive ? "font-semibold text-primary" : "text-foreground"
+                    isActive
+                      ? "font-semibold text-accent-action"
+                      : "text-text-primary"
                   }`}
                 >
                   {t.title}

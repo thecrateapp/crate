@@ -63,7 +63,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
   });
 
   return (
-    <article className="group relative overflow-hidden rounded-[12px] border border-primary/10 bg-text-primary/[0.025] p-4 text-left transition-colors hover:border-primary/25 hover:bg-text-primary/[0.04]">
+    <article className="group relative overflow-hidden rounded-[12px] border border-accent-action/10 bg-text-primary/[0.025] p-4 text-left transition-colors hover:border-accent-action/25 hover:bg-text-primary/[0.04]">
       <div className="upcoming-event-row-atmosphere absolute inset-0" />
       {coverUrl ? (
         <CrateImage
@@ -92,24 +92,24 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
                 }}
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-primary">
+              <div className="flex h-full w-full items-center justify-center text-accent-action">
                 <Disc3 size={24} />
               </div>
             )}
           </div>
 
           <div className="min-w-0">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-accent-action/15 bg-accent-action/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-accent-action">
               <Disc3 size={11} />
               {badgeLabel}
             </div>
-            <h3 className="truncate text-lg font-extrabold text-foreground">
+            <h3 className="truncate text-lg font-extrabold text-text-primary">
               {item.title}
             </h3>
-            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
               <Link
                 to={artistPath}
-                className="truncate transition-colors hover:text-foreground"
+                className="truncate transition-colors hover:text-text-primary"
               >
                 {item.artist}
               </Link>
@@ -121,7 +121,7 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
 
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2 md:justify-end">
           {dateStr ? (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-border-quiet bg-text-primary/[0.06] px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-border-quiet bg-text-primary/[0.06] px-3 py-2 text-sm font-semibold text-accent-action backdrop-blur">
               <Calendar size={14} />
               {dateStr}
             </div>
@@ -129,14 +129,14 @@ export function UpcomingEventRow({ item }: { item: UpcomingItem }) {
           {albumPath ? (
             <Link
               to={albumPath}
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="inline-flex items-center gap-2 rounded-full bg-accent-action px-3.5 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
             >
               <Play size={14} className="fill-current" />
               {t("common.open")}
             </Link>
           ) : null}
           {countdown ? (
-            <div className="rounded-lg border border-primary/15 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
+            <div className="rounded-lg border border-accent-action/15 bg-accent-action/10 px-3 py-2 text-sm font-semibold text-accent-action backdrop-blur">
               {countdown.unit === "hours"
                 ? t("radar.show.time.hoursToGo", { count: countdown.value })
                 : t("radar.show.time.daysToGo", { count: countdown.value })}

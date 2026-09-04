@@ -202,18 +202,18 @@ export function UpcomingShowCollapsedView({
       {/* Center info */}
       <div className="flex-1 min-w-0 px-3 py-2.5">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-[13px] font-semibold text-foreground">
+          <span className="truncate text-[13px] font-semibold text-text-primary">
             {item.artist}
           </span>
           {attending && (
             <span
-              className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-primary"
+              className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-accent-action"
               title={t("radar.show.attending")}
             />
           )}
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-text-primary/40">
-          <MapPin size={10} className="flex-shrink-0 text-primary/60" />
+          <MapPin size={10} className="flex-shrink-0 text-accent-action/60" />
           <span className="truncate">{item.venue}</span>
           {item.city && (
             <>
@@ -232,10 +232,10 @@ export function UpcomingShowCollapsedView({
 
       {/* Date block */}
       <div className="flex flex-shrink-0 flex-col items-center justify-center px-2">
-        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">
+        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-accent-action/55">
           {monthStr}
         </span>
-        <span className="text-[20px] font-black leading-tight text-primary">
+        <span className="text-[20px] font-black leading-tight text-accent-action">
           {dayStr}
         </span>
         <span className="text-[8px] font-medium leading-none text-text-primary/40">
@@ -261,7 +261,7 @@ export function UpcomingShowCollapsedView({
           {savingAttendance ? (
             <Loader2 size={15} className="animate-spin" />
           ) : attending ? (
-            <CalendarCheck size={15} className="text-primary" />
+            <CalendarCheck size={15} className="text-accent-action" />
           ) : (
             <CalendarPlus size={15} />
           )}
@@ -364,11 +364,11 @@ export function UpcomingShowExpandedView({
         {/* Date + time */}
         <div className="absolute top-2.5 right-3 z-10 text-right">
           {timeRemaining ? (
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-accent-action">
               {timeRemaining}
             </div>
           ) : null}
-          <div className="text-[10px] font-bold tracking-wide text-primary/70">
+          <div className="text-[10px] font-bold tracking-wide text-accent-action/70">
             {dateLabel}
           </div>
           {timeLabel && (
@@ -395,7 +395,7 @@ export function UpcomingShowExpandedView({
                   artistId: item.artist_id,
                   artistSlug: item.artist_slug,
                 })}
-                className="block truncate text-sm font-bold text-text-primary transition-colors hover:text-primary"
+                className="block truncate text-sm font-bold text-text-primary transition-colors hover:text-accent-action"
               >
                 {item.artist}
               </Link>
@@ -413,8 +413,11 @@ export function UpcomingShowExpandedView({
 
       {/* Venue info — over the background */}
       <div className="relative flex-1 px-3 pt-2.5 pb-3">
-        <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
-          <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
+        <div className="flex items-start gap-2 text-[11px] text-text-muted">
+          <MapPin
+            size={11}
+            className="mt-0.5 flex-shrink-0 text-accent-action/60"
+          />
           <div className="min-w-0">
             <span className="font-medium text-text-primary/70">
               {item.venue}
@@ -445,8 +448,8 @@ export function UpcomingShowExpandedView({
             disabled={!item.id || savingAttendance}
             className={`flex items-center justify-center gap-1.5 rounded-lg border py-2.5 text-[11px] font-semibold transition-colors ${
               attending
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-border-quiet text-muted-foreground hover:border-primary/20 hover:text-primary"
+                ? "border-accent-action/30 bg-accent-action/10 text-accent-action"
+                : "border-border-quiet text-text-muted hover:border-accent-action/20 hover:text-accent-action"
             }`}
           >
             {savingAttendance ? (
@@ -461,7 +464,7 @@ export function UpcomingShowExpandedView({
           <button
             onClick={() => void onPlaySetlist()}
             disabled={!item.probable_setlist?.length || playingSetlist}
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/20 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/8 disabled:opacity-25"
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-accent-action/20 py-2.5 text-[11px] font-semibold text-accent-action transition-colors hover:bg-accent-action/8 disabled:opacity-25"
           >
             {playingSetlist ? (
               <Loader2 size={13} className="animate-spin" />
@@ -475,7 +478,7 @@ export function UpcomingShowExpandedView({
               href={directionsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border-quiet py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-border-quiet py-2.5 text-[11px] font-semibold text-text-muted transition-colors hover:border-accent-action/20 hover:text-accent-action"
             >
               <MapPin size={13} />
               {t("radar.show.directions")}
@@ -488,7 +491,7 @@ export function UpcomingShowExpandedView({
             onClick={(e) => {
               if (!item.url) e.preventDefault();
             }}
-            className="flex items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/18"
+            className="flex items-center justify-center gap-1.5 rounded-lg bg-accent-action/10 py-2.5 text-[11px] font-semibold text-accent-action transition-colors hover:bg-accent-action/18"
           >
             <ExternalLink size={13} />
             {t("radar.show.getTickets")}

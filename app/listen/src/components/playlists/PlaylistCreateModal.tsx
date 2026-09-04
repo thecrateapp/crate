@@ -153,11 +153,13 @@ function SortableTrackItem({
       </button>
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <div className="w-9 h-9 rounded-md bg-text-primary/5 flex items-center justify-center flex-shrink-0">
-          <Music2 size={15} className="text-muted-foreground" />
+          <Music2 size={15} className="text-text-muted" />
         </div>
         <div className="min-w-0">
-          <div className="truncate text-sm text-foreground">{track.title}</div>
-          <div className="truncate text-xs text-muted-foreground">
+          <div className="truncate text-sm text-text-primary">
+            {track.title}
+          </div>
+          <div className="truncate text-xs text-text-muted">
             {track.artist}
             {track.album ? ` · ${track.album}` : ""}
             {track.duration ? ` · ${formatDuration(track.duration)}` : ""}
@@ -166,7 +168,7 @@ function SortableTrackItem({
       </div>
       <button
         type="button"
-        className="rounded-full p-1.5 text-muted-foreground hover:text-text-primary hover:bg-text-primary/5 transition-colors"
+        className="rounded-full p-1.5 text-text-muted hover:text-text-primary hover:bg-text-primary/5 transition-colors"
         onClick={onRemove}
       >
         <X size={14} />
@@ -377,10 +379,10 @@ export function PlaylistCreateModal({
       <form onSubmit={handleSubmit} className="flex flex-col max-h-[92vh]">
         <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="text-lg font-semibold text-text-primary">
               {modalTitle}
             </h2>
-            <p className="text-xs text-muted-foreground">{modalSubtitle}</p>
+            <p className="text-xs text-text-muted">{modalSubtitle}</p>
           </div>
           <ModalCloseButton onClick={onClose} disabled={submitting} />
         </ModalHeader>
@@ -424,12 +426,12 @@ export function PlaylistCreateModal({
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     onBlur={() => setTitleEditing(false)}
-                    className="w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-xl font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    className="w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-xl font-semibold text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-action"
                   />
                 ) : (
                   <button
                     type="button"
-                    className="w-full text-left text-xl font-semibold text-foreground hover:text-text-primary transition-colors"
+                    className="w-full text-left text-xl font-semibold text-text-primary hover:text-text-primary transition-colors"
                     onClick={() => setTitleEditing(true)}
                   >
                     {name || t("playlistComposer.addTitle")}
@@ -449,12 +451,12 @@ export function PlaylistCreateModal({
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     onBlur={() => setDescriptionEditing(false)}
-                    className="w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
+                    className="w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-action resize-none"
                   />
                 ) : (
                   <button
                     type="button"
-                    className="w-full text-left text-sm leading-6 text-muted-foreground hover:text-foreground transition-colors"
+                    className="w-full text-left text-sm leading-6 text-text-muted hover:text-text-primary transition-colors"
                     onClick={() => setDescriptionEditing(true)}
                   >
                     {description || t("playlistComposer.addDescription")}
@@ -465,7 +467,7 @@ export function PlaylistCreateModal({
               {coverDataUrl ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-text-primary/5 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-text-primary/5 transition-colors"
                   onClick={() => setCoverDataUrl(null)}
                 >
                   <ImagePlus size={14} />
@@ -478,8 +480,8 @@ export function PlaylistCreateModal({
                   type="button"
                   className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                     visibility === "private"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-text-primary/5 text-muted-foreground"
+                      ? "bg-accent-action text-accent-action-foreground"
+                      : "bg-text-primary/5 text-text-muted"
                   }`}
                   onClick={() => setVisibility("private")}
                 >
@@ -489,8 +491,8 @@ export function PlaylistCreateModal({
                   type="button"
                   className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                     visibility === "public"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-text-primary/5 text-muted-foreground"
+                      ? "bg-accent-action text-accent-action-foreground"
+                      : "bg-text-primary/5 text-text-muted"
                   }`}
                   onClick={() => setVisibility("public")}
                 >
@@ -500,8 +502,8 @@ export function PlaylistCreateModal({
                   type="button"
                   className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                     isCollaborative
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-text-primary/5 text-muted-foreground"
+                      ? "bg-accent-action text-accent-action-foreground"
+                      : "bg-text-primary/5 text-text-muted"
                   }`}
                   onClick={() => setIsCollaborative((current) => !current)}
                 >
@@ -513,16 +515,19 @@ export function PlaylistCreateModal({
 
           <div className="space-y-3">
             <div className="flex items-center gap-2 rounded-xl border border-border-quiet bg-text-primary/5 px-3 py-2.5">
-              <Search size={15} className="text-muted-foreground" />
+              <Search size={15} className="text-text-muted" />
               <input
                 type="text"
                 placeholder={t("playlistComposer.searchPlaceholder")}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
               />
               {searching ? (
-                <Loader2 size={14} className="text-primary animate-spin" />
+                <Loader2
+                  size={14}
+                  className="text-accent-action animate-spin"
+                />
               ) : null}
             </div>
 
@@ -538,21 +543,21 @@ export function PlaylistCreateModal({
                         onClick={() => addTrack(toComposerTrack(track))}
                       >
                         <div className="min-w-0">
-                          <div className="truncate text-sm text-foreground">
+                          <div className="truncate text-sm text-text-primary">
                             {track.title}
                           </div>
-                          <div className="truncate text-xs text-muted-foreground">
+                          <div className="truncate text-xs text-text-muted">
                             {track.artist} · {track.album}
                           </div>
                         </div>
-                        <span className="text-xs text-primary">
+                        <span className="text-xs text-accent-action">
                           {t("common.add")}
                         </span>
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className="px-3 py-4 text-sm text-muted-foreground">
+                  <div className="px-3 py-4 text-sm text-text-muted">
                     {t("playlistComposer.noTracksFound")}
                   </div>
                 )}
@@ -563,10 +568,10 @@ export function PlaylistCreateModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">
+                <h3 className="text-sm font-semibold text-text-primary">
                   {t("common.tracks")}
                 </h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-text-muted">
                   {tracks.length > 0
                     ? t("playlistComposer.selectedCount", {
                         count: tracks.length,
@@ -597,7 +602,7 @@ export function PlaylistCreateModal({
                     </SortableContext>
                   </DndContext>
                 ) : (
-                  <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <div className="px-4 py-8 text-center text-sm text-text-muted">
                     Start by searching for tracks or open this modal from an
                     album or track menu.
                   </div>
@@ -610,7 +615,7 @@ export function PlaylistCreateModal({
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
           <button
             type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-text-primary/5 transition-colors"
+            className="rounded-lg px-4 py-2.5 text-sm text-text-muted hover:text-text-primary hover:bg-text-primary/5 transition-colors"
             onClick={onClose}
             disabled={submitting}
           >
@@ -619,7 +624,7 @@ export function PlaylistCreateModal({
           <button
             type="submit"
             disabled={submitting || !name.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-50"
           >
             {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
             {submitLabel}

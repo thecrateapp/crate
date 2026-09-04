@@ -207,10 +207,10 @@ export function SearchResults() {
             <Search size={18} />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">
+            <h1 className="text-xl font-semibold text-text-primary">
               {t("search.label")}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-text-muted">
               {t("search.emptyPrompt")}
             </p>
           </div>
@@ -229,12 +229,12 @@ export function SearchResults() {
             onChange={(event) => setEmptyQuery(event.target.value)}
             placeholder={t("search.placeholder")}
             aria-label={t("search.placeholder")}
-            className="h-11 min-w-0 flex-1 rounded-md border border-text-primary/12 bg-surface-canvas/20 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-primary/50"
+            className="h-11 min-w-0 flex-1 rounded-md border border-text-primary/12 bg-surface-canvas/20 px-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus-visible:border-accent-action/50"
           />
           <button
             type="submit"
             disabled={!emptyQuery.trim()}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-action transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-accent-action px-4 text-sm font-medium text-accent-action-foreground shadow-action transition-colors hover:bg-accent-action/90 disabled:pointer-events-none disabled:opacity-50"
           >
             <Search size={17} />
             {t("search.label")}
@@ -254,10 +254,10 @@ export function SearchResults() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-state-warning/15 bg-state-warning/8 text-state-warning-text">
             <Search size={18} />
           </div>
-          <p className="mt-4 text-base font-semibold text-foreground">
+          <p className="mt-4 text-base font-semibold text-text-primary">
             {t("search.unavailable")}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">{searchError}</p>
+          <p className="mt-2 text-sm text-text-muted">{searchError}</p>
         </div>
       </div>
     );
@@ -370,10 +370,10 @@ export function SearchResults() {
                       </div>
                     )}
                   </div>
-                  <p className="truncate text-sm font-medium text-foreground">
+                  <p className="truncate text-sm font-medium text-text-primary">
                     {a.name}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-text-muted">
                     {a.year ? `${a.year} · ${a.artist}` : a.artist}
                   </p>
                 </Link>
@@ -408,7 +408,7 @@ export function SearchResults() {
                   name: t("search.playSource", { query }),
                 })
               }
-              className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+              className="flex items-center gap-1.5 rounded-full bg-accent-action px-3 py-1.5 text-xs font-medium text-accent-action-foreground"
             >
               <Play size={12} fill="currentColor" /> {t("search.playAll")}
             </button>
@@ -434,10 +434,10 @@ export function SearchResults() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-accent-action/15 bg-accent-action/8 text-text-accent">
             <Search size={18} />
           </div>
-          <p className="mt-4 text-base font-semibold text-foreground">
+          <p className="mt-4 text-base font-semibold text-text-primary">
             {t("search.noMusicFound")}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-text-muted">
             {t("search.noMusicHint")}
           </p>
         </div>

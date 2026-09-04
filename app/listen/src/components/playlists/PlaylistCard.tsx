@@ -50,7 +50,7 @@ function getPlaylistOfflineMeta(
 
 function getPlaylistOfflineSurfaceClass(state: OfflineItemState): string {
   if (state === "ready") return "bg-accent-action/[0.04]";
-  if (isOfflineBusy(state)) return "bg-primary/[0.05]";
+  if (isOfflineBusy(state)) return "bg-accent-action/[0.05]";
   if (state === "error") return "bg-state-warning/[0.05]";
   return "hover:bg-text-primary/5";
 }
@@ -59,7 +59,7 @@ function getPlaylistOfflineMetaClass(
   state: OfflineItemState,
 ): string | undefined {
   if (state === "ready") return "text-text-accent/90";
-  if (isOfflineBusy(state)) return "text-primary";
+  if (isOfflineBusy(state)) return "text-accent-action";
   if (state === "error") return "text-state-warning-text/90";
   return undefined;
 }
@@ -157,7 +157,7 @@ function PlaylistCardPlayButton({
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-surface-canvas/0 transition-colors group-hover:bg-surface-canvas/40">
       <button
-        className="flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-[transform,opacity] group-hover:translate-y-0 group-hover:opacity-100"
+        className="flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-accent-action opacity-0 shadow-lg transition-[transform,opacity] group-hover:translate-y-0 group-hover:opacity-100"
         onClick={async (event) => {
           event.stopPropagation();
           setPlaying(true);
@@ -169,12 +169,15 @@ function PlaylistCardPlayButton({
         }}
       >
         {playing ? (
-          <Loader2 size={18} className="animate-spin text-primary-foreground" />
+          <Loader2
+            size={18}
+            className="animate-spin text-accent-action-foreground"
+          />
         ) : (
           <Play
             size={18}
             fill="currentColor"
-            className="ml-0.5 text-primary-foreground"
+            className="ml-0.5 text-accent-action-foreground"
           />
         )}
       </button>
@@ -281,7 +284,7 @@ export function PlaylistCard({
         ) : null}
         {onPlay ? <PlaylistCardPlayButton onPlay={onPlay} /> : null}
         {badge && !crateManaged ? (
-          <div className="absolute left-2 top-2 rounded-full border border-primary/20 bg-surface-canvas/85 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary backdrop-blur-md">
+          <div className="absolute left-2 top-2 rounded-full border border-accent-action/20 bg-surface-canvas/85 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent-action backdrop-blur-md">
             {badge}
           </div>
         ) : null}
@@ -291,8 +294,10 @@ export function PlaylistCard({
           className={getPlaylistBadgePositionClass(badge, crateManaged)}
         />
       </div>
-      <div className="truncate text-sm font-medium text-foreground">{name}</div>
-      <div className="truncate text-xs text-muted-foreground">
+      <div className="truncate text-sm font-medium text-text-primary">
+        {name}
+      </div>
+      <div className="truncate text-xs text-text-muted">
         {description || meta}
         {offlineMeta ? (
           <span

@@ -1322,11 +1322,11 @@ function RecentEntityRowFrame({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-foreground">
+        <div className="truncate text-sm font-semibold text-text-primary">
           {title}
         </div>
         {subtitle ? (
-          <div className="mt-1 truncate text-xs text-muted-foreground">
+          <div className="mt-1 truncate text-xs text-text-muted">
             {subtitle}
           </div>
         ) : null}
@@ -1510,10 +1510,10 @@ export function CustomMixCard({
           </button>
         </div>
       </div>
-      <div className="truncate text-sm font-semibold text-foreground">
+      <div className="truncate text-sm font-semibold text-text-primary">
         {item.name}
       </div>
-      <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
+      <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-text-muted">
         {mixArtistSummary(item)}
       </div>
       <div className="home-discovery-meta mt-2 text-[11px] uppercase tracking-[0.18em]">
@@ -1606,10 +1606,10 @@ function ListeningHistoryCard({
         )}
       />
       <div className="mt-2.5 flex min-h-[5.4rem] flex-col">
-        <div className="truncate text-sm font-black tracking-[-0.035em] text-foreground">
+        <div className="truncate text-sm font-black tracking-[-0.035em] text-text-primary">
           {historyDisplayTitle(item)}
         </div>
-        <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">
+        <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-text-muted">
           {artists}
         </p>
         <div className="home-history-meta mt-auto text-[10px] font-bold uppercase tracking-[0.14em]">

@@ -143,10 +143,10 @@ export function ArtistBioModal({
               />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-bold text-foreground sm:text-2xl">
+              <h2 className="truncate text-xl font-bold text-text-primary sm:text-2xl">
                 {artist.name}
               </h2>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
                 {mb?.begin_date && <span>Since {mb.begin_date}</span>}
                 {mb?.country && (
                   <span>
@@ -173,7 +173,7 @@ export function ArtistBioModal({
           </div>
           <ModalCloseButton
             onClick={onClose}
-            className="flex-shrink-0 text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-accent-action-strong"
+            className="flex-shrink-0 text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-strong"
           />
         </div>
       </ModalHeader>
@@ -235,7 +235,7 @@ export function ArtistBioModal({
             {bio.length > 500 && (
               <button
                 onClick={() => setBioExpanded(!bioExpanded)}
-                className="mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                className="mt-2 flex items-center gap-1 text-xs text-accent-action hover:text-accent-action/80"
               >
                 {bioExpanded ? (
                   <>
