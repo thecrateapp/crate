@@ -783,6 +783,17 @@
   );
   --jam-artwork-shadow: 0 10px 25px
     color-mix(in srgb, var(--surface-canvas) 30%, transparent);
+  --artwork-mark-shadow: 0 1px 8px var(--surface-glass-shadow);
+  --artwork-text-shadow: 0 2px 18px var(--surface-glass-shadow);
+  --artwork-kicker-shadow: 0 1px 10px var(--surface-glass-shadow);
+  --artwork-compact-mark-shadow: 0 1px 6px var(--surface-glass-shadow);
+  --player-analyzer-mask: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, black 96%, transparent) 18%,
+    color-mix(in srgb, black 90%, transparent) 44%,
+    color-mix(in srgb, black 34%, transparent) 74%,
+    transparent 100%
+  );
 
   --text-control: color-mix(in srgb, var(--text-primary) 75%, transparent);
   --state-warning-border: color-mix(
@@ -1043,6 +1054,10 @@
   --drop-shadow-accent-action-hover: 0 0 10px var(--accent-action-glow-medium);
   --drop-shadow-accent-action-strong: 0 0 10px var(--accent-action-glow-strong);
   --drop-shadow-state-danger: 0 0 8px var(--state-danger-glow);
+  --drop-shadow-artwork-mark: var(--artwork-mark-shadow);
+  --drop-shadow-artwork-text: var(--artwork-text-shadow);
+  --drop-shadow-artwork-kicker: var(--artwork-kicker-shadow);
+  --drop-shadow-artwork-compact-mark: var(--artwork-compact-mark-shadow);
 }
 
 .release-countdown-surface {
@@ -1193,6 +1208,11 @@
     color-mix(in srgb, var(--text-primary) 16%, transparent) 0 1px,
     transparent 1px 12px
   );
+}
+
+.player-analyzer-mask {
+  mask-image: var(--player-analyzer-mask);
+  mask-repeat: no-repeat;
 }
 
 .stats-trend-chart {

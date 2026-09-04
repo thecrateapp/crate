@@ -1,4 +1,4 @@
-import { readCanvasColorToken } from "./canvas-color";
+import { readCssColorToken } from "@crate/ui/lib/read-css-color";
 
 export const SOCIAL_SHARE_COLOR_TOKENS = {
   darkSurface: "--surface-canvas",
@@ -22,8 +22,7 @@ export type SocialShareColors = {
 
 export function readSocialShareColors(element: HTMLElement): SocialShareColors {
   const read = (key: keyof typeof SOCIAL_SHARE_COLOR_TOKENS): string =>
-    readCanvasColorToken(element, SOCIAL_SHARE_COLOR_TOKENS[key]) ??
-    "transparent";
+    readCssColorToken(element, SOCIAL_SHARE_COLOR_TOKENS[key]) ?? "transparent";
 
   return {
     darkSurface: read("darkSurface"),

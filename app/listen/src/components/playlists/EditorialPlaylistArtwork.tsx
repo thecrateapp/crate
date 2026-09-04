@@ -104,17 +104,17 @@ export function EditorialPlaylistArtwork({
         alt=""
         aria-hidden="true"
         data-testid="crate-editorial-mark"
-        className="absolute right-[7%] top-[7%] z-[4] h-[8.5cqw] max-h-6 min-h-3.5 w-[8.5cqw] max-w-6 min-w-3.5 opacity-95 drop-shadow-[0_1px_8px_rgba(0,0,0,0.55)]"
+        className="absolute right-[7%] top-[7%] z-[4] h-[8.5cqw] max-h-6 min-h-3.5 w-[8.5cqw] max-w-6 min-w-3.5 opacity-95 drop-shadow-artwork-mark"
       />
 
       <div
         className={cn("absolute inset-x-[7%] bottom-[7%] z-[4]", textClassName)}
       >
-        <div className="max-w-[96%] text-[clamp(1.25rem,21cqw,4.35rem)] font-black uppercase leading-[0.78] tracking-[-0.09em] text-text-primary text-pretty drop-shadow-[0_2px_18px_rgba(0,0,0,0.6)]">
+        <div className="max-w-[96%] text-[clamp(1.25rem,21cqw,4.35rem)] font-black uppercase leading-[0.78] tracking-[-0.09em] text-text-primary text-pretty drop-shadow-artwork-text">
           {title}
         </div>
         {kicker ? (
-          <div className="mt-[2.5cqw] text-[clamp(0.58rem,5.2cqw,1.05rem)] font-black uppercase leading-none tracking-[0.13em] text-primary drop-shadow-[0_1px_10px_rgba(0,0,0,0.65)]">
+          <div className="mt-[2.5cqw] text-[clamp(0.58rem,5.2cqw,1.05rem)] font-black uppercase leading-none tracking-[0.13em] text-primary drop-shadow-artwork-kicker">
             {kicker}
           </div>
         ) : null}

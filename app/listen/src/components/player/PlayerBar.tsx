@@ -1367,7 +1367,7 @@ export function PlayerBar() {
             <div className="mx-auto hidden max-w-[640px] flex-1 md:flex md:items-center md:justify-center">
               <div className="relative w-full overflow-visible px-4 py-2">
                 {showPlayerBarAnalyzer ? (
-                  <div className="pointer-events-none absolute -inset-y-2 -inset-x-10 opacity-26 [mask-image:radial-gradient(ellipse_at_center,rgba(0,0,0,0.96)_18%,rgba(0,0,0,0.9)_44%,rgba(0,0,0,0.34)_74%,transparent_100%)] [mask-repeat:no-repeat]">
+                  <div className="player-analyzer-mask pointer-events-none absolute -inset-y-2 -inset-x-10 opacity-26">
                     <WaveformCanvas
                       frequenciesDb={frequenciesDb}
                       sampleRate={sampleRate}

@@ -68,4 +68,15 @@ describe("PlaylistArtwork", () => {
     expect(resolver).not.toHaveBeenCalled();
     delete assetWindow.__crateResolveApiAssetUrl;
   });
+
+  it("uses the semantic shadow for the Crate mark", () => {
+    const { container } = render(
+      <PlaylistArtwork name="Marked set" showCrateMark tracks={[]} />,
+    );
+
+    expect(container.querySelector("img[alt='']")).toHaveClass(
+      "drop-shadow-artwork-compact-mark",
+    );
+    expect(container.innerHTML).not.toContain("rgba(");
+  });
 });

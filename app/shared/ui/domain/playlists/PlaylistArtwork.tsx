@@ -56,7 +56,7 @@ function CrateMark({
         src={logoSrc}
         alt=""
         aria-hidden="true"
-        className="h-4 w-4 opacity-95 drop-shadow-[0_1px_6px_rgba(0,0,0,0.45)]"
+        className="h-4 w-4 opacity-95 drop-shadow-artwork-compact-mark"
       />
     </div>
   );

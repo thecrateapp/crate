@@ -70,7 +70,7 @@ export function MixArtwork({
           src="/icons/logo.svg"
           alt=""
           aria-hidden="true"
-          className="h-4.5 w-4.5 opacity-95 drop-shadow-[0_1px_6px_rgba(0,0,0,0.45)]"
+          className="h-4.5 w-4.5 opacity-95 drop-shadow-artwork-compact-mark"
         />
       </div>
     </div>
