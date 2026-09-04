@@ -16,8 +16,6 @@ import {
   Shuffle,
   Repeat,
   Repeat1,
-  Heart,
-  HeartBold,
   ListMusic,
   Mic2,
   Maximize2,
@@ -28,7 +26,6 @@ import {
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import type { PlaySource } from "@/contexts/player-types";
-import { artistPagePath, albumPagePath } from "@/lib/library-routes";
 import {
   getTrackQualityFallback,
   getTrackQualityFromInfo,
@@ -60,7 +57,7 @@ import { cn } from "@crate/ui/lib/cn";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { toast } from "sonner";
-import { RadioFeedback } from "@/components/player/RadioFeedback";
+import { PlayerBarTrackInfo } from "@/components/player/bar/PlayerBarTrackInfo";
 import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
 import {
   LazyEqualizerPopover,
@@ -74,10 +71,8 @@ import {
   preloadLyricsPanel,
   preloadQueuePanel,
 } from "@/components/player/lazy-player-surfaces";
-import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { PlayerVolumeControl } from "@/components/player/bar/PlayerVolumeControl";
 import { WaveformCanvas } from "@/components/player/bar/WaveformCanvas";
-import { CrateImage } from "@/components/artwork/CrateImage";
 import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
 import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
@@ -1088,281 +1083,37 @@ export function PlayerBar() {
               isDesktop ? "px-3 lg:px-4" : "px-4 pt-3 pb-0.5",
             )}
           >
-            {/* ── Block 1: Track Info ── */}
-            <div
-              role={isDesktop ? undefined : "button"}
-              tabIndex={isDesktop ? undefined : 0}
-              aria-label={isDesktop ? undefined : "Open fullscreen player"}
-              className="flex min-w-0 shrink-0 flex-1 touch-manipulation cursor-pointer items-center gap-3 rounded-xl md:w-[260px] md:flex-none md:cursor-default lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]"
-              onTouchStart={() => {
-                if (!isDesktop) prepareFullscreenPlayer();
+            <PlayerBarTrackInfo
+              displayTrack={displayTrack}
+              displayCrossfadeTransition={displayCrossfadeTransition}
+              crossfadeProgress={crossfadeProgress}
+              displayPlaySource={displayPlaySource}
+              sourceLabel={sourceLabel}
+              isDesktop={isDesktop}
+              liked={liked}
+              isShapedRadioTrack={isShapedRadioTrack}
+              shapedRadioSessionId={shapedRadioSessionId}
+              effectiveDisplayedDuration={effectiveDisplayedDuration}
+              duration={duration}
+              onNavigate={navigate}
+              onPrepareFullscreen={prepareFullscreenPlayer}
+              onOpenFullscreen={openFullscreenPlayer}
+              onCoverTouchStart={handleCoverTouchStart}
+              onCoverTouchMove={handleCoverTouchMove}
+              onCoverTouchEnd={handleCoverTouchEnd}
+              isCoverLongPressTriggered={() =>
+                coverLongPressTriggeredRef.current
+              }
+              resetCoverLongPress={() => {
+                coverLongPressTriggeredRef.current = false;
               }}
-              onClick={() => {
-                if (!isDesktop) openFullscreenPlayer();
+              onToggleLike={() => {
+                void toggleLike();
               }}
-              onKeyDown={(e) => {
-                if (!isDesktop && (e.key === "Enter" || e.key === " ")) {
-                  e.preventDefault();
-                  openFullscreenPlayer();
-                }
-              }}
-            >
-              {/* Album art — crossfades outgoing ↔ incoming during audio crossfade.
-                On desktop, clicking navigates to the album page. */}
-              <div
-                aria-label={isDesktop ? undefined : "Track artwork"}
-                className={`listen-player-artwork relative h-10 w-10 shrink-0 overflow-hidden rounded-md md:h-12 md:w-12 ${
-                  isDesktop &&
-                  (displayTrack.globalAlbumUid || displayTrack.albumId)
-                    ? "cursor-pointer"
-                    : ""
-                }`}
-                onTouchStart={handleCoverTouchStart}
-                onTouchMove={handleCoverTouchMove}
-                onTouchEnd={handleCoverTouchEnd}
-                onTouchCancel={handleCoverTouchEnd}
-                onClick={(e) => {
-                  if (!isDesktop && coverLongPressTriggeredRef.current) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    coverLongPressTriggeredRef.current = false;
-                    return;
-                  }
-                  if (
-                    isDesktop &&
-                    (displayTrack.globalAlbumUid || displayTrack.albumId)
-                  ) {
-                    e.stopPropagation();
-                    navigate(
-                      displayTrack.globalAlbumUid
-                        ? albumPagePath({
-                            albumId: displayTrack.albumId,
-                            globalAlbumUid: displayTrack.globalAlbumUid,
-                            albumSlug: displayTrack.albumSlug,
-                            albumName: displayTrack.album,
-                            artistName: displayTrack.artist,
-                          })
-                        : albumPagePath({
-                            albumId: displayTrack.albumId,
-                            albumSlug: displayTrack.albumSlug,
-                            albumName: displayTrack.album,
-                            artistName: displayTrack.artist,
-                          }),
-                    );
-                  }
-                }}
-              >
-                {displayCrossfadeTransition ? (
-                  <>
-                    {displayCrossfadeTransition.outgoing.albumCover ? (
-                      <CrateImage
-                        src={displayCrossfadeTransition.outgoing.albumCover}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={{ opacity: 1 - crossfadeProgress }}
-                      />
-                    ) : null}
-                    {displayCrossfadeTransition.incoming.albumCover ? (
-                      <CrateImage
-                        src={displayCrossfadeTransition.incoming.albumCover}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={{ opacity: crossfadeProgress }}
-                      />
-                    ) : null}
-                  </>
-                ) : displayTrack.albumCover ? (
-                  <CrateImage
-                    src={displayTrack.albumCover}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="listen-player-artwork-placeholder h-full w-full" />
-                )}
-                {!isDesktop && liked ? (
-                  <span
-                    aria-label="Liked track"
-                    className="listen-player-liked-indicator absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full backdrop-blur-md"
-                  >
-                    <HeartBold
-                      size={10}
-                      className="animate-crate-icon-active-pulse"
-                    />
-                  </span>
-                ) : null}
-              </div>
-
-              {/* Text — crossfades outgoing ↔ incoming. Stacks absolutely to allow
-                overlap without layout jump. */}
-              <div className="min-w-0 flex-1 md:flex-none md:max-w-[220px] lg:max-w-[300px] xl:max-w-[min(24vw,420px)] 2xl:max-w-[min(28vw,520px)]">
-                {/* Title + artist crossfade between outgoing and incoming.
-                  Wrapped in its own relative block so the absolute
-                  outgoing copy doesn't escape into the persistent rows
-                  below ("Playing from", "Buffering"). */}
-                <div className="relative">
-                  {displayCrossfadeTransition ? (
-                    <>
-                      <div
-                        className="absolute inset-0"
-                        style={{ opacity: 1 - crossfadeProgress }}
-                      >
-                        <p className="text-[13px] font-semibold text-text-primary truncate leading-tight">
-                          {displayCrossfadeTransition.outgoing.title}
-                        </p>
-                        <p className="text-[11px] text-text-muted truncate leading-tight mt-0.5">
-                          {displayCrossfadeTransition.outgoing.artist}
-                        </p>
-                      </div>
-                      <div style={{ opacity: crossfadeProgress }}>
-                        <p className="text-[13px] font-semibold text-text-primary truncate leading-tight">
-                          {displayCrossfadeTransition.incoming.title}
-                        </p>
-                        <p className="text-[11px] text-text-muted truncate leading-tight mt-0.5">
-                          {displayCrossfadeTransition.incoming.artist}
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <div key={displayTrack.id} className="animate-track-in">
-                      {isDesktop &&
-                      (displayTrack.globalAlbumUid || displayTrack.albumId) ? (
-                        <p
-                          className="text-[13px] font-semibold text-text-primary truncate leading-tight hover:underline cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(
-                              displayTrack.globalAlbumUid
-                                ? albumPagePath({
-                                    albumId: displayTrack.albumId,
-                                    globalAlbumUid: displayTrack.globalAlbumUid,
-                                    albumSlug: displayTrack.albumSlug,
-                                    albumName: displayTrack.album,
-                                    artistName: displayTrack.artist,
-                                  })
-                                : albumPagePath({
-                                    albumId: displayTrack.albumId,
-                                    albumSlug: displayTrack.albumSlug,
-                                    albumName: displayTrack.album,
-                                    artistName: displayTrack.artist,
-                                  }),
-                            );
-                          }}
-                        >
-                          {displayTrack.title}
-                        </p>
-                      ) : (
-                        <p className="text-[13px] font-semibold text-text-primary truncate leading-tight">
-                          {displayTrack.title}
-                        </p>
-                      )}
-                      {isDesktop &&
-                      (displayTrack.globalArtistUid ||
-                        displayTrack.artistId) ? (
-                        <p
-                          className="text-[11px] text-text-muted truncate leading-tight mt-0.5 hover:text-text-primary hover:underline cursor-pointer transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(
-                              displayTrack.globalArtistUid
-                                ? artistPagePath({
-                                    artistId: displayTrack.artistId,
-                                    globalArtistUid:
-                                      displayTrack.globalArtistUid,
-                                    artistSlug: displayTrack.artistSlug,
-                                    artistName: displayTrack.artist,
-                                  })
-                                : artistPagePath({
-                                    artistId: displayTrack.artistId,
-                                    artistSlug: displayTrack.artistSlug,
-                                    artistName: displayTrack.artist,
-                                  }),
-                            );
-                          }}
-                        >
-                          {displayTrack.artist}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-text-muted truncate leading-tight mt-0.5">
-                          {displayTrack.artist}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {/* Persistent metadata that shouldn't blink during a
-                  track crossfade — kept outside the fading block.
-                  When the source itself changes (album → playlist) the
-                  outgoing line fades out while the incoming fades in. */}
-                {sourceLabel && (
-                  <div className="relative mt-0.5 h-[14px] hidden lg:block">
-                    <p
-                      key={`src-${sourceLabel}`}
-                      className="text-[10px] text-text-muted truncate leading-tight animate-fade-in"
-                    >
-                      Playing from:{" "}
-                      {displayPlaySource?.href &&
-                      sourceLabel !== "Discovery Radio" ? (
-                        <span
-                          className="hover:text-text-primary hover:underline cursor-pointer transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(displayPlaySource.href!);
-                          }}
-                        >
-                          {sourceLabel}
-                        </span>
-                      ) : (
-                        sourceLabel
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {isDesktop ? (
-                <div className="ml-1 flex shrink-0 items-center gap-0.5">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void toggleLike();
-                    }}
-                    className="shrink-0 p-1.5 transition-[color,filter,transform] hover:-translate-y-px"
-                  >
-                    {liked ? (
-                      <HeartBold
-                        size={CRATE_ICON_SIZE.md}
-                        className="animate-crate-icon-active-pulse text-accent-action"
-                      />
-                    ) : (
-                      <Heart
-                        size={CRATE_ICON_SIZE.md}
-                        className="text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
-                      />
-                    )}
-                  </button>
-
-                  {isShapedRadioTrack && (
-                    <RadioFeedback
-                      sessionId={shapedRadioSessionId!}
-                      trackId={displayTrack.libraryTrackId}
-                      globalTrackUid={displayTrack.globalTrackUid}
-                      onDislike={handleNextTrack}
-                    />
-                  )}
-
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <PlayerTrackMenu
-                      currentTrack={displayTrack}
-                      duration={effectiveDisplayedDuration || duration}
-                      onOverlayChange={setHasFloatingOverlayOpen}
-                      onAddToCollection={handleAddToCollection}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
+              onNextTrack={handleNextTrack}
+              onAddToCollection={handleAddToCollection}
+              onOverlayChange={setHasFloatingOverlayOpen}
+            />
             {/* ── Block 2: Controls + Progress ── */}
             <div className="mx-auto hidden max-w-[640px] flex-1 md:flex md:items-center md:justify-center">
               <div className="relative w-full overflow-visible px-4 py-2">
