@@ -90,14 +90,6 @@ textarea {
 
 /* ── Listen-only: gradient backgrounds ── */
 :root {
-  --gradient-bg: #0a0a0f;
-  --gradient-bg-85: rgba(10, 10, 15, 0.85);
-  --gradient-bg-90: rgba(10, 10, 15, 0.9);
-  --gradient-bg-40: rgba(10, 10, 15, 0.4);
-  --gradient-bg-50: rgba(10, 10, 15, 0.5);
-  --bandcamp-brand: #1da0c3;
-  --bandcamp-brand-foreground: #7ee7ff;
-
   --listen-viewport-height: 100vh;
   --listen-safe-top: env(safe-area-inset-top, 0px);
   --listen-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -143,14 +135,14 @@ textarea {
 
 .bandcamp-support-owned,
 .bandcamp-support-action {
-  border: 1px solid color-mix(in srgb, var(--bandcamp-brand) 30%, transparent);
-  background: color-mix(in srgb, var(--bandcamp-brand) 10%, transparent);
-  color: var(--bandcamp-brand-foreground);
+  border: 1px solid color-mix(in srgb, var(--brand-bandcamp) 30%, transparent);
+  background: color-mix(in srgb, var(--brand-bandcamp) 10%, transparent);
+  color: var(--brand-bandcamp-foreground);
 }
 
 .bandcamp-support-owned {
-  border-color: color-mix(in srgb, var(--bandcamp-brand) 25%, transparent);
-  color: color-mix(in srgb, var(--bandcamp-brand-foreground) 90%, transparent);
+  border-color: color-mix(in srgb, var(--brand-bandcamp) 25%, transparent);
+  color: color-mix(in srgb, var(--brand-bandcamp-foreground) 90%, transparent);
 }
 
 .bandcamp-support-action {
@@ -158,7 +150,7 @@ textarea {
 }
 
 .bandcamp-support-action:hover {
-  background: color-mix(in srgb, var(--bandcamp-brand) 15%, transparent);
+  background: color-mix(in srgb, var(--brand-bandcamp) 15%, transparent);
 }
 
 .listen-glass-panel {
@@ -292,7 +284,6 @@ textarea {
     transparent
   );
   --border-quiet: color-mix(in srgb, var(--text-primary) 14%, transparent);
-  --surface-glass-shadow: rgba(0, 0, 0, 0.58);
   --surface-accent-shadow: color-mix(
     in srgb,
     var(--accent-action) 6%,
@@ -314,7 +305,8 @@ textarea {
       var(--surface-glass-bottom)
     );
   box-shadow:
-    0 24px 72px var(--surface-glass-shadow),
+    0 24px 72px
+      color-mix(in srgb, var(--surface-glass-shadow) 120%, transparent),
     0 0 22px var(--surface-accent-shadow),
     inset 0 1px 0 var(--border-quiet-subtle);
   backdrop-filter: blur(38px) saturate(1.28) brightness(0.72) contrast(0.88);
@@ -339,7 +331,6 @@ textarea {
     transparent
   );
   --border-quiet: color-mix(in srgb, var(--text-primary) 13%, transparent);
-  --surface-glass-shadow: rgba(0, 0, 0, 0.56);
   --border-quiet-subtle: color-mix(
     in srgb,
     var(--text-primary) 10%,
@@ -357,7 +348,8 @@ textarea {
       var(--surface-glass-bottom)
     );
   box-shadow:
-    0 24px 64px var(--surface-glass-shadow),
+    0 24px 64px
+      color-mix(in srgb, var(--surface-glass-shadow) 116.67%, transparent),
     inset 0 1px 0 var(--border-quiet-subtle);
   backdrop-filter: blur(28px) saturate(1.14) brightness(0.68) contrast(0.92);
   -webkit-backdrop-filter: blur(28px) saturate(1.14) brightness(0.68)
@@ -456,10 +448,14 @@ html[data-keyboard-open] select {
 
 /* Leaflet */
 .leaflet-popup-content-wrapper {
-  background: rgba(18, 18, 26, 0.96) !important;
-  color: var(--color-foreground) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+  background: color-mix(
+    in srgb,
+    var(--surface-elevated) 96%,
+    transparent
+  ) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-quiet) !important;
+  box-shadow: var(--map-popup-shadow) !important;
   border-radius: 8px !important;
 }
 .leaflet-popup-content {
@@ -467,10 +463,14 @@ html[data-keyboard-open] select {
   line-height: 1.35 !important;
 }
 .leaflet-popup-tip {
-  background: rgba(18, 18, 26, 0.96) !important;
+  background: color-mix(
+    in srgb,
+    var(--surface-elevated) 96%,
+    transparent
+  ) !important;
 }
 .leaflet-popup-close-button {
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: color-mix(in srgb, var(--text-primary) 50%, transparent) !important;
 }
 .upcoming-map .leaflet-tile-pane,
 .upcoming-map .leaflet-overlay-pane,

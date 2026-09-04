@@ -213,7 +213,7 @@ export function Upload() {
             </label>
 
             {files.length > 0 ? (
-              <div className="space-y-2 rounded-xl border border-border-quiet bg-[var(--gradient-bg-50)] p-4">
+              <div className="space-y-2 rounded-xl border border-border-quiet bg-surface-canvas/50 p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="text-sm font-semibold text-foreground">
@@ -257,7 +257,7 @@ export function Upload() {
             ) : null}
           </div>
 
-          <div className="space-y-4 rounded-xl border border-border-quiet bg-[var(--gradient-bg-50)] p-5">
+          <div className="space-y-4 rounded-xl border border-border-quiet bg-surface-canvas/50 p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {t("upload.next.title")}
             </h2>
