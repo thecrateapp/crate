@@ -20,12 +20,10 @@ import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
   BarChart3,
-  Globe,
   Loader2,
   LogOut,
   Lock,
   MapPin,
-  Moon,
   Navigation,
   RefreshCw,
   Shield,
@@ -37,32 +35,14 @@ import {
 import { toast } from "sonner";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { CrateImage } from "@/components/artwork/CrateImage";
-import { useAuth } from "@/contexts/AuthContext";
-import { useOffline } from "@/contexts/OfflineContext";
-import { usePlayerActions } from "@/contexts/PlayerContext";
-import {
-  clearLocalListenLocalePreference,
-  getLocalListenLocalePreference,
-  setLocalListenLocalePreference,
-} from "@/i18n/language-preference";
-import { detectPreferredLocale } from "@/i18n/language-detector";
-import {
-  LISTEN_SUPPORTED_LOCALES,
-  type ListenLocale,
-  toSupportedListenLocale,
-} from "@/i18n/locales";
+import { LanguageSection } from "@/components/settings/LanguageSection";
+import { SleepTimerSection } from "@/components/settings/SleepTimerSection";
 import { ServersSection } from "@/components/settings/ServersSection";
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOffline } from "@/contexts/OfflineContext";
 import { api } from "@/lib/api";
 import { isTauriRuntime } from "@/lib/platform";
-import {
-  subscribeSleepTimer,
-  startSleepTimer,
-  cancelSleepTimer,
-  formatRemaining,
-  type SleepTimerMode,
-  type SleepTimerState,
-} from "@/lib/sleep-timer";
 import {
   getEqualizerEnabled,
   setEqualizerEnabled,
@@ -165,25 +145,6 @@ const PLAYBACK_DELIVERY_OPTIONS: {
     descriptionKey: "settings.playback.delivery.dataSaverDescription",
   },
 ];
-
-type LanguageSelection = "auto" | ListenLocale;
-
-const LANGUAGE_OPTIONS: { value: ListenLocale; labelKey: string }[] =
-  LISTEN_SUPPORTED_LOCALES.map((locale) => ({
-    value: locale,
-    labelKey: `settings.language.options.${locale}`,
-  }));
-
-function getBrowserLanguages(): readonly string[] {
-  if (typeof navigator === "undefined") return [];
-  return navigator.languages;
-}
-
-function getAutomaticListenLocale(): ListenLocale {
-  return detectPreferredLocale({
-    browserLanguages: getBrowserLanguages(),
-  });
-}
 
 export function Settings() {
   const { t, i18n } = useTranslation();
@@ -523,163 +484,6 @@ export function Settings() {
         </div>
       </Section>
     </div>
-  );
-}
-
-function LanguageSection({
-  i18n,
-}: {
-  i18n: ReturnType<typeof useTranslation>["i18n"];
-}) {
-  const { t } = useTranslation();
-  const [selection, setSelection] = useState<LanguageSelection>(
-    () => getLocalListenLocalePreference() ?? "auto",
-  );
-  const activeLocale =
-    selection === "auto"
-      ? toSupportedListenLocale(i18n.resolvedLanguage) ??
-        getAutomaticListenLocale()
-      : selection;
-
-  const changeLanguage = (nextSelection: LanguageSelection) => {
-    setSelection(nextSelection);
-    const nextLocale =
-      nextSelection === "auto" ? getAutomaticListenLocale() : nextSelection;
-
-    if (nextSelection === "auto") {
-      clearLocalListenLocalePreference();
-    } else {
-      setLocalListenLocalePreference(nextSelection);
-    }
-
-    void i18n.changeLanguage(nextLocale);
-  };
-
-  return (
-    <Section
-      title={t("settings.language.title")}
-      description={t("settings.language.description")}
-    >
-      <div
-        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
-        role="radiogroup"
-        aria-label={t("settings.language.title")}
-      >
-        <button
-          type="button"
-          role="radio"
-          aria-checked={selection === "auto"}
-          onClick={() => changeLanguage("auto")}
-          className={`rounded-lg border px-3 py-3 text-left transition-colors ${
-            selection === "auto"
-              ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
-              : "border-border-quiet/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
-          }`}
-        >
-          <span className="block text-sm font-semibold">
-            {t("settings.language.auto")}
-          </span>
-          <span className="mt-1 block text-xs text-text-muted">
-            {t("settings.language.autoDescription")}
-          </span>
-        </button>
-
-        {LANGUAGE_OPTIONS.map((option) => {
-          const selected = selection === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => changeLanguage(option.value)}
-              className={`rounded-lg border px-3 py-3 text-left transition-colors ${
-                selected
-                  ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
-                  : "border-border-quiet/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
-              }`}
-            >
-              <span className="block text-sm font-semibold">
-                {t(option.labelKey)}
-              </span>
-              <span className="mt-1 block text-xs uppercase tracking-[0.18em] text-text-muted">
-                {option.value}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex items-start gap-3 rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted">
-        <Globe size={16} className="mt-0.5 text-accent-action/80" />
-        <span>
-          {t("settings.language.current", {
-            language: t(`settings.language.options.${activeLocale}`),
-          })}
-        </span>
-      </div>
-    </Section>
-  );
-}
-
-const SLEEP_MODES: { mode: SleepTimerMode; labelKey: string }[] = [
-  { mode: "15min", labelKey: "settings.sleep.modes.15min" },
-  { mode: "30min", labelKey: "settings.sleep.modes.30min" },
-  { mode: "45min", labelKey: "settings.sleep.modes.45min" },
-  { mode: "1hr", labelKey: "settings.sleep.modes.1hr" },
-  { mode: "end_of_track", labelKey: "settings.sleep.modes.endOfTrack" },
-];
-
-function SleepTimerSection() {
-  const { t } = useTranslation();
-  const { pause } = usePlayerActions();
-  const [timer, setTimer] = useState<SleepTimerState>({
-    active: false,
-    remainingSeconds: 0,
-    mode: null,
-  });
-  useEffect(() => subscribeSleepTimer(setTimer), []);
-
-  return (
-    <Section
-      title={t("settings.sleep.title")}
-      description={t("settings.sleep.subtitle")}
-    >
-      <div className="flex flex-wrap gap-2">
-        {SLEEP_MODES.map(({ mode, labelKey }) => (
-          <button
-            key={mode}
-            onClick={() => startSleepTimer(mode, pause)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              timer.mode === mode
-                ? "bg-accent-action text-accent-action-foreground"
-                : "bg-text-primary/5 text-text-primary/60 hover:bg-text-primary/10"
-            }`}
-          >
-            {t(labelKey)}
-          </button>
-        ))}
-      </div>
-      {timer.active && timer.remainingSeconds > 0 ? (
-        <div className="flex items-center justify-between rounded-lg border border-accent-action/20 bg-accent-action/5 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Moon size={16} className="text-accent-action" />
-            <span className="text-sm text-text-primary">
-              {t("settings.sleep.pausingIn")}{" "}
-              <span className="font-mono font-semibold text-accent-action">
-                {formatRemaining(timer.remainingSeconds)}
-              </span>
-            </span>
-          </div>
-          <button
-            onClick={cancelSleepTimer}
-            className="rounded-full px-3 py-1.5 text-xs font-medium bg-state-danger/15 text-state-danger hover:bg-state-danger/25 transition-colors"
-          >
-            {t("common.cancel")}
-          </button>
-        </div>
-      ) : null}
-    </Section>
   );
 }
 
