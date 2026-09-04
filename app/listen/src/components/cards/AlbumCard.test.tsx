@@ -53,6 +53,17 @@ beforeEach(() => {
 });
 
 describe("AlbumCard", () => {
+  it("uses the themed foreground for the desktop play icon", () => {
+    const { container } = renderWithListenProviders(
+      <AlbumCard artist="Hum" album="Inlet" albumId={42} layout="grid" />,
+    );
+
+    expect(container.querySelector("button.bg-primary svg")).toHaveAttribute(
+      "fill",
+      "currentColor",
+    );
+  });
+
   it("resolves API cover paths for configurable native servers", () => {
     renderWithListenProviders(
       <AlbumCard

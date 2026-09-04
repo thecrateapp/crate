@@ -79,4 +79,21 @@ describe("PlaylistArtwork", () => {
     );
     expect(container.innerHTML).not.toContain("rgba(");
   });
+
+  it("uses themed CSS for the generated placeholder gradient", () => {
+    const { container } = render(
+      <PlaylistArtwork name="Generated set" tracks={[]} />,
+    );
+
+    const placeholder = container.firstElementChild as HTMLElement | null;
+
+    expect(placeholder).toHaveClass("playlist-artwork-placeholder");
+    expect(
+      placeholder?.style.getPropertyValue("--playlist-artwork-hue-1"),
+    ).toMatch(/^\d+$/);
+    expect(
+      placeholder?.style.getPropertyValue("--playlist-artwork-hue-2"),
+    ).toMatch(/^\d+$/);
+    expect(container.innerHTML).not.toContain("hsl(");
+  });
 });

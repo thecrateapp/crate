@@ -787,6 +787,11 @@
   --artwork-text-shadow: 0 2px 18px var(--surface-glass-shadow);
   --artwork-kicker-shadow: 0 1px 10px var(--surface-glass-shadow);
   --artwork-compact-mark-shadow: 0 1px 6px var(--surface-glass-shadow);
+  --playlist-artwork-placeholder-gradient: linear-gradient(
+    145deg,
+    hsl(var(--playlist-artwork-hue-1), 42%, 30%),
+    hsl(var(--playlist-artwork-hue-2), 55%, 18%)
+  );
   --player-analyzer-mask: radial-gradient(
     ellipse at center,
     color-mix(in srgb, black 96%, transparent) 18%,
@@ -2038,6 +2043,10 @@
 
 .listen-player-artwork-placeholder {
   background: var(--surface-quiet);
+}
+
+.playlist-artwork-placeholder {
+  background: var(--playlist-artwork-placeholder-gradient);
 }
 
 .listen-player-liked-indicator {

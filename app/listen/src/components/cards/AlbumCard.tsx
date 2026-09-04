@@ -276,7 +276,7 @@ export const AlbumCard = memo(function AlbumCard({
             ) : (
               <Play
                 size={CRATE_ICON_SIZE.lg}
-                fill="#0a0a0f"
+                fill="currentColor"
                 className="text-primary-foreground ml-0.5"
               />
             )}
