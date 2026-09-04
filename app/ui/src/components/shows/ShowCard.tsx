@@ -15,7 +15,6 @@ import {
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
-export { getGenreColor } from "@crate/ui/domain/shows/show-types";
 
 const COLLAPSED_HEIGHT = 88;
 

@@ -3,11 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  ShowCard,
-  type ShowEvent,
-  getGenreColor,
-} from "@/components/shows/ShowCard";
+import { ShowCard, type ShowEvent } from "@/components/shows/ShowCard";
+import { getGenreColor } from "@crate/ui/domain/shows/show-types";
 import {
   Loader2,
   MapPin,
