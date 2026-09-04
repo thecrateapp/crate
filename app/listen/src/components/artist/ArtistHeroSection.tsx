@@ -198,17 +198,13 @@ export function ArtistHeroSection({
         <div className="absolute inset-0 bg-surface-canvas/10 sm:bg-surface-canvas/32" />
         <div
           className="absolute inset-0 sm:hidden"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.04) 34%, rgba(8, 10, 14, 0.28) 64%, var(--surface-app) 100%)",
-          }}
+          data-testid="artist-hero-mobile-gradient"
+          style={{ background: "var(--hero-artwork-gradient-mobile)" }}
         />
         <div
           className="absolute inset-0 hidden sm:block"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.16) 34%, rgba(8, 10, 14, 0.5) 64%, var(--surface-app) 100%)",
-          }}
+          data-testid="artist-hero-desktop-gradient"
+          style={{ background: "var(--hero-artwork-gradient-desktop)" }}
         />
         <div className="relative mx-auto flex h-full w-full max-w-[1480px] items-end px-4 pb-6 sm:px-6">
           <div className="flex w-full flex-col gap-5 sm:flex-row sm:items-end">

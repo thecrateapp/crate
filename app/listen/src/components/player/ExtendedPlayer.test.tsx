@@ -224,11 +224,41 @@ describe("ExtendedPlayer", () => {
     expect(container.innerHTML).toContain("bg-accent-action/10");
     expect(container.innerHTML).toContain("border-border-quiet");
     expect(container.innerHTML).toContain("bg-surface-quiet-subtle");
+    expect(container.innerHTML).toContain("shadow-player-artwork");
     expect(container.innerHTML).toContain("text-text-muted");
     expect(container.innerHTML).not.toContain("bg-primary/10");
     expect(container.innerHTML).not.toContain("border-white/10");
     expect(container.innerHTML).not.toContain("bg-white/[0.02]");
     expect(container.innerHTML).not.toContain("bg-white/5");
     expect(container.innerHTML).not.toContain("text-white/40");
+  });
+
+  it("uses the layered semantic shadow for visible cover art", () => {
+    useVisualizerConfigMock.mockReturnValue({
+      surfaceMode: "cover",
+      useAlbumPalette: false,
+      trackVizProfile: { hasAnalysis: false, summary: null },
+      setSurfaceMode: vi.fn(),
+    });
+    const track = createMockTrack({
+      id: "extended-visible-artwork-track",
+      entityUid: "extended-visible-artwork-track",
+      title: "Visible artwork",
+      artist: "Crate",
+      albumCover: "/cover.jpg",
+    });
+
+    const { container } = renderWithListenProviders(
+      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      },
+    );
+
+    expect(container.innerHTML).toContain("shadow-player-artwork-layered");
   });
 });

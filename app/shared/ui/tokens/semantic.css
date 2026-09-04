@@ -800,6 +800,27 @@
     color-mix(in srgb, var(--surface-canvas) 46%, transparent) 60%,
     var(--surface-canvas) 100%
   );
+  --hero-artwork-gradient-mobile: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 4%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 28%, transparent) 64%,
+    var(--surface-canvas) 100%
+  );
+  --hero-artwork-gradient-desktop: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 16%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 50%, transparent) 64%,
+    var(--surface-canvas) 100%
+  );
+  --hero-artwork-gradient-desktop-strong: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 16%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 52%, transparent) 66%,
+    var(--surface-canvas) 100%
+  );
 }
 
 @theme inline {
@@ -868,6 +889,16 @@
   --shadow-translation-editor: 0 24px 80px
       color-mix(in srgb, var(--surface-glass-shadow) 92.31%, black 7.69%),
     0 0 28px color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --shadow-share-preview: 0 16px 40px
+    color-mix(in srgb, var(--surface-glass-shadow) 72.92%, transparent);
+  --shadow-share-action-icon: inset 0 1px 0
+    color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --shadow-player-artwork: 0 28px 100px
+    color-mix(in srgb, var(--surface-glass-shadow) 48%, black 52%);
+  --shadow-player-artwork-layered: 0 28px 100px
+      color-mix(in srgb, var(--surface-glass-shadow) 48%, black 52%),
+    0 10px 28px
+      color-mix(in srgb, var(--surface-glass-shadow) 93.75%, transparent);
   --shadow-popover: 0 24px 64px
     color-mix(in srgb, var(--surface-glass-shadow) 88%, transparent);
   --shadow-modal: 0 32px 80px

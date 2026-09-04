@@ -332,7 +332,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                     <CrateImage
                       src={crossfadeTransition.outgoing.albumCover}
                       alt=""
-                      className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
+                      className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-player-artwork-layered"
                       style={{
                         filter: isVisualizerMode
                           ? "grayscale(100%) brightness(0.35)"
@@ -345,7 +345,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                     <CrateImage
                       src={crossfadeTransition.incoming.albumCover}
                       alt=""
-                      className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
+                      className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-player-artwork-layered"
                       style={{
                         filter: isVisualizerMode
                           ? "grayscale(100%) brightness(0.35)"
@@ -359,7 +359,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                 <CrateImage
                   src={currentTrack.albumCover}
                   alt=""
-                  className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
+                  className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-player-artwork-layered"
                   style={{
                     filter: isVisualizerMode
                       ? "grayscale(100%) brightness(0.35)"
@@ -367,7 +367,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                   }}
                 />
               ) : (
-                <div className="absolute inset-0 rounded-xl bg-surface-quiet-subtle shadow-[0_28px_100px_rgba(0,0,0,0.75)]" />
+                <div className="absolute inset-0 rounded-xl bg-surface-quiet-subtle shadow-player-artwork" />
               )}
             </>
           )}

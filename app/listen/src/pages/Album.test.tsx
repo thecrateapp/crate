@@ -656,6 +656,12 @@ describe("Album page", () => {
     expect(screen.getByTestId("album-hero-background")).not.toHaveClass(
       "grayscale",
     );
+    expect(screen.getByTestId("album-hero-mobile-gradient")).toHaveStyle({
+      background: "var(--hero-artwork-gradient-mobile)",
+    });
+    expect(screen.getByTestId("album-hero-desktop-gradient")).toHaveStyle({
+      background: "var(--hero-artwork-gradient-desktop)",
+    });
     expect(screen.getByTestId("album-hero-content")).toHaveClass(
       "pb-[calc(var(--album-mobile-action-overlap)+var(--album-mobile-info-action-gap))]",
       "sm:pb-6",

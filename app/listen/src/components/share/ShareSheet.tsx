@@ -166,12 +166,12 @@ function SharePreviewImage({ payload }: { payload: SharePayload }) {
       <CrateImage
         src={payload.imageUrl}
         alt=""
-        className="h-14 w-14 shrink-0 rounded-xl border border-border-quiet object-cover shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+        className="h-14 w-14 shrink-0 rounded-xl border border-border-quiet object-cover shadow-share-preview"
       />
     );
   }
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-share-preview">
       <span className="text-lg font-black">C</span>
     </div>
   );
@@ -204,7 +204,7 @@ function ShareAction({
           "cursor-not-allowed opacity-45 hover:border-border-quiet hover:bg-surface-canvas/20",
       )}
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.06] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.06] text-primary shadow-share-action-icon backdrop-blur">
         <Icon size={19} className={spinning ? "animate-spin" : ""} />
       </span>
       <span className="min-w-0 flex-1">

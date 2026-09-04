@@ -80,7 +80,7 @@ function renderWithI18n(ui: ReactNode, locale: "en" | "es" = "en") {
 
 describe("ArtistHeroSection", () => {
   it("keeps artist genres out of the hero surface", () => {
-    renderWithI18n(
+    const { container } = renderWithI18n(
       <MemoryRouter>
         <ArtistHeroSection
           artist={{
@@ -119,6 +119,12 @@ describe("ArtistHeroSection", () => {
     );
 
     expect(screen.queryByText("hardcore")).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="artist-hero-mobile-gradient"]'),
+    ).toHaveStyle({ background: "var(--hero-artwork-gradient-mobile)" });
+    expect(
+      container.querySelector('[data-testid="artist-hero-desktop-gradient"]'),
+    ).toHaveStyle({ background: "var(--hero-artwork-gradient-desktop)" });
   });
 
   it("groups desktop hero actions into primary pills and secondary icon labels", () => {

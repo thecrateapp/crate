@@ -136,16 +136,14 @@ export function PlaylistHeroSection({
         <div className="absolute inset-0 bg-surface-canvas/12 sm:bg-surface-canvas/36" />
         <div
           className="absolute inset-0 sm:hidden"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.04) 34%, rgba(8, 10, 14, 0.28) 64%, var(--surface-app) 100%)",
-          }}
+          data-testid="playlist-hero-mobile-gradient"
+          style={{ background: "var(--hero-artwork-gradient-mobile)" }}
         />
         <div
           className="absolute inset-0 hidden sm:block"
+          data-testid="playlist-hero-desktop-gradient"
           style={{
-            background:
-              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.16) 34%, rgba(8, 10, 14, 0.52) 66%, var(--surface-app) 100%)",
+            background: "var(--hero-artwork-gradient-desktop-strong)",
           }}
         />
 

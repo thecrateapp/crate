@@ -1239,17 +1239,13 @@ export function Album() {
         <div className="absolute inset-0 bg-surface-canvas/10 sm:bg-surface-canvas/32" />
         <div
           className="absolute inset-0 sm:hidden"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.04) 34%, rgba(8, 10, 14, 0.28) 64%, var(--surface-app) 100%)",
-          }}
+          data-testid="album-hero-mobile-gradient"
+          style={{ background: "var(--hero-artwork-gradient-mobile)" }}
         />
         <div
           className="absolute inset-0 hidden sm:block"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.16) 34%, rgba(8, 10, 14, 0.5) 64%, var(--surface-app) 100%)",
-          }}
+          data-testid="album-hero-desktop-gradient"
+          style={{ background: "var(--hero-artwork-gradient-desktop)" }}
         />
         <div
           data-testid="album-hero-content"

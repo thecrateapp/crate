@@ -94,6 +94,14 @@ describe("PlaylistHeroSection", () => {
     );
 
     expect(container.querySelector('[class*="blur-"]')).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="playlist-hero-mobile-gradient"]'),
+    ).toHaveStyle({ background: "var(--hero-artwork-gradient-mobile)" });
+    expect(
+      container.querySelector('[data-testid="playlist-hero-desktop-gradient"]'),
+    ).toHaveStyle({
+      background: "var(--hero-artwork-gradient-desktop-strong)",
+    });
   });
 
   it("uses an explicit mobile hero height so copy sits directly above CTAs", () => {
