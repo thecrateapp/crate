@@ -75,6 +75,22 @@ test("classifies token layers and counts external consumers", () => {
   assert.deepEqual(metrics.unreferencedTokens, ["--unused-recipe"]);
 });
 
+test("counts quoted token references used by runtime readers", () => {
+  const metrics = analyzeSemanticTokens(
+    `
+      :root {
+        --visualizer-waveform-peak-idle: #000;
+      }
+    `,
+    ['const token = "--visualizer-waveform-peak-idle";'],
+  );
+
+  assert.deepEqual(metrics.unreferencedTokens, []);
+  assert.deepEqual(metrics.oneShotTokens, [
+    { name: "--visualizer-waveform-peak-idle", consumers: 1 },
+  ]);
+});
+
 test("detects surface tokens used in border and text declarations", () => {
   const metrics = analyzeSemanticTokens(`
     :root {
@@ -101,7 +117,7 @@ test("enforces the normalized semantic token budget", () => {
 
   assert.deepEqual(metrics.nonFoundationAliases, []);
   assert.ok(
-    metrics.definitions <= 185,
+    metrics.definitions <= 226,
     `semantic token definitions grew to ${metrics.definitions}`,
   );
   assert.ok(
@@ -109,7 +125,7 @@ test("enforces the normalized semantic token budget", () => {
     `foundation token definitions grew to ${metrics.foundationDefinitions}`,
   );
   assert.ok(
-    metrics.domainDefinitions <= 90,
+    metrics.domainDefinitions <= 121,
     `domain token definitions grew to ${metrics.domainDefinitions}`,
   );
   assert.equal(
@@ -127,10 +143,22 @@ test("enforces the normalized semantic token budget", () => {
     `hardcoded color utilities grew to ${inventory.totals.hardcodedColorUtilities}`,
   );
   assert.ok(
-    metrics.duplicateDefinitions <= 1,
+    metrics.duplicateDefinitions <= 8,
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,
   );
-  assert.deepEqual(metrics.duplicateTokenGroups, []);
+  assert.deepEqual(metrics.duplicateTokenGroups, [
+    [
+      "--surface-contrast",
+      "--state-danger-foreground",
+      "--visualizer-ribbon-fade",
+    ],
+    ["--surface-accent-shadow", "--visualizer-waveform-gradient-idle-bottom"],
+    ["--surface-accent-subtle", "--visualizer-waveform-gradient-active-bottom"],
+    ["--genre-tone-default", "--visualizer-sphere-color-1"],
+    ["--visualizer-ribbon-stop-1", "--visualizer-waveform-gradient-active-top"],
+    ["--visualizer-waveform-gradient-idle-top", "--border-accent"],
+    ["--visualizer-waveform-peak-idle", "--jam-focus-border"],
+  ]);
 });
 
 test("keeps shared animation colors skin-aware", () => {

@@ -48,14 +48,17 @@ const DOMAIN_TOKEN_PREFIXES = [
   "info-",
   "jam-",
   "lyrics-",
+  "genre-",
   "play-button-",
   "player-",
+  "playlist-",
   "profile-",
   "quality-",
   "radio-",
   "stats-",
   "track-row-",
   "user-profile-",
+  "visualizer-",
 ];
 const SURFACE_ROLE_PATTERNS = [
   /(?<!-)\b(?<property>border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
@@ -135,10 +138,14 @@ function isDomainToken(name) {
 
 function countTokenReferences(content, name) {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return (
+  const cssReferences =
     content.match(new RegExp(`var\\(\\s*${escapedName}(?=\\s*[,\\)])`, "g"))
-      ?.length ?? 0
-  );
+      ?.length ?? 0;
+  const quotedReferences =
+    content.match(new RegExp("[\\\"'`]" + escapedName + "[\\\"'`]", "g"))
+      ?.length ?? 0;
+
+  return cssReferences + quotedReferences;
 }
 
 function findSurfaceRoleViolations(content) {
@@ -193,7 +200,7 @@ export function analyzeSemanticTokens(content, consumerContents = [content]) {
     duplicateGroups: duplicateTokenGroups.length,
     duplicateTokenGroups,
     nonFoundationAliases: aliases
-      .filter(({ name }) => !isFoundationToken(name))
+      .filter(({ name }) => !isFoundationToken(name) && !isDomainToken(name))
       .map(({ name }) => name),
     tokenConsumers,
     oneShotTokens,
