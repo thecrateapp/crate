@@ -8,14 +8,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import {
-  ListMusic,
-  Mic2,
-  Maximize2,
-  Loader2,
-  SlidersHorizontal,
-  CRATE_ICON_SIZE,
-} from "@crate/ui/icons";
+import { Loader2, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import type { PlaySource } from "@/contexts/player-types";
@@ -64,9 +57,8 @@ import {
   preloadLyricsPanel,
   preloadQueuePanel,
 } from "@/components/player/lazy-player-surfaces";
-import { PlayerVolumeControl } from "@/components/player/bar/PlayerVolumeControl";
 import { PlayerBarTransportControls } from "@/components/player/bar/PlayerBarTransportControls";
-import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
+import { PlayerBarActionButtons } from "@/components/player/bar/PlayerBarActionButtons";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
 import {
   CONNECT_SESSION_EVENT,
@@ -86,7 +78,6 @@ import {
   getQualityBadge,
   shouldFetchTrackQualityInfo,
 } from "@/components/player/bar/player-bar-utils";
-import { QualityBadge } from "@/components/player/bar/QualityBadge";
 import { getHorizontalPlayerSwipeAction } from "@/components/player/player-gestures";
 
 const FS_OPEN_KEY = "listen-fs-player-open";
@@ -952,6 +943,14 @@ export function PlayerBar() {
     setShowQueue(false);
   }
 
+  function handleToggleEqualizer() {
+    triggerHaptic("selection");
+    prepareEqualizerPopover();
+    setShowEqualizer((value) => !value);
+    setShowQueue(false);
+    setShowLyrics(false);
+  }
+
   function handleToggleExtendedPlayer() {
     if (isRemoteConnectActive) return;
     triggerHaptic("medium");
@@ -1130,133 +1129,33 @@ export function PlayerBar() {
               onSeek={handleSeek}
             />
 
-            {/* ── Block 3: Action Buttons ── */}
-            <div className="hidden shrink-0 items-center justify-end md:flex md:w-[260px] lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]">
-              <div className="hidden items-center justify-end gap-1 lg:flex">
-                {/* Quality badge */}
-                {qualityBadge && (
-                  <span className="mr-1 inline-flex items-center">
-                    <QualityBadge
-                      badge={qualityBadge}
-                      origin={showsDeliveryQuality ? "stream" : "source"}
-                    />
-                  </span>
-                )}
-
-                {/* Volume */}
-                <PlayerVolumeControl
-                  volume={effectiveVolume}
-                  onVolumeChange={handleVolumeChange}
-                  onOverlayChange={setHasFloatingOverlayOpen}
-                />
-
-                <PlaybackTargetMenu
-                  onOverlayChange={setHasFloatingOverlayOpen}
-                  targetContext={playbackTargetContext}
-                />
-
-                {/* Equalizer (hidden when extended player is open) */}
-                {!isRemoteConnectActive && !extendedOpen && allowEqualizer && (
-                  <button
-                    onClick={() => {
-                      triggerHaptic("selection");
-                      prepareEqualizerPopover();
-                      setShowEqualizer((v) => !v);
-                      setShowQueue(false);
-                      setShowLyrics(false);
-                    }}
-                    onMouseEnter={prepareEqualizerPopover}
-                    onFocus={prepareEqualizerPopover}
-                    aria-label={t("player.equalizer")}
-                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
-                      showEqualizer ? "text-accent-action" : "text-text-muted"
-                    }`}
-                  >
-                    <SlidersHorizontal size={CRATE_ICON_SIZE.md} />
-                  </button>
-                )}
-
-                {/* Queue (hidden when extended player is open) */}
-                {!extendedOpen && (
-                  <button
-                    onClick={handleToggleQueue}
-                    onMouseEnter={prepareQueuePanel}
-                    onFocus={prepareQueuePanel}
-                    className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
-                      showQueue ? "text-accent-action" : "text-text-muted"
-                    }`}
-                    aria-label={t("player.queue")}
-                  >
-                    <ListMusic size={CRATE_ICON_SIZE.md} />
-                    {displayQueue.length > 1 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent-action text-[8px] font-bold text-accent-action-foreground">
-                        {displayQueue.length - displayCurrentIndex - 1}
-                      </span>
-                    )}
-                  </button>
-                )}
-
-                {/* Lyrics (hidden when extended player is open) */}
-                {!isRemoteConnectActive && !extendedOpen && (
-                  <button
-                    onClick={handleToggleLyrics}
-                    onMouseEnter={prepareLyricsPanel}
-                    onFocus={prepareLyricsPanel}
-                    className={`hidden p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action xl:block ${
-                      showLyrics ? "text-accent-action" : "text-text-muted"
-                    }`}
-                    aria-label={t("player.lyrics")}
-                  >
-                    <Mic2 size={CRATE_ICON_SIZE.md} />
-                  </button>
-                )}
-
-                {/* Extended / Full player */}
-                {!isRemoteConnectActive && (
-                  <button
-                    onClick={handleToggleExtendedPlayer}
-                    onMouseEnter={prepareExtendedPlayer}
-                    onFocus={prepareExtendedPlayer}
-                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
-                      extendedOpen ? "text-accent-action" : "text-text-muted"
-                    }`}
-                    aria-label={t("player.expand")}
-                  >
-                    <Maximize2 size={CRATE_ICON_SIZE.md} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* ── Compact action buttons (md only, no lg) ── */}
-            <div className="hidden items-center gap-1 md:flex lg:hidden">
-              {!extendedOpen && (
-                <button
-                  onClick={handleToggleQueue}
-                  onMouseEnter={prepareQueuePanel}
-                  onFocus={prepareQueuePanel}
-                  aria-label={t("player.queue")}
-                  className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
-                    showQueue ? "text-accent-action" : "text-text-muted"
-                  }`}
-                >
-                  <ListMusic size={CRATE_ICON_SIZE.md} />
-                </button>
-              )}
-              {!isRemoteConnectActive && (
-                <button
-                  onClick={handleToggleExtendedPlayer}
-                  onMouseEnter={prepareExtendedPlayer}
-                  onFocus={prepareExtendedPlayer}
-                  aria-label={t("player.expand")}
-                  className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
-                    extendedOpen ? "text-accent-action" : "text-text-muted"
-                  }`}
-                >
-                  <Maximize2 size={CRATE_ICON_SIZE.md} />
-                </button>
-              )}
-            </div>
+            <PlayerBarActionButtons
+              t={t}
+              qualityBadge={qualityBadge}
+              showsDeliveryQuality={showsDeliveryQuality}
+              effectiveVolume={effectiveVolume}
+              onVolumeChange={handleVolumeChange}
+              onOverlayChange={setHasFloatingOverlayOpen}
+              playbackTargetContext={playbackTargetContext}
+              visibility={{
+                isRemoteConnectActive,
+                extendedOpen,
+                allowEqualizer,
+                showEqualizer,
+                showQueue,
+                showLyrics,
+              }}
+              displayQueue={displayQueue}
+              displayCurrentIndex={displayCurrentIndex}
+              onToggleEqualizer={handleToggleEqualizer}
+              onPrepareEqualizer={prepareEqualizerPopover}
+              onToggleQueue={handleToggleQueue}
+              onPrepareQueue={prepareQueuePanel}
+              onToggleLyrics={handleToggleLyrics}
+              onPrepareLyrics={prepareLyricsPanel}
+              onToggleExtendedPlayer={handleToggleExtendedPlayer}
+              onPrepareExtendedPlayer={prepareExtendedPlayer}
+            />
           </div>
         </div>
       ) : null}
