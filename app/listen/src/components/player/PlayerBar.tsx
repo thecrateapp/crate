@@ -1,14 +1,6 @@
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Loader2, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import type { PlaySource } from "@/contexts/player-types";
@@ -46,11 +38,6 @@ import { toast } from "sonner";
 import { PlayerBarTrackInfo } from "@/components/player/bar/PlayerBarTrackInfo";
 import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
 import {
-  LazyEqualizerPopover,
-  LazyExtendedPlayer,
-  LazyFullscreenPlayer,
-  LazyLyricsPanel,
-  LazyQueuePanel,
   preloadEqualizerPopover,
   preloadExtendedPlayer,
   preloadFullscreenPlayer,
@@ -59,6 +46,7 @@ import {
 } from "@/components/player/lazy-player-surfaces";
 import { PlayerBarTransportControls } from "@/components/player/bar/PlayerBarTransportControls";
 import { PlayerBarActionButtons } from "@/components/player/bar/PlayerBarActionButtons";
+import { PlayerBarSurfaces } from "@/components/player/bar/PlayerBarSurfaces";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
 import {
   CONNECT_SESSION_EVENT,
@@ -91,36 +79,7 @@ function getStoredFsOpen(): boolean {
   }
 }
 
-export function PlayerSurfaceFallback({
-  fullscreen = false,
-}: {
-  fullscreen?: boolean;
-}) {
-  const { t } = useTranslation();
-  if (!fullscreen) {
-    return (
-      <div
-        className="pointer-events-none fixed inset-x-0 z-app-player-overlay flex justify-end px-4"
-        style={{
-          bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
-        }}
-      >
-        <div className="listen-player-surface-fallback flex items-center gap-2 rounded-full px-3 py-2 text-[11px] backdrop-blur-xl">
-          <Loader2
-            size={CRATE_ICON_SIZE.sm}
-            className="animate-spin text-accent-action"
-          />
-          {t("player.loading")}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="listen-player-fullscreen-scrim fixed inset-0 z-fullscreen-player flex items-center justify-center backdrop-blur-xl">
-      <Loader2 size={24} className="animate-spin text-accent-action" />
-    </div>
-  );
-}
+export { PlayerSurfaceFallback } from "@/components/player/bar/PlayerSurfaceFallback";
 
 export function PlayerBar() {
   const { t } = useTranslation();
@@ -1159,46 +1118,26 @@ export function PlayerBar() {
           </div>
         </div>
       ) : null}
-      {shouldRenderQueuePanel ? (
-        <Suspense fallback={<PlayerSurfaceFallback />}>
-          <LazyQueuePanel
-            open={showQueue}
-            onClose={() => setShowQueue(false)}
-          />
-        </Suspense>
-      ) : null}
-      {shouldRenderLyricsPanel ? (
-        <Suspense fallback={<PlayerSurfaceFallback />}>
-          <LazyLyricsPanel
-            open={showLyrics}
-            onClose={() => setShowLyrics(false)}
-          />
-        </Suspense>
-      ) : null}
-      {shouldRenderEqualizerPopover ? (
-        <Suspense fallback={<PlayerSurfaceFallback />}>
-          <LazyEqualizerPopover
-            open={showEqualizer}
-            onClose={() => setShowEqualizer(false)}
-          />
-        </Suspense>
-      ) : null}
-      {shouldRenderExtendedPlayer ? (
-        <Suspense fallback={<PlayerSurfaceFallback />}>
-          <LazyExtendedPlayer
-            open={extendedOpen}
-            onClose={() => setExtendedOpen(false)}
-          />
-        </Suspense>
-      ) : null}
-      {!isDesktop && shouldRenderFullscreenPlayer ? (
-        <Suspense fallback={<PlayerSurfaceFallback fullscreen />}>
-          <LazyFullscreenPlayer
-            open={fsOpen}
-            onClose={() => setFsOpen(false)}
-          />
-        </Suspense>
-      ) : null}
+      <PlayerBarSurfaces
+        state={{
+          isDesktop,
+          fsOpen,
+          showQueue,
+          showLyrics,
+          showEqualizer,
+          extendedOpen,
+          shouldRenderQueuePanel,
+          shouldRenderLyricsPanel,
+          shouldRenderEqualizerPopover,
+          shouldRenderExtendedPlayer,
+          shouldRenderFullscreenPlayer,
+        }}
+        onCloseQueue={() => setShowQueue(false)}
+        onCloseLyrics={() => setShowLyrics(false)}
+        onCloseEqualizer={() => setShowEqualizer(false)}
+        onCloseExtendedPlayer={() => setExtendedOpen(false)}
+        onCloseFullscreenPlayer={() => setFsOpen(false)}
+      />
     </>
   );
 }
