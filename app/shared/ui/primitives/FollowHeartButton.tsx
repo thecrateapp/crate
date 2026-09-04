@@ -215,7 +215,7 @@ export function FollowHeartButton({
         "relative inline-flex items-center justify-center gap-1.5 transition-[color,filter,transform]",
         className,
         isActive
-          ? "text-primary drop-shadow-accent-action"
+          ? "text-accent-action drop-shadow-accent-action"
           : "text-text-primary/80",
       )}
       onClick={handleClick}
@@ -285,7 +285,7 @@ export function FollowHeartButton({
             data-testid={heartTestId}
             size={iconSize}
             className={cn(
-              "text-primary animate-crate-icon-active-pulse",
+              "text-accent-action animate-crate-icon-active-pulse",
               followAnimation === "follow"
                 ? "crate-follow-heart-in"
                 : followAnimation === "unfollow"

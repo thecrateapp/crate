@@ -68,11 +68,11 @@ function CollapsedView({
       </div>
 
       <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="truncate text-[13px] font-semibold text-foreground">
+        <div className="truncate text-[13px] font-semibold text-text-primary">
           {show.primaryArtist?.name ?? show.title}
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-text-primary/40">
-          <MapPin size={10} className="flex-shrink-0 text-primary/60" />
+          <MapPin size={10} className="flex-shrink-0 text-accent-action/60" />
           <span className="truncate">{show.venue}</span>
           {show.city ? (
             <>
@@ -94,10 +94,10 @@ function CollapsedView({
       </div>
 
       <div className="flex flex-shrink-0 flex-col items-center justify-center px-2">
-        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">
+        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-accent-action/55">
           {monthLabel}
         </span>
-        <span className="text-[20px] font-black leading-tight text-primary">
+        <span className="text-[20px] font-black leading-tight text-accent-action">
           {dayLabel}
         </span>
         <span className="text-[8px] font-medium leading-none text-text-primary/40">
@@ -176,7 +176,7 @@ function ExpandedView({
         ) : null}
 
         <div className="absolute right-3 top-2.5 z-10 text-right">
-          <div className="text-[10px] font-bold tracking-wide text-primary/70">
+          <div className="text-[10px] font-bold tracking-wide text-accent-action/70">
             {dateLabel}
           </div>
           {timeLabel ? (
@@ -200,7 +200,7 @@ function ExpandedView({
               {artistHref ? (
                 <Link
                   to={artistHref}
-                  className="block truncate text-sm font-bold text-text-primary transition-colors hover:text-primary"
+                  className="block truncate text-sm font-bold text-text-primary transition-colors hover:text-accent-action"
                 >
                   {show.primaryArtist?.name ?? show.title}
                 </Link>
@@ -225,8 +225,11 @@ function ExpandedView({
       </div>
 
       <div className="relative flex-1 px-3 pb-3 pt-2.5">
-        <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
-          <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
+        <div className="flex items-start gap-2 text-[11px] text-text-muted">
+          <MapPin
+            size={11}
+            className="mt-0.5 flex-shrink-0 text-accent-action/60"
+          />
           <div className="min-w-0">
             <span className="font-medium text-text-primary/70">
               {show.venue}
@@ -258,7 +261,7 @@ function ExpandedView({
             {artistHref ? (
               <Link
                 to={artistHref}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border-quiet py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-border-quiet py-2.5 text-[11px] font-semibold text-text-muted transition-colors hover:border-accent-action/20 hover:text-accent-action"
               >
                 <MapPin size={13} />
                 Open Artist
@@ -269,7 +272,7 @@ function ExpandedView({
                 href={show.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-primary/20 bg-primary/10 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/18"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-accent-action/20 bg-accent-action/10 py-2.5 text-[11px] font-semibold text-accent-action transition-colors hover:bg-accent-action/18"
               >
                 <Ticket size={13} />
                 Get Tickets
@@ -355,8 +358,8 @@ export function ShowCard({
       className={cn(
         "relative w-full overflow-hidden rounded-md border",
         expanded
-          ? "border-primary/20 shadow-accent-action-card transition-[height,border-color,box-shadow] duration-400 ease-out"
-          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-text-primary/[0.03]",
+          ? "border-accent-action/20 shadow-accent-action-card transition-[height,border-color,box-shadow] duration-400 ease-out"
+          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-accent-action/15 hover:bg-text-primary/[0.03]",
         className,
       )}
       style={{ height: cardHeight }}

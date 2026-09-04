@@ -32,7 +32,7 @@ interface AdminSelectProps {
 }
 
 const DEFAULT_TRIGGER_CLASS =
-  "flex h-11 min-w-[140px] max-w-[220px] items-center gap-2 rounded-md border border-border-quiet bg-surface-canvas/25 px-4 text-sm text-foreground shadow-control-inset backdrop-blur-sm transition-[background-color,border-color,box-shadow] hover:border-text-primary/20 hover:bg-surface-canvas/35";
+  "flex h-11 min-w-[140px] max-w-[220px] items-center gap-2 rounded-md border border-border-quiet bg-surface-canvas/25 px-4 text-sm text-text-primary shadow-control-inset backdrop-blur-sm transition-[background-color,border-color,box-shadow] hover:border-text-primary/20 hover:bg-surface-canvas/35";
 
 export function AdminSelect({
   value,
@@ -131,7 +131,7 @@ export function AdminSelect({
               }}
               className={cn(
                 "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm text-text-primary/70 transition-colors hover:bg-text-primary/[0.06] hover:text-text-primary",
-                !value && "bg-primary/10 text-primary",
+                !value && "bg-accent-action/10 text-accent-action",
               )}
             >
               <span>{placeholder}</span>
@@ -151,7 +151,8 @@ export function AdminSelect({
                 }}
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm text-text-primary/70 transition-colors hover:bg-text-primary/[0.06] hover:text-text-primary",
-                  value === option.value && "bg-primary/10 text-primary",
+                  value === option.value &&
+                    "bg-accent-action/10 text-accent-action",
                 )}
               >
                 <span className="truncate">{option.label}</span>

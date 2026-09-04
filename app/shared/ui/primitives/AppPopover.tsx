@@ -64,7 +64,7 @@ export function AppMenuButton({
         "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors",
         danger
           ? "text-[var(--status-danger-text)] hover:bg-[var(--hover-bg)]"
-          : "text-foreground hover:bg-[var(--hover-bg)]",
+          : "text-text-primary hover:bg-[var(--hover-bg)]",
         className,
       )}
       {...props}

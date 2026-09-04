@@ -10,7 +10,7 @@ function toneClasses(tone: OpsTone) {
     case "primary":
       return {
         iconWrap:
-          "border-accent-action/20 bg-accent-action/12 text-primary shadow-accent-action-status",
+          "border-accent-action/20 bg-accent-action/12 text-accent-action shadow-accent-action-status",
         value: "text-text-primary",
       };
     case "success":

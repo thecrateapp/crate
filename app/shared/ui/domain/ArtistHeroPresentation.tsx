@@ -31,7 +31,7 @@ export function ArtistHeroPresentation({
   const mobile = composition === "mobile";
   const copy = (
     <>
-      <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.3em] text-primary sm:text-xs">
+      <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.3em] text-accent-action sm:text-xs">
         {kicker}
       </p>
       <h1

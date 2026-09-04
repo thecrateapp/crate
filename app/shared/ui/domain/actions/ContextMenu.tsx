@@ -175,11 +175,11 @@ function ContextMenuMediaHeaderView({
         ) : null}
       </div>
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-foreground">
+        <div className="truncate text-sm font-semibold text-text-primary">
           {header.title}
         </div>
         {header.subtitle ? (
-          <div className="truncate text-xs text-muted-foreground">
+          <div className="truncate text-xs text-text-muted">
             {header.subtitle}
           </div>
         ) : null}
@@ -300,7 +300,7 @@ function ContextMenuItems({
               handleSelect(entry);
             }}
             className={cn(
-              entry.active ? "text-primary" : undefined,
+              entry.active ? "text-accent-action" : undefined,
               entry.disabled ? "opacity-50" : undefined,
             )}
           >
@@ -319,7 +319,7 @@ function ContextMenuItems({
               <span className="truncate">{entry.label}</span>
             </span>
             {entry.active ? (
-              <Check size={17} className="shrink-0 text-primary" />
+              <Check size={17} className="shrink-0 text-accent-action" />
             ) : null}
           </AppMenuButton>
         );

@@ -28,6 +28,14 @@ test("counts raw colors, arbitrary utilities, inline styles and imports", () => 
   });
 });
 
+test("detects legacy aliases on directional borders", () => {
+  assert.equal(
+    analyzeContent('className="border-t-primary border-b-destructive"')
+      .legacySemanticUtilities,
+    2,
+  );
+});
+
 test("normalizes CSS whitespace when grouping semantic values", () => {
   const metrics = analyzeSemanticTokens(`
     :root {
@@ -171,13 +179,7 @@ test("enforces the normalized semantic token budget", () => {
     `hardcoded color utilities grew to ${inventory.totals.hardcodedColorUtilities}`,
   );
   assert.equal(inventory.totals.actionableRawColors, 0);
-  assert.equal(
-    inventory.files
-      .filter(({ path }) => path.startsWith("app/listen/src/"))
-      .reduce((total, file) => total + file.legacySemanticUtilities, 0),
-    0,
-    "Listen still contains legacy semantic utilities",
-  );
+  assert.equal(inventory.totals.legacySemanticUtilities, 0);
   assert.ok(
     metrics.duplicateDefinitions <= 8,
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,

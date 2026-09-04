@@ -20,7 +20,7 @@ describe("ArtistHeroFrame", () => {
       aspectRatio: "1480 / 600",
     });
     expect(screen.getByTestId("desktop-artist-hero-frame")).toHaveClass(
-      "bg-app-surface",
+      "bg-surface-canvas",
     );
     expect(screen.getByTestId("desktop-hero-base")).toHaveStyle({
       background: "var(--surface-app)",

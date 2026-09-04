@@ -21,7 +21,7 @@ const RAW_COLOR_ALLOWLIST = new Map([
   ["app/listen/src/lib/capacitor-init.ts", /color:\s*"#00000000"/gi],
 ]);
 const LEGACY_SEMANTIC_UTILITY_PATTERN =
-  /(?<![A-Za-z0-9_-])(?:bg|text|border|fill|stroke|from|via|to)-(?:app-surface|primary(?:-foreground)?|foreground|muted-foreground|destructive|card|secondary|accent|border|input)(?![A-Za-z0-9_-])/g;
+  /(?<![A-Za-z0-9_-])(?:bg|text|border(?:-[trblxyse])?|fill|stroke|from|via|to)-(?:background|foreground|primary(?:-foreground)?|muted(?:-foreground)?|destructive(?:-foreground)?|card(?:-foreground)?|secondary(?:-foreground)?|accent(?:-foreground)?|border|input|ring|app-surface)(?![A-Za-z0-9_-])/g;
 const COLOR_UTILITY_NAMES =
   "black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 const UTILITY_PATTERN = new RegExp(
@@ -259,9 +259,13 @@ function collectFiles(directory, repoRoot, output) {
 
     const content = readFileSync(filePath, "utf8");
     const path = relative(repoRoot, filePath);
+    const contentMetrics = analyzeContent(content);
     output.push({
       path,
-      ...analyzeContent(content),
+      ...contentMetrics,
+      legacySemanticUtilities: FOUNDATION_TOKEN_PATH_PATTERN.test(path)
+        ? 0
+        : contentMetrics.legacySemanticUtilities,
       ...analyzeRawColorDrift(path, content),
     });
   }
