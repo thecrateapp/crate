@@ -9,6 +9,8 @@
   --text-faint: color-mix(in srgb, var(--text-primary) 20%, transparent);
 
   --surface-canvas: var(--surface-app);
+  --surface-contrast: var(--text-primary);
+  --text-on-contrast: var(--surface-canvas);
   --surface-container: var(--surface-panel);
   --surface-elevated: var(--surface-raised);
   --surface-overlay: var(--surface-modal);

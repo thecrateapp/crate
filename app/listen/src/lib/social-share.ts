@@ -4,6 +4,11 @@ import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog } from "@/lib/dev-logs";
 
+import {
+  readSocialShareColors,
+  type SocialShareColors,
+} from "./social-share-colors";
+
 export const SHARE_REQUEST_EVENT = "crate:share-request";
 
 const STORY_WIDTH = 1080;
@@ -159,6 +164,7 @@ async function buildInstagramStoryCard(payload: SharePayload): Promise<string> {
   canvas.height = STORY_HEIGHT;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas is not available");
+  const colors = readStoryColors();
 
   const [artwork, logo] = await Promise.all([
     payload.imageUrl
@@ -173,17 +179,19 @@ async function buildInstagramStoryCard(payload: SharePayload): Promise<string> {
         artwork.image,
         canvas.width,
         canvas.height,
+        colors,
       );
     } else {
-      drawStoryBackground(ctx, canvas.width, canvas.height);
+      drawStoryBackground(ctx, canvas.width, canvas.height, colors);
     }
 
-    drawStoryBrand(ctx, logo?.image ?? null);
+    drawStoryBrand(ctx, logo?.image ?? null, colors);
     drawEditorialStoryCard(
       ctx,
       payload,
       artwork?.image ?? null,
       logo?.image ?? null,
+      colors,
     );
 
     const encodeStartedAt = performance.now();
@@ -197,6 +205,16 @@ async function buildInstagramStoryCard(payload: SharePayload): Promise<string> {
   } finally {
     artwork?.release();
     logo?.release();
+  }
+}
+
+function readStoryColors(): SocialShareColors {
+  const probe = document.createElement("span");
+  document.documentElement.appendChild(probe);
+  try {
+    return readSocialShareColors(probe);
+  } finally {
+    probe.remove();
   }
 }
 
@@ -264,8 +282,9 @@ function drawStoryArtworkBackground(
   image: HTMLImageElement,
   width: number,
   height: number,
+  colors: SocialShareColors,
 ) {
-  ctx.fillStyle = "#020304";
+  ctx.fillStyle = colors.darkSurface;
   ctx.fillRect(0, 0, width, height);
 
   ctx.save();
@@ -275,20 +294,20 @@ function drawStoryArtworkBackground(
   });
   ctx.restore();
 
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillStyle = colors.scrimMedium;
   ctx.fillRect(0, 0, width, height);
 
   const vignette = ctx.createRadialGradient(540, 840, 120, 540, 960, 1120);
-  vignette.addColorStop(0, "rgba(0,0,0,0.04)");
-  vignette.addColorStop(0.58, "rgba(0,0,0,0.34)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.88)");
+  vignette.addColorStop(0, "transparent");
+  vignette.addColorStop(0.58, colors.scrimMedium);
+  vignette.addColorStop(1, colors.scrimStrong);
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, width, height);
 
   const shade = ctx.createLinearGradient(0, 0, 0, height);
-  shade.addColorStop(0, "rgba(0,0,0,0.2)");
-  shade.addColorStop(0.68, "rgba(0,0,0,0)");
-  shade.addColorStop(1, "rgba(0,0,0,0.74)");
+  shade.addColorStop(0, colors.scrimMedium);
+  shade.addColorStop(0.68, "transparent");
+  shade.addColorStop(1, colors.scrimStrong);
   ctx.fillStyle = shade;
   ctx.fillRect(0, 0, width, height);
 }
@@ -298,6 +317,7 @@ function drawEditorialStoryCard(
   payload: SharePayload,
   artwork: HTMLImageElement | null,
   logo: HTMLImageElement | null,
+  colors: SocialShareColors,
 ) {
   const cardWidth = 840;
   const cardX = (STORY_WIDTH - cardWidth) / 2;
@@ -310,10 +330,10 @@ function drawEditorialStoryCard(
   const infoHeight = 346;
 
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.68)";
+  ctx.shadowColor = colors.scrimStrong;
   ctx.shadowBlur = 84;
   ctx.shadowOffsetY = 42;
-  ctx.fillStyle = "#f8fafc";
+  ctx.fillStyle = colors.cardSurface;
   roundedRect(ctx, cardX, cardY, cardWidth, padding + artSize + infoHeight, 18);
   ctx.fill();
   ctx.restore();
@@ -325,14 +345,14 @@ function drawEditorialStoryCard(
     drawCoverImage(ctx, artwork, artX, artY, artSize, artSize);
     ctx.restore();
   } else {
-    drawGeneratedStoryArtwork(ctx, payload, artX, artY, artSize, logo);
+    drawGeneratedStoryArtwork(ctx, payload, artX, artY, artSize, logo, colors);
   }
 
-  ctx.fillStyle = "#f8fafc";
+  ctx.fillStyle = colors.cardSurface;
   ctx.fillRect(artX, infoY, artSize, infoHeight - padding);
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#111318";
+  ctx.fillStyle = colors.cardInk;
   ctx.font = "800 76px Poppins, ui-sans-serif, system-ui";
   drawWrappedText(
     ctx,
@@ -344,7 +364,7 @@ function drawEditorialStoryCard(
     2,
   );
 
-  ctx.fillStyle = "#62636d";
+  ctx.fillStyle = colors.cardMutedInk;
   ctx.font = "800 43px Poppins, ui-sans-serif, system-ui";
   drawWrappedText(
     ctx,
@@ -364,15 +384,16 @@ function drawGeneratedStoryArtwork(
   y: number,
   size: number,
   logo: HTMLImageElement | null,
+  colors: SocialShareColors,
 ) {
   ctx.save();
   roundedRect(ctx, x, y, size, size, 4);
   ctx.clip();
 
   const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
-  gradient.addColorStop(0, "#092f36");
-  gradient.addColorStop(0.48, "#10131a");
-  gradient.addColorStop(1, "#020306");
+  gradient.addColorStop(0, colors.generatedStart);
+  gradient.addColorStop(0.48, colors.generatedMiddle);
+  gradient.addColorStop(1, colors.darkSurface);
   ctx.fillStyle = gradient;
   ctx.fillRect(x, y, size, size);
 
@@ -384,14 +405,14 @@ function drawGeneratedStoryArtwork(
     y + size * 0.16,
     size * 0.86,
   );
-  glow.addColorStop(0, "rgba(34,211,238,0.46)");
-  glow.addColorStop(1, "rgba(34,211,238,0)");
+  glow.addColorStop(0, colors.accentGlow);
+  glow.addColorStop(1, "transparent");
   ctx.fillStyle = glow;
   ctx.fillRect(x, y, size, size);
 
   if (logo) drawLogoImage(ctx, logo, x + size * 0.34, y + size * 0.16, 240);
 
-  ctx.fillStyle = "rgba(248,250,252,0.08)";
+  ctx.fillStyle = colors.softText;
   ctx.font = "800 230px Poppins, ui-sans-serif, system-ui";
   ctx.textAlign = "center";
   ctx.fillText(getStoryInitials(payload.title), x + size / 2, y + size * 0.84);
@@ -402,10 +423,11 @@ function drawGeneratedStoryArtwork(
 function drawStoryBrand(
   ctx: CanvasRenderingContext2D,
   logo: HTMLImageElement | null,
+  colors: SocialShareColors,
 ) {
   if (logo) drawLogoImage(ctx, logo, 120, 380, 72);
   ctx.textAlign = "left";
-  ctx.fillStyle = "#f8fafc";
+  ctx.fillStyle = colors.cardSurface;
   ctx.font = "800 44px Poppins, ui-sans-serif, system-ui";
   ctx.letterSpacing = "10px";
   ctx.fillText("CRATE", 214, 433);
@@ -449,23 +471,24 @@ function drawStoryBackground(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
+  colors: SocialShareColors,
 ) {
   const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#071013");
-  gradient.addColorStop(0.44, "#0b0c12");
-  gradient.addColorStop(1, "#030407");
+  gradient.addColorStop(0, colors.storyStart);
+  gradient.addColorStop(0.44, colors.storyMiddle);
+  gradient.addColorStop(1, colors.darkSurface);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
   const cyan = ctx.createRadialGradient(170, 120, 20, 170, 120, 900);
-  cyan.addColorStop(0, "rgba(34,211,238,0.42)");
-  cyan.addColorStop(1, "rgba(34,211,238,0)");
+  cyan.addColorStop(0, colors.accentGlow);
+  cyan.addColorStop(1, "transparent");
   ctx.fillStyle = cyan;
   ctx.fillRect(0, 0, width, height);
 
   const lime = ctx.createRadialGradient(900, 1780, 20, 900, 1780, 760);
-  lime.addColorStop(0, "rgba(214,255,99,0.2)");
-  lime.addColorStop(1, "rgba(214,255,99,0)");
+  lime.addColorStop(0, colors.secondaryAccent);
+  lime.addColorStop(1, "transparent");
   ctx.fillStyle = lime;
   ctx.fillRect(0, 0, width, height);
 }
