@@ -437,6 +437,87 @@
   --state-success: var(--color-success);
   --state-warning: var(--color-warning);
   --state-info: var(--color-info);
+  --visualizer-ribbon-stop-0: color-mix(
+    in srgb,
+    var(--accent-action) 0%,
+    transparent
+  );
+  --visualizer-ribbon-stop-1: color-mix(
+    in srgb,
+    var(--accent-action) 55%,
+    transparent
+  );
+  --visualizer-ribbon-stop-2: color-mix(
+    in srgb,
+    var(--accent-action) 78%,
+    transparent
+  );
+  --visualizer-ribbon-stop-3: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 72%, var(--text-primary)) 94%,
+    transparent
+  );
+  --visualizer-ribbon-stop-4: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 56%, var(--text-primary)) 76%,
+    transparent
+  );
+  --visualizer-ribbon-stop-5: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 34%, var(--text-primary)) 45%,
+    transparent
+  );
+  --visualizer-ribbon-stop-6: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 34%, var(--text-primary)) 0%,
+    transparent
+  );
+  --visualizer-ribbon-trace: color-mix(
+    in srgb,
+    var(--accent-action) 66%,
+    transparent
+  );
+  --visualizer-ribbon-trace-shadow: color-mix(
+    in srgb,
+    var(--accent-action) 70%,
+    transparent
+  );
+  --visualizer-ribbon-shadow: color-mix(
+    in srgb,
+    var(--accent-action) 32%,
+    transparent
+  );
+  --visualizer-ribbon-fade: var(--text-primary);
+  --visualizer-waveform-gradient-active-top: color-mix(
+    in srgb,
+    var(--accent-action) 55%,
+    transparent
+  );
+  --visualizer-waveform-gradient-active-bottom: color-mix(
+    in srgb,
+    var(--accent-action) 12%,
+    transparent
+  );
+  --visualizer-waveform-gradient-idle-top: color-mix(
+    in srgb,
+    var(--accent-action) 30%,
+    transparent
+  );
+  --visualizer-waveform-gradient-idle-bottom: color-mix(
+    in srgb,
+    var(--accent-action) 6%,
+    transparent
+  );
+  --visualizer-waveform-peak-active: color-mix(
+    in srgb,
+    var(--accent-action) 95%,
+    transparent
+  );
+  --visualizer-waveform-peak-idle: color-mix(
+    in srgb,
+    var(--accent-action) 50%,
+    transparent
+  );
   --brand-bandcamp: #1da0c3;
   --brand-bandcamp-foreground: #7ee7ff;
   --map-popup-shadow: 0 10px 30px

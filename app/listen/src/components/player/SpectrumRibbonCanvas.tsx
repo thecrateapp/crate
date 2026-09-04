@@ -1,6 +1,8 @@
 import { memo, useEffect, useRef } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
+import { readCanvasColorToken } from "./canvas-color";
+import { SPECTRUM_RIBBON_COLOR_TOKENS } from "./visualizer-color-tokens";
 
 interface SpectrumRibbonCanvasProps {
   frequenciesDb: number[];
@@ -18,13 +20,6 @@ interface SpectrumRibbonBands {
   high: number;
 }
 
-export const SPECTRUM_RIBBON_COLORS = [
-  "#0891b2",
-  "#06b6d4",
-  "#27d7ff",
-  "#67e8f9",
-  "#a5f3fc",
-] as const;
 export const SPECTRUM_RIBBON_PERSISTENCE = {
   idleDecayAlpha: 0.13,
   playingDecayAlpha: 0.055,
@@ -156,16 +151,37 @@ function buildRibbonSignature(
 function buildPhosphorGradient(
   context: CanvasRenderingContext2D,
   width: number,
+  colors: readonly string[],
 ) {
   const gradient = context.createLinearGradient(0, 0, width, 0);
-  gradient.addColorStop(0, "rgba(8,145,178,0)");
-  gradient.addColorStop(0.08, "rgba(8,145,178,0.55)");
-  gradient.addColorStop(0.26, "rgba(6,182,212,0.78)");
-  gradient.addColorStop(0.5, "rgba(39,215,255,0.94)");
-  gradient.addColorStop(0.72, "rgba(103,232,249,0.76)");
-  gradient.addColorStop(0.92, "rgba(165,243,252,0.45)");
-  gradient.addColorStop(1, "rgba(165,243,252,0)");
+  const stops = [0, 0.08, 0.26, 0.5, 0.72, 0.92, 1];
+  stops.forEach((position, index) => {
+    gradient.addColorStop(position, colors[index] ?? "transparent");
+  });
   return gradient;
+}
+
+interface SpectrumRibbonPalette {
+  fade: string;
+  gradient: readonly string[];
+  shadow: string;
+  trace: string;
+  traceShadow: string;
+}
+
+function readSpectrumRibbonPalette(
+  canvas: HTMLCanvasElement,
+): SpectrumRibbonPalette {
+  const read = (tokenName: `--${string}`) =>
+    readCanvasColorToken(canvas, tokenName) ?? "transparent";
+
+  return {
+    fade: read("--visualizer-ribbon-fade"),
+    gradient: SPECTRUM_RIBBON_COLOR_TOKENS.map(read),
+    shadow: read("--visualizer-ribbon-shadow"),
+    trace: read("--visualizer-ribbon-trace"),
+    traceShadow: read("--visualizer-ribbon-trace-shadow"),
+  };
 }
 
 function drawThread(
@@ -245,6 +261,7 @@ function drawTravelingTrace(
   bands: SpectrumRibbonBands,
   waveform: readonly number[] | undefined,
   time: number,
+  palette: SpectrumRibbonPalette,
 ) {
   const head = (time * 0.00008) % 1;
   const windowSize = 0.12;
@@ -256,8 +273,8 @@ function drawTravelingTrace(
   context.rect(width * start - 24, 0, width * (end - start) + 48, height);
   context.clip();
   context.globalCompositeOperation = "lighter";
-  context.strokeStyle = "rgba(165,243,252,0.66)";
-  context.shadowColor = "rgba(39,215,255,0.7)";
+  context.strokeStyle = palette.trace;
+  context.shadowColor = palette.traceShadow;
   context.shadowBlur = 18;
   context.globalAlpha = 0.42;
   context.lineWidth = 1.15;
@@ -295,6 +312,7 @@ export const SpectrumRibbonCanvas = memo(function SpectrumRibbonCanvas({
     const context = canvas.getContext("2d");
     if (!context) return;
     let cancelled = false;
+    const palette = readSpectrumRibbonPalette(canvas);
 
     const syncSize = () => {
       const width = Math.max(1, Math.floor(canvas.clientWidth || 1));
@@ -336,22 +354,21 @@ export const SpectrumRibbonCanvas = memo(function SpectrumRibbonCanvas({
       } else {
         context.save();
         context.globalCompositeOperation = "destination-out";
-        context.fillStyle = `rgba(0,0,0,${
-          isPlaying
-            ? SPECTRUM_RIBBON_PERSISTENCE.playingDecayAlpha
-            : SPECTRUM_RIBBON_PERSISTENCE.idleDecayAlpha
-        })`;
+        context.globalAlpha = isPlaying
+          ? SPECTRUM_RIBBON_PERSISTENCE.playingDecayAlpha
+          : SPECTRUM_RIBBON_PERSISTENCE.idleDecayAlpha;
+        context.fillStyle = palette.fade;
         context.fillRect(0, 0, width, height);
         context.restore();
       }
 
-      const gradient = buildPhosphorGradient(context, width);
+      const gradient = buildPhosphorGradient(context, width, palette.gradient);
 
       context.globalCompositeOperation = "lighter";
       context.strokeStyle = gradient;
       context.lineCap = "round";
       context.lineJoin = "round";
-      context.shadowColor = "rgba(39,215,255,0.32)";
+      context.shadowColor = palette.shadow;
       context.shadowBlur = isPlaying ? 12 : 7;
 
       for (let thread = 0; thread < THREAD_COUNT; thread += 1) {
@@ -398,6 +415,7 @@ export const SpectrumRibbonCanvas = memo(function SpectrumRibbonCanvas({
           bandsRef.current,
           waveformRef.current,
           time,
+          palette,
         );
       }
       rafRef.current = requestAnimationFrame(draw);

@@ -1,5 +1,8 @@
 import { memo, useEffect, useRef } from "react";
 
+import { readCanvasColorToken } from "../canvas-color";
+import { WAVEFORM_COLOR_TOKENS } from "../visualizer-color-tokens";
+
 interface WaveformCanvasProps {
   frequenciesDb: number[];
   sampleRate: number;
@@ -165,13 +168,30 @@ export const WaveformCanvas = memo(function WaveformCanvas({
     const context = canvas.getContext("2d");
     if (!context) return;
 
-    // Read the CSS --primary HSL values once for color construction.
-    const cs = getComputedStyle(canvas);
-    const accent = cs.getPropertyValue("--primary").trim() || "183 100% 50%";
-
-    // Pre-compute colors outside the animation loop.
-    const peakColorPlaying = `hsla(${accent} / 0.95)`;
-    const peakColorPaused = `hsla(${accent} / 0.5)`;
+    const activeGradientTop = readCanvasColorToken(
+      canvas,
+      WAVEFORM_COLOR_TOKENS.activeGradientTop,
+    );
+    const activeGradientBottom = readCanvasColorToken(
+      canvas,
+      WAVEFORM_COLOR_TOKENS.activeGradientBottom,
+    );
+    const idleGradientTop = readCanvasColorToken(
+      canvas,
+      WAVEFORM_COLOR_TOKENS.idleGradientTop,
+    );
+    const idleGradientBottom = readCanvasColorToken(
+      canvas,
+      WAVEFORM_COLOR_TOKENS.idleGradientBottom,
+    );
+    const peakColorPlaying = readCanvasColorToken(
+      canvas,
+      WAVEFORM_COLOR_TOKENS.peakActive,
+    );
+    const peakColorPaused = readCanvasColorToken(
+      canvas,
+      WAVEFORM_COLOR_TOKENS.peakIdle,
+    );
 
     // Single full-height gradient cached per resize; clipped by fillRect.
     let cachedGrad: CanvasGradient | null = null;
@@ -209,14 +229,19 @@ export const WaveformCanvas = memo(function WaveformCanvas({
       if (cachedGradHeight !== height) {
         cachedGradHeight = height;
         cachedGrad = context.createLinearGradient(0, 0, 0, baselineY);
-        const alpha = isPlaying ? 0.55 : 0.3;
-        const alphaBase = isPlaying ? 0.12 : 0.06;
-        cachedGrad.addColorStop(0, `hsla(${accent} / ${alpha})`);
-        cachedGrad.addColorStop(1, `hsla(${accent} / ${alphaBase})`);
+        cachedGrad.addColorStop(
+          0,
+          (isPlaying ? activeGradientTop : idleGradientTop) ?? "transparent",
+        );
+        cachedGrad.addColorStop(
+          1,
+          (isPlaying ? activeGradientBottom : idleGradientBottom) ??
+            "transparent",
+        );
       }
 
       // Batch bars with the same fill
-      context.fillStyle = cachedGrad ?? peakColorPlaying;
+      context.fillStyle = cachedGrad ?? peakColorPlaying ?? "transparent";
       for (let i = 0; i < barCount; i += 1) {
         const target = targetsRef.current[i] ?? 0;
         const current = currentRef.current[i] ?? 0;
@@ -237,7 +262,8 @@ export const WaveformCanvas = memo(function WaveformCanvas({
       }
 
       // Peak markers in a single batch
-      context.fillStyle = isPlaying ? peakColorPlaying : peakColorPaused;
+      context.fillStyle =
+        (isPlaying ? peakColorPlaying : peakColorPaused) ?? "transparent";
       for (let i = 0; i < barCount; i += 1) {
         const peakH = (peaksRef.current[i] ?? 0) * usableHeight;
         if (peakH > 1) {
