@@ -22,14 +22,12 @@ import {
   useTrackVisualizerProfile,
   type VisualizerTrackProfile,
 } from "./useTrackVisualizerProfile";
+import {
+  readVisualizerColors,
+  type VisualizerColorTriplet,
+} from "./visualizer-colors";
 
-type PaletteTriplet = [number, number, number];
-
-const DEFAULT_VIZ_COLORS: [PaletteTriplet, PaletteTriplet, PaletteTriplet] = [
-  [0.024, 0.714, 0.831],
-  [0.4, 0.9, 1],
-  [0.1, 0.3, 0.8],
-];
+type PaletteTriplet = VisualizerColorTriplet;
 
 const ZERO_VIZ_DELTA = {
   separation: 0,
@@ -109,6 +107,20 @@ function adjustPaletteColor(
     clamp(s + Math.abs(hueShift) * 0.12, 0, 1),
     l,
   ]);
+}
+
+function readDefaultVisualizerColors(): [
+  PaletteTriplet,
+  PaletteTriplet,
+  PaletteTriplet,
+] {
+  const probe = document.createElement("span");
+  document.documentElement.appendChild(probe);
+  try {
+    return readVisualizerColors(probe);
+  } finally {
+    probe.remove();
+  }
 }
 
 export interface VisualizerConfigState {
@@ -197,7 +209,7 @@ export function useVisualizerConfig(
     // jitter just before the morph settles.
     if (crossfadeTransition) return;
 
-    const [defaultC1, defaultC2, defaultC3] = DEFAULT_VIZ_COLORS;
+    const [defaultC1, defaultC2, defaultC3] = readDefaultVisualizerColors();
     const paletteBias = trackAdaptiveViz
       ? trackVizProfile.paletteBias
       : { brightness: 0, coolness: 0, saturation: 0, hueShift: 0 };

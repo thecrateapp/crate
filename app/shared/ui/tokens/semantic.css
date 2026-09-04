@@ -511,6 +511,17 @@
     transparent
   );
   --visualizer-ribbon-fade: var(--text-primary);
+  --visualizer-sphere-color-1: var(--accent-action);
+  --visualizer-sphere-color-2: color-mix(
+    in srgb,
+    var(--accent-action) 58%,
+    var(--text-primary)
+  );
+  --visualizer-sphere-color-3: color-mix(
+    in srgb,
+    var(--state-info) 76%,
+    var(--accent-action)
+  );
   --visualizer-waveform-gradient-active-top: color-mix(
     in srgb,
     var(--accent-action) 55%,

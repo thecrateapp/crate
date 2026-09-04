@@ -14,6 +14,10 @@ import {
   BLEND_FRAG,
   QUAD_VERT,
 } from "./shaders";
+import {
+  DEFAULT_VISUALIZER_COLORS,
+  type VisualizerColorTriplet,
+} from "./visualizer-colors";
 
 interface AudioMetrics {
   freqAvg: number;
@@ -109,9 +113,15 @@ export class MusicVisualizer {
   private renderedMidBandWeight = 1.0;
   private renderedHighBandWeight = 1.0;
   private viewportScaleCompensation = 1.0;
-  private renderedColor1: [number, number, number] = [0.024, 0.714, 0.831];
-  private renderedColor2: [number, number, number] = [0.4, 0.9, 1.0];
-  private renderedColor3: [number, number, number] = [0.1, 0.3, 0.8];
+  private renderedColor1: VisualizerColorTriplet = [
+    ...DEFAULT_VISUALIZER_COLORS[0],
+  ];
+  private renderedColor2: VisualizerColorTriplet = [
+    ...DEFAULT_VISUALIZER_COLORS[1],
+  ];
+  private renderedColor3: VisualizerColorTriplet = [
+    ...DEFAULT_VISUALIZER_COLORS[2],
+  ];
 
   // Exposed controls
   separation = 0.15;
@@ -137,9 +147,9 @@ export class MusicVisualizer {
   analysisGainCompensation = 1.0;
 
   // Dynamic scene colors — [r, g, b] normalized 0-1
-  color1: [number, number, number] = [0.024, 0.714, 0.831];
-  color2: [number, number, number] = [0.4, 0.9, 1.0];
-  color3: [number, number, number] = [0.1, 0.3, 0.8];
+  color1: VisualizerColorTriplet = [...DEFAULT_VISUALIZER_COLORS[0]];
+  color2: VisualizerColorTriplet = [...DEFAULT_VISUALIZER_COLORS[1]];
+  color3: VisualizerColorTriplet = [...DEFAULT_VISUALIZER_COLORS[2]];
 
   constructor(
     canvas: HTMLCanvasElement,
