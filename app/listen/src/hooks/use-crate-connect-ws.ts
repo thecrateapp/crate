@@ -18,10 +18,25 @@ import {
   getListenDeviceType,
 } from "@/lib/listen-device";
 import type { PlaybackStatePayload } from "@/lib/remote-playback-state";
+import {
+  HEARTBEAT_INTERVAL_MS,
+  nextReconnectDelay,
+  normalizeInstances,
+  parseMessage,
+  serverTimeOffsetMs,
+  isRemoteCommandType,
+  type BecameInactivePayload,
+  type ConnectedPlaybackInstance,
+  type RemoteCommandType,
+  type TransferCommittedPayload,
+  type TransferFailedPayload,
+  type TransferIncomingPayload,
+} from "./crate-connect-ws-model";
 
-const HEARTBEAT_INTERVAL_MS = 30_000;
-const RECONNECT_BASE_DELAY_MS = 1_000;
-const RECONNECT_MAX_DELAY_MS = 30_000;
+export type {
+  ConnectedPlaybackInstance,
+  ConnectedPlaybackInstancesSnapshot,
+} from "./crate-connect-ws-model";
 
 export type CrateConnectWsStatus =
   | "disabled"
@@ -29,50 +44,6 @@ export type CrateConnectWsStatus =
   | "connected"
   | "disconnected"
   | "error";
-
-export interface ConnectedPlaybackInstance {
-  instance_id: string;
-  device_id?: string | null;
-  device_label?: string | null;
-  device_type?: string | null;
-  app_platform?: string | null;
-  connected_at?: string | null;
-  capabilities?: Record<string, unknown> | null;
-}
-
-export interface ConnectedPlaybackInstancesSnapshot {
-  instances: ConnectedPlaybackInstance[];
-  active_instance_id?: string | null;
-}
-
-interface TransferIncomingPayload {
-  transfer_id?: string;
-  source_instance_id?: string;
-  state?: ConnectPlayerState | null;
-}
-
-interface TransferCommittedPayload {
-  active_instance_id?: string | null;
-  active_device_label?: string | null;
-}
-
-interface TransferFailedPayload {
-  transfer_id?: string | null;
-  reason?: string | null;
-}
-
-interface BecameInactivePayload {
-  active_instance_id?: string | null;
-  active_device_label?: string | null;
-}
-
-type RemoteCommandType =
-  | "seek"
-  | "next_track"
-  | "previous_track"
-  | "pause"
-  | "resume"
-  | "volume";
 
 interface UseCrateConnectWsCallbacks {
   onBecameInactive?: (payload: BecameInactivePayload) => void;
@@ -109,63 +80,6 @@ interface UseCrateConnectWsResult {
   ) => boolean;
   sendVolume: (volume: number) => boolean;
   status: CrateConnectWsStatus;
-}
-
-function parseMessage(data: unknown): ConnectMessage | null {
-  try {
-    if (typeof data === "string") return JSON.parse(data) as ConnectMessage;
-    if (data instanceof Blob) return null;
-    return data as ConnectMessage;
-  } catch {
-    return null;
-  }
-}
-
-function serverTimeOffsetMs(message: ConnectMessage): number {
-  const serverTime = message.payload?.server_time;
-  if (typeof serverTime !== "string") return 0;
-  const parsed = Date.parse(serverTime);
-  return Number.isFinite(parsed) ? parsed - Date.now() : 0;
-}
-
-function normalizeInstances(
-  payload: Record<string, unknown> | null | undefined,
-): ConnectedPlaybackInstancesSnapshot {
-  const rawInstances = Array.isArray(payload?.instances)
-    ? payload?.instances
-    : [];
-  return {
-    active_instance_id:
-      typeof payload?.active_instance_id === "string"
-        ? payload.active_instance_id
-        : null,
-    instances: rawInstances
-      .filter(
-        (entry): entry is ConnectedPlaybackInstance =>
-          typeof entry === "object" &&
-          entry !== null &&
-          typeof (entry as ConnectedPlaybackInstance).instance_id === "string",
-      )
-      .map((entry) => ({ ...entry })),
-  };
-}
-
-function isRemoteCommandType(type: string): type is RemoteCommandType {
-  return (
-    type === "seek" ||
-    type === "next_track" ||
-    type === "previous_track" ||
-    type === "pause" ||
-    type === "resume" ||
-    type === "volume"
-  );
-}
-
-function nextReconnectDelay(attempt: number): number {
-  return Math.min(
-    RECONNECT_MAX_DELAY_MS,
-    RECONNECT_BASE_DELAY_MS * 2 ** Math.max(0, attempt),
-  );
 }
 
 export function useCrateConnectWs({
