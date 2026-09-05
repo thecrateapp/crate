@@ -46,6 +46,49 @@ const NARRATIVE_TONES = [
   "stats-narrative-tone-warm",
   "stats-narrative-tone-alert",
 ];
+const STATS_MOSAIC_CELL_IDS = [
+  "top-left",
+  "top-right",
+  "middle-left",
+  "middle-right",
+  "bottom-left",
+  "bottom-right",
+  "footer-left",
+  "footer-right",
+] as const;
+
+type StorySignal = {
+  key: string;
+  label: string;
+  title: string;
+  body: string;
+};
+
+function statsTrackKey(item: StatsTrack): string {
+  return String(
+    item.track_id ??
+      item.track_path ??
+      `${item.artist}:${item.album}:${item.title}`,
+  );
+}
+
+function statsArtistKey(item: StatsArtist): string {
+  return String(
+    item.artist_id ??
+      item.global_artist_uid ??
+      item.artist_slug ??
+      item.artist_name,
+  );
+}
+
+function statsAlbumKey(item: StatsAlbum): string {
+  return String(
+    item.album_id ??
+      item.global_album_uid ??
+      item.album_slug ??
+      `${item.artist}:${item.album}`,
+  );
+}
 
 export function Stats() {
   const page = useStatsPageController();
@@ -405,67 +448,92 @@ function StatsStorySection({
   fallbackComeback?: StatsStoryArtistSignal;
 }) {
   const { t, i18n } = useTranslation();
-  if (!story) return null;
+  const signals = story
+    ? buildStorySignals({
+        story,
+        fallbackMover,
+        fallbackDiscovery,
+        fallbackComeback,
+        locale: i18n.language,
+        t,
+      })
+    : [];
+
+  if (!signals.length) return null;
+
+  return (
+    <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {signals.map(({ key, label, title, body }) => (
+        <StorySignalCard key={key} label={label} title={title} body={body} />
+      ))}
+    </section>
+  );
+}
+
+function buildStorySignals({
+  story,
+  fallbackMover,
+  fallbackDiscovery,
+  fallbackComeback,
+  locale,
+  t,
+}: {
+  story: StatsStory;
+  fallbackMover?: StatsStoryArtistSignal;
+  fallbackDiscovery?: StatsStoryArtistSignal;
+  fallbackComeback?: StatsStoryArtistSignal;
+  locale: string;
+  t: StatsPageController["t"];
+}): StorySignal[] {
   const mover = fallbackMover ?? story.movers[0];
   const discovery = fallbackDiscovery ?? story.discoveries[0];
   const comeback = fallbackComeback ?? story.comebacks[0];
   const rhythm = story.rhythm;
 
-  if (!mover && !discovery && !comeback && !rhythm.peak_hour_label) return null;
+  if (!mover && !discovery && !comeback && !rhythm.peak_hour_label) {
+    return [];
+  }
 
-  return (
-    <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <StorySignalCard
-        label={t("stats.story.rising")}
-        title={mover?.artist_name || t("stats.story.noSurge")}
-        body={
-          mover?.delta_play_count
-            ? t("stats.story.risingBody", {
-                count: mover.delta_play_count,
-              })
-            : t("stats.story.risingFallback")
-        }
-      />
-      <StorySignalCard
-        label={t("stats.story.newBlood")}
-        title={discovery?.artist_name || t("stats.story.noNewObsession")}
-        body={
-          discovery
-            ? t("stats.story.discoveryBody", {
-                count: discovery.play_count,
-              })
-            : t("stats.story.discoveryFallback")
-        }
-      />
-      <StorySignalCard
-        label={t("stats.story.comeback")}
-        title={comeback?.artist_name || t("stats.story.noComeback")}
-        body={
-          comeback
-            ? t("stats.story.comebackBody", {
-                count: comeback.play_count,
-              })
-            : t("stats.story.comebackFallback")
-        }
-      />
-      <StorySignalCard
-        label={t("stats.story.peakRitual")}
-        title={
-          rhythm.peak_hour_label ||
-          rhythm.peak_weekday ||
-          t("stats.story.noRhythm")
-        }
-        body={
-          rhythm.peak_weekday
-            ? t("stats.story.rhythmBody", {
-                weekday: formatWeekdayLabel(rhythm.peak_weekday, i18n.language),
-                hour: rhythm.peak_hour_label ?? t("stats.story.peakHour"),
-              })
-            : t("stats.story.rhythmFallback")
-        }
-      />
-    </section>
-  );
+  return [
+    {
+      key: "rising",
+      label: t("stats.story.rising"),
+      title: mover?.artist_name || t("stats.story.noSurge"),
+      body: mover?.delta_play_count
+        ? t("stats.story.risingBody", { count: mover.delta_play_count })
+        : t("stats.story.risingFallback"),
+    },
+    {
+      key: "new-blood",
+      label: t("stats.story.newBlood"),
+      title: discovery?.artist_name || t("stats.story.noNewObsession"),
+      body: discovery
+        ? t("stats.story.discoveryBody", { count: discovery.play_count })
+        : t("stats.story.discoveryFallback"),
+    },
+    {
+      key: "comeback",
+      label: t("stats.story.comeback"),
+      title: comeback?.artist_name || t("stats.story.noComeback"),
+      body: comeback
+        ? t("stats.story.comebackBody", { count: comeback.play_count })
+        : t("stats.story.comebackFallback"),
+    },
+    {
+      key: "peak-ritual",
+      label: t("stats.story.peakRitual"),
+      title:
+        rhythm.peak_hour_label ||
+        rhythm.peak_weekday ||
+        t("stats.story.noRhythm"),
+      body: rhythm.peak_weekday
+        ? t("stats.story.rhythmBody", {
+            weekday: formatWeekdayLabel(rhythm.peak_weekday, locale),
+            hour: rhythm.peak_hour_label ?? t("stats.story.peakHour"),
+          })
+        : t("stats.story.rhythmFallback"),
+    },
+  ];
 }
 
 function StorySignalCard({
@@ -508,8 +576,8 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 
 function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
   const covers = tracks
-    .map((track) =>
-      albumCoverApiUrl(
+    .flatMap((track) => {
+      const cover = albumCoverApiUrl(
         {
           albumId: track.album_id,
           globalAlbumUid: track.global_album_uid,
@@ -518,18 +586,18 @@ function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
           albumName: track.album,
         },
         { size: 512 },
-      ),
-    )
-    .filter(Boolean)
+      );
+      return cover ? [cover] : [];
+    })
     .slice(0, 8);
 
   return (
     <div className="absolute inset-0 grid grid-cols-2 opacity-80 sm:grid-cols-4">
-      {Array.from({ length: 8 }).map((_, index) => {
+      {STATS_MOSAIC_CELL_IDS.map((cellId, index) => {
         const cover = covers[index % Math.max(covers.length, 1)];
         return (
           <div
-            key={index}
+            key={cellId}
             className={cn(
               "stats-mosaic-cell relative min-h-40 overflow-hidden",
               index % 3 === 0 && "scale-105",
@@ -610,7 +678,7 @@ function ReplayCard({
         ) : items.length ? (
           items.slice(0, 5).map((item, index) => (
             <button
-              key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
+              key={statsTrackKey(item)}
               onClick={() => onPlayTrack(item)}
               className="stats-replay-row flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
             >
@@ -1162,7 +1230,7 @@ function TopTracksPanel({
         ) : items.length ? (
           items.map((item, index) => (
             <button
-              key={`${item.track_id ?? item.track_path ?? item.title}-${index}`}
+              key={statsTrackKey(item)}
               onClick={() => onPlayTrack(item)}
               className="stats-list-row group flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
             >
@@ -1218,7 +1286,7 @@ function TopArtistsPanel({
             .slice(0, 6)
             .map((item, index) => (
               <TopArtistCard
-                key={`${item.artist_name}-${index}`}
+                key={statsArtistKey(item)}
                 item={item}
                 index={index}
               />
@@ -1306,7 +1374,7 @@ function TopAlbumsPanel({
         ) : items.length ? (
           items.slice(0, 12).map((item, index) => (
             <Link
-              key={`${item.artist}-${item.album}-${index}`}
+              key={statsAlbumKey(item)}
               to={albumPagePath({
                 albumId: item.album_id,
                 globalAlbumUid: item.global_album_uid,
