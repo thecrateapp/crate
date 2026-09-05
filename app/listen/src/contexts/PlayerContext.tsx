@@ -18,11 +18,6 @@ import {
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
-import {
-  setLoop as gpSetLoop,
-  setSingleMode as gpSetSingleMode,
-  setVolume as gpSetVolume,
-} from "@/lib/gapless-player";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
 import { usePlayEventTracker } from "@/contexts/use-play-event-tracker";
@@ -70,6 +65,7 @@ import { usePlayerPreferenceRuntime } from "@/contexts/use-player-preference-run
 import { usePlayerIntelligenceActions } from "@/contexts/use-player-intelligence-actions";
 import { usePlayerTrackRecovery } from "@/contexts/use-player-track-recovery";
 import { usePlayerLifecycleRuntime } from "@/contexts/use-player-lifecycle-runtime";
+import { usePlayerEnginePreferenceRuntime } from "@/contexts/use-player-engine-preference-runtime";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -185,25 +181,17 @@ function usePlayerProviderRuntime(children: ReactNode) {
     commitIsBuffering,
   } = usePlayerRuntimeState();
 
-  // queue, currentIndex, currentTrack, currentTime, duration, isPlaying are
-  // kept in sync with their refs by their respective commit* helpers.
-  // Only repeat, shuffle and playSource use setState directly, so mirror
-  // them into refs here.
-  useEffect(() => {
-    repeatRef.current = repeat;
-    shuffleRef.current = shuffle;
-    playSourceRef.current = playSource;
-    smartCrossfadeEnabledRef.current = smartCrossfadeEnabled;
-  }, [
+  usePlayerEnginePreferenceRuntime({
     playSource,
     repeat,
     shuffle,
     smartCrossfadeEnabled,
+    volume,
     playSourceRef,
     repeatRef,
     shuffleRef,
     smartCrossfadeEnabledRef,
-  ]);
+  });
 
   usePlaybackPersistence({
     queue,
@@ -555,17 +543,6 @@ function usePlayerProviderRuntime(children: ReactNode) {
     setAnalyserVersion,
     setCrossfadeTransition,
   });
-
-  // Engine already booted synchronously at render body; initialize
-  // volume from the stored preference.
-  useEffect(() => {
-    gpSetVolume(volume);
-  }, [volume]);
-
-  useEffect(() => {
-    gpSetLoop(repeat === "all");
-    gpSetSingleMode(repeat === "one");
-  }, [repeat]);
 
   // NOTE: no gpSetShuffle effect. Shuffle is handled in React by reordering
   // the queue in toggleShuffle(); the engine always plays sequentially.
