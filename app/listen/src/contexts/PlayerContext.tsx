@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 
-import type { Track } from "@/contexts/player-types";
 import {
   PlayerActionsContext,
   PlayerProgressContext,
@@ -22,12 +21,9 @@ import {
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
-  addTrack as gpAddTrack,
   destroyPlayer as gpDestroyPlayer,
   getTrackIndex as gpGetTrackIndex,
   getTracks as gpGetTracks,
-  gotoTrack as gpGotoTrack,
-  insertTrack as gpInsertTrack,
   loadQueue as gpLoadQueue,
   play as gpPlay,
   replaceTrack as gpReplaceTrack,
@@ -38,7 +34,6 @@ import {
 } from "@/lib/gapless-player";
 import {
   toFreshEngineTrack,
-  toFreshEngineTracks,
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -97,6 +92,7 @@ import { buildPlaybackStatePayload } from "@/lib/remote-playback-state";
 import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime";
 import { useJamQueueSession } from "@/contexts/use-jam-queue-session";
 import { usePlayerPreferenceRuntime } from "@/contexts/use-player-preference-runtime";
+import { usePlayerIntelligenceActions } from "@/contexts/use-player-intelligence-actions";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -565,191 +561,24 @@ function usePlayerProviderRuntime(children: ReactNode) {
       });
   }, [buildEngineUrls, currentIndexRef, queueRef, repeatRef]);
 
-  // Domain-level actions for usePlaybackIntelligence. Verb-oriented
-  // instead of raw state setters — the hook no longer needs to reason
-  // about engine sync, de-duplication or playback sequencing.
-  const appendIntelligenceTracks = useCallback(
-    (tracks: Track[]) => {
-      const queue = queueRef.current;
-      const existingKeys = new Set(
-        [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
-      );
-      const unique: Track[] = [];
-      for (const track of tracks) {
-        const key = getTrackCacheKey(track);
-        if (!key || existingKeys.has(key)) continue;
-        existingKeys.add(key);
-        unique.push(track);
-      }
-      if (unique.length === 0) return;
-
-      const nextQueue = [...queue, ...unique];
-      const nativePlayerActive = shouldUseAndroidNativePlayer();
-      if (nativePlayerActive) {
-        void (async () => {
-          const engineTracks = await toFreshEngineTracks(unique, undefined, {
-            target: "android-native",
-          });
-          return androidNativeEngine.appendTracks(engineTracks);
-        })().catch((error) => {
-          console.error(
-            "[native-player] failed to append intelligence tracks:",
-            error,
-          );
-        });
-      } else {
-        for (const track of unique) {
-          gpAddTrack(registerEngineTrack(track));
-        }
-      }
-      commitQueue(nextQueue);
-
-      // Keep the un-shuffled snapshot in sync so restoring original order
-      // later (toggle shuffle off / reload after shuffle-on session) doesn't
-      // silently drop radio-refill or continuation tracks fetched while
-      // shuffle was active.
-      if (unshuffledQueueRef.current) {
-        unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...unique];
-      }
-    },
-    [
-      commitQueue,
-      queueRef,
-      recentlyPlayed,
-      registerEngineTrack,
-      unshuffledQueueRef,
-    ],
-  );
-
-  const insertSuggestionAfterCurrent = useCallback(
-    (candidates: Track[]) => {
-      const queue = queueRef.current;
-      const insertionIndex = currentIndexRef.current + 1;
-      if (insertionIndex <= 0 || insertionIndex > queue.length) return;
-      if (queue[insertionIndex]?.isSuggested) return;
-
-      const existingKeys = new Set(
-        [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
-      );
-      const suggestion = candidates.find((t) => {
-        const k = getTrackCacheKey(t);
-        return !!k && !existingKeys.has(k);
-      });
-      if (!suggestion) return;
-
-      const marked: Track = {
-        ...suggestion,
-        isSuggested: true,
-        suggestionSource: "playlist",
-      };
-      const nextQueue = [...queue];
-      nextQueue.splice(insertionIndex, 0, marked);
-      if (shouldUseAndroidNativePlayer()) {
-        void (async () => {
-          const engineTrack = await toFreshEngineTrack(marked, undefined, {
-            target: "android-native",
-          });
-          return androidNativeEngine.insertTrack(insertionIndex, engineTrack);
-        })().catch((error) => {
-          console.error(
-            "[native-player] failed to insert suggested track:",
-            error,
-          );
-        });
-      } else {
-        gpInsertTrack(insertionIndex, registerEngineTrack(marked));
-      }
-      commitQueue(nextQueue);
-
-      // Mirror into the un-shuffled snapshot. We don't know where the
-      // suggestion would live in the original sequence, so we append it
-      // at the end — good enough for restore fidelity (no track lost).
-      if (unshuffledQueueRef.current) {
-        unshuffledQueueRef.current = [...unshuffledQueueRef.current, marked];
-      }
-    },
-    [
-      commitQueue,
-      currentIndexRef,
-      queueRef,
-      recentlyPlayed,
-      registerEngineTrack,
-      unshuffledQueueRef,
-    ],
-  );
-
-  const appendAndAdvance = useCallback(
-    (tracks: Track[]) => {
-      const queue = queueRef.current;
-      const existingKeys = new Set(
-        [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
-      );
-      const unique: Track[] = [];
-      for (const track of tracks) {
-        const key = getTrackCacheKey(track);
-        if (!key || existingKeys.has(key)) continue;
-        existingKeys.add(key);
-        unique.push(track);
-      }
-      if (unique.length === 0) {
-        commitIsBuffering(false);
-        return;
-      }
-
-      const nextQueue = [...queue, ...unique];
-      const nativePlayerActive = shouldUseAndroidNativePlayer();
-      if (nativePlayerActive) {
-        void (async () => {
-          const engineTracks = await toFreshEngineTracks(unique, undefined, {
-            target: "android-native",
-          });
-          await androidNativeEngine.appendTracks(engineTracks);
-          return androidNativeEngine.jumpTo(queue.length, true);
-        })().catch((error) => {
-          console.error("[native-player] failed to append and advance:", error);
-        });
-      } else {
-        for (const track of unique) {
-          gpAddTrack(registerEngineTrack(track));
-        }
-      }
-      commitQueue(nextQueue);
-
-      // Mirror into the un-shuffled snapshot so shuffle-off/reload
-      // doesn't drop the freshly-fetched continuation tracks.
-      if (unshuffledQueueRef.current) {
-        unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...unique];
-      }
-
-      // Advance to the first newly appended track. The old session is
-      // ending by user request (they hit next at the end of the album),
-      // so flush it explicitly before starting the new one.
-      const nextIndex = queue.length;
-      const outgoing = queueRef.current[currentIndexRef.current];
-      flushCurrentPlayEvent("skipped", outgoing);
-      if (!nativePlayerActive) {
-        gpGotoTrack(nextIndex, true);
-      }
-      advanceCursorTo(nextIndex);
-      const incoming = nextQueue[nextIndex];
-      if (incoming) startTrackerSession(incoming, playSourceRef.current);
-      commitIsPlaying(true);
-    },
-    [
-      advanceCursorTo,
-      commitIsBuffering,
-      commitIsPlaying,
-      commitQueue,
-      flushCurrentPlayEvent,
-      currentIndexRef,
-      queueRef,
-      recentlyPlayed,
-      registerEngineTrack,
-      unshuffledQueueRef,
-      playSourceRef,
-      startTrackerSession,
-    ],
-  );
+  const {
+    appendAndAdvance,
+    appendIntelligenceTracks,
+    insertSuggestionAfterCurrent,
+  } = usePlayerIntelligenceActions({
+    advanceCursorTo,
+    commitIsBuffering,
+    commitIsPlaying,
+    commitQueue,
+    currentIndexRef,
+    flushCurrentPlayEvent,
+    playSourceRef,
+    queueRef,
+    recentlyPlayed,
+    registerEngineTrack,
+    startTrackerSession,
+    unshuffledQueueRef,
+  });
 
   const { continueInfinitePlayback, resetPlaybackIntelligence } =
     usePlaybackIntelligence({
