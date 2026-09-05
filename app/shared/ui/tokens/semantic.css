@@ -965,12 +965,17 @@
   --color-text-subtle: var(--text-subtle);
   --color-text-faint: var(--text-faint);
   --color-text-secondary-strong: var(--text-secondary-strong);
+  --color-text-muted-strong: var(--text-muted-strong);
+  --color-text-meta: var(--text-meta);
+  --color-text-quiet: var(--text-quiet);
+  --color-text-hero: var(--text-hero);
   --color-text-accent: var(--text-accent);
   --color-surface-canvas: var(--surface-canvas);
   --color-surface-container: var(--surface-container);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
   --color-surface-chrome: var(--surface-chrome);
+  --color-surface-canvas-overlay: var(--surface-canvas-overlay);
   --color-surface-quiet: var(--surface-quiet);
   --color-surface-quiet-subtle: var(--surface-quiet-subtle);
   --color-surface-control: var(--surface-control);
