@@ -275,9 +275,15 @@ export function HomeSection() {
 
       {data.id === "recommended-tracks" ? (
         <div className="space-y-2">
-          {recommendedTracks.map((track, index) => (
+          {recommendedTracks.map((track) => (
             <TrackRow
-              key={track.id ?? `${track.path}-${index}`}
+              key={
+                track.id ??
+                track.global_track_uid ??
+                track.entity_uid ??
+                track.path ??
+                [track.artist, track.album, track.title].join(":")
+              }
               track={track}
               showArtist
               showAlbum
