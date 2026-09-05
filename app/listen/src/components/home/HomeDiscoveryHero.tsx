@@ -1,20 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ArtistHeroFrame,
-  type ArtistHeroArtworkBounds,
-} from "@crate/ui/domain/ArtistHeroFrame";
+import { ArtistHeroFrame } from "@crate/ui/domain/ArtistHeroFrame";
 import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
-import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  Play,
 } from "@crate/ui/icons";
 
-import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { preloadArtwork } from "@/lib/artwork-manager";
@@ -31,6 +25,7 @@ import {
   legacyHeroBackgroundSrc,
   requestBackgroundWork,
 } from "./home-hero-utils";
+import { HeroActions, HeroBackdrop, HeroGenres } from "./HomeHeroContent";
 
 function useHeroBackgroundPreloader(
   heroes: HomeHeroArtist[],
@@ -587,121 +582,6 @@ function LegacyDesktopHeroNavigation({
       >
         <ChevronRight size={18} />
       </button>
-    </div>
-  );
-}
-
-function HeroBackdrop({
-  hero,
-  backgroundSrc,
-  composition,
-  artworkBounds,
-}: {
-  hero: HomeHeroArtist;
-  backgroundSrc?: string;
-  composition: "desktop" | "mobile";
-  artworkBounds?: ArtistHeroArtworkBounds;
-}) {
-  // A persisted hero already contains the worker's treatment. Applying a
-  // second browser filter here would make Admin and Home render different
-  // pixels, especially for derived compositions.
-  const grayscale =
-    !hero.artwork_revision && hero.artwork_provenance !== "specific";
-  const usesExtendedCanvas =
-    artworkBounds &&
-    (artworkBounds.left !== 0 ||
-      artworkBounds.top !== 0 ||
-      artworkBounds.right !== 1 ||
-      artworkBounds.bottom !== 1);
-
-  if (!backgroundSrc) return null;
-
-  return (
-    <CrateImage
-      data-testid={`${composition}-hero-artwork`}
-      src={backgroundSrc}
-      retryPolicy="eventual"
-      alt=""
-      aria-hidden="true"
-      decoding="async"
-      className={cn(
-        "absolute inset-0 h-full w-full transition-opacity duration-500",
-        usesExtendedCanvas ? "object-fill" : "object-cover object-center",
-        grayscale ? "grayscale" : "",
-      )}
-    />
-  );
-}
-
-function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
-  const genres = hero.genres?.flatMap((name) => (name ? [{ name }] : [])) ?? [];
-
-  if (genres.length === 0) return null;
-
-  return (
-    <div className="mt-4 flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
-      {genres.slice(0, 2).map((genre) => (
-        <GenrePill
-          key={genre.name}
-          item={genre}
-          className="home-hero-genre max-w-[42vw] backdrop-blur-sm sm:max-w-none"
-        />
-      ))}
-    </div>
-  );
-}
-
-function HeroActions({
-  hero,
-  following,
-  onPlay,
-  onToggleFollow,
-}: {
-  hero: HomeHeroArtist;
-  following: boolean;
-  onPlay: () => void;
-  onToggleFollow: () => void;
-}) {
-  const { t } = useTranslation();
-
-  const playLabel = t("home.hero.playArtist", { name: hero.name });
-  const followLabel = t(
-    following ? "actions.artist.unfollowNamed" : "actions.artist.followNamed",
-    { name: hero.name },
-  );
-
-  return (
-    <div className="mt-6 flex items-center gap-2.5">
-      <button
-        type="button"
-        aria-label={playLabel}
-        className={cn(
-          "home-discovery-play-button inline-flex h-11 items-center justify-center gap-2 rounded-md font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90",
-          "px-5",
-        )}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onPlay();
-        }}
-      >
-        <Play size={17} fill="currentColor" />
-        <span>{t("home.hero.playCta")}</span>
-      </button>
-      <FollowHeartButton
-        aria-label={followLabel}
-        className={cn(
-          "home-hero-follow inline-flex h-11 w-11 items-center justify-center rounded-md border-0 bg-transparent transition-colors hover:bg-transparent",
-        )}
-        following={following}
-        heartTestId="hero-follow-heart"
-        particlesTestId="hero-follow-particles"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onToggleFollow();
-        }}
-      />
     </div>
   );
 }
