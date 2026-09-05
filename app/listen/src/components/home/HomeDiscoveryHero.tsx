@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ARTIST_HERO_DESKTOP_SIZE,
-  ARTIST_HERO_MOBILE_SIZE,
   ArtistHeroFrame,
   type ArtistHeroArtworkBounds,
 } from "@crate/ui/domain/ArtistHeroFrame";
@@ -19,113 +17,20 @@ import {
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { CrateImage } from "@/components/artwork/CrateImage";
-import {
-  canonicalArtworkTransportIdentity,
-  preloadArtwork,
-} from "@/lib/artwork-manager";
+import { preloadArtwork } from "@/lib/artwork-manager";
 import { artworkFromUrl } from "@/lib/artwork-source";
-import { artistBackgroundApiUrl, artistHeroApiUrl } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 
 import type { HomeDiscoveryHeroSurfaces, HomeHeroArtist } from "./home-model";
-
-const HERO_BACKGROUND_VERSION = "home-just-landed-v1";
-
-function dedupeHeroArtists(heroes: HomeHeroArtist[]): HomeHeroArtist[] {
-  const seen = new Set<string>();
-  return heroes.filter((hero) => {
-    const name = hero.name?.trim().replace(/\s+/g, " ").toLowerCase();
-    const key = name || hero.entity_uid || String(hero.id);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function heroSelectionKey(hero: HomeHeroArtist): string {
-  return hero.entity_uid || String(hero.id);
-}
-
-function heroBackgroundSrc(
-  hero: HomeHeroArtist,
-  composition: "desktop" | "mobile",
-): string | undefined {
-  const canonical = hero.hero_compositions?.[composition];
-  const backgroundUrl = artistHeroApiUrl(
-    {
-      artistId: hero.id,
-      artistEntityUid: hero.entity_uid,
-      artistSlug: hero.slug,
-      artistName: hero.name,
-    },
-    composition,
-    {
-      size:
-        canonical?.width ??
-        (composition === "desktop"
-          ? ARTIST_HERO_DESKTOP_SIZE.width
-          : ARTIST_HERO_MOBILE_SIZE.width),
-      version:
-        canonical?.render_revision ||
-        hero.artwork_revision ||
-        HERO_BACKGROUND_VERSION,
-    },
-  );
-  return backgroundUrl || undefined;
-}
-
-function heroArtworkBounds(
-  hero: HomeHeroArtist,
-  composition: "desktop" | "mobile",
-): ArtistHeroArtworkBounds | undefined {
-  return (
-    hero.hero_compositions?.[composition]?.bounds ||
-    (composition === "desktop"
-      ? hero.desktop_artwork_bounds
-      : hero.mobile_artwork_bounds)
-  );
-}
-
-function legacyHeroBackgroundSrc(
-  hero: HomeHeroArtist,
-  composition: "desktop" | "mobile",
-): string | undefined {
-  const backgroundUrl = artistBackgroundApiUrl(
-    {
-      artistId: hero.id,
-      artistEntityUid: hero.entity_uid,
-      artistSlug: hero.slug,
-      artistName: hero.name,
-    },
-    {
-      size:
-        composition === "desktop"
-          ? ARTIST_HERO_DESKTOP_SIZE.width
-          : ARTIST_HERO_MOBILE_SIZE.width,
-      version: HERO_BACKGROUND_VERSION,
-    },
-  );
-  return backgroundUrl || undefined;
-}
-
-function requestBackgroundWork(callback: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const idleWindow = window as Window & {
-    requestIdleCallback?: (
-      cb: () => void,
-      options?: { timeout: number },
-    ) => number;
-    cancelIdleCallback?: (handle: number) => void;
-  };
-
-  if (idleWindow.requestIdleCallback) {
-    const handle = idleWindow.requestIdleCallback(callback, { timeout: 1500 });
-    return () => idleWindow.cancelIdleCallback?.(handle);
-  }
-
-  const handle = window.setTimeout(callback, 600);
-  return () => window.clearTimeout(handle);
-}
+import {
+  dedupeHeroArtists,
+  heroArtworkBounds,
+  heroBackgroundSrc,
+  heroSelectionKey,
+  homeHeroArtworkLogicalKey,
+  legacyHeroBackgroundSrc,
+  requestBackgroundWork,
+} from "./home-hero-utils";
 
 function useHeroBackgroundPreloader(
   heroes: HomeHeroArtist[],
@@ -176,7 +81,7 @@ function useHeroBackgroundPreloader(
       started.add(src);
       void preloadArtwork(
         artworkFromUrl(src, {
-          logicalKey: `home-hero:${canonicalArtworkTransportIdentity(src)}`,
+          logicalKey: homeHeroArtworkLogicalKey(src),
         }),
         { fetchPriority: priority, signal: controller.signal },
       )
