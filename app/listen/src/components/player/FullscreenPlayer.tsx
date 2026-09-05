@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-} from "react";
+import { useRef } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { getPlaySourceLabel } from "@/components/player/player-source";
@@ -13,11 +7,6 @@ import { useFullscreenPlayerLyrics } from "@/components/player/useFullscreenPlay
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
-import {
-  getPlayerSurfaceModePreference,
-  PLAYER_VIZ_PREFS_EVENT,
-  type PlayerSurfaceMode,
-} from "@/lib/player-visualizer-prefs";
 import { artistPagePath } from "@/lib/library-routes";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
@@ -25,17 +14,10 @@ import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
 } from "@/hooks/use-crossfade-progress";
-import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
-import type { FSPanel } from "@/components/player/fullscreen-player-types";
 import { useFullscreenPlayerActions } from "@/components/player/useFullscreenPlayerActions";
 import { useFullscreenPlayerGestures } from "@/components/player/useFullscreenPlayerGestures";
+import { useFullscreenPlayerLifecycle } from "@/components/player/useFullscreenPlayerLifecycle";
 import { FullscreenPlayerView } from "@/components/player/FullscreenPlayerView";
-
-function getMobileSurfaceModePreference(): PlayerSurfaceMode {
-  const mode = getPlayerSurfaceModePreference();
-  return mode === "visualizer" ? "cd" : mode;
-}
 
 interface FullscreenPlayerProps {
   open: boolean;
@@ -87,15 +69,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     ? "commit"
     : "live";
 
-  const [activePanel, setActivePanel] = useState<FSPanel | null>(null);
-  const [surfaceMode, setSurfaceMode] = useState<PlayerSurfaceMode>(
-    getMobileSurfaceModePreference,
-  );
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const activeLyricRef = useRef<HTMLButtonElement>(null);
-  const [visible, setVisible] = useState(false);
-  const [animating, setAnimating] = useState(false);
-  const [showEqualizer, setShowEqualizer] = useState(false);
   const { resolvedArtist, artistAvatarUrl, markArtistPhotoFailed } =
     useResolvedPlayerArtist(currentTrack, queue);
   const sourceLabel = getPlaySourceLabel(playSource);
@@ -113,12 +88,23 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   const fsRootRef = useRef<HTMLDivElement>(null);
   const equalizerRef = useRef<HTMLDivElement>(null);
   const equalizerButtonRef = useRef<HTMLButtonElement>(null);
+  const {
+    activePanel,
+    animating,
+    resetClosedUi,
+    setActivePanel,
+    setShowEqualizer,
+    setSurfaceMode,
+    showEqualizer,
+    surfaceMode,
+    visible,
+  } = useFullscreenPlayerLifecycle({
+    equalizerButtonRef,
+    equalizerRef,
+    onClose,
+    open,
+  });
   const isCdMode = surfaceMode === "cd";
-  const resetClosedUi = useCallback(() => {
-    setActivePanel(null);
-    setShowEqualizer(false);
-    onClose();
-  }, [onClose]);
 
   const { activeLyricIndex, lyrics } = useFullscreenPlayerLyrics({
     activeLyricRef,
@@ -163,34 +149,6 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       onClose: resetClosedUi,
     });
 
-  // Animate in/out
-  useEffect(() => {
-    if (open) {
-      setVisible(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => setAnimating(true));
-      });
-    } else {
-      setAnimating(false);
-      const timer = setTimeout(() => setVisible(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
-
-  useEscapeKey(visible, (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (showEqualizer) {
-      setShowEqualizer(false);
-      return;
-    }
-    if (activePanel !== null) {
-      setActivePanel(null);
-      return;
-    }
-    resetClosedUi();
-  });
-
   function goToArtist() {
     const targetArtist = resolvedArtist;
     if (!targetArtist?.id && !targetArtist?.globalArtistUid) return;
@@ -210,52 +168,6 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
           }),
     );
   }
-
-  useEffect(() => {
-    const syncSurfaceMode = () =>
-      setSurfaceMode(getMobileSurfaceModePreference());
-    window.addEventListener("storage", syncSurfaceMode);
-    window.addEventListener(
-      PLAYER_VIZ_PREFS_EVENT,
-      syncSurfaceMode as EventListener,
-    );
-    return () => {
-      window.removeEventListener("storage", syncSurfaceMode);
-      window.removeEventListener(
-        PLAYER_VIZ_PREFS_EVENT,
-        syncSurfaceMode as EventListener,
-      );
-    };
-  }, []);
-
-  useDismissibleLayer({
-    active: visible && showEqualizer,
-    refs: [equalizerRef, equalizerButtonRef],
-    onDismiss: () => {
-      setShowEqualizer(false);
-    },
-    closeOnEscape: false,
-  });
-
-  const handleNativeBack = useEffectEvent((event: Event) => {
-    event.preventDefault();
-    if (showEqualizer) {
-      setShowEqualizer(false);
-      return;
-    }
-    if (activePanel !== null) {
-      setActivePanel(null);
-      return;
-    }
-    resetClosedUi();
-  });
-
-  useEffect(() => {
-    if (!visible) return;
-    window.addEventListener("crate:native-back", handleNativeBack);
-    return () =>
-      window.removeEventListener("crate:native-back", handleNativeBack);
-  }, [visible]);
 
   if (!visible || !currentTrack) return null;
 
