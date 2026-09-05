@@ -50,4 +50,4 @@ jobs:
         with:
           directory: "."
           project: "app/shared/ui,app/ui,app/listen,app/listen-desktop,app/docs,app/site"
-          scope: full
+          scope: changed
