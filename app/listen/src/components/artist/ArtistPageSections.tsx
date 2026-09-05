@@ -165,15 +165,20 @@ function releaseCategory(album: ArtistAlbum): ArtistReleaseCategory {
   return "album";
 }
 
-function ArtistAlbumItem({
-  album,
-  artistName,
-  artistSlug,
-}: {
-  album: ArtistAlbum;
-  artistName: string;
-  artistSlug?: string;
-}) {
+interface ArtistAlbumPresentation {
+  globalAlbumUid: string | null;
+  localAlbumId?: number;
+  cover?: string;
+  coverSrcSet?: string;
+  albumName: string;
+  coverRouteInput: Parameters<typeof albumCoverApiUrl>[0];
+}
+
+function buildArtistAlbumPresentation(
+  album: ArtistAlbum,
+  artistName: string,
+  artistSlug?: string,
+): ArtistAlbumPresentation {
   const globalAlbumUid =
     album.global_album_uid ??
     album.global_uid ??
@@ -207,57 +212,119 @@ function ArtistAlbumItem({
         albumCoverApiUrl(coverRouteInput, { size }),
       );
 
-  if (globalAlbumUid) {
-    return (
-      <Link
-        to={albumPagePath({
-          albumId: localAlbumId,
-          globalAlbumUid,
-          albumSlug: album.slug,
-          artistSlug,
-          artistName,
-          albumName: album.display_name || album.name,
-        })}
-        className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-text-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-      >
-        <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-text-primary/5">
-          {cover ? (
-            <CrateImage
-              src={cover}
-              srcSet={coverSrcSet}
-              sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 20vw"
-              alt={album.display_name || album.name}
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Disc3 size={32} className="text-text-primary/25" />
-            </div>
-          )}
+  return {
+    globalAlbumUid,
+    localAlbumId,
+    cover,
+    coverSrcSet,
+    albumName: album.display_name || album.name,
+    coverRouteInput,
+  };
+}
+
+function ArtistAlbumArtwork({
+  album,
+  cover,
+  coverSrcSet,
+}: {
+  album: ArtistAlbum;
+  cover?: string;
+  coverSrcSet?: string;
+}) {
+  return (
+    <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-text-primary/5">
+      {cover ? (
+        <CrateImage
+          src={cover}
+          srcSet={coverSrcSet}
+          sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 20vw"
+          alt={album.display_name || album.name}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <Disc3 size={32} className="text-text-primary/25" />
         </div>
-        <p className="truncate text-sm font-medium text-text-primary">
-          {album.display_name || album.name}
-        </p>
-        <p className="truncate text-xs text-text-muted">
-          {album.year
-            ? `${album.year.slice(0, 4)} · ${artistName}`
-            : artistName}
-        </p>
-      </Link>
+      )}
+    </div>
+  );
+}
+
+function ArtistGlobalAlbumItem({
+  album,
+  artistName,
+  artistSlug,
+  presentation,
+}: {
+  album: ArtistAlbum;
+  artistName: string;
+  artistSlug?: string;
+  presentation: ArtistAlbumPresentation;
+}) {
+  return (
+    <Link
+      to={albumPagePath({
+        albumId: presentation.localAlbumId,
+        globalAlbumUid: presentation.globalAlbumUid!,
+        albumSlug: album.slug,
+        artistSlug,
+        artistName,
+        albumName: presentation.albumName,
+      })}
+      className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-text-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+    >
+      <ArtistAlbumArtwork
+        album={album}
+        cover={presentation.cover}
+        coverSrcSet={presentation.coverSrcSet}
+      />
+      <p className="truncate text-sm font-medium text-text-primary">
+        {presentation.albumName}
+      </p>
+      <p className="truncate text-xs text-text-muted">
+        {album.year ? `${album.year.slice(0, 4)} · ${artistName}` : artistName}
+      </p>
+    </Link>
+  );
+}
+
+function ArtistAlbumItem({
+  album,
+  artistName,
+  artistSlug,
+}: {
+  album: ArtistAlbum;
+  artistName: string;
+  artistSlug?: string;
+}) {
+  const presentation = buildArtistAlbumPresentation(
+    album,
+    artistName,
+    artistSlug,
+  );
+
+  if (presentation.globalAlbumUid) {
+    return (
+      <ArtistGlobalAlbumItem
+        album={album}
+        artistName={artistName}
+        artistSlug={artistSlug}
+        presentation={presentation}
+      />
     );
   }
 
   return (
     <AlbumCard
       artist={artistName}
-      album={album.display_name || album.name}
-      albumId={localAlbumId}
+      album={presentation.albumName}
+      albumId={presentation.localAlbumId}
       albumSlug={album.slug}
       artistSlug={artistSlug}
       year={album.year?.slice(0, 4)}
-      cover={cover}
+      cover={presentation.cover}
       isPreRelease={album.is_pre_release}
       releaseDate={album.release_date}
       layout="grid"
