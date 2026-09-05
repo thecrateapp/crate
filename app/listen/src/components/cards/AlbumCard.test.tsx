@@ -99,9 +99,7 @@ describe("AlbumCard", () => {
     expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);
     expect(image.getAttribute("srcset")).toMatch(/size=320[^,]* 320w/);
     expect(image.getAttribute("srcset")).toMatch(/format=webp/);
-    expect(image.closest('[role="button"]')).toHaveClass(
-      "listen-deferred-grid-item",
-    );
+    expect(image.closest("article")).toHaveClass("listen-deferred-grid-item");
   });
 
   it("opens the desktop action menu when the album only has stable route identifiers", async () => {
@@ -114,7 +112,7 @@ describe("AlbumCard", () => {
       />,
     );
 
-    const card = screen.getByText("Inlet").closest('[role="button"]');
+    const card = screen.getByText("Inlet").closest("article");
     expect(card).not.toBeNull();
 
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
