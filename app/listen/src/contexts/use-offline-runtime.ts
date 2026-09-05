@@ -14,7 +14,7 @@ import type {
   OfflinePlaylistInput,
   OfflineTrackInput,
 } from "@/contexts/offline-context";
-import { onAppResume, isNative } from "@/lib/capacitor";
+import { isNative } from "@/lib/capacitor";
 import { getCurrentServer } from "@/lib/server-store";
 import {
   type OfflineItemKind,
@@ -30,7 +30,6 @@ import {
   getOfflineTrackAssetKey,
   getOfflineTrackManifestPaths,
   hydrateOfflineProfileState,
-  isOfflineBusy,
   isOfflineSupported,
   saveOfflineSnapshot,
   setActiveOfflineProfileKey,
@@ -42,6 +41,7 @@ import {
   type CoalescedOfflineWriter,
 } from "@/lib/offline-scheduler";
 import { useOfflineManifestSync } from "@/contexts/use-offline-manifest-sync";
+import { useOfflineSynchronization } from "@/contexts/use-offline-synchronization";
 
 const EMPTY_SNAPSHOT: OfflineSnapshot = { items: {} };
 const EMPTY_SUMMARY: OfflineSummary = {
@@ -114,11 +114,9 @@ function findTrackOfflineItem(
 export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   const supported = isOfflineSupported();
   const [snapshot, setSnapshot] = useState<OfflineSnapshot>(EMPTY_SNAPSHOT);
-  const [syncing, setSyncing] = useState(false);
   const snapshotRef = useRef<OfflineSnapshot>(EMPTY_SNAPSHOT);
   const queue = useMemo(() => Promise.resolve(), []);
   const queueRef = useRef(queue);
-  const resumedProfileRef = useRef<string | null>(null);
   const persistenceRef = useRef<{
     profileKey: string | null;
     writer: CoalescedOfflineWriter<OfflineSnapshot>;
@@ -162,7 +160,6 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   // cleanup is intentional rather than a stale-closure bug.
   // react-doctor-disable-next-line exhaustive-deps
   useEffect(() => {
-    resumedProfileRef.current = null;
     let cancelled = false;
     setActiveOfflineProfileKey(profileKey);
     void syncOfflineProfileToServiceWorker(profileKey);
@@ -199,6 +196,16 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     transferAbortRef,
   });
 
+  const { syncing, syncAll } = useOfflineSynchronization({
+    enqueue,
+    profileKey,
+    snapshot,
+    snapshotRef,
+    supported,
+    syncManifestIntoItem,
+    transferAbortRef,
+  });
+
   const removeOfflineItem = useCallback(
     async (kind: OfflineItemKind, entityId: string | number) => {
       if (!supported || !profileKey) return;
@@ -224,115 +231,6 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     },
     [commitSnapshot, profileKey, supported],
   );
-
-  const syncAll = useCallback(async () => {
-    if (!profileKey || !supported) return;
-    const items = Object.values(snapshotRef.current.items);
-    if (!items.length) return;
-    setSyncing(true);
-    try {
-      for (const item of items) {
-        if (item.kind === "track") {
-          const firstTrack = item.tracks[0];
-          const trackRef = getOfflineTrackAssetKey(firstTrack) || item.entityId;
-          const manifestPaths = getOfflineTrackManifestPaths(
-            firstTrack ?? item.entityId,
-          );
-          let synced = false;
-          let lastError: unknown = null;
-          for (const manifestPath of manifestPaths) {
-            try {
-              await syncManifestIntoItem("track", trackRef, manifestPath);
-              synced = true;
-              break;
-            } catch (error) {
-              lastError = error;
-            }
-          }
-          if (!synced) {
-            throw lastError instanceof Error
-              ? lastError
-              : new Error("Failed to fetch offline track manifest");
-          }
-        } else if (item.kind === "album") {
-          // Album and playlist manifests update the same item snapshot; keep
-          // the outer sync sequential to avoid lost updates.
-          // react-doctor-disable-next-line async-await-in-loop
-          await syncManifestIntoItem(
-            "album",
-            item.entityId,
-            `/api/offline/albums/${item.entityId}/manifest`,
-          );
-        } else if (item.kind === "playlist") {
-          // Album and playlist manifests update the same item snapshot; keep
-          // the outer sync sequential to avoid lost updates.
-          // react-doctor-disable-next-line async-await-in-loop
-          await syncManifestIntoItem(
-            "playlist",
-            item.entityId,
-            `/api/offline/playlists/${item.entityId}/manifest`,
-          );
-        }
-      }
-    } finally {
-      setSyncing(false);
-    }
-  }, [profileKey, supported, syncManifestIntoItem]);
-
-  useEffect(() => {
-    if (!profileKey || !supported) return;
-    if (resumedProfileRef.current === profileKey) return;
-    const hasPendingItems = Object.values(snapshot.items).some((item) =>
-      isOfflineBusy(item.state),
-    );
-    if (!hasPendingItems) return;
-    resumedProfileRef.current = profileKey;
-    void enqueue(async () => {
-      setSyncing(true);
-      try {
-        await syncAll();
-      } finally {
-        setSyncing(false);
-      }
-    });
-  }, [enqueue, profileKey, snapshot.items, supported, syncAll]);
-
-  useEffect(() => {
-    if (!profileKey || !supported) return;
-    const handleOnline = () => {
-      void enqueue(async () => {
-        setSyncing(true);
-        try {
-          await syncAll();
-        } finally {
-          setSyncing(false);
-        }
-      });
-    };
-    window.addEventListener("online", handleOnline);
-    window.addEventListener(
-      "crate:network-restored",
-      handleOnline as EventListener,
-    );
-    const disposeResume = onAppResume(handleOnline);
-    const handleVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        transferAbortRef.current?.abort();
-      } else {
-        handleOnline();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener(
-        "crate:network-restored",
-        handleOnline as EventListener,
-      );
-      document.removeEventListener("visibilitychange", handleVisibility);
-      disposeResume();
-    };
-  }, [enqueue, profileKey, supported, syncAll]);
 
   const toggleTrackOffline = useCallback(
     (input: OfflineTrackInput) =>
