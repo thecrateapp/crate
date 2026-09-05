@@ -2,7 +2,6 @@ import {
   useContext,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -46,6 +45,7 @@ import { usePlayerLifecycleRuntime } from "@/contexts/use-player-lifecycle-runti
 import { usePlayerEnginePreferenceRuntime } from "@/contexts/use-player-engine-preference-runtime";
 import { usePlayerPlaybackObservability } from "@/contexts/use-player-playback-observability";
 import { usePlayerConnectState } from "@/contexts/use-player-connect-state";
+import { usePlayerContextValues } from "@/contexts/use-player-context-values";
 import { PlayerProviderSurface } from "@/contexts/PlayerProviderSurface";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
@@ -631,24 +631,8 @@ function usePlayerProviderRuntime(children: ReactNode) {
     seek,
   });
 
-  const stateValue = useMemo<PlayerStateValue>(
-    () => ({
-      isPlaying,
-      isBuffering,
-      volume,
-      analyserVersion,
-      crossfadeTransition,
-    }),
-    [analyserVersion, crossfadeTransition, isPlaying, isBuffering, volume],
-  );
-
-  const progressValue = useMemo<PlayerProgressValue>(
-    () => ({ currentTime, duration }),
-    [currentTime, duration],
-  );
-
-  const actionsValue = useMemo<PlayerActionsValue>(
-    () => ({
+  const { actionsValue, progressValue, stateValue } = usePlayerContextValues({
+    actions: {
       queue,
       currentIndex,
       jamQueueLocked,
@@ -684,45 +668,16 @@ function usePlayerProviderRuntime(children: ReactNode) {
       restoreQueueSnapshot,
       publishConnectState,
       connect: connectValue,
-    }),
-    [
-      queue,
-      currentIndex,
-      jamQueueLocked,
-      jamTransport,
-      shuffle,
-      playSource,
-      repeat,
-      smartCrossfadeEnabled,
-      recentlyPlayed,
-      currentTrack,
-      play,
-      playAll,
-      pause,
-      resume,
-      next,
-      prev,
-      seek,
-      setVolume,
-      setPlaybackRate,
-      clearQueue,
-      toggleShuffle,
-      cycleRepeat,
-      jumpTo,
-      playNext,
-      addToQueue,
-      removeFromQueue,
-      reorderQueue,
-      enterJamSession,
-      leaveJamSession,
-      setJamTransport,
-      syncJamQueue,
-      captureQueueSnapshot,
-      restoreQueueSnapshot,
-      publishConnectState,
-      connectValue,
-    ],
-  );
+    },
+    progress: { currentTime, duration },
+    state: {
+      analyserVersion,
+      crossfadeTransition,
+      isBuffering,
+      isPlaying,
+      volume,
+    },
+  });
 
   return (
     <PlayerProviderSurface
