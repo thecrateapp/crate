@@ -54,6 +54,11 @@ const WINDOW_COPY_KEYS: Record<StatsWindow, { title: string; label: string }> =
   };
 
 const STATS_WINDOWS: StatsWindow[] = ["7d", "30d", "90d", "365d", "all_time"];
+const NARRATIVE_TONES = [
+  "stats-narrative-tone-cool",
+  "stats-narrative-tone-warm",
+  "stats-narrative-tone-alert",
+];
 
 function normalizeWindowParam(value: string | null): StatsWindow {
   return STATS_WINDOWS.includes(value as StatsWindow)
@@ -768,17 +773,12 @@ function NarrativeTile({
   index: number;
 }) {
   const { t } = useTranslation();
-  const tones = [
-    "stats-narrative-tone-cool",
-    "stats-narrative-tone-warm",
-    "stats-narrative-tone-alert",
-  ];
 
   return (
     <div
       className={cn(
         "stats-narrative-tile rounded-[12px] p-5",
-        tones[index % tones.length],
+        NARRATIVE_TONES[index % NARRATIVE_TONES.length],
       )}
     >
       <div className="stats-muted-label text-[10px] font-black uppercase tracking-[0.22em]">

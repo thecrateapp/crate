@@ -1129,7 +1129,7 @@ export function CustomMixCard({
         />
         <div className="home-discovery-artwork-overlay absolute inset-0 flex items-center justify-center">
           <button
-            className="home-discovery-play-button flex h-10 w-10 translate-y-2 items-center justify-center rounded-full opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
+            className="home-discovery-play-button flex h-10 w-10 translate-y-2 items-center justify-center rounded-full opacity-0 shadow-lg transition-[transform,opacity] group-hover:translate-y-0 group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onPlayMix(item);
@@ -1502,7 +1502,7 @@ export function CoreTracksPlaylistCard({
         />
         <div className="home-discovery-artwork-overlay absolute inset-0 flex items-center justify-center">
           <button
-            className="home-discovery-play-button flex h-10 w-10 translate-y-2 items-center justify-center rounded-full opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
+            className="home-discovery-play-button flex h-10 w-10 translate-y-2 items-center justify-center rounded-full opacity-0 shadow-lg transition-[transform,opacity] group-hover:translate-y-0 group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onPlayPlaylist(item);

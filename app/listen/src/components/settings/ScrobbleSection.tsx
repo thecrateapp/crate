@@ -217,7 +217,13 @@ export function ScrobbleSection() {
               placeholder={t("settings.scrobbling.apiToken")}
               className="w-36 rounded-lg border border-border-quiet/10 bg-text-primary/5 px-3 py-1.5 text-xs text-text-primary placeholder:text-text-primary/40 focus:border-accent-action/50 focus:outline-none"
               onKeyDown={(event) => {
-                if (event.key === "Enter") void handleListenBrainzConnect();
+                if (
+                  !event.nativeEvent.isComposing &&
+                  event.nativeEvent.keyCode !== 229 &&
+                  event.key === "Enter"
+                ) {
+                  void handleListenBrainzConnect();
+                }
               }}
             />
             <button
