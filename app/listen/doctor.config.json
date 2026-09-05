@@ -30,6 +30,10 @@
         "rules": ["react-doctor/no-adjust-state-on-prop-change"]
       },
       {
+        "files": ["src/contexts/use-player-lifecycle-runtime.ts"],
+        "rules": ["react-doctor/no-adjust-state-on-prop-change"]
+      },
+      {
         "files": [
           "src/components/artwork/CrateImage.tsx",
           "src/components/player/SpinningDisc.tsx"

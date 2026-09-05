@@ -19,13 +19,11 @@ import {
   type PlayerStateValue,
 } from "@/contexts/player-context";
 import {
-  destroyPlayer as gpDestroyPlayer,
   setLoop as gpSetLoop,
   setSingleMode as gpSetSingleMode,
   setVolume as gpSetVolume,
 } from "@/lib/gapless-player";
 import { useAuth } from "@/contexts/AuthContext";
-import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
 import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
 import { usePlayEventTracker } from "@/contexts/use-play-event-tracker";
 import { usePlaybackIntelligence } from "@/contexts/use-playback-intelligence";
@@ -44,10 +42,7 @@ import {
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
-import {
-  PLAYBACK_NEEDS_USER_GESTURE_EVENT,
-  useSoftInterruption,
-} from "@/contexts/use-soft-interruption";
+import { useSoftInterruption } from "@/contexts/use-soft-interruption";
 import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
 import { useMediaSession } from "@/contexts/use-media-session";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
@@ -74,6 +69,7 @@ import { useJamQueueSession } from "@/contexts/use-jam-queue-session";
 import { usePlayerPreferenceRuntime } from "@/contexts/use-player-preference-runtime";
 import { usePlayerIntelligenceActions } from "@/contexts/use-player-intelligence-actions";
 import { usePlayerTrackRecovery } from "@/contexts/use-player-track-recovery";
+import { usePlayerLifecycleRuntime } from "@/contexts/use-player-lifecycle-runtime";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -112,8 +108,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 }
 
 function usePlayerProviderRuntime(children: ReactNode) {
-  const [playbackNeedsUserGesture, setPlaybackNeedsUserGesture] =
-    useState(false);
   const [jamTransport, setJamTransportState] =
     useState<JamTransportControls | null>(null);
   const setJamTransport = useCallback(
@@ -723,47 +717,14 @@ function usePlayerProviderRuntime(children: ReactNode) {
       volume,
     });
 
-  useEffect(() => {
-    const handleAuthRuntimeReset = () => {
-      clearQueueRef.current();
-    };
-    window.addEventListener(AUTH_RUNTIME_RESET_EVENT, handleAuthRuntimeReset);
-    return () => {
-      window.removeEventListener(
-        AUTH_RUNTIME_RESET_EVENT,
-        handleAuthRuntimeReset,
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleNeedsUserGesture = () => {
-      setPlaybackNeedsUserGesture(true);
-    };
-    window.addEventListener(
-      PLAYBACK_NEEDS_USER_GESTURE_EVENT,
-      handleNeedsUserGesture,
-    );
-    return () => {
-      window.removeEventListener(
-        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
-        handleNeedsUserGesture,
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isPlaying || !currentTrack) {
-      setPlaybackNeedsUserGesture(false);
-    }
-  }, [currentTrack, isPlaying]);
-
-  useEffect(() => {
-    return () => {
-      clearTransferPlaybackGuard();
-      gpDestroyPlayer();
-    };
-  }, [clearTransferPlaybackGuard]);
+  const { playbackNeedsUserGesture, resumeAfterUserGesture } =
+    usePlayerLifecycleRuntime({
+      clearQueueRef,
+      clearTransferPlaybackGuard,
+      currentTrack,
+      isPlaying,
+      resume,
+    });
 
   usePlayerShortcuts({
     hasCurrentTrack: !!currentTrack,
@@ -899,10 +860,7 @@ function usePlayerProviderRuntime(children: ReactNode) {
               <button
                 type="button"
                 className="pointer-events-auto rounded-full border border-accent-action/30 bg-surface-canvas/95 px-4 py-3 text-sm font-semibold text-text-primary shadow-2xl shadow-cyan-950/40 backdrop-blur"
-                onClick={() => {
-                  setPlaybackNeedsUserGesture(false);
-                  resume();
-                }}
+                onClick={resumeAfterUserGesture}
               >
                 Tap to resume playback
               </button>
