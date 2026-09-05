@@ -79,4 +79,26 @@ describe("lyrics surfaces", () => {
     expect(container.innerHTML).not.toContain("rgba(");
     expect(container.innerHTML).not.toContain("text-white/");
   });
+
+  it("passes cancellation to the lyrics request", async () => {
+    apiMock.mockResolvedValue({
+      syncedLyrics: "[00:00.00]Cancellable line",
+      plainLyrics: null,
+    });
+
+    renderWithListenProviders(<LyricsTab useAlbumPalette={false} />, {
+      playerActions: {
+        currentTrack: createMockTrack({ title: "Cancellable lyrics" }),
+      },
+    });
+
+    await screen.findByRole("button", { name: "Cancellable line" });
+
+    expect(apiMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/lyrics?"),
+      "GET",
+      undefined,
+      { signal: expect.any(AbortSignal) },
+    );
+  });
 });
