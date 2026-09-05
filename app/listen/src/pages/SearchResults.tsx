@@ -416,7 +416,13 @@ export function SearchResults() {
           <div>
             {trackRowData.map((t, i) => (
               <TrackRow
-                key={t.id || t.path || `${t.artist}-${t.title}-${i}`}
+                key={
+                  t.id ??
+                  t.global_track_uid ??
+                  t.entity_uid ??
+                  t.path ??
+                  [t.artist, t.album, t.title].join(":")
+                }
                 track={t}
                 index={i}
                 showArtist

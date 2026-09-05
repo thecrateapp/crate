@@ -217,9 +217,13 @@ export function HomeSection() {
 
       {data.id === "recently-played" ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {data.items.map((item, index) => (
+          {data.items.map((item) => (
             <RecentEntityRow
-              key={`${item.type}-${index}`}
+              key={[
+                item.type,
+                openRecentItemPath(item),
+                item.played_at ?? "",
+              ].join(":")}
               item={item}
               onClick={() => navigate(openRecentItemPath(item))}
             />

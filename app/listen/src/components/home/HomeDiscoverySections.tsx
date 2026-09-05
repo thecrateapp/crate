@@ -1373,11 +1373,15 @@ export function RecommendedTracksSection({
             className="min-w-full snap-start"
           >
             <div className="grid gap-2 xl:grid-cols-3">
-              {pageTracks.map((track, index) => (
+              {pageTracks.map((track) => (
                 <TrackRow
-                  key={`${
-                    track.library_track_id ?? track.path ?? track.title
-                  }-${pageIndex}-${index}`}
+                  key={
+                    track.library_track_id ??
+                    track.global_track_uid ??
+                    track.entity_uid ??
+                    track.path ??
+                    [track.artist, track.album, track.title].join(":")
+                  }
                   track={track}
                   showArtist
                   showAlbum

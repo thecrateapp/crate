@@ -75,7 +75,13 @@ export function ArtistTopTracksSection({
       <div className="rounded-xl">
         {tracks.map((track, index) => (
           <TrackRow
-            key={`${track.id}-${index}`}
+            key={
+              track.id ??
+              track.global_track_uid ??
+              track.track_entity_uid ??
+              track.library_track_id ??
+              [track.artist, track.album, track.title].join(":")
+            }
             track={trackRows[index]!}
             index={track.track || index + 1}
             showAlbum

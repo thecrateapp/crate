@@ -52,7 +52,7 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
         >
           {lyrics.synced.map((line, index) => (
             <LyricsLine
-              key={`${line.time}-${index}`}
+              key={[line.time, line.text].join(":")}
               line={line}
               index={index}
               activeIndex={activeIndex}

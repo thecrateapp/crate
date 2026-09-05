@@ -170,7 +170,13 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
           <div className="rounded-xl border border-border-quiet bg-surface-quiet-subtle">
             {trackRows.map((row, index) => (
               <TrackRow
-                key={`${row.artist}-${row.title}-${index}`}
+                key={
+                  row.id ??
+                  row.global_track_uid ??
+                  row.entity_uid ??
+                  row.path ??
+                  [row.artist, row.album, row.title].join(":")
+                }
                 track={row}
                 index={index + 1}
                 showArtist

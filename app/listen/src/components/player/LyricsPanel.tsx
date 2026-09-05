@@ -145,7 +145,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
               const isPast = i < activeIndex;
               return (
                 <button
-                  key={i}
+                  key={[line.time, line.text].join(":")}
                   ref={isActive ? activeRef : null}
                   onClick={() => seek(line.time)}
                   className={`relative z-20 w-full rounded-md px-2 py-1 text-left transition-all duration-500 ${

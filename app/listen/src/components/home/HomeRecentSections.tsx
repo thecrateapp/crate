@@ -374,9 +374,13 @@ export function RecentlyPlayedSection({
             className="min-w-full snap-start"
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {pageItems.map((item, index) => (
+              {pageItems.map((item) => (
                 <RecentEntityRow
-                  key={`${item.type}-${pageIndex}-${index}`}
+                  key={[
+                    item.type,
+                    openRecentItemPath(item),
+                    item.played_at ?? "",
+                  ].join(":")}
                   item={item}
                   onClick={() => onOpenItem(item)}
                 />

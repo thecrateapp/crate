@@ -1078,7 +1078,12 @@ function TopBarSearchDropdown({
         <>
           {results.map((item, index) => (
             <button
-              key={`${item.type}-${item.label}-${index}`}
+              key={[
+                item.type,
+                item.navigateTo ?? item.label,
+                item.sublabel ?? "",
+                item.origin ?? "local",
+              ].join(":")}
               onClick={() => void onSelectItem(item)}
               className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
                 index === activeIdx
@@ -1140,7 +1145,11 @@ function TopBarSearchDropdown({
           </p>
           {recents.map((recent, index) => (
             <button
-              key={`${recent.type ?? "query"}:${recent.label}:${index}`}
+              key={[
+                recent.type ?? "query",
+                recent.navigateTo ?? recent.label,
+                recent.origin ?? "local",
+              ].join(":")}
               onClick={() => onSelectRecent(recent)}
               className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
                 index === activeIdx
