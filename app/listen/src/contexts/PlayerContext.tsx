@@ -18,24 +18,12 @@ import {
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
-import { clampIndex } from "@/contexts/player-queue-helpers";
-import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
   destroyPlayer as gpDestroyPlayer,
-  getTrackIndex as gpGetTrackIndex,
-  getTracks as gpGetTracks,
-  loadQueue as gpLoadQueue,
-  play as gpPlay,
-  replaceTrack as gpReplaceTrack,
-  seekTo as gpSeekTo,
   setLoop as gpSetLoop,
   setSingleMode as gpSetSingleMode,
   setVolume as gpSetVolume,
 } from "@/lib/gapless-player";
-import {
-  toFreshEngineTrack,
-  toStartupEngineTracks,
-} from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
 import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
@@ -54,10 +42,6 @@ import {
   useDesktopTrayNowPlaying,
 } from "@/contexts/use-desktop-tray-commands";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
-import {
-  canApplyNextTrackResolution,
-  getNextTrackIndex,
-} from "@/contexts/player-next-track-resolution";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
 import {
@@ -66,11 +50,7 @@ import {
 } from "@/contexts/use-soft-interruption";
 import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
 import { useMediaSession } from "@/contexts/use-media-session";
-import {
-  androidNativeEngine,
-  shouldUseAndroidNativePlayer,
-} from "@/lib/android-native-engine";
-import { createQueueRevision } from "@/lib/playback-engine";
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import {
   getEffectivePlaybackDeliveryPolicy,
   getPlaybackDeliveryPolicyPreference,
@@ -93,6 +73,7 @@ import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime
 import { useJamQueueSession } from "@/contexts/use-jam-queue-session";
 import { usePlayerPreferenceRuntime } from "@/contexts/use-player-preference-runtime";
 import { usePlayerIntelligenceActions } from "@/contexts/use-player-intelligence-actions";
+import { usePlayerTrackRecovery } from "@/contexts/use-player-track-recovery";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -366,10 +347,17 @@ function usePlayerProviderRuntime(children: ReactNode) {
     },
     [currentTrackRef, playbackDeliveryPolicy],
   );
-  const recoverActiveTrackRef = useRef<() => Promise<boolean>>(
-    async () => false,
+  const { preResolveNextTrack, recoverActiveTrackRef } = usePlayerTrackRecovery(
+    {
+      buildEngineUrls,
+      currentIndexRef,
+      currentTimeRef,
+      effectiveCrossfadeMsRef,
+      lastNonZeroVolumeRef,
+      queueRef,
+      repeatRef,
+    },
   );
-  const nextTrackResolutionKeyRef = useRef<string | null>(null);
 
   const {
     beginSoftInterruption,
@@ -437,129 +425,6 @@ function usePlayerProviderRuntime(children: ReactNode) {
     clearPrevRestartLatch,
     markSeekPosition,
   });
-
-  const recoverActiveTrack = useCallback(async () => {
-    const recoveryQueue = queueRef.current;
-    if (recoveryQueue.length === 0) return false;
-    const recoveryIndex = clampIndex(
-      currentIndexRef.current,
-      recoveryQueue.length,
-    );
-    const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
-    const nativePlayerActive = shouldUseAndroidNativePlayer();
-    const engineTracks = await toStartupEngineTracks(
-      recoveryQueue,
-      recoveryIndex,
-      undefined,
-      nativePlayerActive ? { target: "android-native" } : undefined,
-    );
-
-    if (nativePlayerActive) {
-      await androidNativeEngine.loadQueue({
-        revision: createQueueRevision(),
-        tracks: engineTracks,
-        currentIndex: recoveryIndex,
-        positionMs,
-        autoplay: true,
-        repeat: repeatRef.current,
-        crossfadeMs: effectiveCrossfadeMsRef.current,
-        volume: lastNonZeroVolumeRef.current,
-      });
-      return true;
-    }
-
-    gpLoadQueue(
-      buildEngineUrls(
-        recoveryQueue,
-        engineTracks.map((track) => track.url),
-      ),
-      recoveryIndex,
-      { restartIfSameIndex: true },
-    );
-    if (positionMs > 0) {
-      gpSeekTo(positionMs);
-    }
-    await gpPlay();
-    return true;
-  }, [
-    buildEngineUrls,
-    currentIndexRef,
-    currentTimeRef,
-    effectiveCrossfadeMsRef,
-    lastNonZeroVolumeRef,
-    queueRef,
-    repeatRef,
-  ]);
-
-  useEffect(() => {
-    recoverActiveTrackRef.current = recoverActiveTrack;
-  }, [recoverActiveTrack]);
-
-  const preResolveNextTrack = useCallback(() => {
-    if (shouldUseAndroidNativePlayer()) return;
-
-    const queueSnapshot = queueRef.current;
-    const currentIndex = currentIndexRef.current;
-    const nextIndex = getNextTrackIndex(
-      queueSnapshot.length,
-      currentIndex,
-      repeatRef.current,
-    );
-    if (nextIndex === null) return;
-
-    const currentTrack = queueSnapshot[currentIndex];
-    const nextTrack = queueSnapshot[nextIndex];
-    if (!currentTrack || !nextTrack?.globalTrackUid) return;
-
-    const expectedUrl = gpGetTracks()[nextIndex];
-    if (!expectedUrl) return;
-
-    const resolutionKey = [
-      getTrackCacheKey(currentTrack),
-      getTrackCacheKey(nextTrack),
-      currentIndex,
-      nextIndex,
-      expectedUrl,
-    ].join(":");
-    if (nextTrackResolutionKeyRef.current === resolutionKey) return;
-    nextTrackResolutionKeyRef.current = resolutionKey;
-
-    void toFreshEngineTrack(nextTrack)
-      .then((resolvedTrack) => {
-        if (resolvedTrack.url === expectedUrl) return;
-
-        const engineUrls = gpGetTracks();
-        if (
-          !canApplyNextTrackResolution(
-            {
-              queue: queueSnapshot,
-              currentIndex,
-              nextIndex,
-              expectedUrl,
-            },
-            {
-              queue: queueRef.current,
-              currentIndex: currentIndexRef.current,
-              engineIndex: gpGetTrackIndex(),
-              engineUrl: engineUrls[nextIndex],
-            },
-          )
-        ) {
-          return;
-        }
-
-        gpReplaceTrack(nextIndex, resolvedTrack.url);
-        const resolvedUrls = [...engineUrls];
-        resolvedUrls[nextIndex] = resolvedTrack.url;
-        buildEngineUrls(queueSnapshot, resolvedUrls);
-      })
-      .catch((error) => {
-        if (nextTrackResolutionKeyRef.current === resolutionKey) {
-          nextTrackResolutionKeyRef.current = null;
-        }
-        console.warn("[gapless] failed to resolve next track:", error);
-      });
-  }, [buildEngineUrls, currentIndexRef, queueRef, repeatRef]);
 
   const {
     appendAndAdvance,
