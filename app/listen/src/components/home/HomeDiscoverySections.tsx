@@ -93,9 +93,10 @@ function heroSelectionKey(hero: HomeHeroArtist): string {
 }
 
 function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
-  const names = (item.artwork_artists || [])
-    .map((artist) => artist.artist_name?.trim())
-    .filter(Boolean) as string[];
+  const names = (item.artwork_artists || []).flatMap((artist) => {
+    const name = artist.artist_name?.trim();
+    return name ? [name] : [];
+  });
 
   if (!names.length) return item.description;
   const [first = "", second = "", third = ""] = names;
@@ -261,13 +262,13 @@ function useHeroBackgroundPreloader(
 ): void {
   const sources = useMemo(
     () =>
-      heroes
-        .map((hero) =>
+      heroes.flatMap((hero) => {
+        const source =
           mode === "canonical"
             ? heroBackgroundSrc(hero, composition)
-            : legacyHeroBackgroundSrc(hero, composition),
-        )
-        .filter((src): src is string => Boolean(src)),
+            : legacyHeroBackgroundSrc(hero, composition);
+        return source ? [source] : [];
+      }),
     [composition, heroes, mode],
   );
   const readyRef = useRef<Set<string>>(new Set());
@@ -328,14 +329,14 @@ function useHeroBackgroundPreloader(
     immediate.forEach((src) => loadSource(src, "high"));
 
     const cancelBackgroundWork = requestBackgroundWork(() => {
-      sources
-        .filter((src) => !immediate.has(src))
-        .forEach((src, index) => {
-          const timeout = window.setTimeout(() => {
-            if (!cancelled) loadSource(src, "low");
-          }, index * 220);
-          timeouts.push(timeout);
-        });
+      let backgroundIndex = 0;
+      sources.forEach((src) => {
+        if (immediate.has(src)) return;
+        const timeout = window.setTimeout(() => {
+          if (!cancelled) loadSource(src, "low");
+        }, backgroundIndex++ * 220);
+        timeouts.push(timeout);
+      });
     });
 
     return () => {
@@ -855,8 +856,7 @@ function HeroBackdrop({
 }
 
 function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
-  const genres =
-    hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
+  const genres = hero.genres?.flatMap((name) => (name ? [{ name }] : [])) ?? [];
 
   if (genres.length === 0) return null;
 

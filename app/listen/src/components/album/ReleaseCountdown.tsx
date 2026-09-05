@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 const SECOND_MS = 1_000;
@@ -36,6 +36,15 @@ export function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
   const [now, setNow] = useState(() => Date.now());
   const target = releaseTimestamp(releaseDate);
   const remaining = target == null ? 0 : Math.max(0, target - now);
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.language, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+    [i18n.language],
+  );
 
   useEffect(() => {
     if (target == null || target <= Date.now()) return;
@@ -61,11 +70,7 @@ export function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
     { label: t("album.releaseCountdown.minutes"), value: minutes },
     { label: t("album.releaseCountdown.seconds"), value: seconds },
   ];
-  const formattedDate = new Intl.DateTimeFormat(i18n.language, {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(target));
+  const formattedDate = dateFormatter.format(new Date(target));
 
   return (
     <section

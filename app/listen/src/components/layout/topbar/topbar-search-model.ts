@@ -138,15 +138,13 @@ export function getTopBarSearchRecents(): TopBarSearchRecentEntry[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed
-      .map((entry: unknown) => {
-        if (isTopBarSearchRecentEntry(entry)) return entry;
-        if (typeof entry === "string") {
-          return { label: entry, type: undefined, navigateTo: undefined };
-        }
-        return null;
-      })
-      .filter(Boolean) as TopBarSearchRecentEntry[];
+    return parsed.flatMap((entry: unknown) => {
+      if (isTopBarSearchRecentEntry(entry)) return [entry];
+      if (typeof entry === "string") {
+        return [{ label: entry, type: undefined, navigateTo: undefined }];
+      }
+      return [];
+    });
   } catch {
     return [];
   }
