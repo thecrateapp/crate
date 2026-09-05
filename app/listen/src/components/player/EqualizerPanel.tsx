@@ -14,6 +14,7 @@ import {
   Zap,
 } from "@crate/ui/icons";
 import { useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -138,6 +139,92 @@ function FeatureChip({
   );
 }
 
+type AdaptiveFeatureChipData = {
+  key: string;
+  icon: typeof Sun;
+  label: string;
+  value: string;
+  zone: "neutral" | "active";
+};
+
+function getAdaptiveFeatureChipData(
+  features: EqFeatures,
+): AdaptiveFeatureChipData[] {
+  const chips: AdaptiveFeatureChipData[] = [];
+
+  if (typeof features.brightness === "number") {
+    const brightness = features.brightness;
+    const label =
+      brightness < 0.25
+        ? "dark"
+        : brightness < 0.4
+          ? "warm"
+          : brightness > 0.7
+            ? "sharp"
+            : brightness > 0.55
+              ? "bright"
+              : "neutral";
+    chips.push({
+      key: "brightness",
+      icon: Sun,
+      label: `Brightness: ${label}`,
+      value: `${Math.round(brightness * 100)}%`,
+      zone: brightness < 0.4 || brightness > 0.55 ? "active" : "neutral",
+    });
+  }
+
+  if (typeof features.loudness === "number") {
+    const loudness = features.loudness;
+    chips.push({
+      key: "loudness",
+      icon: Volume2,
+      label:
+        loudness > -10
+          ? "Hot master"
+          : loudness < -20
+            ? "Very quiet"
+            : "Standard level",
+      value: `${loudness.toFixed(1)} LUFS`,
+      zone: loudness > -10 || loudness < -20 ? "active" : "neutral",
+    });
+  }
+
+  if (typeof features.dynamicRange === "number") {
+    const dynamicRange = features.dynamicRange;
+    const label =
+      dynamicRange > 14
+        ? "preserved"
+        : dynamicRange < 6
+          ? "compressed"
+          : "moderate";
+    chips.push({
+      key: "dynamic",
+      icon: Activity,
+      label: `Dynamic range: ${label}`,
+      value: `${dynamicRange.toFixed(1)} dB`,
+      zone: dynamicRange > 14 || dynamicRange < 6 ? "active" : "neutral",
+    });
+  }
+
+  if (typeof features.energy === "number") {
+    const energy = features.energy;
+    chips.push({
+      key: "energy",
+      icon: Zap,
+      label:
+        energy > 0.7
+          ? "High energy"
+          : energy < 0.3
+            ? "Low energy"
+            : "Moderate energy",
+      value: `${Math.round(energy * 100)}%`,
+      zone: energy > 0.7 || energy < 0.3 ? "active" : "neutral",
+    });
+  }
+
+  return chips;
+}
+
 function AdaptiveFeatureChips({
   features,
   status,
@@ -161,79 +248,7 @@ function AdaptiveFeatureChips({
     );
   }
 
-  const chips: React.ReactNode[] = [];
-
-  if (typeof features.brightness === "number") {
-    const b = features.brightness;
-    const active = b < 0.4 || b > 0.55;
-    const label =
-      b < 0.25
-        ? "dark"
-        : b < 0.4
-          ? "warm"
-          : b > 0.7
-            ? "sharp"
-            : b > 0.55
-              ? "bright"
-              : "neutral";
-    chips.push(
-      <FeatureChip
-        key="brightness"
-        icon={Sun}
-        label={`Brightness: ${label}`}
-        value={`${Math.round(b * 100)}%`}
-        zone={active ? "active" : "neutral"}
-      />,
-    );
-  }
-
-  if (typeof features.loudness === "number") {
-    const l = features.loudness;
-    const active = l > -10 || l < -20;
-    chips.push(
-      <FeatureChip
-        key="loudness"
-        icon={Volume2}
-        label={
-          l > -10 ? "Hot master" : l < -20 ? "Very quiet" : "Standard level"
-        }
-        value={`${l.toFixed(1)} LUFS`}
-        zone={active ? "active" : "neutral"}
-      />,
-    );
-  }
-
-  if (typeof features.dynamicRange === "number") {
-    const dr = features.dynamicRange;
-    const active = dr > 14 || dr < 6;
-    const label = dr > 14 ? "preserved" : dr < 6 ? "compressed" : "moderate";
-    chips.push(
-      <FeatureChip
-        key="dynamic"
-        icon={Activity}
-        label={`Dynamic range: ${label}`}
-        value={`${dr.toFixed(1)} dB`}
-        zone={active ? "active" : "neutral"}
-      />,
-    );
-  }
-
-  if (typeof features.energy === "number") {
-    const e = features.energy;
-    const active = e > 0.7 || e < 0.3;
-    chips.push(
-      <FeatureChip
-        key="energy"
-        icon={Zap}
-        label={
-          e > 0.7 ? "High energy" : e < 0.3 ? "Low energy" : "Moderate energy"
-        }
-        value={`${Math.round(e * 100)}%`}
-        zone={active ? "active" : "neutral"}
-      />,
-    );
-  }
-
+  const chips = getAdaptiveFeatureChipData(features);
   if (chips.length === 0) {
     return (
       <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
@@ -247,7 +262,9 @@ function AdaptiveFeatureChips({
       <span className="text-[9px] uppercase tracking-wider text-text-subtle">
         {t("player.equalizer.track")}
       </span>
-      {chips}
+      {chips.map(({ key, ...chip }) => (
+        <FeatureChip key={key} {...chip} />
+      ))}
     </div>
   );
 }
@@ -340,48 +357,304 @@ interface EqualizerPanelProps {
   onClose?: () => void;
 }
 
-/**
- * Reusable EQ panel rendered inside the PlayerBar popover and the
- * FullscreenPlayer overlay. State is owned by useEqualizer — this
- * component is pure presentation.
- */
+type EqualizerState = ReturnType<typeof useEqualizer>;
+
+function EqualizerHeader({
+  eq,
+  onClose,
+  t,
+}: {
+  eq: EqualizerState;
+  onClose?: () => void;
+  t: TFunction;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <SlidersHorizontal
+          size={CRATE_ICON_SIZE.md}
+          className="text-accent-action"
+        />
+        <h2 className="text-sm font-semibold text-text-primary">
+          {t("player.equalizer")}
+        </h2>
+      </div>
+      <div className="flex items-center gap-2">
+        <CratePill
+          active={eq.smart}
+          disabled={!eq.enabled}
+          onClick={() => eq.toggleSmart(!eq.smart)}
+          icon={Brain}
+        >
+          {t("player.equalizer.smart.label")}
+          {eq.smart && eq.smartStatus === "loading" ? (
+            <span className="ml-1 text-[9px] opacity-60">…</span>
+          ) : null}
+        </CratePill>
+        <label className="flex items-center gap-1.5 text-xs font-medium text-text-primary">
+          <input
+            type="checkbox"
+            checked={eq.enabled}
+            onChange={(event) => eq.toggleEnabled(event.target.checked)}
+            className="h-3.5 w-3.5 accent-accent-action"
+          />
+          {t("common.on")}
+        </label>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("player.equalizer.close")}
+            className="flex size-9 items-center justify-center text-text-muted hover:text-text-primary"
+          >
+            <X size={CRATE_ICON_SIZE.lg} />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
+  if (eq.smart) {
+    return <SmartEqReadout eq={eq.effectiveEq} status={eq.smartStatus} />;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border-quiet bg-surface-control px-2.5 py-2">
+      <span className="mr-1 text-[9px] uppercase tracking-[0.18em] text-text-subtle">
+        {t("player.equalizer.manualHelpers")}
+      </span>
+      <CratePill
+        active={eq.genreAdaptive}
+        disabled={!eq.enabled}
+        onClick={() => eq.toggleGenreAdaptive(!eq.genreAdaptive)}
+        icon={Tag}
+      >
+        {t("player.equalizer.genre.label")}
+        {eq.genreAdaptive && eq.genreAdaptiveStatus === "loading" ? (
+          <span className="ml-1 text-[9px] opacity-60">…</span>
+        ) : null}
+      </CratePill>
+      <CratePill
+        active={eq.adaptive}
+        disabled={!eq.enabled}
+        onClick={() => eq.toggleAdaptive(!eq.adaptive)}
+        icon={Sparkles}
+      >
+        {t("player.equalizer.adaptive.label")}
+        {eq.adaptive && eq.adaptiveStatus === "loading" ? (
+          <span className="ml-1 text-[9px] opacity-60">…</span>
+        ) : null}
+      </CratePill>
+    </div>
+  );
+}
+
+function EqualizerPresetPicker({
+  eq,
+  manualControlsEnabled,
+}: {
+  eq: EqualizerState;
+  manualControlsEnabled: boolean;
+}) {
+  return (
+    <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+      {(Object.keys(PRESET_LABELS) as EqPresetName[]).map((name) => (
+        <CratePill
+          key={name}
+          active={
+            eq.preset === name && !eq.smart && !eq.adaptive && !eq.genreAdaptive
+          }
+          disabled={!manualControlsEnabled}
+          onClick={() => eq.applyPreset(name)}
+        >
+          {PRESET_LABELS[name]}
+        </CratePill>
+      ))}
+    </div>
+  );
+}
+
+function EqualizerModeBadge({
+  adaptive,
+  genreAdaptive,
+  preset,
+  smart,
+  t,
+}: {
+  adaptive: boolean;
+  genreAdaptive: boolean;
+  preset: EqualizerState["preset"];
+  smart: boolean;
+  t: TFunction;
+}) {
+  if (smart) {
+    return (
+      <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
+        <Brain size={9} />
+        {t("player.equalizer.smartCurve")}
+      </span>
+    );
+  }
+  if (adaptive) {
+    return (
+      <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
+        <Sparkles size={9} />
+        {t("player.equalizer.adaptiveActive")}
+      </span>
+    );
+  }
+  if (genreAdaptive) {
+    return (
+      <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
+        <Tag size={9} />
+        {t("player.equalizer.genreActive")}
+      </span>
+    );
+  }
+  if (preset === "custom") {
+    return (
+      <span className="rounded-full border border-border-quiet bg-surface-control px-2 py-0.5 text-[10px] text-text-secondary">
+        {t("player.equalizer.custom")}
+      </span>
+    );
+  }
+  return <span />;
+}
+
+function EqualizerTrackPresetActions({
+  eq,
+  hasUserTrackPreset,
+  manualControlsEnabled,
+  onClear,
+  onSave,
+  saving,
+  t,
+}: {
+  eq: EqualizerState;
+  hasUserTrackPreset: boolean;
+  manualControlsEnabled: boolean;
+  onClear: () => void;
+  onSave: () => void;
+  saving: boolean;
+  t: TFunction;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {hasUserTrackPreset ? (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onClear}
+          className="inline-flex items-center gap-1 rounded-full border border-state-danger/20 bg-state-danger/[0.06] px-2.5 py-0.5 text-[10px] text-state-danger/80 hover:border-state-danger/35 hover:text-state-danger disabled:cursor-wait disabled:opacity-50"
+        >
+          <Trash2 size={9} />
+          {t("player.equalizer.clearTrackPreset")}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={!eq.enabled || saving}
+          onClick={onSave}
+          className="inline-flex items-center gap-1 rounded-full border border-accent-action/20 bg-accent-action/[0.06] px-2.5 py-0.5 text-[10px] text-accent-action/80 hover:border-accent-action/35 hover:text-accent-action disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Save size={9} />
+          {t("player.equalizer.saveForTrack")}
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={!manualControlsEnabled}
+        onClick={eq.resetToFlat}
+        className={`inline-flex items-center gap-1 rounded-full border border-border-quiet bg-surface-control px-2.5 py-0.5 text-[10px] text-text-secondary hover:border-border-interactive hover:text-text-primary ${
+          !manualControlsEnabled ? "cursor-not-allowed opacity-40" : ""
+        }`}
+      >
+        <RotateCcw size={9} />
+        {t("player.equalizer.reset")}
+      </button>
+    </div>
+  );
+}
+
+function EqualizerPanelView({
+  eq,
+  onClose,
+  onClear,
+  onSave,
+  saving,
+  t,
+}: {
+  eq: EqualizerState;
+  onClose?: () => void;
+  onClear: () => void;
+  onSave: () => void;
+  saving: boolean;
+  t: TFunction;
+}) {
+  const manualControlsEnabled =
+    eq.enabled && !eq.smart && !eq.adaptive && !eq.genreAdaptive;
+  const hasUserTrackPreset = eq.effectiveEq?.source === "user_track_preset";
+
+  return (
+    <div className="flex flex-col gap-4">
+      <EqualizerHeader eq={eq} onClose={onClose} t={t} />
+      <EqualizerModePicker eq={eq} t={t} />
+      <EqualizerPresetPicker
+        eq={eq}
+        manualControlsEnabled={manualControlsEnabled}
+      />
+      <div className="flex items-center justify-between">
+        <EqualizerModeBadge
+          adaptive={eq.adaptive}
+          genreAdaptive={eq.genreAdaptive}
+          preset={eq.preset}
+          smart={eq.smart}
+          t={t}
+        />
+        <EqualizerTrackPresetActions
+          eq={eq}
+          hasUserTrackPreset={hasUserTrackPreset}
+          manualControlsEnabled={manualControlsEnabled}
+          onClear={onClear}
+          onSave={onSave}
+          saving={saving}
+          t={t}
+        />
+      </div>
+      {eq.adaptive ? (
+        <AdaptiveFeatureChips
+          features={eq.adaptiveFeatures}
+          status={eq.adaptiveStatus}
+        />
+      ) : null}
+      {eq.genreAdaptive ? (
+        <GenreResolutionChip
+          genre={eq.trackGenre}
+          status={eq.genreAdaptiveStatus}
+        />
+      ) : null}
+      <div className="rounded-xl border border-border-quiet bg-surface-canvas p-3">
+        <EqBands
+          gains={eq.gains}
+          onBandChange={manualControlsEnabled ? eq.updateBand : undefined}
+          disabled={!eq.enabled}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
   const { t } = useTranslation();
+  const eq = useEqualizer();
   const [saving, setSaving] = useState(false);
-  const {
-    enabled,
-    preset,
-    gains,
-    smart,
-    adaptive,
-    genreAdaptive,
-    smartStatus,
-    effectiveEq,
-    adaptiveStatus,
-    adaptiveFeatures,
-    genreAdaptiveStatus,
-    trackGenre,
-    toggleEnabled,
-    toggleSmart,
-    toggleAdaptive,
-    toggleGenreAdaptive,
-    applyPreset,
-    updateBand,
-    resetToFlat,
-    saveForCurrentTrack,
-    clearCurrentTrackPreset,
-  } = useEqualizer();
-
-  // Smart/adaptive modes own the curve, so manual controls become
-  // read-only until the user explicitly switches back to manual.
-  const manualControlsEnabled =
-    enabled && !smart && !adaptive && !genreAdaptive;
-  const hasUserTrackPreset = effectiveEq?.source === "user_track_preset";
 
   const handleSaveTrack = async () => {
     setSaving(true);
     try {
-      const result = await saveForCurrentTrack();
+      const result = await eq.saveForCurrentTrack();
       if (result) toast.success(t("player.equalizer.toasts.saved"));
       else toast.error(t("player.equalizer.toasts.cannotSave"));
     } catch (error) {
@@ -395,7 +668,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
   const handleClearTrack = async () => {
     setSaving(true);
     try {
-      await clearCurrentTrackPreset();
+      await eq.clearCurrentTrackPreset();
       toast.success(t("player.equalizer.toasts.cleared"));
     } catch (error) {
       console.error("[eq] failed to clear track preset", error);
@@ -406,182 +679,13 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal
-            size={CRATE_ICON_SIZE.md}
-            className="text-accent-action"
-          />
-          <h2 className="text-sm font-semibold text-text-primary">
-            {t("player.equalizer")}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <CratePill
-            active={smart}
-            disabled={!enabled}
-            onClick={() => toggleSmart(!smart)}
-            icon={Brain}
-          >
-            {t("player.equalizer.smart.label")}
-            {smart && smartStatus === "loading" ? (
-              <span className="ml-1 text-[9px] opacity-60">…</span>
-            ) : null}
-          </CratePill>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-text-primary">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(event) => toggleEnabled(event.target.checked)}
-              className="h-3.5 w-3.5 accent-accent-action"
-            />
-            {t("common.on")}
-          </label>
-          {onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t("player.equalizer.close")}
-              className="flex size-9 items-center justify-center text-text-muted hover:text-text-primary"
-            >
-              <X size={CRATE_ICON_SIZE.lg} />
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {smart ? (
-        <SmartEqReadout eq={effectiveEq} status={smartStatus} />
-      ) : (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border-quiet bg-surface-control px-2.5 py-2">
-          <span className="mr-1 text-[9px] uppercase tracking-[0.18em] text-text-subtle">
-            {t("player.equalizer.manualHelpers")}
-          </span>
-          <CratePill
-            active={genreAdaptive}
-            disabled={!enabled}
-            onClick={() => toggleGenreAdaptive(!genreAdaptive)}
-            icon={Tag}
-          >
-            {t("player.equalizer.genre.label")}
-            {genreAdaptive && genreAdaptiveStatus === "loading" ? (
-              <span className="ml-1 text-[9px] opacity-60">…</span>
-            ) : null}
-          </CratePill>
-          <CratePill
-            active={adaptive}
-            disabled={!enabled}
-            onClick={() => toggleAdaptive(!adaptive)}
-            icon={Sparkles}
-          >
-            {t("player.equalizer.adaptive.label")}
-            {adaptive && adaptiveStatus === "loading" ? (
-              <span className="ml-1 text-[9px] opacity-60">…</span>
-            ) : null}
-          </CratePill>
-        </div>
-      )}
-
-      {/* Preset picker — compact pill scroller */}
-      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-        {(Object.keys(PRESET_LABELS) as EqPresetName[]).map((name) => (
-          <CratePill
-            key={name}
-            active={preset === name && !smart && !adaptive && !genreAdaptive}
-            disabled={!manualControlsEnabled}
-            onClick={() => applyPreset(name)}
-          >
-            {PRESET_LABELS[name]}
-          </CratePill>
-        ))}
-      </div>
-
-      <div className="flex items-center justify-between">
-        {smart ? (
-          <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
-            <Brain size={9} />
-            {t("player.equalizer.smartCurve")}
-          </span>
-        ) : adaptive ? (
-          <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
-            <Sparkles size={9} />
-            {t("player.equalizer.adaptiveActive")}
-          </span>
-        ) : genreAdaptive ? (
-          <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-[10px] text-accent-action">
-            <Tag size={9} />
-            {t("player.equalizer.genreActive")}
-          </span>
-        ) : preset === "custom" ? (
-          <span className="rounded-full border border-border-quiet bg-surface-control px-2 py-0.5 text-[10px] text-text-secondary">
-            {t("player.equalizer.custom")}
-          </span>
-        ) : (
-          <span />
-        )}
-        <div className="flex items-center gap-1.5">
-          {hasUserTrackPreset ? (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleClearTrack}
-              className="inline-flex items-center gap-1 rounded-full border border-state-danger/20 bg-state-danger/[0.06] px-2.5 py-0.5 text-[10px] text-state-danger/80 hover:border-state-danger/35 hover:text-state-danger disabled:cursor-wait disabled:opacity-50"
-            >
-              <Trash2 size={9} />
-              {t("player.equalizer.clearTrackPreset")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!enabled || saving}
-              onClick={handleSaveTrack}
-              className="inline-flex items-center gap-1 rounded-full border border-accent-action/20 bg-accent-action/[0.06] px-2.5 py-0.5 text-[10px] text-accent-action/80 hover:border-accent-action/35 hover:text-accent-action disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Save size={9} />
-              {t("player.equalizer.saveForTrack")}
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={!manualControlsEnabled}
-            onClick={resetToFlat}
-            className={`inline-flex items-center gap-1 rounded-full border border-border-quiet bg-surface-control px-2.5 py-0.5 text-[10px] text-text-secondary hover:border-border-interactive hover:text-text-primary ${
-              !manualControlsEnabled ? "cursor-not-allowed opacity-40" : ""
-            }`}
-          >
-            <RotateCcw size={9} />
-            {t("player.equalizer.reset")}
-          </button>
-        </div>
-      </div>
-
-      {/* Adaptive feature readout — shows the analysis values that drive
-          the per-band gains so the current curve doesn't feel like a
-          black box. Only visible while adaptive mode is on. */}
-      {adaptive ? (
-        <AdaptiveFeatureChips
-          features={adaptiveFeatures}
-          status={adaptiveStatus}
-        />
-      ) : null}
-
-      {/* Genre resolution readout — shows which genre was detected and
-          which preset (if any) got applied. Visible while Genre mode
-          is on so the user can see the mapping at a glance. */}
-      {genreAdaptive ? (
-        <GenreResolutionChip genre={trackGenre} status={genreAdaptiveStatus} />
-      ) : null}
-
-      {/* Band sliders */}
-      <div className="rounded-xl border border-border-quiet bg-surface-canvas p-3">
-        <EqBands
-          gains={gains}
-          onBandChange={manualControlsEnabled ? updateBand : undefined}
-          disabled={!enabled}
-        />
-      </div>
-    </div>
+    <EqualizerPanelView
+      eq={eq}
+      onClose={onClose}
+      onClear={() => void handleClearTrack()}
+      onSave={() => void handleSaveTrack()}
+      saving={saving}
+      t={t}
+    />
   );
 }
