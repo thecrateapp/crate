@@ -32,6 +32,7 @@ import {
   refreshMediaAccessTickets,
   startMediaAccessTicketRefresh,
 } from "@/lib/api-media-access";
+import { createApiUrlResolver } from "@/lib/api-url-resolver";
 
 export {
   AUTH_TOKEN_EVENT,
@@ -88,94 +89,31 @@ export function apiUrl(path: string): string {
   return `${getApiBase()}${path}`;
 }
 
-function isAbsoluteHttpUrl(url: string): boolean {
-  return /^https?:\/\//i.test(url);
-}
-
-function isApiUrl(url: string): boolean {
-  try {
-    const parsed = new URL(
-      url,
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://crate.local",
-    );
-    return parsed.pathname.startsWith("/api/");
-  } catch {
-    return url.startsWith("/api/") || url.startsWith("api/");
-  }
-}
-
-function isPublicCacheableApiAsset(url: string): boolean {
-  try {
-    const parsed = new URL(
-      url,
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://crate.local",
-    );
-    return parsed.pathname === "/api/network/external-artist/photo";
-  } catch {
-    return false;
-  }
-}
-
-function withoutMediaCredentials(url: string): string {
-  const absolute = isAbsoluteHttpUrl(url);
-  const base =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://crate.local";
-  try {
-    const parsed = new URL(url, base);
-    parsed.searchParams.delete("token");
-    parsed.searchParams.delete("media_ticket");
-    if (absolute) return parsed.toString();
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return url;
-  }
-}
-
 function apiCredentials(): RequestCredentials {
   return usesConfigurableServer ? "omit" : "include";
 }
 
-function withMediaAccessTicket(
-  url: string,
-  audience: MediaAccessAudience,
-): string {
-  const absolute = /^(?:https?|wss?):\/\//i.test(url);
-  const base =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://crate.local";
-  try {
-    const parsed = new URL(url, base);
-    parsed.searchParams.delete("token");
-    parsed.searchParams.delete("media_ticket");
-    const server = usesConfigurableServer ? getCurrentServer() : null;
-    const serverOrigin = server?.url ? new URL(server.url) : null;
-    const targetsCurrentServer =
-      !absolute ||
-      !serverOrigin ||
-      (parsed.host === serverOrigin.host &&
-        (parsed.protocol === "https:" || parsed.protocol === "wss:") ===
-          (serverOrigin.protocol === "https:"));
-    const ticket =
-      targetsCurrentServer && server?.token && server.id
-        ? getMediaAccessTicket(audience, parsed.pathname, server.id)
-        : null;
-    if (!ticket && targetsCurrentServer && server?.token && server.id) {
-      queueMediaAccessTarget(audience, parsed.pathname, server.id);
-    }
-    if (ticket) parsed.searchParams.set("media_ticket", ticket);
-    if (absolute) return parsed.toString();
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return url.replace(/([?&])token=[^&]*&?/g, "$1").replace(/[?&]$/, "");
-  }
-}
+const apiUrlResolver = createApiUrlResolver({
+  apiUrl,
+  getApiBase,
+  getCurrentServer,
+  getMediaAccessTicket,
+  queueMediaAccessTarget,
+  usesConfigurableServer,
+});
+
+export const {
+  apiAssetUrl,
+  apiSseUrl,
+  apiStreamUrl,
+  apiWsUrl,
+  isApiUrl,
+  isUsableMediaAssetUrl,
+  requiresMediaAccessTicket,
+  resolveMaybeApiAssetUrl,
+  resolveMaybeApiStreamUrl,
+  withMediaAccessTicket,
+} = apiUrlResolver;
 
 /**
  * Resolve a protected media URL only after its exact-path ticket is available.
@@ -195,138 +133,6 @@ export async function ensureMediaAccessUrl(
     isApiUrl,
     withMediaAccessTicket,
   });
-}
-
-/** Resolve an SSE path to a full URL using a short-lived scoped ticket. */
-export function apiSseUrl(path: string): string {
-  return withMediaAccessTicket(apiUrl(path), "sse");
-}
-
-/** Resolve an API media path using a short-lived artwork ticket. */
-export function apiAssetUrl(path: string): string {
-  const baseUrl = isAbsoluteHttpUrl(path) ? path : apiUrl(path);
-  if (!isApiUrl(baseUrl)) return baseUrl;
-  if (isPublicCacheableApiAsset(baseUrl)) {
-    return withoutMediaCredentials(baseUrl);
-  }
-  return withMediaAccessTicket(baseUrl, "artwork");
-}
-
-export function apiStreamUrl(path: string): string {
-  const baseUrl = isAbsoluteHttpUrl(path) ? path : apiUrl(path);
-  if (!isApiUrl(baseUrl)) return baseUrl;
-  return withMediaAccessTicket(baseUrl, "stream");
-}
-
-export function resolveMaybeApiAssetUrl(
-  url: string | null | undefined,
-): string | null {
-  if (!url) return null;
-  if (
-    url.startsWith("data:") ||
-    url.startsWith("blob:") ||
-    url.startsWith("file:") ||
-    url.startsWith("capacitor:")
-  ) {
-    return url;
-  }
-  if (url.startsWith("/api/")) return apiAssetUrl(url);
-  if (url.startsWith("api/")) return apiAssetUrl(`/${url}`);
-
-  const base = getApiBase();
-  if (base && url.startsWith(`${base}/api/`)) {
-    const relative = url.slice(base.length);
-    return apiAssetUrl(relative);
-  }
-
-  if (
-    typeof window !== "undefined" &&
-    url.startsWith(`${window.location.origin}/api/`)
-  ) {
-    const relative = url.slice(window.location.origin.length);
-    return apiAssetUrl(relative);
-  }
-
-  if (isAbsoluteHttpUrl(url)) {
-    try {
-      const parsed = new URL(url);
-      if (parsed.pathname.startsWith("/api/")) return apiAssetUrl(url);
-    } catch {
-      // Leave malformed external URLs untouched.
-    }
-  }
-
-  return url;
-}
-
-export function requiresMediaAccessTicket(
-  url: string | null | undefined,
-): boolean {
-  if (!url || !usesConfigurableServer || !isApiUrl(url)) return false;
-  if (isPublicCacheableApiAsset(url)) return false;
-  try {
-    const server = getCurrentServer();
-    const parsed = new URL(url, server?.url || "https://crate.local");
-    if (server?.url && parsed.origin !== new URL(server.url).origin) {
-      return false;
-    }
-    return parsed.pathname.startsWith("/api/");
-  } catch {
-    return url.startsWith("/api/") || url.startsWith("api/");
-  }
-}
-
-export function isUsableMediaAssetUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-  if (
-    url.startsWith("data:") ||
-    url.startsWith("blob:") ||
-    url.startsWith("file:") ||
-    url.startsWith("capacitor:")
-  ) {
-    return true;
-  }
-  if (!requiresMediaAccessTicket(url)) return true;
-
-  try {
-    const parsed = new URL(
-      url,
-      getCurrentServer()?.url || "https://crate.local",
-    );
-    return (
-      parsed.searchParams.has("media_ticket") ||
-      parsed.searchParams.has("token")
-    );
-  } catch {
-    return false;
-  }
-}
-
-export function resolveMaybeApiStreamUrl(
-  url: string | null | undefined,
-): string | null {
-  if (!url) return null;
-  if (
-    url.startsWith("blob:") ||
-    url.startsWith("file:") ||
-    url.startsWith("capacitor:") ||
-    url.startsWith("content:")
-  ) {
-    return url;
-  }
-  if (url.startsWith("/api/")) return apiStreamUrl(url);
-  if (url.startsWith("api/")) return apiStreamUrl(`/${url}`);
-  if (isAbsoluteHttpUrl(url) && isApiUrl(url)) return apiStreamUrl(url);
-  return url;
-}
-
-/** Resolve an API path to a full WebSocket URL. */
-export function apiWsUrl(path: string): string {
-  const base = getApiBase();
-  const baseOrigin = base
-    ? base.replace(/^http/i, "ws")
-    : window.location.origin.replace(/^http/i, "ws");
-  return withMediaAccessTicket(`${baseOrigin}${path}`, "ws");
 }
 
 export function setAuthToken(
