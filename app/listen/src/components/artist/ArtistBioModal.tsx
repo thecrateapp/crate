@@ -82,8 +82,13 @@ function useArtistBioEnrichment(open: boolean, artistId?: number) {
   const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
 
   useEffect(() => {
-    if (!open || !artistId || enrichment) return;
+    if (!open || !artistId) {
+      setEnrichment(null);
+      return;
+    }
+
     let cancelled = false;
+    setEnrichment(null);
     api<EnrichmentData>(`/api/artists/${artistId}/enrichment`)
       .then((data) => {
         if (!cancelled) setEnrichment(data);
@@ -93,7 +98,7 @@ function useArtistBioEnrichment(open: boolean, artistId?: number) {
     return () => {
       cancelled = true;
     };
-  }, [open, artistId, enrichment]);
+  }, [open, artistId]);
 
   return enrichment;
 }
