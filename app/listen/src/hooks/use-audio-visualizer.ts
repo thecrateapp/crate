@@ -4,6 +4,21 @@ import { getAnalyserNode } from "@/lib/gapless-player";
 
 const BAR_COUNT = 64;
 
+function isVisualizerMotionBlocked(): boolean {
+  if (
+    typeof document !== "undefined" &&
+    document.visibilityState === "hidden"
+  ) {
+    return true;
+  }
+
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 /**
  * Reuse Gapless-5's analyser directly so the visualizer always taps the
  * actual playback engine instead of an extra derived node.
@@ -38,6 +53,10 @@ export function useAudioVisualizer(
   const frameCountRef = useRef(0);
 
   const tick = useCallback(() => {
+    if (isVisualizerMotionBlocked()) {
+      rafRef.current = 0;
+      return;
+    }
     if (!analyserRef.current || !dataRef.current) return;
     frameCountRef.current++;
     // Throttle state updates to ~20fps (every 3rd frame at 60fps)
@@ -89,11 +108,33 @@ export function useAudioVisualizer(
     setSampleRate(node.context.sampleRate || 44100);
     dataRef.current = new Float32Array(node.frequencyBinCount);
     waveRef.current = new Uint8Array(node.fftSize);
-    rafRef.current = requestAnimationFrame(tick);
+
+    const startSampling = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+      if (isVisualizerMotionBlocked()) return;
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    const handleVisibilityChange = () => {
+      startSampling();
+    };
+    const motionQuery =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : null;
+    const handleMotionPreferenceChange = () => {
+      startSampling();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    motionQuery?.addEventListener("change", handleMotionPreferenceChange);
+    startSampling();
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      motionQuery?.removeEventListener("change", handleMotionPreferenceChange);
       analyserRef.current = null;
       dataRef.current = null;
       waveRef.current = null;
