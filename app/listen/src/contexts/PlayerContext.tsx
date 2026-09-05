@@ -566,7 +566,7 @@ function usePlayerProviderRuntime(children: ReactNode) {
     markSeekPosition,
   });
 
-  recoverActiveTrackRef.current = async () => {
+  const recoverActiveTrack = useCallback(async () => {
     const recoveryQueue = queueRef.current;
     if (recoveryQueue.length === 0) return false;
     const recoveryIndex = clampIndex(
@@ -609,7 +609,19 @@ function usePlayerProviderRuntime(children: ReactNode) {
     }
     await gpPlay();
     return true;
-  };
+  }, [
+    buildEngineUrls,
+    currentIndexRef,
+    currentTimeRef,
+    effectiveCrossfadeMsRef,
+    lastNonZeroVolumeRef,
+    queueRef,
+    repeatRef,
+  ]);
+
+  useEffect(() => {
+    recoverActiveTrackRef.current = recoverActiveTrack;
+  }, [recoverActiveTrack]);
 
   const preResolveNextTrack = useCallback(() => {
     if (shouldUseAndroidNativePlayer()) return;
@@ -1855,7 +1867,9 @@ function usePlayerProviderRuntime(children: ReactNode) {
     restoreQueueSnapshot(snapshot);
   }, [commitJamQueueLocked, restoreQueueSnapshot]);
 
-  ensureJamQueueLockedRef.current = enterJamSession;
+  useEffect(() => {
+    ensureJamQueueLockedRef.current = enterJamSession;
+  }, [enterJamSession]);
 
   const clearQueueRef = useRef(clearQueue);
   useEffect(() => {
