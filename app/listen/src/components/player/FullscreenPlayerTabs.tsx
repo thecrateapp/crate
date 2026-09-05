@@ -26,6 +26,20 @@ import { Disc3 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 import { triggerHaptic } from "@/lib/haptics";
 
+function withStableDuplicateKeys<T>(
+  items: T[],
+  getIdentity: (item: T) => string,
+): Array<{ item: T; key: string }> {
+  const occurrences = new Map<string, number>();
+
+  return items.map((item) => {
+    const identity = getIdentity(item);
+    const occurrence = occurrences.get(identity) ?? 0;
+    occurrences.set(identity, occurrence + 1);
+    return { item, key: `${identity}-${occurrence}` };
+  });
+}
+
 function FullscreenQueueRow({
   track,
   onJump,
@@ -186,6 +200,15 @@ export function FullscreenPlayerQueueTab({
   jumpTo: (index: number) => void;
   scrollTabBottomClearance: string;
 }) {
+  const keyedTracks = useMemo(
+    () =>
+      withStableDuplicateKeys(
+        player.upcomingTracks,
+        (track) => track.globalTrackUid ?? track.entityUid ?? track.id,
+      ),
+    [player.upcomingTracks],
+  );
+
   return (
     <div
       className="flex-1 overflow-y-auto"
@@ -202,9 +225,9 @@ export function FullscreenPlayerQueueTab({
             {t("player.queue.nothingQueued")}
           </p>
         )}
-        {player.upcomingTracks.map((track, index) => (
+        {keyedTracks.map(({ item: track, key }, index) => (
           <FullscreenQueueRow
-            key={`${track.id}-${index}`}
+            key={key}
             track={track}
             onJump={() => jumpTo(index)}
           />
@@ -229,6 +252,16 @@ export function FullscreenPlayerLyricsTab({
   t: TFunction;
   scrollTabBottomClearance: string;
 }) {
+  const syncedLyrics = lyrics?.synced;
+  const keyedLines = useMemo(
+    () =>
+      withStableDuplicateKeys(
+        syncedLyrics ?? [],
+        (line) => `${line.time}-${line.text}`,
+      ),
+    [syncedLyrics],
+  );
+
   return (
     <div
       ref={refs.lyricsContainerRef}
@@ -245,12 +278,12 @@ export function FullscreenPlayerLyricsTab({
         </p>
       ) : lyrics.synced ? (
         <div className="relative z-10 mx-auto flex w-full max-w-[560px] flex-col items-start gap-3 py-8">
-          {lyrics.synced.map((line, index) => {
+          {keyedLines.map(({ item: line, key }, index) => {
             const active = index === activeLyricIndex;
             const past = index < activeLyricIndex;
             return (
               <button
-                key={`${line.time}-${index}`}
+                key={key}
                 type="button"
                 ref={active ? refs.activeLyricRef : null}
                 onClick={() => {
