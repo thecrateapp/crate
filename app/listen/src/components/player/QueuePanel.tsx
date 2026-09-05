@@ -158,7 +158,10 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   if (!open) return null;
 
   const upcoming = queue.slice(currentIndex + 1);
-  const played = queue.slice(0, currentIndex);
+  const played = queue
+    .slice(0, currentIndex)
+    .map((track, queueIndex) => ({ track, queueIndex }))
+    .reverse();
 
   const content = (
     <>
@@ -259,12 +262,12 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                 {t("player.queue.previous")}
               </p>
             </div>
-            {played.map((track, i) => (
+            {played.map(({ track, queueIndex }) => (
               <QueuePanelRow
-                key={`${track.id}-prev-${i}`}
+                key={`${track.id}-prev-${queueIndex}`}
                 track={track}
-                indexLabel={String(i + 1)}
-                onJump={() => jumpTo(i)}
+                indexLabel={String(queueIndex + 1)}
+                onJump={() => jumpTo(queueIndex)}
                 faded
                 locked={jamQueueLocked}
               />
