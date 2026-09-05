@@ -1,9 +1,10 @@
 import {
   useCallback,
   useEffect,
+  useReducer,
   useRef,
-  useState,
   type ChangeEvent,
+  type Dispatch,
   type FormEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,7 +35,7 @@ import {
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
-import { formatDuration } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
 
 export interface PlaylistComposerTrack {
   entityUid?: string;
@@ -200,6 +201,444 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+type PlaylistComposerState = {
+  name: string;
+  description: string;
+  coverDataUrl: string | null;
+  visibility: "public" | "private";
+  isCollaborative: boolean;
+  tracks: PlaylistComposerTrack[];
+  search: string;
+  searching: boolean;
+  results: SearchTrackResult[];
+  titleEditing: boolean;
+  descriptionEditing: boolean;
+};
+
+type PlaylistComposerAction =
+  | {
+      type: "reset";
+      initialName: string;
+      initialDescription: string;
+      initialCoverDataUrl: string | null;
+      initialVisibility: "public" | "private";
+      initialCollaborative: boolean;
+      initialTracks: PlaylistComposerTrack[];
+    }
+  | { type: "set-name"; value: string }
+  | { type: "set-description"; value: string }
+  | { type: "set-cover"; value: string | null }
+  | { type: "set-visibility"; value: "public" | "private" }
+  | { type: "toggle-collaborative" }
+  | { type: "set-tracks"; value: PlaylistComposerTrack[] }
+  | { type: "move-track"; activeId: string; overId: string }
+  | { type: "add-track"; value: PlaylistComposerTrack }
+  | { type: "remove-track"; key: string }
+  | { type: "set-search"; value: string }
+  | { type: "set-searching"; value: boolean }
+  | { type: "set-results"; value: SearchTrackResult[] }
+  | { type: "set-title-editing"; value: boolean }
+  | { type: "set-description-editing"; value: boolean };
+
+const initialPlaylistComposerState: PlaylistComposerState = {
+  name: "",
+  description: "",
+  coverDataUrl: null,
+  visibility: "private",
+  isCollaborative: false,
+  tracks: [],
+  search: "",
+  searching: false,
+  results: [],
+  titleEditing: false,
+  descriptionEditing: false,
+};
+
+function playlistComposerReducer(
+  state: PlaylistComposerState,
+  action: PlaylistComposerAction,
+): PlaylistComposerState {
+  switch (action.type) {
+    case "reset":
+      return {
+        ...initialPlaylistComposerState,
+        name: action.initialName,
+        description: action.initialDescription,
+        coverDataUrl: action.initialCoverDataUrl,
+        visibility: action.initialVisibility,
+        isCollaborative: action.initialCollaborative,
+        tracks: action.initialTracks,
+      };
+    case "set-name":
+      return { ...state, name: action.value };
+    case "set-description":
+      return { ...state, description: action.value };
+    case "set-cover":
+      return { ...state, coverDataUrl: action.value };
+    case "set-visibility":
+      return { ...state, visibility: action.value };
+    case "toggle-collaborative":
+      return { ...state, isCollaborative: !state.isCollaborative };
+    case "set-tracks":
+      return { ...state, tracks: action.value };
+    case "move-track": {
+      const oldIndex = state.tracks.findIndex(
+        (track) => getTrackKey(track) === action.activeId,
+      );
+      const newIndex = state.tracks.findIndex(
+        (track) => getTrackKey(track) === action.overId,
+      );
+      return oldIndex < 0 || newIndex < 0
+        ? state
+        : { ...state, tracks: arrayMove(state.tracks, oldIndex, newIndex) };
+    }
+    case "add-track":
+      return {
+        ...state,
+        tracks: mergeUniqueTracks([...state.tracks, action.value]),
+      };
+    case "remove-track":
+      return {
+        ...state,
+        tracks: state.tracks.filter(
+          (track) => getTrackKey(track) !== action.key,
+        ),
+      };
+    case "set-search":
+      return { ...state, search: action.value };
+    case "set-searching":
+      return { ...state, searching: action.value };
+    case "set-results":
+      return { ...state, results: action.value };
+    case "set-title-editing":
+      return { ...state, titleEditing: action.value };
+    case "set-description-editing":
+      return { ...state, descriptionEditing: action.value };
+  }
+}
+
+type PlaylistIdentityState = Pick<
+  PlaylistComposerState,
+  | "name"
+  | "description"
+  | "coverDataUrl"
+  | "visibility"
+  | "isCollaborative"
+  | "tracks"
+  | "titleEditing"
+  | "descriptionEditing"
+>;
+
+function PlaylistIdentitySection({
+  state,
+  refs,
+  dispatch,
+  handleFileChange,
+  t,
+}: {
+  state: PlaylistIdentityState;
+  refs: {
+    fileInputRef: { current: HTMLInputElement | null };
+    titleInputRef: { current: HTMLInputElement | null };
+    descriptionInputRef: { current: HTMLTextAreaElement | null };
+  };
+  dispatch: Dispatch<PlaylistComposerAction>;
+  handleFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  t: ReturnType<typeof useTranslation>["t"];
+}) {
+  const {
+    name,
+    description,
+    coverDataUrl,
+    visibility,
+    isCollaborative,
+    tracks,
+    titleEditing,
+    descriptionEditing,
+  } = state;
+  const { fileInputRef, titleInputRef, descriptionInputRef } = refs;
+
+  return (
+    <div className="flex items-start gap-4">
+      <div className="relative flex-shrink-0">
+        <PlaylistArtwork
+          name={name || t("playlistComposer.newPlaylist")}
+          coverDataUrl={coverDataUrl}
+          tracks={tracks}
+          className="h-24 w-24 rounded-xl shadow-2xl sm:h-28 sm:w-28"
+        />
+        <button
+          type="button"
+          className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-1 rounded-full bg-surface-canvas/65 px-2.5 py-1.5 text-[11px] font-medium text-text-primary backdrop-blur-md transition-colors hover:bg-surface-canvas/80"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload size={12} />
+          {t("playlistComposer.editCover")}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
+
+      <div className="min-w-0 flex-1 space-y-3 pt-1">
+        <div className="space-y-1">
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-primary/40">
+            {t("playlistComposer.playlistLabel")}
+          </div>
+          {titleEditing ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              placeholder={t("playlistComposer.namePlaceholder")}
+              value={name}
+              onChange={(event) =>
+                dispatch({ type: "set-name", value: event.target.value })
+              }
+              onBlur={() =>
+                dispatch({ type: "set-title-editing", value: false })
+              }
+              className="w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-xl font-semibold text-text-primary placeholder:text-text-muted focus:border-accent-action focus:outline-none"
+            />
+          ) : (
+            <button
+              type="button"
+              className="w-full text-left text-xl font-semibold text-text-primary transition-colors hover:text-text-primary"
+              onClick={() =>
+                dispatch({ type: "set-title-editing", value: true })
+              }
+            >
+              {name || t("playlistComposer.addTitle")}
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-primary/40">
+            {t("playlistComposer.descriptionLabel")}
+          </div>
+          {descriptionEditing ? (
+            <textarea
+              ref={descriptionInputRef}
+              rows={3}
+              placeholder={t("playlistComposer.descriptionPlaceholder")}
+              value={description}
+              onChange={(event) =>
+                dispatch({
+                  type: "set-description",
+                  value: event.target.value,
+                })
+              }
+              onBlur={() =>
+                dispatch({
+                  type: "set-description-editing",
+                  value: false,
+                })
+              }
+              className="w-full resize-none rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-action focus:outline-none"
+            />
+          ) : (
+            <button
+              type="button"
+              className="w-full text-left text-sm leading-6 text-text-muted transition-colors hover:text-text-primary"
+              onClick={() =>
+                dispatch({
+                  type: "set-description-editing",
+                  value: true,
+                })
+              }
+            >
+              {description || t("playlistComposer.addDescription")}
+            </button>
+          )}
+        </div>
+
+        {coverDataUrl ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-3 py-2 text-sm text-text-muted transition-colors hover:bg-text-primary/5 hover:text-text-primary"
+            onClick={() => dispatch({ type: "set-cover", value: null })}
+          >
+            <ImagePlus size={14} />
+            Use collage instead
+          </button>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            type="button"
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+              visibility === "private"
+                ? "bg-accent-action text-accent-action-foreground"
+                : "bg-text-primary/5 text-text-muted",
+            )}
+            onClick={() =>
+              dispatch({ type: "set-visibility", value: "private" })
+            }
+          >
+            Private
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+              visibility === "public"
+                ? "bg-accent-action text-accent-action-foreground"
+                : "bg-text-primary/5 text-text-muted",
+            )}
+            onClick={() =>
+              dispatch({ type: "set-visibility", value: "public" })
+            }
+          >
+            Public
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+              isCollaborative
+                ? "bg-accent-action text-accent-action-foreground"
+                : "bg-text-primary/5 text-text-muted",
+            )}
+            onClick={() => dispatch({ type: "toggle-collaborative" })}
+          >
+            Collaborative
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlaylistTrackSearch({
+  search,
+  searching,
+  results,
+  t,
+  onSearchChange,
+  onAddTrack,
+}: {
+  search: string;
+  searching: boolean;
+  results: SearchTrackResult[];
+  t: ReturnType<typeof useTranslation>["t"];
+  onSearchChange: (value: string) => void;
+  onAddTrack: (track: SearchTrackResult) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 rounded-xl border border-border-quiet bg-text-primary/5 px-3 py-2.5">
+        <Search size={15} className="text-text-muted" />
+        <input
+          type="text"
+          placeholder={t("playlistComposer.searchPlaceholder")}
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+        />
+        {searching ? (
+          <Loader2 size={14} className="text-accent-action animate-spin" />
+        ) : null}
+      </div>
+
+      {search.trim().length >= 2 ? (
+        <div className="rounded-xl border border-border-quiet bg-text-primary/5">
+          {results.length > 0 ? (
+            <div className="max-h-44 overflow-y-auto py-1.5">
+              {results.map((track) => (
+                <button
+                  key={searchTrackKey(track)}
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-text-primary/5"
+                  onClick={() => onAddTrack(track)}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-text-primary">
+                      {track.title}
+                    </div>
+                    <div className="truncate text-xs text-text-muted">
+                      {track.artist} · {track.album}
+                    </div>
+                  </div>
+                  <span className="text-xs text-accent-action">
+                    {t("common.add")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="px-3 py-4 text-sm text-text-muted">
+              {t("playlistComposer.noTracksFound")}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PlaylistTrackList({
+  tracks,
+  t,
+  onDragEnd,
+  onRemove,
+}: {
+  tracks: PlaylistComposerTrack[];
+  t: ReturnType<typeof useTranslation>["t"];
+  onDragEnd: (event: DragEndEvent) => void;
+  onRemove: (track: PlaylistComposerTrack) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary">
+            {t("common.tracks")}
+          </h3>
+          <p className="text-xs text-text-muted">
+            {tracks.length > 0
+              ? t("playlistComposer.selectedCount", { count: tracks.length })
+              : t("playlistComposer.addTracksLater")}
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border-quiet bg-text-primary/5">
+        <div className="max-h-64 overflow-y-auto py-1.5">
+          {tracks.length > 0 ? (
+            <DndContext
+              collisionDetection={closestCenter}
+              onDragEnd={onDragEnd}
+            >
+              <SortableContext
+                items={tracks.map(getTrackKey)}
+                strategy={verticalListSortingStrategy}
+              >
+                {tracks.map((track) => (
+                  <SortableTrackItem
+                    key={getTrackKey(track)}
+                    track={track}
+                    onRemove={() => onRemove(track)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="px-4 py-8 text-center text-sm text-text-muted">
+              Start by searching for tracks or open this modal from an album or
+              track menu.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PlaylistCreateModal({
   open,
   mode = "create",
@@ -214,35 +653,38 @@ export function PlaylistCreateModal({
   onSubmit,
 }: PlaylistCreateModalProps) {
   const { t } = useTranslation();
-  const [name, setName] = useState(initialName);
-  const [description, setDescription] = useState(initialDescription);
-  const [coverDataUrl, setCoverDataUrl] = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<"public" | "private">(
-    initialVisibility,
+  const [state, dispatch] = useReducer(
+    playlistComposerReducer,
+    initialPlaylistComposerState,
   );
-  const [isCollaborative, setIsCollaborative] = useState(initialCollaborative);
-  const [tracks, setTracks] = useState<PlaylistComposerTrack[]>(initialTracks);
-  const [search, setSearch] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<SearchTrackResult[]>([]);
-  const [titleEditing, setTitleEditing] = useState(false);
-  const [descriptionEditing, setDescriptionEditing] = useState(false);
+  const {
+    name,
+    description,
+    coverDataUrl,
+    visibility,
+    isCollaborative,
+    tracks,
+    search,
+    searching,
+    results,
+    titleEditing,
+    descriptionEditing,
+  } = state;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    setName(initialName);
-    setDescription(initialDescription);
-    setCoverDataUrl(initialCoverDataUrl);
-    setVisibility(initialVisibility);
-    setIsCollaborative(initialCollaborative);
-    setTracks(initialTracks);
-    setSearch("");
-    setResults([]);
-    setTitleEditing(false);
-    setDescriptionEditing(false);
+    dispatch({
+      type: "reset",
+      initialName,
+      initialDescription,
+      initialCoverDataUrl,
+      initialVisibility,
+      initialCollaborative,
+      initialTracks,
+    });
   }, [
     initialCollaborative,
     initialCoverDataUrl,
@@ -272,28 +714,28 @@ export function PlaylistCreateModal({
     if (!open) return undefined;
     const query = search.trim();
     if (query.length < 2) {
-      setResults([]);
-      setSearching(false);
+      dispatch({ type: "set-results", value: [] });
+      dispatch({ type: "set-searching", value: false });
       return undefined;
     }
 
     let cancelled = false;
     const timer = window.setTimeout(async () => {
-      setSearching(true);
+      dispatch({ type: "set-searching", value: true });
       try {
         const response = await api<{ tracks: SearchTrackResult[] }>(
           `/api/catalog/search?q=${encodeURIComponent(query)}&limit=20`,
         );
         if (!cancelled) {
-          setResults(response.tracks || []);
+          dispatch({ type: "set-results", value: response.tracks || [] });
         }
       } catch {
         if (!cancelled) {
-          setResults([]);
+          dispatch({ type: "set-results", value: [] });
         }
       } finally {
         if (!cancelled) {
-          setSearching(false);
+          dispatch({ type: "set-searching", value: false });
         }
       }
     }, 220);
@@ -307,10 +749,10 @@ export function PlaylistCreateModal({
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    setTracks((items) => {
-      const oldIdx = items.findIndex((t) => getTrackKey(t) === active.id);
-      const newIdx = items.findIndex((t) => getTrackKey(t) === over.id);
-      return arrayMove(items, oldIdx, newIdx);
+    dispatch({
+      type: "move-track",
+      activeId: String(active.id),
+      overId: String(over.id),
     });
   }, []);
 
@@ -332,23 +774,20 @@ export function PlaylistCreateModal({
     if (!file) return;
     try {
       const dataUrl = await fileToDataUrl(file);
-      setCoverDataUrl(dataUrl);
+      dispatch({ type: "set-cover", value: dataUrl });
     } catch {
-      setCoverDataUrl(null);
+      dispatch({ type: "set-cover", value: null });
     } finally {
       event.target.value = "";
     }
   }
 
   function addTrack(track: PlaylistComposerTrack) {
-    setTracks((current) => mergeUniqueTracks([...current, track]));
+    dispatch({ type: "add-track", value: track });
   }
 
   function removeTrack(track: PlaylistComposerTrack) {
-    const keyToRemove = getTrackKey(track);
-    setTracks((current) =>
-      current.filter((item) => getTrackKey(item) !== keyToRemove),
-    );
+    dispatch({ type: "remove-track", key: getTrackKey(track) });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -388,228 +827,42 @@ export function PlaylistCreateModal({
         </ModalHeader>
 
         <ModalBody className="space-y-5 px-5 py-5">
-          <div className="flex items-start gap-4">
-            <div className="relative flex-shrink-0">
-              <PlaylistArtwork
-                name={name || t("playlistComposer.newPlaylist")}
-                coverDataUrl={coverDataUrl}
-                tracks={tracks}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl shadow-2xl"
-              />
-              <button
-                type="button"
-                className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-1 rounded-full bg-surface-canvas/65 px-2.5 py-1.5 text-[11px] font-medium text-text-primary backdrop-blur-md hover:bg-surface-canvas/80 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload size={12} />
-                {t("playlistComposer.editCover")}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </div>
+          <PlaylistIdentitySection
+            state={{
+              name,
+              description,
+              coverDataUrl,
+              visibility,
+              isCollaborative,
+              tracks,
+              titleEditing,
+              descriptionEditing,
+            }}
+            refs={{
+              fileInputRef,
+              titleInputRef,
+              descriptionInputRef,
+            }}
+            dispatch={dispatch}
+            handleFileChange={handleFileChange}
+            t={t}
+          />
 
-            <div className="min-w-0 flex-1 space-y-3 pt-1">
-              <div className="space-y-1">
-                <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-primary/40">
-                  {t("playlistComposer.playlistLabel")}
-                </div>
-                {titleEditing ? (
-                  <input
-                    ref={titleInputRef}
-                    type="text"
-                    placeholder={t("playlistComposer.namePlaceholder")}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    onBlur={() => setTitleEditing(false)}
-                    className="w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-xl font-semibold text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-action"
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className="w-full text-left text-xl font-semibold text-text-primary hover:text-text-primary transition-colors"
-                    onClick={() => setTitleEditing(true)}
-                  >
-                    {name || t("playlistComposer.addTitle")}
-                  </button>
-                )}
-              </div>
+          <PlaylistTrackSearch
+            search={search}
+            searching={searching}
+            results={results}
+            t={t}
+            onSearchChange={(value) => dispatch({ type: "set-search", value })}
+            onAddTrack={(track) => addTrack(toComposerTrack(track))}
+          />
 
-              <div className="space-y-1">
-                <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-primary/40">
-                  {t("playlistComposer.descriptionLabel")}
-                </div>
-                {descriptionEditing ? (
-                  <textarea
-                    ref={descriptionInputRef}
-                    rows={3}
-                    placeholder={t("playlistComposer.descriptionPlaceholder")}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    onBlur={() => setDescriptionEditing(false)}
-                    className="w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-action resize-none"
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className="w-full text-left text-sm leading-6 text-text-muted hover:text-text-primary transition-colors"
-                    onClick={() => setDescriptionEditing(true)}
-                  >
-                    {description || t("playlistComposer.addDescription")}
-                  </button>
-                )}
-              </div>
-
-              {coverDataUrl ? (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-text-primary/5 transition-colors"
-                  onClick={() => setCoverDataUrl(null)}
-                >
-                  <ImagePlus size={14} />
-                  Use collage instead
-                </button>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2 pt-1">
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                    visibility === "private"
-                      ? "bg-accent-action text-accent-action-foreground"
-                      : "bg-text-primary/5 text-text-muted"
-                  }`}
-                  onClick={() => setVisibility("private")}
-                >
-                  Private
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                    visibility === "public"
-                      ? "bg-accent-action text-accent-action-foreground"
-                      : "bg-text-primary/5 text-text-muted"
-                  }`}
-                  onClick={() => setVisibility("public")}
-                >
-                  Public
-                </button>
-                <button
-                  type="button"
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                    isCollaborative
-                      ? "bg-accent-action text-accent-action-foreground"
-                      : "bg-text-primary/5 text-text-muted"
-                  }`}
-                  onClick={() => setIsCollaborative((current) => !current)}
-                >
-                  Collaborative
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 rounded-xl border border-border-quiet bg-text-primary/5 px-3 py-2.5">
-              <Search size={15} className="text-text-muted" />
-              <input
-                type="text"
-                placeholder={t("playlistComposer.searchPlaceholder")}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
-              />
-              {searching ? (
-                <Loader2
-                  size={14}
-                  className="text-accent-action animate-spin"
-                />
-              ) : null}
-            </div>
-
-            {search.trim().length >= 2 ? (
-              <div className="rounded-xl border border-border-quiet bg-text-primary/5">
-                {results.length > 0 ? (
-                  <div className="max-h-44 overflow-y-auto py-1.5">
-                    {results.map((track) => (
-                      <button
-                        key={searchTrackKey(track)}
-                        type="button"
-                        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-text-primary/5 transition-colors"
-                        onClick={() => addTrack(toComposerTrack(track))}
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-sm text-text-primary">
-                            {track.title}
-                          </div>
-                          <div className="truncate text-xs text-text-muted">
-                            {track.artist} · {track.album}
-                          </div>
-                        </div>
-                        <span className="text-xs text-accent-action">
-                          {t("common.add")}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="px-3 py-4 text-sm text-text-muted">
-                    {t("playlistComposer.noTracksFound")}
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-text-primary">
-                  {t("common.tracks")}
-                </h3>
-                <p className="text-xs text-text-muted">
-                  {tracks.length > 0
-                    ? t("playlistComposer.selectedCount", {
-                        count: tracks.length,
-                      })
-                    : t("playlistComposer.addTracksLater")}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border-quiet bg-text-primary/5">
-              <div className="max-h-64 overflow-y-auto py-1.5">
-                {tracks.length > 0 ? (
-                  <DndContext
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={tracks.map(getTrackKey)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {tracks.map((track) => (
-                        <SortableTrackItem
-                          key={getTrackKey(track)}
-                          track={track}
-                          onRemove={() => removeTrack(track)}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
-                ) : (
-                  <div className="px-4 py-8 text-center text-sm text-text-muted">
-                    Start by searching for tracks or open this modal from an
-                    album or track menu.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <PlaylistTrackList
+            tracks={tracks}
+            t={t}
+            onDragEnd={handleDragEnd}
+            onRemove={removeTrack}
+          />
         </ModalBody>
 
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
