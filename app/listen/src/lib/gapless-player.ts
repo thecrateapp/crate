@@ -18,6 +18,15 @@ import {
 } from "@/lib/equalizer";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { getCrossfadeDurationPreference } from "./player-playback-prefs";
+import {
+  animateVolume,
+  applyVolume,
+  getAppliedVolume,
+  getLastVolume,
+  setLastVolume,
+  setVolumeSink,
+  stopFade,
+} from "./gapless-player-volume";
 
 // Gapless-5 doesn't expose its playlist internals on the public type,
 // but we need a couple of fields to keep play order in sync. Centralized
@@ -83,17 +92,11 @@ export interface PlaybackGestureRequiredError {
 let instance: Gapless5 | null = null;
 let currentCallbacks: GaplessPlayerCallbacks = {};
 let currentAnalyser: AnalyserNode | null = null;
-let lastVolume = 1.0;
-let appliedVolume = 1.0;
-let fadeFrame: number | null = null;
 // True once the current track's audio is fully decoded into the
 // WebAudio buffer (RAM). In that state, network loss cannot stop
 // playback — the consumer (soft-interruption logic) can use this to
 // decide whether it's worth pausing on an offline event.
 let currentTrackFullyBuffered = false;
-// Holds the resolver of the currently-running fade so a new fade can
-// settle the previous promise cleanly (instead of leaking it forever).
-let fadeSettle: (() => void) | null = null;
 // Active equalizer chain (null = direct output, no processing).
 let eqChain: EqChain | null = null;
 
@@ -163,61 +166,6 @@ function invalidateAnalyser() {
   currentCallbacks.onAnalyserInvalidated?.();
 }
 
-function stopFade() {
-  if (fadeFrame != null) {
-    cancelAnimationFrame(fadeFrame);
-    fadeFrame = null;
-  }
-  // Settle any pending fade promise from the previous animation so
-  // awaiters of fadeInAndPlay / fadeOutAndPause never hang.
-  if (fadeSettle) {
-    const settle = fadeSettle;
-    fadeSettle = null;
-    settle();
-  }
-}
-
-function applyVolume(vol: number) {
-  const clamped = Math.max(0, Math.min(vol, 1));
-  appliedVolume = clamped;
-  instance?.setVolume(clamped);
-}
-
-function animateVolume(
-  from: number,
-  to: number,
-  durationMs: number,
-  onDone?: () => void,
-) {
-  stopFade();
-  const start = performance.now();
-  const safeDuration = Math.max(0, durationMs);
-  if (safeDuration === 0) {
-    applyVolume(to);
-    onDone?.();
-    return;
-  }
-
-  // Register onDone as the fade settler. It will be called either on
-  // completion (progress >= 1) or on cancellation (stopFade).
-  fadeSettle = onDone ?? null;
-
-  const tick = (now: number) => {
-    const progress = Math.min(1, (now - start) / safeDuration);
-    applyVolume(from + (to - from) * progress);
-    if (progress >= 1) {
-      fadeFrame = null;
-      const settle = fadeSettle;
-      fadeSettle = null;
-      settle?.();
-      return;
-    }
-    fadeFrame = requestAnimationFrame(tick);
-  };
-
-  fadeFrame = requestAnimationFrame(tick);
-}
-
 export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   if (instance) {
     currentCallbacks = callbacks;
@@ -255,7 +203,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     crossfade: getCrossfadeMs(),
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
     persistentHTML5Audio: isMobileAudioRuntime,
-    volume: lastVolume,
+    volume: getLastVolume(),
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
     // Keep the next mobile <audio> source ready before the active element
     // reaches ended, but only after the current stream has a safe buffer.
@@ -270,7 +218,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     // HTML5-only path above.
     switchToWebAudioDuringPlayback: !preferHtml5Audio,
   });
-  appliedVolume = lastVolume;
+  setVolumeSink((volume) => instance?.setVolume(volume));
 
   instance.ontimeupdate = (posMs, trackIndex) => {
     currentCallbacks.onTimeUpdate?.(posMs, trackIndex);
@@ -379,6 +327,7 @@ export function destroyPlayer(): void {
     instance = null;
     currentAnalyser = null;
   }
+  setVolumeSink(null);
   tauriPlaybackWasActive = false;
 }
 
@@ -606,7 +555,7 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   nextPlayer.singleMode = singleMode;
   nextPlayer.setCrossfade(crossfade);
   nextPlayer.setPlaybackRate(lastPlaybackRate);
-  applyVolume(lastVolume);
+  applyVolume(getLastVolume());
   setEqualizer(preservedEqEnabled, preservedEqGains);
 }
 
@@ -701,7 +650,7 @@ export async function play(): Promise<void> {
   if (shouldRampAfterResume && instance) {
     applyVolume(0);
     instance.play();
-    animateVolume(0, lastVolume, RESUMED_AUDIO_CONTEXT_RAMP_MS);
+    animateVolume(0, getLastVolume(), RESUMED_AUDIO_CONTEXT_RAMP_MS);
     return;
   }
   instance?.play();
@@ -765,7 +714,7 @@ export function seekTo(positionMs: number): void {
 }
 
 export function setVolume(vol: number): void {
-  lastVolume = vol;
+  setLastVolume(vol);
   applyVolume(vol);
 }
 
@@ -820,12 +769,12 @@ export function setCrossfadeDuration(durationMs: number): void {
 
 export function fadeOutAndPause(durationMs = DEFAULT_FADE_MS): Promise<void> {
   if (!instance) return Promise.resolve();
-  const startVolume = appliedVolume;
+  const startVolume = getAppliedVolume();
   return new Promise((resolve) => {
     animateVolume(startVolume, 0, durationMs, () => {
       instance?.pause();
       tauriPlaybackWasActive = false;
-      applyVolume(lastVolume);
+      applyVolume(getLastVolume());
       resolve();
     });
   });
@@ -843,7 +792,7 @@ export async function fadeInAndPlay(
   tauriPlaybackWasActive = true;
   instance?.play();
   return new Promise((resolve) => {
-    animateVolume(0, lastVolume, durationMs, resolve);
+    animateVolume(0, getLastVolume(), durationMs, resolve);
   });
 }
 
@@ -852,7 +801,7 @@ export async function fadeInAndPlay(
  * cancelled fade leaves the player muted.
  */
 export function restoreVolume(): void {
-  applyVolume(lastVolume);
+  applyVolume(getLastVolume());
 }
 
 export function setLoop(enabled: boolean): void {
