@@ -1,5 +1,4 @@
 import {
-  useCallback,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -7,30 +6,21 @@ import {
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import {
-  getPosition as gpGetPosition,
   loadQueue as gpLoadQueue,
   pause as gpPause,
   stop as gpStop,
 } from "@/lib/gapless-player";
-import { shuffleKeepingCurrent } from "@/contexts/player-queue-helpers";
-import { getTrackCacheKey, STORAGE_KEY } from "@/contexts/player-utils";
 import {
   androidNativeEngine as nativeEngine,
   isAndroidNativePlayerAvailable,
-  shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
 import type { PlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 import { usePlayerJamQueueSync } from "@/contexts/use-player-jam-queue-sync";
 import { usePlayerNavigationActions } from "@/contexts/use-player-navigation-actions";
 import { usePlayerQueueMutationActions } from "@/contexts/use-player-queue-mutation-actions";
+import { usePlayerQueueStateActions } from "@/contexts/use-player-queue-state-actions";
 import { usePlayerStartActions } from "@/contexts/use-player-start-actions";
-import type { EngineRepeatMode } from "@/lib/playback-engine";
-import { castStop, isCastSessionActive } from "@/lib/cast-sender";
 import { usePlayerTransportControls } from "@/contexts/use-player-transport-controls";
-
-function toEngineRepeatMode(repeat: RepeatMode): EngineRepeatMode {
-  return repeat;
-}
 
 function silenceGaplessEngine() {
   gpPause();
@@ -43,13 +33,6 @@ function stopNativeEngineIfAvailable(context: string) {
   void nativeEngine.stop().catch((error) => {
     console.error(`[native-player] failed to stop ${context}:`, error);
   });
-}
-
-function playbackPositionMs(currentTimeSeconds: number): number {
-  if (shouldUseAndroidNativePlayer()) {
-    return Math.max(0, Math.round(currentTimeSeconds * 1000));
-  }
-  return gpGetPosition();
 }
 
 interface UsePlayerQueueActionsParams {
@@ -213,127 +196,38 @@ export function usePlayerQueueActions({
     playbackDeliveryPolicy,
   });
 
-  const clearQueue = useCallback(() => {
-    if (jamQueueLockedRef.current) return;
-    if (isCastSessionActive()) {
-      void castStop().catch((error) => {
-        console.error("[cast] failed to stop:", error);
-      });
-    }
-    cancelSoftInterruption();
-    pendingRestoreTimeRef.current = 0;
-    resumeAfterReloadRef.current = false;
-    cancelRestoreAutoplay();
-    bufferingIntentRef.current = false;
-    resetPlaybackIntelligence();
-    flushCurrentPlayEvent("interrupted");
-    stopNativeEngineIfAvailable("clear queue");
-    gpPause();
-    gpStop();
-    gpLoadQueue([], 0);
-    resetEngineTrackMap();
-    commitQueue([]);
-    commitCurrentIndex(0);
-    commitCurrentTime(0);
-    commitDuration(0);
-    commitIsPlaying(false);
-    commitIsBuffering(false);
-    setPlaySource(null);
-    activatedTrackKeyRef.current = null;
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore persistence failures
-    }
-  }, [
-    activatedTrackKeyRef,
-    bufferingIntentRef,
-    cancelSoftInterruption,
-    cancelRestoreAutoplay,
-    commitCurrentIndex,
-    commitCurrentTime,
-    commitDuration,
-    commitIsBuffering,
-    commitIsPlaying,
-    commitQueue,
-    flushCurrentPlayEvent,
-    resetEngineTrackMap,
-    jamQueueLockedRef,
-    pendingRestoreTimeRef,
-    resetPlaybackIntelligence,
-    resumeAfterReloadRef,
-    setPlaySource,
-  ]);
-
-  const toggleShuffle = useCallback(() => {
-    if (jamQueueLockedRef.current) return;
-    const previousQueue = queueRef.current;
-    if (!previousQueue.length) {
-      setShuffleState((value) => !value);
-      return;
-    }
-
-    const enabling = !shuffleRef.current;
-    const activeTrack = previousQueue[currentIndexRef.current];
-
-    if (enabling) {
-      unshuffledQueueRef.current = previousQueue.slice();
-      const nextQueue = shuffleKeepingCurrent(
-        previousQueue,
-        currentIndexRef.current,
-      );
-      setShuffleState(true);
-      pushToEngine(nextQueue, 0, {
-        autoplay: isPlayingRef.current,
-        positionMs: playbackPositionMs(currentTimeRef.current),
-      });
-      return;
-    }
-
-    const original = unshuffledQueueRef.current ?? previousQueue;
-    unshuffledQueueRef.current = null;
-    const nextIndex = activeTrack
-      ? Math.max(
-          0,
-          original.findIndex(
-            (track) =>
-              getTrackCacheKey(track) === getTrackCacheKey(activeTrack),
-          ),
-        )
-      : 0;
-
-    setShuffleState(false);
-    pushToEngine(original, nextIndex, {
-      autoplay: isPlayingRef.current,
-      positionMs: playbackPositionMs(currentTimeRef.current),
-    });
-  }, [
-    currentTimeRef,
-    currentIndexRef,
-    jamQueueLockedRef,
-    isPlayingRef,
-    pushToEngine,
-    queueRef,
-    setShuffleState,
-    shuffleRef,
-    unshuffledQueueRef,
-  ]);
-
-  const cycleRepeat = useCallback(() => {
-    if (jamQueueLockedRef.current) return;
-    setRepeatState((previousMode) => {
-      const nextMode =
-        previousMode === "off" ? "all" : previousMode === "all" ? "one" : "off";
-      if (shouldUseAndroidNativePlayer()) {
-        void nativeEngine
-          .setRepeat(toEngineRepeatMode(nextMode))
-          .catch((error) => {
-            console.error("[native-player] failed to set repeat:", error);
-          });
-      }
-      return nextMode;
-    });
-  }, [jamQueueLockedRef, setRepeatState]);
+  const { clearQueue, toggleShuffle, cycleRepeat } = usePlayerQueueStateActions(
+    {
+      queueRef,
+      currentIndexRef,
+      currentTimeRef,
+      isPlayingRef,
+      jamQueueLockedRef,
+      shuffleRef,
+      unshuffledQueueRef,
+      bufferingIntentRef,
+      pendingRestoreTimeRef,
+      resumeAfterReloadRef,
+      activatedTrackKeyRef,
+      setPlaySource,
+      setShuffleState,
+      setRepeatState,
+      resetEngineTrackMap,
+      flushCurrentPlayEvent,
+      cancelSoftInterruption,
+      cancelRestoreAutoplay,
+      resetPlaybackIntelligence,
+      commitQueue,
+      commitCurrentIndex,
+      commitCurrentTime,
+      commitDuration,
+      commitIsPlaying,
+      commitIsBuffering,
+      pushToEngine,
+      silenceGaplessEngine,
+      stopNativeEngineIfAvailable,
+    },
+  );
 
   const { pause, resume, seek, setVolume, setPlaybackRate } =
     usePlayerTransportControls({
