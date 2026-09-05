@@ -11,6 +11,7 @@ import {
   stableMobileAudioPipeline,
 } from "@/lib/mobile-audio-mode";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
+import { createAudioRecoveryController } from "./gapless-player-audio-recovery";
 import {
   getEqualizerState,
   resetEqualizer,
@@ -42,10 +43,6 @@ function getPlaylistInternal(): GaplessPlaylistInternal | null {
 
 type GaplessOutputInternal = Gapless5 & {
   context?: AudioContext;
-};
-
-type WindowWithGaplessContext = Window & {
-  gapless5AudioContext?: AudioContext;
 };
 
 // The package's TS declarations don't expose these enums as named imports,
@@ -99,8 +96,6 @@ export function getPlaybackLoadLimit(preferHtml5Audio: boolean): number {
     : DESKTOP_DECODE_TRACK_LIMIT;
 }
 let lastPlaybackRate = 1.0;
-let lifecycleRecoveryInstalled = false;
-let contextWakeInFlight: Promise<void> | null = null;
 let tauriAudioOutputMayBeStale = false;
 let tauriPlaybackWasActive = false;
 
@@ -163,7 +158,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     return instance;
   }
 
-  installAudioLifecycleRecovery();
+  audioRecovery.install();
   currentCallbacks = callbacks;
   const preferHtml5Audio = stableMobileAudioPipeline;
   const probe =
@@ -424,75 +419,19 @@ function isTauriDesktopRuntime(): boolean {
   );
 }
 
-function installAudioLifecycleRecovery(): void {
-  if (
-    lifecycleRecoveryInstalled ||
-    typeof window === "undefined" ||
-    typeof document === "undefined"
-  ) {
-    return;
-  }
-  lifecycleRecoveryInstalled = true;
-
-  const wake = (reason: string) => {
-    if (!isTauriDesktopRuntime()) return;
-    if (!tauriPlaybackWasActive || reason === "devicechange") {
-      tauriAudioOutputMayBeStale = true;
-    }
-    void prepareAudioForPlayback(reason);
-  };
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") wake("visibilitychange");
-  });
-  window.addEventListener("focus", () => wake("focus"));
-  window.addEventListener("pageshow", () => wake("pageshow"));
-
-  if (typeof navigator !== "undefined" && navigator.mediaDevices) {
-    navigator.mediaDevices.addEventListener?.("devicechange", () =>
-      wake("devicechange"),
-    );
-  }
-}
-
-function kickAudioOutput(ctx: AudioContext, reason: string): void {
-  if (!isTauriDesktopRuntime() || ctx.state !== "running") return;
-  try {
-    const gain = ctx.createGain();
-    gain.gain.value = 0.00001;
-    const oscillator = ctx.createOscillator();
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.03);
-    window.setTimeout(() => {
-      try {
-        oscillator.disconnect();
-        gain.disconnect();
-      } catch {
-        /* ignore */
-      }
-    }, 80);
-  } catch (error) {
-    recordDevLog(
-      "audio",
-      "output wake kick failed",
-      { reason, error: String(error) },
-      "debug",
-    );
-  }
-}
-
-function clearSharedGaplessAudioContext(
-  previousContext: AudioContext | null,
-): void {
-  if (typeof window === "undefined") return;
-  const w = window as WindowWithGaplessContext;
-  if (!w.gapless5AudioContext) return;
-  if (!previousContext || w.gapless5AudioContext === previousContext) {
-    w.gapless5AudioContext = undefined;
-  }
-}
+const audioRecovery = createAudioRecoveryController({
+  getAudioContext,
+  isTauriDesktopRuntime,
+  isPlaybackActive: () => tauriPlaybackWasActive,
+  isOutputStale: () => tauriAudioOutputMayBeStale,
+  markOutputStale: () => {
+    tauriAudioOutputMayBeStale = true;
+  },
+  clearOutputStale: () => {
+    tauriAudioOutputMayBeStale = false;
+  },
+  rebuildPlayer: (reason) => rebuildPlayerAfterAudioContextLoss(reason),
+});
 
 function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   if (!instance) return;
@@ -526,8 +465,7 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   instance = null;
   currentAnalyser = null;
   currentTrackFullyBuffered = false;
-  clearSharedGaplessAudioContext(previousContext);
-  tauriAudioOutputMayBeStale = false;
+  audioRecovery.clearSharedGaplessAudioContext(previousContext);
 
   const nextPlayer = initPlayer(currentCallbacks);
   if (tracks.length > 0) {
@@ -544,91 +482,11 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   applyEqualizer(preservedEq.enabled, preservedEq.gains);
 }
 
-async function prepareAudioForPlayback(
-  reason: string,
-  options: { rebuildIfTauriOutputMayBeStale?: boolean } = {},
-): Promise<void> {
-  const wantsStaleTauriRebuild =
-    options.rebuildIfTauriOutputMayBeStale &&
-    isTauriDesktopRuntime() &&
-    tauriAudioOutputMayBeStale;
-
-  const trackWake = (wake: Promise<void>) => {
-    const tracked = wake.finally(() => {
-      if (contextWakeInFlight === tracked) {
-        contextWakeInFlight = null;
-      }
-    });
-    contextWakeInFlight = tracked;
-    return tracked;
-  };
-
-  if (contextWakeInFlight) {
-    if (!wantsStaleTauriRebuild) return contextWakeInFlight;
-    const currentWake = contextWakeInFlight;
-    return trackWake(
-      currentWake.then(
-        () => prepareAudioForPlaybackInner(reason, options),
-        () => prepareAudioForPlaybackInner(reason, options),
-      ),
-    );
-  }
-
-  return trackWake(prepareAudioForPlaybackInner(reason, options));
-}
-
-async function prepareAudioForPlaybackInner(
-  reason: string,
-  options: { rebuildIfTauriOutputMayBeStale?: boolean } = {},
-): Promise<void> {
-  let ctx = getAudioContext();
-  if (!ctx) return;
-
-  if (
-    options.rebuildIfTauriOutputMayBeStale &&
-    isTauriDesktopRuntime() &&
-    tauriAudioOutputMayBeStale
-  ) {
-    rebuildPlayerAfterAudioContextLoss(`${reason}:tauri-output-stale`);
-    ctx = getAudioContext();
-  }
-
-  if (!ctx) return;
-
-  if (ctx.state === "closed") {
-    rebuildPlayerAfterAudioContextLoss(reason);
-    ctx = getAudioContext();
-  }
-
-  if (ctx?.state === "suspended") {
-    try {
-      await ctx.resume();
-    } catch (error) {
-      recordDevLog(
-        "audio",
-        "audio context resume failed",
-        { reason, error: String(error) },
-        "warn",
-      );
-    }
-  }
-
-  ctx = getAudioContext();
-  if (ctx?.state === "closed") {
-    rebuildPlayerAfterAudioContextLoss(`${reason}:resume-closed`);
-    ctx = getAudioContext();
-  }
-
-  if (ctx?.state === "running") {
-    kickAudioOutput(ctx, reason);
-  }
-}
-
 export async function play(): Promise<void> {
   stopFade();
   const shouldRampAfterResume =
     !isTauriDesktopRuntime() && getAudioContext()?.state === "suspended";
-  await prepareAudioForPlayback("play", {
+  await audioRecovery.prepare("play", {
     rebuildIfTauriOutputMayBeStale: true,
   });
   tauriPlaybackWasActive = true;
@@ -658,12 +516,14 @@ export function stop(): void {
  * next track (auto-advance uses the same internal path).
  */
 export function next(): void {
-  void prepareAudioForPlayback("next", {
-    rebuildIfTauriOutputMayBeStale: true,
-  }).then(() => {
-    tauriPlaybackWasActive = true;
-    instance?.next(undefined, true, true);
-  });
+  void audioRecovery
+    .prepare("next", {
+      rebuildIfTauriOutputMayBeStale: true,
+    })
+    .then(() => {
+      tauriPlaybackWasActive = true;
+      instance?.next(undefined, true, true);
+    });
 }
 
 /**
@@ -686,12 +546,14 @@ export function gotoTrack(
     instance?.gotoTrack(indexOrUrl, forcePlay);
     return;
   }
-  void prepareAudioForPlayback("gotoTrack", {
-    rebuildIfTauriOutputMayBeStale: true,
-  }).then(() => {
-    tauriPlaybackWasActive = true;
-    instance?.gotoTrack(indexOrUrl, forcePlay);
-  });
+  void audioRecovery
+    .prepare("gotoTrack", {
+      rebuildIfTauriOutputMayBeStale: true,
+    })
+    .then(() => {
+      tauriPlaybackWasActive = true;
+      instance?.gotoTrack(indexOrUrl, forcePlay);
+    });
 }
 
 export function seekTo(positionMs: number): void {
@@ -770,7 +632,7 @@ export async function fadeInAndPlay(
 ): Promise<void> {
   if (!instance) return Promise.resolve();
   stopFade();
-  await prepareAudioForPlayback("fadeInAndPlay", {
+  await audioRecovery.prepare("fadeInAndPlay", {
     rebuildIfTauriOutputMayBeStale: true,
   });
   applyVolume(0);
