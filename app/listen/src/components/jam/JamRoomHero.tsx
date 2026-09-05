@@ -1,4 +1,5 @@
-import { JamRoomActions, type JamRoomHeroProps } from "./JamRoomHeroSections";
+import { type JamRoomHeroProps } from "./JamRoomHeroSections";
+import { JamRoomActions } from "./JamRoomActions";
 import { JamRoomHeader } from "./JamRoomHeaderSections";
 import { JamNowPlaying } from "./JamRoomPlaybackSections";
 
