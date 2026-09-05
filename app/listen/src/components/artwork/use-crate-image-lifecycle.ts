@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { ImgHTMLAttributes, SyntheticEvent } from "react";
 
 import {
@@ -41,8 +41,11 @@ export function useCrateImageLifecycle({
   onError,
   onLoad,
 }: UseCrateImageLifecycleOptions) {
-  const initial = resolved ? { candidate: resolved, ready: false } : null;
-  const [active, setActive] = useState<ActiveArtwork | null>(initial);
+  const [active, dispatch] = useReducer(
+    activeArtworkReducer,
+    resolved,
+    createInitialActiveArtwork,
+  );
   const activeRef = useRef(active);
   const desiredRef = useRef(resolved ? candidateKey(resolved) : "");
   const handledResumeVersion = useRef(resumeVersion);
@@ -52,7 +55,7 @@ export function useCrateImageLifecycle({
 
   const commit = useCallback((next: ActiveArtwork | null) => {
     activeRef.current = next;
-    setActive(next);
+    dispatch({ type: "replace", value: next });
   }, []);
 
   useEffect(() => {
@@ -243,4 +246,17 @@ function buildRecovery({
 
 function candidateKey(candidate: ResolvedArtworkCandidate): string {
   return candidate.logicalKey + String.fromCharCode(0) + candidate.contentKey;
+}
+
+function createInitialActiveArtwork(
+  candidate: ResolvedArtworkCandidate | null,
+): ActiveArtwork | null {
+  return candidate ? { candidate, ready: false } : null;
+}
+
+function activeArtworkReducer(
+  _state: ActiveArtwork | null,
+  action: { type: "replace"; value: ActiveArtwork | null },
+): ActiveArtwork | null {
+  return action.value;
 }
