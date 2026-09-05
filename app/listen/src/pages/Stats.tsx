@@ -13,9 +13,9 @@ import {
 import {
   StatsAnalyticsSection,
   StatsCollectionsSection,
-  StatsHeroSection,
   StatsStorySection,
 } from "./StatsSections";
+import { StatsHeroSection } from "./StatsHeroSections";
 import { WindowPicker } from "@/components/stats/StatsPanels";
 
 export function Stats() {
