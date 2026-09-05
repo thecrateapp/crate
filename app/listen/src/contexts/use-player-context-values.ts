@@ -18,7 +18,13 @@ export function usePlayerContextValues({
   state,
 }: PlayerContextValuesInput) {
   const stateValue = useMemo(
-    () => state,
+    () => ({
+      analyserVersion: state.analyserVersion,
+      crossfadeTransition: state.crossfadeTransition,
+      isBuffering: state.isBuffering,
+      isPlaying: state.isPlaying,
+      volume: state.volume,
+    }),
     [
       state.analyserVersion,
       state.crossfadeTransition,
@@ -29,12 +35,51 @@ export function usePlayerContextValues({
   );
 
   const progressValue = useMemo(
-    () => progress,
+    () => ({
+      currentTime: progress.currentTime,
+      duration: progress.duration,
+    }),
     [progress.currentTime, progress.duration],
   );
 
   const actionsValue = useMemo(
-    () => actions,
+    () => ({
+      addToQueue: actions.addToQueue,
+      captureQueueSnapshot: actions.captureQueueSnapshot,
+      clearQueue: actions.clearQueue,
+      connect: actions.connect,
+      currentIndex: actions.currentIndex,
+      currentTrack: actions.currentTrack,
+      cycleRepeat: actions.cycleRepeat,
+      enterJamSession: actions.enterJamSession,
+      jamQueueLocked: actions.jamQueueLocked,
+      jamTransport: actions.jamTransport,
+      jumpTo: actions.jumpTo,
+      leaveJamSession: actions.leaveJamSession,
+      next: actions.next,
+      pause: actions.pause,
+      play: actions.play,
+      playAll: actions.playAll,
+      playNext: actions.playNext,
+      playSource: actions.playSource,
+      prev: actions.prev,
+      publishConnectState: actions.publishConnectState,
+      queue: actions.queue,
+      reorderQueue: actions.reorderQueue,
+      removeFromQueue: actions.removeFromQueue,
+      repeat: actions.repeat,
+      restoreQueueSnapshot: actions.restoreQueueSnapshot,
+      recentlyPlayed: actions.recentlyPlayed,
+      resume: actions.resume,
+      seek: actions.seek,
+      setJamTransport: actions.setJamTransport,
+      setPlaybackRate: actions.setPlaybackRate,
+      setVolume: actions.setVolume,
+      shuffle: actions.shuffle,
+      smartCrossfadeEnabled: actions.smartCrossfadeEnabled,
+      syncJamQueue: actions.syncJamQueue,
+      toggleShuffle: actions.toggleShuffle,
+    }),
     [
       actions.addToQueue,
       actions.captureQueueSnapshot,

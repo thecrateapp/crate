@@ -24,16 +24,10 @@ import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
 import { usePlayerConnectTransport } from "@/contexts/use-player-connect-transport";
 import { useEqualizerRuntime } from "@/hooks/use-equalizer-runtime";
 import { useRestoreOnMount } from "@/contexts/use-restore-on-mount";
-import {
-  useDesktopTrayCommands,
-  useDesktopTrayNowPlaying,
-} from "@/contexts/use-desktop-tray-commands";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
 import { useSoftInterruption } from "@/contexts/use-soft-interruption";
-import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
-import { useMediaSession } from "@/contexts/use-media-session";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 import { recordPlaybackStall } from "@/lib/playback-network-quality";
 import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime";
@@ -46,6 +40,7 @@ import { usePlayerEnginePreferenceRuntime } from "@/contexts/use-player-engine-p
 import { usePlayerPlaybackObservability } from "@/contexts/use-player-playback-observability";
 import { usePlayerConnectState } from "@/contexts/use-player-connect-state";
 import { usePlayerContextValues } from "@/contexts/use-player-context-values";
+import { usePlayerPlatformIntegrations } from "@/contexts/use-player-platform-integrations";
 import { PlayerProviderSurface } from "@/contexts/PlayerProviderSurface";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
@@ -601,34 +596,20 @@ function usePlayerProviderRuntime(children: ReactNode) {
       resume,
     });
 
-  usePlayerShortcuts({
-    hasCurrentTrack: !!currentTrack,
+  usePlayerPlatformIntegrations({
+    currentTrack,
     isPlaying,
     currentTime,
     duration,
     volume,
     lastNonZeroVolume: lastNonZeroVolumeRef.current,
+    isPlayingRef,
     pause,
     resume,
     next,
     prev,
     seek,
     setVolume,
-  });
-
-  useDesktopTrayCommands({ isPlayingRef, pause, resume, previous: prev, next });
-  useDesktopTrayNowPlaying({ currentTrack, isPlaying });
-
-  useMediaSession({
-    currentTrack,
-    isPlaying,
-    currentTime,
-    duration,
-    pause,
-    resume,
-    next,
-    prev,
-    seek,
   });
 
   const { actionsValue, progressValue, stateValue } = usePlayerContextValues({
