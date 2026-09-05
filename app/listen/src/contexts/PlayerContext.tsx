@@ -20,7 +20,6 @@ import {
 } from "@/contexts/player-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
-import { usePlayEventTracker } from "@/contexts/use-play-event-tracker";
 import { usePlaybackIntelligence } from "@/contexts/use-playback-intelligence";
 import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
 import { useRemotePlaybackState } from "@/contexts/use-remote-playback-state";
@@ -40,23 +39,8 @@ import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
 import { useSoftInterruption } from "@/contexts/use-soft-interruption";
 import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
 import { useMediaSession } from "@/contexts/use-media-session";
-import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
-import {
-  getEffectivePlaybackDeliveryPolicy,
-  getPlaybackDeliveryPolicyPreference,
-  subscribeToPlaybackDeliveryNetworkChanges,
-} from "@/lib/player-playback-prefs";
-import {
-  recordPlaybackStall,
-  recordStablePlayback,
-} from "@/lib/playback-network-quality";
-import { getPlaybackDeliveryProvenance } from "@/lib/playback-provenance";
-import {
-  getPlaybackQoeRuntime,
-  installPlaybackQoeFlush,
-  recordPlaybackQoe,
-  type PlaybackQoeEventName,
-} from "@/lib/playback-qoe";
+import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
+import { recordPlaybackStall } from "@/lib/playback-network-quality";
 import { CRATE_CONNECT_V2_TRANSPORT_ENABLED } from "@/lib/crate-connect";
 import { buildPlaybackStatePayload } from "@/lib/remote-playback-state";
 import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime";
@@ -66,6 +50,7 @@ import { usePlayerIntelligenceActions } from "@/contexts/use-player-intelligence
 import { usePlayerTrackRecovery } from "@/contexts/use-player-track-recovery";
 import { usePlayerLifecycleRuntime } from "@/contexts/use-player-lifecycle-runtime";
 import { usePlayerEnginePreferenceRuntime } from "@/contexts/use-player-engine-preference-runtime";
+import { usePlayerPlaybackObservability } from "@/contexts/use-player-playback-observability";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -283,52 +268,22 @@ function usePlayerProviderRuntime(children: ReactNode) {
   );
   useEqualizerRuntime(currentTrack);
 
-  const getPlaybackSnapshot = useCallback(
-    () => ({
-      currentTime: currentTimeRef.current,
-      duration: durationRef.current,
-    }),
-    [currentTimeRef, durationRef],
-  );
-
   const {
-    startSession: startTrackerSession,
-    ensureSession: ensureTrackerSession,
+    startTrackerSession,
+    ensureTrackerSession,
     flushCurrentPlayEvent,
-    rotateSession: rotateTrackerSession,
+    rotateTrackerSession,
     markSeekPosition,
     recordProgress,
-  } = usePlayEventTracker(getPlaybackSnapshot);
-  const recordPlaybackQualityProgress = useCallback((seconds: number) => {
-    recordStablePlayback(seconds);
-  }, []);
-  const recordCurrentPlaybackQoe = useCallback(
-    (
-      event: PlaybackQoeEventName,
-      details: {
-        durationMs?: number;
-        bufferedAheadSeconds?: number;
-        attempt?: number;
-      } = {},
-    ) => {
-      const track = currentTrackRef.current;
-      if (!track) return;
-      const policy = getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy);
-      const provenance = getPlaybackDeliveryProvenance(track);
-      recordPlaybackQoe({
-        event,
-        origin:
-          provenance?.origin ??
-          (track.origin === "remote" ? "remote" : "local"),
-        requestedPolicy: provenance?.requestedPolicy ?? policy,
-        effectivePolicy: provenance?.effectivePolicy ?? policy,
-        runtime: getPlaybackQoeRuntime(),
-        engine: shouldUseAndroidNativePlayer() ? "media3" : "gapless",
-        ...details,
-      });
-    },
-    [currentTrackRef, playbackDeliveryPolicy],
-  );
+    recordPlaybackQualityProgress,
+    recordCurrentPlaybackQoe,
+  } = usePlayerPlaybackObservability({
+    currentTrackRef,
+    currentTimeRef,
+    durationRef,
+    playbackDeliveryPolicy,
+    setPlaybackDeliveryPolicy,
+  });
   const { preResolveNextTrack, recoverActiveTrackRef } = usePlayerTrackRecovery(
     {
       buildEngineUrls,
@@ -370,12 +325,6 @@ function usePlayerProviderRuntime(children: ReactNode) {
     },
     recoverCurrentTrack: () => recoverActiveTrackRef.current(),
   });
-  useEffect(() => {
-    return subscribeToPlaybackDeliveryNetworkChanges(() => {
-      setPlaybackDeliveryPolicy(getPlaybackDeliveryPolicyPreference());
-    });
-  }, [setPlaybackDeliveryPolicy]);
-  useEffect(() => installPlaybackQoeFlush(), []);
   const {
     syncEffectiveCrossfade,
     rememberActiveTrack,
