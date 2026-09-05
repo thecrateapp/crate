@@ -1,66 +1,22 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Download,
-  ExternalLink,
-  Heart,
-  Loader2,
-  Radar,
-  RefreshCw,
-} from "@crate/ui/icons";
+import { Heart, Loader2, Radar, RefreshCw } from "@crate/ui/icons";
 import type { LucideIcon } from "@crate/ui/icons";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
-import { CrateImage } from "@/components/artwork/CrateImage";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
-import { cn } from "@/lib/utils";
-
-interface BandcampConnectionStatus {
-  connected: boolean;
-  status: string;
-  username?: string | null;
-  display_name?: string | null;
-  image_url?: string | null;
-  last_success_at?: string | null;
-  last_error?: string | null;
-}
-
-interface BandcampCollectionResponse {
-  items: BandcampItem[];
-  total: number;
-}
-
-interface BandcampRadarResponse {
-  items: BandcampRadarItem[];
-  total: number;
-}
-
-interface BandcampTaskResponse {
-  task_id: string;
-  status: string;
-}
-
-interface BandcampItem {
-  id: number;
-  bandcamp_item_id?: number | null;
-  artist_name?: string | null;
-  album_title?: string | null;
-  track_title?: string | null;
-  item_url?: string | null;
-  cover_url?: string | null;
-  owned?: boolean | null;
-  downloadable?: boolean | null;
-  latest_import_status?: string | null;
-}
-
-interface BandcampRadarItem extends BandcampItem {
-  score?: number | null;
-  status?: string | null;
-  source?: string | null;
-}
+import { BandcampCard } from "./BandcampCard";
+import { BandcampListItem } from "./BandcampListItem";
+import type {
+  BandcampCollectionResponse,
+  BandcampConnectionStatus,
+  BandcampItem,
+  BandcampRadarResponse,
+  BandcampTaskResponse,
+} from "./bandcamp-model";
 
 export function Bandcamp() {
   const { t } = useTranslation();
@@ -399,153 +355,10 @@ function ItemList({
   );
 }
 
-function BandcampCard({
-  item,
-  busyAction,
-  onImport,
-}: {
-  item: BandcampItem;
-  busyAction: string | null;
-  onImport: (item: BandcampItem) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <article className="group overflow-hidden rounded-[12px] border border-text-primary/8 bg-surface-canvas/18">
-      <Cover item={item} />
-      <div className="space-y-3 p-4">
-        <div className="min-w-0">
-          <h3 className="truncate text-base font-black text-text-primary">
-            {itemTitle(item, t("bandcamp.itemFallback"))}
-          </h3>
-          <p className="truncate text-sm text-text-muted">{item.artist_name}</p>
-        </div>
-        <ItemActions item={item} busyAction={busyAction} onImport={onImport} />
-      </div>
-    </article>
-  );
-}
-
-function BandcampListItem({
-  item,
-  busyAction,
-  onImport,
-}: {
-  item: BandcampItem;
-  busyAction: string | null;
-  onImport: (item: BandcampItem) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <article className="flex items-center gap-3 rounded-xl border border-text-primary/8 bg-surface-canvas/18 p-3">
-      <Cover item={item} compact />
-      <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-black text-text-primary">
-          {itemTitle(item, t("bandcamp.itemFallback"))}
-        </h3>
-        <p className="truncate text-xs text-text-muted">{item.artist_name}</p>
-      </div>
-      <ItemActions
-        item={item}
-        busyAction={busyAction}
-        onImport={onImport}
-        compact
-      />
-    </article>
-  );
-}
-
-function ItemActions({
-  item,
-  busyAction,
-  onImport,
-  compact = false,
-}: {
-  item: BandcampItem;
-  busyAction: string | null;
-  onImport: (item: BandcampItem) => void;
-  compact?: boolean;
-}) {
-  const { t } = useTranslation();
-  const canImport =
-    item.owned === true &&
-    item.downloadable === true &&
-    item.latest_import_status !== "completed";
-  return (
-    <div className={cn("flex gap-2", compact ? "shrink-0" : "flex-wrap")}>
-      {canImport ? (
-        <button
-          type="button"
-          disabled={busyAction !== null}
-          onClick={() => onImport(item)}
-          className="inline-flex h-9 items-center gap-2 rounded-full bg-accent-action px-3 text-xs font-black text-accent-action-foreground transition hover:bg-accent-action/90 disabled:opacity-50"
-        >
-          {busyAction === `import:${item.id}` ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Download className="h-3.5 w-3.5" />
-          )}
-          {!compact ? t("common.import") : null}
-        </button>
-      ) : null}
-      {item.item_url ? (
-        <button
-          type="button"
-          onClick={() => window.open(item.item_url || "", "_blank")}
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-border-quiet bg-text-primary/5 px-3 text-xs font-black text-text-primary transition hover:bg-text-primary/10"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          {!compact ? t("common.open") : null}
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function Cover({
-  item,
-  compact = false,
-}: {
-  item: BandcampItem;
-  compact?: boolean;
-}) {
-  const { t } = useTranslation();
-  const coverUrl = item.cover_url;
-  const title = itemTitle(item, t("bandcamp.itemFallback"));
-
-  return (
-    <div
-      className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden bg-text-primary/6",
-        compact
-          ? "h-14 w-14 rounded-xl border border-text-primary/8"
-          : "aspect-square w-full",
-      )}
-    >
-      {coverUrl ? (
-        <CrateImage
-          src={coverUrl}
-          retryPolicy="none"
-          alt=""
-          loading="lazy"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-        />
-      ) : (
-        <span className="text-xl font-black text-text-muted/70">
-          {title.slice(0, 2).toUpperCase()}
-        </span>
-      )}
-    </div>
-  );
-}
-
 function Empty({ label }: { label: string }) {
   return (
     <div className="rounded-lg border border-dashed border-border-quiet bg-surface-canvas/16 p-6 text-sm text-text-muted">
       {label}
     </div>
   );
-}
-
-function itemTitle(item: BandcampItem, fallback: string) {
-  return item.album_title || item.track_title || item.artist_name || fallback;
 }
