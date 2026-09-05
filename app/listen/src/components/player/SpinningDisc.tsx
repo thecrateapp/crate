@@ -7,14 +7,12 @@ import {
   DISC_DEGREES_PER_SECOND,
   JOG_RATE_UPDATE_INTERVAL_MS,
   JOG_SEEK_INTERVAL_MS,
-  PLAYING_BACKWARD_SYNC_TOLERANCE_SECONDS,
-  PLAYING_FORWARD_SYNC_TOLERANCE_SECONDS,
   clamp,
   getJogTime,
   getPointerAngle,
   normalizeDeltaDegrees,
-  projectPlaybackTime,
 } from "@/components/player/spinning-disc-math";
+import { useSpinningDiscPlayback } from "@/components/player/use-spinning-disc-playback";
 
 type JogSeekMode = "live" | "commit";
 
@@ -55,9 +53,6 @@ export function SpinningDisc({
   onTogglePlay,
   disabled = false,
 }: SpinningDiscProps) {
-  const rotorRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const playbackAnchorRef = useRef({ time: currentTime, timestamp: 0 });
   const seekTimerRef = useRef<number | null>(null);
   const lastSeekFlushAtRef = useRef(0);
   const lastRateUpdateAtRef = useRef(0);
@@ -74,6 +69,15 @@ export function SpinningDisc({
 
   const [isJogging, setIsJogging] = useState(false);
   const [dragRotation, setDragRotation] = useState<number | null>(null);
+  const { rotorRef, setPlaybackAnchor, setRotorRotation } =
+    useSpinningDiscPlayback({
+      currentTime,
+      dragRotation,
+      duration,
+      isBuffering,
+      isJogging,
+      isPlaying,
+    });
 
   const setJogPlaybackRate = useCallback(
     (rate: number, immediate = false) => {
@@ -93,27 +97,6 @@ export function SpinningDisc({
       onPlaybackRateChange(safeRate);
     },
     [onPlaybackRateChange],
-  );
-
-  const setRotorRotation = useCallback((rotation: number) => {
-    if (!rotorRef.current) return;
-    rotorRef.current.style.transform = `rotate(${rotation}deg)`;
-  }, []);
-
-  const projectedPlaybackTime = useCallback(
-    (timestamp: number) => {
-      const { time: anchorTime, timestamp: anchorTimestamp } =
-        playbackAnchorRef.current;
-      return projectPlaybackTime({
-        anchorTime,
-        anchorTimestamp,
-        duration,
-        isBuffering,
-        isPlaying,
-        timestamp,
-      });
-    },
-    [duration, isBuffering, isPlaying],
   );
 
   const clearSeekTimer = useCallback(() => {
@@ -173,81 +156,8 @@ export function SpinningDisc({
     return () => {
       clearSeekTimer();
       onPlaybackRateChange?.(1);
-      if (animationFrameRef.current != null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
-      }
     };
   }, [clearSeekTimer, onPlaybackRateChange]);
-
-  useEffect(() => {
-    if (isJogging || dragRotation != null) return;
-
-    const timestamp =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
-    const projected = projectedPlaybackTime(timestamp);
-    const drift = currentTime - projected;
-    const shouldHardSync =
-      !isPlaying ||
-      isBuffering ||
-      drift > PLAYING_FORWARD_SYNC_TOLERANCE_SECONDS ||
-      drift < -PLAYING_BACKWARD_SYNC_TOLERANCE_SECONDS;
-
-    if (shouldHardSync) {
-      playbackAnchorRef.current = { time: currentTime, timestamp };
-      if (!isPlaying || isBuffering) {
-        setRotorRotation(currentTime * DISC_DEGREES_PER_SECOND);
-      }
-    }
-  }, [
-    currentTime,
-    dragRotation,
-    isBuffering,
-    isJogging,
-    isPlaying,
-    projectedPlaybackTime,
-    setRotorRotation,
-  ]);
-
-  useEffect(() => {
-    if (dragRotation != null) {
-      setRotorRotation(dragRotation);
-      return;
-    }
-
-    if (animationFrameRef.current != null) {
-      window.cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-
-    if (!isPlaying || isBuffering) {
-      const timestamp =
-        typeof performance !== "undefined" ? performance.now() : Date.now();
-      playbackAnchorRef.current = { time: currentTime, timestamp };
-      setRotorRotation(currentTime * DISC_DEGREES_PER_SECOND);
-      return;
-    }
-
-    const tick = (timestamp: number) => {
-      const displayTime = projectedPlaybackTime(timestamp);
-      setRotorRotation(displayTime * DISC_DEGREES_PER_SECOND);
-      animationFrameRef.current = window.requestAnimationFrame(tick);
-    };
-
-    animationFrameRef.current = window.requestAnimationFrame(tick);
-
-    return () => {
-      if (animationFrameRef.current != null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
-  }, [
-    dragRotation,
-    isBuffering,
-    isPlaying,
-    projectedPlaybackTime,
-    setRotorRotation,
-  ]);
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -328,17 +238,19 @@ export function SpinningDisc({
       setIsJogging(false);
       setDragRotation(null);
       setJogPlaybackRate(1, true);
-      playbackAnchorRef.current = {
-        time: finalTime,
-        timestamp:
-          typeof performance !== "undefined" ? performance.now() : Date.now(),
-      };
+      setPlaybackAnchor(finalTime);
       setRotorRotation(finalTime * DISC_DEGREES_PER_SECOND);
       if (currentTarget.hasPointerCapture(pointerId)) {
         currentTarget.releasePointerCapture(pointerId);
       }
     },
-    [currentTime, flushPendingSeek, setJogPlaybackRate, setRotorRotation],
+    [
+      currentTime,
+      flushPendingSeek,
+      setJogPlaybackRate,
+      setPlaybackAnchor,
+      setRotorRotation,
+    ],
   );
 
   const handlePointerUp = useCallback(
