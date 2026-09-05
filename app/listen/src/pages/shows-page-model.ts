@@ -74,9 +74,11 @@ export function buildShowsPageModel({
     filtered.some((item) => isSameUpcomingItem(item, featuredCandidate))
       ? featuredCandidate
       : null;
-  const comingUp = filtered
-    .filter((item) => item.is_upcoming || item.date >= today)
-    .filter((item) => !featuredShow || !isSameUpcomingItem(item, featuredShow));
+  const comingUp = filtered.filter(
+    (item) =>
+      (item.is_upcoming || item.date >= today) &&
+      (!featuredShow || !isSameUpcomingItem(item, featuredShow)),
+  );
   const recentlyReleased = filtered
     .filter(
       (item) =>

@@ -37,10 +37,9 @@ function ShowsSummary({ page }: ShowsSectionProps) {
   if (!page.summary) return null;
 
   return (
-    <div
-      role="list"
+    <ul
       aria-label={page.t("radar.summaryAria")}
-      className="hidden flex-wrap items-center gap-2 md:flex"
+      className="hidden list-none flex-wrap items-center gap-2 md:flex"
     >
       {page.isGenreRadar ? (
         <SummaryPill
@@ -71,7 +70,7 @@ function ShowsSummary({ page }: ShowsSectionProps) {
           />
         </>
       )}
-    </div>
+    </ul>
   );
 }
 
@@ -90,8 +89,7 @@ function SummaryPill({
       : "border-border-quiet text-text-primary/60";
 
   return (
-    <div
-      role="listitem"
+    <li
       className={cn(
         "rounded-lg border bg-text-primary/[0.03] px-3 py-2",
         accentClass,
@@ -101,7 +99,7 @@ function SummaryPill({
         {label}
       </div>
       <div className="mt-1 text-sm font-semibold">{value}</div>
-    </div>
+    </li>
   );
 }
 
