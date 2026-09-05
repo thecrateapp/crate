@@ -10,13 +10,13 @@ import {
   isMobileAudioRuntime,
   stableMobileAudioPipeline,
 } from "@/lib/mobile-audio-mode";
-import {
-  createEqChain,
-  isFlatGains,
-  type EqChain,
-  type EqGains,
-} from "@/lib/equalizer";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
+import {
+  getEqualizerState,
+  resetEqualizer,
+  setEqualizer as applyEqualizer,
+  setEqualizerHost,
+} from "./gapless-player-equalizer";
 import { getCrossfadeDurationPreference } from "./player-playback-prefs";
 import {
   animateVolume,
@@ -42,10 +42,6 @@ function getPlaylistInternal(): GaplessPlaylistInternal | null {
 
 type GaplessOutputInternal = Gapless5 & {
   context?: AudioContext;
-  masterOut?: GainNode;
-  setOutputChain?: (i: AudioNode | null, o: AudioNode | null) => void;
-  _outputChainInput?: AudioNode | null;
-  _outputChainOutput?: AudioNode | null;
 };
 
 type WindowWithGaplessContext = Window & {
@@ -97,16 +93,11 @@ let currentAnalyser: AnalyserNode | null = null;
 // playback — the consumer (soft-interruption logic) can use this to
 // decide whether it's worth pausing on an offline event.
 let currentTrackFullyBuffered = false;
-// Active equalizer chain (null = direct output, no processing).
-let eqChain: EqChain | null = null;
-
 export function getPlaybackLoadLimit(preferHtml5Audio: boolean): number {
   return preferHtml5Audio
     ? MOBILE_HTML5_TRACK_LIMIT
     : DESKTOP_DECODE_TRACK_LIMIT;
 }
-let eqEnabled = false;
-let lastEqGains: EqGains = [];
 let lastPlaybackRate = 1.0;
 let lifecycleRecoveryInstalled = false;
 let contextWakeInFlight: Promise<void> | null = null;
@@ -219,6 +210,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     switchToWebAudioDuringPlayback: !preferHtml5Audio,
   });
   setVolumeSink((volume) => instance?.setVolume(volume));
+  setEqualizerHost(instance as GaplessOutputInternal);
 
   instance.ontimeupdate = (posMs, trackIndex) => {
     currentCallbacks.onTimeUpdate?.(posMs, trackIndex);
@@ -310,12 +302,8 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
 export function destroyPlayer(): void {
   stopFade();
-  if (eqChain) {
-    eqChain.dispose();
-    eqChain = null;
-  }
-  eqEnabled = false;
-  lastEqGains = [];
+  resetEqualizer();
+  setEqualizerHost(null);
   lastPlaybackRate = 1.0;
   if (instance) {
     try {
@@ -516,8 +504,7 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   const loop = previous.loop;
   const singleMode = previous.singleMode;
   const crossfade = previous.crossfade;
-  const preservedEqEnabled = eqEnabled;
-  const preservedEqGains = lastEqGains;
+  const preservedEq = getEqualizerState();
 
   recordDevLog(
     "audio",
@@ -527,10 +514,8 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   );
 
   stopFade();
-  if (eqChain) {
-    eqChain.dispose();
-    eqChain = null;
-  }
+  resetEqualizer();
+  setEqualizerHost(null);
   try {
     previous.stop();
     previous.removeAllTracks();
@@ -556,7 +541,7 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   nextPlayer.setCrossfade(crossfade);
   nextPlayer.setPlaybackRate(lastPlaybackRate);
   applyVolume(getLastVolume());
-  setEqualizer(preservedEqEnabled, preservedEqGains);
+  applyEqualizer(preservedEq.enabled, preservedEq.gains);
 }
 
 async function prepareAudioForPlayback(
@@ -814,47 +799,4 @@ export function setSingleMode(enabled: boolean): void {
   instance.singleMode = enabled;
 }
 
-// ── Equalizer ────────────────────────────────────────────────────
-
-/**
- * Enable/disable the post-processing equalizer and/or update its gains.
- * Safe to call at any time — no-op until the engine is initialised.
- *
- * When `enabled` is true and `gains` is non-flat, a BiquadFilter chain
- * is spliced between masterOut and destination via our vendored patch.
- * When disabled or flat, the chain is torn down so there is zero
- * processing overhead.
- */
-export function setEqualizer(enabled: boolean, gains: EqGains): void {
-  if (!instance) return;
-  const patched = instance as GaplessOutputInternal;
-  if (typeof patched.setOutputChain !== "function" || !patched.context) return;
-
-  eqEnabled = enabled;
-  lastEqGains = [...gains];
-
-  // If the user wants flat output, skip the chain entirely — biquads
-  // at 0 dB aren't quite a no-op (minor numerical error) and why pay
-  // for unused DSP.
-  const shouldProcess = enabled && !isFlatGains(gains);
-
-  if (!shouldProcess) {
-    if (eqChain) {
-      patched.setOutputChain(null, null);
-      eqChain.dispose();
-      eqChain = null;
-    }
-    return;
-  }
-
-  if (!eqChain) {
-    eqChain = createEqChain(patched.context);
-    patched.setOutputChain(eqChain.input, eqChain.output);
-  }
-  eqChain.setGains(gains);
-}
-
-/** True if the equalizer chain is currently spliced into the output. */
-export function isEqualizerActive(): boolean {
-  return eqEnabled && eqChain !== null;
-}
+export { isEqualizerActive, setEqualizer } from "./gapless-player-equalizer";
