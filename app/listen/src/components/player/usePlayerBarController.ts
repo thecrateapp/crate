@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
 import { getTrackCacheKey } from "@/contexts/player-utils";
@@ -16,34 +16,20 @@ import {
   PLAYER_PLAYBACK_PREFS_EVENT,
   type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
-import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import { usePlayerBarActions } from "./bar/usePlayerBarActions";
 import { usePlayerBarComputedState } from "./bar/usePlayerBarComputedState";
 import { usePlayerBarDisplayState } from "./bar/usePlayerBarDisplayState";
 import {
-  usePlayerBarEqualizerEffect,
-  usePlayerBarExternalSurfaceEffects,
   usePlayerBarLongPressEffect,
-  usePlayerBarMobileSurfaceEffect,
-  usePlayerBarNativeBackEffect,
   usePlayerBarPlaybackPreferenceEffect,
-  usePlayerBarRemoteSurfaceEffect,
 } from "./bar/usePlayerBarLifecycle";
 import { usePlayerBarGestures } from "./bar/usePlayerBarGestures";
 import { usePlayerBarRemotePlayback } from "./bar/usePlayerBarRemotePlayback";
+import { usePlayerBarSurfaceState } from "./bar/use-player-bar-surface-state";
 
-const FS_OPEN_KEY = "listen-fs-player-open";
 const SHOW_PLAYER_BAR_ANALYZER = true;
-
-function getStoredFsOpen(): boolean {
-  try {
-    return localStorage.getItem(FS_OPEN_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
 
 export function usePlayerBarController() {
   const {
@@ -132,77 +118,9 @@ export function usePlayerBarController() {
     pct: number;
     time: string;
   } | null>(null);
-  const [extendedOpen, setExtendedOpen] = useState(false);
-  const [fsOpen, setFsOpenRaw] = useState(getStoredFsOpen);
-  const [showQueue, setShowQueue] = useState(false);
-  const [showLyrics, setShowLyrics] = useState(false);
-  const [showEqualizer, setShowEqualizer] = useState(false);
   const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] =
     useState<PlaybackDeliveryPreference>(getPlaybackDeliveryPolicyPreference);
-  const [shouldRenderQueuePanel, setShouldRenderQueuePanel] = useState(false);
-  const [shouldRenderLyricsPanel, setShouldRenderLyricsPanel] = useState(false);
-  const [shouldRenderEqualizerPopover, setShouldRenderEqualizerPopover] =
-    useState(false);
-  const [shouldRenderExtendedPlayer, setShouldRenderExtendedPlayer] =
-    useState(false);
-  const [shouldRenderFullscreenPlayer, setShouldRenderFullscreenPlayer] =
-    useState(false);
-  const [hasFloatingOverlayOpen, setHasFloatingOverlayOpen] = useState(false);
   const { isLiked, likeTrack, unlikeTrack } = useLikedTracks();
-
-  usePlayerBarEqualizerEffect(allowEqualizer, setShowEqualizer);
-
-  const setFsOpen = useCallback((open: boolean) => {
-    setFsOpenRaw(open);
-    try {
-      localStorage.setItem(FS_OPEN_KEY, String(open));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useDismissibleLayer({
-    active: hasFloatingOverlayOpen || showQueue || showLyrics || showEqualizer,
-    refs: [],
-    onDismiss: () => {
-      setHasFloatingOverlayOpen(false);
-      setShowQueue(false);
-      setShowLyrics(false);
-      setShowEqualizer(false);
-    },
-    closeOnPointerDownOutside: false,
-  });
-
-  usePlayerBarNativeBackEffect({
-    extendedOpen,
-    fsOpen,
-    hasFloatingOverlayOpen,
-    setExtendedOpen,
-    setHasFloatingOverlayOpen,
-    setShowEqualizer,
-    setShowLyrics,
-    setShowQueue,
-    showEqualizer,
-    showLyrics,
-    showQueue,
-  });
-  usePlayerBarMobileSurfaceEffect({
-    isDesktop,
-    setExtendedOpen,
-    setFsOpen,
-    setHasFloatingOverlayOpen,
-    setShowEqualizer,
-    setShowLyrics,
-    setShowQueue,
-  });
-  usePlayerBarRemoteSurfaceEffect({
-    isRemoteConnectActive,
-    setExtendedOpen,
-    setFsOpen,
-    setHasFloatingOverlayOpen,
-    setShowEqualizer,
-    setShowLyrics,
-  });
   usePlayerBarPlaybackPreferenceEffect({
     eventName: PLAYER_PLAYBACK_PREFS_EVENT,
     getPreference: getPlaybackDeliveryPolicyPreference,
@@ -234,6 +152,13 @@ export function usePlayerBarController() {
     legacyConnectEnabled,
     playbackDeliveryPolicy,
   });
+  const surface = usePlayerBarSurfaceState({
+    allowEqualizer,
+    currentTrackAvailable: !!currentTrack,
+    displayTrackAvailable: !!displayTrack,
+    isDesktop,
+    isRemoteConnectActive,
+  });
   const {
     displayCrossfadeTransition,
     effectiveIsBuffering,
@@ -252,7 +177,7 @@ export function usePlayerBarController() {
     effectiveDisplayedDuration,
     effectiveDisplayedTime,
     effectiveVolume,
-    fsOpen,
+    fsOpen: surface.fsOpen,
     isDesktop,
     isLiked,
     isBuffering,
@@ -260,19 +185,6 @@ export function usePlayerBarController() {
     legacyConnectEnabled,
     pause,
     publishConnectState,
-  });
-
-  usePlayerBarExternalSurfaceEffects({
-    currentTrackAvailable: !!currentTrack,
-    displayTrackAvailable: !!displayTrack,
-    fsOpen,
-    isDesktop,
-    setFsOpen,
-    setShowEqualizer,
-    setShowLyrics,
-    setShowQueue,
-    setShouldRenderFullscreenPlayer,
-    setShouldRenderQueuePanel,
   });
 
   const {
@@ -301,19 +213,19 @@ export function usePlayerBarController() {
     isDesktop,
     isRemoteConnectActive,
     jamQueueLocked,
-    showQueue,
-    showLyrics,
-    extendedOpen,
-    setShowQueue,
-    setShowLyrics,
-    setShowEqualizer,
-    setExtendedOpen,
-    setShouldRenderQueuePanel,
-    setShouldRenderLyricsPanel,
-    setShouldRenderEqualizerPopover,
-    setShouldRenderExtendedPlayer,
-    setShouldRenderFullscreenPlayer,
-    setFsOpen,
+    showQueue: surface.showQueue,
+    showLyrics: surface.showLyrics,
+    extendedOpen: surface.extendedOpen,
+    setShowQueue: surface.setShowQueue,
+    setShowLyrics: surface.setShowLyrics,
+    setShowEqualizer: surface.setShowEqualizer,
+    setExtendedOpen: surface.setExtendedOpen,
+    setShouldRenderQueuePanel: surface.setShouldRenderQueuePanel,
+    setShouldRenderLyricsPanel: surface.setShouldRenderLyricsPanel,
+    setShouldRenderEqualizerPopover: surface.setShouldRenderEqualizerPopover,
+    setShouldRenderExtendedPlayer: surface.setShouldRenderExtendedPlayer,
+    setShouldRenderFullscreenPlayer: surface.setShouldRenderFullscreenPlayer,
+    setFsOpen: surface.setFsOpen,
     likeTrack,
     unlikeTrack,
     liked,
@@ -335,19 +247,19 @@ export function usePlayerBarController() {
     jamTransportDisabled: jamQueueLocked,
     showPlayerBarAnalyzer,
     isRemoteConnectActive,
-    extendedOpen,
+    extendedOpen: surface.extendedOpen,
     allowEqualizer,
-    showEqualizer,
-    showQueue,
-    showLyrics,
+    showEqualizer: surface.showEqualizer,
+    showQueue: surface.showQueue,
+    showLyrics: surface.showLyrics,
     hidePlayerBarForMobileFullscreen,
-    hasFloatingOverlayOpen,
-    fsOpen,
-    shouldRenderQueuePanel,
-    shouldRenderLyricsPanel,
-    shouldRenderEqualizerPopover,
-    shouldRenderExtendedPlayer,
-    shouldRenderFullscreenPlayer,
+    hasFloatingOverlayOpen: surface.hasFloatingOverlayOpen,
+    fsOpen: surface.fsOpen,
+    shouldRenderQueuePanel: surface.shouldRenderQueuePanel,
+    shouldRenderLyricsPanel: surface.shouldRenderLyricsPanel,
+    shouldRenderEqualizerPopover: surface.shouldRenderEqualizerPopover,
+    shouldRenderExtendedPlayer: surface.shouldRenderExtendedPlayer,
+    shouldRenderFullscreenPlayer: surface.shouldRenderFullscreenPlayer,
     displayTrack,
     displayCrossfadeTransition,
     crossfadeProgress,
@@ -366,7 +278,7 @@ export function usePlayerBarController() {
     onToggleLike: () => void toggleLike(),
     onNextTrack: handleNextTrack,
     onAddToCollection: handleAddToCollection,
-    onOverlayChange: setHasFloatingOverlayOpen,
+    onOverlayChange: surface.setHasFloatingOverlayOpen,
     handleTouchStart,
     handleTouchEnd,
     effectiveDisplayedTime,
@@ -396,10 +308,10 @@ export function usePlayerBarController() {
     onPrepareLyrics: prepareLyricsPanel,
     onToggleExtendedPlayer: handleToggleExtendedPlayer,
     onPrepareExtendedPlayer: prepareExtendedPlayer,
-    onCloseQueue: () => setShowQueue(false),
-    onCloseLyrics: () => setShowLyrics(false),
-    onCloseEqualizer: () => setShowEqualizer(false),
-    onCloseExtendedPlayer: () => setExtendedOpen(false),
-    onCloseFullscreenPlayer: () => setFsOpen(false),
+    onCloseQueue: surface.closeQueue,
+    onCloseLyrics: surface.closeLyrics,
+    onCloseEqualizer: surface.closeEqualizer,
+    onCloseExtendedPlayer: surface.closeExtendedPlayer,
+    onCloseFullscreenPlayer: surface.closeFullscreenPlayer,
   };
 }
