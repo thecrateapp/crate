@@ -10,10 +10,6 @@ import {
 
 import type { Track } from "@/contexts/player-types";
 import {
-  createPlayerQueueSnapshot,
-  type PlayerQueueSnapshot,
-} from "@/contexts/player-session";
-import {
   PlayerActionsContext,
   PlayerProgressContext,
   PlayerStateContext,
@@ -115,6 +111,7 @@ import {
   type RemotePlaybackState,
 } from "@/lib/remote-playback-state";
 import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime";
+import { useJamQueueSession } from "@/contexts/use-jam-queue-session";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -1070,87 +1067,34 @@ function usePlayerProviderRuntime(children: ReactNode) {
     ),
   });
 
-  const jamQueueSnapshotRef = useRef<PlayerQueueSnapshot | null>(null);
-  const captureQueueSnapshot = useCallback(
-    () =>
-      createPlayerQueueSnapshot({
-        queue: queueRef.current,
-        currentIndex: currentIndexRef.current,
-        currentTime: currentTimeRef.current,
-        isPlaying: isPlayingRef.current,
-        shuffle: shuffleRef.current,
-        repeat: repeatRef.current,
-        playSource: playSourceRef.current,
-        unshuffledQueue: unshuffledQueueRef.current,
-      }),
-    [
-      currentIndexRef,
-      currentTimeRef,
-      isPlayingRef,
-      playSourceRef,
-      queueRef,
-      repeatRef,
-      shuffleRef,
-      unshuffledQueueRef,
-    ],
-  );
-  const restoreQueueSnapshot = useCallback(
-    (snapshot: PlayerQueueSnapshot) => {
-      jamQueueLockedRef.current = false;
-      commitJamQueueLocked(false);
-      repeatRef.current = snapshot.repeat;
-      shuffleRef.current = snapshot.shuffle;
-      playSourceRef.current = snapshot.playSource;
-      unshuffledQueueRef.current = snapshot.unshuffledQueue
-        ? [...snapshot.unshuffledQueue]
-        : null;
-      setRepeatState(snapshot.repeat);
-      setShuffleState(snapshot.shuffle);
-      setPlaySource(snapshot.playSource);
-      pushToEngine(snapshot.queue, snapshot.currentIndex, {
-        autoplay: snapshot.isPlaying,
-        positionMs: snapshot.currentTime * 1000,
-        preservePlayback: snapshot.isPlaying,
-      });
-      commitCurrentTime(snapshot.currentTime);
-    },
-    [
-      commitCurrentTime,
-      commitJamQueueLocked,
-      jamQueueLockedRef,
-      pushToEngine,
-      setPlaySource,
-      setRepeatState,
-      setShuffleState,
-      repeatRef,
-      shuffleRef,
-      playSourceRef,
-      unshuffledQueueRef,
-    ],
-  );
-  const enterJamSession = useCallback(() => {
-    if (jamQueueLockedRef.current) return;
-    jamQueueSnapshotRef.current = captureQueueSnapshot();
-    commitJamQueueLocked(true);
-  }, [captureQueueSnapshot, commitJamQueueLocked, jamQueueLockedRef]);
-  const leaveJamSession = useCallback(() => {
-    const snapshot = jamQueueSnapshotRef.current;
-    jamQueueSnapshotRef.current = null;
-    if (!snapshot) {
-      commitJamQueueLocked(false);
-      return;
-    }
-    restoreQueueSnapshot(snapshot);
-  }, [commitJamQueueLocked, restoreQueueSnapshot]);
-
-  useEffect(() => {
-    ensureJamQueueLockedRef.current = enterJamSession;
-  }, [enterJamSession]);
-
   const clearQueueRef = useRef(clearQueue);
   useEffect(() => {
     clearQueueRef.current = clearQueue;
   }, [clearQueue]);
+
+  const {
+    captureQueueSnapshot,
+    enterJamSession,
+    leaveJamSession,
+    restoreQueueSnapshot,
+  } = useJamQueueSession({
+    commitCurrentTime,
+    commitJamQueueLocked,
+    currentIndexRef,
+    currentTimeRef,
+    ensureJamQueueLockedRef,
+    isPlayingRef,
+    jamQueueLockedRef,
+    playSourceRef,
+    pushToEngine,
+    queueRef,
+    repeatRef,
+    setPlaySource,
+    setRepeatState,
+    setShuffleState,
+    shuffleRef,
+    unshuffledQueueRef,
+  });
 
   const applyConnectStateToLocalQueue = useCallback(
     (state: RemotePlaybackState, startPlaying: boolean) => {
