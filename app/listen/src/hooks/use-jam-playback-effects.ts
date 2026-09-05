@@ -154,7 +154,7 @@ export function useJamPlaybackEffects({
     duration,
     isHost,
     isPlaying,
-    roomCurrentTrack?.id,
+    roomCurrentTrack,
     roomIsActive,
     sendEvent,
   ]);

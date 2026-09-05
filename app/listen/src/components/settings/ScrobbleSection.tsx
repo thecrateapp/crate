@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -66,19 +66,22 @@ export function ScrobbleSection() {
     }
   };
 
-  const handleLastfmCallback = async (token: string) => {
-    setConnecting("lastfm");
-    try {
-      await api("/api/me/scrobble/lastfm", "POST", { token });
-      toast.success(t("settings.scrobbling.toasts.lastfmConnected"));
-      const updated = await api<ScrobbleStatus>("/api/me/scrobble/status");
-      setStatus(updated);
-    } catch {
-      toast.error(t("settings.scrobbling.toasts.lastfmConnectFailed"));
-    } finally {
-      setConnecting(null);
-    }
-  };
+  const handleLastfmCallback = useCallback(
+    async (token: string) => {
+      setConnecting("lastfm");
+      try {
+        await api("/api/me/scrobble/lastfm", "POST", { token });
+        toast.success(t("settings.scrobbling.toasts.lastfmConnected"));
+        const updated = await api<ScrobbleStatus>("/api/me/scrobble/status");
+        setStatus(updated);
+      } catch {
+        toast.error(t("settings.scrobbling.toasts.lastfmConnectFailed"));
+      } finally {
+        setConnecting(null);
+      }
+    },
+    [t],
+  );
 
   const handleListenBrainzConnect = async () => {
     if (!lbToken.trim()) return;
@@ -128,7 +131,7 @@ export function ScrobbleSection() {
       window.history.replaceState({}, "", "/settings");
       void handleLastfmCallback(lastfmToken);
     }
-  }, []);
+  }, [handleLastfmCallback]);
 
   const lastfm = status.lastfm;
   const listenbrainz = status.listenbrainz;

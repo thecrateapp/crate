@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ export function useGenreDetailActions({
   const { playAll } = usePlayerActions();
   const [startingRadio, setStartingRadio] = useState(false);
 
-  async function handlePlayGenreRadio() {
+  const handlePlayGenreRadio = useCallback(async () => {
     if (!data || startingRadio) return;
     setStartingRadio(true);
     try {
@@ -50,16 +50,19 @@ export function useGenreDetailActions({
     } finally {
       setStartingRadio(false);
     }
-  }
+  }, [data, playAll, startingRadio, t]);
 
-  function openGenreRadar(show?: UpcomingItem | null) {
-    if (!data) return;
-    const params = new URLSearchParams({ genre: data.slug });
-    if (show?.id != null) params.set("show", String(show.id));
-    navigate(`/upcoming?${params.toString()}`);
-  }
+  const openGenreRadar = useCallback(
+    (show?: UpcomingItem | null) => {
+      if (!data) return;
+      const params = new URLSearchParams({ genre: data.slug });
+      if (show?.id != null) params.set("show", String(show.id));
+      navigate(`/upcoming?${params.toString()}`);
+    },
+    [data, navigate],
+  );
 
-  function shareGenre() {
+  const shareGenre = useCallback(() => {
     if (!data) return;
     openShareSheet({
       kind: "genre",
@@ -68,7 +71,7 @@ export function useGenreDetailActions({
       imageUrl: heroCoverUrl,
       url: publicShareUrl(`/explore?genre=${encodeURIComponent(data.slug)}`),
     });
-  }
+  }, [data, heroCoverUrl, t]);
 
   const genreMenuActions = useMemo<ItemActionMenuEntry[]>(() => {
     if (!data) return [];
@@ -95,7 +98,7 @@ export function useGenreDetailActions({
         onSelect: shareGenre,
       }),
     ];
-  }, [data, heroCoverUrl, nextShow, startingRadio, t]);
+  }, [data, handlePlayGenreRadio, nextShow, openGenreRadar, shareGenre, t]);
 
   return {
     startingRadio,

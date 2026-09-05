@@ -186,7 +186,7 @@ export function MobileActionSheet({
       event.stopPropagation();
       suppressAndRequestClose();
     },
-    [suppressAndRequestClose],
+    [isPanelTarget, suppressAndRequestClose],
   );
 
   const beginDrag = useCallback(
@@ -373,12 +373,19 @@ export function MobileActionSheet({
     <div
       role="dialog"
       aria-modal="true"
+      aria-label="Action sheet"
+      tabIndex={-1}
       className={cn(
         "fixed inset-0 flex items-end justify-center bg-surface-canvas/58 p-0 backdrop-blur-md z-app-modal",
         isClosing ? "animate-fade-out" : "animate-fade-in",
       )}
       onClickCapture={handleOverlayClick}
       onPointerDownCapture={handlePointerDown}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        suppressAndRequestClose();
+      }}
       onTouchEnd={(event) => {
         if (isPanelTarget(event.target)) return;
         setIsDragging(false);

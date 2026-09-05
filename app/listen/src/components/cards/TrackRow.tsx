@@ -520,8 +520,9 @@ function TrackRowArtistLink({
   if (!globalArtistUid && !track.artist_id) return <>{track.artist}</>;
 
   return (
-    <span
-      className="text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
+    <button
+      type="button"
+      className="border-0 bg-transparent p-0 text-left text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
       onClick={(event) => {
         event.stopPropagation();
         navigate(
@@ -538,7 +539,7 @@ function TrackRowArtistLink({
       }}
     >
       {track.artist}
-    </span>
+    </button>
   );
 }
 
@@ -554,8 +555,9 @@ function TrackRowAlbumLink({
   if (!globalAlbumUid && !track.album_id) return <>{track.album}</>;
 
   return (
-    <span
-      className="text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
+    <button
+      type="button"
+      className="border-0 bg-transparent p-0 text-left text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
       onClick={(event) => {
         event.stopPropagation();
         navigate(
@@ -572,7 +574,7 @@ function TrackRowAlbumLink({
       }}
     >
       {track.album}
-    </span>
+    </button>
   );
 }
 
@@ -802,6 +804,7 @@ export const TrackRow = memo(function TrackRow({
       data-active={isActive}
       data-disabled={model.disabled}
       data-selected={selected}
+      aria-label={track.title}
       aria-selected={selectable ? selected : undefined}
       onContextMenu={(event) => {
         if (model.disabled) return;
@@ -817,6 +820,19 @@ export const TrackRow = memo(function TrackRow({
         }
         void playback.handleActivate();
       }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        if (model.disabled) return;
+        if (selectable && onSelect) {
+          onSelect(track, event as unknown as MouseEvent<HTMLDivElement>);
+          return;
+        }
+        void playback.handleActivate();
+      }}
+      role="row"
+      tabIndex={model.disabled ? -1 : 0}
       onDoubleClick={
         selectable
           ? (event) => {

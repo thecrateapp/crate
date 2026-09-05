@@ -77,6 +77,7 @@ export function AutoDjOptions({
                   event.key === "Enter" &&
                   genreSuggestions[genreSuggestionIndex]
                 ) {
+                  if (event.nativeEvent.isComposing) return;
                   event.preventDefault();
                   selectGenre(genreSuggestions[genreSuggestionIndex]);
                 } else if (event.key === "Escape") {

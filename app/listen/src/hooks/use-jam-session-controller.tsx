@@ -212,20 +212,34 @@ export function useJamSessionController() {
     isPlaying,
     playSource,
   });
-  playerActionsRef.current = {
+  const currentTimeRef = useRef(currentTime);
+  useEffect(() => {
+    playerActionsRef.current = {
+      play,
+      playAll,
+      pause,
+      resume,
+      seek,
+      setPlaybackRate,
+      syncJamQueue,
+      currentTrack,
+      isPlaying,
+      playSource,
+    };
+    currentTimeRef.current = currentTime;
+  }, [
+    currentTime,
+    currentTrack,
+    isPlaying,
+    pause,
     play,
     playAll,
-    pause,
+    playSource,
     resume,
     seek,
     setPlaybackRate,
     syncJamQueue,
-    currentTrack,
-    isPlaying,
-    playSource,
-  };
-  const currentTimeRef = useRef(currentTime);
-  currentTimeRef.current = currentTime;
+  ]);
 
   useJamSessionLifecycle({
     roomId,

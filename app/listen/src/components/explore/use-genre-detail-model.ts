@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
@@ -104,10 +104,27 @@ export function useGenreDetailModel(slug: string) {
     [data?.cover_url, fallbackGenreSlug, primaryArtists],
   );
   const heroCoverFingerprint = heroCoverCandidates.join("|");
-  const [heroCoverIndex, setHeroCoverIndex] = useState(0);
-  useEffect(() => {
-    setHeroCoverIndex(0);
-  }, [heroCoverFingerprint]);
+  const [heroCoverState, setHeroCoverState] = useState({
+    fingerprint: heroCoverFingerprint,
+    index: 0,
+  });
+  const heroCoverIndex =
+    heroCoverState.fingerprint === heroCoverFingerprint
+      ? heroCoverState.index
+      : 0;
+  const setHeroCoverIndex = useCallback(
+    (next: SetStateAction<number>) => {
+      setHeroCoverState((previous) => {
+        const currentIndex =
+          previous.fingerprint === heroCoverFingerprint ? previous.index : 0;
+        return {
+          fingerprint: heroCoverFingerprint,
+          index: typeof next === "function" ? next(currentIndex) : next,
+        };
+      });
+    },
+    [heroCoverFingerprint],
+  );
 
   const summary = useMemo(
     () =>

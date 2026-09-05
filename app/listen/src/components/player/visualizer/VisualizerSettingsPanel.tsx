@@ -25,10 +25,19 @@ const SLIDERS = [
   { key: "octaves" as const, label: "Octaves", min: 1, max: 5, step: 1 },
 ] as const;
 
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+function Toggle({
+  label,
+  on,
+  onToggle,
+}: {
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+}) {
   return (
     <button
       type="button"
+      aria-label={label}
       onClick={onToggle}
       className={`h-5 w-9 rounded-full transition-colors ${
         on ? "bg-accent-action" : "bg-border-interactive"
@@ -81,7 +90,11 @@ export function VisualizerSettingsPanel({
         }`}
       >
         <span className="text-[11px] text-text-muted">Album palette</span>
-        <Toggle on={useAlbumPalette} onToggle={toggleAlbumPalette} />
+        <Toggle
+          label="Album palette"
+          on={useAlbumPalette}
+          onToggle={toggleAlbumPalette}
+        />
       </div>
 
       <div
@@ -90,7 +103,11 @@ export function VisualizerSettingsPanel({
         }`}
       >
         <span className="text-[11px] text-text-muted">Track adaptive</span>
-        <Toggle on={trackAdaptiveViz} onToggle={toggleTrackAdaptive} />
+        <Toggle
+          label="Track adaptive"
+          on={trackAdaptiveViz}
+          onToggle={toggleTrackAdaptive}
+        />
       </div>
 
       <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-2 text-[10px] text-text-muted">
@@ -127,6 +144,7 @@ export function VisualizerSettingsPanel({
           </div>
           <input
             type="range"
+            aria-label={label}
             min={min}
             max={max}
             step={step}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ArrowRight } from "@crate/ui/icons";
@@ -22,12 +22,12 @@ export function RelatedGenreCard({ genre, onOpen }: RelatedGenreCardProps) {
     [genre],
   );
   const imageFingerprint = imageCandidates.join("|");
-  const [imageIndex, setImageIndex] = useState(0);
-
-  useEffect(() => {
-    setImageIndex(0);
-  }, [imageFingerprint]);
-
+  const [imageState, setImageState] = useState({
+    fingerprint: imageFingerprint,
+    index: 0,
+  });
+  const imageIndex =
+    imageState.fingerprint === imageFingerprint ? imageState.index : 0;
   const coverUrl = imageCandidates[imageIndex] ?? null;
   const contentLabel = [
     genre.artist_count > 0
@@ -54,11 +54,17 @@ export function RelatedGenreCard({ genre, onOpen }: RelatedGenreCardProps) {
           decoding="async"
           loading="eager"
           onError={() => {
-            if (imageIndex + 1 < imageCandidates.length) {
-              setImageIndex((index) => index + 1);
-            } else {
-              setImageIndex(imageCandidates.length);
-            }
+            setImageState((previous) => {
+              const currentIndex =
+                previous.fingerprint === imageFingerprint ? previous.index : 0;
+              return {
+                fingerprint: imageFingerprint,
+                index:
+                  currentIndex + 1 < imageCandidates.length
+                    ? currentIndex + 1
+                    : imageCandidates.length,
+              };
+            });
           }}
         />
       ) : null}

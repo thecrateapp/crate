@@ -25,6 +25,11 @@ import {
   type StatsPeriod,
 } from "@/pages/stats-page-model";
 
+const EMPTY_TOP_TRACKS: StatsDashboard["top_tracks"]["items"] = [];
+const EMPTY_TOP_ARTISTS: StatsDashboard["top_artists"]["items"] = [];
+const EMPTY_TOP_ALBUMS: StatsDashboard["top_albums"]["items"] = [];
+const EMPTY_TOP_GENRES: StatsDashboard["top_genres"]["items"] = [];
+
 export interface StatsPageController {
   changeWindow: (window: StatsWindow) => void;
   coverTracks: StatsDashboard["top_tracks"]["items"];
@@ -159,10 +164,22 @@ export function useStatsPageController(): StatsPageController {
   );
   const overview = dashboard?.overview;
   const trends = dashboard?.trends;
-  const topTrackItems = dashboard?.top_tracks.items ?? [];
-  const topArtistItems = dashboard?.top_artists.items ?? [];
-  const topAlbumItems = dashboard?.top_albums.items ?? [];
-  const topGenreItems = dashboard?.top_genres.items ?? [];
+  const topTrackItems = useMemo(
+    () => dashboard?.top_tracks.items ?? EMPTY_TOP_TRACKS,
+    [dashboard?.top_tracks.items],
+  );
+  const topArtistItems = useMemo(
+    () => dashboard?.top_artists.items ?? EMPTY_TOP_ARTISTS,
+    [dashboard?.top_artists.items],
+  );
+  const topAlbumItems = useMemo(
+    () => dashboard?.top_albums.items ?? EMPTY_TOP_ALBUMS,
+    [dashboard?.top_albums.items],
+  );
+  const topGenreItems = useMemo(
+    () => dashboard?.top_genres.items ?? EMPTY_TOP_GENRES,
+    [dashboard?.top_genres.items],
+  );
   const replay = dashboard?.replay as ReplayMix | undefined;
   const story = dashboard?.story;
   const replayItems = replay?.items ?? [];

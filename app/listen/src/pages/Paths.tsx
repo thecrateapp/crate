@@ -339,24 +339,30 @@ function PathCard({
   const { t } = useTranslation();
   const navigate = useNavigate();
   return (
-    <div
-      onClick={() => navigate(`/paths/${path.id}`)}
-      className="group cursor-pointer rounded-xl border border-text-primary/6 bg-text-primary/[0.02] p-4 transition hover:border-accent-action/20 hover:bg-text-primary/[0.04]"
-    >
+    <div className="group cursor-pointer rounded-xl border border-text-primary/6 bg-text-primary/[0.02] p-4 transition hover:border-accent-action/20 hover:bg-text-primary/[0.04]">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
-          <Route size={16} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-text-primary">
-            {path.name}
-          </div>
-          <div className="mt-0.5 text-[11px] text-text-primary/40">
-            {t("common.trackCountLabel", { count: path.track_count })} ·{" "}
-            {new Date(path.created_at).toLocaleDateString()}
-          </div>
-        </div>
         <button
+          type="button"
+          aria-label={path.name}
+          onClick={() => navigate(`/paths/${path.id}`)}
+          className="flex min-w-0 flex-1 items-center gap-3 border-0 bg-transparent p-0 text-left"
+        >
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
+            <Route size={16} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-text-primary">
+              {path.name}
+            </div>
+            <div className="mt-0.5 text-[11px] text-text-primary/40">
+              {t("common.trackCountLabel", { count: path.track_count })} ·{" "}
+              {new Date(path.created_at).toLocaleDateString()}
+            </div>
+          </div>
+        </button>
+        <button
+          type="button"
+          aria-label={t("player.play")}
           onClick={(e) => {
             e.stopPropagation();
             onPlay();
@@ -366,6 +372,8 @@ function PathCard({
           <Play size={14} className="ml-0.5 fill-current" />
         </button>
         <button
+          type="button"
+          aria-label={t("common.delete")}
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -493,6 +501,7 @@ export function Paths() {
           <div className="flex items-center gap-3">
             <input
               type="range"
+              aria-label={t("paths.length")}
               min={5}
               max={50}
               value={steps}

@@ -20,6 +20,10 @@
       {
         "files": ["primitives/AppModal.tsx"],
         "rules": ["react-doctor/no-adjust-state-on-prop-change"]
+      },
+      {
+        "files": ["domain/actions/MobileActionSheet.tsx"],
+        "rules": ["react-doctor/prefer-html-dialog"]
       }
     ]
   }

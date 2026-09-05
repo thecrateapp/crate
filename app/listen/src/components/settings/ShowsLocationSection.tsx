@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -28,6 +28,14 @@ interface CityResult {
   longitude: number;
 }
 
+interface DetectedLocation {
+  city: string;
+  country: string;
+  country_code: string;
+  latitude: number;
+  longitude: number;
+}
+
 export function ShowsLocationSection() {
   const { t } = useTranslation();
   const [location, setLocation] = useState<LocationData | null>(null);
@@ -51,9 +59,37 @@ export function ShowsLocationSection() {
       .catch(() => {});
   }, []);
 
+  const fetchDetectedLocation =
+    useCallback(async (): Promise<DetectedLocation> => {
+      const geo = await api<DetectedLocation>("/api/me/geolocation");
+      await api("/api/me/location", "PUT", {
+        city: geo.city,
+        country: geo.country,
+        country_code: geo.country_code,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+      });
+      return geo;
+    }, []);
+
   useEffect(() => {
-    if (location && !location.city) detectFromIp(true);
-  }, [location?.city]);
+    if (!location || location.city) return;
+    let cancelled = false;
+    setDetecting(true);
+    void fetchDetectedLocation()
+      .then((geo) => {
+        if (cancelled) return;
+        setCity(geo.city);
+        setLocation((previous) => (previous ? { ...previous, ...geo } : null));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setDetecting(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchDetectedLocation, location]);
 
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -75,39 +111,29 @@ export function ShowsLocationSection() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  async function detectFromIp(silent = false) {
-    setDetecting(true);
-    try {
-      const geo = await api<{
-        city: string;
-        country: string;
-        country_code: string;
-        latitude: number;
-        longitude: number;
-      }>("/api/me/geolocation");
-      setCity(geo.city);
-      await api("/api/me/location", "PUT", {
-        city: geo.city,
-        country: geo.country,
-        country_code: geo.country_code,
-        latitude: geo.latitude,
-        longitude: geo.longitude,
-      });
-      setLocation((prev) => (prev ? { ...prev, ...geo } : null));
-      if (!silent) {
-        toast.success(
-          t("settings.shows.toasts.detected", {
-            city: geo.city,
-            country: geo.country,
-          }),
-        );
+  const detectFromIp = useCallback(
+    async (silent = false) => {
+      setDetecting(true);
+      try {
+        const geo = await fetchDetectedLocation();
+        setCity(geo.city);
+        setLocation((prev) => (prev ? { ...prev, ...geo } : null));
+        if (!silent) {
+          toast.success(
+            t("settings.shows.toasts.detected", {
+              city: geo.city,
+              country: geo.country,
+            }),
+          );
+        }
+      } catch {
+        if (!silent) toast.error(t("settings.shows.toasts.detectFailed"));
+      } finally {
+        setDetecting(false);
       }
-    } catch {
-      if (!silent) toast.error(t("settings.shows.toasts.detectFailed"));
-    } finally {
-      setDetecting(false);
-    }
-  }
+    },
+    [fetchDetectedLocation, t],
+  );
 
   function selectCity(result: CityResult) {
     setCity(result.city);
