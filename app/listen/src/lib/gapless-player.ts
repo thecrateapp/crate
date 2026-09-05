@@ -28,18 +28,13 @@ import {
   setVolumeSink,
   stopFade,
 } from "./gapless-player-volume";
-
-// Gapless-5 doesn't expose its playlist internals on the public type,
-// but we need a couple of fields to keep play order in sync. Centralized
-// here so the unsafe cast lives in one place.
-interface GaplessPlaylistInternal {
-  shuffledIndices: number[];
-  sources: unknown[];
-}
-type GaplessInternal = Gapless5 & { playlist?: GaplessPlaylistInternal };
-function getPlaylistInternal(): GaplessPlaylistInternal | null {
-  return (instance as GaplessInternal | null)?.playlist ?? null;
-}
+import {
+  addTrack as addQueueTrack,
+  insertTrack as insertQueueTrack,
+  loadQueue as loadQueueTracks,
+  removeTrack as removeQueueTrack,
+  replaceTrack as replaceQueueTrack,
+} from "./gapless-player-queue";
 
 type GaplessOutputInternal = Gapless5 & {
   context?: AudioContext;
@@ -321,91 +316,25 @@ export function loadQueue(
   startIndex = 0,
   options: { restartIfSameIndex?: boolean } = {},
 ): void {
-  if (!instance) return;
-  recordDevLog(
-    "gapless",
-    "load queue",
-    {
-      count: urls.length,
-      startIndex,
-      firstUrl: urls[0] ? redactUrl(urls[0]) : null,
-      restartIfSameIndex: options.restartIfSameIndex === true,
-    },
-    "debug",
-  );
-
-  // Idempotent: if the incoming URL list is identical to what the engine
-  // already has, don't rebuild the queue — just align the current track.
-  // Avoids interrupting playback on structurally identical resyncs.
-  const currentUrls = instance.getTracks();
-  const same =
-    urls.length === currentUrls.length &&
-    urls.every((url, i) => url === currentUrls[i]);
-  if (same) {
-    if (urls.length > 0 && instance.getIndex() !== startIndex) {
-      currentTrackFullyBuffered = false;
-      instance.gotoTrack(startIndex);
-    } else if (urls.length > 0 && options.restartIfSameIndex) {
-      currentTrackFullyBuffered = false;
-      instance.gotoTrack(startIndex, true);
-    }
-    return;
-  }
-
-  currentTrackFullyBuffered = false;
-  instance.removeAllTracks();
-  for (const url of urls) {
-    instance.addTrack(url);
-  }
-
-  // CRITICAL: Gapless-5's playlist.add() inserts into shuffledIndices at
-  // a random position on every call (gapless5.js:814). When shuffleMode
-  // is on, the queue ends up in random order instead of the order we
-  // passed in. Normalize shuffledIndices to identity so the engine's
-  // play order matches the caller's URL list exactly.
-  //
-  // This makes the React queue the single source of truth for play
-  // order. If the UI wants shuffle, it reorders the React queue itself
-  // and we feed the engine that same order.
-  const playlist = getPlaylistInternal();
-  if (playlist && urls.length > 0) {
-    playlist.shuffledIndices = urls.map((_, i) => i);
-  }
-
-  if (urls.length > 0) {
-    instance.gotoTrack(startIndex);
-  }
-}
-
-/**
- * Gapless-5's playlist.add() inserts into shuffledIndices at a random
- * position. After any add/insert we rewrite shuffledIndices to identity
- * so the engine's play order stays in sync with the caller's queue
- * (which is already in the desired play order per loadQueue's contract).
- */
-function normalizeShuffledIndices() {
-  const playlist = getPlaylistInternal();
-  if (!playlist) return;
-  playlist.shuffledIndices = playlist.sources.map((_, i) => i);
+  loadQueueTracks(instance, urls, startIndex, options, () => {
+    currentTrackFullyBuffered = false;
+  });
 }
 
 export function addTrack(url: string): void {
-  instance?.addTrack(url);
-  normalizeShuffledIndices();
+  addQueueTrack(instance, url);
 }
 
 export function insertTrack(index: number, url: string): void {
-  instance?.insertTrack(index, url);
-  normalizeShuffledIndices();
+  insertQueueTrack(instance, index, url);
 }
 
 export function removeTrack(indexOrUrl: number | string): void {
-  instance?.removeTrack(indexOrUrl);
-  normalizeShuffledIndices();
+  removeQueueTrack(instance, indexOrUrl);
 }
 
 export function replaceTrack(index: number, url: string): void {
-  instance?.replaceTrack(index, url);
+  replaceQueueTrack(instance, index, url);
 }
 
 function getAudioContext(): AudioContext | null {
