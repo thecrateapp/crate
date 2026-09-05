@@ -4,10 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@crate/ui/shadcn/button";
 
 import {
-  AutoDjOptions,
   PlaybackModeSelect,
   RoomVisibilityOptions,
 } from "./JamRoomCreateOptions";
+import { AutoDjOptions } from "./JamRoomAutoDjOptions";
 import type { JamRoomCreatePanelProps } from "./jam-lobby-types";
 
 export function JamRoomCreatePanel({
