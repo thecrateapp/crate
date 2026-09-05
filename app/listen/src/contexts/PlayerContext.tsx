@@ -78,17 +78,10 @@ import {
 } from "@/lib/android-native-engine";
 import { createQueueRevision } from "@/lib/playback-engine";
 import {
-  getInfinitePlaybackPreference,
   getEffectivePlaybackDeliveryPolicy,
   getPlaybackDeliveryPolicyPreference,
   subscribeToPlaybackDeliveryNetworkChanges,
-  getSmartCrossfadePreference,
-  getSmartPlaylistSuggestionsCadencePreference,
-  getSmartPlaylistSuggestionsPreference,
-  PLAYER_PLAYBACK_PREFS_EVENT,
-  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
-import { preparePlaybackDelivery } from "@/lib/playback-delivery";
 import {
   recordPlaybackStall,
   recordStablePlayback,
@@ -112,6 +105,7 @@ import {
 } from "@/lib/remote-playback-state";
 import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime";
 import { useJamQueueSession } from "@/contexts/use-jam-queue-session";
+import { usePlayerPreferenceRuntime } from "@/contexts/use-player-preference-runtime";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -830,92 +824,21 @@ function usePlayerProviderRuntime(children: ReactNode) {
     rotateTrackerSession,
   });
 
-  useEffect(() => {
-    const onPrefsChanged = (event: Event) => {
-      const detail = (
-        event as CustomEvent<{
-          crossfadeSeconds?: number;
-          smartCrossfadeEnabled?: boolean;
-          infinitePlaybackEnabled?: boolean;
-          playbackDeliveryPolicy?: PlaybackDeliveryPreference;
-          smartPlaylistSuggestionsEnabled?: boolean;
-          smartPlaylistSuggestionsCadence?: number;
-        }>
-      ).detail;
-      syncEffectiveCrossfade();
-      if (typeof detail?.smartCrossfadeEnabled === "boolean") {
-        setSmartCrossfadeEnabled(detail.smartCrossfadeEnabled);
-      } else {
-        setSmartCrossfadeEnabled(getSmartCrossfadePreference());
-      }
-      if (typeof detail?.infinitePlaybackEnabled === "boolean") {
-        setInfinitePlaybackEnabled(detail.infinitePlaybackEnabled);
-      } else {
-        setInfinitePlaybackEnabled(getInfinitePlaybackPreference());
-      }
-      if (detail?.playbackDeliveryPolicy) {
-        setPlaybackDeliveryPolicy(detail.playbackDeliveryPolicy);
-      } else {
-        setPlaybackDeliveryPolicy(getPlaybackDeliveryPolicyPreference());
-      }
-      if (typeof detail?.smartPlaylistSuggestionsEnabled === "boolean") {
-        setSmartPlaylistSuggestionsEnabled(
-          detail.smartPlaylistSuggestionsEnabled,
-        );
-      } else {
-        setSmartPlaylistSuggestionsEnabled(
-          getSmartPlaylistSuggestionsPreference(),
-        );
-      }
-      if (typeof detail?.smartPlaylistSuggestionsCadence === "number") {
-        setSmartPlaylistSuggestionsCadence(
-          detail.smartPlaylistSuggestionsCadence,
-        );
-      } else {
-        setSmartPlaylistSuggestionsCadence(
-          getSmartPlaylistSuggestionsCadencePreference(),
-        );
-      }
-    };
-
-    window.addEventListener(
-      PLAYER_PLAYBACK_PREFS_EVENT,
-      onPrefsChanged as EventListener,
-    );
-    return () => {
-      window.removeEventListener(
-        PLAYER_PLAYBACK_PREFS_EVENT,
-        onPrefsChanged as EventListener,
-      );
-    };
-  }, [
+  usePlayerPreferenceRuntime({
+    currentIndex,
+    playbackDeliveryPolicy,
+    playSource,
+    queue,
+    repeat,
     setInfinitePlaybackEnabled,
     setPlaybackDeliveryPolicy,
     setSmartCrossfadeEnabled,
     setSmartPlaylistSuggestionsCadence,
     setSmartPlaylistSuggestionsEnabled,
-    syncEffectiveCrossfade,
-  ]);
-
-  useEffect(() => {
-    syncEffectiveCrossfade();
-  }, [
-    syncEffectiveCrossfade,
-    queue,
-    currentIndex,
-    playSource,
-    repeat,
     shuffle,
     smartCrossfadeEnabled,
-  ]);
-
-  useEffect(() => {
-    preparePlaybackDelivery(
-      queue,
-      currentIndex,
-      getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy),
-    );
-  }, [currentIndex, playbackDeliveryPolicy, queue]);
+    syncEffectiveCrossfade,
+  });
 
   const {
     pendingRestoreTimeRef,
