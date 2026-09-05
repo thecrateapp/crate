@@ -1,9 +1,9 @@
 import {
   JamRoomActions,
   JamRoomHeader,
-  JamNowPlaying,
   type JamRoomHeroProps,
 } from "./JamRoomHeroSections";
+import { JamNowPlaying } from "./JamRoomPlaybackSections";
 
 export function JamRoomHero(props: JamRoomHeroProps) {
   return (
