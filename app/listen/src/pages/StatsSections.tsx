@@ -1,0 +1,1285 @@
+import type { ComponentType, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  Activity,
+  CalendarDays,
+  Disc3,
+  Flame,
+  Music2,
+  Play,
+  Repeat2,
+  Search,
+} from "@crate/ui/icons";
+import { Link } from "react-router";
+
+import type { StatsPageController } from "@/pages/use-stats-page-controller";
+import type { SoundProfile } from "@/pages/stats-page-model";
+import { CrateImage } from "@/components/artwork/CrateImage";
+import {
+  formatStatsMinutes,
+  formatStatsPercent,
+  type ReplayMix,
+  type StatsAlbum,
+  type StatsArtist,
+  type StatsGenre,
+  type StatsStory,
+  type StatsStoryArtistSignal,
+  type StatsTrack,
+  type StatsTrendPoint,
+} from "@/components/stats/stats-model";
+import {
+  albumCoverApiUrl,
+  albumPagePath,
+  artistPhotoApiUrl,
+  artistPagePath,
+} from "@/lib/library-routes";
+import { cn } from "@/lib/utils";
+
+const STATS_MOSAIC_CELL_IDS = [
+  "top-left",
+  "top-right",
+  "middle-left",
+  "middle-right",
+  "bottom-left",
+  "bottom-right",
+  "footer-left",
+  "footer-right",
+] as const;
+
+type StorySignal = {
+  key: string;
+  label: string;
+  title: string;
+  body: string;
+};
+
+function statsTrackKey(item: StatsTrack): string {
+  return String(
+    item.track_id ??
+      item.track_path ??
+      `${item.artist}:${item.album}:${item.title}`,
+  );
+}
+
+function statsArtistKey(item: StatsArtist): string {
+  return String(
+    item.artist_id ??
+      item.global_artist_uid ??
+      item.artist_slug ??
+      item.artist_name,
+  );
+}
+
+function statsAlbumKey(item: StatsAlbum): string {
+  return String(
+    item.album_id ??
+      item.global_album_uid ??
+      item.album_slug ??
+      `${item.artist}:${item.album}`,
+  );
+}
+
+export function StatsHeroSection({ page }: { page: StatsPageController }) {
+  return (
+    <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+      <StatsHeroCover page={page} />
+      <aside className="grid gap-4">
+        <ReplayCard
+          replay={page.replay}
+          items={page.replayItems}
+          loading={page.dashboardLoading}
+          onPlay={page.playReplay}
+          onPlayTrack={page.playTopTrack}
+        />
+        <StatsSignalCards page={page} />
+      </aside>
+    </section>
+  );
+}
+
+function StatsHeroCover({ page }: { page: StatsPageController }) {
+  const { leadArtist, leadGenre, overview, period, t } = page;
+
+  return (
+    <div className="stats-hero-surface relative min-h-[520px] overflow-hidden rounded-[12px] p-5 sm:p-7">
+      <StatsCoverMosaic tracks={page.coverTracks} />
+      <div className="stats-hero-overlay absolute inset-0" />
+      <div className="relative z-10 flex min-h-[460px] flex-col justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="stats-hero-period-muted rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
+            {period.label}
+          </span>
+          <span className="stats-hero-period-accent rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
+            {period.title}
+          </span>
+        </div>
+        <div>
+          <div className="stats-hero-title max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-[-0.1em]">
+            {leadGenre?.genre_name || leadArtist?.artist_name || "Crate"}
+          </div>
+          <div className="mt-5 grid max-w-3xl gap-3 sm:grid-cols-3">
+            <HeroMetric
+              label={t("stats.metrics.minutes")}
+              value={formatStatsMinutes(overview?.minutes_listened ?? 0)}
+            />
+            <HeroMetric
+              label={t("stats.metrics.plays")}
+              value={overview?.play_count ? String(overview.play_count) : "0"}
+            />
+            <HeroMetric
+              label={t("stats.metrics.activeDays")}
+              value={overview?.active_days ? String(overview.active_days) : "0"}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatsSignalCards({ page }: { page: StatsPageController }) {
+  const { leadArtist, leadTrack, t, topDiscovery } = page;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+      <SignalCard
+        icon={Flame}
+        label={t("stats.signals.obsession")}
+        title={leadTrack?.title || t("stats.signals.noDominantTrack")}
+        body={
+          leadTrack
+            ? t("stats.signals.dominantTrackBody", {
+                artist: leadTrack.artist,
+                count: leadTrack.play_count,
+              })
+            : t("stats.signals.noDominantTrackBody")
+        }
+      />
+      <SignalCard
+        icon={Search}
+        label={
+          topDiscovery
+            ? t("stats.signals.discovery")
+            : t("stats.signals.gravity")
+        }
+        title={
+          topDiscovery?.artist_name ||
+          leadArtist?.artist_name ||
+          t("stats.signals.noLeadingArtist")
+        }
+        body={
+          topDiscovery
+            ? t("stats.signals.discoveryBody", {
+                count: topDiscovery.play_count,
+              })
+            : leadArtist
+              ? t("stats.signals.gravityBody", {
+                  minutes: formatStatsMinutes(leadArtist.minutes_listened),
+                  count: leadArtist.play_count,
+                })
+              : t("stats.signals.noLeadingArtistBody")
+        }
+      />
+    </div>
+  );
+}
+
+export function StatsAnalyticsSection({ page }: { page: StatsPageController }) {
+  return (
+    <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <SoundProfileCard
+        profile={page.soundProfile}
+        genres={page.topGenreItems}
+        skipRate={page.overview?.skip_rate ?? 0}
+      />
+      <ListeningPulseCard
+        story={page.story}
+        points={page.trends?.points ?? []}
+        loading={page.dashboardLoading}
+      />
+    </section>
+  );
+}
+
+export function StatsCollectionsSection({
+  page,
+}: {
+  page: StatsPageController;
+}) {
+  return (
+    <>
+      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <TopTracksPanel
+          items={page.topTrackItems}
+          loading={page.dashboardLoading}
+          onPlayTrack={page.playTopTrack}
+        />
+        <TopArtistsPanel
+          items={page.topArtistItems}
+          loading={page.dashboardLoading}
+        />
+      </section>
+      <TopAlbumsPanel
+        items={page.topAlbumItems}
+        loading={page.dashboardLoading}
+      />
+    </>
+  );
+}
+
+export function StatsStorySection({
+  story,
+  fallbackMover,
+  fallbackDiscovery,
+  fallbackComeback,
+}: {
+  story?: StatsStory;
+  fallbackMover?: StatsStoryArtistSignal;
+  fallbackDiscovery?: StatsStoryArtistSignal;
+  fallbackComeback?: StatsStoryArtistSignal;
+}) {
+  const { t, i18n } = useTranslation();
+  const signals = story
+    ? buildStorySignals({
+        story,
+        fallbackMover,
+        fallbackDiscovery,
+        fallbackComeback,
+        locale: i18n.language,
+        t,
+      })
+    : [];
+
+  if (!signals.length) return null;
+
+  return (
+    <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {signals.map(({ key, label, title, body }) => (
+        <StorySignalCard key={key} label={label} title={title} body={body} />
+      ))}
+    </section>
+  );
+}
+
+function buildStorySignals({
+  story,
+  fallbackMover,
+  fallbackDiscovery,
+  fallbackComeback,
+  locale,
+  t,
+}: {
+  story: StatsStory;
+  fallbackMover?: StatsStoryArtistSignal;
+  fallbackDiscovery?: StatsStoryArtistSignal;
+  fallbackComeback?: StatsStoryArtistSignal;
+  locale: string;
+  t: StatsPageController["t"];
+}): StorySignal[] {
+  const mover = fallbackMover ?? story.movers[0];
+  const discovery = fallbackDiscovery ?? story.discoveries[0];
+  const comeback = fallbackComeback ?? story.comebacks[0];
+  const rhythm = story.rhythm;
+
+  if (!mover && !discovery && !comeback && !rhythm.peak_hour_label) {
+    return [];
+  }
+
+  return [
+    {
+      key: "rising",
+      label: t("stats.story.rising"),
+      title: mover?.artist_name || t("stats.story.noSurge"),
+      body: mover?.delta_play_count
+        ? t("stats.story.risingBody", { count: mover.delta_play_count })
+        : t("stats.story.risingFallback"),
+    },
+    {
+      key: "new-blood",
+      label: t("stats.story.newBlood"),
+      title: discovery?.artist_name || t("stats.story.noNewObsession"),
+      body: discovery
+        ? t("stats.story.discoveryBody", { count: discovery.play_count })
+        : t("stats.story.discoveryFallback"),
+    },
+    {
+      key: "comeback",
+      label: t("stats.story.comeback"),
+      title: comeback?.artist_name || t("stats.story.noComeback"),
+      body: comeback
+        ? t("stats.story.comebackBody", { count: comeback.play_count })
+        : t("stats.story.comebackFallback"),
+    },
+    {
+      key: "peak-ritual",
+      label: t("stats.story.peakRitual"),
+      title:
+        rhythm.peak_hour_label ||
+        rhythm.peak_weekday ||
+        t("stats.story.noRhythm"),
+      body: rhythm.peak_weekday
+        ? t("stats.story.rhythmBody", {
+            weekday: formatWeekdayLabel(rhythm.peak_weekday, locale),
+            hour: rhythm.peak_hour_label ?? t("stats.story.peakHour"),
+          })
+        : t("stats.story.rhythmFallback"),
+    },
+  ];
+}
+
+function StorySignalCard({
+  label,
+  title,
+  body,
+}: {
+  label: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="stats-card relative overflow-hidden rounded-[12px] p-5">
+      <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-accent-action/10 blur-3xl" />
+      <div className="relative">
+        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
+          {label}
+        </div>
+        <div className="mt-3 line-clamp-2 text-2xl font-black uppercase leading-[0.9] tracking-[-0.07em] text-text-primary">
+          {title}
+        </div>
+        <p className="mt-3 text-sm leading-6 text-text-muted">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function HeroMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stats-hero-metric rounded-lg px-4 py-3 backdrop-blur">
+      <div className="stats-hero-metric-label text-[10px] font-black uppercase tracking-[0.2em]">
+        {label}
+      </div>
+      <div className="stats-hero-metric-value mt-1 text-2xl font-black tracking-[-0.04em]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
+  const covers = tracks
+    .flatMap((track) => {
+      const cover = albumCoverApiUrl(
+        {
+          albumId: track.album_id,
+          globalAlbumUid: track.global_album_uid,
+          albumSlug: track.album_slug,
+          artistName: track.artist,
+          albumName: track.album,
+        },
+        { size: 512 },
+      );
+      return cover ? [cover] : [];
+    })
+    .slice(0, 8);
+
+  return (
+    <div className="absolute inset-0 grid grid-cols-2 opacity-80 sm:grid-cols-4">
+      {STATS_MOSAIC_CELL_IDS.map((cellId, index) => {
+        const cover = covers[index % Math.max(covers.length, 1)];
+        return (
+          <div
+            key={cellId}
+            className={cn(
+              "stats-mosaic-cell relative min-h-40 overflow-hidden",
+              index % 3 === 0 && "scale-105",
+            )}
+          >
+            {cover ? (
+              <CrateImage
+                src={cover}
+                alt=""
+                className="h-full w-full object-cover grayscale-[35%] saturate-[0.85]"
+                loading={index < 4 ? "eager" : "lazy"}
+              />
+            ) : (
+              <div className="stats-mosaic-placeholder h-full w-full" />
+            )}
+            <div className="stats-mosaic-overlay absolute inset-0" />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReplayCard({
+  replay,
+  items,
+  loading,
+  onPlay,
+  onPlayTrack,
+}: {
+  replay?: ReplayMix;
+  items: StatsTrack[];
+  loading: boolean;
+  onPlay: () => void;
+  onPlayTrack: (item: StatsTrack) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="stats-replay-card rounded-[12px] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="stats-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]">
+            <Repeat2 size={12} />
+            {t("stats.replay.title")}
+          </div>
+          <h2 className="mt-3 text-2xl font-black tracking-[-0.06em] text-text-primary">
+            {replay?.title || t("stats.replay.title")}
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-text-muted">
+            {replay?.subtitle || t("stats.replay.defaultSubtitle")}
+          </p>
+        </div>
+        <button
+          onClick={onPlay}
+          disabled={!items.length}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-xl shadow-primary/20 transition hover:scale-105 disabled:opacity-50"
+        >
+          <Play size={18} fill="currentColor" />
+        </button>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <MiniStat
+          label={t("common.tracks")}
+          value={String(replay?.track_count ?? 0)}
+        />
+        <MiniStat
+          label={t("stats.metrics.minutes")}
+          value={formatStatsMinutes(replay?.minutes_listened ?? 0)}
+        />
+      </div>
+
+      <div className="mt-5 space-y-2">
+        {loading ? (
+          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+            {t("stats.replay.loading")}
+          </div>
+        ) : items.length ? (
+          items.slice(0, 5).map((item, index) => (
+            <button
+              key={statsTrackKey(item)}
+              onClick={() => onPlayTrack(item)}
+              className="stats-replay-row flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
+            >
+              <TrackCover item={item} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-text-primary">
+                  {item.title}
+                </div>
+                <div className="truncate text-xs text-text-muted">
+                  {item.artist}
+                </div>
+              </div>
+              <div className="text-xs font-bold text-accent-action">
+                {index + 1}
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+            {t("stats.replay.empty")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stats-dark-card rounded-lg px-4 py-3">
+      <div className="stats-muted-label text-[10px] font-black uppercase tracking-[0.18em]">
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-black text-text-primary">{value}</div>
+    </div>
+  );
+}
+
+function SignalCard({
+  icon: Icon,
+  label,
+  title,
+  body,
+}: {
+  icon: ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="stats-card rounded-[12px] p-5">
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-accent-action">
+        <Icon size={13} />
+        {label}
+      </div>
+      <div className="mt-3 text-xl font-black tracking-[-0.05em] text-text-primary">
+        {title}
+      </div>
+      <p className="mt-2 text-sm leading-6 text-text-muted">{body}</p>
+    </div>
+  );
+}
+
+function SoundProfileCard({
+  profile,
+  genres,
+  skipRate,
+}: {
+  profile: SoundProfile;
+  genres: StatsGenre[];
+  skipRate: number;
+}) {
+  const { t } = useTranslation();
+  const genreLabels = normalizeGenreLabels(genres);
+
+  return (
+    <div className="stats-card rounded-[12px] p-5">
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
+            {t("stats.soundProfile.title")}
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            {t("stats.soundProfile.subtitle")}
+          </p>
+        </div>
+        <Activity className="text-accent-action" size={22} />
+      </div>
+
+      <div className="space-y-4">
+        <ProfileBar
+          label={t("stats.soundProfile.energy")}
+          value={profile.energy}
+        />
+        <ProfileBar
+          label={t("stats.soundProfile.movement")}
+          value={profile.danceability}
+        />
+        <ProfileBar
+          label={t("stats.soundProfile.brightness")}
+          value={profile.valence}
+        />
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <MiniStat
+          label={t("stats.soundProfile.avgBpm")}
+          value={profile.bpm ? String(profile.bpm) : "—"}
+        />
+        <MiniStat
+          label={t("stats.soundProfile.skipRate")}
+          value={formatStatsPercent(skipRate)}
+        />
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        {genreLabels.map((genre) => (
+          <span
+            key={genre}
+            className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs font-bold text-accent-action"
+          >
+            {genre}
+          </span>
+        ))}
+        {!genreLabels.length ? (
+          <span className="text-sm text-text-muted">
+            {t("stats.soundProfile.genreEmpty")}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ListeningPulseCard({
+  story,
+  points,
+  loading,
+}: {
+  story?: StatsStory;
+  points: StatsTrendPoint[];
+  loading: boolean;
+}) {
+  const { t, i18n } = useTranslation();
+  const activePoints = points.filter(
+    (point) => point.play_count > 0 || point.minutes_listened > 0,
+  );
+  const strongestDay = activePoints.reduce<StatsTrendPoint | null>(
+    (strongest, point) =>
+      !strongest || point.minutes_listened > strongest.minutes_listened
+        ? point
+        : strongest,
+    null,
+  );
+  const totalMinutes = points.reduce(
+    (sum, point) => sum + point.minutes_listened,
+    0,
+  );
+  const averageActiveMinutes = activePoints.length
+    ? totalMinutes / activePoints.length
+    : 0;
+  const consistency = points.length ? activePoints.length / points.length : 0;
+  const rhythm = story?.rhythm;
+
+  return (
+    <div className="stats-card rounded-[12px] p-5">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
+            {t("stats.rhythm.title")}
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            {t("stats.rhythm.subtitle")}
+          </p>
+        </div>
+        <CalendarDays className="text-accent-action" size={22} />
+      </div>
+
+      {loading ? (
+        <PanelLoading />
+      ) : activePoints.length ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <MiniStat
+              label={t("stats.rhythm.strongestDay")}
+              value={
+                strongestDay
+                  ? formatTrendDay(strongestDay.day, i18n.language)
+                  : "—"
+              }
+            />
+            <MiniStat
+              label={t("stats.rhythm.peakHour")}
+              value={rhythm?.peak_hour_label ?? "—"}
+            />
+            <MiniStat
+              label={t("stats.rhythm.avgActiveDay")}
+              value={formatStatsMinutes(averageActiveMinutes)}
+            />
+          </div>
+
+          <PulseConstellation points={points} />
+
+          <div className="stats-dark-card mt-4 rounded-xl p-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
+              {t("stats.rhythm.cadence")}
+            </div>
+            <p className="mt-2 text-sm leading-6 text-text-muted">
+              {t("stats.rhythm.activityDays", {
+                percent: formatStatsPercent(consistency),
+              })}
+              {rhythm?.peak_weekday
+                ? ` ${t("stats.rhythm.strongestWeekday", {
+                    weekday: formatWeekdayLabel(
+                      rhythm.peak_weekday,
+                      i18n.language,
+                    ),
+                  })}`
+                : ""}
+            </p>
+          </div>
+        </>
+      ) : (
+        <PanelEmpty text={t("stats.rhythm.empty")} />
+      )}
+    </div>
+  );
+}
+
+function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
+  const { t, i18n } = useTranslation();
+  const visible = points.slice(-18);
+  const maxMinutes = Math.max(
+    ...visible.map((point) => point.minutes_listened),
+    1,
+  );
+  const coordinates = visible.map((point, index) => {
+    const intensity = Math.min(1, point.minutes_listened / maxMinutes);
+    const x = visible.length > 1 ? 5 + (index / (visible.length - 1)) * 90 : 50;
+    const y = 78 - intensity * 52;
+    return { point, intensity, x, y };
+  });
+  const polyline = coordinates
+    .map(({ x, y }) => `${x.toFixed(2)},${y.toFixed(2)}`)
+    .join(" ");
+
+  return (
+    <div className="stats-pulse-surface mt-5 rounded-[12px] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
+            {t("stats.rhythm.dailySignalMap")}
+          </div>
+          <p className="mt-1 text-xs text-text-muted">
+            {t("stats.rhythm.dailySignalDescription")}
+          </p>
+        </div>
+        <div className="stats-muted-pill rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em]">
+          {t("stats.rhythm.dayCount", { count: visible.length })}
+        </div>
+      </div>
+
+      <div className="stats-pulse-plot relative h-36 rounded-xl">
+        <div className="stats-pulse-grid pointer-events-none absolute inset-3 rounded-xl opacity-50" />
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <polyline
+            points={polyline}
+            fill="none"
+            className="stats-pulse-line"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+
+        {coordinates.map(({ point, intensity, x, y }, index) => {
+          const size = 0.65 + intensity * 1.25;
+          const completionRate = point.play_count
+            ? point.complete_play_count / point.play_count
+            : 0;
+          const skipRate = point.play_count
+            ? point.skip_count / point.play_count
+            : 0;
+          const isActive = point.play_count > 0 || point.minutes_listened > 0;
+
+          return (
+            <div
+              key={point.day}
+              className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 hover:z-40 focus-within:z-40"
+              style={{ left: `${x}%`, top: `${y}%` }}
+            >
+              <button
+                type="button"
+                className={cn(
+                  "relative flex h-10 w-10 items-center justify-center rounded-full outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-primary/70",
+                  isActive
+                    ? "text-accent-action hover:scale-110"
+                    : "stats-pulse-point-idle",
+                )}
+                aria-label={`${formatTrendDay(
+                  point.day,
+                  i18n.language,
+                )}: ${formatStatsMinutes(point.minutes_listened)}, ${t(
+                  "common.playCount",
+                  { count: point.play_count },
+                )}`}
+              >
+                <span
+                  className={cn(
+                    "absolute rounded-full blur-md transition",
+                    isActive
+                      ? "bg-accent-action/25"
+                      : "stats-pulse-point-idle-glow",
+                  )}
+                  style={{
+                    height: `${size * 1.45}rem`,
+                    width: `${size * 1.45}rem`,
+                  }}
+                />
+                <span
+                  className={cn(
+                    "relative rounded-full border transition",
+                    isActive
+                      ? "stats-pulse-point-active border-accent-action/55 bg-accent-action"
+                      : "stats-pulse-point-idle-dot",
+                  )}
+                  style={{ height: `${size}rem`, width: `${size}rem` }}
+                />
+              </button>
+
+              <div
+                className={cn(
+                  "stats-pulse-tooltip pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-[12px] p-3 text-left opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
+                  index < 2
+                    ? "left-0 translate-x-0"
+                    : index > coordinates.length - 3
+                      ? "right-0 translate-x-0"
+                      : "left-1/2",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="stats-pulse-tooltip-title text-sm font-black">
+                      {formatTrendDay(point.day, i18n.language)}
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-accent-action">
+                      {formatShortWeekday(point.day, i18n.language)}
+                    </div>
+                  </div>
+                  <div className="rounded-full border border-accent-action/20 bg-accent-action/10 px-2.5 py-1 text-[10px] font-black text-accent-action">
+                    {formatStatsMinutes(point.minutes_listened)}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <TooltipMetric
+                    label={t("stats.metrics.plays")}
+                    value={String(point.play_count)}
+                  />
+                  <TooltipMetric
+                    label={t("stats.rhythm.done")}
+                    value={String(point.complete_play_count)}
+                  />
+                  <TooltipMetric
+                    label={t("stats.rhythm.skips")}
+                    value={String(point.skip_count)}
+                  />
+                </div>
+                <div className="mt-3 space-y-2">
+                  <TooltipMeter
+                    label={t("stats.rhythm.completion")}
+                    value={completionRate}
+                  />
+                  <TooltipMeter
+                    label={t("stats.rhythm.skipPressure")}
+                    value={skipRate}
+                  />
+                </div>
+                <div className="mt-3 text-xs leading-5 text-text-muted">
+                  {isActive
+                    ? t("stats.rhythm.completedAcross", {
+                        complete: point.complete_play_count,
+                        total: point.play_count,
+                      })
+                    : t("stats.rhythm.noDaySignal")}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TooltipMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stats-tooltip-metric rounded-xl px-2.5 py-2">
+      <div className="stats-tooltip-label text-[9px] font-black uppercase tracking-[0.16em]">
+        {label}
+      </div>
+      <div className="stats-tooltip-value mt-1 text-sm font-black">{value}</div>
+    </div>
+  );
+}
+
+function TooltipMeter({ label, value }: { label: string; value: number }) {
+  const percent = Math.max(0, Math.min(100, Math.round(value * 100)));
+  return (
+    <div>
+      <div className="stats-tooltip-meter-label mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.12em]">
+        <span>{label}</span>
+        <span>{percent}%</span>
+      </div>
+      <div className="stats-tooltip-meter-track h-1.5 overflow-hidden rounded-full">
+        <div
+          className="h-full rounded-full bg-accent-action"
+          style={{ width: `${Math.max(3, percent)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProfileBar({ label, value }: { label: string; value: number }) {
+  const percent = Math.round(value * 100);
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-xs">
+        <span className="stats-profile-label font-bold uppercase tracking-[0.16em]">
+          {label}
+        </span>
+        <span className="font-black text-text-primary">{percent}%</span>
+      </div>
+      <div className="stats-profile-track h-3 overflow-hidden rounded-full">
+        <div
+          className="stats-profile-fill h-full rounded-full"
+          style={{ width: `${Math.max(3, percent)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function normalizeGenreLabels(genres: StatsGenre[]): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const genre of genres) {
+    for (const rawLabel of genre.genre_name.split(",")) {
+      const label = rawLabel.trim();
+      const key = label.toLowerCase();
+      if (!label || seen.has(key)) continue;
+      seen.add(key);
+      labels.push(label);
+    }
+  }
+  return labels.slice(0, 8);
+}
+
+function formatTrendDay(day: string, locale: string): string {
+  const date = new Date(`${day}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return day;
+  return date.toLocaleDateString(locale, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatShortWeekday(day: string, locale: string): string {
+  const date = new Date(`${day}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(locale, { weekday: "long" });
+}
+
+const WEEKDAY_INDEX_BY_ENGLISH = new Map(
+  [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ].map((weekday, index) => [weekday, index] as const),
+);
+
+function formatWeekdayLabel(weekday: string, locale: string): string {
+  const weekdayIndex = WEEKDAY_INDEX_BY_ENGLISH.get(weekday.toLowerCase());
+  if (weekdayIndex == null) return weekday;
+  const date = new Date(Date.UTC(2026, 0, 4 + weekdayIndex, 12));
+  return date.toLocaleDateString(locale, { weekday: "long" });
+}
+
+function TopTracksPanel({
+  items,
+  loading,
+  onPlayTrack,
+}: {
+  items: StatsTrack[];
+  loading: boolean;
+  onPlayTrack: (item: StatsTrack) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <StatsPanel
+      title={t("stats.topTracks.title")}
+      subtitle={t("stats.topTracks.subtitle")}
+      icon={Music2}
+    >
+      <div className="space-y-2">
+        {loading ? (
+          <PanelLoading />
+        ) : items.length ? (
+          items.map((item, index) => (
+            <button
+              key={statsTrackKey(item)}
+              onClick={() => onPlayTrack(item)}
+              className="stats-list-row group flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
+            >
+              <div className="w-7 text-center text-xs font-black text-text-muted">
+                {index + 1}
+              </div>
+              <TrackCover item={item} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-text-primary">
+                  {item.title}
+                </div>
+                <div className="truncate text-xs text-text-muted">
+                  {item.artist} · {item.album}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="text-sm font-black text-text-primary">
+                  {item.play_count}
+                </div>
+                <div className="text-[11px] text-text-muted">
+                  {formatStatsMinutes(item.minutes_listened)}
+                </div>
+              </div>
+            </button>
+          ))
+        ) : (
+          <PanelEmpty text={t("stats.topTracks.empty")} />
+        )}
+      </div>
+    </StatsPanel>
+  );
+}
+
+function TopArtistsPanel({
+  items,
+  loading,
+}: {
+  items: StatsArtist[];
+  loading: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <StatsPanel
+      title={t("stats.topArtists.title")}
+      subtitle={t("stats.topArtists.subtitle")}
+      icon={Flame}
+    >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+        {loading ? (
+          <PanelLoading />
+        ) : items.length ? (
+          items
+            .slice(0, 6)
+            .map((item, index) => (
+              <TopArtistCard
+                key={statsArtistKey(item)}
+                item={item}
+                index={index}
+              />
+            ))
+        ) : (
+          <PanelEmpty text={t("stats.topArtists.empty")} />
+        )}
+      </div>
+    </StatsPanel>
+  );
+}
+
+function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
+  const { t } = useTranslation();
+  const photo = artistPhotoApiUrl(
+    {
+      artistId: item.artist_id,
+      globalArtistUid: item.global_artist_uid,
+      artistSlug: item.artist_slug,
+      artistName: item.artist_name,
+    },
+    { size: 640 },
+  );
+
+  return (
+    <Link
+      to={artistPagePath({
+        artistId: item.artist_id,
+        globalArtistUid: item.global_artist_uid,
+        artistSlug: item.artist_slug,
+        artistName: item.artist_name,
+      })}
+      className="stats-artist-card group relative min-h-40 overflow-hidden rounded-xl p-4 transition"
+    >
+      {photo ? (
+        <CrateImage
+          src={photo}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover grayscale opacity-55 transition duration-500 group-hover:scale-105 group-hover:opacity-70"
+          loading="lazy"
+        />
+      ) : (
+        <div className="stats-artist-placeholder absolute inset-0" />
+      )}
+      <div className="stats-artist-overlay absolute inset-0" />
+      <div className="stats-artist-index absolute -bottom-6 -right-1 text-[8.5rem] font-black leading-none tracking-[-0.12em]">
+        {String(index + 1).padStart(2, "0")}
+      </div>
+      <div className="relative z-10 flex min-h-32 flex-col justify-between">
+        <div className="text-[10px] font-black uppercase tracking-[0.22em] text-accent-action">
+          {t("stats.rank", { rank: index + 1 })}
+        </div>
+        <div>
+          <div className="stats-artist-title line-clamp-2 text-3xl font-black uppercase leading-[0.86] tracking-[-0.08em]">
+            {item.artist_name}
+          </div>
+          <div className="stats-artist-meta mt-3 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.12em]">
+            <span>{t("common.playCount", { count: item.play_count })}</span>
+            <span>{formatStatsMinutes(item.minutes_listened)}</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function TopAlbumsPanel({
+  items,
+  loading,
+}: {
+  items: StatsAlbum[];
+  loading: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <StatsPanel
+      title={t("stats.topAlbums.title")}
+      subtitle={t("stats.topAlbums.subtitle")}
+      icon={Disc3}
+      className="mt-8"
+    >
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+        {loading ? (
+          <PanelLoading />
+        ) : items.length ? (
+          items.slice(0, 12).map((item, index) => (
+            <Link
+              key={statsAlbumKey(item)}
+              to={albumPagePath({
+                albumId: item.album_id,
+                globalAlbumUid: item.global_album_uid,
+                albumSlug: item.album_slug,
+                artistSlug: item.artist_slug,
+                artistName: item.artist,
+                albumName: item.album,
+              })}
+              className="group min-w-0"
+            >
+              <div className="stats-album-cover relative aspect-square overflow-hidden rounded-xl">
+                {albumCoverApiUrl(
+                  {
+                    albumId: item.album_id,
+                    globalAlbumUid: item.global_album_uid,
+                    albumSlug: item.album_slug,
+                    artistSlug: item.artist_slug,
+                    artistName: item.artist,
+                    albumName: item.album,
+                  },
+                  { size: 384 },
+                ) ? (
+                  <CrateImage
+                    src={albumCoverApiUrl(
+                      {
+                        albumId: item.album_id,
+                        globalAlbumUid: item.global_album_uid,
+                        albumSlug: item.album_slug,
+                        artistSlug: item.artist_slug,
+                        artistName: item.artist,
+                        albumName: item.album,
+                      },
+                      { size: 384 },
+                    )}
+                    alt=""
+                    className="h-full w-full object-cover transition group-hover:scale-105"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-accent-action">
+                    <Disc3 size={28} />
+                  </div>
+                )}
+                <div className="stats-album-rank absolute left-2 top-2 rounded-full px-2 py-1 text-[10px] font-black">
+                  #{index + 1}
+                </div>
+              </div>
+              <div className="mt-2 truncate text-sm font-semibold text-text-primary">
+                {item.album}
+              </div>
+              <div className="truncate text-xs text-text-muted">
+                {item.artist}
+              </div>
+            </Link>
+          ))
+        ) : (
+          <PanelEmpty text={t("stats.topAlbums.empty")} />
+        )}
+      </div>
+    </StatsPanel>
+  );
+}
+
+function StatsPanel({
+  title,
+  subtitle,
+  icon: Icon,
+  children,
+  className,
+}: {
+  title: string;
+  subtitle: string;
+  icon: ComponentType<{ size?: number; className?: string }>;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("stats-card rounded-[12px] p-5", className)}>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
+            {title}
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
+        </div>
+        <Icon className="text-accent-action" size={22} />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function TrackCover({
+  item,
+  size = "md",
+}: {
+  item: StatsTrack;
+  size?: "sm" | "md";
+}) {
+  const cover = albumCoverApiUrl(
+    {
+      albumId: item.album_id,
+      globalAlbumUid: item.global_album_uid,
+      albumSlug: item.album_slug,
+      artistName: item.artist,
+      albumName: item.album,
+    },
+    { size: 160 },
+  );
+  return (
+    <div
+      className={cn(
+        "stats-track-cover shrink-0 overflow-hidden rounded-xl",
+        size === "sm" ? "h-10 w-10" : "h-12 w-12",
+      )}
+    >
+      {cover ? (
+        <CrateImage
+          src={cover}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-accent-action">
+          <Music2 size={size === "sm" ? 16 : 18} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelLoading() {
+  const { t } = useTranslation();
+  return (
+    <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+      {t("common.loadingShort")}
+    </div>
+  );
+}
+
+function PanelEmpty({ text }: { text: string }) {
+  return (
+    <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+      {text}
+    </div>
+  );
+}
