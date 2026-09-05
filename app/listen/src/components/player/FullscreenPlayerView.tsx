@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import type { Dispatch, RefObject, SetStateAction } from "react";
 import type { TFunction } from "i18next";
 import {
   ItemActionMenu,
@@ -8,128 +7,34 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
-import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
-import { SpinningDisc } from "@/components/player/SpinningDisc";
-import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
-import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
+import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { InfoTab } from "@/components/player/extended/InfoTab";
-import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
 import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
-import type { CrossfadeTransition } from "@/contexts/player-context";
-import type { RepeatMode, Track } from "@/contexts/player-types";
-import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
+import { FullscreenPlayerArtwork } from "@/components/player/FullscreenPlayerArtwork";
+import { FullscreenPlayerControls } from "@/components/player/FullscreenPlayerControls";
+import type {
+  FullscreenPlayerViewProps,
+  ViewPlayer,
+  ViewRefs,
+} from "@/components/player/fullscreen-player-view-types";
 import type {
   FSPanel,
   FullscreenLyrics,
 } from "@/components/player/fullscreen-player-types";
+import type { Track } from "@/contexts/player-types";
 import {
   ChevronDown,
   Disc3,
-  Heart,
-  HeartBold,
   Info,
   ListMusic,
-  Loader2,
   Mic3,
-  Pause,
-  Play,
-  Repeat,
-  Repeat1,
-  Shuffle,
-  SlidersHorizontal,
-  SkipBack,
-  SkipForward,
-  Square,
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 import { triggerHaptic } from "@/lib/haptics";
-
-type ViewState = {
-  activePanel: FSPanel | null;
-  animating: boolean;
-  allowMobileEqualizer: boolean;
-  isBuffering: boolean;
-  isCdMode: boolean;
-  isPlaying: boolean;
-  jamQueueLocked: boolean;
-  jamTransportDisabled: boolean;
-  liked: boolean;
-  repeat: RepeatMode;
-  showEqualizer: boolean;
-  shuffle: boolean;
-  surfaceMode: PlayerSurfaceMode;
-  swipeY: number;
-};
-
-type ViewPlayer = {
-  currentTrack: Track;
-  crossfadeProgress: number;
-  crossfadeTransition: CrossfadeTransition | null;
-  displayedDuration: number;
-  displayedTime: number;
-  duration: number;
-  effectiveRemainingTime: number;
-  resolvedArtist: {
-    id?: number | null;
-    globalArtistUid?: string | null;
-    slug?: string | null;
-    name?: string | null;
-  } | null;
-  artistAvatarUrl: string | null;
-  sourceLabel: string | null;
-  spinningDiscJogSeekMode: "commit" | "live";
-  upcomingTracks: Track[];
-};
-
-type ViewRefs = {
-  activeLyricRef: RefObject<HTMLButtonElement | null>;
-  coverRef: RefObject<HTMLDivElement | null>;
-  equalizerButtonRef: RefObject<HTMLButtonElement | null>;
-  equalizerRef: RefObject<HTMLDivElement | null>;
-  fsRootRef: RefObject<HTMLDivElement | null>;
-  lyricsContainerRef: RefObject<HTMLDivElement | null>;
-};
-
-type ViewActions = {
-  closeWithFeedback: () => void;
-  cycleRepeatWithFeedback: () => void;
-  goNextWithFeedback: () => void;
-  goPrevWithFeedback: () => void;
-  goToArtist: () => void;
-  jumpTo: (index: number) => void;
-  onClose: () => void;
-  onSwipeEnd: (event: React.TouchEvent) => void;
-  onSwipeMove: (event: React.TouchEvent) => void;
-  onSwipeStart: (event: React.TouchEvent) => void;
-  seek: (time: number) => void;
-  seekWithFeedback: (time: number) => void;
-  setDragging: (dragging: boolean) => void;
-  setShowEqualizer: Dispatch<SetStateAction<boolean>>;
-  setPlaybackRate: (rate: number) => void;
-  equalizerButtonRef: RefObject<HTMLButtonElement | null>;
-  toggleLikeWithFeedback: () => Promise<void>;
-  togglePlaybackWithFeedback: () => void;
-  toggleShuffleWithFeedback: () => void;
-  toggleSurfaceModeWithFeedback: () => void;
-};
-
-type FullscreenPlayerViewProps = {
-  t: TFunction;
-  state: ViewState;
-  player: ViewPlayer;
-  refs: ViewRefs;
-  actions: ViewActions;
-  lyrics: FullscreenLyrics | null;
-  activeLyricIndex: number;
-  playerTabBottomClearance: string;
-  scrollTabBottomClearance: string;
-  onSelectPanel: Dispatch<SetStateAction<FSPanel | null>>;
-  setShowEqualizer: Dispatch<SetStateAction<boolean>>;
-  markArtistPhotoFailed: () => void;
-};
 
 function FullscreenQueueRow({
   track,
@@ -283,217 +188,6 @@ function FullscreenPlayerHeader({
         })}
       </div>
     </div>
-  );
-}
-
-function FullscreenPlayerArtwork({
-  state,
-  player,
-  refs,
-  actions,
-}: Pick<FullscreenPlayerViewProps, "state" | "player" | "refs" | "actions">) {
-  const { currentTrack, crossfadeProgress, crossfadeTransition } = player;
-  return (
-    <div ref={refs.coverRef} className="relative">
-      {state.isCdMode ? (
-        <SpinningDisc
-          albumCover={currentTrack.albumCover}
-          className="w-full"
-          crossfadeIncomingCover={crossfadeTransition?.incoming.albumCover}
-          crossfadeOutgoingCover={crossfadeTransition?.outgoing.albumCover}
-          crossfadeProgress={crossfadeProgress}
-          currentTime={player.displayedTime}
-          duration={player.displayedDuration}
-          isBuffering={state.isBuffering}
-          isPlaying={state.isPlaying}
-          disabled={state.jamQueueLocked}
-          jogEnabled
-          jogSeekMode={player.spinningDiscJogSeekMode}
-          onJoggingChange={actions.setDragging}
-          onPlaybackRateChange={actions.setPlaybackRate}
-          onSeek={actions.seekWithFeedback}
-          onTogglePlay={actions.togglePlaybackWithFeedback}
-        />
-      ) : (
-        <div className="relative aspect-square overflow-hidden rounded-xl">
-          {crossfadeTransition ? (
-            <>
-              {crossfadeTransition.outgoing.albumCover ? (
-                <CrateImage
-                  src={crossfadeTransition.outgoing.albumCover}
-                  alt=""
-                  className="fullscreen-player-artwork absolute inset-0 h-full w-full object-cover"
-                  style={{ opacity: 1 - crossfadeProgress }}
-                />
-              ) : null}
-              {crossfadeTransition.incoming.albumCover ? (
-                <CrateImage
-                  src={crossfadeTransition.incoming.albumCover}
-                  alt=""
-                  className="fullscreen-player-artwork absolute inset-0 h-full w-full object-cover"
-                  style={{ opacity: crossfadeProgress }}
-                />
-              ) : null}
-            </>
-          ) : currentTrack.albumCover ? (
-            <CrateImage
-              src={currentTrack.albumCover}
-              alt=""
-              className="fullscreen-player-artwork h-full w-full object-cover"
-            />
-          ) : (
-            <div className="fullscreen-player-artwork-placeholder flex h-full w-full items-center justify-center">
-              <ListMusic size={64} className="fullscreen-player-artwork-icon" />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FullscreenPlayerControls({
-  state,
-  player,
-  actions,
-  t,
-}: Pick<FullscreenPlayerViewProps, "state" | "player" | "actions" | "t">) {
-  return (
-    <>
-      <div className="mx-auto mt-5 flex w-full max-w-[360px] items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={actions.toggleShuffleWithFeedback}
-          disabled={state.jamQueueLocked}
-          aria-label={
-            state.shuffle
-              ? t("player.disableShuffle")
-              : t("player.enableShuffle")
-          }
-          className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
-            state.shuffle
-              ? "text-accent-action drop-shadow-accent-action"
-              : "text-text-muted active:text-text-secondary"
-          }`}
-        >
-          <Shuffle size={CRATE_ICON_SIZE.lg} />
-        </button>
-        <button
-          type="button"
-          onClick={actions.goPrevWithFeedback}
-          disabled={state.jamQueueLocked}
-          aria-label={t("player.previous")}
-          className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-text-secondary transition-colors active:bg-surface-control active:text-text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
-        >
-          <SkipBack size={CRATE_ICON_SIZE.xl} fill="currentColor" />
-        </button>
-        <SpectrumPlayButton
-          onClick={actions.togglePlaybackWithFeedback}
-          disabled={state.jamTransportDisabled}
-          aria-label={state.isPlaying ? t("player.pause") : t("player.play")}
-          size="lg"
-          active={state.isPlaying}
-          className="touch-manipulation disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:scale-100"
-        >
-          {state.isBuffering ? (
-            <Loader2
-              size={CRATE_ICON_SIZE.xl}
-              className="animate-spin text-accent-action"
-            />
-          ) : state.isPlaying ? (
-            <Pause size={26} className="text-text-primary" />
-          ) : (
-            <Play
-              size={26}
-              className="ml-1 text-text-primary"
-              fill="currentColor"
-            />
-          )}
-        </SpectrumPlayButton>
-        <button
-          type="button"
-          onClick={actions.goNextWithFeedback}
-          disabled={state.jamTransportDisabled}
-          aria-label={t("player.next")}
-          className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-text-secondary transition-colors active:bg-surface-control active:text-text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
-        >
-          <SkipForward size={CRATE_ICON_SIZE.xl} fill="currentColor" />
-        </button>
-        <button
-          type="button"
-          onClick={actions.cycleRepeatWithFeedback}
-          disabled={state.jamQueueLocked}
-          aria-label={t("player.repeat", { mode: state.repeat })}
-          className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
-            state.repeat !== "off"
-              ? "text-accent-action drop-shadow-accent-action"
-              : "text-text-muted active:text-text-secondary"
-          }`}
-        >
-          {state.repeat === "one" ? (
-            <Repeat1 size={CRATE_ICON_SIZE.lg} />
-          ) : (
-            <Repeat size={CRATE_ICON_SIZE.lg} />
-          )}
-        </button>
-      </div>
-      <div className="mx-auto mt-3 flex w-full max-w-[360px] items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={() => void actions.toggleLikeWithFeedback()}
-          aria-label={state.liked ? "Unlike track" : "Like track"}
-          className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
-        >
-          {state.liked ? (
-            <HeartBold
-              size={19}
-              className="animate-crate-icon-active-pulse text-accent-action drop-shadow-accent-action"
-            />
-          ) : (
-            <Heart size={19} />
-          )}
-        </button>
-        {state.allowMobileEqualizer ? (
-          <button
-            type="button"
-            ref={actions.equalizerButtonRef}
-            onClick={() => {
-              triggerHaptic("selection");
-              actions.setShowEqualizer((value) => !value);
-            }}
-            aria-label={t("player.equalizer")}
-            className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control transition-colors active:bg-surface-control-hover ${
-              state.showEqualizer
-                ? "text-accent-action drop-shadow-accent-action"
-                : "text-text-secondary active:text-text-primary"
-            }`}
-          >
-            <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
-          </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={actions.toggleSurfaceModeWithFeedback}
-          aria-label={
-            state.surfaceMode === "cd" ? "Show album cover" : "Show spinning CD"
-          }
-          title={
-            state.surfaceMode === "cd" ? "Show album cover" : "Show spinning CD"
-          }
-          className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
-        >
-          {state.surfaceMode === "cd" ? (
-            <Square size={CRATE_ICON_SIZE.lg} />
-          ) : (
-            <Disc3 size={CRATE_ICON_SIZE.lg} />
-          )}
-        </button>
-        <PlayerTrackMenu
-          currentTrack={player.currentTrack}
-          className="h-12 w-12 rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
-        />
-      </div>
-    </>
   );
 }
 
