@@ -20,14 +20,15 @@ import {
 } from "./gapless-player-equalizer";
 import { getCrossfadeDurationPreference } from "./player-playback-prefs";
 import {
-  animateVolume,
   applyVolume,
-  getAppliedVolume,
   getLastVolume,
-  setLastVolume,
   setVolumeSink,
   stopFade,
 } from "./gapless-player-volume";
+import {
+  createGaplessPlayerControls,
+  type GaplessPlayerControls,
+} from "./gapless-player-controls";
 import {
   addTrack as addQueueTrack,
   insertTrack as insertQueueTrack,
@@ -48,7 +49,6 @@ const GAPLESS_CROSSFADE_EQUAL_POWER = 3;
 const DESKTOP_DECODE_TRACK_LIMIT = 2;
 const MOBILE_HTML5_TRACK_LIMIT = 1;
 const ADJACENT_LOAD_BUFFER_SECONDS = 15;
-const RESUMED_AUDIO_CONTEXT_RAMP_MS = 24;
 
 export interface GaplessPlayerCallbacks {
   onTimeUpdate?: (positionMs: number, trackIndex: number) => void;
@@ -94,8 +94,6 @@ let lastPlaybackRate = 1.0;
 let tauriAudioOutputMayBeStale = false;
 let tauriPlaybackWasActive = false;
 
-const DEFAULT_FADE_MS = 220;
-
 function getCrossfadeMs(): number {
   const seconds = getCrossfadeDurationPreference();
   return seconds * 1000;
@@ -120,7 +118,7 @@ export function isCurrentTrackFullyBuffered(): boolean {
 }
 
 export function getCurrentBufferedAheadSeconds(): number {
-  return instance?.getCurrentBufferedAheadSeconds() ?? 0;
+  return playerControls.getCurrentBufferedAheadSeconds();
 }
 
 export function isPlaybackGestureRequiredError(error: unknown): boolean {
@@ -362,6 +360,20 @@ const audioRecovery = createAudioRecoveryController({
   rebuildPlayer: (reason) => rebuildPlayerAfterAudioContextLoss(reason),
 });
 
+const playerControls: GaplessPlayerControls = createGaplessPlayerControls({
+  audioRecovery,
+  getAudioContext,
+  getCrossfadeDurationMs: getCrossfadeMs,
+  getPlayer: () => instance,
+  isTauriDesktopRuntime,
+  setLastPlaybackRate: (rate) => {
+    lastPlaybackRate = rate;
+  },
+  setPlaybackActive: (active) => {
+    tauriPlaybackWasActive = active;
+  },
+});
+
 function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   if (!instance) return;
   const previous = instance;
@@ -411,183 +423,27 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   applyEqualizer(preservedEq.enabled, preservedEq.gains);
 }
 
-export async function play(): Promise<void> {
-  stopFade();
-  const shouldRampAfterResume =
-    !isTauriDesktopRuntime() && getAudioContext()?.state === "suspended";
-  await audioRecovery.prepare("play", {
-    rebuildIfTauriOutputMayBeStale: true,
-  });
-  tauriPlaybackWasActive = true;
-  if (shouldRampAfterResume && instance) {
-    applyVolume(0);
-    instance.play();
-    animateVolume(0, getLastVolume(), RESUMED_AUDIO_CONTEXT_RAMP_MS);
-    return;
-  }
-  instance?.play();
-}
-
-export function pause(): void {
-  stopFade();
-  tauriPlaybackWasActive = false;
-  instance?.pause();
-}
-
-export function stop(): void {
-  stopFade();
-  tauriPlaybackWasActive = false;
-  instance?.stop();
-}
-
-/**
- * Sequential skip forward. Enables crossfade when transitioning to the
- * next track (auto-advance uses the same internal path).
- */
-export function next(): void {
-  void audioRecovery
-    .prepare("next", {
-      rebuildIfTauriOutputMayBeStale: true,
-    })
-    .then(() => {
-      tauriPlaybackWasActive = true;
-      instance?.next(undefined, true, true);
-    });
-}
-
-/**
- * Sequential skip backward. Gapless-5's prev() doesn't support crossfade,
- * so this is always a hard cut.
- */
-export function prev(): void {
-  instance?.prev(undefined, false);
-}
-
-/**
- * Jump to an arbitrary track. Does NOT crossfade — use next()/prev()
- * for sequential skips that should respect the crossfade setting.
- */
-export function gotoTrack(
-  indexOrUrl: number | string,
-  forcePlay = false,
-): void {
-  if (!forcePlay) {
-    instance?.gotoTrack(indexOrUrl, forcePlay);
-    return;
-  }
-  void audioRecovery
-    .prepare("gotoTrack", {
-      rebuildIfTauriOutputMayBeStale: true,
-    })
-    .then(() => {
-      tauriPlaybackWasActive = true;
-      instance?.gotoTrack(indexOrUrl, forcePlay);
-    });
-}
-
-export function seekTo(positionMs: number): void {
-  instance?.setPosition(positionMs);
-}
-
-export function setVolume(vol: number): void {
-  setLastVolume(vol);
-  applyVolume(vol);
-}
-
-export function setPlaybackRate(rate: number): void {
-  const safeRate = Math.max(0.25, Math.min(rate, 4));
-  lastPlaybackRate = safeRate;
-  instance?.setPlaybackRate(safeRate);
-}
-
-export function getPosition(): number {
-  return instance?.getPosition() ?? 0;
-}
-
-export function getCurrentTrackDuration(): number {
-  return instance?.currentLength() ?? 0;
-}
-
-export function getCurrentTrackUrl(): string {
-  return instance?.getTrack() ?? "";
-}
-
-export function getTrackIndex(): number {
-  return instance?.getIndex() ?? -1;
-}
-
-export function getTracks(): string[] {
-  return instance?.getTracks() ?? [];
-}
-
-/**
- * @deprecated Shuffle is owned by the React layer (PlayerContext reorders
- * the queue and feeds the engine sequentially). Kept for API completeness;
- * do not call — using Gapless-5's shuffle alongside a pre-shuffled queue
- * causes a double-shuffle (see loadQueue for the details).
- */
-export function setShuffle(enabled: boolean): void {
-  if (!instance) return;
-  if (enabled && !instance.isShuffled()) {
-    instance.shuffle(true);
-  } else if (!enabled && instance.isShuffled()) {
-    instance.toggleShuffle();
-  }
-}
-
-export function updateCrossfade(): void {
-  instance?.setCrossfade(getCrossfadeMs());
-}
-
-export function setCrossfadeDuration(durationMs: number): void {
-  instance?.setCrossfade(Math.max(0, durationMs));
-}
-
-export function fadeOutAndPause(durationMs = DEFAULT_FADE_MS): Promise<void> {
-  if (!instance) return Promise.resolve();
-  const startVolume = getAppliedVolume();
-  return new Promise((resolve) => {
-    animateVolume(startVolume, 0, durationMs, () => {
-      instance?.pause();
-      tauriPlaybackWasActive = false;
-      applyVolume(getLastVolume());
-      resolve();
-    });
-  });
-}
-
-export async function fadeInAndPlay(
-  durationMs = DEFAULT_FADE_MS,
-): Promise<void> {
-  if (!instance) return Promise.resolve();
-  stopFade();
-  await audioRecovery.prepare("fadeInAndPlay", {
-    rebuildIfTauriOutputMayBeStale: true,
-  });
-  applyVolume(0);
-  tauriPlaybackWasActive = true;
-  instance?.play();
-  return new Promise((resolve) => {
-    animateVolume(0, getLastVolume(), durationMs, resolve);
-  });
-}
-
-/**
- * Restore applied volume to the last user-set value. Useful after a
- * cancelled fade leaves the player muted.
- */
-export function restoreVolume(): void {
-  applyVolume(getLastVolume());
-}
-
-export function setLoop(enabled: boolean): void {
-  if (!instance) return;
-  instance.loop = enabled;
-}
-
-export function setSingleMode(enabled: boolean): void {
-  if (!instance) return;
-  instance.singleMode = enabled;
-}
+export const play = playerControls.play;
+export const pause = playerControls.pause;
+export const stop = playerControls.stop;
+export const next = playerControls.next;
+export const prev = playerControls.prev;
+export const gotoTrack = playerControls.gotoTrack;
+export const seekTo = playerControls.seekTo;
+export const setVolume = playerControls.setVolume;
+export const setPlaybackRate = playerControls.setPlaybackRate;
+export const getPosition = playerControls.getPosition;
+export const getCurrentTrackDuration = playerControls.getCurrentTrackDuration;
+export const getCurrentTrackUrl = playerControls.getCurrentTrackUrl;
+export const getTrackIndex = playerControls.getTrackIndex;
+export const getTracks = playerControls.getTracks;
+export const setShuffle = playerControls.setShuffle;
+export const updateCrossfade = playerControls.updateCrossfade;
+export const setCrossfadeDuration = playerControls.setCrossfadeDuration;
+export const fadeOutAndPause = playerControls.fadeOutAndPause;
+export const fadeInAndPlay = playerControls.fadeInAndPlay;
+export const restoreVolume = playerControls.restoreVolume;
+export const setLoop = playerControls.setLoop;
+export const setSingleMode = playerControls.setSingleMode;
 
 export { isEqualizerActive, setEqualizer } from "./gapless-player-equalizer";
