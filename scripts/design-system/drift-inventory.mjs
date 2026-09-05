@@ -18,6 +18,7 @@ const RAW_COLOR_ALLOWLIST = new Map([
     "app/shared/ui/domain/auth/OAuthButtons.tsx",
     /fill="#(?:4285F4|34A853|FBBC05|EA4335)"/gi,
   ],
+  ["app/shared/ui/lib/theme-skin.ts", /#[0-9a-f]{3,8}\b|rgba?\(/gi],
   ["app/listen/src/lib/capacitor-init.ts", /color:\s*"#00000000"/gi],
 ]);
 const LEGACY_SEMANTIC_UTILITY_PATTERN =

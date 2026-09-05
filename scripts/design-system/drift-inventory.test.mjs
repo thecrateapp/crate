@@ -120,6 +120,13 @@ test("separates foundation and intentional raw colors from product drift", () =>
   );
   assert.deepEqual(
     analyzeRawColorDrift(
+      "app/shared/ui/lib/theme-skin.ts",
+      '"--color-primary": "#a78bfa", "--surface-modal": "rgba(17, 16, 30, 0.96)"',
+    ),
+    { foundationRawColors: 0, allowlistedRawColors: 2, actionableRawColors: 0 },
+  );
+  assert.deepEqual(
+    analyzeRawColorDrift(
       "app/listen/src/components/Example.tsx",
       'style={{ color: "#123456" }}',
     ),

@@ -41,12 +41,27 @@ export const SKIN_REGISTRY = {
     label: "Default",
     variables: DEFAULT_SKIN_VARIABLES,
   },
+  aurora: {
+    id: "aurora",
+    label: "Aurora",
+    variables: {
+      "--color-primary": "#a78bfa",
+      "--color-primary-foreground": "#1e1b4b",
+      "--color-foreground": "#f5f3ff",
+      "--color-muted-foreground": "#a5b4fc",
+      "--color-border": "#302e4a",
+      "--surface-app": "#080711",
+      "--surface-panel": "#11101e",
+      "--surface-raised": "#19162b",
+      "--surface-modal": "rgba(17, 16, 30, 0.96)",
+    },
+  },
 } as const satisfies Record<string, SkinDefinition>;
 
 export type ThemeId = keyof typeof THEME_REGISTRY;
 export type SkinId = keyof typeof SKIN_REGISTRY;
 
-const SUPPORTED_COMBINATIONS = new Set(["dark:default"]);
+const SUPPORTED_COMBINATIONS = new Set(["dark:default", "dark:aurora"]);
 
 export interface ThemeSkinSelection {
   theme: ThemeId;

@@ -10,6 +10,7 @@ import { ScrobbleSection } from "@/components/settings/ScrobbleSection";
 import { ShowsLocationSection } from "@/components/settings/ShowsLocationSection";
 import { SleepTimerSection } from "@/components/settings/SleepTimerSection";
 import { ServersSection } from "@/components/settings/ServersSection";
+import { ThemeSkinSection } from "@/components/settings/ThemeSkinSection";
 
 export function Settings() {
   const { t, i18n } = useTranslation();
@@ -23,6 +24,7 @@ export function Settings() {
         <p className="mt-1 text-sm text-text-muted">{t("settings.subtitle")}</p>
       </div>
 
+      <ThemeSkinSection />
       <LanguageSection i18n={i18n} />
       <PlaybackSection />
       <OfflineSection />

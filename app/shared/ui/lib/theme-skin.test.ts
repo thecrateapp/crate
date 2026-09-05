@@ -18,7 +18,22 @@ describe("theme and skin runtime", () => {
 
   it("resolves only registered combinations", () => {
     expect(resolveThemeSkin("dark", "default")).toEqual(DEFAULT_THEME_SKIN);
+    expect(resolveThemeSkin("dark", "aurora")).toEqual({
+      theme: "dark",
+      skin: "aurora",
+    });
     expect(resolveThemeSkin("light", "default")).toEqual(DEFAULT_THEME_SKIN);
+  });
+
+  it("replaces previously applied skin variables when returning to default", () => {
+    const root = document.documentElement;
+
+    applyThemeSkin("dark", "aurora", { root, storage: undefined });
+    expect(root.style.getPropertyValue("--color-primary")).toBe("#a78bfa");
+
+    applyThemeSkin("dark", "default", { root, storage: undefined });
+    expect(root.style.getPropertyValue("--color-primary")).toBe("");
+    expect(root.dataset.crateThemeSkinVars).toBeUndefined();
   });
 
   it("applies Listen scope attributes and persists the resolved selection", () => {
