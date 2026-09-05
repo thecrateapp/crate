@@ -238,6 +238,10 @@ export function usePlayer(): PlayerContextValue {
 }
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
+  return usePlayerProviderRuntime(children);
+}
+
+function usePlayerProviderRuntime(children: ReactNode) {
   const [playbackNeedsUserGesture, setPlaybackNeedsUserGesture] =
     useState(false);
   const [jamTransport, setJamTransportState] =
