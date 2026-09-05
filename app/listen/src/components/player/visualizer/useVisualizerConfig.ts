@@ -1,18 +1,8 @@
-import { useEffect, useState, type MutableRefObject } from "react";
+import { type MutableRefObject } from "react";
 
 import type { CrossfadeTransition } from "@/contexts/PlayerContext";
 import type { Track } from "@/contexts/player-types";
 import {
-  DEFAULT_VISUALIZER_SETTINGS,
-  PLAYER_VIZ_PREFS_EVENT,
-  getTrackAdaptiveVisualizerPreference,
-  getPlayerSurfaceModePreference,
-  getUseAlbumPalettePreference,
-  getVisualizerSettingsPreference,
-  setPlayerSurfaceModePreference,
-  setTrackAdaptiveVisualizerPreference,
-  setUseAlbumPalettePreference,
-  setVisualizerSettingsPreference,
   type PlayerSurfaceMode,
   type VisualizerSettingsPreference,
 } from "@/lib/player-visualizer-prefs";
@@ -24,6 +14,7 @@ import {
 import { clamp } from "./visualizer-palette-math";
 import { useVisualizerEngineSettings } from "./useVisualizerEngineSettings";
 import { useVisualizerPalette } from "./useVisualizerPalette";
+import { useVisualizerPreferences } from "./useVisualizerPreferences";
 
 const ZERO_VIZ_DELTA = {
   separation: 0,
@@ -55,16 +46,17 @@ export function useVisualizerConfig(
   crossfadeTransition: CrossfadeTransition | null = null,
   visualizerAllowed = true,
 ): VisualizerConfigState {
-  const [surfaceModePreference, setSurfaceModeState] = useState(
-    getPlayerSurfaceModePreference,
-  );
-  const [useAlbumPalette, setUseAlbumPalette] = useState(
-    getUseAlbumPalettePreference,
-  );
-  const [trackAdaptiveViz, setTrackAdaptiveViz] = useState(
-    getTrackAdaptiveVisualizerPreference,
-  );
-  const [vizConfig, setVizConfig] = useState(getVisualizerSettingsPreference);
+  const {
+    surfaceModePreference,
+    useAlbumPalette,
+    trackAdaptiveViz,
+    vizConfig,
+    setSurfaceMode,
+    toggleAlbumPalette,
+    toggleTrackAdaptive,
+    updateConfig,
+    resetConfig,
+  } = useVisualizerPreferences(visualizerAllowed);
   const surfaceMode =
     visualizerAllowed || surfaceModePreference !== "visualizer"
       ? surfaceModePreference
@@ -114,47 +106,6 @@ export function useVisualizerConfig(
     effectiveVizConfig,
     vizEnabled,
   });
-
-  // Sync preferences from storage events
-  useEffect(() => {
-    const sync = () => {
-      setSurfaceModeState(getPlayerSurfaceModePreference());
-      setUseAlbumPalette(getUseAlbumPalettePreference());
-      setVizConfig(getVisualizerSettingsPreference());
-      setTrackAdaptiveViz(getTrackAdaptiveVisualizerPreference());
-    };
-    window.addEventListener("storage", sync);
-    window.addEventListener(PLAYER_VIZ_PREFS_EVENT, sync as EventListener);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(PLAYER_VIZ_PREFS_EVENT, sync as EventListener);
-    };
-  }, []);
-
-  const setSurfaceMode = (mode: PlayerSurfaceMode) => {
-    const next = !visualizerAllowed && mode === "visualizer" ? "cover" : mode;
-    setSurfaceModeState(next);
-    setPlayerSurfaceModePreference(next);
-  };
-
-  const toggleAlbumPalette = () => {
-    const next = !useAlbumPalette;
-    setUseAlbumPalette(next);
-    setUseAlbumPalettePreference(next);
-  };
-
-  const toggleTrackAdaptive = () => {
-    const next = !trackAdaptiveViz;
-    setTrackAdaptiveViz(next);
-    setTrackAdaptiveVisualizerPreference(next);
-  };
-
-  const updateConfig = (next: VisualizerSettingsPreference) => {
-    setVizConfig(next);
-    setVisualizerSettingsPreference(next);
-  };
-
-  const resetConfig = () => updateConfig(DEFAULT_VISUALIZER_SETTINGS);
 
   return {
     surfaceMode,
