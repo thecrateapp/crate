@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   Plus,
@@ -14,7 +14,6 @@ import {
   Disc,
   ListMusic,
   Download,
-  ExternalLink,
   Loader2,
   Play,
   Pencil,
@@ -48,7 +47,7 @@ import {
 } from "@crate/ui/primitives/AppModal";
 import { type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
-import { api, apiAssetUrl, resolveMaybeApiAssetUrl } from "@/lib/api";
+import { api, apiAssetUrl } from "@/lib/api";
 import { contributionSourceLabel } from "@/lib/contributions";
 import { formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
@@ -61,6 +60,14 @@ import { toTrackRowData } from "@/lib/track-row-data";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
+
+import { LibraryBandcampTab } from "./LibraryBandcampTab";
+import { EmptyState, Spinner, StatBox } from "./LibraryPrimitives";
+import type {
+  BandcampTaskResponse,
+  ContributionsResponse,
+  LibraryContribution,
+} from "./library-model";
 
 type Tab =
   | "playlists"
@@ -175,51 +182,6 @@ interface SavedAlbum {
   total_duration: number;
 }
 
-interface BandcampCollectionResponse {
-  items: BandcampItem[];
-  total: number;
-}
-
-interface ContributionsResponse {
-  items: LibraryContribution[];
-  total: number;
-}
-
-interface BandcampTaskResponse {
-  task_id: string;
-  status: string;
-}
-
-interface BandcampItem {
-  id: number;
-  bandcamp_item_id?: number | null;
-  artist_name?: string | null;
-  album_title?: string | null;
-  track_title?: string | null;
-  item_url?: string | null;
-  cover_url?: string | null;
-  owned?: boolean | null;
-  downloadable?: boolean | null;
-  latest_import_status?: string | null;
-}
-
-interface LibraryContribution {
-  id: number;
-  album_id?: number | null;
-  album_entity_uid?: string | null;
-  album_slug?: string | null;
-  artist_name: string;
-  album_name: string;
-  source: string;
-  source_ref: string;
-  status: string;
-  imported_at?: string | null;
-  track_entity_uids?: string[];
-  track_count?: number | null;
-  total_duration?: number | null;
-  has_cover?: boolean | null;
-}
-
 const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
   { key: "playlists", labelKey: "nav.collection.playlists", icon: ListMusic },
   { key: "artists", labelKey: "nav.collection.artists", icon: Users },
@@ -272,31 +234,6 @@ function parseTab(value: string | null): Tab {
   )
     return value;
   return "playlists";
-}
-
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center py-16">
-      <Loader2 size={24} className="text-accent-action animate-spin" />
-    </div>
-  );
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex items-center justify-center py-16">
-      <p className="text-sm text-text-muted">{message}</p>
-    </div>
-  );
-}
-
-function StatBox({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex-1 rounded-lg bg-text-primary/5 px-3 py-2.5 text-center">
-      <div className="text-lg font-bold text-text-primary">{value ?? 0}</div>
-      <div className="text-[11px] text-text-muted">{label}</div>
-    </div>
-  );
 }
 
 function CollectionSortDropdown<T extends string>({
@@ -808,315 +745,6 @@ function AlbumsTab() {
   );
 }
 
-function BandcampTab() {
-  const { t } = useTranslation();
-  const {
-    data: collection,
-    loading: collectionLoading,
-    refetch: refetchCollection,
-  } = useApi<BandcampCollectionResponse>("/api/bandcamp/me/collection");
-  const {
-    data: contributions,
-    loading: contributionsLoading,
-    refetch: refetchContributions,
-  } = useApi<ContributionsResponse>("/api/me/contributions?source=bandcamp");
-  const { data: wishlist, loading: wishlistLoading } =
-    useApi<BandcampCollectionResponse>("/api/bandcamp/me/wishlist");
-  const [busyItemId, setBusyItemId] = useState<number | null>(null);
-  const [withdrawTarget, setWithdrawTarget] =
-    useState<LibraryContribution | null>(null);
-  const [withdrawing, setWithdrawing] = useState(false);
-
-  async function importItem(item: BandcampItem) {
-    const itemId = item.bandcamp_item_id ?? item.id;
-    if (!itemId) return;
-    setBusyItemId(item.id);
-    try {
-      const response = await api<BandcampTaskResponse>(
-        "/api/bandcamp/me/imports",
-        "POST",
-        { bandcamp_item_id: itemId, format: "flac" },
-      );
-      toast.success(
-        t("bandcamp.toasts.importQueued", { taskId: response.task_id }),
-      );
-      refetchCollection();
-      refetchContributions();
-    } catch (error) {
-      toast.error(
-        (error as Error).message || t("bandcamp.toasts.importFailed"),
-      );
-    } finally {
-      setBusyItemId(null);
-    }
-  }
-
-  function exportContribution(contribution: LibraryContribution) {
-    window.open(
-      apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
-      "_blank",
-      "noopener,noreferrer",
-    );
-  }
-
-  async function withdrawContribution() {
-    if (!withdrawTarget) return;
-    setWithdrawing(true);
-    try {
-      const response = await api<BandcampTaskResponse>(
-        `/api/me/contributions/${withdrawTarget.id}/withdraw`,
-        "POST",
-      );
-      toast.success(
-        t("library.bandcamp.toasts.removalQueued", {
-          taskId: response.task_id,
-        }),
-      );
-      setWithdrawTarget(null);
-      refetchCollection();
-      refetchContributions();
-    } catch (error) {
-      toast.error(
-        (error as Error).message || t("library.bandcamp.toasts.removeFailed"),
-      );
-    } finally {
-      setWithdrawing(false);
-    }
-  }
-
-  const purchases = collection?.items ?? [];
-  const importedContributions = contributions?.items ?? [];
-  const wishlistCount = wishlist?.total ?? 0;
-
-  if (collectionLoading || wishlistLoading || contributionsLoading)
-    return <Spinner />;
-
-  return (
-    <div className="space-y-5">
-      <div className="rounded-[12px] border border-accent-action/20 bg-accent-action/10 p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-accent-action">
-              <BandcampLogo size={13} />
-              Bandcamp
-            </div>
-            <h2 className="mt-3 text-xl font-black text-text-primary">
-              {t("library.bandcamp.title")}
-            </h2>
-            <p className="mt-1 text-sm text-text-muted">
-              {t("library.bandcamp.description")}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <StatBox
-              value={purchases.length}
-              label={t("library.bandcamp.stats.purchases")}
-            />
-            <StatBox
-              value={importedContributions.length}
-              label={t("library.bandcamp.stats.inCrate")}
-            />
-            <StatBox
-              value={wishlistCount}
-              label={t("bandcamp.stats.wishlist")}
-            />
-          </div>
-        </div>
-      </div>
-
-      {importedContributions.length ? (
-        <section className="space-y-3">
-          <div>
-            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-accent-action">
-              {t("library.bandcamp.imported.title")}
-            </h3>
-            <p className="mt-1 text-sm text-text-muted">
-              {t("library.bandcamp.imported.description")}
-            </p>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {importedContributions.map((contribution) => (
-              <article
-                key={contribution.id}
-                className="flex items-center gap-3 rounded-xl border border-text-primary/8 bg-text-primary/[0.03] p-3"
-              >
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-text-primary/8 bg-text-primary/6">
-                  {contribution.album_id ? (
-                    <CrateImage
-                      src={albumCoverApiUrl(
-                        {
-                          albumId: contribution.album_id,
-                          albumEntityUid: contribution.album_entity_uid,
-                          artistName: contribution.artist_name,
-                          albumName: contribution.album_name,
-                        },
-                        { size: 128 },
-                      )}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <BandcampLogo
-                        size={20}
-                        className="text-accent-action/70"
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="truncate text-sm font-black text-text-primary">
-                    {contribution.album_name}
-                  </h4>
-                  <p className="truncate text-xs text-text-muted">
-                    {contribution.artist_name}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={!contribution.album_id}
-                  onClick={() => exportContribution(contribution)}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted disabled:opacity-40"
-                >
-                  <Download size={14} />
-                  {t("common.export")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWithdrawTarget(contribution)}
-                  className="inline-flex min-h-10 items-center rounded-full border border-state-danger/20 px-3 text-xs font-bold text-state-danger"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {!purchases.length ? (
-        <div className="space-y-3">
-          <EmptyState message={t("library.bandcamp.emptyPurchases")} />
-          <Link
-            to="/settings"
-            className="inline-flex min-h-11 items-center rounded-full bg-accent-action px-4 text-sm font-bold text-accent-action-foreground"
-          >
-            {t("library.bandcamp.openSettings")}
-          </Link>
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {purchases.map((item) => {
-            const coverUrl = resolveMaybeApiAssetUrl(item.cover_url);
-
-            return (
-              <article
-                key={`${item.id}-${item.item_url}`}
-                className="flex items-center gap-3 rounded-xl border border-text-primary/8 bg-text-primary/[0.03] p-3"
-              >
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-text-primary/8 bg-text-primary/6">
-                  {coverUrl ? (
-                    <CrateImage
-                      src={coverUrl}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <BandcampLogo size={22} className="text-accent-action/70" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-black text-text-primary">
-                    {bandcampItemTitle(item, t("bandcamp.itemFallback"))}
-                  </h3>
-                  <p className="truncate text-xs text-text-muted">
-                    {item.artist_name || t("bandcamp.titleLabel")}
-                  </p>
-                </div>
-                {item.latest_import_status === "completed" ? (
-                  <span className="rounded-full border border-state-success/25 bg-state-success/10 px-3 py-1 text-xs font-bold text-state-success">
-                    {t("library.bandcamp.imported.badge")}
-                  </span>
-                ) : item.downloadable ? (
-                  <button
-                    type="button"
-                    disabled={busyItemId === item.id}
-                    onClick={() => void importItem(item)}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-full bg-accent-action px-3 text-xs font-black text-accent-action-foreground disabled:opacity-50"
-                  >
-                    {busyItemId === item.id ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Download size={14} />
-                    )}
-                    {t("common.import")}
-                  </button>
-                ) : null}
-                {item.item_url ? (
-                  <button
-                    type="button"
-                    onClick={() => window.open(item.item_url || "", "_blank")}
-                    className="inline-flex min-h-10 items-center rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted"
-                  >
-                    <ExternalLink size={14} />
-                  </button>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      <AppModal
-        open={Boolean(withdrawTarget)}
-        onClose={() => {
-          if (!withdrawing) setWithdrawTarget(null);
-        }}
-      >
-        <ModalHeader>
-          <h2 className="text-lg font-black text-text-primary">
-            {t("library.bandcamp.withdraw.title")}
-          </h2>
-          <ModalCloseButton
-            disabled={withdrawing}
-            onClick={() => setWithdrawTarget(null)}
-          />
-        </ModalHeader>
-        <ModalBody>
-          <p className="text-sm text-text-muted">
-            {t("library.bandcamp.withdraw.description", {
-              album: withdrawTarget?.album_name,
-            })}
-          </p>
-        </ModalBody>
-        <ModalFooter>
-          <button
-            type="button"
-            disabled={withdrawing}
-            onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-text-muted disabled:opacity-50"
-          >
-            {t("common.keepIt")}
-          </button>
-          <button
-            type="button"
-            disabled={withdrawing}
-            onClick={() => void withdrawContribution()}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-state-danger px-4 text-sm font-black text-state-danger-foreground disabled:opacity-50"
-          >
-            {withdrawing ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : null}
-            {t("library.contributions.withdraw.confirm")}
-          </button>
-        </ModalFooter>
-      </AppModal>
-    </div>
-  );
-}
-
 function ContributionArtwork({
   contribution,
 }: {
@@ -1299,10 +927,6 @@ function ContributionsTab() {
       </AppModal>
     </div>
   );
-}
-
-function bandcampItemTitle(item: BandcampItem, fallback: string): string {
-  return item.album_title || item.track_title || item.artist_name || fallback;
 }
 
 function LikedTab() {
@@ -1534,7 +1158,7 @@ export function Library() {
       {tab === "artists" && <ArtistsTab key={refreshKey} />}
       {tab === "albums" && <AlbumsTab key={refreshKey} />}
       {tab === "liked" && <LikedTab key={refreshKey} />}
-      {tab === "bandcamp" && <BandcampTab key={refreshKey} />}
+      {tab === "bandcamp" && <LibraryBandcampTab key={refreshKey} />}
       {tab === "contributions" && <ContributionsTab key={refreshKey} />}
     </div>
   );
