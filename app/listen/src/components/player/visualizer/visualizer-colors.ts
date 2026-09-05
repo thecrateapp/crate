@@ -14,7 +14,7 @@ export const DEFAULT_VISUALIZER_COLORS: VisualizerColorPalette = [
 ];
 
 export const VISUALIZER_COLOR_TOKENS = {
-  color1: "--visualizer-sphere-color-1",
+  color1: "--accent-action",
   color2: "--visualizer-sphere-color-2",
   color3: "--visualizer-sphere-color-3",
 } as const;

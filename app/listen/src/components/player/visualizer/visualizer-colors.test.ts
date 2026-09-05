@@ -10,7 +10,7 @@ import {
 describe("visualizer colors", () => {
   it("keeps the semantic roles mapped to CSS tokens", () => {
     expect(Object.values(VISUALIZER_COLOR_TOKENS)).toEqual([
-      "--visualizer-sphere-color-1",
+      "--accent-action",
       "--visualizer-sphere-color-2",
       "--visualizer-sphere-color-3",
     ]);
@@ -40,7 +40,7 @@ describe("visualizer colors", () => {
     vi.spyOn(window, "getComputedStyle").mockImplementation(
       (target) =>
         ({
-          color: (target as HTMLElement).style.color.includes("color-1")
+          color: (target as HTMLElement).style.color.includes("accent-action")
             ? "color(srgb 0.2 0.4 0.6)"
             : "",
         }) as CSSStyleDeclaration,

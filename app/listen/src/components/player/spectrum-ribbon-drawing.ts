@@ -165,7 +165,7 @@ export function readSpectrumRibbonPalette(
     readCanvasColorToken(canvas, tokenName) ?? "transparent";
 
   return {
-    fade: read("--visualizer-ribbon-fade"),
+    fade: read("--text-primary"),
     gradient: SPECTRUM_RIBBON_COLOR_TOKENS.map(read),
     shadow: read("--visualizer-ribbon-shadow"),
     trace: read("--visualizer-ribbon-trace"),

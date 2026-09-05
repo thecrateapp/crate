@@ -160,15 +160,15 @@ test("enforces the normalized semantic token budget", () => {
 
   assert.deepEqual(metrics.nonFoundationAliases, []);
   assert.ok(
-    metrics.definitions <= 226,
+    metrics.definitions <= 220,
     `semantic token definitions grew to ${metrics.definitions}`,
   );
   assert.ok(
-    metrics.foundationDefinitions <= 95,
+    metrics.foundationDefinitions <= 94,
     `foundation token definitions grew to ${metrics.foundationDefinitions}`,
   );
   assert.ok(
-    metrics.domainDefinitions <= 121,
+    metrics.domainDefinitions <= 114,
     `domain token definitions grew to ${metrics.domainDefinitions}`,
   );
   assert.equal(
@@ -188,21 +188,11 @@ test("enforces the normalized semantic token budget", () => {
   assert.equal(inventory.totals.actionableRawColors, 0);
   assert.equal(inventory.totals.legacySemanticUtilities, 0);
   assert.ok(
-    metrics.duplicateDefinitions <= 8,
+    metrics.duplicateDefinitions <= 1,
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,
   );
   assert.deepEqual(metrics.duplicateTokenGroups, [
-    [
-      "--surface-contrast",
-      "--state-danger-foreground",
-      "--visualizer-ribbon-fade",
-    ],
-    ["--surface-accent-shadow", "--visualizer-waveform-gradient-idle-bottom"],
-    ["--surface-accent-subtle", "--visualizer-waveform-gradient-active-bottom"],
-    ["--genre-tone-default", "--visualizer-sphere-color-1"],
-    ["--visualizer-ribbon-stop-1", "--visualizer-waveform-gradient-active-top"],
-    ["--visualizer-waveform-gradient-idle-top", "--border-accent"],
-    ["--visualizer-waveform-peak-idle", "--jam-focus-border"],
+    ["--surface-contrast", "--state-danger-foreground"],
   ]);
 });
 

@@ -47,6 +47,11 @@
     var(--accent-action) 28%,
     transparent
   );
+  --accent-action-strong: color-mix(
+    in srgb,
+    var(--accent-action) 50%,
+    transparent
+  );
   --surface-glass-hover-shadow: color-mix(
     in srgb,
     var(--surface-glass-shadow) 79%,
@@ -510,8 +515,6 @@
     var(--accent-action) 32%,
     transparent
   );
-  --visualizer-ribbon-fade: var(--text-primary);
-  --visualizer-sphere-color-1: var(--accent-action);
   --visualizer-sphere-color-2: color-mix(
     in srgb,
     var(--accent-action) 58%,
@@ -522,34 +525,9 @@
     var(--state-info) 76%,
     var(--accent-action)
   );
-  --visualizer-waveform-gradient-active-top: color-mix(
-    in srgb,
-    var(--accent-action) 55%,
-    transparent
-  );
-  --visualizer-waveform-gradient-active-bottom: color-mix(
-    in srgb,
-    var(--accent-action) 12%,
-    transparent
-  );
-  --visualizer-waveform-gradient-idle-top: color-mix(
-    in srgb,
-    var(--accent-action) 30%,
-    transparent
-  );
-  --visualizer-waveform-gradient-idle-bottom: color-mix(
-    in srgb,
-    var(--accent-action) 6%,
-    transparent
-  );
   --visualizer-waveform-peak-active: color-mix(
     in srgb,
     var(--accent-action) 95%,
-    transparent
-  );
-  --visualizer-waveform-peak-idle: color-mix(
-    in srgb,
-    var(--accent-action) 50%,
     transparent
   );
   --brand-bandcamp: #1da0c3;
@@ -730,7 +708,7 @@
     var(--accent-action) 25%,
     transparent
   );
-  --jam-focus-border: color-mix(in srgb, var(--accent-action) 50%, transparent);
+  --jam-focus-border: var(--accent-action-strong);
   --jam-accent-soft-surface: color-mix(
     in srgb,
     var(--accent-action) 4%,

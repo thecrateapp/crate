@@ -9,10 +9,10 @@ export const SPECTRUM_RIBBON_COLOR_TOKENS = [
 ] as const;
 
 export const WAVEFORM_COLOR_TOKENS = {
-  activeGradientBottom: "--visualizer-waveform-gradient-active-bottom",
-  activeGradientTop: "--visualizer-waveform-gradient-active-top",
-  idleGradientBottom: "--visualizer-waveform-gradient-idle-bottom",
-  idleGradientTop: "--visualizer-waveform-gradient-idle-top",
+  activeGradientBottom: "--surface-accent-subtle",
+  activeGradientTop: "--visualizer-ribbon-stop-1",
+  idleGradientBottom: "--surface-accent-shadow",
+  idleGradientTop: "--border-accent",
   peakActive: "--visualizer-waveform-peak-active",
-  peakIdle: "--visualizer-waveform-peak-idle",
+  peakIdle: "--accent-action-strong",
 } as const;
