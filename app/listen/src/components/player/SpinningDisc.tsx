@@ -1,39 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Disc3, Loader2, Pause, Play } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
-import { CrateImage } from "@/components/artwork/CrateImage";
-
-const DISC_DEGREES_PER_SECOND = 120;
-const JOG_SECONDS_PER_ROTATION = 2.5;
-const JOG_SEEK_INTERVAL_MS = 110;
-const JOG_RATE_UPDATE_INTERVAL_MS = 70;
-const PLAYING_FORWARD_SYNC_TOLERANCE_SECONDS = 0.65;
-const PLAYING_BACKWARD_SYNC_TOLERANCE_SECONDS = 1.6;
+import { SpinningDiscArtwork } from "@/components/player/SpinningDiscArtwork";
+import { SpinningDiscControl } from "@/components/player/SpinningDiscControl";
+import {
+  DISC_DEGREES_PER_SECOND,
+  JOG_RATE_UPDATE_INTERVAL_MS,
+  JOG_SEEK_INTERVAL_MS,
+  PLAYING_BACKWARD_SYNC_TOLERANCE_SECONDS,
+  PLAYING_FORWARD_SYNC_TOLERANCE_SECONDS,
+  clamp,
+  getJogTime,
+  getPointerAngle,
+  normalizeDeltaDegrees,
+  projectPlaybackTime,
+} from "@/components/player/spinning-disc-math";
 
 type JogSeekMode = "live" | "commit";
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getPointerAngle(
-  event: Pick<PointerEvent, "clientX" | "clientY">,
-  bounds: DOMRect,
-): number {
-  const centerX = bounds.left + bounds.width / 2;
-  const centerY = bounds.top + bounds.height / 2;
-  return (
-    Math.atan2(event.clientY - centerY, event.clientX - centerX) *
-    (180 / Math.PI)
-  );
-}
-
-function normalizeDeltaDegrees(delta: number): number {
-  if (delta > 180) return delta - 360;
-  if (delta < -180) return delta + 360;
-  return delta;
-}
 
 interface SpinningDiscProps {
   albumCover?: string | null;
@@ -72,7 +55,6 @@ export function SpinningDisc({
   onTogglePlay,
   disabled = false,
 }: SpinningDiscProps) {
-  const discRef = useRef<HTMLDivElement>(null);
   const rotorRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const playbackAnchorRef = useRef({ time: currentTime, timestamp: 0 });
@@ -92,8 +74,6 @@ export function SpinningDisc({
 
   const [isJogging, setIsJogging] = useState(false);
   const [dragRotation, setDragRotation] = useState<number | null>(null);
-
-  const showCrossfade = !!crossfadeOutgoingCover && !!crossfadeIncomingCover;
 
   const setJogPlaybackRate = useCallback(
     (rate: number, immediate = false) => {
@@ -122,11 +102,16 @@ export function SpinningDisc({
 
   const projectedPlaybackTime = useCallback(
     (timestamp: number) => {
-      const anchor = playbackAnchorRef.current;
-      if (!isPlaying || isBuffering) return anchor.time;
-      const elapsedSeconds = Math.max(0, (timestamp - anchor.timestamp) / 1000);
-      const projected = anchor.time + elapsedSeconds;
-      return duration > 0 ? Math.min(projected, duration) : projected;
+      const { time: anchorTime, timestamp: anchorTimestamp } =
+        playbackAnchorRef.current;
+      return projectPlaybackTime({
+        anchorTime,
+        anchorTimestamp,
+        duration,
+        isBuffering,
+        isPlaying,
+        timestamp,
+      });
     },
     [duration, isBuffering, isPlaying],
   );
@@ -308,12 +293,11 @@ export function SpinningDisc({
       dragState.previousMoveAt = now;
       dragState.accumDegrees += delta;
 
-      const nextTime = clamp(
-        dragState.startTime +
-          (dragState.accumDegrees / 360) * JOG_SECONDS_PER_ROTATION,
-        0,
+      const nextTime = getJogTime({
+        accumDegrees: dragState.accumDegrees,
         duration,
-      );
+        startTime: dragState.startTime,
+      });
 
       setDragRotation(dragState.baseRotation + dragState.accumDegrees);
       const degreesPerSecond = (delta / elapsedMs) * 1000;
@@ -381,7 +365,6 @@ export function SpinningDisc({
     >
       <div className="spinning-disc-ambient absolute inset-[7%] rounded-full blur-3xl opacity-80" />
       <div
-        ref={discRef}
         className={cn(
           "spinning-disc-surface relative aspect-square w-full rounded-full",
           jogEnabled && onSeek
@@ -408,56 +391,22 @@ export function SpinningDisc({
                 : "transform 140ms linear",
           }}
         >
-          {showCrossfade ? (
-            <>
-              <CrateImage
-                src={crossfadeOutgoingCover!}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-                style={{ opacity: 1 - crossfadeProgress }}
-              />
-              <CrateImage
-                src={crossfadeIncomingCover!}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-                style={{ opacity: crossfadeProgress }}
-              />
-            </>
-          ) : albumCover ? (
-            <CrateImage
-              src={albumCover}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          ) : (
-            <div className="spinning-disc-placeholder absolute inset-0 flex items-center justify-center">
-              <Disc3 size={88} className="spinning-disc-placeholder-icon" />
-            </div>
-          )}
+          <SpinningDiscArtwork
+            albumCover={albumCover}
+            crossfadeIncomingCover={crossfadeIncomingCover}
+            crossfadeOutgoingCover={crossfadeOutgoingCover}
+            crossfadeProgress={crossfadeProgress}
+          />
         </div>
 
         <div className="spinning-disc-overlay pointer-events-none absolute inset-[2%] rounded-full" />
 
-        <button
-          type="button"
-          onClick={onTogglePlay}
+        <SpinningDiscControl
           disabled={disabled}
-          onPointerDown={(event) => event.stopPropagation()}
-          className="spinning-disc-control absolute left-1/2 top-1/2 z-10 flex h-[26%] w-[26%] min-h-[72px] min-w-[72px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-xl transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97]"
-          aria-label={isPlaying ? "Pause" : "Play"}
-        >
-          <span className="spinning-disc-control-ring absolute inset-[10%] rounded-full" />
-          {isBuffering ? (
-            <Loader2 size={22} className="animate-spin text-accent-action" />
-          ) : isPlaying ? (
-            <Pause size={22} className="text-text-primary" />
-          ) : (
-            <Play
-              size={22}
-              className="translate-x-[2px] fill-text-primary text-text-primary"
-            />
-          )}
-        </button>
+          isBuffering={isBuffering}
+          isPlaying={isPlaying}
+          onTogglePlay={onTogglePlay}
+        />
       </div>
     </div>
   );
