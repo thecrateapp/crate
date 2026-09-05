@@ -58,76 +58,8 @@ export function JamRoomCard({
         }}
         className="jam-card-interactive cursor-pointer rounded-xl p-4"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="truncate text-base font-semibold text-text-primary">
-              {listedRoom.name}
-            </div>
-            {listedRoom.description ? (
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-text-muted">
-                {listedRoom.description}
-              </p>
-            ) : null}
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-              <span className="jam-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-text-muted">
-                {listedRoom.visibility === "public" ? (
-                  <Globe2 size={11} />
-                ) : (
-                  <Lock size={11} />
-                )}
-                {mode === "member"
-                  ? t("jam.roomCard.yourRoom")
-                  : t("jam.visibility.public")}
-              </span>
-              {listedRoom.is_permanent ? (
-                <span className="jam-accent-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5">
-                  <Pin size={11} />
-                  {t("jam.roomCard.permanent")}
-                </span>
-              ) : null}
-              {listedRoom.status !== "active" ? (
-                <span className="jam-warning-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5">
-                  {t("jam.roomCard.paused")}
-                </span>
-              ) : null}
-              {(listedRoom.tags || []).slice(0, 5).map((tag) => (
-                <span
-                  key={`${listedRoom.id}-${tag}`}
-                  className="jam-chip rounded-full px-2 py-0.5 text-text-muted"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-2 pr-12">
-            <div className="jam-chip flex h-9 w-9 items-center justify-center rounded-full text-text-muted">
-              {joining ? (
-                <Loader2 size={15} className="jam-accent-text animate-spin" />
-              ) : (
-                <Users size={15} />
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <div className="flex -space-x-2">
-            {listedRoom.members.slice(0, 5).map((member) => (
-              <JamAvatarBubble
-                key={`${listedRoom.id}-${member.user_id}`}
-                name={displayName(member)}
-                avatar={member.avatar}
-                userId={member.user_id}
-                size="sm"
-              />
-            ))}
-          </div>
-          <div className="text-xs text-text-muted">
-            {t("jam.roomCard.memberCount", {
-              count: listedRoom.member_count || listedRoom.members.length,
-            })}
-          </div>
-        </div>
+        <RoomCardHeader room={listedRoom} mode={mode} joining={joining} t={t} />
+        <RoomCardMembers room={listedRoom} t={t} />
         {latestEvent ? (
           <div className="mt-3 truncate text-xs text-text-muted">
             {eventActivityText(latestEvent, latestActor?.name, t)}
@@ -135,21 +67,146 @@ export function JamRoomCard({
         ) : null}
       </div>
       {isHostRoom ? (
-        <button
-          type="button"
-          onClick={() => onDelete(listedRoom)}
-          disabled={deleting}
-          title={t("jam.delete.title")}
-          aria-label={t("jam.delete.aria", { name: listedRoom.name })}
-          className="jam-danger-control absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
-        >
-          {deleting ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <Trash2 size={14} />
-          )}
-        </button>
+        <RoomCardDeleteButton
+          room={listedRoom}
+          deleting={deleting}
+          onDelete={onDelete}
+          t={t}
+        />
       ) : null}
     </div>
+  );
+}
+
+function RoomCardHeader({
+  room,
+  mode,
+  joining,
+  t,
+}: {
+  room: JamRoom;
+  mode: "member" | "public";
+  joining: boolean;
+  t: TFunction;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="truncate text-base font-semibold text-text-primary">
+          {room.name}
+        </div>
+        {room.description ? (
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-text-muted">
+            {room.description}
+          </p>
+        ) : null}
+        <RoomCardBadges room={room} mode={mode} t={t} />
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-2 pr-12">
+        <div className="jam-chip flex h-9 w-9 items-center justify-center rounded-full text-text-muted">
+          {joining ? (
+            <Loader2 size={15} className="jam-accent-text animate-spin" />
+          ) : (
+            <Users size={15} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoomCardBadges({
+  room,
+  mode,
+  t,
+}: {
+  room: JamRoom;
+  mode: "member" | "public";
+  t: TFunction;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+      <span className="jam-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-text-muted">
+        {room.visibility === "public" ? (
+          <Globe2 size={11} />
+        ) : (
+          <Lock size={11} />
+        )}
+        {mode === "member"
+          ? t("jam.roomCard.yourRoom")
+          : t("jam.visibility.public")}
+      </span>
+      {room.is_permanent ? (
+        <span className="jam-accent-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5">
+          <Pin size={11} />
+          {t("jam.roomCard.permanent")}
+        </span>
+      ) : null}
+      {room.status !== "active" ? (
+        <span className="jam-warning-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5">
+          {t("jam.roomCard.paused")}
+        </span>
+      ) : null}
+      {(room.tags || []).slice(0, 5).map((tag) => (
+        <span
+          key={`${room.id}-${tag}`}
+          className="jam-chip rounded-full px-2 py-0.5 text-text-muted"
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function RoomCardMembers({ room, t }: { room: JamRoom; t: TFunction }) {
+  return (
+    <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="flex -space-x-2">
+        {room.members.slice(0, 5).map((member) => (
+          <JamAvatarBubble
+            key={`${room.id}-${member.user_id}`}
+            name={displayName(member)}
+            avatar={member.avatar}
+            userId={member.user_id}
+            size="sm"
+          />
+        ))}
+      </div>
+      <div className="text-xs text-text-muted">
+        {t("jam.roomCard.memberCount", {
+          count: room.member_count || room.members.length,
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RoomCardDeleteButton({
+  room,
+  deleting,
+  onDelete,
+  t,
+}: {
+  room: JamRoom;
+  deleting: boolean;
+  onDelete: (room: JamRoom) => void;
+  t: TFunction;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onDelete(room)}
+      disabled={deleting}
+      title={t("jam.delete.title")}
+      aria-label={t("jam.delete.aria", { name: room.name })}
+      className="jam-danger-control absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+    >
+      {deleting ? (
+        <Loader2 size={13} className="animate-spin" />
+      ) : (
+        <Trash2 size={14} />
+      )}
+    </button>
   );
 }
