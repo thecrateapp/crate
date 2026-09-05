@@ -1,10 +1,7 @@
 import { ApiError, createApiClient } from "../../../shared/web/api";
 
 export { ApiError };
-import {
-  redirectToLoginOnUnauthorized,
-  shouldRedirectToLoginOnUnauthorized,
-} from "@/lib/auth-route-policy";
+import { shouldRedirectToLoginOnUnauthorized } from "@/lib/auth-route-policy";
 import { isTauriRuntime, usesConfigurableServer } from "@/lib/platform";
 import {
   getCurrentServer,
@@ -33,6 +30,7 @@ import {
   startMediaAccessTicketRefresh,
 } from "@/lib/api-media-access";
 import { createApiUrlResolver } from "@/lib/api-url-resolver";
+import { createApiAuthTransport } from "@/lib/api-auth-transport";
 
 export {
   AUTH_TOKEN_EVENT,
@@ -172,155 +170,20 @@ const innerApi = createApiClient({
   defaultHeaders: getApiAuthHeaders,
 });
 
-let refreshPromise: Promise<boolean> | null = null;
-const AUTH_TOKEN_FRESHNESS_MARGIN_MS = 10 * 60 * 1000;
+const apiAuthTransport = createApiAuthTransport({
+  apiBase: getApiBase,
+  apiClient: innerApi,
+  apiCredentials,
+  getApiAuthHeaders,
+  getAuthToken,
+  getAuthTokenExpiresAt,
+  getRefreshToken,
+  setAuthToken,
+  setAuthTokens,
+  usesConfigurableServer,
+});
 
-function shouldAttemptRefresh(path: string): boolean {
-  return (
-    !path.includes("/api/auth/login") &&
-    !path.includes("/api/auth/register") &&
-    !path.includes("/api/auth/refresh") &&
-    !path.includes("/api/auth/logout")
-  );
-}
-
-function redirectAfterUnauthorized(): void {
-  redirectToLoginOnUnauthorized(window.location.pathname, (path) => {
-    window.location.href = path;
-  });
-}
-
-async function clearRejectedWebSession(): Promise<void> {
-  if (usesConfigurableServer) return;
-  await fetch(`${getApiBase()}/api/auth/logout`, {
-    method: "POST",
-    credentials: apiCredentials(),
-    headers: getApiAuthHeaders(),
-  }).catch(() => {
-    // The session is already unusable; a network failure should not block auth recovery.
-  });
-}
-
-export async function refreshAuthToken(): Promise<boolean> {
-  if (refreshPromise) return refreshPromise;
-  refreshPromise = (async () => {
-    const refreshToken = getRefreshToken();
-    const headers = getApiAuthHeaders();
-    headers["Content-Type"] = "application/json";
-    const response = await fetch(`${getApiBase()}/api/auth/refresh`, {
-      method: "POST",
-      credentials: apiCredentials(),
-      headers,
-      body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
-    }).catch(() => null);
-    if (!response) {
-      return false;
-    }
-    if (!response.ok) {
-      if (
-        response.status === 400 ||
-        response.status === 401 ||
-        response.status === 403
-      ) {
-        setAuthToken(null);
-        await clearRejectedWebSession();
-      }
-      return false;
-    }
-    const data = (await response.json().catch(() => null)) as {
-      token?: string;
-      access_expires_at?: string | null;
-      refresh_token?: string | null;
-    } | null;
-    if (!data?.token) {
-      setAuthToken(null);
-      await clearRejectedWebSession();
-      return false;
-    }
-    setAuthTokens(
-      data.token,
-      data.refresh_token ?? undefined,
-      data.access_expires_at ?? undefined,
-    );
-    return true;
-  })().finally(() => {
-    refreshPromise = null;
-  });
-  return refreshPromise;
-}
-
-export async function ensureFreshAuthToken(
-  minValidityMs = AUTH_TOKEN_FRESHNESS_MARGIN_MS,
-): Promise<boolean> {
-  const token = getAuthToken();
-  if (!token) return true;
-
-  const expiresAt = getAuthTokenExpiresAt();
-  if (!expiresAt) return true;
-
-  const expiresMs = Date.parse(expiresAt);
-  if (!Number.isFinite(expiresMs)) return true;
-
-  if (expiresMs - Date.now() > minValidityMs) return true;
-  return refreshAuthToken();
-}
-
-export function api<T = unknown>(
-  path: string,
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
-  body?: unknown,
-  options?: { signal?: AbortSignal },
-): Promise<T> {
-  return innerApi<T>(`${getApiBase()}${path}`, method, body, options).catch(
-    async (error) => {
-      if (
-        error instanceof ApiError &&
-        error.status === 401 &&
-        shouldAttemptRefresh(path) &&
-        (await refreshAuthToken())
-      ) {
-        return innerApi<T>(`${getApiBase()}${path}`, method, body, options);
-      }
-      if (error instanceof ApiError && error.status === 401) {
-        redirectAfterUnauthorized();
-      }
-      throw error;
-    },
-  );
-}
-
-/** fetch() wrapper that adds API base URL and auth headers. Fire-and-forget friendly. */
-export async function apiFetch(
-  path: string,
-  init?: RequestInit,
-): Promise<Response> {
-  const headers: Record<string, string> = {
-    ...((init?.headers as Record<string, string>) || {}),
-    ...getApiAuthHeaders(),
-  };
-  const request = () =>
-    fetch(`${getApiBase()}${path}`, {
-      ...init,
-      credentials: apiCredentials(),
-      headers,
-    });
-  let response = await request();
-  if (
-    response.status === 401 &&
-    shouldAttemptRefresh(path) &&
-    (await refreshAuthToken())
-  ) {
-    response = await fetch(`${getApiBase()}${path}`, {
-      ...init,
-      credentials: apiCredentials(),
-      headers: {
-        ...((init?.headers as Record<string, string>) || {}),
-        ...getApiAuthHeaders(),
-      },
-    });
-  }
-  if (response.status === 401) {
-    redirectAfterUnauthorized();
-  }
-  return response;
-}
+export const api = apiAuthTransport.api;
+export const apiFetch = apiAuthTransport.apiFetch;
+export const ensureFreshAuthToken = apiAuthTransport.ensureFreshAuthToken;
+export const refreshAuthToken = apiAuthTransport.refreshAuthToken;
