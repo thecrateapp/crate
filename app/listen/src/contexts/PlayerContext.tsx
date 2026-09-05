@@ -22,13 +22,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
 import { usePlaybackIntelligence } from "@/contexts/use-playback-intelligence";
 import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
-import { useRemotePlaybackState } from "@/contexts/use-remote-playback-state";
 import { usePlayerConnectTransport } from "@/contexts/use-player-connect-transport";
-import { ContinuePlaybackPrompt } from "@/components/player/ContinuePlaybackPrompt";
-import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
 import { useEqualizerRuntime } from "@/hooks/use-equalizer-runtime";
 import { useRestoreOnMount } from "@/contexts/use-restore-on-mount";
-import { usePlayerAuthSync } from "@/contexts/use-player-auth-sync";
 import {
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
@@ -41,8 +37,6 @@ import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
 import { useMediaSession } from "@/contexts/use-media-session";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 import { recordPlaybackStall } from "@/lib/playback-network-quality";
-import { CRATE_CONNECT_V2_TRANSPORT_ENABLED } from "@/lib/crate-connect";
-import { buildPlaybackStatePayload } from "@/lib/remote-playback-state";
 import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime";
 import { useJamQueueSession } from "@/contexts/use-jam-queue-session";
 import { usePlayerPreferenceRuntime } from "@/contexts/use-player-preference-runtime";
@@ -51,6 +45,8 @@ import { usePlayerTrackRecovery } from "@/contexts/use-player-track-recovery";
 import { usePlayerLifecycleRuntime } from "@/contexts/use-player-lifecycle-runtime";
 import { usePlayerEnginePreferenceRuntime } from "@/contexts/use-player-engine-preference-runtime";
 import { usePlayerPlaybackObservability } from "@/contexts/use-player-playback-observability";
+import { usePlayerConnectState } from "@/contexts/use-player-connect-state";
+import { PlayerProviderSurface } from "@/contexts/PlayerProviderSurface";
 
 export type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 export type { CrossfadeTransition } from "@/contexts/player-context";
@@ -192,80 +188,33 @@ function usePlayerProviderRuntime(children: ReactNode) {
   });
 
   const { user: authUser } = useAuth();
-  const connectEnabled = useCrateConnectEnabled();
-  const connectV2Enabled = connectEnabled && CRATE_CONNECT_V2_TRANSPORT_ENABLED;
-  const connectV1Enabled =
-    connectEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED;
-  usePlayerAuthSync({
+  const {
+    connectEnabled,
+    connectV1Enabled,
+    connectV2Enabled,
+    connectV2PublishRef,
+    suppressNextConnectClaimRef,
+    buildConnectSnapshotPayload,
+    publishConnectState,
+  } = usePlayerConnectState({
     authUser,
     currentTrack,
     isPlaying,
+    queue,
+    currentIndex,
+    shuffle,
+    repeat,
+    playSource,
+    queueRef,
+    currentIndexRef,
+    currentTimeRef,
+    durationRef,
+    isPlayingRef,
+    shuffleRef,
+    repeatRef,
+    playSourceRef,
+    unshuffledQueueRef,
   });
-  const suppressNextConnectClaimRef = useRef(false);
-  const connectV2PublishRef = useRef<
-    ((options?: { claimActive?: boolean }) => Promise<void>) | null
-  >(null);
-  const buildConnectSnapshotPayload = useCallback(
-    (
-      snapshotKind: "light" | "structural",
-      options?: { claimActive?: boolean },
-    ) =>
-      buildPlaybackStatePayload({
-        currentIndex: currentIndexRef.current,
-        currentTime: currentTimeRef.current,
-        duration: durationRef.current,
-        isPlaying: isPlayingRef.current,
-        playSource: playSourceRef.current,
-        queue: queueRef.current,
-        repeat: repeatRef.current,
-        shuffle: shuffleRef.current,
-        snapshotKind,
-        unshuffledQueue: unshuffledQueueRef.current,
-        claimActive: options?.claimActive,
-      }),
-    [
-      currentIndexRef,
-      currentTimeRef,
-      durationRef,
-      isPlayingRef,
-      playSourceRef,
-      queueRef,
-      repeatRef,
-      shuffleRef,
-      unshuffledQueueRef,
-    ],
-  );
-  const { publishStructuralNow: publishConnectStateV1 } =
-    useRemotePlaybackState({
-      authUser,
-      enabled: connectV1Enabled,
-      queue,
-      currentIndex,
-      isPlaying,
-      shuffle,
-      repeat,
-      playSource,
-      queueRef,
-      currentIndexRef,
-      currentTimeRef,
-      durationRef,
-      isPlayingRef,
-      shuffleRef,
-      repeatRef,
-      playSourceRef,
-      unshuffledQueueRef,
-      suppressNextActiveClaimRef: suppressNextConnectClaimRef,
-    });
-  const publishConnectState = useCallback(
-    async (options?: { claimActive?: boolean }) => {
-      if (connectV2Enabled) {
-        await connectV2PublishRef.current?.(options);
-        return;
-      }
-      await publishConnectStateV1(options);
-    },
-    [connectV2Enabled, publishConnectStateV1],
-  );
   useEqualizerRuntime(currentTrack);
 
   const {
@@ -776,24 +725,15 @@ function usePlayerProviderRuntime(children: ReactNode) {
   );
 
   return (
-    <PlayerActionsContext.Provider value={actionsValue}>
-      <PlayerStateContext.Provider value={stateValue}>
-        <PlayerProgressContext.Provider value={progressValue}>
-          {children}
-          <ContinuePlaybackPrompt />
-          {playbackNeedsUserGesture && currentTrack ? (
-            <div className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--listen-player-bottom-offset,5.5rem)+env(safe-area-inset-bottom))] z-[1600] flex justify-center sm:bottom-28">
-              <button
-                type="button"
-                className="pointer-events-auto rounded-full border border-accent-action/30 bg-surface-canvas/95 px-4 py-3 text-sm font-semibold text-text-primary shadow-2xl shadow-cyan-950/40 backdrop-blur"
-                onClick={resumeAfterUserGesture}
-              >
-                Tap to resume playback
-              </button>
-            </div>
-          ) : null}
-        </PlayerProgressContext.Provider>
-      </PlayerStateContext.Provider>
-    </PlayerActionsContext.Provider>
+    <PlayerProviderSurface
+      actionsValue={actionsValue}
+      currentTrack={currentTrack}
+      playbackNeedsUserGesture={playbackNeedsUserGesture}
+      progressValue={progressValue}
+      resumeAfterUserGesture={resumeAfterUserGesture}
+      stateValue={stateValue}
+    >
+      {children}
+    </PlayerProviderSurface>
   );
 }
