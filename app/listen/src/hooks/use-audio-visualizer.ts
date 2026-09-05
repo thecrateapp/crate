@@ -1,23 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 import { getAnalyserNode } from "@/lib/gapless-player";
+import {
+  isMotionBlocked,
+  subscribeToMotionAvailability,
+} from "@/lib/motion-availability";
 
 const BAR_COUNT = 64;
-
-function isVisualizerMotionBlocked(): boolean {
-  if (
-    typeof document !== "undefined" &&
-    document.visibilityState === "hidden"
-  ) {
-    return true;
-  }
-
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
 
 /**
  * Reuse Gapless-5's analyser directly so the visualizer always taps the
@@ -53,7 +42,7 @@ export function useAudioVisualizer(
   const frameCountRef = useRef(0);
 
   const tick = useCallback(() => {
-    if (isVisualizerMotionBlocked()) {
+    if (isMotionBlocked()) {
       rafRef.current = 0;
       return;
     }
@@ -112,29 +101,16 @@ export function useAudioVisualizer(
     const startSampling = () => {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
-      if (isVisualizerMotionBlocked()) return;
+      if (isMotionBlocked()) return;
       rafRef.current = requestAnimationFrame(tick);
     };
-    const handleVisibilityChange = () => {
-      startSampling();
-    };
-    const motionQuery =
-      typeof window !== "undefined" && typeof window.matchMedia === "function"
-        ? window.matchMedia("(prefers-reduced-motion: reduce)")
-        : null;
-    const handleMotionPreferenceChange = () => {
-      startSampling();
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    motionQuery?.addEventListener("change", handleMotionPreferenceChange);
+    const unsubscribeFromMotion = subscribeToMotionAvailability(startSampling);
     startSampling();
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      motionQuery?.removeEventListener("change", handleMotionPreferenceChange);
+      unsubscribeFromMotion();
       analyserRef.current = null;
       dataRef.current = null;
       waveRef.current = null;

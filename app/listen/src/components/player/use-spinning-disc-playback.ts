@@ -6,6 +6,10 @@ import {
   PLAYING_FORWARD_SYNC_TOLERANCE_SECONDS,
   projectPlaybackTime,
 } from "@/components/player/spinning-disc-math";
+import {
+  isMotionBlocked,
+  subscribeToMotionAvailability,
+} from "@/lib/motion-availability";
 
 interface UseSpinningDiscPlaybackOptions {
   currentTime: number;
@@ -110,9 +114,24 @@ export function useSpinningDiscPlayback({
       animationFrameRef.current = window.requestAnimationFrame(tick);
     };
 
-    animationFrameRef.current = window.requestAnimationFrame(tick);
+    const startAnimation = () => {
+      if (animationFrameRef.current != null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      if (isMotionBlocked()) {
+        setPlaybackAnchor(currentTime);
+        setRotorRotation(currentTime * DISC_DEGREES_PER_SECOND);
+        return;
+      }
+      animationFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    const unsubscribeFromMotion = subscribeToMotionAvailability(startAnimation);
+    startAnimation();
 
     return () => {
+      unsubscribeFromMotion();
       if (animationFrameRef.current != null) {
         window.cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
