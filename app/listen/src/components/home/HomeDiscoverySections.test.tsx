@@ -957,9 +957,7 @@ describe("RecentEntityRow", () => {
       />,
     );
 
-    expect(
-      screen.getByText("High Vis").closest('[role="button"]'),
-    ).not.toBeNull();
+    expect(screen.getByText("High Vis").closest("article")).not.toBeNull();
     expect(screen.getByAltText("High Vis")).toHaveAttribute(
       "src",
       "/api/catalog/artists/artist-global-1/photo?size=320&format=webp",
