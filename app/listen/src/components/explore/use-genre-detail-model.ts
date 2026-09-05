@@ -7,6 +7,70 @@ import { useApi } from "@/hooks/use-api";
 import type { GenreDetail } from "./explore-model";
 import { buildGenreHeroCoverCandidates } from "./genre-covers";
 
+interface GenreDetailSummary {
+  description: string;
+  artistCount: number;
+  albumCount: number;
+  trackCount: number;
+  visibleArtists: GenreDetail["artists"];
+  visibleAlbums: GenreDetail["albums"];
+  visibleRelatedGenres: NonNullable<GenreDetail["related_genres"]>;
+}
+
+function buildGenreDetailSummary(
+  data: GenreDetail | null | undefined,
+  primaryArtists: GenreDetail["artists"],
+  primaryAlbums: GenreDetail["albums"],
+  isDesktop: boolean,
+  t: ReturnType<typeof useTranslation>["t"],
+): GenreDetailSummary {
+  if (!data) {
+    return {
+      description: t("genre.defaultDescription"),
+      artistCount: 0,
+      albumCount: 0,
+      trackCount: 0,
+      visibleArtists: primaryArtists,
+      visibleAlbums: primaryAlbums,
+      visibleRelatedGenres: [],
+    };
+  }
+
+  const description =
+    data.description ||
+    data.canonical_description ||
+    data.external_description ||
+    t("genre.defaultDescription");
+  const hasArtistMemberships = data.artists.some((artist) => artist.membership);
+  const hasAlbumMemberships = data.albums.some((album) => album.membership);
+  const artistCount = hasArtistMemberships
+    ? primaryArtists.length
+    : data.artist_count ?? primaryArtists.length;
+  const albumCount = hasAlbumMemberships
+    ? primaryAlbums.length
+    : data.album_count ?? primaryAlbums.length;
+  const directAlbumTrackCount = primaryAlbums.reduce(
+    (total, album) => total + (album.track_count || 0),
+    0,
+  );
+  const trackCount = hasAlbumMemberships
+    ? directAlbumTrackCount
+    : data.track_count ?? directAlbumTrackCount;
+
+  return {
+    description,
+    artistCount,
+    albumCount,
+    trackCount,
+    visibleArtists: isDesktop ? primaryArtists : primaryArtists.slice(0, 12),
+    visibleAlbums: isDesktop ? primaryAlbums : primaryAlbums.slice(0, 12),
+    visibleRelatedGenres: (data.related_genres ?? []).slice(
+      0,
+      isDesktop ? 12 : 6,
+    ),
+  };
+}
+
 export function useGenreDetailModel(slug: string) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -45,48 +109,17 @@ export function useGenreDetailModel(slug: string) {
     setHeroCoverIndex(0);
   }, [heroCoverFingerprint]);
 
-  if (!data) {
-    return {
-      data,
-      loading,
-      isDesktop,
-      primaryArtists,
-      primaryAlbums,
-      nextShow,
-      heroCoverCandidates,
-      heroCoverIndex,
-      heroCoverUrl: heroCoverCandidates[heroCoverIndex] ?? null,
-      description: t("genre.defaultDescription"),
-      artistCount: 0,
-      albumCount: 0,
-      trackCount: 0,
-      visibleArtists: primaryArtists,
-      visibleAlbums: primaryAlbums,
-      visibleRelatedGenres: [],
-      setHeroCoverIndex,
-    };
-  }
-
-  const description =
-    data.description ||
-    data.canonical_description ||
-    data.external_description ||
-    t("genre.defaultDescription");
-  const hasArtistMemberships = data.artists.some((artist) => artist.membership);
-  const hasAlbumMemberships = data.albums.some((album) => album.membership);
-  const artistCount = hasArtistMemberships
-    ? primaryArtists.length
-    : data.artist_count ?? primaryArtists.length;
-  const albumCount = hasAlbumMemberships
-    ? primaryAlbums.length
-    : data.album_count ?? primaryAlbums.length;
-  const directAlbumTrackCount = primaryAlbums.reduce(
-    (total, album) => total + (album.track_count || 0),
-    0,
+  const summary = useMemo(
+    () =>
+      buildGenreDetailSummary(
+        data,
+        primaryArtists,
+        primaryAlbums,
+        isDesktop,
+        t,
+      ),
+    [data, isDesktop, primaryAlbums, primaryArtists, t],
   );
-  const trackCount = hasAlbumMemberships
-    ? directAlbumTrackCount
-    : data.track_count ?? directAlbumTrackCount;
 
   return {
     data,
@@ -98,16 +131,7 @@ export function useGenreDetailModel(slug: string) {
     heroCoverCandidates,
     heroCoverIndex,
     heroCoverUrl: heroCoverCandidates[heroCoverIndex] ?? null,
-    description,
-    artistCount,
-    albumCount,
-    trackCount,
-    visibleArtists: isDesktop ? primaryArtists : primaryArtists.slice(0, 12),
-    visibleAlbums: isDesktop ? primaryAlbums : primaryAlbums.slice(0, 12),
-    visibleRelatedGenres: (data.related_genres ?? []).slice(
-      0,
-      isDesktop ? 12 : 6,
-    ),
+    ...summary,
     setHeroCoverIndex,
   };
 }
