@@ -259,6 +259,12 @@ function emitSidebarExpanded(expanded: boolean) {
   }
 }
 
+function navClass(isActive: boolean): string {
+  return isActive
+    ? "bg-white/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+    : "text-white/42 hover:bg-white/5 hover:text-white";
+}
+
 export function Sidebar({ onNavigate }: SidebarProps) {
   const [expanded, setExpanded] = useState(getStoredSidebarExpanded);
   const auth = useAuth();
@@ -300,12 +306,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     const next = !expanded;
     setExpanded(next);
     emitSidebarExpanded(next);
-  }
-
-  function navClass(isActive: boolean) {
-    return isActive
-      ? "bg-white/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-      : "text-white/42 hover:bg-white/5 hover:text-white";
   }
 
   const asideWidth = expanded ? "w-60" : "w-[4.5rem]";
@@ -360,18 +360,18 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto py-3">
-        {visibleNavItems.map((item, index) => {
+        {visibleNavItems.map((item) => {
           if ("section" in item) {
             return expanded ? (
               <div
-                key={`${item.section}-${index}`}
+                key={`section-${item.section}`}
                 className="px-4 pb-2 pt-5 text-[10px] font-bold uppercase tracking-[0.18em] text-white/25"
               >
                 {item.section}
               </div>
             ) : (
               <div
-                key={`${item.section}-${index}`}
+                key={`divider-${item.section}`}
                 className="mx-4 my-3 border-t border-white/5"
               />
             );

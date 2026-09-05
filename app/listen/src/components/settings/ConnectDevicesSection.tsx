@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, LogOut, MonitorSpeaker } from "@crate/ui/icons";
 import { toast } from "sonner";
@@ -92,6 +92,9 @@ function ConnectDevicesSectionContent() {
   );
   const [updatingPreference, setUpdatingPreference] = useState(false);
   const devicesRequestIdRef = useRef(0);
+  const showLoadError = useEffectEvent(() => {
+    toast.error(t("settings.connectDevices.toasts.loadFailed"));
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -113,7 +116,7 @@ function ConnectDevicesSectionContent() {
         if (requestId !== devicesRequestIdRef.current) return;
         if (error instanceof DOMException && error.name === "AbortError")
           return;
-        toast.error(t("settings.connectDevices.toasts.loadFailed"));
+        showLoadError();
       })
       .finally(() => {
         if (

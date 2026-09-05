@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
 import { App } from "./App";
-import { I18nProvider } from "./i18n";
+import { I18nProvider } from "./i18n/I18nProvider";
 import { startMediaAccessTicketRefresh } from "./lib/api";
 import { initCapacitor } from "./lib/capacitor";
 import { primeOfflineRuntimeProfile } from "./lib/offline";
@@ -29,9 +29,11 @@ async function disableDevServiceWorker() {
   try {
     const cacheNames = await caches.keys();
     await Promise.all(
-      cacheNames
-        .filter((cacheName) => cacheName.startsWith("crate-listen"))
-        .map((cacheName) => caches.delete(cacheName)),
+      cacheNames.map((cacheName) =>
+        cacheName.startsWith("crate-listen")
+          ? caches.delete(cacheName)
+          : Promise.resolve(false),
+      ),
     );
   } catch {
     // Ignore cache cleanup failures; the next hard refresh can finish the reset.

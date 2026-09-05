@@ -300,7 +300,15 @@ export function PathDetail() {
             <div
               key={t.step}
               ref={isActive ? activeTrackRef : null}
+              role="button"
+              tabIndex={0}
               onClick={() => playFromStep(i)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  playFromStep(i);
+                }
+              }}
               className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
                 isActive
                   ? "border-accent-action/30 bg-accent-action/10"

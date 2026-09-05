@@ -23,7 +23,7 @@ import {
 } from "@/lib/native-secure-session";
 import { isCapacitorRuntime, usesConfigurableServer } from "@/lib/platform";
 
-const SERVERS_KEY = "crate-servers";
+const SERVERS_KEY = "crate-servers:v1";
 const CURRENT_KEY = "crate-current-server";
 const LEGACY_TOKEN_KEY = "crate-auth-token";
 const ALLOW_INSECURE_LOOPBACK =
@@ -242,6 +242,8 @@ export async function bootstrapNativeSessionStore(): Promise<void> {
       };
       if (legacySecret.token || legacySecret.refreshToken) {
         const serialized = serializedSecret(legacySecret);
+        // Migrate and verify one server secret at a time to keep persistence atomic.
+        // react-doctor-disable-next-line async-await-in-loop
         await setSecureSessionValue(secureSessionKey(server.id), serialized);
         const verified = await getSecureSessionValue(
           secureSessionKey(server.id),

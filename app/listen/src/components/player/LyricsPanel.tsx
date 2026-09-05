@@ -68,7 +68,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
       })
       .catch(() => setLyrics({ synced: null, plain: null }))
       .finally(() => setLoading(false));
-  }, [open, currentTrack?.id]);
+  }, [currentTrack?.artist, currentTrack?.id, currentTrack?.title, open]);
 
   // Find active line index
   const activeIndex = useMemo(() => {

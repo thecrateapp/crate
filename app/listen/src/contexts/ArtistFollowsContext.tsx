@@ -76,6 +76,8 @@ export function ArtistFollowsProvider({ children }: { children: ReactNode }) {
     } finally {
       if (requestRef.current === controller) {
         requestRef.current = null;
+        // The identity guard prevents an older request from clearing a newer one.
+        // react-doctor-disable-next-line no-loading-flag-reset-outside-finally
         setLoading(false);
       }
     }

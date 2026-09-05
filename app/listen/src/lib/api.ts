@@ -38,7 +38,6 @@ import {
 } from "@/lib/media-access";
 
 export const AUTH_TOKEN_EVENT = "crate:auth-token-updated";
-const WEB_TOKEN_EXPIRES_AT_KEY = "listen-auth-token-expires-at";
 
 /**
  * Development-only desktop convenience. Release builds must not ship with a
@@ -307,24 +306,18 @@ export function apiWsUrl(path: string): string {
 // ── Auth token ──────────────────────────────────────────────────────
 //
 // In Capacitor, the token lives on the ServerConfig — every server can
-// have its own session. On web, the token is stored in localStorage.
+// have its own session. On web, the HttpOnly session cookie is authoritative.
+let webAuthToken: string | null = null;
+let webAuthTokenExpiresAt: string | null = null;
 
 export function getAuthToken(): string | null {
   if (usesConfigurableServer) return getCurrentServer()?.token ?? null;
-  try {
-    return localStorage.getItem("listen-auth-token");
-  } catch {
-    return null;
-  }
+  return webAuthToken;
 }
 
 export function getAuthTokenExpiresAt(): string | null {
   if (usesConfigurableServer) return getCurrentServer()?.tokenExpiresAt ?? null;
-  try {
-    return localStorage.getItem(WEB_TOKEN_EXPIRES_AT_KEY);
-  } catch {
-    return null;
-  }
+  return webAuthTokenExpiresAt;
 }
 
 export function getRefreshToken(): string | null {
@@ -394,20 +387,8 @@ export function setAuthTokens(
     else void refreshMediaAccessTickets();
     return;
   }
-  try {
-    if (token) localStorage.setItem("listen-auth-token", token);
-    else localStorage.removeItem("listen-auth-token");
-    if (nextAccessExpiresAt) {
-      localStorage.setItem(WEB_TOKEN_EXPIRES_AT_KEY, nextAccessExpiresAt);
-    } else {
-      localStorage.removeItem(WEB_TOKEN_EXPIRES_AT_KEY);
-    }
-    if (refreshToken !== undefined && refreshToken === null) {
-      localStorage.removeItem("listen-auth-refresh-token");
-    }
-  } catch {
-    // ignore persistence failures
-  }
+  webAuthToken = token;
+  webAuthTokenExpiresAt = nextAccessExpiresAt;
   emitAuthTokenChange();
 }
 

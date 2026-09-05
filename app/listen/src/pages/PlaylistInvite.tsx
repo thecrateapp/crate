@@ -32,7 +32,7 @@ export function PlaylistInvite() {
     return () => {
       cancelled = true;
     };
-  }, [navigate, token]);
+  }, [navigate, t, token]);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">

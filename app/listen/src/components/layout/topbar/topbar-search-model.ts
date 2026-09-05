@@ -103,7 +103,7 @@ export interface TopBarSearchRecentEntry {
   origin?: "local" | "remote";
 }
 
-const RECENTS_KEY = "listen-search-recents";
+export const TOP_BAR_SEARCH_RECENTS_STORAGE_KEY = "listen-search-recents:v1";
 const MAX_RECENTS = 5;
 
 function isTopBarSearchRecentEntry(
@@ -133,7 +133,7 @@ function dedupeRecentEntries(
 
 export function getTopBarSearchRecents(): TopBarSearchRecentEntry[] {
   try {
-    const raw = localStorage.getItem(RECENTS_KEY);
+    const raw = localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -163,7 +163,7 @@ export function addTopBarSearchRecent(recent: TopBarSearchRecentEntry): void {
   recents.unshift(recent);
   const deduped = dedupeRecentEntries(recents);
   localStorage.setItem(
-    RECENTS_KEY,
+    TOP_BAR_SEARCH_RECENTS_STORAGE_KEY,
     JSON.stringify(deduped.slice(0, MAX_RECENTS)),
   );
 }

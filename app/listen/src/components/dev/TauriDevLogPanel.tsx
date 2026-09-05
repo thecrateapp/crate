@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore, useState } from "react";
 
 import {
   clearDevLogs,
   DEV_LOG_EVENT,
-  getDevLogs,
+  getDevLogsSnapshot,
   type DevLogEntry,
 } from "@/lib/dev-logs";
 import { isTauriRuntime } from "@/lib/platform";
@@ -18,13 +18,15 @@ function timeLabel(timestamp: number): string {
 
 export function TauriDevLogPanel() {
   const [open, setOpen] = useState(false);
-  const [logs, setLogs] = useState<DevLogEntry[]>(() => getDevLogs());
-
-  useEffect(() => {
-    const onLog = () => setLogs(getDevLogs());
-    window.addEventListener(DEV_LOG_EVENT, onLog);
-    return () => window.removeEventListener(DEV_LOG_EVENT, onLog);
-  }, []);
+  const logs = useSyncExternalStore<DevLogEntry[]>(
+    (onStoreChange) => {
+      const onLog = () => onStoreChange();
+      window.addEventListener(DEV_LOG_EVENT, onLog);
+      return () => window.removeEventListener(DEV_LOG_EVENT, onLog);
+    },
+    getDevLogsSnapshot,
+    () => [],
+  );
 
   if (!isTauriRuntime || !import.meta.env.DEV) return null;
 

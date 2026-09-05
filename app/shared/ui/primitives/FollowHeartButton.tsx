@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { Heart, HeartBold } from "../icons";
+import { Heart, HeartBold } from "../icons/media";
 import { cn } from "../lib/cn";
 
 type FollowAnimation = "follow" | "unfollow" | null;

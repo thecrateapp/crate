@@ -12,6 +12,9 @@ export function Register() {
   const { t } = useTranslation();
   const { user, loading: authLoading, refetch } = useAuth();
   const [searchParams] = useSearchParams();
+  // Invite links are intentionally prefilled; the API validates the token
+  // before creating an account.
+  // react-doctor-disable-next-line url-prefilled-privileged-action
   const inviteToken = searchParams.get("invite") || undefined;
   const returnTo = searchParams.get("return_to") || "/";
   const [name, setName] = useState("");

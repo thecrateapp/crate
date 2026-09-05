@@ -206,7 +206,6 @@ export function usePlayerEngineSync({
       commitQueue,
       currentIndexRef,
       durationRef,
-      engineTrackMapRef,
       queueRef,
       rememberActiveTrack,
     ],

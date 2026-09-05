@@ -10,8 +10,8 @@ import {
 import { getOfflineNativePlaybackUrl } from "@/lib/offline";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 
-export const STORAGE_KEY = "listen-player-state";
-export const RECENTLY_PLAYED_KEY = "listen-recently-played";
+export const STORAGE_KEY = "listen-player-state:v1";
+export const RECENTLY_PLAYED_KEY = "listen-recently-played:v1";
 export const MAX_RECENT = 10;
 export const ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS = 1;
 export const ANDROID_MEDIA_SESSION_HANDOFF_SECONDS = 0.15;

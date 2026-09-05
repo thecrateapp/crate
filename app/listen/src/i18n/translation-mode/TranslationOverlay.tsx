@@ -52,8 +52,8 @@ export function TranslationOverlay() {
       </div>
 
       {selectedTarget ? (
-        <section
-          role="dialog"
+        <dialog
+          open
           aria-label="Edit translation"
           className="pointer-events-auto absolute right-4 bottom-20 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-accent-action/20 bg-surface-canvas/82 text-text-primary shadow-translation-editor backdrop-blur-2xl"
         >
@@ -117,7 +117,7 @@ export function TranslationOverlay() {
               </Button>
             </div>
           </div>
-        </section>
+        </dialog>
       ) : null}
     </div>
   );

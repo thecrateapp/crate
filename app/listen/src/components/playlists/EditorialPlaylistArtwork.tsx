@@ -28,6 +28,8 @@ const VARIANT_RADIALS: Record<EditorialVariant, string> = {
   crate: "editorial-playlist-radial-crate",
 };
 
+const EMPTY_TRACKS: PlaylistArtworkTrack[] = [];
+
 export function editorialPlaylistLabel(
   name: string,
   fallbackKicker = "Core Tracks",
@@ -56,7 +58,7 @@ export function editorialPlaylistLabel(
 export function EditorialPlaylistArtwork({
   title,
   kicker = "Core Tracks",
-  tracks = [],
+  tracks = EMPTY_TRACKS,
   coverDataUrl,
   backgroundImageUrl,
   variant = "core",

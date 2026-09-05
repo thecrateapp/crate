@@ -97,9 +97,9 @@ export function CrateLoader({
           className="inline-flex w-[1.35em] justify-start"
           aria-hidden="true"
         >
-          {[0, 1, 2].map((index) => (
+          {["first", "second", "third"].map((key, index) => (
             <span
-              key={index}
+              key={key}
               aria-hidden="true"
               data-testid="crate-loader-dot"
               className="animate-crate-loader-dot-bounce"

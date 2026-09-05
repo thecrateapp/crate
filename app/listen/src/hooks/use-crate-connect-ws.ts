@@ -176,7 +176,8 @@ export function useCrateConnectWs({
   const callbacksRef = useRef<UseCrateConnectWsCallbacks | undefined>(
     callbacks,
   );
-  const playbackInstanceIdRef = useRef(generatePlaybackInstanceId());
+  const [playbackInstanceId] = useState(generatePlaybackInstanceId);
+  const playbackInstanceIdRef = useRef(playbackInstanceId);
   const reconnectAttemptRef = useRef(0);
   const socketRef = useRef<WebSocket | null>(null);
   const playerStateRef = useRef<ConnectPlayerState | null>(null);

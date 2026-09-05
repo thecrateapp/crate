@@ -287,6 +287,10 @@ function ExploreCratePlaylists({
   );
 }
 
+function getGenreSlug(genre: { slug?: string | null; name: string }): string {
+  return genre.slug?.trim() || genre.name.toLowerCase().replace(/\s+/g, "-");
+}
+
 function GenreExplorer({
   genres,
   onOpen,
@@ -297,10 +301,6 @@ function GenreExplorer({
   const { t } = useTranslation();
   const topGenres = [...genres].sort((a, b) => b.count - a.count).slice(0, 12);
   if (!topGenres.length) return null;
-
-  function getGenreSlug(genre: (typeof topGenres)[number]) {
-    return genre.slug?.trim() || genre.name.toLowerCase().replace(/\s+/g, "-");
-  }
 
   return (
     <section className="space-y-4">

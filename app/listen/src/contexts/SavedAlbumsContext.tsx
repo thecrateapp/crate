@@ -72,6 +72,8 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
     } finally {
       if (savedAlbumsRequestRef.current === controller) {
         savedAlbumsRequestRef.current = null;
+        // The identity guard prevents an older request from clearing a newer one.
+        // react-doctor-disable-next-line no-loading-flag-reset-outside-finally
         setLoading(false);
       }
     }

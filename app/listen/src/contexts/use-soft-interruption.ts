@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 
 import { getStreamUrl } from "@/contexts/player-utils";
@@ -297,57 +297,58 @@ export function useSoftInterruption({
     isPlayingRef,
   ]);
 
-  scheduleStallProtectionRef.current = scheduleStallProtection;
-
-  maybeResumeRef.current = async () => {
-    if (!shouldAutoResumeAfterInterruptionRef.current) return;
-    if (!currentTrackRef.current || recoveryProbeInFlightRef.current) return;
-    recoveryProbeInFlightRef.current = true;
-    commitIsBuffering(true);
-    try {
-      const available = await probeCurrentTrackAvailability();
-      if (!available) {
-        recoveryFailuresRef.current += 1;
-        if (
-          recoveryFailuresRef.current >= 2 &&
-          recoveryFailuresRef.current <= 3 &&
-          recoverCurrentTrack
-        ) {
-          const refreshed = await recoverCurrentTrack();
-          if (refreshed) {
-            onPlaybackRecovered?.(recoveryFailuresRef.current);
+  useLayoutEffect(() => {
+    scheduleStallProtectionRef.current = scheduleStallProtection;
+    maybeResumeRef.current = async () => {
+      if (!shouldAutoResumeAfterInterruptionRef.current) return;
+      if (!currentTrackRef.current || recoveryProbeInFlightRef.current) return;
+      recoveryProbeInFlightRef.current = true;
+      commitIsBuffering(true);
+      try {
+        const available = await probeCurrentTrackAvailability();
+        if (!available) {
+          recoveryFailuresRef.current += 1;
+          if (
+            recoveryFailuresRef.current >= 2 &&
+            recoveryFailuresRef.current <= 3 &&
+            recoverCurrentTrack
+          ) {
+            const refreshed = await recoverCurrentTrack();
+            if (refreshed) {
+              onPlaybackRecovered?.(recoveryFailuresRef.current);
+              return;
+            }
+          }
+          if (recoveryFailuresRef.current > 3) {
+            shouldAutoResumeAfterInterruptionRef.current = false;
+            bufferingIntentRef.current = false;
+            commitIsPlaying(false);
+            commitIsBuffering(false);
+            window.dispatchEvent(
+              new CustomEvent(PLAYBACK_NEEDS_USER_GESTURE_EVENT),
+            );
             return;
           }
-        }
-        if (recoveryFailuresRef.current > 3) {
-          shouldAutoResumeAfterInterruptionRef.current = false;
-          bufferingIntentRef.current = false;
-          commitIsPlaying(false);
-          commitIsBuffering(false);
-          window.dispatchEvent(
-            new CustomEvent(PLAYBACK_NEEDS_USER_GESTURE_EVENT),
-          );
+          scheduleRecoveryCheck();
           return;
         }
+        bufferingIntentRef.current = true;
+        if (shouldUseAndroidNativePlayer()) {
+          await androidNativeEngine.play();
+        } else {
+          await gpFadeInAndPlay(SOFT_PAUSE_FADE_MS);
+        }
+      } catch {
+        // Fade failed — restore volume and schedule another recovery
+        // attempt so we don't sit on muted audio indefinitely.
+        recoveryFailuresRef.current += 1;
+        gpRestoreVolume();
         scheduleRecoveryCheck();
-        return;
+      } finally {
+        recoveryProbeInFlightRef.current = false;
       }
-      bufferingIntentRef.current = true;
-      if (shouldUseAndroidNativePlayer()) {
-        await androidNativeEngine.play();
-      } else {
-        await gpFadeInAndPlay(SOFT_PAUSE_FADE_MS);
-      }
-    } catch {
-      // Fade failed — restore volume and schedule another recovery
-      // attempt so we don't sit on muted audio indefinitely.
-      recoveryFailuresRef.current += 1;
-      gpRestoreVolume();
-      scheduleRecoveryCheck();
-    } finally {
-      recoveryProbeInFlightRef.current = false;
-    }
-  };
+    };
+  });
 
   // Listen to browser online/offline + app-level network-restored events.
   useEffect(() => {

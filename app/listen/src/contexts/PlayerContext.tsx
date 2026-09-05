@@ -125,7 +125,7 @@ import {
 import { toast } from "sonner";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
-const NATIVE_PLAYBACK_DIAGNOSTIC_KEY = "listen-native-playback-diagnostic";
+const NATIVE_PLAYBACK_DIAGNOSTIC_KEY = "listen-native-playback-diagnostic:v1";
 
 function nativeTransitionFlushReason(
   reason: string | undefined,
@@ -334,7 +334,16 @@ function usePlayerProviderRuntime(children: ReactNode) {
     shuffleRef.current = shuffle;
     playSourceRef.current = playSource;
     smartCrossfadeEnabledRef.current = smartCrossfadeEnabled;
-  }, [playSource, repeat, shuffle, smartCrossfadeEnabled]);
+  }, [
+    playSource,
+    repeat,
+    shuffle,
+    smartCrossfadeEnabled,
+    playSourceRef,
+    repeatRef,
+    shuffleRef,
+    smartCrossfadeEnabledRef,
+  ]);
 
   usePlaybackPersistence({
     queue,
@@ -431,7 +440,7 @@ function usePlayerProviderRuntime(children: ReactNode) {
       currentTime: currentTimeRef.current,
       duration: durationRef.current,
     }),
-    [],
+    [currentTimeRef, durationRef],
   );
 
   const {
@@ -736,7 +745,13 @@ function usePlayerProviderRuntime(children: ReactNode) {
         unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...unique];
       }
     },
-    [commitQueue, recentlyPlayed, registerEngineTrack],
+    [
+      commitQueue,
+      queueRef,
+      recentlyPlayed,
+      registerEngineTrack,
+      unshuffledQueueRef,
+    ],
   );
 
   const insertSuggestionAfterCurrent = useCallback(
@@ -786,7 +801,14 @@ function usePlayerProviderRuntime(children: ReactNode) {
         unshuffledQueueRef.current = [...unshuffledQueueRef.current, marked];
       }
     },
-    [commitQueue, recentlyPlayed, registerEngineTrack],
+    [
+      commitQueue,
+      currentIndexRef,
+      queueRef,
+      recentlyPlayed,
+      registerEngineTrack,
+      unshuffledQueueRef,
+    ],
   );
 
   const appendAndAdvance = useCallback(
@@ -852,8 +874,12 @@ function usePlayerProviderRuntime(children: ReactNode) {
       commitIsPlaying,
       commitQueue,
       flushCurrentPlayEvent,
+      currentIndexRef,
+      queueRef,
       recentlyPlayed,
       registerEngineTrack,
+      unshuffledQueueRef,
+      playSourceRef,
       startTrackerSession,
     ],
   );
@@ -1493,7 +1519,14 @@ function usePlayerProviderRuntime(children: ReactNode) {
         onPrefsChanged as EventListener,
       );
     };
-  }, [syncEffectiveCrossfade]);
+  }, [
+    setInfinitePlaybackEnabled,
+    setPlaybackDeliveryPolicy,
+    setSmartCrossfadeEnabled,
+    setSmartPlaylistSuggestionsCadence,
+    setSmartPlaylistSuggestionsEnabled,
+    syncEffectiveCrossfade,
+  ]);
 
   useEffect(() => {
     syncEffectiveCrossfade();
@@ -1850,6 +1883,10 @@ function usePlayerProviderRuntime(children: ReactNode) {
       setPlaySource,
       setRepeatState,
       setShuffleState,
+      repeatRef,
+      shuffleRef,
+      playSourceRef,
+      unshuffledQueueRef,
     ],
   );
   const enterJamSession = useCallback(() => {

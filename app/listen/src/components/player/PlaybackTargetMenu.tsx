@@ -43,7 +43,9 @@ export function PlaybackTargetMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const targetContextRef = useRef(targetContext);
-  targetContextRef.current = targetContext;
+  useEffect(() => {
+    targetContextRef.current = targetContext;
+  }, [targetContext]);
   const targetTrackId = targetContext?.currentTrack?.id;
   const activeConnectInstanceId = targetContext?.connect?.activeInstanceId;
   const connectedInstanceCount =

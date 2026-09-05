@@ -59,6 +59,12 @@ function homePlaylistPath(playlistId: string): string {
   return `/home/playlist/${encodeURIComponent(playlistId)}`;
 }
 
+async function loadHomePlaylist(playlistId: string) {
+  return api<HomeGeneratedPlaylistDetail>(
+    `/api/me/home/playlists/${encodeURIComponent(playlistId)}`,
+  );
+}
+
 export function HomeSection() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -78,12 +84,6 @@ export function HomeSection() {
         : [],
     [data],
   );
-
-  async function loadHomePlaylist(playlistId: string) {
-    return api<HomeGeneratedPlaylistDetail>(
-      `/api/me/home/playlists/${encodeURIComponent(playlistId)}`,
-    );
-  }
 
   async function playHomePlaylist(item: HomeGeneratedPlaylistSummary) {
     try {

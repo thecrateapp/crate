@@ -99,6 +99,8 @@ async function chunkedUpload(
         `${file.name}.part-${chunkIndex}`,
       );
 
+      // Chunks are sent in order so the server can commit a deterministic upload.
+      // react-doctor-disable-next-line async-await-in-loop
       await api(
         `/api/acquisition/upload/chunked/${init.upload_id}/chunk`,
         "POST",

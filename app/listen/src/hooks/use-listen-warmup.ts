@@ -100,6 +100,8 @@ async function runWarmupPool(
       while (!signal.aborted) {
         const task = tasks[index++];
         if (!task) return;
+        // Each worker intentionally processes one warmup at a time.
+        // react-doctor-disable-next-line async-await-in-loop
         await task(signal);
       }
     }),

@@ -1,6 +1,7 @@
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -59,6 +60,20 @@ interface ConnectedAccount {
   provider: string;
   status: string;
   external_username?: string | null;
+}
+
+function generatePassword(): string {
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
+  const values = new Uint32Array(16);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(values);
+  } else {
+    for (let index = 0; index < values.length; index += 1) {
+      values[index] = Math.floor(Math.random() * chars.length);
+    }
+  }
+  return Array.from(values, (value) => chars[value % chars.length]).join("");
 }
 
 interface CurrentTrack {
@@ -178,9 +193,11 @@ function roleLabel(role: string) {
 
 function rolesForUser(user: Pick<UserRecord, "role" | "roles"> | null) {
   const roles = Array.isArray(user?.roles) ? user.roles : [];
-  const normalized = roles
-    .map((role) => role.trim().toLowerCase())
-    .filter(Boolean);
+  const normalized = roles.reduce<string[]>((values, role) => {
+    const value = role.trim().toLowerCase();
+    if (value) values.push(value);
+    return values;
+  }, []);
   if (normalized.length > 0) return Array.from(new Set(normalized));
   return [user?.role || "user"];
 }
@@ -199,9 +216,9 @@ function toggleRole(current: string[], role: string) {
     if (current.length === 1) return current;
     return current.filter((candidate) => candidate !== role);
   }
-  const next = [...current, role];
+  const next = new Set([...current, role]);
   return ROLE_OPTIONS.map((option) => option.value).filter((candidate) =>
-    next.includes(candidate),
+    next.has(candidate),
   );
 }
 
@@ -655,12 +672,15 @@ export function Users() {
   const canAssignRoles =
     hasCapability("roles.assign") || hasCapability("roles.manage");
 
-  function setInspectParam(userId: number | null) {
-    const next = new URLSearchParams(searchParams);
-    if (userId == null) next.delete("inspect");
-    else next.set("inspect", String(userId));
-    setSearchParams(next, { replace: true });
-  }
+  const setInspectParam = useCallback(
+    (userId: number | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (userId == null) next.delete("inspect");
+      else next.set("inspect", String(userId));
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   function openUserDetail(user: UserRecord) {
     setDetailTarget(user);
@@ -702,7 +722,7 @@ export function Users() {
     } else if (users.length > 0 && currentUser?.id === inspectId) {
       setInspectParam(null);
     }
-  }, [currentUser?.id, detailTarget, searchParams, users]);
+  }, [currentUser?.id, detailTarget, searchParams, setInspectParam, users]);
 
   async function handleDelete() {
     if (!deleteTarget || !canDeleteUsers) return;
@@ -1147,20 +1167,29 @@ function UserDetailDialog({
   const [roleSaving, setRoleSaving] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
 
-  async function fetchDetail(userId: number) {
-    setLoading(true);
-    try {
-      const data = await api<UserDetail>(`/api/auth/users/${userId}`);
-      setDetail(data);
-    } catch (err) {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to load user detail",
-      );
-      setDetail(null);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const fetchDetail = useCallback(
+    async (userId: number, signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const data = await api<UserDetail>(
+          `/api/auth/users/${userId}`,
+          "GET",
+          undefined,
+          { signal },
+        );
+        if (signal?.aborted) return;
+        setDetail(data);
+      } catch (err) {
+        toast.error(
+          err instanceof ApiError ? err.message : "Failed to load user detail",
+        );
+        setDetail(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!open || !user) {
@@ -1169,8 +1198,10 @@ function UserDetailDialog({
       return;
     }
     setSessionFilter("active");
-    void fetchDetail(user.id);
-  }, [open, user]);
+    const controller = new AbortController();
+    void fetchDetail(user.id, controller.signal);
+    return () => controller.abort();
+  }, [fetchDetail, open, user]);
 
   useEffect(() => {
     if (detail) {
@@ -1875,20 +1906,6 @@ function SetPasswordDialog({
   const [newPassword, setNewPassword] = useState("");
   const [revokeAllSessions, setRevokeAllSessions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  function generatePassword() {
-    const chars =
-      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
-    const values = new Uint32Array(16);
-    if (globalThis.crypto?.getRandomValues) {
-      globalThis.crypto.getRandomValues(values);
-    } else {
-      for (let index = 0; index < values.length; index += 1) {
-        values[index] = Math.floor(Math.random() * chars.length);
-      }
-    }
-    return Array.from(values, (value) => chars[value % chars.length]).join("");
-  }
 
   useEffect(() => {
     if (!open) {

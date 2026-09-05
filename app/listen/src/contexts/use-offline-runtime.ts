@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import type {
@@ -115,7 +122,8 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   const [snapshot, setSnapshot] = useState<OfflineSnapshot>(EMPTY_SNAPSHOT);
   const [syncing, setSyncing] = useState(false);
   const snapshotRef = useRef<OfflineSnapshot>(EMPTY_SNAPSHOT);
-  const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const queue = useMemo(() => Promise.resolve(), []);
+  const queueRef = useRef(queue);
   const resumedProfileRef = useRef<string | null>(null);
   const persistenceRef = useRef<{
     profileKey: string | null;
@@ -131,7 +139,9 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     return deriveOfflineProfileKey(user.id, origin);
   }, [supported, user?.id]);
   const activeProfileRef = useRef(profileKey);
-  activeProfileRef.current = profileKey;
+  useLayoutEffect(() => {
+    activeProfileRef.current = profileKey;
+  }, [profileKey]);
 
   const commitSnapshot = useCallback(
     (next: OfflineSnapshot, flush = false) => {
@@ -276,6 +286,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         },
       });
 
+      const readyKeys = new Set(midItem.readyAssetKeys || []);
       const pendingTracks = manifestTracks.filter((track) => {
         const assetKey = getOfflineTrackAssetKey(track);
         if (!assetKey) {
@@ -283,9 +294,8 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
           failureMessage = "One or more tracks are missing entity identifiers";
           return false;
         }
-        return !midItem.readyAssetKeys?.includes(assetKey);
+        return !readyKeys.has(assetKey);
       });
-      const readyKeys = new Set(midItem.readyAssetKeys || []);
       transferAbortRef.current?.abort();
       const transferController = new AbortController();
       transferAbortRef.current = transferController;
@@ -369,9 +379,11 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       commitSnapshot(nextSnapshot, true);
 
       const oldAssetKeys = new Set(
-        (existing?.tracks || [])
-          .map((track) => getOfflineTrackAssetKey(track))
-          .filter((value): value is string => Boolean(value)),
+        (existing?.tracks || []).reduce<string[]>((keys, track) => {
+          const assetKey = getOfflineTrackAssetKey(track);
+          if (assetKey) keys.push(assetKey);
+          return keys;
+        }, []),
       );
       for (const track of manifestTracks) {
         const assetKey = getOfflineTrackAssetKey(track);
@@ -381,11 +393,14 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       }
       if (oldAssetKeys.size) {
         const usage = buildAssetUsage(nextSnapshot);
-        for (const assetKey of oldAssetKeys) {
-          if ((usage.get(assetKey) || 0) === 0) {
-            await deleteCachedTrackAsset(profileKey, assetKey);
-          }
-        }
+        await Promise.all(
+          [...oldAssetKeys].reduce<Promise<void>[]>((deletions, assetKey) => {
+            if ((usage.get(assetKey) || 0) === 0) {
+              deletions.push(deleteCachedTrackAsset(profileKey, assetKey));
+            }
+            return deletions;
+          }, []),
+        );
       }
     },
     [commitSnapshot, profileKey, supported],
@@ -403,12 +418,16 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       delete nextSnapshot.items[itemKey];
       commitSnapshot(nextSnapshot);
       const usage = buildAssetUsage(nextSnapshot);
-      for (const track of existing.tracks) {
-        const assetKey = getOfflineTrackAssetKey(track);
-        if (assetKey && (usage.get(assetKey) || 0) === 0) {
-          await deleteCachedTrackAsset(profileKey, track);
-        }
-      }
+      await Promise.all(
+        existing.tracks
+          .reduce<OfflineTrackInput[]>((tracks, track) => {
+            const assetKey = getOfflineTrackAssetKey(track);
+            if (assetKey && (usage.get(assetKey) || 0) === 0)
+              tracks.push(track);
+            return tracks;
+          }, [])
+          .map((track) => deleteCachedTrackAsset(profileKey, track)),
+      );
     },
     [commitSnapshot, profileKey, supported],
   );
@@ -443,12 +462,18 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
               : new Error("Failed to fetch offline track manifest");
           }
         } else if (item.kind === "album") {
+          // Album and playlist manifests update the same item snapshot; keep
+          // the outer sync sequential to avoid lost updates.
+          // react-doctor-disable-next-line async-await-in-loop
           await syncManifestIntoItem(
             "album",
             item.entityId,
             `/api/offline/albums/${item.entityId}/manifest`,
           );
         } else if (item.kind === "playlist") {
+          // Album and playlist manifests update the same item snapshot; keep
+          // the outer sync sequential to avoid lost updates.
+          // react-doctor-disable-next-line async-await-in-loop
           await syncManifestIntoItem(
             "playlist",
             item.entityId,

@@ -284,13 +284,7 @@ function PreloadBackground({ show }: { show: NormalizedShow }) {
   return <img src={show.backgroundUrl} alt="" className="hidden" />;
 }
 
-function CollapsedShowCard({
-  show,
-  onToggle,
-}: {
-  show: NormalizedShow;
-  onToggle?: () => void;
-}) {
+function CollapsedShowCard({ show }: { show: NormalizedShow }) {
   const { monthLabel, dayLabel, weekdayLabel } = formatDateParts(
     show.date,
     show.time,
@@ -298,10 +292,7 @@ function CollapsedShowCard({
   const support = show.lineupArtists.slice(1);
 
   return (
-    <div
-      className="absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0"
-      onClick={onToggle}
-    >
+    <div className="absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0">
       <PreloadBackground show={show} />
       <div className="h-full w-[88px] flex-shrink-0 bg-white/5">
         {show.artistPhotoUrl ? (
@@ -615,14 +606,28 @@ export function ShowCard({
         className,
       )}
       style={{ height: cardHeight }}
+      role={!expanded ? "button" : undefined}
+      tabIndex={!expanded ? 0 : undefined}
+      aria-expanded={!expanded ? expanded : undefined}
       onClick={!expanded ? onToggle : undefined}
+      onKeyDown={
+        !expanded && onToggle
+          ? (event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onToggle();
+              }
+            }
+          : undefined
+      }
     >
       <div ref={contentRef}>
         {!expanded ? (
           <div className="absolute inset-0 bg-raised-surface" />
         ) : null}
         {!expanded ? (
-          <CollapsedShowCard show={normalized} onToggle={onToggle} />
+          <CollapsedShowCard show={normalized} />
         ) : (
           <ExpandedShowCardBody
             show={normalized}

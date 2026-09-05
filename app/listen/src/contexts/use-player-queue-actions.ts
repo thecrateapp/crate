@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useMemo,
   useRef,
   type Dispatch,
   type MutableRefObject,
@@ -281,7 +282,8 @@ export function usePlayerQueueActions({
   playbackDeliveryPolicy,
 }: UsePlayerQueueActionsParams) {
   const jamQueueSyncRevisionRef = useRef(0);
-  const nativeJamQueueMutationRef = useRef(Promise.resolve());
+  const initialJamQueueMutation = useMemo(() => Promise.resolve(), []);
+  const nativeJamQueueMutationRef = useRef(initialJamQueueMutation);
 
   const startQueuePlayback = useCallback(
     (tracks: Track[], startIndex: number, source?: PlaySource) => {
@@ -397,6 +399,8 @@ export function usePlayerQueueActions({
       commitIsBuffering,
       commitIsPlaying,
       commitQueue,
+      commitDuration,
+      bufferingIntentRef,
       currentIndexRef,
       jamQueueLockedRef,
       flushCurrentPlayEvent,
@@ -405,8 +409,12 @@ export function usePlayerQueueActions({
       resetPlaybackIntelligence,
       pullFromEngine,
       playbackDeliveryPolicy,
+      pendingRestoreTimeRef,
       publishConnectState,
       queueRef,
+      repeatRef,
+      resumeAfterReloadRef,
+      setPlaySource,
       startTrackerSession,
     ],
   );
@@ -501,7 +509,13 @@ export function usePlayerQueueActions({
       gpRestoreVolume();
       gpPlay();
     });
-  }, [cancelSoftInterruption, commitIsBuffering, commitIsPlaying, queueRef]);
+  }, [
+    bufferingIntentRef,
+    cancelSoftInterruption,
+    commitIsBuffering,
+    commitIsPlaying,
+    queueRef,
+  ]);
 
   const advanceToTrack = useCallback(
     (targetIndex: number) => {
@@ -852,6 +866,7 @@ export function usePlayerQueueActions({
     commitIsPlaying,
     commitQueue,
     flushCurrentPlayEvent,
+    resetEngineTrackMap,
     jamQueueLockedRef,
     pendingRestoreTimeRef,
     resetPlaybackIntelligence,
@@ -908,7 +923,6 @@ export function usePlayerQueueActions({
     isPlayingRef,
     pushToEngine,
     queueRef,
-    resetEngineTrackMap,
     setShuffleState,
     shuffleRef,
     unshuffledQueueRef,
@@ -1234,6 +1248,9 @@ export function usePlayerQueueActions({
                   return;
                 }
                 if (edit.type === "remove") {
+                  // Native queue indices change after each edit, so these
+                  // operations must remain ordered.
+                  // react-doctor-disable-next-line async-await-in-loop
                   await nativeEngine.removeTrack(edit.index);
                   if (
                     jamQueueSyncRevisionRef.current !== jamQueueSyncRevision
@@ -1318,7 +1335,6 @@ export function usePlayerQueueActions({
     },
     [
       commitCurrentIndex,
-      commitCurrentTime,
       commitQueue,
       currentIndexRef,
       currentTimeRef,
@@ -1329,9 +1345,11 @@ export function usePlayerQueueActions({
       playSourceRef,
       pushToEngine,
       queueRef,
+      registerEngineTrack,
       resume,
       seek,
       setPlaySource,
+      unregisterEngineTrack,
     ],
   );
 

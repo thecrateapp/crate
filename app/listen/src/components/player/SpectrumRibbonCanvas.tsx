@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -44,8 +44,10 @@ export const SpectrumRibbonCanvas = memo(function SpectrumRibbonCanvas({
   const rafRef = useRef(0);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
 
-  frequenciesRef.current = frequenciesDb;
-  waveformRef.current = waveform;
+  useLayoutEffect(() => {
+    frequenciesRef.current = frequenciesDb;
+    waveformRef.current = waveform;
+  }, [frequenciesDb, waveform]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

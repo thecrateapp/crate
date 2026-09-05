@@ -91,7 +91,20 @@ export function UpcomingShowCard({
           : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-accent-action/15 hover:bg-text-primary/[0.03]",
       )}
       style={{ height: cardHeight }}
+      role={!expanded ? "button" : undefined}
+      tabIndex={!expanded ? 0 : undefined}
+      aria-expanded={!expanded ? expanded : undefined}
       onClick={!expanded ? onToggle : undefined}
+      onKeyDown={
+        !expanded && onToggle
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onToggle();
+              }
+            }
+          : undefined
+      }
       onContextMenu={actionMenu.handleContextMenu}
     >
       <div ref={contentRef}>

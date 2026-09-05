@@ -417,11 +417,19 @@ export function AppModal({
     <div
       role="dialog"
       aria-modal="true"
+      aria-label="Dialog"
+      tabIndex={-1}
       className={cn(
         "z-app-modal fixed inset-0 flex items-end justify-center bg-surface-canvas/72 p-0 backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
         overlayClassName,
       )}
       onClick={handleOverlayClick}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && closeOnEscape) {
+          event.preventDefault();
+          onClose();
+        }
+      }}
       onPointerDown={handleOverlayPointerDown}
     >
       <div

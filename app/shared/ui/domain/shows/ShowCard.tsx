@@ -34,11 +34,9 @@ function PreloadBackground({ url }: { url?: string }) {
 
 function CollapsedView({
   show,
-  onToggle,
   collapsedActionsSlot,
 }: {
   show: NormalizedShow;
-  onToggle?: () => void;
   collapsedActionsSlot?: ReactNode;
 }) {
   const { monthLabel, dayLabel, weekdayLabel } = formatShowDateParts(
@@ -48,10 +46,7 @@ function CollapsedView({
   const support = show.lineupArtists.slice(1);
 
   return (
-    <div
-      className="absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0"
-      onClick={onToggle}
-    >
+    <div className="absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0">
       <PreloadBackground url={show.backgroundUrl} />
       <div className="h-full w-[88px] flex-shrink-0 bg-text-primary/5">
         {show.artistPhotoUrl ? (
@@ -363,7 +358,20 @@ export function ShowCard({
         className,
       )}
       style={{ height: cardHeight }}
+      role={!expanded ? "button" : undefined}
+      tabIndex={!expanded ? 0 : undefined}
+      aria-expanded={!expanded ? expanded : undefined}
       onClick={!expanded ? onToggle : undefined}
+      onKeyDown={
+        !expanded && onToggle
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onToggle();
+              }
+            }
+          : undefined
+      }
     >
       <div ref={contentRef}>
         {!expanded ? (
@@ -372,7 +380,6 @@ export function ShowCard({
         {!expanded ? (
           <CollapsedView
             show={show}
-            onToggle={onToggle}
             collapsedActionsSlot={collapsedActionsSlot}
           />
         ) : (

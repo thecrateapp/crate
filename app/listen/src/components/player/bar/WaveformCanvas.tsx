@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
 
 import {
   drawWaveformFrame,
@@ -23,7 +23,9 @@ export const WaveformCanvas = memo(function WaveformCanvas({
   const peaksRef = useRef<number[]>([]);
   const rafRef = useRef<number>(0);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
-  frequenciesDbRef.current = frequenciesDb;
+  useLayoutEffect(() => {
+    frequenciesDbRef.current = frequenciesDb;
+  }, [frequenciesDb]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

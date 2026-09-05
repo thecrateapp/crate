@@ -1,0 +1,41 @@
+{
+  "ignore": {
+    "files": ["src/lib/gapless5/**", "scripts/**"],
+    "rules": [
+      "react-doctor/no-high-complexity-react-function",
+      "react-doctor/no-giant-component",
+      "react-doctor/prefer-useReducer",
+      "react-doctor/no-many-boolean-props",
+      "react-doctor/no-multi-component-file",
+      "react-doctor/only-export-components",
+      "react-doctor/duplicate-jsx-subtree"
+    ],
+    "overrides": [
+      {
+        "files": ["src/components/explore/ExploreViews.tsx"],
+        "rules": [
+          "react-doctor/no-reset-all-state-on-prop-change",
+          "react-doctor/no-adjust-state-on-prop-change"
+        ]
+      },
+      {
+        "files": [
+          "src/components/home/HomeDiscoverySections.tsx",
+          "src/components/player/ExtendedPlayer.tsx",
+          "src/components/player/useResolvedPlayerArtist.ts",
+          "src/components/playlists/PlaylistCreateModal.tsx",
+          "src/components/social/ProfileHoverCard.tsx",
+          "src/hooks/use-api.ts"
+        ],
+        "rules": ["react-doctor/no-adjust-state-on-prop-change"]
+      },
+      {
+        "files": ["src/components/player/RadioFeedback.tsx"],
+        "rules": [
+          "react-doctor/no-reset-all-state-on-prop-change",
+          "react-doctor/no-adjust-state-on-prop-change"
+        ]
+      }
+    ]
+  }
+}

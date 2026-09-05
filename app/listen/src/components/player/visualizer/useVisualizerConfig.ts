@@ -1,4 +1,4 @@
-import { type MutableRefObject } from "react";
+import { useMemo, type MutableRefObject } from "react";
 
 import type { CrossfadeTransition } from "@/contexts/PlayerContext";
 import type { Track } from "@/contexts/player-types";
@@ -70,21 +70,24 @@ export function useVisualizerConfig(
   const effectiveVizDelta = trackAdaptiveViz
     ? trackVizProfile.settingsDelta
     : ZERO_VIZ_DELTA;
-  const effectiveVizConfig = {
-    separation: clamp(
-      vizConfig.separation + effectiveVizDelta.separation,
-      0,
-      0.5,
-    ),
-    glow: clamp(vizConfig.glow + effectiveVizDelta.glow, 0, 15),
-    scale: clamp(vizConfig.scale + effectiveVizDelta.scale, 0.2, 3),
-    persistence: clamp(
-      vizConfig.persistence + effectiveVizDelta.persistence,
-      0,
-      2,
-    ),
-    octaves: clamp(vizConfig.octaves + effectiveVizDelta.octaves, 1, 5),
-  };
+  const effectiveVizConfig = useMemo(
+    () => ({
+      separation: clamp(
+        vizConfig.separation + effectiveVizDelta.separation,
+        0,
+        0.5,
+      ),
+      glow: clamp(vizConfig.glow + effectiveVizDelta.glow, 0, 15),
+      scale: clamp(vizConfig.scale + effectiveVizDelta.scale, 0.2, 3),
+      persistence: clamp(
+        vizConfig.persistence + effectiveVizDelta.persistence,
+        0,
+        2,
+      ),
+      octaves: clamp(vizConfig.octaves + effectiveVizDelta.octaves, 1, 5),
+    }),
+    [effectiveVizDelta, vizConfig],
+  );
 
   useVisualizerPalette({
     vizRef,
