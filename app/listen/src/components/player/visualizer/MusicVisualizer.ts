@@ -1,4 +1,4 @@
-import { vec3, vec4 } from "gl-matrix";
+import { vec3 } from "gl-matrix";
 import { type VisualizerMode } from "@/lib/player-visualizer-prefs";
 import {
   DEFAULT_VISUALIZER_COLORS,
@@ -8,23 +8,11 @@ import {
   type AudioMetrics,
   VisualizerAudioAnalyzer,
 } from "./visualizer-audio-analyzer";
+import { renderVisualizerSpheres } from "./visualizer-spheres-renderer";
 import { VisualizerWebGLResources } from "./visualizer-webgl-resources";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
-}
-
-function mixColor(
-  a: [number, number, number],
-  b: [number, number, number],
-  t: number,
-): [number, number, number] {
-  const mix = clamp(t, 0, 1);
-  return [
-    a[0] + (b[0] - a[0]) * mix,
-    a[1] + (b[1] - a[1]) * mix,
-    a[2] + (b[2] - a[2]) * mix,
-  ];
 }
 
 function lerp(a: number, b: number, t: number) {
@@ -288,133 +276,30 @@ export class MusicVisualizer {
     this.resources.camera.update();
   }
 
-  private renderSpheresScene(metrics: AudioMetrics) {
-    this.resources.line.setTime(this.time);
-    this.resources.line.setAudio(metrics.freqAvg, metrics.timeAvg);
-
-    const beat = metrics.beat * this.renderedBeatResponse;
-    const sectionWave =
-      0.5 +
-      0.5 *
-        Math.sin(
-          this.time * 0.0014 * this.renderedSectionRate +
-            this.renderedOrbitPhase * 0.35,
-        );
-    const sectionLift = (sectionWave - 0.5) * 2 * this.renderedSectionDepth;
-    const arrival = this.audioAnalyzer.arrivalAccentPulse;
-    const pulseLow =
-      (metrics.low * this.renderedLowBandWeight + beat * 0.5) *
-      this.renderedPulseGain;
-    const pulseMid =
-      (metrics.mid * this.renderedMidBandWeight +
-        beat * 0.22 +
-        metrics.transient * 0.35) *
-      this.renderedPulseGain;
-    const pulseHigh =
-      (metrics.high * this.renderedHighBandWeight + metrics.transient * 0.28) *
-      this.renderedPulseGain;
-    const turbulence =
-      this.renderedTurbulence + sectionLift * 0.18 + arrival * 0.16;
-    const shellGap =
-      this.renderedSeparation *
-      clamp(
-        1.22 -
-          (this.renderedShellDensity - 1) * 0.7 +
-          sectionLift * 0.18 +
-          arrival * 0.12,
-        0.7,
-        1.4,
-      );
-    const coreDetail =
-      3 +
-      this.renderedOctaves +
-      beat * 0.3 +
-      this.renderedShellDensity * 0.2 +
-      sectionLift * 0.2 +
-      arrival * 0.35;
-    const midDetail =
-      1 +
-      this.renderedOctaves +
-      this.renderedShellDensity * 0.15 +
-      sectionLift * 0.15 +
-      arrival * 0.18;
-    const outerDetail =
-      2 +
-      this.renderedOctaves +
-      metrics.transient * 0.4 +
-      this.renderedShellDensity * 0.1 +
-      sectionLift * 0.1 +
-      arrival * 0.22;
-    const colorLift = clamp(arrival * 0.18 + beat * 0.05, 0, 0.24);
-    const color1 = mixColor(this.renderedColor1, [1, 1, 1], colorLift);
-    const color2 = mixColor(this.renderedColor2, [1, 1, 1], colorLift * 0.85);
-    const color3 = mixColor(this.renderedColor3, [1, 1, 1], colorLift * 0.72);
-
-    let scaleVal =
-      (1.16 +
-        pulseLow * 0.3 +
-        beat * 0.11 +
-        this.renderedCameraDepth * 0.08 +
-        sectionLift * 0.08 +
-        arrival * 0.1) *
-      this.viewportScaleCompensation;
-    this.resources.line.setNoise(
-      this.renderedScale *
-        2.0 *
-        turbulence *
-        (0.92 + this.renderedShellDensity * 0.08),
-      this.renderedPersistence * (0.48 + sectionWave * 0.04),
-      coreDetail,
-      0.005 * turbulence + this.renderedOrbitPhase * 0.001,
-    );
-    this.resources.line.setGeometryColor(
-      vec4.fromValues(color1[0], color1[1], color1[2], 1.0),
-    );
-    this.resources.renderer.render(
-      this.resources.camera,
-      this.resources.line,
-      [this.resources.sphere3],
-      scaleVal,
-    );
-
-    scaleVal += shellGap + pulseMid * 0.1;
-    this.resources.line.setNoise(
-      this.renderedScale * turbulence,
-      this.renderedPersistence * (0.18 + beat * 0.06 + sectionWave * 0.02),
-      midDetail,
-      -0.01 * turbulence + this.renderedOrbitPhase * 0.0006,
-    );
-    this.resources.line.setGeometryColor(
-      vec4.fromValues(color2[0], color2[1], color2[2], 1.0),
-    );
-    this.resources.renderer.render(
-      this.resources.camera,
-      this.resources.line,
-      [this.resources.sphere2],
-      scaleVal,
-    );
-
-    scaleVal += shellGap + pulseHigh * 0.08;
-    this.resources.line.setNoise(
-      this.renderedScale * (0.92 + turbulence * 0.08 + beat * 0.04),
-      this.renderedPersistence *
-        (0.94 + metrics.transient * 0.12 + sectionLift * 0.05),
-      outerDetail,
-      0.01 * turbulence - this.renderedOrbitPhase * 0.0008,
-    );
-    this.resources.line.setGeometryColor(
-      vec4.fromValues(color3[0], color3[1], color3[2], 1.0),
-    );
-    this.resources.renderer.render(
-      this.resources.camera,
-      this.resources.line,
-      [this.resources.sphere1],
-      scaleVal,
-    );
-  }
-
   private renderScene(metrics: AudioMetrics) {
-    this.renderSpheresScene(metrics);
+    renderVisualizerSpheres(this.resources, metrics, {
+      time: this.time,
+      separation: this.renderedSeparation,
+      scale: this.renderedScale,
+      persistence: this.renderedPersistence,
+      octaves: this.renderedOctaves,
+      pulseGain: this.renderedPulseGain,
+      turbulence: this.renderedTurbulence,
+      orbitPhase: this.renderedOrbitPhase,
+      shellDensity: this.renderedShellDensity,
+      beatResponse: this.renderedBeatResponse,
+      sectionRate: this.renderedSectionRate,
+      sectionDepth: this.renderedSectionDepth,
+      lowBandWeight: this.renderedLowBandWeight,
+      midBandWeight: this.renderedMidBandWeight,
+      highBandWeight: this.renderedHighBandWeight,
+      cameraDepth: this.renderedCameraDepth,
+      viewportScaleCompensation: this.viewportScaleCompensation,
+      arrivalAccentPulse: this.audioAnalyzer.arrivalAccentPulse,
+      color1: this.renderedColor1,
+      color2: this.renderedColor2,
+      color3: this.renderedColor3,
+    });
   }
 
   setSize(w: number, h: number) {
