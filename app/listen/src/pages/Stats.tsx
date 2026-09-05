@@ -13,8 +13,8 @@ import {
 import {
   StatsAnalyticsSection,
   StatsCollectionsSection,
-  StatsStorySection,
 } from "./StatsSections";
+import { StatsStorySection } from "./StatsStorySections";
 import { StatsHeroSection } from "./StatsHeroSections";
 import { WindowPicker } from "@/components/stats/StatsPanels";
 
