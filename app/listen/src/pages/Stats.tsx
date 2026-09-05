@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,29 +12,28 @@ import {
   Search,
   Users,
 } from "@crate/ui/icons";
-import { Link, useLocation, useParams, useSearchParams } from "react-router";
+import { Link } from "react-router";
 
+import {
+  useStatsPageController,
+  type StatsPageController,
+} from "@/pages/use-stats-page-controller";
+import type { SoundProfile } from "@/pages/stats-page-model";
 import { WindowPicker } from "@/components/stats/StatsPanels";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import {
-  buildRecapHighlights,
   formatStatsMinutes,
   formatStatsPercent,
-  toPlayerTrack,
   type ReplayMix,
   type StatsAlbum,
   type StatsAffinity,
   type StatsArtist,
-  type StatsDashboard,
   type StatsGenre,
   type StatsStory,
   type StatsStoryArtistSignal,
   type StatsTrack,
   type StatsTrendPoint,
-  type StatsWindow,
 } from "@/components/stats/stats-model";
-import { usePlayerActions } from "@/contexts/PlayerContext";
-import { useApi } from "@/hooks/use-api";
 import {
   albumCoverApiUrl,
   albumPagePath,
@@ -43,365 +41,278 @@ import {
   artistPagePath,
 } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
-
-const WINDOW_COPY_KEYS: Record<StatsWindow, { title: string; label: string }> =
-  {
-    "7d": { title: "stats.window.7d", label: "stats.window.week" },
-    "30d": { title: "stats.window.30d", label: "stats.window.month" },
-    "90d": { title: "stats.window.90d", label: "stats.window.season" },
-    "365d": { title: "stats.window.365d", label: "stats.window.year" },
-    all_time: { title: "stats.window.allTime", label: "stats.window.archive" },
-  };
-
-const STATS_WINDOWS: StatsWindow[] = ["7d", "30d", "90d", "365d", "all_time"];
 const NARRATIVE_TONES = [
   "stats-narrative-tone-cool",
   "stats-narrative-tone-warm",
   "stats-narrative-tone-alert",
 ];
 
-function normalizeWindowParam(value: string | null): StatsWindow {
-  return STATS_WINDOWS.includes(value as StatsWindow)
-    ? (value as StatsWindow)
-    : "30d";
-}
-
-function normalizeMonthParam(value: string | null): string | null {
-  return value && /^\d{4}-\d{2}$/.test(value) ? value : null;
-}
-
-function formatMonthTitle(month: string, locale: string): string {
-  const date = new Date(`${month}-01T12:00:00`);
-  if (Number.isNaN(date.getTime())) return month;
-  return date.toLocaleDateString(locale, {
-    month: "long",
-    year: "numeric",
-  });
-}
-
 export function Stats() {
-  const { t, i18n } = useTranslation();
-  const location = useLocation();
-  const { username } = useParams<{ username: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const isGlobalStats = location.pathname === "/stats/global";
-  const isUserStats = Boolean(username);
-  const selectedMonth = normalizeMonthParam(searchParams.get("month"));
-  const selectedWindow = selectedMonth
-    ? "30d"
-    : normalizeWindowParam(searchParams.get("window"));
-  const statsPeriodQuery = selectedMonth
-    ? `month=${selectedMonth}`
-    : `window=${selectedWindow}`;
-  const windowCopy = useMemo(
-    () =>
-      Object.fromEntries(
-        STATS_WINDOWS.map((window) => {
-          const copy = WINDOW_COPY_KEYS[window];
-          return [
-            window,
-            { title: t(copy.title), label: t(copy.label) },
-          ] as const;
-        }),
-      ) as Record<StatsWindow, { title: string; label: string }>,
-    [t],
-  );
-  const period = selectedMonth
-    ? {
-        title: formatMonthTitle(selectedMonth, i18n.language),
-        label: t("stats.window.month"),
-      }
-    : windowCopy[selectedWindow];
+  const page = useStatsPageController();
+  return <StatsPageContent page={page} />;
+}
 
-  const { play, playAll } = usePlayerActions();
-  const statsEndpoint = isGlobalStats
-    ? "/api/stats/dashboard"
-    : username
-      ? `/api/users/${encodeURIComponent(username)}/stats/dashboard`
-      : "/api/me/stats/dashboard";
-  const { data: dashboard, loading: dashboardLoading } = useApi<StatsDashboard>(
-    `${statsEndpoint}?${statsPeriodQuery}&tracks_limit=12&artists_limit=10&albums_limit=12&genres_limit=10&replay_limit=36`,
-  );
-
-  const overview = dashboard?.overview;
-  const trends = dashboard?.trends;
-  const topTrackItems = dashboard?.top_tracks.items ?? [];
-  const topArtistItems = dashboard?.top_artists.items ?? [];
-  const topAlbumItems = dashboard?.top_albums.items ?? [];
-  const topGenreItems = dashboard?.top_genres.items ?? [];
-  const replay = dashboard?.replay as ReplayMix | undefined;
-  const story = dashboard?.story;
-  const replayItems = replay?.items ?? [];
-  const changeWindow = (window: StatsWindow) => {
-    setSearchParams({ window });
-  };
-
-  const recapHighlights = useMemo(
-    () =>
-      buildRecapHighlights(
-        overview ?? undefined,
-        replay ?? undefined,
-        topArtistItems,
-        topTrackItems,
-        t,
-      ),
-    [overview, replay, topArtistItems, topTrackItems, t],
-  );
-
-  const soundProfile = useMemo(
-    () =>
-      story?.audio_profile
-        ? {
-            energy: story.audio_profile.energy,
-            danceability: story.audio_profile.danceability,
-            valence: story.audio_profile.valence,
-            bpm: story.audio_profile.bpm ?? null,
-          }
-        : buildSoundProfile(topTrackItems),
-    [story?.audio_profile, topTrackItems],
-  );
-
-  const coverTracks = replayItems.length ? replayItems : topTrackItems;
-  const leadTrack = topTrackItems[0];
-  const leadArtist = topArtistItems[0];
-  const leadGenre = topGenreItems[0];
-  const topMover = story?.movers[0];
-  const topDiscovery = story?.discoveries[0];
-  const topComeback = story?.comebacks[0];
-  const hasStats = Boolean(overview?.play_count);
-  const subjectName =
-    dashboard?.subject?.display_name ||
-    dashboard?.subject?.username ||
-    username ||
-    null;
-  const heroTitle = isGlobalStats
-    ? t("stats.hero.globalTitle")
-    : isUserStats && subjectName
-      ? t("stats.hero.userTitle", { name: subjectName })
-      : t("stats.hero.yourTitle");
-  const heroBody = isGlobalStats
-    ? t("stats.hero.globalBody")
-    : isUserStats
-      ? t("stats.hero.userBody")
-      : t("stats.hero.yourBody");
-
-  const playTopTrack = (item: StatsTrack) => {
-    const track = toPlayerTrack(item);
-    play(track, {
-      type: "track",
-      name: item.title,
-      id: item.track_id ?? item.track_path,
-    });
-  };
-
-  const playReplay = () => {
-    if (!replayItems.length) return;
-    playAll(replayItems.map(toPlayerTrack), 0, {
-      type: "playlist",
-      name: replay?.title || t("stats.replay.title"),
-    });
-  };
+function StatsPageContent({ page }: { page: StatsPageController }) {
+  const {
+    dashboard,
+    dashboardLoading,
+    hasStats,
+    recapHighlights,
+    story,
+    subjectName,
+    topComeback,
+    topDiscovery,
+    topMover,
+  } = page;
 
   return (
     <div className="relative -mx-4 -mt-2 overflow-hidden px-4 pb-12 pt-3 sm:-mx-6 sm:px-6">
       <div className="stats-page-atmosphere pointer-events-none absolute inset-0 -z-10" />
       <div className="stats-page-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] opacity-30" />
-
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="stats-hero-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em]">
-            <BarChart3 size={12} />
-            {t("stats.hero.badge")}
-          </div>
-          <h1 className="stats-hero-title mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em]">
-            {heroTitle}
-            <span className="stats-hero-title-accent block">
-              {t("stats.hero.decoded")}
-            </span>
-          </h1>
-          <p className="stats-hero-body mt-4 max-w-2xl text-sm leading-6 sm:text-base">
-            {heroBody}
-          </p>
-        </div>
-        <div className="flex flex-col items-start gap-3 lg:items-end">
-          <div className="flex flex-wrap gap-2">
-            {!isUserStats ? (
-              <>
-                <ScopeLink active={!isGlobalStats} to="/stats">
-                  {t("stats.scope.yourDna")}
-                </ScopeLink>
-                <ScopeLink active={isGlobalStats} to="/stats/global">
-                  {t("stats.scope.cratePulse")}
-                </ScopeLink>
-              </>
-            ) : username ? (
-              <ScopeLink active={false} to={`/users/${username}`}>
-                {t("stats.scope.backToProfile")}
-              </ScopeLink>
-            ) : null}
-          </div>
-          <WindowPicker
-            value={selectedMonth ? null : selectedWindow}
-            onChange={changeWindow}
-          />
-        </div>
-      </div>
-
-      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-        <div className="stats-hero-surface relative min-h-[520px] overflow-hidden rounded-[12px] p-5 sm:p-7">
-          <StatsCoverMosaic tracks={coverTracks} />
-          <div className="stats-hero-overlay absolute inset-0" />
-          <div className="relative z-10 flex min-h-[460px] flex-col justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="stats-hero-period-muted rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
-                {period.label}
-              </span>
-              <span className="stats-hero-period-accent rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
-                {period.title}
-              </span>
-            </div>
-
-            <div>
-              <div className="stats-hero-title max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-[-0.1em]">
-                {leadGenre?.genre_name || leadArtist?.artist_name || "Crate"}
-              </div>
-              <div className="mt-5 grid max-w-3xl gap-3 sm:grid-cols-3">
-                <HeroMetric
-                  label={t("stats.metrics.minutes")}
-                  value={formatStatsMinutes(overview?.minutes_listened ?? 0)}
-                />
-                <HeroMetric
-                  label={t("stats.metrics.plays")}
-                  value={
-                    overview?.play_count ? String(overview.play_count) : "0"
-                  }
-                />
-                <HeroMetric
-                  label={t("stats.metrics.activeDays")}
-                  value={
-                    overview?.active_days ? String(overview.active_days) : "0"
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <aside className="grid gap-4">
-          <ReplayCard
-            replay={replay}
-            items={replayItems}
-            loading={dashboardLoading}
-            onPlay={playReplay}
-            onPlayTrack={playTopTrack}
-          />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <SignalCard
-              icon={Flame}
-              label={t("stats.signals.obsession")}
-              title={leadTrack?.title || t("stats.signals.noDominantTrack")}
-              body={
-                leadTrack
-                  ? t("stats.signals.dominantTrackBody", {
-                      artist: leadTrack.artist,
-                      count: leadTrack.play_count,
-                    })
-                  : t("stats.signals.noDominantTrackBody")
-              }
-            />
-            <SignalCard
-              icon={Search}
-              label={
-                topDiscovery
-                  ? t("stats.signals.discovery")
-                  : t("stats.signals.gravity")
-              }
-              title={
-                topDiscovery?.artist_name ||
-                leadArtist?.artist_name ||
-                t("stats.signals.noLeadingArtist")
-              }
-              body={
-                topDiscovery
-                  ? t("stats.signals.discoveryBody", {
-                      count: topDiscovery.play_count,
-                    })
-                  : leadArtist
-                    ? t("stats.signals.gravityBody", {
-                        minutes: formatStatsMinutes(
-                          leadArtist.minutes_listened,
-                        ),
-                        count: leadArtist.play_count,
-                      })
-                    : t("stats.signals.noLeadingArtistBody")
-              }
-            />
-          </div>
-        </aside>
-      </section>
-
-      <section className="mt-5 grid gap-4 lg:grid-cols-3">
-        {recapHighlights.length > 0 ? (
-          recapHighlights.map((item, index) => (
-            <NarrativeTile key={item.title} index={index} {...item} />
-          ))
-        ) : (
-          <div className="stats-card-empty rounded-[12px] border-dashed p-6 text-sm lg:col-span-3">
-            {t("stats.empty.recap")}
-          </div>
-        )}
-      </section>
-
+      <StatsHeader page={page} />
+      <StatsHeroSection page={page} />
+      <StatsRecapSection highlights={recapHighlights} t={page.t} />
       <StatsStorySection
         story={story}
         fallbackMover={topMover}
         fallbackDiscovery={topDiscovery}
         fallbackComeback={topComeback}
       />
-
       <AffinityCard
         affinity={dashboard?.viewer_affinity}
         subject={subjectName}
       />
-
-      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <SoundProfileCard
-          profile={soundProfile}
-          genres={topGenreItems}
-          skipRate={overview?.skip_rate ?? 0}
-        />
-        <ListeningPulseCard
-          story={story}
-          points={trends?.points ?? []}
-          loading={dashboardLoading}
-        />
-      </section>
-
-      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <TopTracksPanel
-          items={topTrackItems}
-          loading={dashboardLoading}
-          onPlayTrack={playTopTrack}
-        />
-        <TopArtistsPanel items={topArtistItems} loading={dashboardLoading} />
-      </section>
-
-      <TopAlbumsPanel items={topAlbumItems} loading={dashboardLoading} />
-
-      {!dashboardLoading && !hasStats ? (
-        <div className="stats-card-empty mt-8 rounded-[12px] border-dashed p-8 text-center">
-          <h2 className="text-xl font-black text-text-primary">
-            {t("stats.empty.title")}
-          </h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-text-muted">
-            {t("stats.empty.body")}
-          </p>
-        </div>
-      ) : null}
+      <StatsAnalyticsSection page={page} />
+      <StatsCollectionsSection page={page} />
+      {!dashboardLoading && !hasStats ? <StatsEmptyState t={page.t} /> : null}
     </div>
   );
 }
 
+function StatsHeader({ page }: { page: StatsPageController }) {
+  const { t, heroBody, heroTitle, isGlobalStats, isUserStats, username } = page;
+
+  return (
+    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <div className="stats-hero-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em]">
+          <BarChart3 size={12} />
+          {t("stats.hero.badge")}
+        </div>
+        <h1 className="stats-hero-title mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em]">
+          {heroTitle}
+          <span className="stats-hero-title-accent block">
+            {t("stats.hero.decoded")}
+          </span>
+        </h1>
+        <p className="stats-hero-body mt-4 max-w-2xl text-sm leading-6 sm:text-base">
+          {heroBody}
+        </p>
+      </div>
+      <div className="flex flex-col items-start gap-3 lg:items-end">
+        <div className="flex flex-wrap gap-2">
+          {!isUserStats ? (
+            <>
+              <ScopeLink active={!isGlobalStats} to="/stats">
+                {t("stats.scope.yourDna")}
+              </ScopeLink>
+              <ScopeLink active={isGlobalStats} to="/stats/global">
+                {t("stats.scope.cratePulse")}
+              </ScopeLink>
+            </>
+          ) : username ? (
+            <ScopeLink active={false} to={"/users/" + username}>
+              {t("stats.scope.backToProfile")}
+            </ScopeLink>
+          ) : null}
+        </div>
+        <WindowPicker
+          value={page.selectedMonth ? null : page.selectedWindow}
+          onChange={page.changeWindow}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StatsHeroSection({ page }: { page: StatsPageController }) {
+  return (
+    <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+      <StatsHeroCover page={page} />
+      <aside className="grid gap-4">
+        <ReplayCard
+          replay={page.replay}
+          items={page.replayItems}
+          loading={page.dashboardLoading}
+          onPlay={page.playReplay}
+          onPlayTrack={page.playTopTrack}
+        />
+        <StatsSignalCards page={page} />
+      </aside>
+    </section>
+  );
+}
+
+function StatsHeroCover({ page }: { page: StatsPageController }) {
+  const { leadArtist, leadGenre, overview, period, t } = page;
+
+  return (
+    <div className="stats-hero-surface relative min-h-[520px] overflow-hidden rounded-[12px] p-5 sm:p-7">
+      <StatsCoverMosaic tracks={page.coverTracks} />
+      <div className="stats-hero-overlay absolute inset-0" />
+      <div className="relative z-10 flex min-h-[460px] flex-col justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="stats-hero-period-muted rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
+            {period.label}
+          </span>
+          <span className="stats-hero-period-accent rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em]">
+            {period.title}
+          </span>
+        </div>
+        <div>
+          <div className="stats-hero-title max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-[-0.1em]">
+            {leadGenre?.genre_name || leadArtist?.artist_name || "Crate"}
+          </div>
+          <div className="mt-5 grid max-w-3xl gap-3 sm:grid-cols-3">
+            <HeroMetric
+              label={t("stats.metrics.minutes")}
+              value={formatStatsMinutes(overview?.minutes_listened ?? 0)}
+            />
+            <HeroMetric
+              label={t("stats.metrics.plays")}
+              value={overview?.play_count ? String(overview.play_count) : "0"}
+            />
+            <HeroMetric
+              label={t("stats.metrics.activeDays")}
+              value={overview?.active_days ? String(overview.active_days) : "0"}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatsSignalCards({ page }: { page: StatsPageController }) {
+  const { leadArtist, leadTrack, t, topDiscovery } = page;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+      <SignalCard
+        icon={Flame}
+        label={t("stats.signals.obsession")}
+        title={leadTrack?.title || t("stats.signals.noDominantTrack")}
+        body={
+          leadTrack
+            ? t("stats.signals.dominantTrackBody", {
+                artist: leadTrack.artist,
+                count: leadTrack.play_count,
+              })
+            : t("stats.signals.noDominantTrackBody")
+        }
+      />
+      <SignalCard
+        icon={Search}
+        label={
+          topDiscovery
+            ? t("stats.signals.discovery")
+            : t("stats.signals.gravity")
+        }
+        title={
+          topDiscovery?.artist_name ||
+          leadArtist?.artist_name ||
+          t("stats.signals.noLeadingArtist")
+        }
+        body={
+          topDiscovery
+            ? t("stats.signals.discoveryBody", {
+                count: topDiscovery.play_count,
+              })
+            : leadArtist
+              ? t("stats.signals.gravityBody", {
+                  minutes: formatStatsMinutes(leadArtist.minutes_listened),
+                  count: leadArtist.play_count,
+                })
+              : t("stats.signals.noLeadingArtistBody")
+        }
+      />
+    </div>
+  );
+}
+
+function StatsRecapSection({
+  highlights,
+  t,
+}: {
+  highlights: StatsPageController["recapHighlights"];
+  t: StatsPageController["t"];
+}) {
+  return (
+    <section className="mt-5 grid gap-4 lg:grid-cols-3">
+      {highlights.length > 0 ? (
+        highlights.map((item, index) => (
+          <NarrativeTile key={item.title} index={index} {...item} />
+        ))
+      ) : (
+        <div className="stats-card-empty rounded-[12px] border-dashed p-6 text-sm lg:col-span-3">
+          {t("stats.empty.recap")}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StatsAnalyticsSection({ page }: { page: StatsPageController }) {
+  return (
+    <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <SoundProfileCard
+        profile={page.soundProfile}
+        genres={page.topGenreItems}
+        skipRate={page.overview?.skip_rate ?? 0}
+      />
+      <ListeningPulseCard
+        story={page.story}
+        points={page.trends?.points ?? []}
+        loading={page.dashboardLoading}
+      />
+    </section>
+  );
+}
+
+function StatsCollectionsSection({ page }: { page: StatsPageController }) {
+  return (
+    <>
+      <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <TopTracksPanel
+          items={page.topTrackItems}
+          loading={page.dashboardLoading}
+          onPlayTrack={page.playTopTrack}
+        />
+        <TopArtistsPanel
+          items={page.topArtistItems}
+          loading={page.dashboardLoading}
+        />
+      </section>
+      <TopAlbumsPanel
+        items={page.topAlbumItems}
+        loading={page.dashboardLoading}
+      />
+    </>
+  );
+}
+
+function StatsEmptyState({ t }: { t: StatsPageController["t"] }) {
+  return (
+    <div className="stats-card-empty mt-8 rounded-[12px] border-dashed p-8 text-center">
+      <h2 className="text-xl font-black text-text-primary">
+        {t("stats.empty.title")}
+      </h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-text-muted">
+        {t("stats.empty.body")}
+      </p>
+    </div>
+  );
+}
 function ScopeLink({
   active,
   to,
@@ -1543,36 +1454,4 @@ function PanelEmpty({ text }: { text: string }) {
       {text}
     </div>
   );
-}
-
-interface SoundProfile {
-  energy: number;
-  danceability: number;
-  valence: number;
-  bpm: number | null;
-}
-
-function buildSoundProfile(items: StatsTrack[]): SoundProfile {
-  const average = (field: "energy" | "danceability" | "valence") => {
-    const values = items
-      .map((item) => item[field])
-      .filter((value): value is number => typeof value === "number");
-    if (!values.length) return 0;
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  };
-
-  const bpmValues = items
-    .map((item) => item.bpm)
-    .filter((value): value is number => typeof value === "number" && value > 0);
-
-  return {
-    energy: average("energy"),
-    danceability: average("danceability"),
-    valence: average("valence"),
-    bpm: bpmValues.length
-      ? Math.round(
-          bpmValues.reduce((sum, value) => sum + value, 0) / bpmValues.length,
-        )
-      : null,
-  };
 }
