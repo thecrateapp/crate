@@ -1,30 +1,28 @@
 import {
-  Activity,
   Brain,
   CRATE_ICON_SIZE,
   RotateCcw,
   Save,
   SlidersHorizontal,
   Sparkles,
-  Sun,
   Tag,
   Trash2,
-  Volume2,
   X,
-  Zap,
 } from "@crate/ui/icons";
 import { useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import type { EqFeatures } from "@/hooks/use-eq-features";
 import { useEqualizer } from "@/hooks/use-equalizer";
-import type { TrackGenre } from "@/hooks/use-track-genre";
 import { type EqPresetName } from "@/lib/equalizer";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
-import { CratePill, CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
 import { EqualizerSmartReadout } from "@/components/player/EqualizerSmartReadout";
+import {
+  AdaptiveFeatureChips,
+  GenreResolutionChip,
+} from "@/components/player/EqualizerAdaptiveReadouts";
 
 const PRESET_LABELS: Record<EqPresetName, string> = {
   flat: "Flat",
@@ -51,247 +49,6 @@ const PRESET_LABELS: Record<EqPresetName, string> = {
   post_rock: "Post-Rock",
   lo_fi: "Indie / Lo-Fi",
 };
-
-/**
- * Labeled chip showing a single adaptive feature with its value and a
- * terse semantic classifier (dark/neutral/bright, compressed/moderate/
- * dynamic, etc.). Renders a subtle cyan accent when the value lands in
- * a zone where the adaptive heuristic actually acts on it.
- */
-function FeatureChip({
-  icon: Icon,
-  label,
-  value,
-  zone,
-}: {
-  icon: typeof Sun;
-  label: string;
-  value: string;
-  zone: "neutral" | "active";
-}) {
-  return (
-    <CrateChip
-      active={zone === "active"}
-      icon={Icon}
-      className="font-mono tabular-nums"
-    >
-      <span title={label}>{value}</span>
-    </CrateChip>
-  );
-}
-
-type AdaptiveFeatureChipData = {
-  key: string;
-  icon: typeof Sun;
-  label: string;
-  value: string;
-  zone: "neutral" | "active";
-};
-
-function getAdaptiveFeatureChipData(
-  features: EqFeatures,
-): AdaptiveFeatureChipData[] {
-  const chips: AdaptiveFeatureChipData[] = [];
-
-  if (typeof features.brightness === "number") {
-    const brightness = features.brightness;
-    const label =
-      brightness < 0.25
-        ? "dark"
-        : brightness < 0.4
-          ? "warm"
-          : brightness > 0.7
-            ? "sharp"
-            : brightness > 0.55
-              ? "bright"
-              : "neutral";
-    chips.push({
-      key: "brightness",
-      icon: Sun,
-      label: `Brightness: ${label}`,
-      value: `${Math.round(brightness * 100)}%`,
-      zone: brightness < 0.4 || brightness > 0.55 ? "active" : "neutral",
-    });
-  }
-
-  if (typeof features.loudness === "number") {
-    const loudness = features.loudness;
-    chips.push({
-      key: "loudness",
-      icon: Volume2,
-      label:
-        loudness > -10
-          ? "Hot master"
-          : loudness < -20
-            ? "Very quiet"
-            : "Standard level",
-      value: `${loudness.toFixed(1)} LUFS`,
-      zone: loudness > -10 || loudness < -20 ? "active" : "neutral",
-    });
-  }
-
-  if (typeof features.dynamicRange === "number") {
-    const dynamicRange = features.dynamicRange;
-    const label =
-      dynamicRange > 14
-        ? "preserved"
-        : dynamicRange < 6
-          ? "compressed"
-          : "moderate";
-    chips.push({
-      key: "dynamic",
-      icon: Activity,
-      label: `Dynamic range: ${label}`,
-      value: `${dynamicRange.toFixed(1)} dB`,
-      zone: dynamicRange > 14 || dynamicRange < 6 ? "active" : "neutral",
-    });
-  }
-
-  if (typeof features.energy === "number") {
-    const energy = features.energy;
-    chips.push({
-      key: "energy",
-      icon: Zap,
-      label:
-        energy > 0.7
-          ? "High energy"
-          : energy < 0.3
-            ? "Low energy"
-            : "Moderate energy",
-      value: `${Math.round(energy * 100)}%`,
-      zone: energy > 0.7 || energy < 0.3 ? "active" : "neutral",
-    });
-  }
-
-  return chips;
-}
-
-function AdaptiveFeatureChips({
-  features,
-  status,
-}: {
-  features: EqFeatures | null;
-  status: "idle" | "loading" | "ready" | "unavailable";
-}) {
-  const { t } = useTranslation();
-  if (status === "loading") {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
-        {t("player.equalizer.adaptive.loading")}
-      </div>
-    );
-  }
-  if (status === "unavailable" || !features) {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
-        {t("player.equalizer.adaptive.unavailable")}
-      </div>
-    );
-  }
-
-  const chips = getAdaptiveFeatureChipData(features);
-  if (chips.length === 0) {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
-        {t("player.equalizer.adaptive.empty")}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[9px] uppercase tracking-wider text-text-subtle">
-        {t("player.equalizer.track")}
-      </span>
-      {chips.map(({ key, ...chip }) => (
-        <FeatureChip key={key} {...chip} />
-      ))}
-    </div>
-  );
-}
-
-/**
- * Readout for the genre-adaptive mode. Shows what genre the track
- * reports + how the backend resolved its EQ preset (direct hit vs
- * inherited from an ancestor vs nothing). Keeps the behavior
- * transparent so it doesn't feel like a black box when the curve
- * suddenly changes mid-track.
- */
-function GenreResolutionChip({
-  genre,
-  status,
-}: {
-  genre: TrackGenre | null;
-  status: "idle" | "loading" | "ready" | "unavailable";
-}) {
-  const { t } = useTranslation();
-  if (status === "loading") {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
-        {t("player.equalizer.genre.loading")}
-      </div>
-    );
-  }
-  if (status === "unavailable" || !genre?.primary) {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-muted">
-        {t("player.equalizer.genre.unavailable")}
-      </div>
-    );
-  }
-
-  const primaryName = genre.primary.name;
-  const canonical = genre.primary.canonical;
-  const preset = genre.preset;
-
-  if (!canonical) {
-    return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
-        <Tag size={10} className="opacity-70" />
-        <span className="font-medium capitalize text-text-primary/80">
-          {primaryName}
-        </span>
-        <span className="opacity-50">
-          {t("player.equalizer.genre.unmapped")}
-        </span>
-      </div>
-    );
-  }
-
-  if (!preset) {
-    return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-[10px] text-text-secondary">
-        <Tag size={10} className="opacity-70" />
-        <span className="font-medium capitalize text-text-primary/80">
-          {primaryName}
-        </span>
-        <span className="opacity-50">
-          {t("player.equalizer.genre.noPreset")}
-        </span>
-      </div>
-    );
-  }
-
-  const isInherited = preset.source === "inherited";
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-accent-action/30 bg-accent-action/10 px-2.5 py-1.5 text-[10px] text-accent-action">
-      <Tag size={10} />
-      <span className="font-medium capitalize">{primaryName}</span>
-      <span className="opacity-70">
-        {isInherited
-          ? t("player.equalizer.genre.inherited")
-          : t("player.equalizer.genre.preset")}
-      </span>
-      {isInherited && preset.inheritedFrom ? (
-        <span className="font-medium capitalize opacity-80">
-          {t("player.equalizer.genre.from", {
-            name: preset.inheritedFrom.name,
-          })}
-        </span>
-      ) : null}
-    </div>
-  );
-}
 
 interface EqualizerPanelProps {
   /** Shown as a header action — optional, typically the close button. */
