@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useReducer } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Loader2,
@@ -57,6 +57,76 @@ interface SearchResult {
   value: string;
   label: string;
   imageUrl?: string;
+}
+
+type RadioState = {
+  discoveryAvailable: boolean;
+  starting: boolean;
+  activeSession: string | null;
+  activeMode: "seeded" | "discovery" | null;
+  seedLabel: string;
+  query: string;
+  results: SearchResult[];
+  searching: boolean;
+};
+
+type RadioAction =
+  | { type: "set-discovery-available"; value: boolean }
+  | { type: "start-request" }
+  | { type: "start-failed" }
+  | {
+      type: "radio-started";
+      sessionId: string;
+      mode: "seeded" | "discovery";
+      seedLabel: string;
+    }
+  | { type: "set-query"; value: string }
+  | { type: "search-started" }
+  | { type: "search-cleared" }
+  | { type: "search-succeeded"; value: SearchResult[] }
+  | { type: "search-failed" }
+  | { type: "search-finished" };
+
+const initialRadioState: RadioState = {
+  discoveryAvailable: false,
+  starting: false,
+  activeSession: null,
+  activeMode: null,
+  seedLabel: "",
+  query: "",
+  results: [],
+  searching: false,
+};
+
+function radioReducer(state: RadioState, action: RadioAction): RadioState {
+  switch (action.type) {
+    case "set-discovery-available":
+      return { ...state, discoveryAvailable: action.value };
+    case "start-request":
+      return { ...state, starting: true };
+    case "start-failed":
+      return { ...state, starting: false };
+    case "radio-started":
+      return {
+        ...state,
+        starting: false,
+        activeSession: action.sessionId,
+        activeMode: action.mode,
+        seedLabel: action.seedLabel,
+      };
+    case "set-query":
+      return { ...state, query: action.value };
+    case "search-started":
+      return { ...state, searching: true };
+    case "search-cleared":
+      return { ...state, results: [], searching: false };
+    case "search-succeeded":
+      return { ...state, results: action.value, searching: false };
+    case "search-failed":
+      return { ...state, results: [], searching: false };
+    case "search-finished":
+      return { ...state, searching: false };
+  }
 }
 
 function stationTypeLabelKey(station: PersonalizedRadioStation): string {
@@ -204,21 +274,22 @@ export function RadioPage() {
     loading: stationsLoading,
     error: stationsError,
   } = useApi<PersonalizedRadioStationsResponse>("/api/radio/stations");
-  const [discoveryAvailable, setDiscoveryAvailable] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [activeSession, setActiveSession] = useState<string | null>(null);
-  const [activeMode, setActiveMode] = useState<"seeded" | "discovery" | null>(
-    null,
-  );
-  const [seedLabel, setSeedLabel] = useState("");
-
-  // Seed picker state
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [state, dispatch] = useReducer(radioReducer, initialRadioState);
+  const {
+    discoveryAvailable,
+    starting,
+    activeSession,
+    activeMode,
+    seedLabel,
+    query,
+    results,
+    searching,
+  } = state;
 
   useEffect(() => {
-    checkDiscoveryAvailable().then(setDiscoveryAvailable);
+    checkDiscoveryAvailable().then((available) => {
+      dispatch({ type: "set-discovery-available", value: available });
+    });
   }, []);
 
   const artistStations = stationGroups?.artist_stations ?? [];
@@ -226,10 +297,10 @@ export function RadioPage() {
 
   const search = useCallback(async (q: string) => {
     if (q.length < 2) {
-      setResults([]);
+      dispatch({ type: "search-cleared" });
       return;
     }
-    setSearching(true);
+    dispatch({ type: "search-started" });
     try {
       const [searchData, genresData] = await Promise.all([
         api<{
@@ -291,16 +362,16 @@ export function RadioPage() {
           ),
         });
       }
-      setResults(items);
+      dispatch({ type: "search-succeeded", value: items });
     } catch {
-      setResults([]);
+      dispatch({ type: "search-failed" });
     } finally {
-      setSearching(false);
+      dispatch({ type: "search-finished" });
     }
   }, []);
 
   const startStation = async (station: PersonalizedRadioStation) => {
-    setStarting(true);
+    dispatch({ type: "start-request" });
     const seedValue =
       station.seed_value ||
       station.genre_slug ||
@@ -312,46 +383,52 @@ export function RadioPage() {
     );
     if (!result) {
       toast.error(t("radio.toasts.startFailed"));
-      setStarting(false);
+      dispatch({ type: "start-failed" });
       return;
     }
-    setActiveSession(result.sessionId);
-    setActiveMode("seeded");
-    setSeedLabel(result.seedLabel || stationLabel(station));
+    dispatch({
+      type: "radio-started",
+      sessionId: result.sessionId,
+      mode: "seeded",
+      seedLabel: result.seedLabel || stationLabel(station),
+    });
     playAll(result.tracks, 0, result.source);
-    setStarting(false);
   };
 
   const startSeeded = async (seed: SearchResult) => {
-    setStarting(true);
-    setQuery("");
-    setResults([]);
+    dispatch({ type: "start-request" });
+    dispatch({ type: "set-query", value: "" });
+    dispatch({ type: "search-cleared" });
     const result = await startShapedRadio("seeded", seed.type, seed.value);
     if (!result) {
       toast.error(t("radio.toasts.startFailed"));
-      setStarting(false);
+      dispatch({ type: "start-failed" });
       return;
     }
-    setActiveSession(result.sessionId);
-    setActiveMode("seeded");
-    setSeedLabel(result.seedLabel);
+    dispatch({
+      type: "radio-started",
+      sessionId: result.sessionId,
+      mode: "seeded",
+      seedLabel: result.seedLabel,
+    });
     playAll(result.tracks, 0, result.source);
-    setStarting(false);
   };
 
   const startDiscovery = async () => {
-    setStarting(true);
+    dispatch({ type: "start-request" });
     const result = await startShapedRadio("discovery");
     if (!result) {
       toast.error(t("radio.toasts.discoveryUnavailable"));
-      setStarting(false);
+      dispatch({ type: "start-failed" });
       return;
     }
-    setActiveSession(result.sessionId);
-    setActiveMode("discovery");
-    setSeedLabel(t("radio.discovery"));
+    dispatch({
+      type: "radio-started",
+      sessionId: result.sessionId,
+      mode: "discovery",
+      seedLabel: t("radio.discovery"),
+    });
     playAll(result.tracks, 0, result.source);
-    setStarting(false);
   };
 
   return (
@@ -438,7 +515,7 @@ export function RadioPage() {
           type="text"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
+            dispatch({ type: "set-query", value: e.target.value });
             void search(e.target.value);
           }}
           placeholder={t("radio.seed.placeholder")}
