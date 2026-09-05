@@ -1,4 +1,4 @@
-import { readCanvasColorToken } from "../canvas-color";
+import { readCanvasColorToken } from "@/lib/canvas-color";
 import { WAVEFORM_COLOR_TOKENS } from "../visualizer-color-tokens";
 
 const MIN_DISPLAY_DB = -85;

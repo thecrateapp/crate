@@ -1,4 +1,4 @@
-import { readCanvasColorToken } from "../canvas-color";
+import { readCanvasColorToken } from "@/lib/canvas-color";
 
 export type VisualizerColorTriplet = [number, number, number];
 export type VisualizerColorPalette = [

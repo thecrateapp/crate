@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { readCanvasColorToken } from "./canvas-color";
+import { readCanvasColorToken } from "@/lib/canvas-color";
 
 describe("readCanvasColorToken", () => {
   afterEach(() => {

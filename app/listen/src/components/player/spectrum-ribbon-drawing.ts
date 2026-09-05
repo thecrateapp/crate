@@ -1,4 +1,4 @@
-import { readCanvasColorToken } from "./canvas-color";
+import { readCanvasColorToken } from "@/lib/canvas-color";
 import { SPECTRUM_RIBBON_COLOR_TOKENS } from "./visualizer-color-tokens";
 
 export interface SpectrumRibbonBands {

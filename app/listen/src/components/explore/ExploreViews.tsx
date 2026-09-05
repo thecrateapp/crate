@@ -200,7 +200,7 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
       {hasTracks ? (
         <div className="space-y-3">
           <h2 className="px-1 text-lg font-bold">{t("common.tracks")}</h2>
-          <div className="rounded-xl border border-border-quiet bg-text-primary/[0.02]">
+          <div className="rounded-xl border border-border-quiet bg-surface-quiet-subtle">
             {trackRows.map((row, index) => (
               <TrackRow
                 key={`${row.artist}-${row.title}-${index}`}
