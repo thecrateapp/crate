@@ -1,5 +1,6 @@
-import { JamQueueToolbar, type JamQueuePanelProps } from "./JamQueueSections";
+import type { JamQueuePanelProps } from "./JamQueueSections";
 import { JamQueueList } from "./JamQueueListSections";
+import { JamQueueToolbar } from "./JamQueueToolbarSections";
 
 export function JamQueuePanel(props: JamQueuePanelProps) {
   return (
