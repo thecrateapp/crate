@@ -9,7 +9,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 import { useResolvedPlayerArtist } from "@/components/player/useResolvedPlayerArtist";
-import { api } from "@/lib/api";
+import { useFullscreenPlayerLyrics } from "@/components/player/useFullscreenPlayerLyrics";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
@@ -31,23 +31,6 @@ import type { FSPanel } from "@/components/player/fullscreen-player-types";
 import { useFullscreenPlayerActions } from "@/components/player/useFullscreenPlayerActions";
 import { useFullscreenPlayerGestures } from "@/components/player/useFullscreenPlayerGestures";
 import { FullscreenPlayerView } from "@/components/player/FullscreenPlayerView";
-
-interface LyricLine {
-  time: number;
-  text: string;
-}
-
-function parseSyncedLyrics(raw: string): LyricLine[] {
-  return raw.split("\n").reduce<LyricLine[]>((acc, line) => {
-    const m = line.match(/^\[(\d+):(\d+)\.(\d+)\](.*)/);
-    if (m)
-      acc.push({
-        time: +m[1]! * 60 + +m[2]! + +m[3]! / 100,
-        text: m[4]!.trim(),
-      });
-    return acc;
-  }, []);
-}
 
 function getMobileSurfaceModePreference(): PlayerSurfaceMode {
   const mode = getPlayerSurfaceModePreference();
@@ -108,10 +91,6 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   const [surfaceMode, setSurfaceMode] = useState<PlayerSurfaceMode>(
     getMobileSurfaceModePreference,
   );
-  const [lyrics, setLyrics] = useState<{
-    synced: LyricLine[] | null;
-    plain: string | null;
-  } | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const activeLyricRef = useRef<HTMLButtonElement>(null);
   const [visible, setVisible] = useState(false);
@@ -140,6 +119,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     setShowEqualizer(false);
     onClose();
   }, [onClose]);
+
+  const { activeLyricIndex, lyrics } = useFullscreenPlayerLyrics({
+    activeLyricRef,
+    activePanel,
+    currentTime,
+    currentTrack: currentTrack ?? null,
+    visible,
+  });
 
   const {
     closeWithFeedback,
@@ -240,61 +227,6 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       );
     };
   }, []);
-
-  // Lyrics fetch
-  useEffect(() => {
-    if (!visible || activePanel !== "lyrics" || !currentTrack) {
-      if (!visible || !currentTrack) setLyrics(null);
-      return;
-    }
-    const controller = new AbortController();
-    setLyrics(null);
-    api<{ syncedLyrics: string | null; plainLyrics: string | null }>(
-      `/api/lyrics?artist=${encodeURIComponent(
-        currentTrack.artist || "",
-      )}&title=${encodeURIComponent(currentTrack.title || "")}`,
-      "GET",
-      undefined,
-      { signal: controller.signal },
-    )
-      .then((d) => {
-        if (controller.signal.aborted) return;
-        setLyrics({
-          synced: d.syncedLyrics ? parseSyncedLyrics(d.syncedLyrics) : null,
-          plain: d.plainLyrics || null,
-        });
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setLyrics({ synced: null, plain: null });
-      });
-    return () => controller.abort();
-  }, [
-    activePanel,
-    visible,
-    currentTrack?.id,
-    currentTrack?.artist,
-    currentTrack?.title,
-  ]);
-
-  // Active lyric index
-  const activeLyricIndex = lyrics?.synced
-    ? (() => {
-        for (let i = (lyrics.synced?.length ?? 0) - 1; i >= 0; i--) {
-          if (currentTime >= lyrics.synced![i]!.time) return i;
-        }
-        return -1;
-      })()
-    : -1;
-
-  // Auto-scroll lyrics
-  useEffect(() => {
-    if (activePanel !== "lyrics" || !activeLyricRef.current) return;
-    activeLyricRef.current.scrollIntoView?.({
-      behavior: "smooth",
-      block: "center",
-    });
-  }, [activeLyricIndex, activePanel]);
 
   useDismissibleLayer({
     active: visible && showEqualizer,
