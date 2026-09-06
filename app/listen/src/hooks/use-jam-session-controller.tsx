@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   KeyboardSensor,
@@ -14,11 +14,9 @@ import {
   usePlayerState,
 } from "@/contexts/PlayerContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useApi } from "@/hooks/use-api";
-import {
-  useJamLobbyData,
-  type GenreTaxonomyNode,
-} from "@/hooks/use-jam-lobby-data";
+import type { GenreTaxonomyNode } from "@/hooks/use-jam-lobby-data";
+import { useJamSessionPlayerRefs } from "@/hooks/use-jam-session-player-refs";
+import { useJamSessionRoomQueries } from "@/hooks/use-jam-session-room-queries";
 import { JamDeleteRoomModal } from "@/components/jam/JamDeleteRoomModal";
 import { createJamRoomManagement } from "@/hooks/jam-room-management";
 import { deriveJamRoomViewModel } from "@/hooks/jam-room-view-model";
@@ -27,11 +25,7 @@ import { useJamPlaybackEffects } from "@/hooks/use-jam-playback-effects";
 import { useJamSessionLifecycle } from "@/hooks/use-jam-session-lifecycle";
 import { useJamSessionState } from "@/hooks/use-jam-session-state";
 import { useJamWebSocket } from "@/hooks/use-jam-websocket";
-import {
-  type JamQueueMode,
-  type JamRoom,
-  type JamRoomsResponse,
-} from "@/pages/jam-reducer";
+import { type JamQueueMode, type JamRoom } from "@/pages/jam-reducer";
 
 export function useJamSessionController() {
   const { t } = useTranslation();
@@ -124,40 +118,28 @@ export function useJamSessionController() {
     connectionProblem,
   } = state;
 
-  const deferredRoomSearch = useDeferredValue(roomSearch);
-  const roomsUrl = !roomId
-    ? `/api/jam/rooms${
-        deferredRoomSearch.trim()
-          ? `?q=${encodeURIComponent(deferredRoomSearch.trim())}`
-          : ""
-      }`
-    : null;
-  const { data, loading, error } = useApi<JamRoom>(
-    roomId ? `/api/jam/rooms/${roomId}` : null,
-  );
   const {
-    data: roomsData,
+    data,
+    loading,
+    error,
     loading: roomsLoading,
-    refetch: refetchRooms,
-  } = useApi<JamRoomsResponse>(roomsUrl, "GET", undefined, {
-    safetyNetMs: 5_000,
-  });
-  const roomNameRef = useRef<string>("Jam session");
-  const queueSearchInputRef = useRef<HTMLInputElement>(null);
-  const {
+    refetchRooms,
     taxonomyLoading,
     genreSuggestions,
     selectedGenreItems,
     memberRooms,
     publicRooms,
-  } = useJamLobbyData({
+  } = useJamSessionRoomQueries({
     roomId,
     roomQueueMode,
     roomGenreFilters,
     roomGenreFiltersInput,
-    visibleRooms: roomsData?.rooms ?? [],
+    roomSearch,
     userId: user?.id,
   });
+
+  const roomNameRef = useRef<string>("Jam session");
+  const queueSearchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setGenreSuggestionIndex((current) =>
@@ -200,21 +182,8 @@ export function useJamSessionController() {
     t,
   });
 
-  const playerActionsRef = useRef({
-    play,
-    playAll,
-    pause,
-    resume,
-    seek,
-    setPlaybackRate,
-    syncJamQueue,
-    currentTrack,
-    isPlaying,
-    playSource,
-  });
-  const currentTimeRef = useRef(currentTime);
-  useEffect(() => {
-    playerActionsRef.current = {
+  const jamPlayerActions = useMemo(
+    () => ({
       play,
       playAll,
       pause,
@@ -225,21 +194,24 @@ export function useJamSessionController() {
       currentTrack,
       isPlaying,
       playSource,
-    };
-    currentTimeRef.current = currentTime;
-  }, [
+    }),
+    [
+      currentTrack,
+      isPlaying,
+      pause,
+      play,
+      playAll,
+      playSource,
+      resume,
+      seek,
+      setPlaybackRate,
+      syncJamQueue,
+    ],
+  );
+  const { playerActionsRef, currentTimeRef } = useJamSessionPlayerRefs({
+    actions: jamPlayerActions,
     currentTime,
-    currentTrack,
-    isPlaying,
-    pause,
-    play,
-    playAll,
-    playSource,
-    resume,
-    seek,
-    setPlaybackRate,
-    syncJamQueue,
-  ]);
+  });
 
   useJamSessionLifecycle({
     roomId,
