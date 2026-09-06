@@ -46,6 +46,22 @@ describe("ThemeSkinSection", () => {
     );
   });
 
+  it("explains unavailable skin combinations to assistive technology", async () => {
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
+    await user.click(screen.getByRole("radio", { name: /High contrast/i }));
+
+    const auroraSkin = screen.getByRole("radio", { name: /Aurora/i });
+    expect(auroraSkin).toHaveAttribute(
+      "aria-describedby",
+      "theme-skin-aurora-description theme-skin-aurora-availability",
+    );
+    expect(
+      screen.getByText("Not available with this reading mode."),
+    ).toBeInTheDocument();
+  });
+
   it("initializes from the persisted skin", () => {
     localStorage.setItem(
       "crate.listen.theme-skin",

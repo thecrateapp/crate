@@ -96,6 +96,9 @@ export function ThemeSkinSection() {
                   type="button"
                   role="radio"
                   aria-checked={selected}
+                  aria-describedby={`theme-skin-${skin.id}-description${
+                    supported ? "" : ` theme-skin-${skin.id}-availability`
+                  }`}
                   disabled={!supported}
                   onClick={() => selectSkin(skin.id)}
                   className={`${selectionButtonClass(selected)} ${
@@ -103,11 +106,24 @@ export function ThemeSkinSection() {
                   }`}
                 >
                   <span className="block text-sm font-semibold">
-                    {skin.label}
+                    {t(`settings.appearance.skinNames.${skin.id}`, {
+                      defaultValue: skin.label,
+                    })}
                   </span>
-                  <span className="mt-1 block text-xs text-text-muted">
+                  <span
+                    id={`theme-skin-${skin.id}-description`}
+                    className="mt-1 block text-xs text-text-muted"
+                  >
                     {t(`settings.appearance.skins.${skin.id}`)}
                   </span>
+                  {!supported && (
+                    <span
+                      id={`theme-skin-${skin.id}-availability`}
+                      className="sr-only"
+                    >
+                      {t("settings.appearance.skinUnavailable")}
+                    </span>
+                  )}
                 </button>
               );
             })}
