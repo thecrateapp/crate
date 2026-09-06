@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 
-import { getStreamUrl } from "@/contexts/player-utils";
 import type { Track } from "@/contexts/player-types";
 import {
   androidNativeEngine,
@@ -16,10 +15,11 @@ import {
   pause as gpPause,
   restoreVolume as gpRestoreVolume,
 } from "@/lib/gapless-player";
+import { probeTrackAvailability } from "./soft-interruption-probe";
+import { useSoftInterruptionEvents } from "./use-soft-interruption-events";
 
 const STREAM_STALL_GRACE_MS = 2500;
 const RECOVERY_RETRY_MS = 3000;
-const STREAM_PROBE_TIMEOUT_MS = 4000;
 const SOFT_PAUSE_FADE_MS = 220;
 export const BUFFERED_AHEAD_SAFE_SECONDS = 5;
 export const BUFFERED_AHEAD_CRITICAL_SECONDS = 1.5;
@@ -110,36 +110,6 @@ export function useSoftInterruption({
       recoveryTimerRef.current = null;
     }
   }, []);
-
-  const probeCurrentTrackAvailability =
-    useCallback(async (): Promise<boolean> => {
-      const track = currentTrackRef.current;
-      if (!track) return false;
-
-      const online = await isRuntimeOnline();
-      if (!online) return false;
-
-      const controller = new AbortController();
-      const timeout = window.setTimeout(
-        () => controller.abort(),
-        STREAM_PROBE_TIMEOUT_MS,
-      );
-      try {
-        const response = await fetch(getStreamUrl(track), {
-          method: "GET",
-          headers: { Range: "bytes=0-0" },
-          credentials: "include",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        response.body?.cancel().catch(() => {});
-        return response.ok || response.status === 206;
-      } catch {
-        return false;
-      } finally {
-        window.clearTimeout(timeout);
-      }
-    }, [currentTrackRef]);
 
   const scheduleRecoveryCheck = useCallback(
     (delay: number = RECOVERY_RETRY_MS) => {
@@ -305,7 +275,7 @@ export function useSoftInterruption({
       recoveryProbeInFlightRef.current = true;
       commitIsBuffering(true);
       try {
-        const available = await probeCurrentTrackAvailability();
+        const available = await probeTrackAvailability(currentTrackRef.current);
         if (!available) {
           recoveryFailuresRef.current += 1;
           if (
@@ -350,70 +320,7 @@ export function useSoftInterruption({
     };
   });
 
-  // Listen to browser online/offline + app-level network-restored events.
-  useEffect(() => {
-    const handleOffline = () => {
-      if (!currentTrackRef.current) return;
-      // Playback does not depend on the network once the track is
-      // fully decoded into the WebAudio buffer (RAM). Interrupting
-      // here would be actively destructive — the user would hear
-      // silence for a track that would otherwise play to the end.
-      // Let it play; we'll re-check on actual stall events.
-      if (hasSafeBufferedAhead()) return;
-      if (isPlayingRef.current || isBufferingRef.current) {
-        beginSoftInterruption("offline");
-      }
-    };
-    const handleRestored = () => {
-      if (!shouldAutoResumeAfterInterruptionRef.current) return;
-      scheduleRecoveryCheck(0);
-    };
-
-    const handleAppPaused = () => {
-      settleAfterAppLifecycle();
-    };
-    const handleAppResumed = () => {
-      settleAfterAppLifecycle();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        settleAfterAppLifecycle();
-      }
-    };
-
-    window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleRestored);
-    window.addEventListener(
-      "crate:network-restored",
-      handleRestored as EventListener,
-    );
-    window.addEventListener(
-      "crate:app-paused",
-      handleAppPaused as EventListener,
-    );
-    window.addEventListener(
-      "crate:app-resumed",
-      handleAppResumed as EventListener,
-    );
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleRestored);
-      window.removeEventListener(
-        "crate:network-restored",
-        handleRestored as EventListener,
-      );
-      window.removeEventListener(
-        "crate:app-paused",
-        handleAppPaused as EventListener,
-      );
-      window.removeEventListener(
-        "crate:app-resumed",
-        handleAppResumed as EventListener,
-      );
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [
+  useSoftInterruptionEvents({
     beginSoftInterruption,
     currentTrackRef,
     hasSafeBufferedAhead,
@@ -421,7 +328,7 @@ export function useSoftInterruption({
     isPlayingRef,
     scheduleRecoveryCheck,
     settleAfterAppLifecycle,
-  ]);
+  });
 
   // Cleanup timers on unmount.
   useEffect(
