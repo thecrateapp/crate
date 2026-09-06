@@ -14,7 +14,7 @@ import { usePlayerProgress } from "@/contexts/PlayerContext";
 import { isOfflineBusy, type OfflineItemState } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
-import type { TrackRowData } from "@/components/cards/TrackRow";
+import type { TrackRowData } from "@/components/cards/TrackRowModel";
 
 function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
   const { currentTime, duration } = usePlayerProgress();
