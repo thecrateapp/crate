@@ -1,8 +1,6 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
   type Dispatch,
   type SetStateAction,
 } from "react";
@@ -12,14 +10,16 @@ import type { PlayerConnectValue } from "@/contexts/player-context";
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import { useCrateConnectCommands } from "@/contexts/use-crate-connect-commands";
-import { useCrateConnectWs } from "@/hooks/use-crate-connect-ws";
-import { connectPlayerStateToRemotePlaybackState } from "@/lib/crate-connect";
+import { usePlayerConnectV2Sync } from "@/contexts/use-player-connect-v2-sync";
+import type { PlayerConnectV2SyncRuntime } from "@/contexts/use-player-connect-v2-sync";
 import {
   remotePlaybackQueue,
   remoteTrackToPlayerTrack,
   type PlaybackStatePayload,
   type RemotePlaybackState,
 } from "@/lib/remote-playback-state";
+
+export { hasRemoteConnectOwner } from "@/contexts/use-player-connect-v2-sync";
 
 interface Ref<T> {
   current: T;
@@ -76,27 +76,6 @@ interface UsePlayerConnectTransportOptions {
   seek: (time: number) => void;
 }
 
-interface ConnectedInstanceLike {
-  instance_id: string;
-}
-
-export function hasRemoteConnectOwner(
-  enabled: boolean,
-  activeInstanceId: string | null,
-  playbackInstanceId: string | null,
-  connectedInstances: readonly ConnectedInstanceLike[],
-): boolean {
-  return (
-    enabled &&
-    Boolean(activeInstanceId) &&
-    connectedInstances.some(
-      (instance) => instance.instance_id === activeInstanceId,
-    ) &&
-    Boolean(playbackInstanceId) &&
-    activeInstanceId !== playbackInstanceId
-  );
-}
-
 const noConnectTransfer = () => false;
 const noConnectRemoteCommand = () => false;
 
@@ -144,28 +123,6 @@ export function usePlayerConnectTransport({
   prev,
   seek,
 }: UsePlayerConnectTransportOptions): PlayerConnectTransportRuntime {
-  const clearTransferPlaybackGuardRef = useRef<number | null>(null);
-  const clearTransferPlaybackGuard = useCallback(() => {
-    if (clearTransferPlaybackGuardRef.current === null) return;
-    window.clearTimeout(clearTransferPlaybackGuardRef.current);
-    clearTransferPlaybackGuardRef.current = null;
-  }, []);
-  const scheduleTransferPlaybackGuard = useCallback(() => {
-    clearTransferPlaybackGuard();
-    const startedAtSeconds = currentTimeRef.current;
-    clearTransferPlaybackGuardRef.current = window.setTimeout(() => {
-      clearTransferPlaybackGuardRef.current = null;
-      const advancedEnough = currentTimeRef.current > startedAtSeconds + 0.25;
-      if (isPlayingRef.current && advancedEnough) return;
-      requireUserGestureToResume();
-    }, 2500);
-  }, [
-    clearTransferPlaybackGuard,
-    currentTimeRef,
-    isPlayingRef,
-    requireUserGestureToResume,
-  ]);
-
   const applyConnectStateToLocalQueue = useCallback(
     (state: RemotePlaybackState, startPlaying: boolean) => {
       const tracks = remotePlaybackQueue(state);
@@ -230,252 +187,31 @@ export function usePlayerConnectTransport({
     [applyConnectStateToLocalQueue],
   );
 
-  const handleConnectV2TransferIncoming = useCallback(
-    (payload: { state?: unknown }) => {
-      const remoteState = connectPlayerStateToRemotePlaybackState(
-        payload.state as Parameters<
-          typeof connectPlayerStateToRemotePlaybackState
-        >[0],
-      );
-      if (!remoteState) return false;
-      return applyConnectStateToLocalQueue(remoteState, false);
-    },
-    [applyConnectStateToLocalQueue],
-  );
-
-  const handleConnectV2RemoteCommand = useCallback(
-    (
-      type:
-        | "seek"
-        | "next_track"
-        | "previous_track"
-        | "pause"
-        | "resume"
-        | "volume",
-      payload: { payload?: Record<string, unknown> | null },
-    ) => {
-      if (type === "pause") {
-        pause();
-        return;
-      }
-      if (type === "resume") {
-        resume();
-        return;
-      }
-      if (type === "next_track") {
-        next();
-        return;
-      }
-      if (type === "previous_track") {
-        prev();
-        return;
-      }
-      if (type === "volume") {
-        const rawVolume = payload.payload?.volume;
-        if (typeof rawVolume === "number" && Number.isFinite(rawVolume)) {
-          setVolume(Math.max(0, Math.min(1, rawVolume)));
-        }
-        return;
-      }
-      const rawPosition =
-        payload.payload?.position_ms ?? payload.payload?.positionMs;
-      if (typeof rawPosition === "number" && Number.isFinite(rawPosition)) {
-        seek(Math.max(0, rawPosition / 1000));
-        void publishConnectState();
-      }
-    },
-    [next, pause, prev, publishConnectState, resume, seek, setVolume],
-  );
-
-  const {
-    activeInstanceId: connectV2ActiveInstanceId,
-    connectedInstances: connectV2ConnectedInstances,
-    playbackInstanceId: connectV2PlaybackInstanceId,
-    playerState: connectV2PlayerState,
-    requestTransfer: requestConnectV2Transfer,
-    serverClockOffsetMs: connectV2ServerClockOffsetMs,
-    sendMessage: sendConnectV2Message,
-    sendSnapshot: sendConnectV2Snapshot,
-    sendVolume: sendConnectV2Volume,
-  } = useCrateConnectWs({
+  const connectV2: PlayerConnectV2SyncRuntime = usePlayerConnectV2Sync({
+    applyConnectStateToLocalQueue,
     authUserId: authUser?.id,
-    callbacks: {
-      onBecameInactive: pause,
-      onRemoteCommand: handleConnectV2RemoteCommand,
-      onTransferCommitted: () => {
-        resume();
-        void publishConnectState({ claimActive: true });
-        scheduleTransferPlaybackGuard();
-      },
-      onTransferIncoming: handleConnectV2TransferIncoming,
-    },
-    enabled: connectV2Enabled,
-  });
-  const connectV2IsActive =
-    connectV2ActiveInstanceId === connectV2PlaybackInstanceId;
-  const connectV2HasRemoteOwner = hasRemoteConnectOwner(
-    connectV2Enabled,
-    connectV2ActiveInstanceId,
-    connectV2PlaybackInstanceId,
-    connectV2ConnectedInstances,
-  );
-  const connectV2RemoteState = useMemo(
-    () => connectPlayerStateToRemotePlaybackState(connectV2PlayerState),
-    [connectV2PlayerState],
-  );
-  const sendConnectV2RemoteCommand = useCallback(
-    (
-      type:
-        | "pause"
-        | "resume"
-        | "seek"
-        | "next_track"
-        | "previous_track"
-        | "volume",
-      payload?: Record<string, unknown>,
-    ) =>
-      sendConnectV2Message({
-        payload: payload ?? {},
-        type,
-        version: null,
-      }),
-    [sendConnectV2Message],
-  );
-  const publishConnectV2State = useCallback(
-    async (options?: ConnectPublishOptions) => {
-      if (!authUser?.id || !connectV2Enabled || !queueRef.current.length)
-        return;
-      const payload = buildConnectSnapshotPayload(
-        options?.claimActive ? "structural" : "light",
-        options,
-      );
-      if (options?.claimActive) {
-        sendConnectV2Message({
-          payload: { position_ms: payload.position_ms },
-          type: "claim_active",
-          version: null,
-        });
-        sendConnectV2Message({
-          payload: payload as unknown as Record<string, unknown>,
-          type: "update_snapshot",
-          version: null,
-        });
-        return;
-      }
-      if (!connectV2IsActive) return;
-      sendConnectV2Snapshot(payload);
-    },
-    [
-      authUser?.id,
-      buildConnectSnapshotPayload,
-      connectV2Enabled,
-      connectV2IsActive,
-      queueRef,
-      sendConnectV2Message,
-      sendConnectV2Snapshot,
-    ],
-  );
-  useEffect(() => {
-    connectV2PublishRef.current = connectV2Enabled
-      ? publishConnectV2State
-      : null;
-  }, [connectV2Enabled, connectV2PublishRef, publishConnectV2State]);
-
-  const connectV2StructuralRevisionRef = useRef<string | null>(null);
-  const connectV2ClaimedPlaybackRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!authUser?.id || !connectV2Enabled || !isPlaying || !queue.length)
-      return;
-    if (
-      connectV2ActiveInstanceId &&
-      connectV2ActiveInstanceId !== connectV2PlaybackInstanceId
-    ) {
-      return;
-    }
-    const payload = buildConnectSnapshotPayload("structural", {
-      claimActive: true,
-    });
-    const claimKey = [
-      payload.queue_revision,
-      payload.current_index,
-      payload.track_id ?? payload.track_entity_uid ?? payload.track_path ?? "",
-      payload.status,
-    ].join(":");
-    if (claimKey === connectV2ClaimedPlaybackRef.current) return;
-    connectV2ClaimedPlaybackRef.current = claimKey;
-    sendConnectV2Message({
-      payload: { position_ms: payload.position_ms },
-      type: "claim_active",
-      version: null,
-    });
-    sendConnectV2Message({
-      payload: payload as unknown as Record<string, unknown>,
-      type: "update_snapshot",
-      version: null,
-    });
-  }, [
-    authUser?.id,
     buildConnectSnapshotPayload,
-    connectV2ActiveInstanceId,
     connectV2Enabled,
-    connectV2PlaybackInstanceId,
+    connectV2PublishRef,
     currentIndex,
+    currentTimeRef,
     isPlaying,
-    queue,
-    sendConnectV2Message,
-  ]);
-
-  useEffect(() => {
-    if (!connectV2Enabled || !connectV2IsActive || !queue.length) return;
-    const payload = buildConnectSnapshotPayload("structural");
-    if (payload.queue_revision === connectV2StructuralRevisionRef.current)
-      return;
-    connectV2StructuralRevisionRef.current = payload.queue_revision;
-    sendConnectV2Snapshot(payload);
-  }, [
-    buildConnectSnapshotPayload,
-    connectV2Enabled,
-    connectV2IsActive,
-    currentIndex,
+    isPlayingRef,
+    next,
+    pause,
     playSource,
+    prev,
+    publishConnectState,
     queue,
+    queueRef,
     repeat,
-    sendConnectV2Snapshot,
+    requireUserGestureToResume,
+    resume,
+    seek,
+    setVolume,
     shuffle,
-  ]);
-
-  useEffect(() => {
-    if (!connectV2Enabled || !connectV2IsActive || !queueRef.current.length)
-      return;
-    sendConnectV2Snapshot(buildConnectSnapshotPayload("light"));
-  }, [
-    buildConnectSnapshotPayload,
-    connectV2Enabled,
-    connectV2IsActive,
-    isPlaying,
-    queueRef,
-    sendConnectV2Snapshot,
-  ]);
-
-  useEffect(() => {
-    if (!connectV2Enabled || !connectV2IsActive) return;
-    sendConnectV2Volume(volume);
-  }, [connectV2Enabled, connectV2IsActive, sendConnectV2Volume, volume]);
-
-  useEffect(() => {
-    if (!connectV2Enabled || !connectV2IsActive) return;
-    const intervalId = window.setInterval(() => {
-      if (!queueRef.current.length) return;
-      sendConnectV2Snapshot(buildConnectSnapshotPayload("light"));
-    }, 5000);
-    return () => window.clearInterval(intervalId);
-  }, [
-    buildConnectSnapshotPayload,
-    connectV2Enabled,
-    connectV2IsActive,
-    queueRef,
-    sendConnectV2Snapshot,
-  ]);
+    volume,
+  });
 
   useCrateConnectCommands({
     authUser,
@@ -493,34 +229,26 @@ export function usePlayerConnectTransport({
 
   const connectValue = useMemo<PlayerConnectValue>(
     () => ({
-      activeInstanceId: connectV2Enabled ? connectV2ActiveInstanceId : null,
-      connectedInstances: connectV2Enabled ? connectV2ConnectedInstances : [],
+      activeInstanceId: connectV2.activeInstanceId,
+      connectedInstances: connectV2.connectedInstances,
       enabled: connectEnabled,
-      isRemoteActive: connectV2HasRemoteOwner,
-      playbackInstanceId: connectV2Enabled ? connectV2PlaybackInstanceId : null,
-      remoteState: connectV2Enabled ? connectV2RemoteState : null,
+      isRemoteActive: connectV2.isRemoteActive,
+      playbackInstanceId: connectV2.playbackInstanceId,
+      remoteState: connectV2.remoteState,
       requestTransfer: connectV2Enabled
-        ? requestConnectV2Transfer
+        ? connectV2.requestTransfer
         : noConnectTransfer,
       sendRemoteCommand: connectV2Enabled
-        ? sendConnectV2RemoteCommand
+        ? connectV2.sendRemoteCommand
         : noConnectRemoteCommand,
-      serverClockOffsetMs: connectV2Enabled ? connectV2ServerClockOffsetMs : 0,
+      serverClockOffsetMs: connectV2.serverClockOffsetMs,
       transport: connectEnabled ? (connectV2Enabled ? "ws" : "legacy") : null,
     }),
-    [
-      connectEnabled,
-      connectV2ActiveInstanceId,
-      connectV2ConnectedInstances,
-      connectV2Enabled,
-      connectV2HasRemoteOwner,
-      connectV2PlaybackInstanceId,
-      connectV2RemoteState,
-      connectV2ServerClockOffsetMs,
-      requestConnectV2Transfer,
-      sendConnectV2RemoteCommand,
-    ],
+    [connectEnabled, connectV2, connectV2Enabled],
   );
 
-  return { clearTransferPlaybackGuard, connectValue };
+  return {
+    clearTransferPlaybackGuard: connectV2.clearTransferPlaybackGuard,
+    connectValue,
+  };
 }
