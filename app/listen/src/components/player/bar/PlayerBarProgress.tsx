@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { CSSProperties } from "react";
 import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
 
 export type PlayerSeekHover = {
@@ -102,26 +103,33 @@ export function PlayerBarProgress({
         )}
         <div className="listen-player-progress-track absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full" />
         <div
-          className="pointer-events-none absolute left-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full opacity-65 transition-[width] duration-150"
-          style={{ width: `${progressPct}%` }}
+          className="listen-player-progress-width-dynamic pointer-events-none absolute left-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full opacity-65 transition-[width] duration-150"
+          style={{ "--progress-width": `${progressPct}%` } as CSSProperties}
         >
           <div className="listen-player-progress-glow absolute inset-0 blur-[3px]" />
           <div className="listen-player-progress-fill absolute inset-y-[5px] inset-x-0 rounded-full" />
         </div>
         <div
-          className="listen-player-progress-fill absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full transition-[width] duration-150"
-          style={{ width: `${progressPct}%` }}
+          className="listen-player-progress-fill listen-player-progress-width-dynamic absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full transition-[width] duration-150"
+          style={{ "--progress-width": `${progressPct}%` } as CSSProperties}
         />
         <div
-          className="listen-player-progress-thumb pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full transition-[left,opacity] duration-150"
-          style={{
-            left: `calc(${progressPct}% - 4px)`,
-            opacity: progressPct > 0 ? 0.62 : 0,
-          }}
+          className={`listen-player-progress-thumb listen-player-progress-left-dynamic pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full transition-[left,opacity] duration-150 ${
+            progressPct > 0 ? "opacity-[0.62]" : "opacity-0"
+          }`}
+          style={
+            {
+              "--progress-left": `calc(${progressPct}% - 4px)`,
+            } as CSSProperties
+          }
         />
         <div
-          className="listen-player-progress-thumb-active absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-[left,opacity] duration-150 group-hover:opacity-100"
-          style={{ left: `calc(${progressPct}% - 5px)` }}
+          className="listen-player-progress-thumb-active listen-player-progress-left-active-dynamic absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-[left,opacity] duration-150 group-hover:opacity-100"
+          style={
+            {
+              "--progress-left": `calc(${progressPct}% - 5px)`,
+            } as CSSProperties
+          }
         />
       </div>
       <span className="w-9 font-mono text-[10px] tabular-nums text-text-muted">

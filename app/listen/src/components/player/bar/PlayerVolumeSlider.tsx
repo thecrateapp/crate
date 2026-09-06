@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import type { CSSProperties, RefObject } from "react";
 import type { TFunction } from "i18next";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
@@ -76,22 +76,25 @@ export function PlayerVolumeSlider({
       >
         <div className="listen-player-progress-track absolute bottom-0 left-1/2 h-full w-[3px] -translate-x-1/2 rounded-full" />
         <div
-          className="pointer-events-none absolute bottom-0 left-1/2 w-3 -translate-x-1/2 overflow-hidden rounded-full opacity-65 transition-[height] duration-150"
-          style={{ height: `${volumePct}%` }}
+          className="listen-player-progress-height-dynamic pointer-events-none absolute bottom-0 left-1/2 w-3 -translate-x-1/2 overflow-hidden rounded-full opacity-65 transition-[height] duration-150"
+          style={{ "--progress-height": `${volumePct}%` } as CSSProperties}
         >
           <div className="listen-player-progress-glow--vertical absolute inset-0 blur-[3px]" />
           <div className="listen-player-progress-fill--vertical absolute inset-x-[4px] inset-y-0 rounded-full" />
         </div>
         <div
-          className="listen-player-progress-fill--vertical absolute bottom-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full transition-[height] duration-150"
-          style={{ height: `${volumePct}%` }}
+          className="listen-player-progress-fill--vertical listen-player-progress-height-dynamic absolute bottom-0 left-1/2 w-[3px] -translate-x-1/2 rounded-full transition-[height] duration-150"
+          style={{ "--progress-height": `${volumePct}%` } as CSSProperties}
         />
         <div
-          className="listen-player-progress-thumb pointer-events-none absolute left-1/2 h-2 w-2 -translate-x-1/2 translate-y-1/2 rounded-full transition-[bottom,opacity] duration-150"
-          style={{
-            bottom: `${volumePct}%`,
-            opacity: volumePct > 0 ? 0.72 : 0.45,
-          }}
+          className={`listen-player-progress-thumb listen-player-progress-bottom-dynamic pointer-events-none absolute left-1/2 h-2 w-2 -translate-x-1/2 translate-y-1/2 rounded-full transition-[bottom,opacity] duration-150 ${
+            volumePct > 0 ? "opacity-[0.72]" : "opacity-[0.45]"
+          }`}
+          style={
+            {
+              "--progress-bottom": `${volumePct}%`,
+            } as CSSProperties
+          }
         />
       </div>
     </AppPopover>

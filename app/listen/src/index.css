@@ -224,6 +224,34 @@ textarea {
   background: var(--surface-quiet);
 }
 
+.listen-player-progress-width-dynamic {
+  width: var(--progress-width);
+}
+
+.listen-player-progress-left-dynamic,
+.listen-player-progress-left-active-dynamic {
+  left: var(--progress-left);
+}
+
+.listen-player-progress-height-dynamic {
+  height: var(--progress-height);
+}
+
+.listen-player-progress-bottom-dynamic {
+  bottom: var(--progress-bottom);
+}
+
+.listen-player-seek-input {
+  accent-color: var(--accent-action);
+  background: linear-gradient(
+    90deg,
+    var(--accent-action) 0%,
+    var(--accent-action) var(--seek-progress),
+    var(--surface-quiet) var(--seek-progress),
+    var(--surface-quiet) 100%
+  );
+}
+
 .listen-player-progress-glow {
   background: var(--control-progress-glow-horizontal);
 }

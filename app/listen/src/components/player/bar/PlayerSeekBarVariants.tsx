@@ -1,4 +1,4 @@
-import type { PointerEvent } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
@@ -151,26 +151,31 @@ export function GlowSeekBar({
           className={`listen-player-progress-track absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full ${model.glowTrackClass}`}
         />
         <div
-          className="pointer-events-none absolute left-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full opacity-65 transition-[width] duration-150"
+          className="listen-player-progress-width-dynamic pointer-events-none absolute left-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full opacity-65 transition-[width] duration-150"
           style={model.glowWidthStyle}
         >
           <div className="listen-player-progress-glow absolute inset-0 blur-[3px]" />
           <div className="listen-player-progress-fill absolute inset-y-[5px] inset-x-0 rounded-full" />
         </div>
         <div
-          className={`listen-player-progress-fill absolute left-0 top-1/2 -translate-y-1/2 rounded-full transition-[width] duration-150 ${model.glowTrackClass}`}
+          className={`listen-player-progress-fill listen-player-progress-width-dynamic absolute left-0 top-1/2 -translate-y-1/2 rounded-full transition-[width] duration-150 ${model.glowTrackClass}`}
           style={model.glowWidthStyle}
         />
         <div
-          className="listen-player-progress-thumb pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full transition-[left,opacity] duration-150"
+          className={`listen-player-progress-thumb listen-player-progress-left-dynamic pointer-events-none absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full transition-[left,opacity] duration-150 ${
+            model.progress > 0 ? "opacity-[0.62]" : "opacity-0"
+          }`}
           style={{
             ...model.glowLeftStyle,
-            opacity: model.progress > 0 ? 0.62 : 0,
           }}
         />
         <div
-          className="listen-player-progress-thumb-active absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-[left,opacity] duration-150 group-hover:opacity-100"
-          style={{ left: `calc(${model.progress}% - 5px)` }}
+          className="listen-player-progress-thumb-active listen-player-progress-left-active-dynamic absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-[left,opacity] duration-150 group-hover:opacity-100"
+          style={
+            {
+              "--progress-left": `calc(${model.progress}% - 5px)`,
+            } as CSSProperties
+          }
         />
         <SeekInput
           model={model}
@@ -218,7 +223,7 @@ export function DefaultSeekBar({
         <SeekInput
           model={model}
           disabled={disabled}
-          className={`block w-full appearance-none rounded-full border-0 outline-none ${
+          className={`listen-player-seek-input block w-full appearance-none rounded-full border-0 outline-none ${
             thin ? "h-1" : compact ? "h-1.5" : "h-2"
           } cursor-pointer disabled:cursor-default disabled:opacity-50`}
           style={model.sliderStyle}

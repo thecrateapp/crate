@@ -1,5 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { PointerEvent, RefObject, SyntheticEvent } from "react";
+import type {
+  CSSProperties,
+  PointerEvent,
+  RefObject,
+  SyntheticEvent,
+} from "react";
 
 import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
 
@@ -10,13 +15,10 @@ export interface SeekBarModel {
   hoverPercent: number | null;
   hoverTime: string | null;
   trackRef: RefObject<HTMLDivElement | null>;
-  sliderStyle: {
-    accentColor: string;
-    background: string;
-  };
+  sliderStyle: CSSVariableStyle;
   glowTrackClass: string;
-  glowWidthStyle: { width: string };
-  glowLeftStyle: { left: string };
+  glowWidthStyle: CSSVariableStyle;
+  glowLeftStyle: CSSVariableStyle;
   beginScrubbing: () => void;
   endScrubbing: () => void;
   handleHover: (event: PointerEvent<HTMLDivElement>) => void;
@@ -24,6 +26,10 @@ export interface SeekBarModel {
   stopPropagation: (event: SyntheticEvent) => void;
   commitSeek: (value: number) => void;
 }
+
+type CSSVariableStyle = CSSProperties & {
+  [key: `--${string}`]: string;
+};
 
 function stopEventPropagation(event: SyntheticEvent) {
   event.stopPropagation();
@@ -48,10 +54,7 @@ export function useSeekBarModel(
       ? Math.max(0, Math.min(100, (displayedTime / safeDuration) * 100))
       : 0;
   const sliderStyle = useMemo(
-    () => ({
-      accentColor: "var(--accent-action)",
-      background: `linear-gradient(90deg, var(--accent-action) 0%, var(--accent-action) ${progress}%, var(--surface-quiet) ${progress}%, var(--surface-quiet) 100%)`,
-    }),
+    () => ({ "--seek-progress": `${progress}%` }),
     [progress],
   );
   const hoverTime =
@@ -99,8 +102,8 @@ export function useSeekBarModel(
     trackRef,
     sliderStyle,
     glowTrackClass: thin ? "h-[3px]" : "h-1",
-    glowWidthStyle: { width: `${progress}%` },
-    glowLeftStyle: { left: `calc(${progress}% - 4px)` },
+    glowWidthStyle: { "--progress-width": `${progress}%` },
+    glowLeftStyle: { "--progress-left": `calc(${progress}% - 4px)` },
     beginScrubbing,
     endScrubbing,
     handleHover,
