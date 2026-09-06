@@ -64,23 +64,25 @@ describe("color contrast", () => {
   });
 
   it("keeps every explicit skin text pairing AA-compliant", () => {
-    Object.values(SKIN_REGISTRY).forEach(({ variables }) => {
-      const foreground = variables["--color-foreground"];
-      const muted = variables["--color-muted-foreground"];
-      const panel = variables["--surface-panel"];
-      const app = variables["--surface-app"];
-      const primary = variables["--color-primary"];
-      const primaryForeground = variables["--color-primary-foreground"];
+    Object.values(SKIN_REGISTRY).forEach(({ modes }) => {
+      Object.values(modes).forEach((variables) => {
+        const foreground = variables["--color-foreground"];
+        const muted = variables["--color-muted-foreground"];
+        const panel = variables["--surface-panel"];
+        const app = variables["--surface-app"];
+        const primary = variables["--color-primary"];
+        const primaryForeground = variables["--color-primary-foreground"];
 
-      if (foreground && panel) {
-        expect(meetsWcagAa(foreground, panel)).toBe(true);
-      }
-      if (muted && app) {
-        expect(meetsWcagAa(muted, app)).toBe(true);
-      }
-      if (primary && primaryForeground) {
-        expect(meetsWcagAa(primaryForeground, primary)).toBe(true);
-      }
+        if (foreground && panel) {
+          expect(meetsWcagAa(foreground, panel)).toBe(true);
+        }
+        if (muted && app) {
+          expect(meetsWcagAa(muted, app)).toBe(true);
+        }
+        if (primary && primaryForeground) {
+          expect(meetsWcagAa(primaryForeground, primary)).toBe(true);
+        }
+      });
     });
   });
 

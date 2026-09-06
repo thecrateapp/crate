@@ -1,13 +1,17 @@
 export const THEME_SKIN_STORAGE_KEY = "crate.listen.theme-skin";
 
-export const THEME_REGISTRY = {
+export const MODE_REGISTRY = {
   dark: {
     id: "dark",
     colorScheme: "dark",
   },
-  "high-contrast": {
-    id: "high-contrast",
-    colorScheme: "dark",
+  light: {
+    id: "light",
+    colorScheme: "light",
+  },
+  system: {
+    id: "system",
+    colorScheme: "dark light",
   },
 } as const;
 
@@ -30,59 +34,58 @@ export const SKIN_VARIABLE_ALLOWLIST = [
 
 type SkinVariableName = (typeof SKIN_VARIABLE_ALLOWLIST)[number];
 
+type SkinVariables = Partial<Record<SkinVariableName, string>>;
+
 interface SkinDefinition {
   id: string;
-  variables: Partial<Record<SkinVariableName, string>>;
+  modes: Record<ResolvedColorMode, SkinVariables>;
 }
 
-const DEFAULT_SKIN_VARIABLES: Partial<Record<SkinVariableName, string>> = {};
+const EMPTY_SKIN_VARIABLES: SkinVariables = {};
 
 export const SKIN_REGISTRY = {
   default: {
     id: "default",
-    variables: DEFAULT_SKIN_VARIABLES,
+    modes: {
+      dark: EMPTY_SKIN_VARIABLES,
+      light: EMPTY_SKIN_VARIABLES,
+    },
   },
-  aurora: {
-    id: "aurora",
-    variables: {
-      "--color-primary": "#a78bfa",
-      "--color-primary-foreground": "#1e1b4b",
-      "--color-foreground": "#f5f3ff",
-      "--color-muted-foreground": "#a5b4fc",
-      "--color-border": "#302e4a",
-      "--surface-app": "#080711",
-      "--surface-panel": "#11101e",
-      "--surface-raised": "#19162b",
-      "--surface-modal": "rgba(17, 16, 30, 0.96)",
+  crateRed: {
+    id: "crateRed",
+    modes: {
+      dark: EMPTY_SKIN_VARIABLES,
+      light: EMPTY_SKIN_VARIABLES,
     },
   },
 } as const satisfies Record<string, SkinDefinition>;
 
-export type ThemeId = keyof typeof THEME_REGISTRY;
+export type ColorModePreference = keyof typeof MODE_REGISTRY;
+export type ResolvedColorMode = Exclude<ColorModePreference, "system">;
 export type SkinId = keyof typeof SKIN_REGISTRY;
 
-const SUPPORTED_COMBINATIONS = new Set([
-  "dark:default",
-  "dark:aurora",
-  "high-contrast:default",
-]);
-
 export interface ThemeSkinSelection {
-  theme: ThemeId;
+  mode: ColorModePreference;
   skin: SkinId;
 }
 
+export interface AppliedThemeSkinSelection extends ThemeSkinSelection {
+  resolvedMode: ResolvedColorMode;
+}
+
 export const DEFAULT_THEME_SKIN = {
-  theme: "dark",
+  mode: "dark",
   skin: "default",
 } as const satisfies ThemeSkinSelection;
 
 type StorageReader = Pick<Storage, "getItem">;
 type StorageWriter = Pick<Storage, "setItem">;
+type MatchMedia = (query: string) => MediaQueryList;
 
 interface ThemeSkinOptions {
   root?: HTMLElement;
   storage?: StorageReader & Partial<StorageWriter>;
+  matchMedia?: MatchMedia;
 }
 
 function getBrowserStorage(): Storage | undefined {
@@ -95,10 +98,21 @@ function getBrowserStorage(): Storage | undefined {
   }
 }
 
-function isThemeId(value: unknown): value is ThemeId {
+function getBrowserMatchMedia(): MatchMedia | undefined {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return undefined;
+  }
+
+  return window.matchMedia.bind(window);
+}
+
+function isColorModePreference(value: unknown): value is ColorModePreference {
   return (
     typeof value === "string" &&
-    Object.prototype.hasOwnProperty.call(THEME_REGISTRY, value)
+    Object.prototype.hasOwnProperty.call(MODE_REGISTRY, value)
   );
 }
 
@@ -109,19 +123,46 @@ function isSkinId(value: unknown): value is SkinId {
   );
 }
 
+export function resolveColorMode(
+  mode: ColorModePreference,
+  systemPrefersDark: boolean,
+): ResolvedColorMode {
+  if (mode === "system") return systemPrefersDark ? "dark" : "light";
+  return mode;
+}
+
 export function resolveThemeSkin(
-  theme: unknown,
+  mode: unknown,
   skin: unknown,
 ): ThemeSkinSelection {
-  const resolvedTheme = isThemeId(theme) ? theme : DEFAULT_THEME_SKIN.theme;
+  const resolvedMode = isColorModePreference(mode)
+    ? mode
+    : DEFAULT_THEME_SKIN.mode;
   const resolvedSkin = isSkinId(skin) ? skin : DEFAULT_THEME_SKIN.skin;
 
-  if (SUPPORTED_COMBINATIONS.has(`${resolvedTheme}:${resolvedSkin}`)) {
-    return { theme: resolvedTheme, skin: resolvedSkin };
+  if (
+    resolvedMode === "system" ||
+    Object.prototype.hasOwnProperty.call(SKIN_REGISTRY, resolvedSkin)
+  ) {
+    return { mode: resolvedMode, skin: resolvedSkin };
   }
 
-  if (SUPPORTED_COMBINATIONS.has(`${resolvedTheme}:default`)) {
-    return { theme: resolvedTheme, skin: "default" };
+  return { mode: resolvedMode, skin: DEFAULT_THEME_SKIN.skin };
+}
+
+function migrateStoredSelection(candidate: {
+  mode?: unknown;
+  skin?: unknown;
+  theme?: unknown;
+}): ThemeSkinSelection {
+  if ("mode" in candidate) {
+    return resolveThemeSkin(candidate.mode, candidate.skin);
+  }
+
+  if (candidate.theme === "dark" || candidate.theme === "light") {
+    const migratedSkin =
+      candidate.skin === "aurora" ? "crateRed" : candidate.skin;
+    return resolveThemeSkin(candidate.theme, migratedSkin);
   }
 
   return DEFAULT_THEME_SKIN;
@@ -139,11 +180,23 @@ export function readStoredThemeSkin(
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return DEFAULT_THEME_SKIN;
 
-    const candidate = parsed as { theme?: unknown; skin?: unknown };
-    return resolveThemeSkin(candidate.theme, candidate.skin);
+    return migrateStoredSelection(
+      parsed as {
+        mode?: unknown;
+        skin?: unknown;
+        theme?: unknown;
+      },
+    );
   } catch {
     return DEFAULT_THEME_SKIN;
   }
+}
+
+const systemListenerCleanup = new WeakMap<HTMLElement, () => void>();
+
+function clearSystemListener(root: HTMLElement): void {
+  systemListenerCleanup.get(root)?.();
+  systemListenerCleanup.delete(root);
 }
 
 function clearAppliedVariables(root: HTMLElement): void {
@@ -155,14 +208,15 @@ function clearAppliedVariables(root: HTMLElement): void {
   delete root.dataset.crateThemeSkinVars;
 }
 
-function applySkinVariables(root: HTMLElement, skin: SkinId): void {
+function applySkinVariables(
+  root: HTMLElement,
+  skin: SkinId,
+  mode: ResolvedColorMode,
+): void {
   clearAppliedVariables(root);
 
   const appliedVariables: string[] = [];
-  const skinDefinition = SKIN_REGISTRY[skin];
-  if (!skinDefinition) return;
-
-  const variables = skinDefinition.variables;
+  const variables = SKIN_REGISTRY[skin].modes[mode];
 
   Object.entries(variables).forEach(([name, value]) => {
     if (
@@ -182,36 +236,61 @@ function applySkinVariables(root: HTMLElement, skin: SkinId): void {
 }
 
 export function applyThemeSkin(
-  theme: unknown,
+  mode: unknown,
   skin: unknown,
   options: ThemeSkinOptions = {},
-): ThemeSkinSelection {
-  const selection = resolveThemeSkin(theme, skin);
+): AppliedThemeSkinSelection {
+  const selection = resolveThemeSkin(mode, skin);
   const root =
     options.root ??
     (typeof document === "undefined" ? undefined : document.documentElement);
+  const matchMedia = options.matchMedia ?? getBrowserMatchMedia();
+  const mediaQuery = matchMedia?.("(prefers-color-scheme: dark)");
+  const resolvedMode = resolveColorMode(
+    selection.mode,
+    mediaQuery?.matches ?? true,
+  );
 
   if (root) {
+    clearSystemListener(root);
     root.dataset.crateApp = "listen";
-    root.dataset.crateTheme = selection.theme;
+    root.dataset.crateMode = resolvedMode;
+    root.dataset.crateModePreference = selection.mode;
     root.dataset.crateSkin = selection.skin;
-    root.style.colorScheme = THEME_REGISTRY[selection.theme].colorScheme;
-    applySkinVariables(root, selection.skin);
+    root.style.colorScheme = MODE_REGISTRY[resolvedMode].colorScheme;
+    applySkinVariables(root, selection.skin, resolvedMode);
+
+    if (selection.mode === "system" && mediaQuery) {
+      const onChange = (event: MediaQueryListEvent) => {
+        const nextMode = event.matches ? "dark" : "light";
+        root.dataset.crateMode = nextMode;
+        root.style.colorScheme = MODE_REGISTRY[nextMode].colorScheme;
+        applySkinVariables(root, selection.skin, nextMode);
+      };
+
+      mediaQuery.addEventListener("change", onChange);
+      systemListenerCleanup.set(root, () =>
+        mediaQuery.removeEventListener("change", onChange),
+      );
+    }
   }
 
   const storage = options.storage ?? getBrowserStorage();
   try {
-    storage?.setItem?.(THEME_SKIN_STORAGE_KEY, JSON.stringify(selection));
+    storage?.setItem?.(
+      THEME_SKIN_STORAGE_KEY,
+      JSON.stringify({ mode: selection.mode, skin: selection.skin }),
+    );
   } catch {
     // Persistence is best effort; the active selection still applies.
   }
 
-  return selection;
+  return { ...selection, resolvedMode };
 }
 
 export function initializeThemeSkin(
   options: ThemeSkinOptions = {},
-): ThemeSkinSelection {
+): AppliedThemeSkinSelection {
   const stored = readStoredThemeSkin(options.storage);
-  return applyThemeSkin(stored.theme, stored.skin, options);
+  return applyThemeSkin(stored.mode, stored.skin, options);
 }
