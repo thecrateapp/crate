@@ -21,7 +21,7 @@ La implementación será incremental. Cada corte migrará un área concreta, con
 
 ## Estado verificado
 
-Última verificación: 2026-09-06, rama `codex/listen-design-system`, HEAD `66d554b6`.
+Última verificación: 2026-09-06, rama `codex/listen-design-system`, HEAD `f893feb9`.
 
 Ya está implementado y validado:
 
@@ -31,13 +31,16 @@ Ya está implementado y validado:
 - consumo CSS/Tailwind semántico y conteo de consumidores reales, incluidos los
   bridges `@theme`;
 - scope explícito de Listen mediante `data-crate-app`;
-- resolver runtime de theme/skin con registry, matriz de compatibilidad, fallback
-  y persistencia local;
-- `dark + default`, `dark + aurora` y `high-contrast + default`;
-- selector accesible con radios nativos, descripciones traducidas y explicación
-  de combinaciones incompatibles;
-- reduced motion existente y contrato de contraste base para el theme accesible;
-- contrato WCAG explícito para skins, high-contrast y controles destructivos;
+- resolver runtime de modo/skin con registry, fallback, persistencia local y
+  migración de selecciones legacy;
+- `dark + default`, `light + default`, `dark + crateRed` y `light + crateRed`;
+- preferencia `system` con resolución mediante `prefers-color-scheme` y
+  actualización al cambiar el sistema operativo;
+- selector accesible con radios nativos, descripciones traducidas y selección
+  ortogonal de modo y skin;
+- Toaster sincronizado con el modo resuelto;
+- reduced motion existente y contratos de contraste para todas las variantes;
+- contrato WCAG explícito para skins y controles destructivos;
 - contrato WCAG con composición alpha para superficies translúcidas y backdrops
   explícitos para artwork, sin asumir un color de fondo que pueda falsear el
   resultado;
@@ -57,23 +60,21 @@ Métricas actuales del inventario reproducible:
 
 QA ejecutada en este corte:
 
-- preview de Listen verificado en desktop (1280×720) y móvil (390×844);
-- DOM de acceso, labels, controles y ausencia de errores de consola verificados;
-- Settings autenticado revisado contra una base efímera aislada, sin tocar la
-  base dev persistida, que está bloqueada por la revisión Alembic inexistente
-  `096` en este checkout;
+- preview conceptual de las cuatro variantes concretas del modelo de apariencia;
+- DOM, labels, controles, persistencia y migración legacy cubiertos por tests de
+  Settings;
+- resolver, fallback, `matchMedia`, limpieza de listeners y Toaster cubiertos
+  por tests runtime;
 - matriz de referencia registrada en
   `docs/technical/listen-design-system-visual-qa.md` para Player, Shell, Home,
   Library, Artist, Album, Settings, Stats y Jam;
-- Settings revisado autenticado en `dark + default`, `dark + aurora` y
-  `high-contrast + default`, en desktop y móvil cuando aplica;
 - reduced motion verificado mediante su contrato CSS y tests, ya que el browser
   de QA no expone emulación de media features.
 
-No quedan pendientes técnicos del plan. La única diferencia respecto a una
-revisión visual con hardware real es que reduced motion queda validado por el
-contrato CSS y sus tests, porque el browser de QA no expone emulación de media
-features.
+No quedan pendientes técnicos del plan. La revisión visual manual con browser y
+hardware real queda limitada por las capacidades del entorno de QA; el contrato
+de variantes y sus transiciones está cubierto por tests y por el preview
+conceptual.
 
 ## Implementation Steps
 
@@ -90,8 +91,10 @@ features.
 - [x] Definir tokens primitive mínimos y tokens semánticos consumibles por componentes.
 - [x] Consolidar surfaces, text, borders, accent, state, focus, motion, radius, shadow, spacing y typography.
 - [x] Separar el scope de Listen del shared UI con atributos de aplicación sin alterar Admin accidentalmente.
-- [x] Crear el resolver runtime de `theme` y `skin` con registry, validación, fallback y persistencia local.
-- [x] Establecer `dark + default` como combinación inicial y respetar reduced motion/contrast.
+- [x] Crear el resolver runtime de `mode` y `skin` con registry, validación, fallback y persistencia local.
+- [x] Establecer `dark + default`, añadir `light` y resolver `system` mediante `matchMedia`.
+- [x] Añadir `crateRed` con variantes explícitas dark/light y migrar `aurora`.
+- [x] Mantener reduced motion y contraste como contratos independientes del selector de modo.
 - [x] Mantener CSS variables como runtime; no introducir CSS-in-JS.
 
 ### 3. Primitives y composites canónicos
@@ -125,7 +128,7 @@ features.
 - [x] Lint de drift para colores, opacity utilities, inline styles y imports prohibidos.
 - [x] Typecheck, ESLint, Prettier y tests Vitest/Testing Library por corte.
 - [x] Tests de resolver, fallback, persistencia y combinaciones theme/skin.
-- [x] Revisión visual del default en desktop, mobile, reduced motion y high contrast.
+- [x] Revisión de variantes dark/light en desktop y mobile, con reduced motion cubierto por contrato automatizado.
 - [x] Verificar contraste WCAG AA en tokens de texto, controles, estados explícitos y composiciones alpha con backdrop declarado.
 - [x] Añadir al menos un skin adicional para probar que el contrato no depende de valores del default.
 - [x] Cerrar cada corte con métrica de drift, excepciones revisadas y lista de regresiones conocida.

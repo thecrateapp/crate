@@ -51,17 +51,22 @@ The token barrel is split into layers under `app/shared/ui/tokens/`:
 - theme-only overrides in `themes.css`;
 - motion, radius, typography and z-index contracts.
 
-The current appearance is the `dark + default` combination. The runtime
-resolver in `app/shared/ui/lib/theme-skin.ts` validates and persists the
-selection, while the supported `dark + aurora` skin changes only the curated
-identity surface. `high-contrast + default` is a reading/accessibility theme;
-unsupported combinations fall back to the compatible default skin.
+The current appearance remains `dark + default`, but the runtime contract now
+separates the color-mode preference from the visual identity. The mode can be
+`dark`, `light`, or `system`; `system` resolves through
+`prefers-color-scheme` and reacts to operating-system changes. The supported
+skins are `default` and `crateRed`, and each skin has explicit dark and light
+token variants. Legacy `aurora` selections migrate to `crateRed`, while old
+high-contrast selections fall back to `dark + default`.
 
-Theme overrides are scoped with `data-crate-app="listen"`, so Admin does not
-inherit Listen accessibility or skin rules accidentally. Skins are limited to
-an explicit variable allowlist and cannot change layout, spacing, motion or
-component behavior. Drift inventory tests enforce the scope and keep raw color
-exceptions attributable.
+Runtime state is exposed through `data-crate-app="listen"`,
+`data-crate-mode`, `data-crate-mode-preference`, and `data-crate-skin`, so Admin
+does not inherit Listen appearance rules accidentally. Skins are limited to an
+explicit variable allowlist covering identity colors, surfaces, rings, radii,
+shadows, and brand typography; they cannot change layout, spacing, motion or
+component behavior. Settings applies the selection immediately and persists it
+per device. The shared appearance store also keeps the Listen Toaster aligned
+with the resolved mode.
 
 The quality gates also enforce the shared UI layer graph, explicit WCAG AA
 pairings for supported skins and destructive controls, and a reproducible
