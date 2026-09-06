@@ -2,6 +2,10 @@
    Themes may change identity and accessibility, never layout or behavior. */
 
 /* Listen-only accessibility theme. It changes reading contrast, not skin identity. */
+[data-crate-app="listen"][data-crate-theme="dark"] {
+  --state-danger-foreground: var(--surface-canvas);
+}
+
 [data-crate-app="listen"][data-crate-theme="high-contrast"] {
   --color-background: #000000;
   --color-foreground: #ffffff;

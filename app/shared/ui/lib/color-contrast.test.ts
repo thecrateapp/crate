@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { contrastRatio, meetsWcagAa, parseHexColor } from "./color-contrast";
@@ -38,5 +40,14 @@ describe("color contrast", () => {
   it("keeps the high-contrast Listen theme on the AA-safe base pairing", () => {
     expect(meetsWcagAa("#ffffff", "#000000")).toBe(true);
     expect(meetsWcagAa("#67e8f9", "#000000")).toBe(true);
+  });
+
+  it("keeps solid destructive controls on an AA-safe foreground", () => {
+    const themeTokens = readFileSync("tokens/themes.css", "utf8");
+
+    expect(themeTokens).toMatch(
+      /--state-danger-foreground:\s*var\(--surface-canvas\)/,
+    );
+    expect(meetsWcagAa("#0a0a0f", "#ef4444")).toBe(true);
   });
 });
