@@ -8,6 +8,13 @@ import {
 } from "./theme-skin";
 
 describe("theme and skin runtime", () => {
+  it("keeps translated labels out of the shared runtime registry", async () => {
+    const { SKIN_REGISTRY, THEME_REGISTRY } = await import("./theme-skin");
+
+    expect(THEME_REGISTRY.dark).not.toHaveProperty("label");
+    expect(SKIN_REGISTRY.aurora).not.toHaveProperty("label");
+  });
+
   it("falls back to the supported default for unknown persisted values", () => {
     const storage = {
       getItem: () => JSON.stringify({ theme: "light", skin: "neon" }),

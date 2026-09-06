@@ -3,12 +3,10 @@ export const THEME_SKIN_STORAGE_KEY = "crate.listen.theme-skin";
 export const THEME_REGISTRY = {
   dark: {
     id: "dark",
-    label: "Dark",
     colorScheme: "dark",
   },
   "high-contrast": {
     id: "high-contrast",
-    label: "High contrast",
     colorScheme: "dark",
   },
 } as const;
@@ -34,7 +32,6 @@ type SkinVariableName = (typeof SKIN_VARIABLE_ALLOWLIST)[number];
 
 interface SkinDefinition {
   id: string;
-  label: string;
   variables: Partial<Record<SkinVariableName, string>>;
 }
 
@@ -43,12 +40,10 @@ const DEFAULT_SKIN_VARIABLES: Partial<Record<SkinVariableName, string>> = {};
 export const SKIN_REGISTRY = {
   default: {
     id: "default",
-    label: "Default",
     variables: DEFAULT_SKIN_VARIABLES,
   },
   aurora: {
     id: "aurora",
-    label: "Aurora",
     variables: {
       "--color-primary": "#a78bfa",
       "--color-primary-foreground": "#1e1b4b",

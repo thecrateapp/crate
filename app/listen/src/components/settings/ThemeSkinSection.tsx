@@ -14,11 +14,9 @@ import {
 
 const THEME_OPTIONS = Object.values(THEME_REGISTRY).map((theme) => ({
   id: theme.id as ThemeId,
-  label: theme.label,
 }));
 const SKIN_OPTIONS = Object.values(SKIN_REGISTRY).map((skin) => ({
   id: skin.id as SkinId,
-  label: skin.label,
 }));
 
 const selectionButtonClass = (selected: boolean) =>
@@ -71,9 +69,7 @@ export function ThemeSkinSection() {
                     className="sr-only"
                   />
                   <span className="block text-sm font-semibold">
-                    {t(`settings.appearance.themes.${theme.id}`, {
-                      defaultValue: theme.label,
-                    })}
+                    {t(`settings.appearance.themes.${theme.id}`)}
                   </span>
                 </label>
               );
@@ -114,9 +110,7 @@ export function ThemeSkinSection() {
                     className="sr-only"
                   />
                   <span className="block text-sm font-semibold">
-                    {t(`settings.appearance.skinNames.${skin.id}`, {
-                      defaultValue: skin.label,
-                    })}
+                    {t(`settings.appearance.skinNames.${skin.id}`)}
                   </span>
                   <span
                     id={`theme-skin-${skin.id}-description`}
