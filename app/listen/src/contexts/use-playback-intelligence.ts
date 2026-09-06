@@ -129,14 +129,16 @@ export function usePlaybackIntelligence({
   // and infinite mode is on, prefetch continuation tracks.
   useEffect(() => {
     const currentTrack = queue[currentIndex];
+    const continuationSource = playSource;
     const supportsContinuation =
       infinitePlaybackEnabled &&
       !shuffle &&
       !!currentTrack &&
-      (playSource?.type === "album" || playSource?.type === "playlist") &&
-      !!playSource?.radio?.seedId;
+      (continuationSource?.type === "album" ||
+        continuationSource?.type === "playlist") &&
+      !!continuationSource?.radio?.seedId;
 
-    if (!supportsContinuation) return;
+    if (!supportsContinuation || !continuationSource) return;
 
     const remainingUpcoming = queue.length - currentIndex - 1;
     if (remainingUpcoming > RADIO_REFILL_THRESHOLD) {
@@ -145,7 +147,7 @@ export function usePlaybackIntelligence({
     }
     if (continuationInFlightRef.current) return;
 
-    const sessionSignature = getPlaySourceSignature(playSource);
+    const sessionSignature = getPlaySourceSignature(continuationSource);
     const signature = [
       sessionSignature,
       currentTrack?.id ?? "",
@@ -157,7 +159,7 @@ export function usePlaybackIntelligence({
     const controller = new AbortController();
     continuationPrefetchAbortRef.current = controller;
 
-    fetchInfiniteContinuation(playSource!, RADIO_REFILL_BATCH_SIZE, {
+    fetchInfiniteContinuation(continuationSource, RADIO_REFILL_BATCH_SIZE, {
       signal: controller.signal,
     })
       .then((tracks) => {
@@ -202,14 +204,15 @@ export function usePlaybackIntelligence({
   useEffect(() => {
     const currentTrack = queue[currentIndex];
     const nextTrack = queue[currentIndex + 1];
+    const suggestionSource = playSource;
     const supportsSmartInclusion =
       smartPlaylistSuggestionsEnabled &&
       !shuffle &&
       !!currentTrack &&
-      playSource?.type === "playlist" &&
-      !!playSource?.radio?.seedId;
+      suggestionSource?.type === "playlist" &&
+      !!suggestionSource?.radio?.seedId;
 
-    if (!supportsSmartInclusion) {
+    if (!supportsSmartInclusion || !suggestionSource) {
       playlistSuggestionSignatureRef.current = null;
       return;
     }
@@ -236,7 +239,7 @@ export function usePlaybackIntelligence({
 
     if (nextTrack?.isSuggested) {
       playlistSuggestionSignatureRef.current = [
-        playSource?.radio?.seedId ?? "",
+        suggestionSource.radio?.seedId ?? "",
         playedOriginalCount,
         currentTrack?.id ?? "",
       ].join("::");
@@ -246,7 +249,7 @@ export function usePlaybackIntelligence({
     if (playlistSuggestionInFlightRef.current) return;
 
     const signature = [
-      playSource?.radio?.seedId ?? "",
+      suggestionSource.radio?.seedId ?? "",
       playedOriginalCount,
       currentTrack?.id ?? "",
       queue.length,
@@ -256,10 +259,10 @@ export function usePlaybackIntelligence({
     playlistSuggestionInFlightRef.current = true;
     const controller = new AbortController();
     playlistSuggestionAbortRef.current = controller;
-    const expectedSeedId = playSource?.radio?.seedId ?? null;
+    const expectedSeedId = suggestionSource.radio?.seedId ?? null;
 
     fetchInfiniteContinuation(
-      playSource!,
+      suggestionSource,
       SMART_PLAYLIST_SUGGESTION_BATCH_SIZE,
       { signal: controller.signal },
     )
