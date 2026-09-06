@@ -64,3 +64,6 @@ jobs:
 
       - name: Test design-system tooling
         run: node --test scripts/design-system/*.test.mjs
+
+      - name: Check shared UI layer boundaries
+        run: npm run design-system:layers
