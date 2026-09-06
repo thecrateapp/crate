@@ -34,4 +34,9 @@ describe("color contrast", () => {
       }
     });
   });
+
+  it("keeps the high-contrast Listen theme on the AA-safe base pairing", () => {
+    expect(meetsWcagAa("#ffffff", "#000000")).toBe(true);
+    expect(meetsWcagAa("#67e8f9", "#000000")).toBe(true);
+  });
 });

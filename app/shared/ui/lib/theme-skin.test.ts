@@ -25,6 +25,13 @@ describe("theme and skin runtime", () => {
     expect(resolveThemeSkin("light", "default")).toEqual(DEFAULT_THEME_SKIN);
   });
 
+  it("keeps a supported theme when an incompatible skin is requested", () => {
+    expect(resolveThemeSkin("high-contrast", "aurora")).toEqual({
+      theme: "high-contrast",
+      skin: "default",
+    });
+  });
+
   it("replaces previously applied skin variables when returning to default", () => {
     const root = document.documentElement;
 

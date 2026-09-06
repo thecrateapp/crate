@@ -6,6 +6,11 @@ export const THEME_REGISTRY = {
     label: "Dark",
     colorScheme: "dark",
   },
+  "high-contrast": {
+    id: "high-contrast",
+    label: "High contrast",
+    colorScheme: "dark",
+  },
 } as const;
 
 export const SKIN_VARIABLE_ALLOWLIST = [
@@ -61,7 +66,11 @@ export const SKIN_REGISTRY = {
 export type ThemeId = keyof typeof THEME_REGISTRY;
 export type SkinId = keyof typeof SKIN_REGISTRY;
 
-const SUPPORTED_COMBINATIONS = new Set(["dark:default", "dark:aurora"]);
+const SUPPORTED_COMBINATIONS = new Set([
+  "dark:default",
+  "dark:aurora",
+  "high-contrast:default",
+]);
 
 export interface ThemeSkinSelection {
   theme: ThemeId;
@@ -109,12 +118,15 @@ export function resolveThemeSkin(
   theme: unknown,
   skin: unknown,
 ): ThemeSkinSelection {
-  if (
-    isThemeId(theme) &&
-    isSkinId(skin) &&
-    SUPPORTED_COMBINATIONS.has(`${theme}:${skin}`)
-  ) {
-    return { theme, skin };
+  const resolvedTheme = isThemeId(theme) ? theme : DEFAULT_THEME_SKIN.theme;
+  const resolvedSkin = isSkinId(skin) ? skin : DEFAULT_THEME_SKIN.skin;
+
+  if (SUPPORTED_COMBINATIONS.has(`${resolvedTheme}:${resolvedSkin}`)) {
+    return { theme: resolvedTheme, skin: resolvedSkin };
+  }
+
+  if (SUPPORTED_COMBINATIONS.has(`${resolvedTheme}:default`)) {
+    return { theme: resolvedTheme, skin: "default" };
   }
 
   return DEFAULT_THEME_SKIN;

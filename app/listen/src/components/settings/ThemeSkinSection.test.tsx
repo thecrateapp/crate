@@ -8,6 +8,8 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 describe("ThemeSkinSection", () => {
   beforeEach(() => {
     localStorage.clear();
+    document.documentElement.removeAttribute("data-crate-app");
+    document.documentElement.removeAttribute("data-crate-theme");
     document.documentElement.removeAttribute("data-crate-skin");
   });
 
@@ -27,6 +29,20 @@ describe("ThemeSkinSection", () => {
     expect(document.documentElement.dataset.crateSkin).toBe("aurora");
     expect(localStorage.getItem("crate.listen.theme-skin")).toBe(
       JSON.stringify({ theme: "dark", skin: "aurora" }),
+    );
+  });
+
+  it("switches to high contrast and falls back to the compatible default skin", async () => {
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
+    await user.click(screen.getByRole("radio", { name: /High contrast/i }));
+
+    expect(document.documentElement.dataset.crateTheme).toBe("high-contrast");
+    expect(document.documentElement.dataset.crateSkin).toBe("default");
+    expect(screen.getByRole("radio", { name: /Aurora/i })).toBeDisabled();
+    expect(localStorage.getItem("crate.listen.theme-skin")).toBe(
+      JSON.stringify({ theme: "high-contrast", skin: "default" }),
     );
   });
 
