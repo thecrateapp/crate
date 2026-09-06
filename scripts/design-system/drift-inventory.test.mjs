@@ -139,6 +139,31 @@ test("separates foundation and intentional raw colors from product drift", () =>
   );
 });
 
+test("exposes ownership metadata for every raw color exception", () => {
+  const inventory = buildDriftInventory();
+
+  assert.deepEqual(inventory.rawColorAllowlist, [
+    {
+      path: "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      owner: "shared-ui",
+      reason: "Provider brand colors must match Google's official OAuth mark.",
+      reviewBy: "2026-12-31",
+    },
+    {
+      path: "app/shared/ui/lib/theme-skin.ts",
+      owner: "design-system",
+      reason: "Curated skin values are runtime inputs for the skin registry.",
+      reviewBy: "2026-12-31",
+    },
+    {
+      path: "app/listen/src/lib/capacitor-init.ts",
+      owner: "listen-platform",
+      reason: "Capacitor requires a fully transparent native status-bar color.",
+      reviewBy: "2026-12-31",
+    },
+  ]);
+});
+
 test("detects surface tokens used in border and text declarations", () => {
   const metrics = analyzeSemanticTokens(`
     :root {

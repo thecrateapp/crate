@@ -16,10 +16,31 @@ const FOUNDATION_TOKEN_PATH_PATTERN = /^app\/shared\/ui\/tokens\//;
 const RAW_COLOR_ALLOWLIST = new Map([
   [
     "app/shared/ui/domain/auth/OAuthButtons.tsx",
-    /fill="#(?:4285F4|34A853|FBBC05|EA4335)"/gi,
+    {
+      pattern: /fill="#(?:4285F4|34A853|FBBC05|EA4335)"/gi,
+      owner: "shared-ui",
+      reason: "Provider brand colors must match Google's official OAuth mark.",
+      reviewBy: "2026-12-31",
+    },
   ],
-  ["app/shared/ui/lib/theme-skin.ts", /#[0-9a-f]{3,8}\b|rgba?\(/gi],
-  ["app/listen/src/lib/capacitor-init.ts", /color:\s*"#00000000"/gi],
+  [
+    "app/shared/ui/lib/theme-skin.ts",
+    {
+      pattern: /#[0-9a-f]{3,8}\b|rgba?\(/gi,
+      owner: "design-system",
+      reason: "Curated skin values are runtime inputs for the skin registry.",
+      reviewBy: "2026-12-31",
+    },
+  ],
+  [
+    "app/listen/src/lib/capacitor-init.ts",
+    {
+      pattern: /color:\s*"#00000000"/gi,
+      owner: "listen-platform",
+      reason: "Capacitor requires a fully transparent native status-bar color.",
+      reviewBy: "2026-12-31",
+    },
+  ],
 ]);
 const LEGACY_SEMANTIC_UTILITY_PATTERN =
   /(?<![A-Za-z0-9_-])(?:bg|text|border(?:-[trblxyse])?|fill|stroke|from|via|to)-(?:background|foreground|primary(?:-foreground)?|muted(?:-foreground)?|destructive(?:-foreground)?|card(?:-foreground)?|secondary(?:-foreground)?|accent(?:-foreground)?|border|input|ring|app-surface)(?![A-Za-z0-9_-])/g;
@@ -125,7 +146,7 @@ export function analyzeRawColorDrift(path, content) {
     ? 0
     : Math.min(
         rawColors,
-        countMatches(content, RAW_COLOR_ALLOWLIST.get(path) ?? /$^/g),
+        countMatches(content, RAW_COLOR_ALLOWLIST.get(path)?.pattern ?? /$^/g),
       );
 
   return {
@@ -133,6 +154,15 @@ export function analyzeRawColorDrift(path, content) {
     allowlistedRawColors,
     actionableRawColors: rawColors - foundationRawColors - allowlistedRawColors,
   };
+}
+
+function getRawColorAllowlistMetadata() {
+  return [...RAW_COLOR_ALLOWLIST.entries()].map(([path, metadata]) => ({
+    path,
+    owner: metadata.owner,
+    reason: metadata.reason,
+    reviewBy: metadata.reviewBy,
+  }));
 }
 
 function extractRootBlock(content) {
@@ -359,6 +389,7 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
   return {
     version: 4,
     roots: SOURCE_DIRECTORIES,
+    rawColorAllowlist: getRawColorAllowlistMetadata(),
     semanticTokens: statSync(semanticTokenPath, { throwIfNoEntry: false })
       ? analyzeSemanticTokens(
           readFileSync(semanticTokenPath, "utf8"),
