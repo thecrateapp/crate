@@ -112,4 +112,12 @@ describe("color contrast", () => {
     );
     expect(meetsWcagAa("#0a0a0f", "#ef4444")).toBe(true);
   });
+
+  it("scopes appearance hooks to resolved color modes", () => {
+    const themeTokens = readFileSync("tokens/themes.css", "utf8");
+
+    expect(themeTokens).toMatch(/data-crate-mode="dark"/);
+    expect(themeTokens).toMatch(/data-crate-mode="light"/);
+    expect(themeTokens).not.toContain('data-crate-theme="high-contrast"');
+  });
 });

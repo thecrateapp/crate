@@ -105,6 +105,22 @@ describe("theme and skin runtime", () => {
     });
   });
 
+  it("defines explicit dark and light token variants for each skin", async () => {
+    const { SKIN_REGISTRY } = await import("./theme-skin");
+
+    Object.values(SKIN_REGISTRY).forEach(({ modes }) => {
+      expect(modes.dark["--color-primary"]).toBeTruthy();
+      expect(modes.light["--color-primary"]).toBeTruthy();
+      expect(modes.dark["--surface-app"]).toBeTruthy();
+      expect(modes.light["--surface-app"]).toBeTruthy();
+    });
+
+    expect(SKIN_REGISTRY.default.modes.light["--surface-app"]).toBe("#f8fafc");
+    expect(SKIN_REGISTRY.crateRed.modes.dark["--color-primary"]).toBe(
+      "#ff375f",
+    );
+  });
+
   it("applies resolved mode and persists the preference", () => {
     const root = document.documentElement;
     const values = new Map<string, string>();

@@ -267,7 +267,7 @@ test("keeps shared animation colors skin-aware", () => {
   assert.match(animations, /var\(--surface-glass-shadow\)/);
 });
 
-test("keeps accessibility theme overrides isolated from semantic recipes", () => {
+test("keeps runtime mode hooks isolated from semantic recipes", () => {
   const semantic = readFileSync(
     new URL("../../app/shared/ui/tokens/semantic.css", import.meta.url),
     "utf8",
@@ -277,14 +277,16 @@ test("keeps accessibility theme overrides isolated from semantic recipes", () =>
     "utf8",
   );
 
-  assert.doesNotMatch(semantic, /data-crate-theme="high-contrast"/);
+  assert.doesNotMatch(semantic, /data-crate-mode="(?:dark|light)"/);
+  assert.doesNotMatch(themes, /data-crate-theme="high-contrast"/);
+  assert.match(themes, /\[data-crate-app="listen"\]\[data-crate-mode="dark"\]/);
   assert.match(
     themes,
-    /\[data-crate-app="listen"\]\[data-crate-theme="high-contrast"\]/,
+    /\[data-crate-app="listen"\]\[data-crate-mode="light"\]/,
   );
   assert.match(
     themes,
-    /\[data-crate-app="listen"\]\[data-crate-theme="dark"\][\s\S]*--state-danger-foreground:\s*var\(--surface-canvas\)/,
+    /\[data-crate-app="listen"\]\[data-crate-mode="dark"\][\s\S]*--state-danger-foreground:\s*var\(--surface-canvas\)/,
   );
   assert.doesNotMatch(
     themes,
