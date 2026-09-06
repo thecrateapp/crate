@@ -38,8 +38,21 @@ describe("color contrast", () => {
   });
 
   it("keeps the high-contrast Listen theme on the AA-safe base pairing", () => {
-    expect(meetsWcagAa("#ffffff", "#000000")).toBe(true);
-    expect(meetsWcagAa("#67e8f9", "#000000")).toBe(true);
+    const pairings = [
+      ["#ffffff", "#000000"],
+      ["#f1f5f9", "#000000"],
+      ["#e2e8f0", "#000000"],
+      ["#cbd5e1", "#000000"],
+      ["#001014", "#67e8f9"],
+      ["#000000", "#fca5a5"],
+      ["#000000", "#86efac"],
+      ["#000000", "#fde68a"],
+      ["#000000", "#93c5fd"],
+    ] as const;
+
+    pairings.forEach(([foreground, background]) => {
+      expect(meetsWcagAa(foreground, background)).toBe(true);
+    });
   });
 
   it("keeps solid destructive controls on an AA-safe foreground", () => {

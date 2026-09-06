@@ -282,6 +282,10 @@ test("keeps accessibility theme overrides isolated from semantic recipes", () =>
     themes,
     /\[data-crate-app="listen"\]\[data-crate-theme="high-contrast"\]/,
   );
+  assert.match(
+    themes,
+    /\[data-crate-app="listen"\]\[data-crate-theme="dark"\][\s\S]*--state-danger-foreground:\s*var\(--surface-canvas\)/,
+  );
   assert.doesNotMatch(
     themes,
     /(?:^|[;{])\s*(?:margin|padding|width|height)\s*:/m,
