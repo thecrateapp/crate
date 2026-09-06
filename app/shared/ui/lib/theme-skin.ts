@@ -85,8 +85,6 @@ interface SkinDefinition {
   modes: Record<ResolvedColorMode, SkinVariables>;
 }
 
-const EMPTY_SKIN_VARIABLES: SkinVariables = {};
-
 const DEFAULT_DARK_SKIN_VARIABLES: SkinVariables = {
   "--color-background": "#0a0a0f",
   "--color-card": "#16161e",
@@ -326,6 +324,31 @@ export const DEFAULT_THEME_SKIN = {
   skin: "default",
 } as const satisfies ThemeSkinSelection;
 
+const THEME_SKIN_CHANGE_EVENT = "crate:theme-skin-change";
+let currentThemeSkin: AppliedThemeSkinSelection = {
+  ...DEFAULT_THEME_SKIN,
+  resolvedMode: "dark",
+};
+
+export function getAppliedThemeSkin(): AppliedThemeSkinSelection {
+  return currentThemeSkin;
+}
+
+export function subscribeThemeSkin(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+
+  window.addEventListener(THEME_SKIN_CHANGE_EVENT, listener);
+  return () => window.removeEventListener(THEME_SKIN_CHANGE_EVENT, listener);
+}
+
+function publishThemeSkin(selection: AppliedThemeSkinSelection): void {
+  currentThemeSkin = selection;
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(THEME_SKIN_CHANGE_EVENT));
+  }
+}
+
 type StorageReader = Pick<Storage, "getItem">;
 type StorageWriter = Pick<Storage, "setItem">;
 type MatchMedia = (query: string) => MediaQueryList;
@@ -514,6 +537,10 @@ export function applyThemeSkin(
         root.dataset.crateMode = nextMode;
         root.style.colorScheme = MODE_REGISTRY[nextMode].colorScheme;
         applySkinVariables(root, selection.skin, nextMode);
+        publishThemeSkin({
+          ...selection,
+          resolvedMode: nextMode,
+        });
       };
 
       mediaQuery.addEventListener("change", onChange);
@@ -533,7 +560,9 @@ export function applyThemeSkin(
     // Persistence is best effort; the active selection still applies.
   }
 
-  return { ...selection, resolvedMode };
+  const appliedSelection = { ...selection, resolvedMode };
+  publishThemeSkin(appliedSelection);
+  return appliedSelection;
 }
 
 export function initializeThemeSkin(

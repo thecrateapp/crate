@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
@@ -9,7 +10,11 @@ import { primeOfflineRuntimeProfile } from "./lib/offline";
 import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
 import { renderSecureSessionError } from "./lib/secure-session-error";
-import { initializeThemeSkin } from "@crate/ui/lib/theme-skin";
+import {
+  getAppliedThemeSkin,
+  initializeThemeSkin,
+  subscribeThemeSkin,
+} from "@crate/ui/lib/theme-skin";
 import "./index.css";
 
 async function disableDevServiceWorker() {
@@ -42,6 +47,25 @@ async function disableDevServiceWorker() {
 
 const isCapacitorBuild = import.meta.env.MODE === "capacitor";
 
+function ThemeAwareToaster() {
+  const resolvedMode = useSyncExternalStore(
+    subscribeThemeSkin,
+    () => getAppliedThemeSkin().resolvedMode,
+    () => "dark" as const,
+  );
+
+  return (
+    <Toaster
+      theme={resolvedMode}
+      position="bottom-center"
+      richColors
+      mobileOffset={{
+        bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
+      }}
+    />
+  );
+}
+
 // Load Poppins only on web — iOS/Android use system fonts (San
 // Francisco / Roboto) for a native feel. The mode guard is build-time
 // constant, so Vite drops the font chunk from Capacitor bundles.
@@ -55,14 +79,7 @@ function renderApp(): void {
       <I18nProvider>
         <App />
       </I18nProvider>
-      <Toaster
-        theme="dark"
-        position="bottom-center"
-        richColors
-        mobileOffset={{
-          bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
-        }}
-      />
+      <ThemeAwareToaster />
     </BrowserRouter>,
   );
 }

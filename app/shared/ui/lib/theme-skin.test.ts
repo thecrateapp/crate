@@ -4,9 +4,11 @@ import {
   DEFAULT_THEME_SKIN,
   MODE_REGISTRY,
   applyThemeSkin,
+  getAppliedThemeSkin,
   readStoredThemeSkin,
   resolveColorMode,
   resolveThemeSkin,
+  subscribeThemeSkin,
 } from "./theme-skin";
 
 function createMatchMedia(initiallyDark: boolean) {
@@ -174,5 +176,20 @@ describe("theme and skin runtime", () => {
     expect(darkMedia.listenerCount()).toBe(0);
     expect(lightMedia.listenerCount()).toBe(0);
     expect(root.dataset.crateMode).toBe("light");
+  });
+
+  it("notifies app surfaces when the resolved appearance changes", () => {
+    const root = document.documentElement;
+    const changes: string[] = [];
+    const unsubscribe = subscribeThemeSkin(() => {
+      changes.push(getAppliedThemeSkin().resolvedMode);
+    });
+
+    applyThemeSkin("light", "default", { root, storage: undefined });
+    unsubscribe();
+    applyThemeSkin("dark", "default", { root, storage: undefined });
+
+    expect(changes).toEqual(["light"]);
+    expect(getAppliedThemeSkin().resolvedMode).toBe("dark");
   });
 });
