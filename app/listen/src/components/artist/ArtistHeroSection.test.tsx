@@ -80,7 +80,7 @@ function renderWithI18n(ui: ReactNode, locale: "en" | "es" = "en") {
 
 describe("ArtistHeroSection", () => {
   it("keeps artist genres out of the hero surface", () => {
-    renderWithI18n(
+    const { container } = renderWithI18n(
       <MemoryRouter>
         <ArtistHeroSection
           artist={{
@@ -119,6 +119,12 @@ describe("ArtistHeroSection", () => {
     );
 
     expect(screen.queryByText("hardcore")).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="artist-hero-mobile-gradient"]'),
+    ).toHaveStyle({ background: "var(--hero-artwork-gradient-mobile)" });
+    expect(
+      container.querySelector('[data-testid="artist-hero-desktop-gradient"]'),
+    ).toHaveStyle({ background: "var(--hero-artwork-gradient-desktop)" });
   });
 
   it("groups desktop hero actions into primary pills and secondary icon labels", () => {
@@ -164,12 +170,16 @@ describe("ArtistHeroSection", () => {
     });
     const playButton = within(primary).getByRole("button", { name: "Play" });
     expect(playButton).toHaveTextContent("Play");
-    expect(playButton).toHaveClass("rounded-lg");
+    expect(playButton).toHaveClass(
+      "rounded-lg",
+      "shadow-action-solid",
+      "hover:shadow-action-solid-hover",
+    );
     const shuffleButton = within(primary).getByRole("button", {
       name: "Shuffle",
     });
     expect(shuffleButton).toHaveTextContent("Shuffle");
-    expect(shuffleButton).toHaveClass("rounded-lg");
+    expect(shuffleButton).toHaveClass("rounded-lg", "shadow-control-inset");
 
     const actionRail = primary.parentElement;
     expect(actionRail).not.toBeNull();
@@ -424,7 +434,7 @@ describe("ArtistHeroSection", () => {
       name: "Artist Radio",
     });
     expect(radio).toHaveTextContent("Radio");
-    expect(radio).toHaveClass("hover:text-primary");
+    expect(radio).toHaveClass("hover:text-accent-action");
     expect(radio.className).toContain("hover:drop-shadow");
     expect(radio).not.toHaveClass("rounded-lg");
 

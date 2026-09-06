@@ -47,7 +47,7 @@ export function OfflineBadge({
             ? "text-[var(--status-ready-text)]"
             : state === "error"
               ? "text-[var(--status-error-text)]"
-              : "text-primary/85",
+              : "text-accent-action/85",
           className,
         )}
       >
@@ -93,7 +93,7 @@ export function OfflineBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-        "border-[var(--active-border)] bg-[var(--active-bg)] text-primary",
+        "border-[var(--active-border)] bg-[var(--active-bg)] text-accent-action",
         className,
       )}
     >

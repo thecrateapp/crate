@@ -9,8 +9,16 @@ describe("QualityBadge", () => {
         badge={{ tier: "hi-res", label: "HI-RES", detail: "24-bit / 96 kHz" }}
       />,
     );
+    const badge = container.firstElementChild;
+
     expect(container.textContent).toContain("HI-RES");
     expect(container.querySelector("svg")).toBeInTheDocument();
+    expect(badge).toHaveClass(
+      "border-state-warning/50",
+      "text-state-warning",
+      "bg-state-warning/10",
+      "quality-badge-hi-res-glow",
+    );
   });
 
   it("renders stream badge without icon", () => {
@@ -20,7 +28,13 @@ describe("QualityBadge", () => {
         origin="stream"
       />,
     );
+    const badge = container.firstElementChild;
+
     expect(container.querySelector("svg")).toBeNull();
+    expect(badge).toHaveClass("quality-badge-stream");
+    expect(badge?.className).not.toMatch(
+      /(?:border|text|bg)-(?:white|cyan)|rgba\(|shadow-\[/,
+    );
   });
 
   it("renders standard badge without icon", () => {
@@ -29,6 +43,16 @@ describe("QualityBadge", () => {
         badge={{ tier: "standard", label: "MP3", detail: "320 kbps" }}
       />,
     );
+    const badge = container.firstElementChild;
+
     expect(container.querySelector("svg")).toBeNull();
+    expect(badge).toHaveClass(
+      "border-border-quiet",
+      "text-text-muted",
+      "bg-transparent",
+    );
+    expect(badge?.className).not.toMatch(
+      /(?:border|text|bg)-(?:white|primary)|rgba\(|shadow-\[/,
+    );
   });
 });

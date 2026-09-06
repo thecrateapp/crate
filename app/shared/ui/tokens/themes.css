@@ -1,0 +1,8 @@
+/* crate-ui — Runtime mode hooks
+   The selected skin provides explicit dark/light token values. These hooks
+   stay scoped to Listen for behavior that depends on the resolved mode. */
+
+[data-crate-app="listen"][data-crate-mode="dark"],
+[data-crate-app="listen"][data-crate-mode="light"] {
+  --state-danger-foreground: var(--surface-canvas);
+}

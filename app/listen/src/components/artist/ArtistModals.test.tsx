@@ -1,23 +1,28 @@
 import { MemoryRouter } from "react-router";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 
 import { ArtistBioModal } from "./ArtistBioModal";
 import { ArtistSetlistModal } from "./ArtistSetlistSection";
 import { I18nProvider } from "@/i18n";
 
+const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
-    api: vi.fn(() =>
-      Promise.reject(new Error("skip enrichment in modal tests")),
-    ),
+    api: apiMock,
   };
 });
 
 describe("artist mobile modals", () => {
+  beforeEach(() => {
+    apiMock.mockReset();
+    apiMock.mockRejectedValue(new Error("skip enrichment in modal tests"));
+  });
+
   it("renders probable setlist as a native bottom sheet instead of a floating panel", () => {
     renderWithProviders(
       <ArtistSetlistModal
@@ -131,9 +136,79 @@ describe("artist mobile modals", () => {
     expect(hardcore).not.toHaveClass("rounded-full", "bg-white/8");
     expect(header).toHaveClass("border-b-0", "bg-transparent");
     expect(header).not.toHaveClass("backdrop-blur-xl");
-    expect(close).toHaveClass("hover:text-primary");
+    expect(close).toHaveClass("hover:text-accent-action");
     expect(close.className).not.toContain("bg-white/5");
     expect(close.className).not.toContain("border-white/10");
+  });
+
+  it("refetches enrichment when the open modal switches artists", async () => {
+    const { rerender } = renderWithProviders(
+      <ArtistBioModal
+        open
+        onClose={() => {}}
+        photoUrl="/artist.jpg"
+        tags={[]}
+        artist={{
+          id: 7,
+          name: "Kneecap",
+          albums: [],
+          total_tracks: 0,
+          total_size_mb: 0,
+          primary_format: null,
+          genres: [],
+          issue_count: 0,
+        }}
+        artistInfo={{
+          bio: "Belfast trio.",
+          tags: [],
+          similar: [],
+          listeners: 0,
+          playcount: 0,
+          image_url: null,
+          url: "",
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/artists/7/enrichment");
+    });
+
+    rerender(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <ArtistBioModal
+            open
+            onClose={() => {}}
+            photoUrl="/artist.jpg"
+            tags={[]}
+            artist={{
+              id: 8,
+              name: "Converge",
+              albums: [],
+              total_tracks: 0,
+              total_size_mb: 0,
+              primary_format: null,
+              genres: [],
+              issue_count: 0,
+            }}
+            artistInfo={{
+              bio: "Boston band.",
+              tags: [],
+              similar: [],
+              listeners: 0,
+              playcount: 0,
+              image_url: null,
+              url: "",
+            }}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith("/api/artists/8/enrichment");
+    });
   });
 });
 

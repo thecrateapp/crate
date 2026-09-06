@@ -200,7 +200,12 @@ export function Setup() {
                 ].map(({ key, label, desc, url }) => (
                   <div key={key}>
                     <div className="flex items-center gap-2 mb-1">
-                      <label className="text-xs font-medium">{label}</label>
+                      <label
+                        htmlFor={`setup-${key}`}
+                        className="text-xs font-medium"
+                      >
+                        {label}
+                      </label>
                       {desc && (
                         <span className="text-[10px] text-muted-foreground">
                           {desc}
@@ -218,6 +223,7 @@ export function Setup() {
                       )}
                     </div>
                     <Input
+                      id={`setup-${key}`}
                       placeholder={`Enter ${label}...`}
                       value={(keys as any)[key]}
                       onChange={(e) =>

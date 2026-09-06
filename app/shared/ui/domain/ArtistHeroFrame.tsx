@@ -96,7 +96,7 @@ export function ArtistHeroFrame({
       {...props}
       data-testid={`${composition}-artist-hero-frame`}
       className={cn(
-        "relative w-full overflow-hidden bg-app-surface",
+        "relative w-full overflow-hidden bg-surface-canvas",
         className,
       )}
       style={{

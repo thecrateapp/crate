@@ -225,6 +225,8 @@ export function HeroCompositionCanvas({
       crop.y + crop.height <= imageSize.height + 1 &&
       Math.abs(cropAspect - aspect) < 0.02;
     if (!cropIsValid) {
+      // The canvas owns validation but the parent owns the persisted recipe.
+      // react-doctor-disable-next-line no-pass-data-to-parent, no-pass-live-state-to-parent
       setRecipe({ crop: centeredCropForAspect(imageSize, aspect) });
     }
   }, [aspect, imageSize, recipe.crop, recipe.mode, setRecipe]);

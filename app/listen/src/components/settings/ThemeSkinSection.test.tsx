@@ -1,0 +1,63 @@
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { ThemeSkinSection } from "@/components/settings/ThemeSkinSection";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
+
+describe("ThemeSkinSection", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.removeAttribute("data-crate-app");
+    document.documentElement.removeAttribute("data-crate-mode");
+    document.documentElement.removeAttribute("data-crate-mode-preference");
+    document.documentElement.removeAttribute("data-crate-skin");
+  });
+
+  it("shows the stored skin and applies a new skin selection", async () => {
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
+
+    const defaultSkin = screen.getByRole("radio", { name: /Default/i });
+    const crateRedSkin = screen.getByRole("radio", { name: /Crate Red/i });
+    expect(defaultSkin).toBeChecked();
+    expect(crateRedSkin).not.toBeChecked();
+
+    await user.click(crateRedSkin);
+
+    expect(crateRedSkin).toBeChecked();
+    expect(document.documentElement.dataset.crateSkin).toBe("crateRed");
+    expect(localStorage.getItem("crate.listen.theme-skin")).toBe(
+      JSON.stringify({ mode: "dark", skin: "crateRed" }),
+    );
+  });
+
+  it("supports dark, light, and system color modes", async () => {
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
+
+    await user.click(screen.getByRole("radio", { name: /^Light$/i }));
+    expect(document.documentElement.dataset.crateMode).toBe("light");
+    expect(document.documentElement.dataset.crateModePreference).toBe("light");
+
+    await user.click(screen.getByRole("radio", { name: /^System$/i }));
+    expect(document.documentElement.dataset.crateModePreference).toBe("system");
+    expect(screen.getByText(/system preference/i)).toBeInTheDocument();
+    expect(localStorage.getItem("crate.listen.theme-skin")).toBe(
+      JSON.stringify({ mode: "system", skin: "default" }),
+    );
+  });
+
+  it("initializes from the persisted skin and migrates legacy values", () => {
+    localStorage.setItem(
+      "crate.listen.theme-skin",
+      JSON.stringify({ theme: "dark", skin: "aurora" }),
+    );
+
+    renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
+
+    expect(screen.getByRole("radio", { name: /Crate Red/i })).toBeChecked();
+  });
+});

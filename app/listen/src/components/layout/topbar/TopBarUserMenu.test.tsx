@@ -101,6 +101,9 @@ describe("TopBarUserMenu", () => {
   it("uses the canonical glass context menu on desktop", async () => {
     renderMenu();
 
+    expect(screen.getByRole("button", { name: "User menu" })).toHaveClass(
+      "shadow-icon-control",
+    );
     fireEvent.click(screen.getByRole("button", { name: "User menu" }));
 
     const menu = screen.getByRole("menu");

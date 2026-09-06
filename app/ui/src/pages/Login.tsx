@@ -95,7 +95,6 @@ export function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            autoFocus
             autoComplete="email"
             className="h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white focus:border-cyan-400/50 focus:outline-none"
           />

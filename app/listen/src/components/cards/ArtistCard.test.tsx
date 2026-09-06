@@ -74,7 +74,7 @@ describe("ArtistCard", () => {
     expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);
     expect(image.getAttribute("srcset")).toMatch(/size=320[^,]* 320w/);
     expect(image.getAttribute("srcset")).toMatch(/format=webp/);
-    expect(screen.getByText("High Vis").closest('[role="button"]')).toHaveClass(
+    expect(screen.getByText("High Vis").closest("article")).toHaveClass(
       "listen-deferred-grid-item",
     );
   });
@@ -370,7 +370,7 @@ describe("ArtistCard", () => {
       />,
     );
 
-    const card = screen.getByText("Dredg").closest('[role="button"]');
+    const card = screen.getByText("Dredg").closest("article");
     expect(card).not.toBeNull();
 
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
@@ -396,7 +396,7 @@ describe("ArtistCard", () => {
       screen.queryByRole("button", { name: "Follow Dredg" }),
     ).not.toBeInTheDocument();
 
-    const card = screen.getByText("Dredg").closest('[role="button"]');
+    const card = screen.getByText("Dredg").closest("article");
     expect(card).not.toBeNull();
 
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });

@@ -66,9 +66,9 @@ export function ArtistAboutSection({
         <div>
           <h3 className="text-sm font-semibold text-white/70 mb-3">Members</h3>
           <div className="space-y-2">
-            {musicbrainz.members.map((member, i) => (
+            {musicbrainz.members.map((member) => (
               <div
-                key={i}
+                key={`${member.name}-${member.attributes?.join("-") || ""}`}
                 className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"
               >
                 <div>
