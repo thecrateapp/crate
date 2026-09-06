@@ -108,6 +108,27 @@ test("counts quoted token references used by runtime readers", () => {
   ]);
 });
 
+test("counts Tailwind utility consumers through @theme bridges", () => {
+  const metrics = analyzeSemanticTokens(`
+    :root {
+      --text-secondary: #cbd5e1;
+      --action-shadow: 0 0 1px black;
+      --state-danger-glow: 0 0 1px red;
+    }
+    @theme inline {
+      --color-text-secondary: var(--text-secondary);
+      --shadow-action: var(--action-shadow);
+      --drop-shadow-state-danger: var(--state-danger-glow);
+    }
+    <div className="text-text-secondary hover:bg-text-secondary shadow-action drop-shadow-state-danger" />
+  `);
+
+  assert.equal(metrics.tokenConsumers["--text-secondary"], 3);
+  assert.equal(metrics.tokenConsumers["--action-shadow"], 2);
+  assert.equal(metrics.tokenConsumers["--state-danger-glow"], 2);
+  assert.deepEqual(metrics.oneShotTokens, []);
+});
+
 test("separates foundation and intentional raw colors from product drift", () => {
   assert.deepEqual(
     analyzeRawColorDrift(

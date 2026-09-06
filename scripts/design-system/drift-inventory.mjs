@@ -50,6 +50,29 @@ const UTILITY_PATTERN = new RegExp(
   `\\b(?:bg|text|border|ring|outline|from|via|to|fill|stroke)-(?<value>\\[[^\\]]+\\]|(?:${COLOR_UTILITY_NAMES})(?:-\\d{2,3})?(?:\\/\\d{1,3})?)(?=[\\s"'\`]|$)`,
   "g",
 );
+const THEME_COLOR_UTILITY_PREFIXES = [
+  "accent",
+  "bg",
+  "border",
+  "caret",
+  "decoration",
+  "divide",
+  "fill",
+  "from",
+  "placeholder",
+  "ring",
+  "stroke",
+  "text",
+  "to",
+  "via",
+];
+const THEME_UTILITY_GROUPS = {
+  color: THEME_COLOR_UTILITY_PREFIXES,
+  shadow: ["shadow"],
+  "drop-shadow": ["drop-shadow"],
+  radius: ["rounded"],
+  font: ["font"],
+};
 const HARDCODED_COLOR_VALUE_PATTERN =
   /#[0-9a-f]{3,8}\b|(?:rgba?|hsla?)\(|\b(?:black|white|transparent|currentColor)\b/i;
 const INLINE_STYLE_PATTERN = /\bstyle\s*=\s*\{\{/g;
@@ -216,7 +239,29 @@ function countTokenReferences(content, name) {
     content.match(new RegExp("[\\\"'`]" + escapedName + "[\\\"'`]", "g"))
       ?.length ?? 0;
 
-  return cssReferences + quotedReferences;
+  const themeUtilityAliases = [
+    ...content.matchAll(
+      /--(?<group>color|shadow|drop-shadow|radius|font)-(?<alias>[a-z0-9-]+)\s*:\s*var\(\s*(?<source>--[a-z0-9-]+)/gi,
+    ),
+  ]
+    .filter((match) => match.groups?.source === name)
+    .flatMap((match) => {
+      const group = match.groups?.group;
+      const alias = match.groups?.alias;
+      return (THEME_UTILITY_GROUPS[group] ?? []).map(
+        (prefix) => `${prefix}-${alias}`,
+      );
+    });
+  const utilityReferences = themeUtilityAliases.reduce(
+    (count, utility) =>
+      count +
+      (content.match(
+        new RegExp(`(?<![A-Za-z0-9_-])${utility}(?=$|[^A-Za-z0-9_-])`, "g"),
+      )?.length ?? 0),
+    0,
+  );
+
+  return cssReferences + quotedReferences + utilityReferences;
 }
 
 function duplicateGroupKey(tokens) {
