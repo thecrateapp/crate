@@ -63,6 +63,12 @@ an explicit variable allowlist and cannot change layout, spacing, motion or
 component behavior. Drift inventory tests enforce the scope and keep raw color
 exceptions attributable.
 
+The quality gates also enforce the shared UI layer graph, explicit WCAG AA
+pairings for supported skins and destructive controls, and a reproducible
+`@crate/ui` build that emits both ESM and DTS without relying on tsup's DTS
+worker. Runtime progress geometry remains a calculated CSS custom property,
+not a new semantic token.
+
 ## Admin app architecture
 
 The admin app is still a fairly traditional operator SPA:
