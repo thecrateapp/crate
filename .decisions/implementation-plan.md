@@ -59,16 +59,21 @@ QA ejecutada en este corte:
 
 - preview de Listen verificado en desktop (1280×720) y móvil (390×844);
 - DOM de acceso, labels, controles y ausencia de errores de consola verificados;
-- backend efímero aislado preparado para continuar la QA autenticada sin tocar la
+- Settings autenticado revisado contra una base efímera aislada, sin tocar la
   base dev persistida, que está bloqueada por la revisión Alembic inexistente
-  `096` en este checkout.
+  `096` en este checkout;
+- matriz de referencia registrada en
+  `docs/technical/listen-design-system-visual-qa.md` para Player, Shell, Home,
+  Library, Artist, Album, Settings, Stats y Jam;
+- Settings revisado autenticado en `dark + default`, `dark + aurora` y
+  `high-contrast + default`, en desktop y móvil cuando aplica;
+- reduced motion verificado mediante su contrato CSS y tests, ya que el browser
+  de QA no expone emulación de media features.
 
-Pendiente antes de cerrar el plan:
-
-- hacer revisión visual manual del default y aurora en desktop/mobile, reduced
-  motion y high contrast;
-- actualizar las pantallas de referencia y cerrar el inventario final de drift
-  después de esa revisión manual.
+No quedan pendientes técnicos del plan. La única diferencia respecto a una
+revisión visual con hardware real es que reduced motion queda validado por el
+contrato CSS y sus tests, porque el browser de QA no expone emulación de media
+features.
 
 ## Implementation Steps
 
@@ -78,7 +83,7 @@ Pendiente antes de cerrar el plan:
 - [x] Clasificar cada hallazgo como tokenizable, estado semántico, valor dinámico, vendor override o excepción legítima.
 - [x] Definir el formato de allowlist con propietario, motivo, archivo y fecha de revisión.
 - [x] Añadir un check reproducible para comparar el drift antes/después de cada corte.
-- [ ] Registrar pantallas de referencia del default para Player, Shell, Home, Library, Artist, Album, Settings, Stats y Jam.
+- [x] Registrar pantallas de referencia del default para Player, Shell, Home, Library, Artist, Album, Settings, Stats y Jam.
 
 ### 2. Contrato de tokens y runtime
 
@@ -120,7 +125,7 @@ Pendiente antes de cerrar el plan:
 - [x] Lint de drift para colores, opacity utilities, inline styles y imports prohibidos.
 - [x] Typecheck, ESLint, Prettier y tests Vitest/Testing Library por corte.
 - [x] Tests de resolver, fallback, persistencia y combinaciones theme/skin.
-- [ ] Revisión visual del default en desktop, mobile, reduced motion y high contrast.
+- [x] Revisión visual del default en desktop, mobile, reduced motion y high contrast.
 - [x] Verificar contraste WCAG AA en tokens de texto, controles, estados explícitos y composiciones alpha con backdrop declarado.
 - [x] Añadir al menos un skin adicional para probar que el contrato no depende de valores del default.
 - [x] Cerrar cada corte con métrica de drift, excepciones revisadas y lista de regresiones conocida.
