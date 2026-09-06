@@ -14,7 +14,7 @@ import {
   usePlayerState,
 } from "@/contexts/PlayerContext";
 import { useAuth } from "@/contexts/AuthContext";
-import type { GenreTaxonomyNode } from "@/hooks/use-jam-lobby-data";
+import { useJamLobbyFormState } from "@/hooks/use-jam-lobby-form-state";
 import { useJamSessionPlayerRefs } from "@/hooks/use-jam-session-player-refs";
 import { useJamSessionRoomQueries } from "@/hooks/use-jam-session-room-queries";
 import { JamDeleteRoomModal } from "@/components/jam/JamDeleteRoomModal";
@@ -25,18 +25,26 @@ import { useJamPlaybackEffects } from "@/hooks/use-jam-playback-effects";
 import { useJamSessionLifecycle } from "@/hooks/use-jam-session-lifecycle";
 import { useJamSessionState } from "@/hooks/use-jam-session-state";
 import { useJamWebSocket } from "@/hooks/use-jam-websocket";
-import { type JamQueueMode, type JamRoom } from "@/pages/jam-reducer";
+import type { JamRoom } from "@/pages/jam-reducer";
 
 export function useJamSessionController() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { roomId } = useParams<{ roomId: string }>();
   const { user } = useAuth();
-  const [roomQueueMode, setRoomQueueMode] = useState<JamQueueMode>("manual");
-  const [roomGenreFiltersInput, setRoomGenreFiltersInput] = useState("");
-  const [roomGenreFilters, setRoomGenreFilters] = useState<string[]>([]);
-  const [genreSuggestionIndex, setGenreSuggestionIndex] = useState(0);
-  const [roomAutoDjVoting, setRoomAutoDjVoting] = useState(true);
+  const {
+    roomQueueMode,
+    setRoomQueueMode,
+    roomGenreFiltersInput,
+    setRoomGenreFiltersInput,
+    roomGenreFilters,
+    genreSuggestionIndex,
+    setGenreSuggestionIndex,
+    roomAutoDjVoting,
+    setRoomAutoDjVoting,
+    selectGenre,
+    removeGenre,
+  } = useJamLobbyFormState();
   const [roomActionsOpen, setRoomActionsOpen] = useState(false);
   const queueSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -147,19 +155,7 @@ export function useJamSessionController() {
         ? Math.min(current, genreSuggestions.length - 1)
         : 0,
     );
-  }, [genreSuggestions.length]);
-
-  function selectGenre(node: GenreTaxonomyNode) {
-    setRoomGenreFilters((current) =>
-      current.includes(node.slug) ? current : [...current, node.slug],
-    );
-    setRoomGenreFiltersInput("");
-    setGenreSuggestionIndex(0);
-  }
-
-  function removeGenre(slug: string) {
-    setRoomGenreFilters((current) => current.filter((value) => value !== slug));
-  }
+  }, [genreSuggestions, setGenreSuggestionIndex]);
 
   const {
     isHost,
