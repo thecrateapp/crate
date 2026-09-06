@@ -71,6 +71,13 @@ const DOMAIN_TOKEN_PREFIXES = [
   "user-profile-",
   "visualizer-",
 ];
+const INTENTIONAL_DUPLICATE_TOKEN_GROUPS = [
+  {
+    tokens: ["--surface-contrast", "--state-danger-foreground"],
+    reason:
+      "The default skin shares the same value, but cards and destructive controls are separate semantic roles for future skins.",
+  },
+];
 const SURFACE_ROLE_PATTERNS = [
   /(?<!-)\b(?<property>border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
   /(?<!-)\b(?<property>color|fill|stroke)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
@@ -182,6 +189,28 @@ function countTokenReferences(content, name) {
   return cssReferences + quotedReferences;
 }
 
+function duplicateGroupKey(tokens) {
+  return [...tokens].sort().join("|");
+}
+
+function classifyDuplicateTokenGroups(duplicateTokenGroups) {
+  const intentionalDuplicateGroups = duplicateTokenGroups.flatMap((tokens) => {
+    const match = INTENTIONAL_DUPLICATE_TOKEN_GROUPS.find(
+      (candidate) =>
+        duplicateGroupKey(candidate.tokens) === duplicateGroupKey(tokens),
+    );
+    return match ? [{ tokens, reason: match.reason }] : [];
+  });
+  const intentionalKeys = new Set(
+    intentionalDuplicateGroups.map(({ tokens }) => duplicateGroupKey(tokens)),
+  );
+  const actionableDuplicateGroups = duplicateTokenGroups.filter(
+    (tokens) => !intentionalKeys.has(duplicateGroupKey(tokens)),
+  );
+
+  return { actionableDuplicateGroups, intentionalDuplicateGroups };
+}
+
 function findSurfaceRoleViolations(content) {
   return SURFACE_ROLE_PATTERNS.flatMap((pattern) =>
     [...content.matchAll(pattern)].map((match) => ({
@@ -209,6 +238,8 @@ export function analyzeSemanticTokens(content, consumerContents = [content]) {
         .filter((definition) => definition.value === value)
         .map(({ name }) => name),
     );
+  const { actionableDuplicateGroups, intentionalDuplicateGroups } =
+    classifyDuplicateTokenGroups(duplicateTokenGroups);
   const allConsumerContent = consumerContents.join("\n");
   const roleViolations = findSurfaceRoleViolations(allConsumerContent);
   const tokenConsumers = Object.fromEntries(
@@ -231,8 +262,14 @@ export function analyzeSemanticTokens(content, consumerContents = [content]) {
     aliases: aliases.length,
     uniqueValues: values.size,
     duplicateDefinitions: definitions.length - values.size,
+    actionableDuplicateDefinitions: actionableDuplicateGroups.reduce(
+      (count, tokens) => count + tokens.length - 1,
+      0,
+    ),
     duplicateGroups: duplicateTokenGroups.length,
     duplicateTokenGroups,
+    actionableDuplicateGroups,
+    intentionalDuplicateGroups,
     nonFoundationAliases: aliases
       .filter(({ name }) => !isFoundationToken(name) && !isDomainToken(name))
       .map(({ name }) => name),
@@ -320,7 +357,7 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
   );
 
   return {
-    version: 3,
+    version: 4,
     roots: SOURCE_DIRECTORIES,
     semanticTokens: statSync(semanticTokenPath, { throwIfNoEntry: false })
       ? analyzeSemanticTokens(

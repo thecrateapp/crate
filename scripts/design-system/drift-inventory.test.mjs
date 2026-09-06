@@ -45,9 +45,14 @@ test("normalizes CSS whitespace when grouping semantic values", () => {
   `);
 
   assert.equal(metrics.duplicateDefinitions, 1);
+  assert.equal(metrics.actionableDuplicateDefinitions, 1);
   assert.deepEqual(metrics.duplicateTokenGroups, [
     ["--surface-alpha", "--surface-beta"],
   ]);
+  assert.deepEqual(metrics.actionableDuplicateGroups, [
+    ["--surface-alpha", "--surface-beta"],
+  ]);
+  assert.deepEqual(metrics.intentionalDuplicateGroups, []);
 });
 
 test("classifies token layers and counts external consumers", () => {
@@ -155,7 +160,7 @@ test("detects surface tokens used in border and text declarations", () => {
 
 test("enforces the normalized semantic token budget", () => {
   const inventory = buildDriftInventory();
-  assert.equal(inventory.version, 3);
+  assert.equal(inventory.version, 4);
   const metrics = inventory.semanticTokens;
 
   assert.deepEqual(metrics.nonFoundationAliases, []);
@@ -191,6 +196,15 @@ test("enforces the normalized semantic token budget", () => {
     metrics.duplicateDefinitions <= 1,
     `semantic token duplicates grew to ${metrics.duplicateDefinitions}`,
   );
+  assert.equal(metrics.actionableDuplicateDefinitions, 0);
+  assert.deepEqual(metrics.actionableDuplicateGroups, []);
+  assert.deepEqual(metrics.intentionalDuplicateGroups, [
+    {
+      tokens: ["--surface-contrast", "--state-danger-foreground"],
+      reason:
+        "The default skin shares the same value, but cards and destructive controls are separate semantic roles for future skins.",
+    },
+  ]);
   assert.deepEqual(metrics.duplicateTokenGroups, [
     ["--surface-contrast", "--state-danger-foreground"],
   ]);
