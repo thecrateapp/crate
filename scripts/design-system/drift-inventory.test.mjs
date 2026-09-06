@@ -266,3 +266,24 @@ test("keeps shared animation colors skin-aware", () => {
   assert.match(animations, /var\(--accent-action\)/);
   assert.match(animations, /var\(--surface-glass-shadow\)/);
 });
+
+test("keeps accessibility theme overrides isolated from semantic recipes", () => {
+  const semantic = readFileSync(
+    new URL("../../app/shared/ui/tokens/semantic.css", import.meta.url),
+    "utf8",
+  );
+  const themes = readFileSync(
+    new URL("../../app/shared/ui/tokens/themes.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(semantic, /data-crate-theme="high-contrast"/);
+  assert.match(
+    themes,
+    /\[data-crate-app="listen"\]\[data-crate-theme="high-contrast"\]/,
+  );
+  assert.doesNotMatch(
+    themes,
+    /(?:^|[;{])\s*(?:margin|padding|width|height)\s*:/m,
+  );
+});

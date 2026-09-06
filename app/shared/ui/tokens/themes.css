@@ -1,0 +1,43 @@
+/* crate-ui — Theme-specific overrides
+   Themes may change identity and accessibility, never layout or behavior. */
+
+/* Listen-only accessibility theme. It changes reading contrast, not skin identity. */
+[data-crate-app="listen"][data-crate-theme="high-contrast"] {
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+  --color-primary: #67e8f9;
+  --color-primary-foreground: #001014;
+  --color-muted-foreground: #e2e8f0;
+  --color-destructive: #fca5a5;
+  --color-success: #86efac;
+  --color-warning: #fde68a;
+  --color-info: #93c5fd;
+  --color-ring: #67e8f9;
+  --surface-app: #000000;
+  --surface-panel: #050505;
+  --surface-raised: #111111;
+  --surface-modal: #000000;
+  --surface-popover: #050505;
+  --color-border: #64748b;
+  --scrollbar-thumb: #94a3b8;
+  --scrollbar-hover: #cbd5e1;
+  --text-primary: #ffffff;
+  --text-secondary: #f1f5f9;
+  --text-muted: #e2e8f0;
+  --text-subtle: #cbd5e1;
+  --text-faint: #cbd5e1;
+  --surface-canvas: #000000;
+  --surface-container: #050505;
+  --surface-elevated: #111111;
+  --surface-overlay: #000000;
+  --border-subtle: #64748b;
+  --border-quiet: #64748b;
+  --border-quiet-subtle: #475569;
+  --accent-action: #67e8f9;
+  --accent-action-foreground: #001014;
+  --state-danger: #fca5a5;
+  --state-danger-foreground: #000000;
+  --state-success: #86efac;
+  --state-warning: #fde68a;
+  --state-info: #93c5fd;
+}
