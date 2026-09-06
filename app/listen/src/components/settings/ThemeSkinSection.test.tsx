@@ -20,12 +20,12 @@ describe("ThemeSkinSection", () => {
 
     const defaultSkin = screen.getByRole("radio", { name: /Default/i });
     const auroraSkin = screen.getByRole("radio", { name: /Aurora/i });
-    expect(defaultSkin).toHaveAttribute("aria-checked", "true");
-    expect(auroraSkin).toHaveAttribute("aria-checked", "false");
+    expect(defaultSkin).toBeChecked();
+    expect(auroraSkin).not.toBeChecked();
 
     await user.click(auroraSkin);
 
-    expect(auroraSkin).toHaveAttribute("aria-checked", "true");
+    expect(auroraSkin).toBeChecked();
     expect(document.documentElement.dataset.crateSkin).toBe("aurora");
     expect(localStorage.getItem("crate.listen.theme-skin")).toBe(
       JSON.stringify({ theme: "dark", skin: "aurora" }),
@@ -70,9 +70,6 @@ describe("ThemeSkinSection", () => {
 
     renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
 
-    expect(screen.getByRole("radio", { name: /Aurora/i })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    expect(screen.getByRole("radio", { name: /Aurora/i })).toBeChecked();
   });
 });

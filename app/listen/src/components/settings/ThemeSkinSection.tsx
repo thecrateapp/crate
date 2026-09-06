@@ -22,7 +22,7 @@ const SKIN_OPTIONS = Object.values(SKIN_REGISTRY).map((skin) => ({
 }));
 
 const selectionButtonClass = (selected: boolean) =>
-  `rounded-lg border px-3 py-3 text-left transition-colors ${
+  `rounded-lg border px-3 py-3 text-left transition-colors focus-within:ring-2 focus-within:ring-focus-ring/50 ${
     selected
       ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
       : "border-border-quiet/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"
@@ -58,20 +58,24 @@ export function ThemeSkinSection() {
             {THEME_OPTIONS.map((theme) => {
               const selected = selection.theme === theme.id;
               return (
-                <button
+                <label
                   key={theme.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => selectTheme(theme.id)}
                   className={selectionButtonClass(selected)}
                 >
+                  <input
+                    type="radio"
+                    name="crate-theme"
+                    value={theme.id}
+                    checked={selected}
+                    onChange={() => selectTheme(theme.id)}
+                    className="sr-only"
+                  />
                   <span className="block text-sm font-semibold">
                     {t(`settings.appearance.themes.${theme.id}`, {
                       defaultValue: theme.label,
                     })}
                   </span>
-                </button>
+                </label>
               );
             })}
           </div>
@@ -91,20 +95,24 @@ export function ThemeSkinSection() {
               const supported =
                 resolveThemeSkin(selection.theme, skin.id).skin === skin.id;
               return (
-                <button
+                <label
                   key={skin.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-describedby={`theme-skin-${skin.id}-description${
-                    supported ? "" : ` theme-skin-${skin.id}-availability`
-                  }`}
-                  disabled={!supported}
-                  onClick={() => selectSkin(skin.id)}
                   className={`${selectionButtonClass(selected)} ${
                     supported ? "" : "cursor-not-allowed opacity-50"
                   }`}
                 >
+                  <input
+                    type="radio"
+                    name="crate-skin"
+                    value={skin.id}
+                    checked={selected}
+                    disabled={!supported}
+                    onChange={() => selectSkin(skin.id)}
+                    aria-describedby={`theme-skin-${skin.id}-description${
+                      supported ? "" : ` theme-skin-${skin.id}-availability`
+                    }`}
+                    className="sr-only"
+                  />
                   <span className="block text-sm font-semibold">
                     {t(`settings.appearance.skinNames.${skin.id}`, {
                       defaultValue: skin.label,
@@ -124,7 +132,7 @@ export function ThemeSkinSection() {
                       {t("settings.appearance.skinUnavailable")}
                     </span>
                   )}
-                </button>
+                </label>
               );
             })}
           </div>
