@@ -42,6 +42,18 @@ describe("color contrast", () => {
     ).toBeGreaterThan(4.5);
   });
 
+  it("checks the translucent surface tokens against their canvas", () => {
+    const surfaceTokens = readFileSync("tokens/surfaces.css", "utf8");
+    const modalSurface = surfaceTokens.match(
+      /--surface-modal:\s*(rgba\([^;]+\))/,
+    )?.[1];
+
+    expect(modalSurface).toBe("rgba(16, 16, 24, 0.95)");
+    expect(
+      contrastRatioComposited("#f1f5f9", modalSurface!, "#0a0a0f"),
+    ).toBeGreaterThan(4.5);
+  });
+
   it("requires an artwork backdrop instead of guessing through transparency", () => {
     expect(
       contrastRatioComposited("#ffffff", "rgba(10, 10, 15, 0.68)"),
