@@ -19,14 +19,45 @@ La implementación será incremental. Cada corte migrará un área concreta, con
 | 7   | CSS consumption             | A: CSS variables + Tailwind semántico                      | Technical |
 | 8   | Migration and quality gates | A: cortes verticales con gates                             | Technical |
 
+## Estado verificado
+
+Última verificación: 2026-09-06, rama `codex/listen-design-system`.
+
+Ya está implementado y validado:
+
+- inventario reproducible de drift con allowlists propietarias y fecha de revisión;
+- contrato de tokens semánticos para superficies, texto, estados, interacción,
+  sombras, motion y visual recipes;
+- consumo CSS/Tailwind semántico y conteo de consumidores reales, incluidos los
+  bridges `@theme`;
+- scope explícito de Listen mediante `data-crate-app`;
+- resolver runtime de theme/skin con registry, matriz de compatibilidad, fallback
+  y persistencia local;
+- `dark + default`, `dark + aurora` y `high-contrast + default`;
+- selector accesible con radios nativos, descripciones traducidas y explicación
+  de combinaciones incompatibles;
+- reduced motion existente y contrato de contraste base para el theme accesible;
+- gates automatizados de drift, typecheck, lint, i18n, build, tests y React Doctor.
+
+Pendiente antes de cerrar el plan:
+
+- completar la revisión/migración de las áreas visuales de alto impacto que aún
+  conservan recipes específicas legítimas;
+- terminar la auditoría de ownership entre primitives, composites, domain y
+  páginas, eliminando imports directos no justificados;
+- hacer revisión visual del default y aurora en desktop/mobile, reduced motion y
+  high contrast;
+- ampliar la matriz WCAG AA a todos los estados interactivos y skins;
+- actualizar las pantallas de referencia y cerrar el inventario final de drift.
+
 ## Implementation Steps
 
 ### 1. Baseline e inventario automatizado
 
 - [ ] Congelar el inventario inicial de raw colors, utilities, inline styles, imports, tamaños de archivos y suppressions.
 - [ ] Clasificar cada hallazgo como tokenizable, estado semántico, valor dinámico, vendor override o excepción legítima.
-- [ ] Definir el formato de allowlist con propietario, motivo, archivo y fecha de revisión.
-- [ ] Añadir un check reproducible para comparar el drift antes/después de cada corte.
+- [x] Definir el formato de allowlist con propietario, motivo, archivo y fecha de revisión.
+- [x] Añadir un check reproducible para comparar el drift antes/después de cada corte.
 - [ ] Registrar pantallas de referencia del default para Player, Shell, Home, Library, Artist, Album, Settings, Stats y Jam.
 
 ### 2. Contrato de tokens y runtime
@@ -34,9 +65,9 @@ La implementación será incremental. Cada corte migrará un área concreta, con
 - [ ] Definir tokens primitive mínimos y tokens semánticos consumibles por componentes.
 - [ ] Consolidar surfaces, text, borders, accent, state, focus, motion, radius, shadow, spacing y typography.
 - [ ] Separar el scope de Listen del shared UI con atributos de aplicación sin alterar Admin accidentalmente.
-- [ ] Crear el resolver runtime de `theme` y `skin` con registry, validación, fallback y persistencia local.
-- [ ] Establecer `dark + default` como combinación inicial y respetar reduced motion/contrast.
-- [ ] Mantener CSS variables como runtime; no introducir CSS-in-JS.
+- [x] Crear el resolver runtime de `theme` y `skin` con registry, validación, fallback y persistencia local.
+- [x] Establecer `dark + default` como combinación inicial y respetar reduced motion/contrast.
+- [x] Mantener CSS variables como runtime; no introducir CSS-in-JS.
 
 ### 3. Primitives y composites canónicos
 
@@ -66,13 +97,13 @@ La implementación será incremental. Cada corte migrará un área concreta, con
 
 ### 6. Quality gates y rollout
 
-- [ ] Lint de drift para colores, opacity utilities, inline styles y imports prohibidos.
-- [ ] Typecheck, ESLint, Prettier y tests Vitest/Testing Library por corte.
-- [ ] Tests de resolver, fallback, persistencia y combinaciones theme/skin.
+- [x] Lint de drift para colores, opacity utilities, inline styles y imports prohibidos.
+- [x] Typecheck, ESLint, Prettier y tests Vitest/Testing Library por corte.
+- [x] Tests de resolver, fallback, persistencia y combinaciones theme/skin.
 - [ ] Revisión visual del default en desktop, mobile, reduced motion y high contrast.
 - [ ] Verificar contraste WCAG AA en tokens de texto, controles y estados.
-- [ ] Añadir al menos un skin adicional para probar que el contrato no depende de valores del default.
-- [ ] Cerrar cada corte con métrica de drift, excepciones revisadas y lista de regresiones conocida.
+- [x] Añadir al menos un skin adicional para probar que el contrato no depende de valores del default.
+- [x] Cerrar cada corte con métrica de drift, excepciones revisadas y lista de regresiones conocida.
 
 ## Definition of Done
 

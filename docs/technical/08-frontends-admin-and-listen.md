@@ -5,7 +5,7 @@ section: architecture
 audience: [developer]
 status: canonical
 order: 97
-verified: 2026-07-21
+verified: 2026-09-06
 sources: [app/ui, app/listen, app/shared/ui, app/shared/web]
 ---
 
@@ -40,6 +40,28 @@ Shared code now has two layers:
 
 The shared layer is intentionally bounded. Most app state and product logic
 remains app-specific.
+
+## Listen design-system contract
+
+Listen consumes `@crate/ui` through CSS variables and semantic Tailwind names.
+The token barrel is split into layers under `app/shared/ui/tokens/`:
+
+- primitives and shared color/surface definitions;
+- semantic roles and reusable visual recipes;
+- theme-only overrides in `themes.css`;
+- motion, radius, typography and z-index contracts.
+
+The current appearance is the `dark + default` combination. The runtime
+resolver in `app/shared/ui/lib/theme-skin.ts` validates and persists the
+selection, while the supported `dark + aurora` skin changes only the curated
+identity surface. `high-contrast + default` is a reading/accessibility theme;
+unsupported combinations fall back to the compatible default skin.
+
+Theme overrides are scoped with `data-crate-app="listen"`, so Admin does not
+inherit Listen accessibility or skin rules accidentally. Skins are limited to
+an explicit variable allowlist and cannot change layout, spacing, motion or
+component behavior. Drift inventory tests enforce the scope and keep raw color
+exceptions attributable.
 
 ## Admin app architecture
 
