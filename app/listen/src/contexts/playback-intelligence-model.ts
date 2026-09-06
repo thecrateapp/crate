@@ -1,3 +1,5 @@
+import type { MutableRefObject } from "react";
+
 import type { PlaySource, Track } from "@/contexts/player-types";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 
@@ -39,6 +41,14 @@ export interface PlaybackIntelligenceOptions {
   smartPlaylistSuggestionsCadence: number;
   recentlyPlayed: Track[];
   actions: PlaybackIntelligenceActions;
+}
+
+export interface PlaybackIntelligenceRefs {
+  currentIndexRef: MutableRefObject<number>;
+  playSourceRef: MutableRefObject<PlaySource | null>;
+  queueRef: MutableRefObject<Track[]>;
+  recentlyPlayedRef: MutableRefObject<Track[]>;
+  actionsRef: MutableRefObject<PlaybackIntelligenceActions>;
 }
 
 export function getPlaySourceSignature(
