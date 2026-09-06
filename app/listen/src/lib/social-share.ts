@@ -1,5 +1,3 @@
-import { registerPlugin } from "@capacitor/core";
-
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog } from "@/lib/dev-logs";
@@ -16,6 +14,7 @@ import {
   STORY_HEIGHT,
   STORY_WIDTH,
 } from "./social-share-story-canvas";
+import { getNativeHttpPlugin, nativeSocialShare } from "./social-share-native";
 
 export const SHARE_REQUEST_EVENT = "crate:share-request";
 
@@ -46,42 +45,6 @@ export interface SharePayload {
   subtitle?: string | null;
   imageUrl?: string | null;
 }
-
-interface NativeInstagramStoryResult {
-  available?: boolean;
-  shared?: boolean;
-}
-
-interface NativeHttpResponse {
-  status: number;
-  data?: unknown;
-  headers?: Record<string, string>;
-}
-
-interface NativeHttpPlugin {
-  get(options: {
-    url: string;
-    responseType: "blob";
-    connectTimeout: number;
-    readTimeout: number;
-  }): Promise<NativeHttpResponse>;
-}
-
-interface NativeImageDataResult {
-  dataUrl?: string;
-}
-
-interface CrateSocialSharePlugin {
-  canShareInstagramStory(): Promise<NativeInstagramStoryResult>;
-  loadImageDataUrl?(options: { url: string }): Promise<NativeImageDataResult>;
-  shareInstagramStory(options: {
-    imageDataUrl: string;
-    contentUrl: string;
-  }): Promise<NativeInstagramStoryResult>;
-}
-
-const nativeSocialShare =
-  registerPlugin<CrateSocialSharePlugin>("CrateSocialShare");
 
 export function buildShareText(payload: SharePayload): string {
   const title = payload.title.trim();
@@ -412,41 +375,6 @@ async function loadNativeSharePluginImageDataUrl(
     throw new Error("native social image loader returned non-image data");
   }
   return dataUrl;
-}
-
-let nativeHttpPluginPromise: Promise<NativeHttpPlugin | null> | null = null;
-
-function getNativeHttpPlugin(): Promise<NativeHttpPlugin | null> {
-  nativeHttpPluginPromise ??= import("@capacitor/core")
-    .then((module) => {
-      const maybeModule = module as unknown as {
-        Capacitor?: {
-          Plugins?: {
-            CapacitorHttp?: NativeHttpPlugin;
-          };
-        };
-        CapacitorHttp?: NativeHttpPlugin;
-      };
-      return (
-        maybeModule.CapacitorHttp ??
-        maybeModule.Capacitor?.Plugins?.CapacitorHttp ??
-        null
-      );
-    })
-    .catch(() => getWindowCapacitorHttpPlugin());
-  return nativeHttpPluginPromise;
-}
-
-function getWindowCapacitorHttpPlugin(): NativeHttpPlugin | null {
-  if (typeof window === "undefined") return null;
-  const maybeWindow = window as unknown as {
-    Capacitor?: {
-      Plugins?: {
-        CapacitorHttp?: NativeHttpPlugin;
-      };
-    };
-  };
-  return maybeWindow.Capacitor?.Plugins?.CapacitorHttp ?? null;
 }
 
 function getResponseHeader(
