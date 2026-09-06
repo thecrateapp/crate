@@ -4,16 +4,15 @@ import { useTranslation } from "react-i18next";
 import { Section } from "@/components/settings/SettingsPrimitives";
 import {
   applyThemeSkin,
+  MODE_REGISTRY,
   readStoredThemeSkin,
-  resolveThemeSkin,
   SKIN_REGISTRY,
-  THEME_REGISTRY,
-  type ThemeId,
+  type ColorModePreference,
   type SkinId,
 } from "@crate/ui/lib/theme-skin";
 
-const THEME_OPTIONS = Object.values(THEME_REGISTRY).map((theme) => ({
-  id: theme.id as ThemeId,
+const MODE_OPTIONS = Object.values(MODE_REGISTRY).map((mode) => ({
+  id: mode.id as ColorModePreference,
 }));
 const SKIN_OPTIONS = Object.values(SKIN_REGISTRY).map((skin) => ({
   id: skin.id as SkinId,
@@ -30,12 +29,9 @@ export function ThemeSkinSection() {
   const { t } = useTranslation();
   const [selection, setSelection] = useState(readStoredThemeSkin);
 
-  const selectTheme = (theme: ThemeId) => {
-    setSelection(applyThemeSkin(theme, selection.skin));
-  };
-
   const selectSkin = (skin: SkinId) => {
-    setSelection(applyThemeSkin(selection.theme, skin));
+    const applied = applyThemeSkin(selection.mode, skin);
+    setSelection({ mode: applied.mode, skin: applied.skin });
   };
 
   return (
@@ -46,35 +42,43 @@ export function ThemeSkinSection() {
       <div className="space-y-5">
         <div>
           <p className="mb-2 text-sm font-medium text-text-secondary">
-            {t("settings.appearance.themeLabel")}
+            {t("settings.appearance.modeLabel")}
           </p>
           <div
             className="grid gap-2 sm:grid-cols-2"
             role="radiogroup"
-            aria-label={t("settings.appearance.themeLabel")}
+            aria-label={t("settings.appearance.modeLabel")}
           >
-            {THEME_OPTIONS.map((theme) => {
-              const selected = selection.theme === theme.id;
+            {MODE_OPTIONS.map((mode) => {
+              const selected = selection.mode === mode.id;
               return (
-                <label
-                  key={theme.id}
-                  className={selectionButtonClass(selected)}
-                >
+                <label key={mode.id} className={selectionButtonClass(selected)}>
                   <input
                     type="radio"
-                    name="crate-theme"
-                    value={theme.id}
+                    name="crate-mode"
+                    value={mode.id}
                     checked={selected}
-                    onChange={() => selectTheme(theme.id)}
+                    onChange={() => {
+                      const applied = applyThemeSkin(mode.id, selection.skin);
+                      setSelection({
+                        mode: applied.mode,
+                        skin: applied.skin,
+                      });
+                    }}
                     className="sr-only"
                   />
                   <span className="block text-sm font-semibold">
-                    {t(`settings.appearance.themes.${theme.id}`)}
+                    {t(`settings.appearance.modes.${mode.id}`)}
                   </span>
                 </label>
               );
             })}
           </div>
+          {selection.mode === "system" ? (
+            <p className="mt-2 text-xs text-text-muted">
+              {t("settings.appearance.systemPreference")}
+            </p>
+          ) : null}
         </div>
 
         <div>
@@ -88,25 +92,15 @@ export function ThemeSkinSection() {
           >
             {SKIN_OPTIONS.map((skin) => {
               const selected = selection.skin === skin.id;
-              const supported =
-                resolveThemeSkin(selection.theme, skin.id).skin === skin.id;
               return (
-                <label
-                  key={skin.id}
-                  className={`${selectionButtonClass(selected)} ${
-                    supported ? "" : "cursor-not-allowed opacity-50"
-                  }`}
-                >
+                <label key={skin.id} className={selectionButtonClass(selected)}>
                   <input
                     type="radio"
                     name="crate-skin"
                     value={skin.id}
                     checked={selected}
-                    disabled={!supported}
                     onChange={() => selectSkin(skin.id)}
-                    aria-describedby={`theme-skin-${skin.id}-description${
-                      supported ? "" : ` theme-skin-${skin.id}-availability`
-                    }`}
+                    aria-describedby={`theme-skin-${skin.id}-description`}
                     className="sr-only"
                   />
                   <span className="block text-sm font-semibold">
@@ -118,14 +112,6 @@ export function ThemeSkinSection() {
                   >
                     {t(`settings.appearance.skins.${skin.id}`)}
                   </span>
-                  {!supported && (
-                    <span
-                      id={`theme-skin-${skin.id}-availability`}
-                      className="sr-only"
-                    >
-                      {t("settings.appearance.skinUnavailable")}
-                    </span>
-                  )}
                 </label>
               );
             })}

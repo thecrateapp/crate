@@ -9,7 +9,8 @@ describe("ThemeSkinSection", () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute("data-crate-app");
-    document.documentElement.removeAttribute("data-crate-theme");
+    document.documentElement.removeAttribute("data-crate-mode");
+    document.documentElement.removeAttribute("data-crate-mode-preference");
     document.documentElement.removeAttribute("data-crate-skin");
   });
 
@@ -19,50 +20,37 @@ describe("ThemeSkinSection", () => {
     renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
 
     const defaultSkin = screen.getByRole("radio", { name: /Default/i });
-    const auroraSkin = screen.getByRole("radio", { name: /Aurora/i });
+    const crateRedSkin = screen.getByRole("radio", { name: /Crate Red/i });
     expect(defaultSkin).toBeChecked();
-    expect(auroraSkin).not.toBeChecked();
+    expect(crateRedSkin).not.toBeChecked();
 
-    await user.click(auroraSkin);
+    await user.click(crateRedSkin);
 
-    expect(auroraSkin).toBeChecked();
-    expect(document.documentElement.dataset.crateSkin).toBe("aurora");
+    expect(crateRedSkin).toBeChecked();
+    expect(document.documentElement.dataset.crateSkin).toBe("crateRed");
     expect(localStorage.getItem("crate.listen.theme-skin")).toBe(
-      JSON.stringify({ theme: "dark", skin: "aurora" }),
+      JSON.stringify({ mode: "dark", skin: "crateRed" }),
     );
   });
 
-  it("switches to high contrast and falls back to the compatible default skin", async () => {
+  it("supports dark, light, and system color modes", async () => {
     const user = userEvent.setup();
 
     renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
-    await user.click(screen.getByRole("radio", { name: /High contrast/i }));
 
-    expect(document.documentElement.dataset.crateTheme).toBe("high-contrast");
-    expect(document.documentElement.dataset.crateSkin).toBe("default");
-    expect(screen.getByRole("radio", { name: /Aurora/i })).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: /^Light$/i }));
+    expect(document.documentElement.dataset.crateMode).toBe("light");
+    expect(document.documentElement.dataset.crateModePreference).toBe("light");
+
+    await user.click(screen.getByRole("radio", { name: /^System$/i }));
+    expect(document.documentElement.dataset.crateModePreference).toBe("system");
+    expect(screen.getByText(/system preference/i)).toBeInTheDocument();
     expect(localStorage.getItem("crate.listen.theme-skin")).toBe(
-      JSON.stringify({ theme: "high-contrast", skin: "default" }),
+      JSON.stringify({ mode: "system", skin: "default" }),
     );
   });
 
-  it("explains unavailable skin combinations to assistive technology", async () => {
-    const user = userEvent.setup();
-
-    renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
-    await user.click(screen.getByRole("radio", { name: /High contrast/i }));
-
-    const auroraSkin = screen.getByRole("radio", { name: /Aurora/i });
-    expect(auroraSkin).toHaveAttribute(
-      "aria-describedby",
-      "theme-skin-aurora-description theme-skin-aurora-availability",
-    );
-    expect(
-      screen.getByText("Not available with this reading mode."),
-    ).toBeInTheDocument();
-  });
-
-  it("initializes from the persisted skin", () => {
+  it("initializes from the persisted skin and migrates legacy values", () => {
     localStorage.setItem(
       "crate.listen.theme-skin",
       JSON.stringify({ theme: "dark", skin: "aurora" }),
@@ -70,6 +58,6 @@ describe("ThemeSkinSection", () => {
 
     renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
 
-    expect(screen.getByRole("radio", { name: /Aurora/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Crate Red/i })).toBeChecked();
   });
 });
