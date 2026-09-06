@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   analyzeLayerImports,
   buildLayerInventory,
+  formatLayerInventorySummary,
 } from "./layer-inventory.mjs";
 
 test("allows lower layers to consume curated shared primitives", () => {
@@ -48,5 +49,11 @@ test("rejects upward dependencies from primitives and composites", () => {
 });
 
 test("keeps the current shared UI layer graph valid", () => {
-  assert.deepEqual(buildLayerInventory().violations, []);
+  const inventory = buildLayerInventory();
+
+  assert.deepEqual(inventory.violations, []);
+  assert.match(
+    formatLayerInventorySummary(inventory),
+    /^Shared UI layer boundaries: 0 violations across \d+ source files$/,
+  );
 });

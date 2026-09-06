@@ -90,9 +90,24 @@ export function buildLayerInventory(repoRoot = process.cwd()) {
   };
 }
 
+export function formatLayerInventorySummary(inventory) {
+  return `Shared UI layer boundaries: ${inventory.violations.length} violations across ${inventory.files.length} source files`;
+}
+
 if (
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(import.meta.filename)
 ) {
-  console.log(JSON.stringify(buildLayerInventory(), null, 2));
+  const inventory = buildLayerInventory();
+  const jsonOutput = process.argv.includes("--json");
+
+  console.log(
+    jsonOutput
+      ? JSON.stringify(inventory, null, 2)
+      : formatLayerInventorySummary(inventory),
+  );
+
+  if (inventory.violations.length > 0) {
+    process.exitCode = 1;
+  }
 }
