@@ -10,7 +10,11 @@ export function useLyrics(currentTrack: Track | null | undefined) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!currentTrack) return;
+    if (!currentTrack) {
+      setLyrics(null);
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
 
     setLyrics(null);
