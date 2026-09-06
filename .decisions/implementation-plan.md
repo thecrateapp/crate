@@ -21,7 +21,7 @@ La implementación será incremental. Cada corte migrará un área concreta, con
 
 ## Estado verificado
 
-Última verificación: 2026-09-06, rama `codex/listen-design-system`, HEAD `18d0cdc5`.
+Última verificación: 2026-09-06, rama `codex/listen-design-system`, HEAD `66d554b6`.
 
 Ya está implementado y validado:
 
@@ -38,6 +38,9 @@ Ya está implementado y validado:
   de combinaciones incompatibles;
 - reduced motion existente y contrato de contraste base para el theme accesible;
 - contrato WCAG explícito para skins, high-contrast y controles destructivos;
+- contrato WCAG con composición alpha para superficies translúcidas y backdrops
+  explícitos para artwork, sin asumir un color de fondo que pueda falsear el
+  resultado;
 - gates automatizados de drift, typecheck, lint, i18n, build, tests, layers y React Doctor;
 - build reproducible de `@crate/ui` separado en bundle ESM y declaraciones DTS,
   sin depender del worker DTS de tsup.
@@ -52,12 +55,18 @@ Métricas actuales del inventario reproducible:
 - 100 inline styles, todos asociados a valores calculados o geometría runtime;
 - 91 archivos de `@crate/ui` bajo el gate de capas, con 0 violaciones.
 
+QA ejecutada en este corte:
+
+- preview de Listen verificado en desktop (1280×720) y móvil (390×844);
+- DOM de acceso, labels, controles y ausencia de errores de consola verificados;
+- backend efímero aislado preparado para continuar la QA autenticada sin tocar la
+  base dev persistida, que está bloqueada por la revisión Alembic inexistente
+  `096` en este checkout.
+
 Pendiente antes de cerrar el plan:
 
 - hacer revisión visual manual del default y aurora en desktop/mobile, reduced
   motion y high contrast;
-- ampliar la matriz WCAG AA a estados con alpha/composición y superficies de
-  artwork, donde el análisis estático no puede inferir el color final;
 - actualizar las pantallas de referencia y cerrar el inventario final de drift
   después de esa revisión manual.
 
@@ -112,7 +121,7 @@ Pendiente antes de cerrar el plan:
 - [x] Typecheck, ESLint, Prettier y tests Vitest/Testing Library por corte.
 - [x] Tests de resolver, fallback, persistencia y combinaciones theme/skin.
 - [ ] Revisión visual del default en desktop, mobile, reduced motion y high contrast.
-- [x] Verificar contraste WCAG AA en tokens de texto, controles y estados explícitos.
+- [x] Verificar contraste WCAG AA en tokens de texto, controles, estados explícitos y composiciones alpha con backdrop declarado.
 - [x] Añadir al menos un skin adicional para probar que el contrato no depende de valores del default.
 - [x] Cerrar cada corte con métrica de drift, excepciones revisadas y lista de regresiones conocida.
 
