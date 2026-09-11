@@ -347,6 +347,9 @@ class PlaybackDeliveryStatsResponse(BaseModel):
     variant_tracks: int = 0
     ready: int = 0
     pending: int = 0
+    pending_active: int = 0
+    pending_unassigned: int = 0
+    pending_stale: int = 0
     running: int = 0
     failed: int = 0
     missing: int = 0
