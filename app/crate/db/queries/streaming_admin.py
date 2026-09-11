@@ -29,16 +29,32 @@ def get_playback_delivery_snapshot(*, limit: int = 20) -> dict:
                 SELECT
                     COUNT(*) AS variants,
                     COUNT(DISTINCT sv.track_id) FILTER (WHERE sv.track_id IS NOT NULL) AS variant_tracks,
-                    COUNT(*) FILTER (WHERE status = 'ready') AS ready,
-                    COUNT(*) FILTER (WHERE status = 'pending') AS pending,
-                    COUNT(*) FILTER (WHERE status = 'running') AS running,
-                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,
-                    COUNT(*) FILTER (WHERE status = 'missing') AS missing,
-                    COUNT(DISTINCT sv.track_id) FILTER (WHERE status = 'ready' AND sv.track_id IS NOT NULL) AS ready_tracks,
-                    COALESCE(SUM(bytes) FILTER (WHERE status = 'ready'), 0) AS cached_bytes,
-                    COALESCE(SUM(source_size) FILTER (WHERE status = 'ready'), 0) AS ready_source_bytes,
-                    AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) FILTER (WHERE status = 'ready' AND completed_at IS NOT NULL) AS avg_prepare_seconds
+                    COUNT(*) FILTER (WHERE sv.status = 'ready') AS ready,
+                    COUNT(*) FILTER (WHERE sv.status = 'pending') AS pending,
+                    COUNT(*) FILTER (
+                        WHERE sv.status = 'pending'
+                          AND t.status IN ('pending', 'running', 'delegated', 'completing')
+                    ) AS pending_active,
+                    COUNT(*) FILTER (
+                        WHERE sv.status = 'pending' AND sv.task_id IS NULL
+                    ) AS pending_unassigned,
+                    COUNT(*) FILTER (
+                        WHERE sv.status = 'pending'
+                          AND sv.task_id IS NOT NULL
+                          AND (
+                              t.id IS NULL
+                              OR t.status NOT IN ('pending', 'running', 'delegated', 'completing')
+                          )
+                    ) AS pending_stale,
+                    COUNT(*) FILTER (WHERE sv.status = 'running') AS running,
+                    COUNT(*) FILTER (WHERE sv.status = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE sv.status = 'missing') AS missing,
+                    COUNT(DISTINCT sv.track_id) FILTER (WHERE sv.status = 'ready' AND sv.track_id IS NOT NULL) AS ready_tracks,
+                    COALESCE(SUM(sv.bytes) FILTER (WHERE sv.status = 'ready'), 0) AS cached_bytes,
+                    COALESCE(SUM(sv.source_size) FILTER (WHERE sv.status = 'ready'), 0) AS ready_source_bytes,
+                    AVG(EXTRACT(EPOCH FROM (sv.completed_at - sv.created_at))) FILTER (WHERE sv.status = 'ready' AND sv.completed_at IS NOT NULL) AS avg_prepare_seconds
                 FROM stream_variants sv
+                LEFT JOIN tasks t ON t.id = sv.task_id
                 JOIN library_tracks lt
                   ON lt.id = sv.track_id
                  AND lt.path = sv.source_path
@@ -134,6 +150,9 @@ def get_playback_delivery_snapshot(*, limit: int = 20) -> dict:
             "variant_tracks": _int(variant_stats.get("variant_tracks")),
             "ready": _int(variant_stats.get("ready")),
             "pending": _int(variant_stats.get("pending")),
+            "pending_active": _int(variant_stats.get("pending_active")),
+            "pending_unassigned": _int(variant_stats.get("pending_unassigned")),
+            "pending_stale": _int(variant_stats.get("pending_stale")),
             "running": _int(variant_stats.get("running")),
             "failed": _int(variant_stats.get("failed")),
             "missing": _int(variant_stats.get("missing")),
