@@ -127,6 +127,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private boolean eqEnabled = false;
     private boolean sessionRegistered = false;
     private boolean resumeAuthorizationPending = false;
+    private boolean restoredPlayWhenReady = false;
     private int systemEqAudioSessionId = C.AUDIO_SESSION_ID_UNSET;
 
     public final class LocalBinder extends Binder {
@@ -302,7 +303,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
                             playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
                         )
                     ) {
-                        emitResumeAuthorizationRequired();
+                        // Only an explicit play/pause press means the user
+                        // is asking for playback to start — a bare seek or
+                        // an OS-triggered prepare shouldn't override the
+                        // paused/playing state the checkpoint was actually
+                        // saved with.
+                        emitResumeAuthorizationRequired(
+                            playerCommand == Player.COMMAND_PLAY_PAUSE || restoredPlayWhenReady
+                        );
                         openAppForAuthorization();
                         return SessionError.ERROR_SESSION_AUTHENTICATION_EXPIRED;
                     }
@@ -450,6 +458,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         int index = Math.max(0, Math.min(checkpoint.index, mediaItems.size() - 1));
         player.setMediaItems(mediaItems, index, checkpoint.positionMs);
         player.setRepeatMode(toRepeatMode(checkpoint.repeat));
+        restoredPlayWhenReady = checkpoint.playWhenReady;
         resumeAuthorizationPending = true;
     }
 
@@ -484,11 +493,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
         );
     }
 
-    private void emitResumeAuthorizationRequired() {
+    private void emitResumeAuthorizationRequired(boolean playWhenReady) {
         JSObject payload = basePayload();
         payload.put("index", player == null ? 0 : Math.max(0, player.getCurrentMediaItemIndex()));
         payload.put("positionMs", player == null ? 0L : Math.max(0L, player.getCurrentPosition()));
-        payload.put("playWhenReady", true);
+        payload.put("playWhenReady", playWhenReady);
         emit("resumeAuthorizationRequired", payload);
     }
 
@@ -554,7 +563,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     public void setEventSink(@Nullable EventSink sink) {
         eventSink = sink;
         if (sink != null && resumeAuthorizationPending) {
-            emitResumeAuthorizationRequired();
+            emitResumeAuthorizationRequired(restoredPlayWhenReady);
         }
         syncPositionTicker();
     }
@@ -722,6 +731,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void play() {
+        if (blockIfResumeAuthorizationPending(true)) return;
         if (player != null) {
             player.play();
             syncPositionTicker();
@@ -744,6 +754,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void seekTo(long positionMs) {
+        if (blockIfResumeAuthorizationPending(restoredPlayWhenReady)) return;
         if (player != null) {
             player.seekTo(Math.max(0L, positionMs));
             emitPosition();
@@ -755,27 +766,27 @@ public class CrateNativePlaybackService extends MediaSessionService {
     // one only covers lock-screen/hardware-button controllers) — without
     // this, JS could still skip across a restored queue of fake
     // placeholder URIs before re-supplying the real ones.
-    private boolean blockIfResumeAuthorizationPending() {
+    private boolean blockIfResumeAuthorizationPending(boolean playWhenReady) {
         if (!resumeAuthorizationPending) return false;
-        emitResumeAuthorizationRequired();
+        emitResumeAuthorizationRequired(playWhenReady);
         openAppForAuthorization();
         return true;
     }
 
     public void jumpTo(int index, boolean autoplay) {
-        if (blockIfResumeAuthorizationPending()) return;
+        if (blockIfResumeAuthorizationPending(autoplay)) return;
         if (player == null || index < 0 || index >= player.getMediaItemCount()) return;
         player.seekToDefaultPosition(index);
         if (autoplay) player.play();
     }
 
     public void next() {
-        if (blockIfResumeAuthorizationPending()) return;
+        if (blockIfResumeAuthorizationPending(restoredPlayWhenReady)) return;
         if (player != null && player.hasNextMediaItem()) player.seekToNextMediaItem();
     }
 
     public void previous() {
-        if (blockIfResumeAuthorizationPending()) return;
+        if (blockIfResumeAuthorizationPending(restoredPlayWhenReady)) return;
         if (player != null && player.hasPreviousMediaItem()) player.seekToPreviousMediaItem();
     }
 

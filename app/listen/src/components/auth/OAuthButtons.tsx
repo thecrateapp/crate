@@ -41,12 +41,33 @@ function oauthProvider(loginUrl: string): "google" | "apple" {
   return /(?:^|[/?])apple(?:[/?]|$)/i.test(loginUrl) ? "apple" : "google";
 }
 
-function tauriOAuthCallbackUrl(returnTo: string | null, state: string): URL {
-  const callbackUrl = new URL("http://127.0.0.1:17654/oauth/callback");
+function tauriOAuthCallbackUrl(
+  returnTo: string | null,
+  state: string,
+  port: number,
+): URL {
+  const callbackUrl = new URL(`http://127.0.0.1:${port}/oauth/callback`);
   if (returnTo && returnTo !== "/")
     callbackUrl.searchParams.set("next", returnTo);
   callbackUrl.searchParams.set("state", state);
   return callbackUrl;
+}
+
+// The loopback listener binds an OS-assigned ephemeral port rather than a
+// fixed one — a fixed, predictable port could be squatted by another
+// local process before Crate starts, which would then receive the real
+// access/refresh token straight from the browser instead of us. Failing
+// closed (no login attempt) if we can't confirm the port beats silently
+// falling back to a guessed one.
+async function fetchTauriOAuthLoopbackPort(): Promise<number | null> {
+  const invoke = window.__crateTauriInvoke;
+  if (!invoke) return null;
+  try {
+    const port = await invoke<number | null>("get_oauth_loopback_port");
+    return typeof port === "number" ? port : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function openExternalOAuthUrl(url: string): Promise<void> {
@@ -75,12 +96,24 @@ export function OAuthButtons({
       const target = new URL(loginUrl, base);
       if (invite) target.searchParams.set("invite", invite);
       if (isTauriRuntime) {
-        const state = beginDesktopOAuthHandoff(rt || "/");
-        const callbackUrl = tauriOAuthCallbackUrl(rt, state);
-        target.searchParams.set("return_to", callbackUrl.toString());
-        target.searchParams.set("app_id", "listen-tauri");
-        void openExternalOAuthUrl(target.toString()).catch(() => {
-          window.location.href = target.toString();
+        void fetchTauriOAuthLoopbackPort().then((port) => {
+          if (!port) {
+            toast.error(t("auth.login.connectionError"));
+            return;
+          }
+          let state: string;
+          try {
+            state = beginDesktopOAuthHandoff(rt || "/");
+          } catch {
+            toast.error(t("auth.login.connectionError"));
+            return;
+          }
+          const callbackUrl = tauriOAuthCallbackUrl(rt, state, port);
+          target.searchParams.set("return_to", callbackUrl.toString());
+          target.searchParams.set("app_id", "listen-tauri");
+          void openExternalOAuthUrl(target.toString()).catch(() => {
+            window.location.href = target.toString();
+          });
         });
         return;
       }

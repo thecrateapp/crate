@@ -31,6 +31,7 @@ import com.google.android.gms.cast.framework.SessionManagerListener;
 import com.google.android.gms.cast.framework.media.RemoteMediaClient;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.images.WebImage;
 
 import org.json.JSONException;
@@ -410,7 +411,7 @@ public class CrateCastPlugin extends Plugin {
     }
 
     private interface RemoteClientAction {
-        void run(RemoteMediaClient remoteClient);
+        PendingResult<RemoteMediaClient.MediaChannelResult> run(RemoteMediaClient remoteClient);
     }
 
     private void runWithRemoteClient(PluginCall call, RemoteClientAction action) {
@@ -423,8 +424,18 @@ public class CrateCastPlugin extends Plugin {
                     call.resolve(result(false, "No active Cast media session."));
                     return;
                 }
-                action.run(remoteClient);
-                call.resolve(result(true, null));
+                PendingResult<RemoteMediaClient.MediaChannelResult> pendingResult = action.run(remoteClient);
+                if (pendingResult == null) {
+                    call.resolve(result(true, null));
+                    return;
+                }
+                pendingResult.setResultCallback(mediaChannelResult -> {
+                    if (mediaChannelResult.getStatus().isSuccess()) {
+                        call.resolve(result(true, null));
+                    } else {
+                        call.resolve(result(false, "Cast command was rejected by the receiver."));
+                    }
+                });
             } catch (RuntimeException error) {
                 Log.w(TAG, "Cast control failed.", error);
                 call.resolve(result(false, "Cast control failed."));

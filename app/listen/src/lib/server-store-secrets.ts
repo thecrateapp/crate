@@ -18,6 +18,7 @@ export interface LegacyServerSecretRecord {
 
 const runtimeSecrets = new Map<string, ServerSecret>();
 const pendingSecretWrites = new Set<Promise<void>>();
+const writeChains = new Map<string, Promise<void>>();
 
 function secureSessionKey(serverId: string): string {
   return `crate.session.${serverId}`;
@@ -71,23 +72,44 @@ function trackSecretWrite(operation: Promise<void>): void {
     .finally(() => pendingSecretWrites.delete(operation));
 }
 
+// Two writes for the same server (e.g. a token refresh's set() racing a
+// logout's remove()) aren't guaranteed to land in the order we issued them —
+// whichever secure-storage call finishes last wins, which could silently
+// resurrect a just-logged-out session or leave a stale token behind. Chaining
+// per-server keeps writes applied in issue order without blocking writes to
+// other servers.
+function enqueueSecretWrite(
+  serverId: string,
+  operation: () => Promise<void>,
+): void {
+  const previous = writeChains.get(serverId) ?? Promise.resolve();
+  const gated = previous.then(operation, operation);
+  writeChains.set(
+    serverId,
+    gated.catch(() => undefined),
+  );
+  trackSecretWrite(gated);
+}
+
 export function queueSecretWrite(serverId: string, secret: ServerSecret): void {
   if (!isCapacitorRuntime) return;
-  const operation =
+  enqueueSecretWrite(serverId, () =>
     secret.token || secret.refreshToken
       ? setSecureSessionValue(
           secureSessionKey(serverId),
           serializeSecret(secret),
         )
-      : removeSecureSessionValue(secureSessionKey(serverId));
-  trackSecretWrite(operation);
+      : removeSecureSessionValue(secureSessionKey(serverId)),
+  );
 }
 
 export function removeQueuedSecret(serverId: string): void {
   if (!isCapacitorRuntime) return;
-  void removeSecureSessionValue(secureSessionKey(serverId)).catch(() => {
-    // The in-memory session is already removed; a later bootstrap can retry.
-  });
+  enqueueSecretWrite(serverId, () =>
+    removeSecureSessionValue(secureSessionKey(serverId)).catch(() => {
+      // The in-memory session is already removed; a later bootstrap can retry.
+    }),
+  );
 }
 
 export async function waitForPendingSecureSessionWrites(): Promise<void> {

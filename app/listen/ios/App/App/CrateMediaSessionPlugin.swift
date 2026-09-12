@@ -21,8 +21,11 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private var artworkRequestId = 0
     private var cachedArtworkUrl: String?
     private var cachedArtwork: MPMediaItemArtwork?
+    private var pendingArtworkUrl: String?
     private var routePickerOverlay: UIView?
     private var routePickerDismissWorkItem: DispatchWorkItem?
+    private var lastKnownIsPlaying = false
+    private var wasPlayingBeforeInterruption = false
 
     override func load() {
         super.load()
@@ -61,6 +64,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         let album = call.getString("album", "")
         let artwork = call.getString("artwork", "")
         let isPlaying = call.getBool("isPlaying", false)
+        lastKnownIsPlaying = isPlaying
         let duration = max(0, call.getDouble("duration", 0))
         let position = max(0, min(call.getDouble("position", 0), duration > 0 ? duration : call.getDouble("position", 0)))
 
@@ -172,6 +176,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func stop(_ call: CAPPluginCall) {
         artworkRequestId += 1
+        pendingArtworkUrl = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         call.resolve()
     }
@@ -248,11 +253,18 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
         switch type {
         case .began:
+            // Capture our own state before we force a pause, since a
+            // subsequent .ended callback can't tell the difference between
+            // "we were playing and got interrupted" and "the user had
+            // already paused before the interruption" — resuming in the
+            // latter case would silently undo the user's own pause.
+            wasPlayingBeforeInterruption = lastKnownIsPlaying
             sendControl("pause")
         case .ended:
             configureAudioSession()
             let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            if AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume) {
+            let shouldResume = AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume)
+            if wasPlayingBeforeInterruption && shouldResume {
                 sendControl("play")
             }
         @unknown default:
@@ -301,16 +313,32 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func loadArtwork(from artworkUrl: String, into baseInfo: [String: Any]) {
         guard let url = URL(string: artworkUrl), !artworkUrl.isEmpty else { return }
+        if pendingArtworkUrl == artworkUrl {
+            // update() fires roughly once per second while playing. Without
+            // this guard, an artwork download/decode that takes longer than
+            // that would get a brand new request issued on every tick,
+            // which bumps artworkRequestId and invalidates the previous
+            // attempt before it can ever finish — the artwork never loads.
+            return
+        }
+        pendingArtworkUrl = artworkUrl
         artworkRequestId += 1
         let currentRequestId = artworkRequestId
 
         URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let self else { return }
             guard
-                let self,
                 currentRequestId == self.artworkRequestId,
                 let data,
                 let decodedArtwork = CrateArtworkDownsampler.decode(data: data)
-            else { return }
+            else {
+                DispatchQueue.main.async {
+                    if self.pendingArtworkUrl == artworkUrl {
+                        self.pendingArtworkUrl = nil
+                    }
+                }
+                return
+            }
 
             let image = UIImage(cgImage: decodedArtwork)
             let mediaArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
@@ -318,6 +346,9 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 guard currentRequestId == self.artworkRequestId else { return }
                 self.cachedArtworkUrl = artworkUrl
                 self.cachedArtwork = mediaArtwork
+                if self.pendingArtworkUrl == artworkUrl {
+                    self.pendingArtworkUrl = nil
+                }
                 var nextInfo = baseInfo
                 nextInfo[MPMediaItemPropertyArtwork] = mediaArtwork
                 MPNowPlayingInfoCenter.default().nowPlayingInfo = nextInfo

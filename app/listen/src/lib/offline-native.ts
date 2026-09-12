@@ -40,7 +40,12 @@ async function verifyWithFilesystem(
         });
         const size = Math.max(0, Number(stat.size || 0));
         const expected = Math.max(0, Number(expectedBytes || 0));
-        const valid = expected === 0 || size === 0 || size === expected;
+        // A 0-byte file is never a legitimately cached track — it means an
+        // interrupted/truncated write, not one with no content. Matches the
+        // same rule assertNativeTrackIntegrity applies right after a
+        // download; without it, a corrupted cache entry would keep passing
+        // this check forever and only fail once actual playback is attempted.
+        const valid = size > 0 && (expected === 0 || size === expected);
         if (!valid) {
           await Filesystem.deleteFile({
             path,

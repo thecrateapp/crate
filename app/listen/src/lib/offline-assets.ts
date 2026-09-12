@@ -127,12 +127,17 @@ export async function ensureOfflineStorageBudget(
 export async function cacheTrackAsset(
   profileKey: string,
   track: OfflineManifestTrack,
+  signal?: AbortSignal,
 ): Promise<void> {
   const assetKey = getOfflineTrackAssetKey(track);
   if (!assetKey) {
     throw new Error("Offline copy requires entity_uid or storage_id");
   }
   if (isNative) {
+    // Capacitor's Filesystem.downloadFile has no cancellation primitive —
+    // an in-flight native download can't be aborted mid-transfer, only
+    // prevented from starting (the caller already checks signal.aborted
+    // before calling this).
     await cacheNativeTrackAsset(profileKey, track);
     return;
   }
@@ -142,7 +147,7 @@ export async function cacheTrackAsset(
   await cacheWebOfflineAsset(
     cache,
     cacheKey,
-    () => apiFetch(track.stream_url, { method: "GET" }),
+    () => apiFetch(track.stream_url, { method: "GET", signal }),
     expectedTrackBytes(track),
   );
 }

@@ -4,7 +4,11 @@ import {
   removeSecureSessionValue,
   setSecureSessionValue,
 } from "@/lib/native-secure-session";
-import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
+import {
+  getCurrentServerId,
+  setCurrentServerId,
+  waitForPendingSecureSessionWrites,
+} from "@/lib/server-store";
 
 const OAUTH_NEXT_KEY = "crate-oauth-next";
 const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
@@ -14,6 +18,7 @@ const DESKTOP_HANDOFF_KEY_PREFIX = "crate-oauth-desktop-state:";
 interface DesktopOAuthHandoffRecord {
   next: string;
   createdAt: number;
+  serverId: string | null;
 }
 
 type OAuthProvider = "google" | "apple";
@@ -22,6 +27,7 @@ interface NativeOAuthRecord {
   verifier: string;
   next: string;
   createdAt: number;
+  serverId: string | null;
 }
 
 interface NativeOAuthLoginResponse {
@@ -69,6 +75,11 @@ export async function beginNativeOAuth(
     verifier,
     next: next || "/",
     createdAt: Date.now(),
+    // The system browser can stay open for minutes; if the user switches
+    // the "current server" in the meantime, a token minted for the server
+    // this flow started against must not land on whatever server happens
+    // to be current when the callback finally arrives.
+    serverId: getCurrentServerId(),
   };
   const recordKey = oauthRecordKey(state);
   await setSecureSessionValue(recordKey, JSON.stringify(record));
@@ -131,26 +142,30 @@ export function beginDesktopOAuthHandoff(next: string): string {
   const record: DesktopOAuthHandoffRecord = {
     next: next || "/",
     createdAt: Date.now(),
+    serverId: getCurrentServerId(),
   };
   try {
     localStorage.setItem(
       DESKTOP_HANDOFF_KEY_PREFIX + state,
       JSON.stringify(record),
     );
-  } catch {
-    // If storage is unavailable, consumeDesktopOAuthHandoff will simply
-    // find no matching record later and fail closed.
+  } catch (error) {
+    // A flow that opens the system browser but can never validate its own
+    // callback (no nonce was actually persisted) would silently strand the
+    // user on an external login page — fail before opening the browser at
+    // all, instead of leaving peekDesktopOAuthHandoff to reject it later.
+    const failure = new Error("Could not start the desktop login flow");
+    (failure as { cause?: unknown }).cause = error;
+    throw failure;
   }
   return state;
 }
 
-function consumeDesktopOAuthHandoff(
+function peekDesktopOAuthHandoff(
   state: string,
 ): DesktopOAuthHandoffRecord | null {
-  const key = DESKTOP_HANDOFF_KEY_PREFIX + state;
   try {
-    const raw = localStorage.getItem(key);
-    localStorage.removeItem(key);
+    const raw = localStorage.getItem(DESKTOP_HANDOFF_KEY_PREFIX + state);
     if (!raw) return null;
     const record = JSON.parse(raw) as Partial<DesktopOAuthHandoffRecord>;
     if (
@@ -160,9 +175,21 @@ function consumeDesktopOAuthHandoff(
     ) {
       return null;
     }
-    return record as DesktopOAuthHandoffRecord;
+    return {
+      next: record.next,
+      createdAt: record.createdAt,
+      serverId: typeof record.serverId === "string" ? record.serverId : null,
+    };
   } catch {
     return null;
+  }
+}
+
+function consumeDesktopOAuthHandoff(state: string): void {
+  try {
+    localStorage.removeItem(DESKTOP_HANDOFF_KEY_PREFIX + state);
+  } catch {
+    // best-effort
   }
 }
 
@@ -204,12 +231,28 @@ function consumeDesktopTokenHandoff(params: URLSearchParams): {
   const state = params.get("state");
   if (!state) return { handled: false, next: "/" };
 
-  const record = consumeDesktopOAuthHandoff(state);
+  const record = peekDesktopOAuthHandoff(state);
   if (!record) return { handled: false, next: "/" };
 
-  const result = persistOAuthCallbackPayload(params);
-  if (!result.handled) return result;
+  // The system browser can sit open for minutes; restore the server this
+  // flow was started against so the token lands there, not on whatever
+  // server the user may have switched "current" to in the meantime.
+  if (record.serverId && record.serverId !== getCurrentServerId()) {
+    setCurrentServerId(record.serverId);
+  }
 
+  const result = persistOAuthCallbackPayload(params);
+  if (!result.handled) {
+    // No token in this callback — could be a request the loopback server
+    // only read part of. Leave the nonce in place so a complete retry
+    // within the TTL can still succeed, instead of burning the one-time
+    // nonce on an incomplete attempt.
+    return result;
+  }
+
+  // Only consume the nonce once we've actually accepted a token under
+  // it, so a genuine login can't be replayed a second time.
+  consumeDesktopOAuthHandoff(state);
   // Trust our own stored destination, not whatever `next` the URL itself
   // carries, as a second layer of defense.
   storePendingOAuthNext(record.next);
@@ -265,6 +308,15 @@ async function exchangeNativeOAuthCallback(
       Date.now() - record.createdAt > OAUTH_RECORD_MAX_AGE_MS
     ) {
       return { handled: false, next: "/" };
+    }
+    // The system browser can sit open for a while; restore the server this
+    // flow was started against so the exchanged token lands there, not on
+    // whatever server the user may have switched "current" to meanwhile.
+    if (
+      typeof record.serverId === "string" &&
+      record.serverId !== getCurrentServerId()
+    ) {
+      setCurrentServerId(record.serverId);
     }
     const response = await api<NativeOAuthLoginResponse>(
       "/api/auth/native/exchange",

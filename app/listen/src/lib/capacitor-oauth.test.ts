@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   setAuthTokens: vi.fn(),
+  getCurrentServerId: vi.fn<() => string | null>(() => null),
+  setCurrentServerId: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -17,6 +19,8 @@ vi.mock("@/lib/native-secure-session", () => ({
 
 vi.mock("@/lib/server-store", () => ({
   waitForPendingSecureSessionWrites: vi.fn(),
+  getCurrentServerId: mocks.getCurrentServerId,
+  setCurrentServerId: mocks.setCurrentServerId,
 }));
 
 import {
@@ -28,6 +32,8 @@ describe("desktop OAuth token handoff", () => {
   beforeEach(() => {
     localStorage.clear();
     mocks.setAuthTokens.mockReset();
+    mocks.getCurrentServerId.mockReset().mockReturnValue(null);
+    mocks.setCurrentServerId.mockReset();
   });
 
   afterEach(() => {
@@ -93,5 +99,37 @@ describe("desktop OAuth token handoff", () => {
     );
 
     expect(result).toEqual({ handled: true, next: "/library" });
+  });
+
+  it("does not burn the nonce on a callback with no token, so a complete retry can still succeed", async () => {
+    const state = beginDesktopOAuthHandoff("/library");
+
+    // e.g. the loopback server only read part of the real request.
+    const incomplete = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?state=${state}`,
+    );
+    expect(incomplete).toEqual({ handled: false, next: "/" });
+    expect(mocks.setAuthTokens).not.toHaveBeenCalled();
+
+    const retry = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?token=real-token&state=${state}`,
+    );
+    expect(retry).toEqual({ handled: true, next: "/library" });
+  });
+
+  it("restores the server the flow was started against if the user switched servers meanwhile", async () => {
+    mocks.getCurrentServerId.mockReturnValue("server-a");
+    const state = beginDesktopOAuthHandoff("/library");
+
+    // The user switched to a different server while the system browser
+    // was open.
+    mocks.getCurrentServerId.mockReturnValue("server-b");
+
+    const result = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?token=real-token&state=${state}`,
+    );
+
+    expect(result).toEqual({ handled: true, next: "/library" });
+    expect(mocks.setCurrentServerId).toHaveBeenCalledWith("server-a");
   });
 });

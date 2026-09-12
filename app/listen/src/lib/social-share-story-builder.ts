@@ -1,6 +1,6 @@
 import {
   getApiAuthHeaders,
-  isApiUrl,
+  getApiBase,
   resolveMaybeApiAssetUrl,
 } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
@@ -229,14 +229,39 @@ async function loadCanvasImage(src: string): Promise<CanvasArtwork> {
   }
 }
 
+function expectedApiOrigin(): string | null {
+  const base = getApiBase();
+  try {
+    if (base) return new URL(base).origin;
+  } catch {
+    return null;
+  }
+  return typeof window !== "undefined" ? window.location.origin : null;
+}
+
 // Self-hosted artwork can require auth (bearer token, not cookies, for the
 // native multi-server flow), which neither the native share plugin nor
 // CapacitorHttp attach on their own. Only attached for our own API, never
-// a third-party CDN, so this never leaks the token elsewhere.
+// a third-party CDN — checking the *origin*, not just isApiUrl()'s
+// path-only "/api/" prefix check, which a URL like
+// https://attacker.example/api/cover.jpg satisfies just as well as our
+// own server, and would otherwise get our bearer token and device
+// headers sent straight to that attacker's origin.
 export function resolveArtworkAuthHeaders(
   src: string,
 ): Record<string, string> | undefined {
-  return isApiUrl(src) ? getApiAuthHeaders() : undefined;
+  const origin = expectedApiOrigin();
+  if (!origin) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(src, origin);
+  } catch {
+    return undefined;
+  }
+  if (parsed.origin !== origin || !parsed.pathname.startsWith("/api/")) {
+    return undefined;
+  }
+  return getApiAuthHeaders();
 }
 
 async function loadNativeHttpImageDataUrl(src: string): Promise<string> {

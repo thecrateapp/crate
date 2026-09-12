@@ -154,7 +154,11 @@ export function useOfflineManifestSync({
               await ensureOfflineStorageBudget(profileKey, [track], {
                 assumeMissing: true,
               });
-              await cacheTrackAsset(profileKey, track);
+              await cacheTrackAsset(
+                profileKey,
+                track,
+                transferController.signal,
+              );
             } catch (error) {
               if (transferController.signal.aborted) return;
               failureCount += 1;

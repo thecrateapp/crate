@@ -46,6 +46,30 @@ const nativeAssetIndexLoaders = new Map<
   string,
   Promise<Record<string, OfflineNativeAssetRecord>>
 >();
+const nativeAssetIndexWriteChains = new Map<string, Promise<void>>();
+
+// Downloading several tracks at once (e.g. a whole album) means several
+// cacheNativeTrackAsset() calls race to read-modify-write the same
+// per-profile index. Each one's in-memory read/mutate is safe (JS has no
+// yield points in between), but the disk writes themselves are
+// concurrent — whichever one's write happens to finish last on disk wins,
+// even if it was issued first with an older, less complete snapshot. That
+// silently reverts the index and orphans a just-finished download. Chaining
+// writes per profile keeps them landing on disk in the order they were
+// issued, so the most recently issued (most complete) write always wins.
+function enqueueNativeAssetIndexWrite(
+  profileKey: string,
+  write: () => Promise<void>,
+): Promise<void> {
+  const previous =
+    nativeAssetIndexWriteChains.get(profileKey) ?? Promise.resolve();
+  const next = previous.then(write, write);
+  nativeAssetIndexWriteChains.set(
+    profileKey,
+    next.catch(() => undefined),
+  );
+  return next;
+}
 
 export function getOfflineItemKey(
   kind: OfflineItemKind,
@@ -336,9 +360,8 @@ export async function saveOfflineNativeAssetIndex(
     // killed before flushing — otherwise a completed download can end up
     // as an orphaned file on disk with no matching index entry.
     nativeAssetIndexCache.set(profileKey, assets);
-    await writeNativeJsonFile(
-      getOfflineNativeAssetIndexPath(profileKey),
-      assets,
+    await enqueueNativeAssetIndexWrite(profileKey, () =>
+      writeNativeJsonFile(getOfflineNativeAssetIndexPath(profileKey), assets),
     );
     return;
   }

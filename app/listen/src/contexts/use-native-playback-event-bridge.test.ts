@@ -13,6 +13,7 @@ describe("recoverNativeResumeAuthorizationWithRetry", () => {
 
     const promise = recoverNativeResumeAuthorizationWithRetry(
       recoverNativeBuffering,
+      true,
     );
     await vi.runAllTimersAsync();
     const recovered = await promise;
@@ -28,12 +29,30 @@ describe("recoverNativeResumeAuthorizationWithRetry", () => {
 
     const promise = recoverNativeResumeAuthorizationWithRetry(
       recoverNativeBuffering,
+      true,
     );
     await vi.runAllTimersAsync();
     const recovered = await promise;
 
     expect(recovered).toBe(false);
     expect(recoverNativeBuffering).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
+
+  it("passes the requested autoplay flag through to each recovery attempt", async () => {
+    vi.useFakeTimers();
+    const recoverNativeBuffering = vi.fn().mockResolvedValueOnce(true);
+
+    const promise = recoverNativeResumeAuthorizationWithRetry(
+      recoverNativeBuffering,
+      false,
+    );
+    await vi.runAllTimersAsync();
+    await promise;
+
+    expect(recoverNativeBuffering).toHaveBeenCalledWith(
+      expect.objectContaining({ autoplay: false }),
+    );
     vi.useRealTimers();
   });
 });

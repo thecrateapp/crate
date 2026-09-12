@@ -96,7 +96,11 @@ export function useNativeBufferingRecovery({
   }, []);
 
   const recoverNativeBuffering = useCallback(
-    async (options: { forceRefresh: boolean; probeStatus: string }) => {
+    async (options: {
+      forceRefresh: boolean;
+      probeStatus: string;
+      autoplay?: boolean;
+    }) => {
       if (!shouldUseAndroidNativePlayer()) return false;
 
       const queueSnapshot = queueRef.current;
@@ -128,7 +132,7 @@ export function useNativeBufferingRecovery({
         tracks: engineTracks,
         currentIndex: index,
         positionMs,
-        autoplay: true,
+        autoplay: options.autoplay ?? true,
         repeat: repeatRef.current,
         crossfadeMs: effectiveCrossfadeMsRef.current,
         volume: lastNonZeroVolumeRef.current,

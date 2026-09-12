@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { isApiUrlMock, getApiAuthHeadersMock } = vi.hoisted(() => ({
-  isApiUrlMock: vi.fn(),
+const { getApiAuthHeadersMock, getApiBaseMock } = vi.hoisted(() => ({
   getApiAuthHeadersMock: vi.fn(),
+  getApiBaseMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
-  isApiUrl: isApiUrlMock,
   getApiAuthHeaders: getApiAuthHeadersMock,
+  getApiBase: getApiBaseMock,
   resolveMaybeApiAssetUrl: (src: string) => src,
 }));
 
@@ -18,8 +18,8 @@ describe("resolveArtworkAuthHeaders", () => {
     vi.clearAllMocks();
   });
 
-  it("attaches auth headers for our own API's artwork URLs", () => {
-    isApiUrlMock.mockReturnValue(true);
+  it("attaches auth headers for our own configured server's artwork URLs", () => {
+    getApiBaseMock.mockReturnValue("https://my-instance.example");
     getApiAuthHeadersMock.mockReturnValue({ Authorization: "Bearer secret" });
 
     expect(
@@ -27,11 +27,32 @@ describe("resolveArtworkAuthHeaders", () => {
     ).toEqual({ Authorization: "Bearer secret" });
   });
 
+  it("attaches auth headers for same-origin relative API paths", () => {
+    getApiBaseMock.mockReturnValue("");
+    getApiAuthHeadersMock.mockReturnValue({ Authorization: "Bearer secret" });
+
+    expect(resolveArtworkAuthHeaders("/api/covers/1")).toEqual({
+      Authorization: "Bearer secret",
+    });
+  });
+
   it("never attaches auth headers for third-party artwork URLs", () => {
-    isApiUrlMock.mockReturnValue(false);
+    getApiBaseMock.mockReturnValue("https://my-instance.example");
 
     expect(
       resolveArtworkAuthHeaders("https://lastfm-img.example/cover.jpg"),
+    ).toBeUndefined();
+    expect(getApiAuthHeadersMock).not.toHaveBeenCalled();
+  });
+
+  it("does not attach auth headers just because the path starts with /api/ on a different origin", () => {
+    getApiBaseMock.mockReturnValue("https://my-instance.example");
+
+    // A malicious host could serve a path that merely *looks* like our
+    // API — isApiUrl()'s old path-only check would have matched this and
+    // leaked the bearer token/device headers to attacker.example.
+    expect(
+      resolveArtworkAuthHeaders("https://attacker.example/api/cover.jpg"),
     ).toBeUndefined();
     expect(getApiAuthHeadersMock).not.toHaveBeenCalled();
   });

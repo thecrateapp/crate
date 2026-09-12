@@ -17,6 +17,7 @@ import {
   persistNativePlaybackDiagnostic,
   redactDiagnosticUrl,
 } from "@/contexts/use-native-buffering-recovery";
+import { recordDevLog } from "@/lib/dev-logs";
 import { toast } from "sonner";
 
 type ValueRef<T> = { readonly current: T };
@@ -38,7 +39,9 @@ export async function recoverNativeResumeAuthorizationWithRetry(
   recoverNativeBuffering: (options: {
     forceRefresh: boolean;
     probeStatus: string;
+    autoplay?: boolean;
   }) => Promise<boolean>,
+  autoplay: boolean,
 ): Promise<boolean> {
   for (const delay of RESUME_AUTHORIZATION_RETRY_DELAYS_MS) {
     if (delay > 0) {
@@ -47,6 +50,7 @@ export async function recoverNativeResumeAuthorizationWithRetry(
     const recovered = await recoverNativeBuffering({
       forceRefresh: false,
       probeStatus: "resume-authorization",
+      autoplay,
     });
     if (recovered) return true;
   }
@@ -151,7 +155,12 @@ export function useNativePlaybackEventBridge({
         return;
       }
       if (eventName === "resumeAuthorizationRequired") {
-        void recoverNativeResumeAuthorizationWithRetry(recoverNativeBuffering)
+        const resumeEvent =
+          payload as EngineEventMap["resumeAuthorizationRequired"];
+        void recoverNativeResumeAuthorizationWithRetry(
+          recoverNativeBuffering,
+          Boolean(resumeEvent.playWhenReady),
+        )
           .then((recovered) => {
             if (recovered) return;
             toast.error("Open Crate to resume playback", {
@@ -213,13 +222,21 @@ export function useNativePlaybackEventBridge({
   const reconcileNativePlayback = useCallback(
     (options: PlaybackStateOptions = {}) => {
       if (!shouldUseAndroidNativePlayer()) return;
-      void androidNativeEngine
-        .getState()
-        .then((state) => {
-          if (!state) return;
-          applyNativeState(state, options);
-        })
-        .catch(() => {});
+      void androidNativeEngine.getState().then((state) => {
+        // getState() itself swallows native-bridge failures and resolves
+        // null rather than rejecting — nothing else surfaces that, so
+        // reconciliation would otherwise fail silently on every foreground.
+        if (!state) {
+          recordDevLog(
+            "native-player",
+            "foreground reconciliation failed to read native state",
+            {},
+            "warn",
+          );
+          return;
+        }
+        applyNativeState(state, options);
+      });
     },
     [applyNativeState],
   );
@@ -266,21 +283,33 @@ export function useNativePlaybackEventBridge({
       },
     });
 
-    void subscription.ready.catch((error) => {
-      console.error("[native-player] failed to attach listeners:", error);
-    });
-
-    void androidNativeEngine
-      .drainEvents()
-      .then((events) => {
-        if (disposed) return;
-        for (const event of events) {
-          handleNativeEvent(event.event, event.payload);
-        }
+    // Listeners attach one event at a time (subscription.ready), each a
+    // native round trip — draining or reconciling before that finishes
+    // could ask native to flush events into a listener that isn't wired up
+    // yet and silently lose them. Reconciling (getState) only after the
+    // drain also ensures the freshest snapshot is applied last, instead of
+    // racing a stale buffered event for who gets applied second.
+    void subscription.ready
+      .catch((error) => {
+        console.error("[native-player] failed to attach listeners:", error);
       })
-      .catch(() => {});
+      .then(() => {
+        if (disposed) return;
+        return androidNativeEngine
+          .drainEvents()
+          .then((events) => {
+            if (disposed) return;
+            for (const event of events) {
+              handleNativeEvent(event.event, event.payload);
+            }
+          })
+          .catch(() => {});
+      })
+      .then(() => {
+        if (disposed) return;
+        reconcileNativePlayback();
+      });
 
-    reconcileNativePlayback();
     const onNativeResume = () => {
       reconcileNativePlayback({
         rotateIndexChange: true,

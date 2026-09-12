@@ -2,7 +2,7 @@
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     thread,
 };
 #[cfg(target_os = "macos")]
@@ -350,16 +350,42 @@ fn dispatch_oauth_callback<R: tauri::Runtime>(app: &tauri::AppHandle<R>, callbac
     }
 }
 
+// A fixed, well-known port is squattable: another local process (or
+// malware already running when Crate starts) can bind it first, and the
+// browser will then hand that process the real access/refresh token
+// instead of us — no amount of validating the callback *after* the fact
+// helps, because we never even see the request. Binding port 0 lets the
+// OS assign a free ephemeral port instead, and get_oauth_loopback_port
+// reports the one actually bound so the frontend never has to guess.
+#[cfg(desktop)]
+static OAUTH_LOOPBACK_PORT: OnceLock<u16> = OnceLock::new();
+
+#[cfg(desktop)]
+#[tauri::command]
+fn get_oauth_loopback_port() -> Option<u16> {
+    OAUTH_LOOPBACK_PORT.get().copied()
+}
+
 #[cfg(desktop)]
 fn start_oauth_loopback<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
     thread::spawn(move || {
-        let listener = match TcpListener::bind(("127.0.0.1", 17654)) {
+        let listener = match TcpListener::bind(("127.0.0.1", 0)) {
             Ok(listener) => listener,
             Err(err) => {
                 eprintln!("failed to bind Crate OAuth loopback listener: {err}");
                 return;
             }
         };
+        let port = match listener.local_addr() {
+            Ok(addr) => addr.port(),
+            Err(err) => {
+                eprintln!("failed to read Crate OAuth loopback port: {err}");
+                return;
+            }
+        };
+        // set() only fails if already set, which can't happen — this
+        // thread is spawned exactly once.
+        let _ = OAUTH_LOOPBACK_PORT.set(port);
 
         for stream in listener.incoming() {
             match stream {
@@ -372,6 +398,34 @@ fn start_oauth_loopback<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
 
 #[cfg(desktop)]
 const OAUTH_LOOPBACK_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+#[cfg(desktop)]
+const OAUTH_LOOPBACK_MAX_REQUEST_BYTES: usize = 16 * 1024;
+
+// A single `read()` call is not guaranteed to return a full HTTP request
+// even when it fits well within the buffer — TCP makes no promise that
+// read boundaries line up with what the browser wrote in one go. The
+// previous single fixed-size read could silently truncate the request
+// line (dropping the token/state query params) on a request split across
+// multiple packets. Reads until the end of headers or the size cap.
+#[cfg(desktop)]
+fn read_http_request_head(stream: &mut TcpStream) -> String {
+    let mut buffer = Vec::with_capacity(1024);
+    let mut chunk = [0_u8; 1024];
+    loop {
+        if buffer.len() >= OAUTH_LOOPBACK_MAX_REQUEST_BYTES {
+            break;
+        }
+        let read = match stream.read(&mut chunk) {
+            Ok(0) | Err(_) => break,
+            Ok(read) => read,
+        };
+        buffer.extend_from_slice(&chunk[..read]);
+        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+    String::from_utf8_lossy(&buffer).into_owned()
+}
 
 #[cfg(desktop)]
 fn handle_oauth_loopback_request<R: tauri::Runtime>(
@@ -385,9 +439,7 @@ fn handle_oauth_loopback_request<R: tauri::Runtime>(
     // one at a time — indefinitely.
     let _ = stream.set_read_timeout(Some(OAUTH_LOOPBACK_READ_TIMEOUT));
 
-    let mut buffer = [0_u8; 4096];
-    let read = stream.read(&mut buffer).unwrap_or(0);
-    let request = String::from_utf8_lossy(&buffer[..read]);
+    let request = read_http_request_head(stream);
     let request_target = request
         .lines()
         .next()
@@ -849,7 +901,8 @@ pub fn run() {
             cache_desktop_media_artwork,
             ensure_desktop_window_size,
             open_bandcamp_cookie_interceptor,
-            linux_desktop_theme_snapshot
+            linux_desktop_theme_snapshot,
+            get_oauth_loopback_port
         ])
         .build(tauri::generate_context!())
         .expect("error while building Crate desktop")

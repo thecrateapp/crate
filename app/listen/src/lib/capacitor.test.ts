@@ -63,6 +63,8 @@ vi.mock("@/lib/native-secure-session", () => ({
 }));
 vi.mock("@/lib/server-store", () => ({
   waitForPendingSecureSessionWrites,
+  getCurrentServerId: () => null,
+  setCurrentServerId: () => {},
 }));
 
 import {

@@ -25,13 +25,19 @@ pub fn install(app: &tauri::App) {
     let _ = MEDIA_APP_HANDLE.set(app.handle().clone());
 
     let Some(window) = app.get_webview_window("main") else {
+        eprintln!("Crate SMTC init failed: no main webview window");
         return;
     };
     let Ok(hwnd) = window.hwnd() else {
+        eprintln!("Crate SMTC init failed: could not read window HWND");
         return;
     };
-    let Ok(smtc) = create_smtc(hwnd) else {
-        return;
+    let smtc = match create_smtc(hwnd) {
+        Ok(smtc) => smtc,
+        Err(err) => {
+            eprintln!("Crate SMTC init failed: {err}");
+            return;
+        }
     };
 
     let _ = smtc.SetIsEnabled(true);
@@ -71,6 +77,11 @@ pub fn update_now_playing(payload: &DesktopMediaSessionPayload) {
     };
 
     if let Ok(updater) = smtc.DisplayUpdater() {
+        // Clear stale fields from the previous track first — SMTC keeps
+        // whatever was last set, so a track with no artist/album/artwork
+        // would otherwise still show the previous track's values instead
+        // of blank ones.
+        let _ = updater.ClearAll();
         let _ = updater.SetType(MediaPlaybackType::Music);
         if let Ok(music) = updater.MusicProperties() {
             let _ = music.SetTitle(&HSTRING::from(title));

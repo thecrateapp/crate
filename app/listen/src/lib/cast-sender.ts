@@ -170,11 +170,16 @@ function resolveWebCastMediaCommand(
 async function getNativeCastCapabilities(): Promise<CastSenderCapabilities> {
   try {
     const capabilities = await getNativeCast().getCapabilities();
+    // This is the freshest read of the native session state we ever get —
+    // sync our local flag from it, since a session can end natively
+    // (receiver disconnect before the plugin is registered/listening,
+    // app restart, etc.) without a `sessionChanged` event ever reaching us.
+    nativeCastSessionActive = Boolean(capabilities.activeSession);
     return {
       platform: "native",
       visible: capabilities.visible,
       available: capabilities.available,
-      activeSession: Boolean(capabilities.activeSession),
+      activeSession: nativeCastSessionActive,
       targetName: capabilities.targetName,
       reason: capabilities.reason,
     };
