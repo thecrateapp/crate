@@ -165,7 +165,7 @@ async function handleDeepLinkUrls(urls: string[]): Promise<void> {
     const result = await consumeOAuthCallbackUrl(url);
     if (!result.handled) {
       recordTauriAuthDiagnostic(
-        "Deep link ignored",
+        result.retryable ? "OAuth exchange deferred" : "Deep link ignored",
         protocolForDiagnostic(url),
       );
       continue;

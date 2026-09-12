@@ -189,7 +189,7 @@ describe("capacitor OAuth callback helpers", () => {
     );
   });
 
-  it("deletes the verifier when native code exchange fails", async () => {
+  it("keeps the verifier when native code exchange fails transiently", async () => {
     getSecureSessionValue.mockResolvedValue(
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -207,10 +207,8 @@ describe("capacitor OAuth callback helpers", () => {
       )}`,
     );
 
-    expect(result).toEqual({ handled: false, next: "/" });
-    expect(removeSecureSessionValue).toHaveBeenCalledWith(
-      `crate.oauth.${"s".repeat(43)}`,
-    );
+    expect(result).toEqual({ handled: false, next: "/", retryable: true });
+    expect(removeSecureSessionValue).not.toHaveBeenCalled();
   });
 
   it("rejects the callback when the exchanged session cannot be persisted", async () => {

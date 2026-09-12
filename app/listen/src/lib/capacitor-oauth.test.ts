@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../../../shared/web/api";
+
 const mocks = vi.hoisted(() => ({
   apiForServerMock: vi.fn(),
   setAuthTokensForServer: vi.fn(() => true),
@@ -131,6 +133,54 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
     // The one-time verifier record must not survive a successful exchange.
     expect(localStorage.getItem(`crate.oauth.${state}`)).toBeNull();
+  });
+
+  it("keeps the PKCE verifier when exchange fails transiently", async () => {
+    const state = "s".repeat(32);
+    const recordKey = `crate.oauth.${state}`;
+    localStorage.setItem(
+      recordKey,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    mocks.apiForServerMock.mockRejectedValue(
+      new ApiError(503, "exchange unavailable"),
+    );
+
+    const result = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
+    );
+
+    expect(result).toEqual({ handled: false, next: "/", retryable: true });
+    expect(localStorage.getItem(recordKey)).not.toBeNull();
+  });
+
+  it("removes the PKCE verifier when exchange rejects the handoff", async () => {
+    const state = "s".repeat(32);
+    const recordKey = `crate.oauth.${state}`;
+    localStorage.setItem(
+      recordKey,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    mocks.apiForServerMock.mockRejectedValue(
+      new ApiError(401, "handoff rejected"),
+    );
+
+    const result = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
+    );
+
+    expect(result).toEqual({ handled: false, next: "/" });
+    expect(localStorage.getItem(recordKey)).toBeNull();
   });
 
   it("rejects a callback whose state has no matching stored verifier", async () => {

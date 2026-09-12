@@ -1,3 +1,4 @@
+import { ApiError } from "../../../shared/web/api";
 import { apiForServer, setAuthTokens, setAuthTokensForServer } from "@/lib/api";
 import {
   getSecureSessionValue,
@@ -30,6 +31,12 @@ interface NativeOAuthLoginResponse {
   token?: string;
   refresh_token?: string | null;
   access_expires_at?: string | null;
+}
+
+interface OAuthCallbackResult {
+  handled: boolean;
+  next: string;
+  retryable?: true;
 }
 
 function base64Url(bytes: Uint8Array): string {
@@ -200,7 +207,7 @@ export function persistOAuthCallbackPayload(search: string | URLSearchParams): {
 
 export async function consumeOAuthCallbackUrl(
   url: string,
-): Promise<{ handled: boolean; next: string }> {
+): Promise<OAuthCallbackResult> {
   try {
     const parsed = new URL(url);
     const isCustomSchemeCallback =
@@ -234,12 +241,14 @@ export async function consumeOAuthCallbackUrl(
 async function exchangeNativeOAuthCallback(
   code: string,
   state: string,
-): Promise<{ handled: boolean; next: string }> {
+): Promise<OAuthCallbackResult> {
   if (activeOAuthStates.has(state)) {
     return { handled: false, next: "/" };
   }
   activeOAuthStates.add(state);
   const recordKey = oauthRecordKey(state);
+  let exchangeCompleted = false;
+  let removeRecord = true;
   try {
     const raw = await readNativeOAuthRecord(recordKey);
     if (!raw) return { handled: false, next: "/" };
@@ -266,6 +275,7 @@ async function exchangeNativeOAuthCallback(
         state,
       },
     );
+    exchangeCompleted = true;
     if (!response.token) return { handled: false, next: "/" };
     const stored = setAuthTokensForServer(
       record.serverId,
@@ -286,10 +296,21 @@ async function exchangeNativeOAuthCallback(
     setCurrentServerId(record.serverId);
     storePendingOAuthNext(record.next);
     return { handled: true, next: record.next };
-  } catch {
+  } catch (error) {
+    if (!exchangeCompleted && isRetryableOAuthExchangeError(error)) {
+      removeRecord = false;
+      return { handled: false, next: "/", retryable: true };
+    }
     return { handled: false, next: "/" };
   } finally {
-    await removeNativeOAuthRecord(recordKey);
+    if (removeRecord) {
+      await removeNativeOAuthRecord(recordKey);
+    }
     activeOAuthStates.delete(state);
   }
+}
+
+function isRetryableOAuthExchangeError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return true;
+  return error.status >= 500 || [408, 425, 429].includes(error.status);
 }
