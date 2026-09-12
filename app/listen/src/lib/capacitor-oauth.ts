@@ -9,6 +9,12 @@ import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
 const OAUTH_NEXT_KEY = "crate-oauth-next";
 const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
+const DESKTOP_HANDOFF_KEY_PREFIX = "crate-oauth-desktop-state:";
+
+interface DesktopOAuthHandoffRecord {
+  next: string;
+  createdAt: number;
+}
 
 type OAuthProvider = "google" | "apple";
 
@@ -110,6 +116,56 @@ export function clearPendingOAuthNext(): void {
   }
 }
 
+/**
+ * The desktop (Tauri) OAuth flow can't do the mobile PKCE dance — it opens
+ * the system browser and relays the resulting token back through a local
+ * loopback server into the `cratemusic://` deep link. That link has no
+ * origin check: any other app or a webpage can invoke the same custom URL
+ * scheme with an arbitrary `token`, and prior to this nonce there was
+ * nothing distinguishing our own login from an attacker's crafted one
+ * (login CSRF / session fixation). We generate this nonce before opening
+ * the browser and require it to come back unchanged.
+ */
+export function beginDesktopOAuthHandoff(next: string): string {
+  const state = randomBase64Url(32);
+  const record: DesktopOAuthHandoffRecord = {
+    next: next || "/",
+    createdAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(
+      DESKTOP_HANDOFF_KEY_PREFIX + state,
+      JSON.stringify(record),
+    );
+  } catch {
+    // If storage is unavailable, consumeDesktopOAuthHandoff will simply
+    // find no matching record later and fail closed.
+  }
+  return state;
+}
+
+function consumeDesktopOAuthHandoff(
+  state: string,
+): DesktopOAuthHandoffRecord | null {
+  const key = DESKTOP_HANDOFF_KEY_PREFIX + state;
+  try {
+    const raw = localStorage.getItem(key);
+    localStorage.removeItem(key);
+    if (!raw) return null;
+    const record = JSON.parse(raw) as Partial<DesktopOAuthHandoffRecord>;
+    if (
+      typeof record.next !== "string" ||
+      typeof record.createdAt !== "number" ||
+      Date.now() - record.createdAt > OAUTH_RECORD_MAX_AGE_MS
+    ) {
+      return null;
+    }
+    return record as DesktopOAuthHandoffRecord;
+  } catch {
+    return null;
+  }
+}
+
 export function getOAuthCallbackPayload(search: string | URLSearchParams): {
   token: string | null;
   refreshToken: string | null;
@@ -141,6 +197,25 @@ export function persistOAuthCallbackPayload(search: string | URLSearchParams): {
   return { handled: true, next };
 }
 
+function consumeDesktopTokenHandoff(params: URLSearchParams): {
+  handled: boolean;
+  next: string;
+} {
+  const state = params.get("state");
+  if (!state) return { handled: false, next: "/" };
+
+  const record = consumeDesktopOAuthHandoff(state);
+  if (!record) return { handled: false, next: "/" };
+
+  const result = persistOAuthCallbackPayload(params);
+  if (!result.handled) return result;
+
+  // Trust our own stored destination, not whatever `next` the URL itself
+  // carries, as a second layer of defense.
+  storePendingOAuthNext(record.next);
+  return { handled: true, next: record.next };
+}
+
 export async function consumeOAuthCallbackUrl(
   url: string,
 ): Promise<{ handled: boolean; next: string }> {
@@ -160,7 +235,7 @@ export async function consumeOAuthCallbackUrl(
     const result =
       code && state
         ? await exchangeNativeOAuthCallback(code, state)
-        : persistOAuthCallbackPayload(parsed.searchParams);
+        : consumeDesktopTokenHandoff(parsed.searchParams);
     if (!result.handled) {
       return result;
     }

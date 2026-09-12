@@ -3,7 +3,11 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { api, getApiBase } from "@/lib/api";
-import { beginNativeOAuth, isNative } from "@/lib/capacitor";
+import {
+  beginDesktopOAuthHandoff,
+  beginNativeOAuth,
+  isNative,
+} from "@/lib/capacitor";
 import { isTauriRuntime } from "@/lib/platform";
 import { OAuthButtons as OAuthButtonsBase } from "@crate/ui/domain/auth/OAuthButtons";
 
@@ -37,10 +41,11 @@ function oauthProvider(loginUrl: string): "google" | "apple" {
   return /(?:^|[/?])apple(?:[/?]|$)/i.test(loginUrl) ? "apple" : "google";
 }
 
-function tauriOAuthCallbackUrl(returnTo: string | null): URL {
+function tauriOAuthCallbackUrl(returnTo: string | null, state: string): URL {
   const callbackUrl = new URL("http://127.0.0.1:17654/oauth/callback");
   if (returnTo && returnTo !== "/")
     callbackUrl.searchParams.set("next", returnTo);
+  callbackUrl.searchParams.set("state", state);
   return callbackUrl;
 }
 
@@ -70,7 +75,8 @@ export function OAuthButtons({
       const target = new URL(loginUrl, base);
       if (invite) target.searchParams.set("invite", invite);
       if (isTauriRuntime) {
-        const callbackUrl = tauriOAuthCallbackUrl(rt);
+        const state = beginDesktopOAuthHandoff(rt || "/");
+        const callbackUrl = tauriOAuthCallbackUrl(rt, state);
         target.searchParams.set("return_to", callbackUrl.toString());
         target.searchParams.set("app_id", "listen-tauri");
         void openExternalOAuthUrl(target.toString()).catch(() => {
