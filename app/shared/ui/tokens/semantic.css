@@ -1791,6 +1791,7 @@
 .jam-input:focus,
 .jam-select-trigger:focus {
   border-color: var(--border-accent-focus);
+  box-shadow: var(--focus-shadow);
   outline: none;
 }
 
@@ -2340,6 +2341,7 @@
     transparent
   );
   border-color: var(--_radio-seed-input-focus-border);
+  box-shadow: var(--focus-shadow);
   outline: none;
 }
 

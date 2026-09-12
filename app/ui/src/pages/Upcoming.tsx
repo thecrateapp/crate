@@ -591,7 +591,7 @@ function EventCard({
       role="button"
       tabIndex={0}
       className={cn(
-        "group relative overflow-hidden rounded-md border p-3.5 transition-all duration-200",
+        "group relative overflow-hidden rounded-md border p-3.5 transition-[background-color,border-color,box-shadow] duration-200",
         "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl hover:bg-white/[0.07]",
         item.tidal_url
           ? "border-primary/25 shadow-[0_0_22px_rgba(6,182,212,0.15)]"

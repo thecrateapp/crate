@@ -199,7 +199,7 @@ export function LegacyDesktopHeroNavigation({
           >
             <span
               className={cn(
-                "block h-1.5 rounded-full transition-all duration-300",
+                "block h-1.5 rounded-full transition-[width,background-color] duration-300",
                 index === activeIndex
                   ? "home-hero-pagination-active w-6"
                   : "home-hero-pagination-inactive w-1.5",

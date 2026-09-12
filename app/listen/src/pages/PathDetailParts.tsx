@@ -54,7 +54,7 @@ export function PathRouteVisualization({
                   className="group relative flex size-4 shrink-0 items-center justify-center"
                 >
                   <div
-                    className={`rounded-full transition-all duration-300 ${
+                    className={`rounded-full transition-[width,height,background-color,box-shadow] duration-300 ${
                       isActive
                         ? "path-node-active h-3 w-3 bg-accent-action"
                         : isPast

@@ -95,7 +95,7 @@ export function ScanProgress({ progress }: ScanProgressProps) {
             <div
               key={id}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-[color,background-color,border-color]",
                 isDone &&
                   "border-l-2 border-l-green-500 border-green-500/30 text-green-400 bg-green-500/5",
                 isRunning &&

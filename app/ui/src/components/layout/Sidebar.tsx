@@ -314,7 +314,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "z-app-sidebar fixed top-0 left-0 bottom-0 flex flex-col border-r border-white/6 bg-app-surface transition-all duration-200",
+        "z-app-sidebar fixed top-0 left-0 bottom-0 flex flex-col border-r border-white/6 bg-app-surface transition-[width] duration-200",
         asideWidth,
       )}
     >

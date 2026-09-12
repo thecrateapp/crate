@@ -194,7 +194,7 @@ export function PlayerBarView({
       {!hidePlayerBarForMobileFullscreen ? (
         <div
           className={cn(
-            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-all duration-200 md:left-3 md:right-3 md:h-[82px]",
+            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-[bottom,left,right,height] duration-200 md:left-3 md:right-3 md:h-[82px]",
             hasFloatingOverlayOpen ? "z-app-player-overlay" : "z-app-player",
           )}
           style={{

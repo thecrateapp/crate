@@ -94,7 +94,7 @@ function Band({
         <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border-interactive" />
         <div
           className={`absolute left-1/2 size-3 -translate-x-1/2 rounded-full bg-accent-action shadow-accent-action-indicator ${
-            dragging ? "" : "transition-all duration-500"
+            dragging ? "" : "transition-[top] duration-500"
           }`}
           style={{ top: `calc(${100 - pct}% - 6px)` }}
         />

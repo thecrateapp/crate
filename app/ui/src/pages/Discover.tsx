@@ -163,7 +163,7 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
             <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
               <div
                 className={cn(
-                  "h-full rounded-sm transition-all",
+                  "h-full rounded-sm transition-[width,background-color]",
                   completionTone(artist.pct),
                 )}
                 style={{ width: `${Math.min(artist.pct, 100)}%` }}

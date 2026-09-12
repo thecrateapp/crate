@@ -31,7 +31,7 @@ export function DesktopShell({
       <div
         data-testid="listen-header"
         data-home-overlay={String(homeDesktopOverlay)}
-        className={`z-app-header fixed top-0 ${sidebarLeft} right-0 transition-all duration-200 ${
+        className={`z-app-header fixed top-0 ${sidebarLeft} right-0 transition-[left,background-color,border-color,box-shadow] duration-200 ${
           desktopOverlayHeader
             ? "bg-transparent"
             : "border-b border-border-quiet bg-surface-chrome shadow-chrome backdrop-blur-xl"
@@ -48,7 +48,7 @@ export function DesktopShell({
         </div>
       </div>
       <main
-        className={`relative z-0 flex-1 ${sidebarW} overflow-x-hidden transition-all duration-200 ${
+        className={`relative z-0 flex-1 ${sidebarW} overflow-x-hidden transition-[margin-left] duration-200 ${
           hasTrack ? "pb-[90px]" : ""
         }`}
       >
@@ -56,7 +56,7 @@ export function DesktopShell({
           data-testid="listen-content"
           className={`mx-auto w-full ${desktopContentPadClass} ${
             homeDesktopOverlay ? "max-w-[1480px] px-0" : "max-w-[1480px] px-6"
-          } transition-all duration-200 ${headerOffsetClass}`}
+          } transition-[padding-top,padding-right,padding-left] duration-200 ${headerOffsetClass}`}
         >
           <Outlet />
         </div>

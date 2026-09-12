@@ -148,7 +148,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
                   key={[line.time, line.text].join(":")}
                   ref={isActive ? activeRef : null}
                   onClick={() => seek(line.time)}
-                  className={`relative z-20 w-full rounded-md px-2 py-1 text-left transition-all duration-500 ${
+                  className={`relative z-20 w-full rounded-md px-2 py-1 text-left transition-[color,background-color,font-size] duration-500 ${
                     isActive
                       ? "lyrics-active-line bg-accent-action/10 text-[17px] font-semibold text-accent-action"
                       : isPast

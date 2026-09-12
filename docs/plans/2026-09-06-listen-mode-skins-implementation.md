@@ -224,4 +224,3 @@ git push origin codex/listen-design-system
 **Step 2: Check React Doctor and persistent review for the latest commit**
 
 Use the GitHub integration to verify the review comment and status check. If a finding appears, fix it in a follow-up cut, rerun the relevant checks, commit, push, and recheck the review before closing the plan.
-

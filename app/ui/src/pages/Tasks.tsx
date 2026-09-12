@@ -1273,7 +1273,7 @@ function HistoryTaskRow({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-md border transition-all duration-700",
+        "overflow-hidden rounded-md border transition-[background-color,border-color,box-shadow] duration-700",
         status.cardClass,
         highlightMeta?.cardClass,
         highlightStatus && "ring-1",

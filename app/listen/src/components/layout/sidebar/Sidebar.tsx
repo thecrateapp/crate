@@ -50,7 +50,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`z-app-sidebar fixed top-0 left-0 bottom-0 ${width} flex flex-col border-r border-border-quiet bg-surface-canvas transition-all duration-200`}
+      className={`z-app-sidebar fixed top-0 left-0 bottom-0 ${width} flex flex-col border-r border-border-quiet bg-surface-canvas transition-[width] duration-200`}
     >
       <SidebarBrand
         discoveryGlowStrength={discoveryGlowStrength}

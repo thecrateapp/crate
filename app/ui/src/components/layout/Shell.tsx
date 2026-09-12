@@ -124,7 +124,7 @@ export function Shell() {
       </Sheet>
 
       <div
-        className={`z-app-header fixed top-0 right-0 hidden border-b border-white/6 bg-app-surface/68 backdrop-blur-xl transition-all duration-200 md:block ${sidebarLeftClass}`}
+        className={`z-app-header fixed top-0 right-0 hidden border-b border-white/6 bg-app-surface/68 backdrop-blur-xl transition-[left] duration-200 md:block ${sidebarLeftClass}`}
       >
         <div className="flex h-16 w-full items-center gap-4 px-4 pointer-events-none">
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
@@ -155,7 +155,7 @@ export function Shell() {
       </div>
 
       <main
-        className={`overflow-x-hidden transition-all duration-200 ${sidebarWidthClass}`}
+        className={`overflow-x-hidden transition-[margin-left] duration-200 ${sidebarWidthClass}`}
       >
         <div
           className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 ${
