@@ -77,15 +77,12 @@ blocks authentication bootstrap with a recoverable restart screen.
 
 - `NATIVE_OAUTH_EXCHANGE_ENABLED` defaults to enabled and controls the secure
   start/callback/exchange path.
-- `NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED` defaults to disabled. Enable it only
-  for a bounded rollback window with a known legacy client population.
 - Deploy the backend and verify Redis before publishing a native client that
   depends on this contract.
 - Roll back an exchange incident by disabling
   `NATIVE_OAUTH_EXCHANGE_ENABLED`. Existing sessions and secure-store records
   remain valid; do not roll back the database or reintroduce credentials in
-  redirects.
-- Never enable legacy credential redirects as a normal operating mode.
+  redirects. Native credential redirects cannot be enabled at runtime.
 
 ## Errors and redaction
 

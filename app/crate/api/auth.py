@@ -351,10 +351,6 @@ def _native_oauth_exchange_enabled() -> bool:
     return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", True)
 
 
-def _native_oauth_legacy_redirect_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED", False)
-
-
 _NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
 _NATIVE_CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 _NATIVE_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
@@ -369,12 +365,12 @@ def _validate_native_oauth_start(
     challenge: str | None,
     state: str | None,
 ) -> bool:
+    native_callback = (return_to or "").startswith("cratemusic://")
+    if native_callback and return_to != _NATIVE_CALLBACK_URL:
+        raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
     requested = challenge is not None or state is not None
     if not requested:
-        if (
-            _is_native_listen_app_id(app_id)
-            and not _native_oauth_legacy_redirect_enabled()
-        ):
+        if native_callback or _is_native_listen_app_id(app_id):
             raise HTTPException(
                 status_code=426,
                 detail="Native app upgrade required",
@@ -2364,14 +2360,14 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     native_challenge = parsed_state.get("native_code_challenge")
     native_state = parsed_state.get("native_state")
-    if native_challenge is not None or native_state is not None:
-        _validate_native_oauth_start(
-            app_id=app_id,
-            mode=str(parsed_state.get("mode") or ""),
-            return_to=parsed_state.get("return_to"),
-            challenge=native_challenge,
-            state=native_state,
-        )
+    native_exchange = _validate_native_oauth_start(
+        app_id=app_id,
+        mode=str(parsed_state.get("mode") or ""),
+        return_to=parsed_state.get("return_to"),
+        challenge=native_challenge,
+        state=native_state,
+    )
+    if native_exchange:
         try:
             handoff_code = issue_native_oauth_handoff(
                 user_id=int(user["id"]),
@@ -2403,19 +2399,6 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     return_to = parsed_state.get("return_to") or "/"
     safe_return = _validate_return_to(return_to, app_id=app_id)
-
-    if safe_return.startswith("cratemusic://"):
-        redirect_url = _append_query_param(safe_return, "token", token)
-        access_expires_at = _access_expires_at_from_token(token)
-        if access_expires_at:
-            redirect_url = _append_query_param(
-                redirect_url, "access_expires_at", _iso_datetime(access_expires_at)
-            )
-        if refresh_token:
-            redirect_url = _append_query_param(
-                redirect_url, "refresh_token", refresh_token
-            )
-        return RedirectResponse(url=redirect_url)
 
     if safe_return.startswith("http"):
         redirect_url = _post_auth_redirect_url(safe_return, token)
