@@ -35,6 +35,8 @@ vi.mock("@capacitor/filesystem", () => ({
 
 import {
   ensureOfflineNativeAssetIndexLoaded,
+  loadOfflineNativeAssetIndex,
+  saveOfflineNativeAssetIndex,
   updateOfflineNativeAssetIndex,
 } from "@/lib/offline-storage";
 
@@ -163,6 +165,41 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     ).rejects.toThrow("promotion failed");
 
     expect(JSON.parse(writtenFiles.get(path) ?? "{}")).toEqual({
+      previous: { assetKey: "previous" },
+    });
+  });
+
+  it("does not publish a failed atomic update to the in-memory index", async () => {
+    await updateOfflineNativeAssetIndex("failed-update-profile", () => ({
+      previous: { assetKey: "previous" } as never,
+    }));
+    writeFileMock.mockRejectedValueOnce(new Error("disk full"));
+
+    await expect(
+      updateOfflineNativeAssetIndex("failed-update-profile", (current) => ({
+        ...current,
+        latest: { assetKey: "latest" } as never,
+      })),
+    ).rejects.toThrow("disk full");
+
+    expect(loadOfflineNativeAssetIndex("failed-update-profile")).toEqual({
+      previous: { assetKey: "previous" },
+    });
+  });
+
+  it("does not publish a failed direct save to the in-memory index", async () => {
+    await saveOfflineNativeAssetIndex("failed-save-profile", {
+      previous: { assetKey: "previous" } as never,
+    });
+    writeFileMock.mockRejectedValueOnce(new Error("disk full"));
+
+    await expect(
+      saveOfflineNativeAssetIndex("failed-save-profile", {
+        latest: { assetKey: "latest" } as never,
+      }),
+    ).rejects.toThrow("disk full");
+
+    expect(loadOfflineNativeAssetIndex("failed-save-profile")).toEqual({
       previous: { assetKey: "previous" },
     });
   });
