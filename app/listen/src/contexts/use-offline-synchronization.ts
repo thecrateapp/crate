@@ -14,6 +14,8 @@ import {
   isOfflineBusy,
 } from "@/lib/offline";
 
+const HIDDEN_ABORT_DELAY_MS = 10_000;
+
 type Enqueue = <T>(fn: () => Promise<T>) => Promise<T>;
 type SyncManifestIntoItem = (
   kind: OfflineItemKind,
@@ -133,10 +135,25 @@ export function useOfflineSynchronization({
       handleOnline as EventListener,
     );
     const disposeResume = onAppResume(handleOnline);
+    // A quick glance at another app (notification shade, switching to
+    // check a message) shouldn't nuke an in-flight download — only treat
+    // this as a real backgrounding, worth aborting to free the connection
+    // before the OS reclaims it, once we've stayed hidden for a bit.
+    let hiddenAbortTimer: number | null = null;
+    const clearHiddenAbortTimer = () => {
+      if (hiddenAbortTimer === null) return;
+      window.clearTimeout(hiddenAbortTimer);
+      hiddenAbortTimer = null;
+    };
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
-        transferAbortRef.current?.abort();
+        clearHiddenAbortTimer();
+        hiddenAbortTimer = window.setTimeout(() => {
+          hiddenAbortTimer = null;
+          transferAbortRef.current?.abort();
+        }, HIDDEN_ABORT_DELAY_MS);
       } else {
+        clearHiddenAbortTimer();
         enqueueSync();
       }
     };
@@ -148,6 +165,7 @@ export function useOfflineSynchronization({
         handleOnline as EventListener,
       );
       document.removeEventListener("visibilitychange", handleVisibility);
+      clearHiddenAbortTimer();
       disposeResume();
     };
   }, [enqueueSync, profileKey, supported, transferAbortRef]);

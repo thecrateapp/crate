@@ -22,6 +22,37 @@ import { toast } from "sonner";
 type ValueRef<T> = { readonly current: T };
 type MutableValueRef<T> = { current: T };
 
+// The most common trigger for resumeAuthorizationRequired is Android
+// killing the whole process (not just the service) while a foreground
+// media notification is alive — the native side restores a checkpoint
+// with placeholder URIs and asks JS to re-supply the real queue as soon
+// as it attaches an event sink, which happens right on app relaunch,
+// often before the app's own persisted queue has been rehydrated into
+// React state. A single immediate attempt loses that race silently
+// (recoverNativeBuffering resolves to `false`, not a thrown error, so
+// nothing surfaced it): retry a few times as the queue catches up
+// before giving up and telling the user to open the app.
+const RESUME_AUTHORIZATION_RETRY_DELAYS_MS = [0, 500, 1500, 3000];
+
+export async function recoverNativeResumeAuthorizationWithRetry(
+  recoverNativeBuffering: (options: {
+    forceRefresh: boolean;
+    probeStatus: string;
+  }) => Promise<boolean>,
+): Promise<boolean> {
+  for (const delay of RESUME_AUTHORIZATION_RETRY_DELAYS_MS) {
+    if (delay > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, delay));
+    }
+    const recovered = await recoverNativeBuffering({
+      forceRefresh: false,
+      probeStatus: "resume-authorization",
+    });
+    if (recovered) return true;
+  }
+  return false;
+}
+
 type PlaybackStateOptions = {
   rotateIndexChange?: boolean;
   passiveLifecycle?: boolean;
@@ -120,18 +151,22 @@ export function useNativePlaybackEventBridge({
         return;
       }
       if (eventName === "resumeAuthorizationRequired") {
-        void recoverNativeBuffering({
-          forceRefresh: false,
-          probeStatus: "resume-authorization",
-        }).catch((error) => {
-          console.error(
-            "[native-player] failed to authorize restored playback:",
-            error,
-          );
-          toast.error("Open Crate to resume playback", {
-            description: "The saved queue needs fresh server authorization.",
+        void recoverNativeResumeAuthorizationWithRetry(recoverNativeBuffering)
+          .then((recovered) => {
+            if (recovered) return;
+            toast.error("Open Crate to resume playback", {
+              description: "The saved queue needs fresh server authorization.",
+            });
+          })
+          .catch((error) => {
+            console.error(
+              "[native-player] failed to authorize restored playback:",
+              error,
+            );
+            toast.error("Open Crate to resume playback", {
+              description: "The saved queue needs fresh server authorization.",
+            });
           });
-        });
         return;
       }
       if (eventName === "error") {

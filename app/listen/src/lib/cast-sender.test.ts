@@ -1,14 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, runtimeMock, nativeCapabilitiesMock } = vi.hoisted(() => ({
+const {
+  apiMock,
+  runtimeMock,
+  nativeCapabilitiesMock,
+  nativeControlMock,
+  nativeListenerMock,
+  sessionChangedListeners,
+} = vi.hoisted(() => ({
   apiMock: vi.fn(),
   runtimeMock: { isNative: false },
   nativeCapabilitiesMock: vi.fn(),
+  nativeControlMock: vi.fn(),
+  nativeListenerMock: vi.fn(),
+  sessionChangedListeners: [] as Array<(event: { active: boolean }) => void>,
 }));
 
 vi.mock("@capacitor/core", () => ({
   registerPlugin: () => ({
     getCapabilities: nativeCapabilitiesMock,
+    play: nativeControlMock,
+    pause: nativeControlMock,
+    stop: nativeControlMock,
+    addListener: nativeListenerMock.mockImplementation(
+      (_event: string, listener: (event: { active: boolean }) => void) => {
+        sessionChangedListeners.push(listener);
+        return Promise.resolve({ remove: vi.fn() });
+      },
+    ),
   }),
 }));
 
@@ -26,6 +45,7 @@ vi.mock("@/lib/capacitor-runtime", () => ({
 import {
   buildCastTicketRequest,
   castPause,
+  castPlay,
   castSeek,
   castSetVolume,
   getCastSenderCapabilities,
@@ -208,5 +228,22 @@ describe("cast sender", () => {
     await expect(castSeek(42)).resolves.toEqual({ ok: true });
     await expect(castSetVolume(0.7)).resolves.toEqual({ ok: true });
     expect(calls).toEqual(["pause", "seek:42", "volume:0.7"]);
+  });
+
+  it("reflects a native session ending for reasons the app never asked for", async () => {
+    runtimeMock.isNative = true;
+    nativeControlMock.mockResolvedValue({ ok: true });
+
+    // Establish a session the way the app normally would.
+    await castPlay();
+    expect(isCastSessionActive()).toBe(true);
+
+    // The native side ends the session on its own (receiver closed
+    // remotely, TV turned off, route dropped) and notifies listeners —
+    // before this fix, isCastSessionActive() had no way to hear about it.
+    expect(sessionChangedListeners.length).toBeGreaterThan(0);
+    sessionChangedListeners.forEach((listener) => listener({ active: false }));
+
+    expect(isCastSessionActive()).toBe(false);
   });
 });

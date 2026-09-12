@@ -1,3 +1,5 @@
+import type { PluginListenerHandle } from "@capacitor/core";
+
 import type { Track } from "@/contexts/player-types";
 
 export interface CastTicketRequest {
@@ -48,6 +50,10 @@ export interface CastStartResult {
   targetName?: string;
 }
 
+export interface NativeCastSessionChangedEvent {
+  active: boolean;
+}
+
 export interface NativeCastPlugin {
   getCapabilities(): Promise<CastSenderCapabilities>;
   requestSession(payload: NativeCastMediaPayload): Promise<CastStartResult>;
@@ -56,6 +62,10 @@ export interface NativeCastPlugin {
   seek(payload: { currentTime: number }): Promise<CastStartResult>;
   setVolume(payload: { volume: number }): Promise<CastStartResult>;
   stop(): Promise<CastStartResult>;
+  addListener(
+    eventName: "sessionChanged",
+    listener: (event: NativeCastSessionChangedEvent) => void,
+  ): Promise<PluginListenerHandle>;
 }
 
 export interface NativeCastMediaPayload {

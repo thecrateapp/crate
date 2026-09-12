@@ -38,7 +38,17 @@ let nativeCast: NativeCastPlugin | null = null;
 let nativeCastSessionActive = false;
 
 function getNativeCast(): NativeCastPlugin {
-  nativeCast ??= registerPlugin<NativeCastPlugin>("CrateCast");
+  if (!nativeCast) {
+    nativeCast = registerPlugin<NativeCastPlugin>("CrateCast");
+    // The native side ends a Cast session for reasons we never asked for
+    // (receiver app closed remotely, TV turned off, the route dropping) —
+    // without this, nativeCastSessionActive only ever moved in response to
+    // a command *we* issued, so the first play/pause after an external
+    // disconnect silently no-op'd against a session that no longer exists.
+    void nativeCast.addListener("sessionChanged", (event) => {
+      nativeCastSessionActive = event.active;
+    });
+  }
   return nativeCast;
 }
 

@@ -32,6 +32,12 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             name: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance()
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioSessionInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
     }
 
     deinit {
@@ -221,6 +227,32 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             data: ["route": currentRoutePayload()],
             retainUntilConsumed: true
         )
+    }
+
+    @objc private func handleAudioSessionInterruption(_ notification: Notification) {
+        // A phone call, Siri, or another app grabbing the audio session
+        // stops our output without any route change and without ever
+        // calling back into JS — without this, the lock screen (and JS's
+        // own isPlaying state, which drives it) is left showing "playing"
+        // indefinitely after the interruption ends.
+        guard
+            let info = notification.userInfo,
+            let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+            let type = AVAudioSession.InterruptionType(rawValue: typeValue)
+        else { return }
+
+        switch type {
+        case .began:
+            sendControl("pause")
+        case .ended:
+            configureAudioSession()
+            let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            if AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume) {
+                sendControl("play")
+            }
+        @unknown default:
+            break
+        }
     }
 
     @objc private func dismissRoutePickerOverlay() {
