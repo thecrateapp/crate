@@ -23,6 +23,13 @@ interface FilesystemReadOptions extends FilesystemPathOptions {
   encoding?: Encoding;
 }
 
+interface FilesystemRenameOptions {
+  from: string;
+  to: string;
+  directory?: Directory;
+  toDirectory?: Directory;
+}
+
 interface FilesystemDownloadOptions extends FilesystemPathOptions {
   url: string;
   headers?: Record<string, string>;
@@ -45,6 +52,7 @@ export const Filesystem = {
     _options: FilesystemPathOptions,
   ): Promise<{ size?: number; uri: string }> => unsupported(),
   deleteFile: (_options: FilesystemPathOptions): Promise<void> => unsupported(),
+  rename: (_options: FilesystemRenameOptions): Promise<void> => unsupported(),
   downloadFile: (
     _options: FilesystemDownloadOptions,
   ): Promise<{ path?: string; blob?: Blob }> => unsupported(),
