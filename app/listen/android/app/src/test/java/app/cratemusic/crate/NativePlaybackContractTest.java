@@ -52,10 +52,12 @@ public class NativePlaybackContractTest {
     }
 
     @Test
-    public void nativeEventSequenceIsStrictlyMonotonic() {
-        NativeEventSequence sequence = new NativeEventSequence();
+    public void nativeEventSequenceSurvivesServiceRecreation() {
+        NativeEventSequence firstService = new NativeEventSequence();
+        long first = firstService.next();
+        NativeEventSequence recreatedService = new NativeEventSequence();
+        long second = recreatedService.next();
 
-        assertEquals(1L, sequence.next());
-        assertEquals(2L, sequence.next());
+        assertTrue(second > first);
     }
 }
