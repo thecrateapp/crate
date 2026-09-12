@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createNativeResumeAuthorizationCoordinator,
   recoverNativeResumeAuthorizationWithRetry,
   shouldHandleNativeSideEffectEvent,
 } from "@/contexts/use-native-playback-event-bridge";
@@ -84,6 +85,66 @@ describe("recoverNativeResumeAuthorizationWithRetry", () => {
 
     await expect(promise).resolves.toBe(false);
     expect(recoverNativeBuffering).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+});
+
+describe("native resume authorization coordinator", () => {
+  const resumeEvent = {
+    revision: "queue-rev-1",
+    index: 0,
+    positionMs: 0,
+    playWhenReady: true,
+    nativeSequence: 1,
+    nativeTimeMs: 100,
+  };
+
+  it("starts only one recovery for duplicate events from the same revision", async () => {
+    let resolveRecovery!: (value: boolean) => void;
+    const recoverNativeBuffering = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveRecovery = resolve;
+        }),
+    );
+    const coordinator = createNativeResumeAuthorizationCoordinator(
+      recoverNativeBuffering,
+    );
+
+    const first = coordinator.start(resumeEvent);
+    const duplicate = coordinator.start({
+      ...resumeEvent,
+      nativeSequence: 2,
+    });
+
+    expect(duplicate).toBeNull();
+    expect(recoverNativeBuffering).toHaveBeenCalledTimes(1);
+
+    resolveRecovery(true);
+    await expect(first).resolves.toBe("recovered");
+  });
+
+  it("cancels retries and suppresses late failure after disposal", async () => {
+    vi.useFakeTimers();
+    let resolveRecovery!: (value: boolean) => void;
+    const recoverNativeBuffering = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveRecovery = resolve;
+        }),
+    );
+    const coordinator = createNativeResumeAuthorizationCoordinator(
+      recoverNativeBuffering,
+    );
+
+    const recovery = coordinator.start(resumeEvent);
+    coordinator.dispose();
+    resolveRecovery(false);
+    await vi.runAllTimersAsync();
+
+    await expect(recovery).resolves.toBe("cancelled");
+    expect(recoverNativeBuffering).toHaveBeenCalledTimes(1);
+    expect(coordinator.start(resumeEvent)).toBeNull();
     vi.useRealTimers();
   });
 });

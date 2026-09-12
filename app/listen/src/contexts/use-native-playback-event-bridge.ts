@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { Track } from "@/contexts/player-types";
 import { subscribeNativePlayerEvents } from "@/contexts/subscribe-native-player-events";
@@ -47,22 +47,35 @@ export function shouldHandleNativeSideEffectEvent(
 // before giving up and telling the user to open the app.
 const RESUME_AUTHORIZATION_RETRY_DELAYS_MS = [0, 500, 1500, 3000];
 
+type RecoverNativeBuffering = (options: {
+  forceRefresh: boolean;
+  probeStatus: string;
+  autoplay?: boolean;
+  intentGeneration?: number;
+}) => Promise<boolean>;
+
 export async function recoverNativeResumeAuthorizationWithRetry(
-  recoverNativeBuffering: (options: {
-    forceRefresh: boolean;
-    probeStatus: string;
-    autoplay?: boolean;
-    intentGeneration?: number;
-  }) => Promise<boolean>,
+  recoverNativeBuffering: RecoverNativeBuffering,
   autoplay: boolean,
+  shouldContinue: () => boolean = () => true,
 ): Promise<boolean> {
   const intentGeneration = captureNativePlaybackRecoveryIntent();
   for (const delay of RESUME_AUTHORIZATION_RETRY_DELAYS_MS) {
-    if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return false;
+    if (
+      !shouldContinue() ||
+      !isNativePlaybackRecoveryIntentCurrent(intentGeneration)
+    ) {
+      return false;
+    }
     if (delay > 0) {
       await new Promise((resolve) => window.setTimeout(resolve, delay));
     }
-    if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return false;
+    if (
+      !shouldContinue() ||
+      !isNativePlaybackRecoveryIntentCurrent(intentGeneration)
+    ) {
+      return false;
+    }
     const recovered = await recoverNativeBuffering({
       forceRefresh: false,
       probeStatus: "resume-authorization",
@@ -72,6 +85,52 @@ export async function recoverNativeResumeAuthorizationWithRetry(
     if (recovered) return true;
   }
   return false;
+}
+
+type NativeResumeAuthorizationOutcome = "recovered" | "failed" | "cancelled";
+
+export function createNativeResumeAuthorizationCoordinator(
+  recoverNativeBuffering: RecoverNativeBuffering,
+) {
+  let disposed = false;
+  const activeRevisions = new Map<
+    string,
+    Promise<NativeResumeAuthorizationOutcome>
+  >();
+
+  const start = (
+    event: EngineEventMap["resumeAuthorizationRequired"],
+  ): Promise<NativeResumeAuthorizationOutcome> | null => {
+    if (disposed || activeRevisions.has(event.revision)) return null;
+    const recovery = recoverNativeResumeAuthorizationWithRetry(
+      recoverNativeBuffering,
+      Boolean(event.playWhenReady),
+      () => !disposed,
+    )
+      .then((recovered): NativeResumeAuthorizationOutcome => {
+        if (disposed) return "cancelled";
+        return recovered ? "recovered" : "failed";
+      })
+      .catch((error): NativeResumeAuthorizationOutcome => {
+        if (disposed) return "cancelled";
+        throw error;
+      });
+    const tracked = recovery.finally(() => {
+      if (activeRevisions.get(event.revision) === tracked) {
+        activeRevisions.delete(event.revision);
+      }
+    });
+    activeRevisions.set(event.revision, tracked);
+    return tracked;
+  };
+
+  return {
+    start,
+    dispose: () => {
+      disposed = true;
+      activeRevisions.clear();
+    },
+  };
 }
 
 type PlaybackStateOptions = {
@@ -100,12 +159,7 @@ export interface UseNativePlaybackEventBridgeParams {
   ) => void;
   isNativeEventStale: (event: NativeEventMetadata) => boolean;
   queueRef: ValueRef<Track[]>;
-  recoverNativeBuffering: (options: {
-    forceRefresh: boolean;
-    probeStatus: string;
-    autoplay?: boolean;
-    intentGeneration?: number;
-  }) => Promise<boolean>;
+  recoverNativeBuffering: RecoverNativeBuffering;
   retryNativePlaybackAfterAuthError: (
     nativeError: EngineEventMap["error"],
   ) => boolean;
@@ -129,6 +183,9 @@ export function useNativePlaybackEventBridge({
   retryNativePlaybackAfterAuthError,
   scheduleNativeBufferingWatchdog,
 }: UseNativePlaybackEventBridgeParams) {
+  const resumeAuthorizationCoordinatorRef = useRef<ReturnType<
+    typeof createNativeResumeAuthorizationCoordinator
+  > | null>(null);
   const handleNativeEvent = useCallback(
     <K extends EngineEventName>(eventName: K, payload: EngineEventMap[K]) => {
       if (eventName === "positionChanged") {
@@ -186,12 +243,12 @@ export function useNativePlaybackEventBridge({
       if (eventName === "resumeAuthorizationRequired") {
         const resumeEvent =
           payload as EngineEventMap["resumeAuthorizationRequired"];
-        void recoverNativeResumeAuthorizationWithRetry(
-          recoverNativeBuffering,
-          Boolean(resumeEvent.playWhenReady),
-        )
-          .then((recovered) => {
-            if (recovered) return;
+        const recovery =
+          resumeAuthorizationCoordinatorRef.current?.start(resumeEvent);
+        if (!recovery) return;
+        void recovery
+          .then((outcome) => {
+            if (outcome !== "failed") return;
             toast.error("Open Crate to resume playback", {
               description: "The saved queue needs fresh server authorization.",
             });
@@ -274,6 +331,9 @@ export function useNativePlaybackEventBridge({
   useEffect(() => {
     if (!shouldUseAndroidNativePlayer()) return;
     let disposed = false;
+    const resumeAuthorizationCoordinator =
+      createNativeResumeAuthorizationCoordinator(recoverNativeBuffering);
+    resumeAuthorizationCoordinatorRef.current = resumeAuthorizationCoordinator;
     const subscription = subscribeNativePlayerEvents(androidNativeEngine, {
       positionChanged: (event) => {
         if (disposed) return;
@@ -359,6 +419,13 @@ export function useNativePlaybackEventBridge({
 
     return () => {
       disposed = true;
+      resumeAuthorizationCoordinator.dispose();
+      if (
+        resumeAuthorizationCoordinatorRef.current ===
+        resumeAuthorizationCoordinator
+      ) {
+        resumeAuthorizationCoordinatorRef.current = null;
+      }
       window.removeEventListener("crate:app-resumed", onNativeResume);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       clearNativeBufferingWatchdog();
@@ -371,5 +438,6 @@ export function useNativePlaybackEventBridge({
     clearNativeBufferingWatchdog,
     handleNativeEvent,
     reconcileNativePlayback,
+    recoverNativeBuffering,
   ]);
 }
