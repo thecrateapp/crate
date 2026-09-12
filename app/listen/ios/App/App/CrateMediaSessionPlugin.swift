@@ -17,7 +17,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "presentRoutePicker", returnType: CAPPluginReturnPromise)
     ]
 
-    private var remoteCommandTokens: [Any] = []
+    private var remoteCommandTokens: [(MPRemoteCommand, Any)] = []
     private var artworkRequestId = 0
     private var cachedArtworkUrl: String?
     private var cachedArtwork: MPMediaItemArtwork?
@@ -44,13 +44,8 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-        let commandCenter = MPRemoteCommandCenter.shared()
-        for token in remoteCommandTokens {
-            commandCenter.playCommand.removeTarget(token)
-            commandCenter.pauseCommand.removeTarget(token)
-            commandCenter.nextTrackCommand.removeTarget(token)
-            commandCenter.previousTrackCommand.removeTarget(token)
-            commandCenter.changePlaybackPositionCommand.removeTarget(token)
+        for (command, token) in remoteCommandTokens {
+            command.removeTarget(token)
         }
     }
 
@@ -199,27 +194,27 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         commandCenter.previousTrackCommand.isEnabled = true
         commandCenter.changePlaybackPositionCommand.isEnabled = true
 
-        remoteCommandTokens.append(commandCenter.playCommand.addTarget { [weak self] _ in
+        remoteCommandTokens.append((commandCenter.playCommand, commandCenter.playCommand.addTarget { [weak self] _ in
             self?.sendControl("play")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.pauseCommand.addTarget { [weak self] _ in
+        }))
+        remoteCommandTokens.append((commandCenter.pauseCommand, commandCenter.pauseCommand.addTarget { [weak self] _ in
             self?.sendControl("pause")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+        }))
+        remoteCommandTokens.append((commandCenter.nextTrackCommand, commandCenter.nextTrackCommand.addTarget { [weak self] _ in
             self?.sendControl("next")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+        }))
+        remoteCommandTokens.append((commandCenter.previousTrackCommand, commandCenter.previousTrackCommand.addTarget { [weak self] _ in
             self?.sendControl("previous")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
+        }))
+        remoteCommandTokens.append((commandCenter.changePlaybackPositionCommand, commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
             self?.sendControl("seekTo", position: event.positionTime)
             return .success
-        })
+        }))
     }
 
     private func sendControl(_ control: String, position: Double? = nil) {

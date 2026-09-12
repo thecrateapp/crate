@@ -295,7 +295,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
                         resumeAuthorizationPending &&
                         (
                             playerCommand == Player.COMMAND_PLAY_PAUSE ||
-                            playerCommand == Player.COMMAND_PREPARE
+                            playerCommand == Player.COMMAND_PREPARE ||
+                            playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
+                            playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
+                            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||
+                            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
                         )
                     ) {
                         emitResumeAuthorizationRequired();
@@ -746,17 +750,32 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
     }
 
+    // jumpTo/next/previous are called directly by the JS-facing plugin,
+    // bypassing the MediaSession onPlayerCommandRequest gate above (that
+    // one only covers lock-screen/hardware-button controllers) — without
+    // this, JS could still skip across a restored queue of fake
+    // placeholder URIs before re-supplying the real ones.
+    private boolean blockIfResumeAuthorizationPending() {
+        if (!resumeAuthorizationPending) return false;
+        emitResumeAuthorizationRequired();
+        openAppForAuthorization();
+        return true;
+    }
+
     public void jumpTo(int index, boolean autoplay) {
+        if (blockIfResumeAuthorizationPending()) return;
         if (player == null || index < 0 || index >= player.getMediaItemCount()) return;
         player.seekToDefaultPosition(index);
         if (autoplay) player.play();
     }
 
     public void next() {
+        if (blockIfResumeAuthorizationPending()) return;
         if (player != null && player.hasNextMediaItem()) player.seekToNextMediaItem();
     }
 
     public void previous() {
+        if (blockIfResumeAuthorizationPending()) return;
         if (player != null && player.hasPreviousMediaItem()) player.seekToPreviousMediaItem();
     }
 
