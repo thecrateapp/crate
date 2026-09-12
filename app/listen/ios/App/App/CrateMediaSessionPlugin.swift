@@ -25,7 +25,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private var routePickerOverlay: UIView?
     private var routePickerDismissWorkItem: DispatchWorkItem?
     private var lastKnownIsPlaying = false
-    private var wasPlayingBeforeInterruption = false
+    private var interruptionState = CrateMediaSessionInterruptionState()
 
     override func load() {
         super.load()
@@ -177,6 +177,8 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func stop(_ call: CAPPluginCall) {
         artworkRequestId += 1
         pendingArtworkUrl = nil
+        lastKnownIsPlaying = false
+        interruptionState.stop()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         call.resolve()
     }
@@ -258,13 +260,13 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             // "we were playing and got interrupted" and "the user had
             // already paused before the interruption" — resuming in the
             // latter case would silently undo the user's own pause.
-            wasPlayingBeforeInterruption = lastKnownIsPlaying
+            interruptionState.begin(wasPlaying: lastKnownIsPlaying)
             sendControl("pause")
         case .ended:
             configureAudioSession()
             let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let shouldResume = AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume)
-            if wasPlayingBeforeInterruption && shouldResume {
+            if interruptionState.end(systemAllowsResume: shouldResume) {
                 sendControl("play")
             }
         @unknown default:

@@ -54,6 +54,9 @@ jobs:
       - name: Test iOS offline asset integrity check
         run: app/listen/scripts/test-ios-offline-integrity.sh
 
+      - name: Test iOS media-session interruption state
+        run: app/listen/scripts/test-ios-media-session-interruption.sh
+
       - name: Build and sync Capacitor bundle
         run: npm run build:cap
         working-directory: app/listen
