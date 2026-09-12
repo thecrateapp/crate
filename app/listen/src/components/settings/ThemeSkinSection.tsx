@@ -115,7 +115,6 @@ export function ThemeSkinSection() {
     const next = { ...draft, mode: applied.mode, preset: applied.skin };
     committedStore.value = next;
     setMotionPreference(next.accessibility.motion);
-    document.documentElement.dataset.crateMotion = next.accessibility.motion;
     setDraft(next);
     setSaveError(false);
   };

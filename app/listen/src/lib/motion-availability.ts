@@ -26,6 +26,8 @@ export function isMotionBlocked(
 
   return (
     preference === "reduced" ||
+    (typeof document !== "undefined" &&
+      document.documentElement.dataset.crateMotion === "reduced") ||
     (typeof window !== "undefined" &&
       typeof window.matchMedia === "function" &&
       window.matchMedia(REDUCED_MOTION_QUERY).matches)

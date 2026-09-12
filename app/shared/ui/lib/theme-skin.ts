@@ -367,6 +367,7 @@ interface ThemeSkinOptions {
   root?: HTMLElement;
   storage?: StorageReader & Partial<StorageWriter>;
   matchMedia?: MatchMedia;
+  persist?: boolean;
 }
 
 function getBrowserStorage(): Storage | undefined {
@@ -621,14 +622,14 @@ export function applyThemeSkin(
     }
   }
 
-  if (storage?.getItem && storage.setItem) {
+  if (options.persist !== false && storage?.getItem && storage.setItem) {
     const preferences = readAppearancePreferences(storage);
     writeAppearancePreferences(storage as AppearanceStorage, {
       ...preferences,
       mode: selection.mode,
       preset: selection.skin,
     });
-  } else {
+  } else if (options.persist !== false) {
     try {
       storage?.setItem?.(
         THEME_SKIN_STORAGE_KEY,
@@ -647,6 +648,15 @@ export function applyThemeSkin(
 export function initializeThemeSkin(
   options: ThemeSkinOptions = {},
 ): AppliedThemeSkinSelection {
-  const stored = readStoredThemeSkin(options.storage);
-  return applyThemeSkin(stored.mode, stored.skin, options);
+  const storage = options.storage ?? getBrowserStorage();
+  const stored = readStoredThemeSkin(storage);
+  const status = storage
+    ? inspectAppearancePreferences(storage).status
+    : "default";
+
+  return applyThemeSkin(stored.mode, stored.skin, {
+    ...options,
+    storage,
+    persist: status === "legacy",
+  });
 }

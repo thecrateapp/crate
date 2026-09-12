@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeSkinSection } from "@/components/settings/ThemeSkinSection";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -13,6 +13,11 @@ describe("ThemeSkinSection", () => {
     document.documentElement.removeAttribute("data-crate-mode-preference");
     document.documentElement.removeAttribute("data-crate-skin");
     document.documentElement.removeAttribute("data-crate-density");
+    document.documentElement.removeAttribute("data-crate-motion");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("uses the shared themed select for appearance controls", () => {
@@ -133,6 +138,20 @@ describe("ThemeSkinSection", () => {
         accessibility: { motion: "reduced" },
       }),
     );
+  });
+
+  it("keeps the effective system reduced-motion state after Apply", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<ThemeSkinSection />, { locale: "en" });
+    await user.click(screen.getByRole("button", { name: /Apply appearance/i }));
+
+    expect(document.documentElement.dataset.crateMotion).toBe("reduced");
   });
 
   it("persists compact content density without changing the selected skin", async () => {

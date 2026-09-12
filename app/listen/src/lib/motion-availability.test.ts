@@ -17,6 +17,7 @@ function setVisibilityState(value: DocumentVisibilityState) {
 afterEach(() => {
   setVisibilityState("visible");
   setMotionPreference("system");
+  delete document.documentElement.dataset.crateMotion;
   vi.unstubAllGlobals();
 });
 
@@ -47,6 +48,18 @@ describe("motion availability", () => {
     setMotionPreference("reduced");
 
     expect(getMotionPreference()).toBe("reduced");
+    expect(isMotionBlocked()).toBe(true);
+  });
+
+  it("honors the effective reduced-motion state restored on the root", () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    document.documentElement.dataset.crateMotion = "reduced";
+    setMotionPreference("system");
+
     expect(isMotionBlocked()).toBe(true);
   });
 

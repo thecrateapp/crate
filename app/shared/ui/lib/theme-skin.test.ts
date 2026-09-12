@@ -5,11 +5,16 @@ import {
   MODE_REGISTRY,
   applyThemeSkin,
   getAppliedThemeSkin,
+  initializeThemeSkin,
   readStoredThemeSkin,
   resolveColorMode,
   resolveThemeSkin,
   subscribeThemeSkin,
 } from "./theme-skin";
+import {
+  APPEARANCE_CORRUPT_BACKUP_STORAGE_KEY,
+  APPEARANCE_STORAGE_KEY,
+} from "./appearance-types";
 
 function createMatchMedia(initiallyDark: boolean) {
   let matches = initiallyDark;
@@ -149,6 +154,29 @@ describe("theme and skin runtime", () => {
     expect(values.get("crate.listen.theme-skin")).toBe(
       JSON.stringify({ mode: "light", skin: "default" }),
     );
+  });
+
+  it("keeps a corrupt v2 payload untouched during bootstrap", () => {
+    const corruptPayload = "{not-json";
+    const values = new Map<string, string>([
+      [APPEARANCE_STORAGE_KEY, corruptPayload],
+    ]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    } as unknown as Storage;
+
+    const selection = initializeThemeSkin({
+      root: document.documentElement,
+      storage,
+    });
+
+    expect(selection).toEqual({
+      ...DEFAULT_THEME_SKIN,
+      resolvedMode: "dark",
+    });
+    expect(values.get(APPEARANCE_STORAGE_KEY)).toBe(corruptPayload);
+    expect(values.has(APPEARANCE_CORRUPT_BACKUP_STORAGE_KEY)).toBe(false);
   });
 
   it("applies runtime appearance tokens on cold boot and system changes", () => {
