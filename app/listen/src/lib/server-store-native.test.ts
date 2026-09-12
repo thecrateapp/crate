@@ -246,6 +246,50 @@ describe("native server credential migration", () => {
     ).toBeNull();
   });
 
+  it("retries pending removals for independent servers concurrently", async () => {
+    localStorage.setItem(
+      "crate-servers",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Primary",
+          url: "https://primary.example.com",
+          tokenExpiresAt: null,
+        },
+        {
+          id: "server-2",
+          label: "Secondary",
+          url: "https://secondary.example.com",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem(
+      "crate-pending-session-removals:v1",
+      JSON.stringify({ "server-1": 1, "server-2": 1 }),
+    );
+    secureGet.mockResolvedValue(null);
+    let resolveFirstRemoval: (() => void) | undefined;
+    secureRemove.mockImplementation((key: string) => {
+      if (key === "crate.session.server-1") {
+        return new Promise<void>((resolve) => {
+          resolveFirstRemoval = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+    const store = await import("./server-store");
+
+    const bootstrap = store.bootstrapNativeSessionStore();
+
+    await vi.waitFor(() => expect(secureRemove).toHaveBeenCalledTimes(2));
+    resolveFirstRemoval!();
+    await bootstrap;
+    expect(
+      localStorage.getItem("crate-pending-session-removals:v1"),
+    ).toBeNull();
+  });
+
   it("does not rehydrate a secure session while its removal is pending", async () => {
     localStorage.setItem(
       "crate-servers",

@@ -300,7 +300,6 @@ export function useNativePlaybackEventBridge({
       flushCurrentPlayEvent,
       isNativeEventStale,
       queueRef,
-      recoverNativeBuffering,
       retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
     ],

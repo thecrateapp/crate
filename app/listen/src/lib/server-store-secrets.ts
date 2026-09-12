@@ -134,28 +134,28 @@ function clearPendingSecretRemoval(serverId: string, generation: number): void {
 }
 
 async function retryPendingSecretRemovals(): Promise<void> {
-  for (const [serverId, generation] of readPendingSecretRemovals()) {
-    try {
-      // A login that completed after this logout carries a newer generation.
-      // Keep it even if the process crashed before clearing the old tombstone.
-      // react-doctor-disable-next-line async-await-in-loop
-      const current = parseSecureServerSecret(
-        await getSecureSessionValue(secureSessionKey(serverId)),
-      );
-      observeSecretGeneration(serverId, current.generation);
-      if (current.generation > generation) {
+  await Promise.all(
+    [...readPendingSecretRemovals()].map(async ([serverId, generation]) => {
+      try {
+        // A login that completed after this logout carries a newer generation.
+        // Keep it even if the process crashed before clearing the old tombstone.
+        const current = parseSecureServerSecret(
+          await getSecureSessionValue(secureSessionKey(serverId)),
+        );
+        observeSecretGeneration(serverId, current.generation);
+        if (current.generation > generation) {
+          clearPendingSecretRemoval(serverId, generation);
+          return;
+        }
+        // Each tombstone is independent; one unavailable Keychain entry must not
+        // prevent the remaining active sessions from loading at startup.
+        await removeSecureSessionValue(secureSessionKey(serverId));
         clearPendingSecretRemoval(serverId, generation);
-        continue;
+      } catch {
+        // Keep the tombstone durable so the next bootstrap retries it again.
       }
-      // Each tombstone is independent; one unavailable Keychain entry must not
-      // prevent the remaining active sessions from loading at startup.
-      // react-doctor-disable-next-line async-await-in-loop
-      await removeSecureSessionValue(secureSessionKey(serverId));
-      clearPendingSecretRemoval(serverId, generation);
-    } catch {
-      // Keep the tombstone durable so the next bootstrap retries it again.
-    }
-  }
+    }),
+  );
 }
 
 export function parseServerSecret(value: string | null): ServerSecret {
