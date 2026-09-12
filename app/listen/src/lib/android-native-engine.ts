@@ -307,6 +307,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
 
   async getState(): Promise<EngineState | null> {
     try {
+      await this.ensureReady();
       const state = await nativePlayback.getState();
       if (state.revision) this.queueRevision = state.revision;
       return state;
@@ -318,6 +319,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
   async drainEvents(): Promise<
     Array<{ event: EngineEventName; payload: EngineEventMap[EngineEventName] }>
   > {
+    await this.ensureReady();
     const response = await nativePlayback.drainEvents();
     return (response.events ?? []).flatMap((event) => {
       if (!event.event || !event.payload) return [];
