@@ -1230,6 +1230,7 @@
   "library.contributions.toasts.removalQueued": "Eliminació en cua ({taskId})",
   "library.contributions.toasts.removeFailed": "No s'ha pogut treure la contribució",
   "player.queue.upNextTracks": "A continuació · {count, plural, one {# tema} other {# temes}}",
+  "actions.artist.openNamed": "Obre {name}",
   "actions.artist.followNamed": "Segueix {name}",
   "actions.artist.unfollowNamed": "Deixa de seguir {name}",
   "playlist.toasts.noPlayableTracks": "Aquesta playlist encara no te temes reproduibles",

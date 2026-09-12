@@ -105,7 +105,6 @@ function DesktopTasteHero({
           index === (activeIndex + 1) % count ||
           index === (activeIndex - 1 + count) % count;
         const heroProps = {
-          key: hero.entity_uid || hero.id,
           hero,
           active: index === activeIndex,
           backgroundSrc: isPrepared ? source : undefined,
@@ -115,9 +114,15 @@ function DesktopTasteHero({
           onToggleFollow: () => onToggleFollow(hero),
         };
         return mode === "canonical" ? (
-          <DesktopFeaturedArtist {...heroProps} />
+          <DesktopFeaturedArtist
+            key={hero.entity_uid || hero.id}
+            {...heroProps}
+          />
         ) : (
-          <LegacyDesktopFeaturedArtist {...heroProps} />
+          <LegacyDesktopFeaturedArtist
+            key={hero.entity_uid || hero.id}
+            {...heroProps}
+          />
         );
       })}
 

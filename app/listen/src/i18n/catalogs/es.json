@@ -1244,6 +1244,7 @@
   "library.contributions.toasts.removalQueued": "Eliminación encolada ({taskId})",
   "library.contributions.toasts.removeFailed": "No se pudo quitar la contribución",
   "player.queue.upNextTracks": "A continuación · {count, plural, one {# tema} other {# temas}}",
+  "actions.artist.openNamed": "Abrir {name}",
   "actions.artist.followNamed": "Seguir a {name}",
   "actions.artist.unfollowNamed": "Dejar de seguir a {name}",
   "playlist.toasts.noPlayableTracks": "Esta playlist aun no tiene temas reproducibles",

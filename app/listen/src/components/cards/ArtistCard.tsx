@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { Link } from "react-router";
 import { UserRound } from "@crate/ui/icons";
 
 import {
@@ -32,7 +32,6 @@ export function ArtistCard({
   layout = "rail",
   fillGrid = false,
 }: ArtistCardProps) {
-  const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const model = useArtistCardModel({
     name,
@@ -66,31 +65,34 @@ export function ArtistCard({
     name,
     toggleArtistFollow: model.toggleArtistFollow,
   });
+  const artwork = (inlineActions: boolean) => (
+    <ArtistCardArtwork
+      photoArtwork={model.photoArtwork}
+      name={name}
+      imageSize={model.imageSize}
+      artworkWidth={model.artworkWidth}
+      fillGrid={model.fillGrid}
+      imageTone={model.imageTone}
+      monogram={model.monogram}
+    >
+      {inlineActions && model.hasPlayableArtist ? (
+        <ArtistCardInlineActions
+          artistName={name}
+          following={model.following}
+          hasPlayableArtist={model.hasPlayableArtist}
+          canUseInlineHoverActions={model.canUseInlineHoverActions}
+          playingTopTracks={playback.playingTopTracks}
+          togglingFollow={follow.togglingFollow}
+          handlePlayTopTracks={playback.handlePlayTopTracks}
+          handleToggleFollow={follow.handleToggleFollow}
+          t={model.t}
+        />
+      ) : null}
+    </ArtistCardArtwork>
+  );
   const content = (
     <>
-      <ArtistCardArtwork
-        photoArtwork={model.photoArtwork}
-        name={name}
-        imageSize={model.imageSize}
-        artworkWidth={model.artworkWidth}
-        fillGrid={model.fillGrid}
-        imageTone={model.imageTone}
-        monogram={model.monogram}
-      >
-        {!external && model.hasPlayableArtist ? (
-          <ArtistCardInlineActions
-            artistName={name}
-            following={model.following}
-            hasPlayableArtist={model.hasPlayableArtist}
-            canUseInlineHoverActions={model.canUseInlineHoverActions}
-            playingTopTracks={playback.playingTopTracks}
-            togglingFollow={follow.togglingFollow}
-            handlePlayTopTracks={playback.handlePlayTopTracks}
-            handleToggleFollow={follow.handleToggleFollow}
-            t={model.t}
-          />
-        ) : null}
-      </ArtistCardArtwork>
+      {artwork(false)}
       <ArtistCardDetails name={name} subtitle={subtitle} />
     </>
   );
@@ -110,24 +112,20 @@ export function ArtistCard({
 
   return (
     <article
-      className={model.wrapperClassName}
+      className={`${model.wrapperClassName} relative`}
       onContextMenu={model.actionMenu.handleContextMenu}
       {...model.actionMenu.longPressHandlers}
     >
-      <button
-        type="button"
-        className="group block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        onClick={() => navigate(model.targetHref)}
-        onKeyDown={(event) => {
-          model.actionMenu.handleKeyboardTrigger(event);
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            navigate(model.targetHref);
-          }
-        }}
-      >
-        {content}
-      </button>
+      <Link
+        to={model.targetHref}
+        aria-label={model.t("actions.artist.openNamed", { name })}
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        onKeyDown={model.actionMenu.handleKeyboardTrigger}
+      />
+      <div className="pointer-events-none relative z-10">
+        {artwork(true)}
+        <ArtistCardDetails name={name} subtitle={subtitle} />
+      </div>
       <ItemActionMenu
         actions={model.actions}
         header={{

@@ -1244,6 +1244,7 @@
   "library.contributions.toasts.removalQueued": "Removal queued ({taskId})",
   "library.contributions.toasts.removeFailed": "Failed to remove contribution",
   "player.queue.upNextTracks": "Up Next · {count, plural, one {# track} other {# tracks}}",
+  "actions.artist.openNamed": "Open {name}",
   "actions.artist.followNamed": "Follow {name}",
   "actions.artist.unfollowNamed": "Unfollow {name}",
   "playlist.toasts.noPlayableTracks": "This playlist has no playable tracks yet",

@@ -265,7 +265,10 @@ describe("SearchResults", () => {
       expect(screen.getAllByText("Blending").length).toBeGreaterThan(0);
       expect(screen.getByText("Talk For Hours")).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: /High Vis/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open High Vis" })).toHaveAttribute(
+      "href",
+      "/artists/high-vis",
+    );
     const links = screen.getAllByRole("link");
     expect(
       links.find(

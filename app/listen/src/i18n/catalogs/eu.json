@@ -1230,6 +1230,7 @@
   "library.contributions.toasts.removalQueued": "Ezabaketa ilaran ({taskId})",
   "library.contributions.toasts.removeFailed": "Ezin izan da ekarpena kendu",
   "player.queue.upNextTracks": "Hurrengoa · {count, plural, one {# pista} other {# pista}}",
+  "actions.artist.openNamed": "Ireki {name}",
   "actions.artist.followNamed": "Jarraitu {name}",
   "actions.artist.unfollowNamed": "Utzi {name} jarraitzeari",
   "playlist.toasts.noPlayableTracks": "Playlist honek ez du oraindik erreproduzitzeko pistarik",

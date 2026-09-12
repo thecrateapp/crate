@@ -1230,6 +1230,7 @@
   "library.contributions.toasts.removalQueued": "Suppression mise en file ({taskId})",
   "library.contributions.toasts.removeFailed": "Impossible de retirer la contribution",
   "player.queue.upNextTracks": "À suivre · {count, plural, one {# titre} other {# titres}}",
+  "actions.artist.openNamed": "Ouvrir {name}",
   "actions.artist.followNamed": "Suivre {name}",
   "actions.artist.unfollowNamed": "Ne plus suivre {name}",
   "playlist.toasts.noPlayableTracks": "Cette playlist ne contient pas encore de titres lisibles",

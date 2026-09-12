@@ -6,7 +6,8 @@
     "design-system:layers": "node scripts/design-system/layer-inventory.mjs",
     "design-system:tokens:check": "npm run --workspace=app/shared/ui test -- lib/appearance-theme-css.test.ts",
     "design-system:tokens:generate": "CRATE_UPDATE_THEME_TOKENS=1 npm run --workspace=app/shared/ui test -- lib/appearance-theme-css.test.ts",
-    "test:appearance": "playwright test --config=playwright.appearance.config.ts"
+    "test:appearance": "playwright test --config=playwright.appearance.config.ts",
+    "test:listen-visual": "playwright test --config=playwright.listen-visual.config.ts"
   },
   "workspaces": [
     "app/shared/ui",

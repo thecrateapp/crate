@@ -1230,6 +1230,7 @@
   "library.contributions.toasts.removalQueued": "Rimozione in coda ({taskId})",
   "library.contributions.toasts.removeFailed": "Impossibile rimuovere il contributo",
   "player.queue.upNextTracks": "A seguire · {count, plural, one {# brano} other {# brani}}",
+  "actions.artist.openNamed": "Apri {name}",
   "actions.artist.followNamed": "Segui {name}",
   "actions.artist.unfollowNamed": "Non seguire piu {name}",
   "playlist.toasts.noPlayableTracks": "Questa playlist non ha ancora brani riproducibili",

@@ -1230,6 +1230,7 @@
   "library.contributions.toasts.removalQueued": "Entfernung eingereiht ({taskId})",
   "library.contributions.toasts.removeFailed": "Beitrag konnte nicht entfernt werden",
   "player.queue.upNextTracks": "Als Nächstes · {count, plural, one {# Track} other {# Tracks}}",
+  "actions.artist.openNamed": "{name} öffnen",
   "actions.artist.followNamed": "{name} folgen",
   "actions.artist.unfollowNamed": "{name} entfolgen",
   "playlist.toasts.noPlayableTracks": "Diese Playlist hat noch keine abspielbaren Tracks",

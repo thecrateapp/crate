@@ -12,7 +12,9 @@ on:
       - "package-lock.json"
       - "scripts/design-system/**"
       - "playwright.appearance.config.ts"
+      - "playwright.listen-visual.config.ts"
       - "tests/appearance/**"
+      - "tests/listen-visual/**"
       - ".github/workflows/test-frontend.yml"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -25,7 +27,9 @@ on:
       - "package-lock.json"
       - "scripts/design-system/**"
       - "playwright.appearance.config.ts"
+      - "playwright.listen-visual.config.ts"
       - "tests/appearance/**"
+      - "tests/listen-visual/**"
       - ".github/workflows/test-frontend.yml"
 
 jobs:
@@ -119,6 +123,9 @@ jobs:
       - name: Run appearance contracts
         run: npm run test:appearance -- --project=chromium
 
+      - name: Run real Listen visual regression
+        run: npm run test:listen-visual
+
       - name: Upload appearance report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -126,4 +133,6 @@ jobs:
           name: appearance-chromium-report
           path: |
             playwright-report/appearance/
+            playwright-report/listen-visual/
             test-results/appearance/
+            test-results/listen-visual/
