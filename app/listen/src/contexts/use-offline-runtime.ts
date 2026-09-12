@@ -330,9 +330,13 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
 
   const clearActiveProfile = useCallback(async () => {
     if (!profileKey || !supported) return;
-    await commitSnapshot(EMPTY_SNAPSHOT, true);
-    await clearOfflineAssets(profileKey);
-  }, [commitSnapshot, profileKey, supported]);
+    transferAbortRef.current?.abort();
+    await enqueue(async () => {
+      transferAbortRef.current?.abort();
+      await commitSnapshot(EMPTY_SNAPSHOT, true);
+      await clearOfflineAssets(profileKey);
+    });
+  }, [commitSnapshot, enqueue, profileKey, supported]);
 
   const items = useMemo(() => Object.values(snapshot.items), [snapshot.items]);
   const summary = useMemo(

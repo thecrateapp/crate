@@ -415,18 +415,18 @@ export async function updateOfflineNativeAssetIndex(
   profileKey: string,
   mutate: (
     current: Record<string, OfflineNativeAssetRecord>,
-  ) => Record<string, OfflineNativeAssetRecord>,
+  ) =>
+    | Record<string, OfflineNativeAssetRecord>
+    | Promise<Record<string, OfflineNativeAssetRecord>>,
 ): Promise<void> {
   if (!isNative) {
-    saveOfflineNativeAssetIndex(
-      profileKey,
-      mutate(loadOfflineNativeAssetIndex(profileKey)),
-    );
+    const next = await mutate(loadOfflineNativeAssetIndex(profileKey));
+    await saveOfflineNativeAssetIndex(profileKey, next);
     return;
   }
   await enqueueNativeAssetIndexWrite(profileKey, async () => {
     const current = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-    const next = mutate(current);
+    const next = await mutate(current);
     nativeAssetIndexCache.set(profileKey, next);
     await writeNativeJsonFile(getOfflineNativeAssetIndexPath(profileKey), next);
   });

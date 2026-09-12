@@ -45,7 +45,7 @@ export function useOfflineSynchronization({
   const [syncing, setSyncing] = useState(false);
   const resumedProfileRef = useRef<string | null>(null);
 
-  const syncAll = useCallback(async () => {
+  const performSyncAll = useCallback(async () => {
     if (!profileKey || !supported) return;
     const items = Object.values(snapshotRef.current.items);
     if (!items.length) return;
@@ -99,16 +99,14 @@ export function useOfflineSynchronization({
     }
   }, [profileKey, snapshotRef, supported, syncManifestIntoItem]);
 
+  const syncAll = useCallback(
+    () => enqueue(performSyncAll),
+    [enqueue, performSyncAll],
+  );
+
   const enqueueSync = useCallback(() => {
-    void enqueue(async () => {
-      setSyncing(true);
-      try {
-        await syncAll();
-      } finally {
-        setSyncing(false);
-      }
-    });
-  }, [enqueue, syncAll]);
+    void syncAll();
+  }, [syncAll]);
 
   useEffect(() => {
     if (!profileKey || !supported) return;

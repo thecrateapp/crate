@@ -1,15 +1,24 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   clearOfflineAssetsMock,
+  abortOfflineTransferMock,
   hydrateOfflineProfileStateMock,
   isOfflineSupportedMock,
   saveOfflineSnapshotMock,
   setActiveOfflineProfileKeyMock,
   syncOfflineProfileToServiceWorkerMock,
+  offlineSyncOperationMock,
 } = vi.hoisted(() => ({
   clearOfflineAssetsMock: vi.fn(async () => {}),
+  abortOfflineTransferMock: vi.fn(),
   hydrateOfflineProfileStateMock: vi.fn(async () => ({
     items: {
       "track:storage-1": {
@@ -39,6 +48,7 @@ const {
   saveOfflineSnapshotMock: vi.fn(),
   setActiveOfflineProfileKeyMock: vi.fn(),
   syncOfflineProfileToServiceWorkerMock: vi.fn(),
+  offlineSyncOperationMock: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/offline", () => ({
@@ -96,6 +106,32 @@ vi.mock("@/lib/offline", () => ({
   syncOfflineProfileToServiceWorker: syncOfflineProfileToServiceWorkerMock,
 }));
 
+vi.mock("@/contexts/use-offline-synchronization", () => ({
+  useOfflineSynchronization: ({
+    enqueue,
+    transferAbortRef,
+  }: {
+    enqueue: <T>(fn: () => Promise<T>) => Promise<T>;
+    transferAbortRef: { current: AbortController | null };
+  }) => ({
+    syncing: false,
+    syncAll: () =>
+      enqueue(async () => {
+        const controller = {
+          abort: abortOfflineTransferMock,
+        } as unknown as AbortController;
+        transferAbortRef.current = controller;
+        try {
+          await offlineSyncOperationMock();
+        } finally {
+          if (transferAbortRef.current === controller) {
+            transferAbortRef.current = null;
+          }
+        }
+      }),
+  }),
+}));
+
 import { AuthContext, type AuthContextValue } from "@/contexts/auth-context";
 import { OfflineProvider, useOffline } from "@/contexts/OfflineContext";
 
@@ -127,6 +163,7 @@ function OfflineProbe() {
     <div>
       <div>{offline.summary.itemCount}</div>
       <div>{offline.getTrackState("entity-1")}</div>
+      <button onClick={() => void offline.syncAll()}>sync</button>
       <button onClick={() => void offline.clearActiveProfile()}>clear</button>
     </div>
   );
@@ -135,11 +172,13 @@ function OfflineProbe() {
 describe("OfflineProvider", () => {
   beforeEach(() => {
     clearOfflineAssetsMock.mockClear();
+    abortOfflineTransferMock.mockClear();
     hydrateOfflineProfileStateMock.mockClear();
     isOfflineSupportedMock.mockClear();
     saveOfflineSnapshotMock.mockClear();
     setActiveOfflineProfileKeyMock.mockClear();
     syncOfflineProfileToServiceWorkerMock.mockClear();
+    offlineSyncOperationMock.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -183,5 +222,38 @@ describe("OfflineProvider", () => {
     await waitFor(() => {
       expect(clearOfflineAssetsMock).toHaveBeenCalledWith("profile-1");
     });
+  });
+
+  it("aborts and waits for active offline work before clearing assets", async () => {
+    let finishSync: (() => void) | undefined;
+    offlineSyncOperationMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishSync = resolve;
+      }),
+    );
+    render(
+      <AuthContext.Provider value={createAuthValue()}>
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByText("ready")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "sync" }));
+    await waitFor(() =>
+      expect(offlineSyncOperationMock).toHaveBeenCalledOnce(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "clear" }));
+
+    await waitFor(() =>
+      expect(abortOfflineTransferMock).toHaveBeenCalledOnce(),
+    );
+    expect(clearOfflineAssetsMock).not.toHaveBeenCalled();
+
+    await act(async () => finishSync!());
+    await waitFor(() =>
+      expect(clearOfflineAssetsMock).toHaveBeenCalledWith("profile-1"),
+    );
   });
 });

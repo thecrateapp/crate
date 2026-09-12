@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/capacitor", () => ({
@@ -67,5 +67,28 @@ describe("useOfflineSynchronization background abort", () => {
     vi.advanceTimersByTime(10_000);
 
     expect(abort).toHaveBeenCalledTimes(1);
+  });
+
+  it("serializes an explicit sync through the shared operation queue", async () => {
+    let enqueueCalls = 0;
+    const enqueue = <T>(fn: () => Promise<T>): Promise<T> => {
+      enqueueCalls += 1;
+      return fn();
+    };
+    const { result } = renderHook(() =>
+      useOfflineSynchronization({
+        enqueue,
+        profileKey: "user-1",
+        snapshot: EMPTY_OFFLINE_SNAPSHOT,
+        snapshotRef: { current: EMPTY_OFFLINE_SNAPSHOT },
+        supported: true,
+        syncManifestIntoItem: vi.fn(),
+        transferAbortRef: { current: null },
+      }),
+    );
+
+    await act(async () => result.current.syncAll());
+
+    expect(enqueueCalls).toBe(1);
   });
 });

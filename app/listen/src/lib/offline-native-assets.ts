@@ -16,7 +16,6 @@ import {
   ensureOfflineNativeAssetIndexLoaded,
   getActiveOfflineProfileKey,
   loadOfflineNativeAssetIndex,
-  saveOfflineNativeAssetIndex,
   updateOfflineNativeAssetIndex,
 } from "./offline-storage";
 import type { OfflineTrackIdentityInput } from "./offline-track-identity";
@@ -339,25 +338,26 @@ export async function clearNativeOfflineAssets(
   profileKey: string,
 ): Promise<void> {
   if (!isNative) return;
-  const assets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-  await Promise.all(
-    Object.values(assets).map((asset) =>
-      Filesystem.deleteFile({
-        path: asset.path,
-        directory: Directory.Data,
-      }).catch((error) => {
-        // See deleteNativeCachedTrackAsset — still clearing the whole
-        // index below, just no longer silently.
-        recordDevLog(
-          "offline",
-          "failed to delete cached asset during clear-all",
-          { path: asset.path, error: String(error) },
-          "warn",
-        );
-      }),
-    ),
-  );
-  await saveOfflineNativeAssetIndex(profileKey, {});
+  await updateOfflineNativeAssetIndex(profileKey, async (assets) => {
+    await Promise.all(
+      Object.values(assets).map((asset) =>
+        Filesystem.deleteFile({
+          path: asset.path,
+          directory: Directory.Data,
+        }).catch((error) => {
+          // See deleteNativeCachedTrackAsset — still clearing the whole
+          // index below, just no longer silently.
+          recordDevLog(
+            "offline",
+            "failed to delete cached asset during clear-all",
+            { path: asset.path, error: String(error) },
+            "warn",
+          );
+        }),
+      ),
+    );
+    return {};
+  });
 }
 
 export function getNativeOfflinePlaybackUrl(
