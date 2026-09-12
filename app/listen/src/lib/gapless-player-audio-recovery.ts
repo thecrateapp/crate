@@ -1,5 +1,11 @@
 import { recordDevLog } from "@/lib/dev-logs";
 
+// A quick alt-tab and a real system sleep fire the exact same
+// visibilitychange/focus events on resume — only the elapsed hidden time
+// tells them apart. Long enough to never trip on background-tab timer
+// throttling (which caps around 1s), short enough to catch a real sleep.
+const LONG_ABSENCE_MS = 10_000;
+
 export interface AudioRecoveryOptions {
   rebuildIfTauriOutputMayBeStale?: boolean;
 }
@@ -29,7 +35,16 @@ export function createAudioRecoveryController(
 ): AudioRecoveryController {
   let lifecycleRecoveryInstalled = false;
   let contextWakeInFlight: Promise<void> | null = null;
+  let hiddenAt: number | null = null;
 
+  // Empirical mitigation, not a documented API contract: on Tauri desktop
+  // (WKWebView/WebKitGTK), an AudioContext can report state "running" after
+  // a wake/focus event while the underlying CoreAudio/PulseAudio output
+  // stream is still torn down — silent, no error, no observable state
+  // change. A near-silent oscillator blip nudges the engine to reconnect
+  // the real output device. If this stops working on a future WebKit/GTK
+  // version, this is where to look — the real fix is upstream in the
+  // webview's audio stack, which we don't control.
   const kickAudioOutput = (ctx: AudioContext, reason: string): void => {
     if (
       !dependencies.isTauriDesktopRuntime() ||
@@ -170,14 +185,25 @@ export function createAudioRecoveryController(
 
     const wake = (reason: string): void => {
       if (!dependencies.isTauriDesktopRuntime()) return;
-      if (!dependencies.isPlaybackActive() || reason === "devicechange") {
+      const wasHiddenForLong =
+        hiddenAt != null && Date.now() - hiddenAt >= LONG_ABSENCE_MS;
+      if (
+        !dependencies.isPlaybackActive() ||
+        wasHiddenForLong ||
+        reason === "devicechange"
+      ) {
         dependencies.markOutputStale();
       }
       void prepare(reason);
     };
 
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") wake("visibilitychange");
+      if (document.visibilityState === "visible") {
+        wake("visibilitychange");
+        hiddenAt = null;
+      } else {
+        hiddenAt = Date.now();
+      }
     });
     window.addEventListener("focus", () => wake("focus"));
     window.addEventListener("pageshow", () => wake("pageshow"));

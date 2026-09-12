@@ -294,6 +294,12 @@ export function destroyPlayer(): void {
   setEqualizerHost(null);
   lastPlaybackRate = 1.0;
   if (instance) {
+    // Gapless-5 shares a single AudioContext across every instance via
+    // `window.gapless5AudioContext` — if we don't clear it here, the next
+    // initPlayer() in this same page session (e.g. logout → login without
+    // a reload) reuses a context that belonged to the instance we just
+    // tore down instead of getting a fresh one.
+    const previousContext = getAudioContext();
     try {
       instance.stop();
       instance.removeAllTracks();
@@ -302,9 +308,11 @@ export function destroyPlayer(): void {
     }
     instance = null;
     currentAnalyser = null;
+    audioRecovery.clearSharedGaplessAudioContext(previousContext);
   }
   setVolumeSink(null);
   tauriPlaybackWasActive = false;
+  tauriAudioOutputMayBeStale = false;
 }
 
 // ── Convenience methods ──────────────────────────────────────────
