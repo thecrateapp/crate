@@ -237,7 +237,14 @@ async function castControl(
           volume: Math.max(0, Math.min(1, payload.volume ?? 1)),
         });
       } else result = await nativeCastPlugin.stop();
-      nativeCastSessionActive = command === "stop" ? false : result.ok;
+      // "stop" only stops the receiver's current media, it doesn't end
+      // the Cast session — unlike the old `command === "stop" ? false :
+      // result.ok`, a successful stop must not flip this to false, or
+      // the very next play/pause looks like there's no active session
+      // when we're still connected to the device. The authoritative
+      // source is the "sessionChanged" listener (see getNativeCast); this
+      // is just an optimistic same-tick update for the common case.
+      nativeCastSessionActive = result.ok;
       return result;
     } catch (error) {
       return {

@@ -48,6 +48,7 @@ import {
   castPlay,
   castSeek,
   castSetVolume,
+  castStop,
   getCastSenderCapabilities,
   isCastSessionActive,
   startCastSession,
@@ -245,5 +246,19 @@ describe("cast sender", () => {
     sessionChangedListeners.forEach((listener) => listener({ active: false }));
 
     expect(isCastSessionActive()).toBe(false);
+  });
+
+  it("does not treat a successful stop as the Cast session ending", async () => {
+    runtimeMock.isNative = true;
+    nativeControlMock.mockResolvedValue({ ok: true });
+
+    await castPlay();
+    expect(isCastSessionActive()).toBe(true);
+
+    // stop() only stops the receiver's current media — it does not end
+    // the Cast session, so the app should still be able to play again
+    // without re-picking a device.
+    await expect(castStop()).resolves.toEqual({ ok: true });
+    expect(isCastSessionActive()).toBe(true);
   });
 });

@@ -17,6 +17,7 @@ export interface NativeHttpPlugin {
     responseType: "blob";
     connectTimeout: number;
     readTimeout: number;
+    headers?: Record<string, string>;
   }): Promise<NativeHttpResponse>;
 }
 
@@ -26,7 +27,10 @@ interface NativeImageDataResult {
 
 interface CrateSocialSharePlugin {
   canShareInstagramStory(): Promise<NativeInstagramStoryResult>;
-  loadImageDataUrl?(options: { url: string }): Promise<NativeImageDataResult>;
+  loadImageDataUrl?(options: {
+    url: string;
+    headers?: Record<string, string>;
+  }): Promise<NativeImageDataResult>;
   shareInstagramStory(options: {
     imageDataUrl: string;
     contentUrl: string;

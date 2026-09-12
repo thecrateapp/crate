@@ -3,6 +3,7 @@ import { Directory, Filesystem } from "@capacitor/filesystem";
 
 import { api, apiUrl, getApiAuthHeaders } from "@/lib/api";
 import { isAndroidNative, isNative } from "@/lib/capacitor-runtime";
+import { recordDevLog } from "@/lib/dev-logs";
 import { verifyNativeOfflineAssets } from "@/lib/offline-native";
 import type { PlaybackResolution } from "@/lib/track-playback";
 import {
@@ -298,8 +299,19 @@ export async function deleteNativeCachedTrackAsset(
     await Filesystem.deleteFile({
       path: entry.path,
       directory: Directory.Data,
-    }).catch(() => {
-      // ignore missing files; we still want to clear metadata
+    }).catch((error) => {
+      // We still clear the index entry below even on failure — the
+      // common case is the file is already gone, and refusing to drop
+      // stale metadata over that would be worse. But a failure for any
+      // other reason (permission error, file briefly locked) now leaves
+      // an orphaned, untracked file with no self-heal path, so at least
+      // make that observable instead of fully silent.
+      recordDevLog(
+        "offline",
+        "failed to delete cached track asset",
+        { path: entry.path, error: String(error) },
+        "warn",
+      );
     });
   }
   for (const alias of aliases) delete assets[alias];
@@ -316,8 +328,15 @@ export async function clearNativeOfflineAssets(
       Filesystem.deleteFile({
         path: asset.path,
         directory: Directory.Data,
-      }).catch(() => {
-        // ignore missing files during cleanup
+      }).catch((error) => {
+        // See deleteNativeCachedTrackAsset — still clearing the whole
+        // index below, just no longer silently.
+        recordDevLog(
+          "offline",
+          "failed to delete cached asset during clear-all",
+          { path: asset.path, error: String(error) },
+          "warn",
+        );
       }),
     ),
   );

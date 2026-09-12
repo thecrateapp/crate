@@ -1,4 +1,8 @@
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import {
+  getApiAuthHeaders,
+  isApiUrl,
+  resolveMaybeApiAssetUrl,
+} from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog } from "@/lib/dev-logs";
 
@@ -225,18 +229,31 @@ async function loadCanvasImage(src: string): Promise<CanvasArtwork> {
   }
 }
 
+// Self-hosted artwork can require auth (bearer token, not cookies, for the
+// native multi-server flow), which neither the native share plugin nor
+// CapacitorHttp attach on their own. Only attached for our own API, never
+// a third-party CDN, so this never leaks the token elsewhere.
+export function resolveArtworkAuthHeaders(
+  src: string,
+): Record<string, string> | undefined {
+  return isApiUrl(src) ? getApiAuthHeaders() : undefined;
+}
+
 async function loadNativeHttpImageDataUrl(src: string): Promise<string> {
-  const pluginDataUrl = await loadNativeSharePluginImageDataUrl(src).catch(
-    (error) => {
-      recordDevLog(
-        "share",
-        "Native story artwork loader failed; falling back to CapacitorHttp",
-        { error: formatArtworkError(error), src },
-        "warn",
-      );
-      return null;
-    },
-  );
+  const authHeaders = resolveArtworkAuthHeaders(src);
+
+  const pluginDataUrl = await loadNativeSharePluginImageDataUrl(
+    src,
+    authHeaders,
+  ).catch((error) => {
+    recordDevLog(
+      "share",
+      "Native story artwork loader failed; falling back to CapacitorHttp",
+      { error: formatArtworkError(error), src },
+      "warn",
+    );
+    return null;
+  });
   if (pluginDataUrl) return pluginDataUrl;
 
   let response;
@@ -248,6 +265,7 @@ async function loadNativeHttpImageDataUrl(src: string): Promise<string> {
       responseType: "blob",
       connectTimeout: 15_000,
       readTimeout: 30_000,
+      headers: authHeaders,
     });
   } catch (error) {
     throw new Error(
@@ -273,9 +291,13 @@ async function loadNativeHttpImageDataUrl(src: string): Promise<string> {
 
 async function loadNativeSharePluginImageDataUrl(
   src: string,
+  headers: Record<string, string> | undefined,
 ): Promise<string | null> {
   if (!nativeSocialShare.loadImageDataUrl) return null;
-  const result = await nativeSocialShare.loadImageDataUrl({ url: src });
+  const result = await nativeSocialShare.loadImageDataUrl({
+    url: src,
+    headers,
+  });
   const dataUrl = result.dataUrl?.trim();
   if (!dataUrl) {
     throw new Error("native social image loader returned empty data");
