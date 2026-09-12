@@ -6,13 +6,13 @@ use std::{
 use objc2::{
     class,
     encode::{Encode, Encoding},
-    ffi, msg_send,
+    msg_send,
     runtime::{AnyClass, AnyObject, Imp, Sel},
     sel,
 };
-use objc2_app_kit::NSApplication;
-use objc2_foundation::{MainThreadMarker, NSString};
+use objc2_foundation::NSString;
 
+use crate::macos_delegate::{app_delegate, replace_method};
 use crate::DesktopMediaSessionPayload;
 
 #[link(name = "MediaPlayer", kind = "framework")]
@@ -78,16 +78,10 @@ pub fn update_now_playing(payload: &DesktopMediaSessionPayload) {
 }
 
 unsafe fn patch_application_delegate() {
-    let Some(mtm) = MainThreadMarker::new() else {
+    let Some(delegate) = app_delegate() else {
         return;
     };
-    let app = NSApplication::sharedApplication(mtm);
-    let Some(delegate) = app.delegate() else {
-        return;
-    };
-    let delegate_ref = &*delegate;
-    let delegate_object: &AnyObject = delegate_ref.as_ref();
-    let class = delegate_object.class() as *const AnyClass as *mut AnyClass;
+    let class = (*delegate).class() as *const AnyClass as *mut AnyClass;
 
     replace_method(
         class,
@@ -122,15 +116,10 @@ unsafe fn patch_application_delegate() {
 }
 
 unsafe fn register_remote_commands() {
-    let Some(mtm) = MainThreadMarker::new() else {
+    let Some(delegate) = app_delegate() else {
         return;
     };
-    let app = NSApplication::sharedApplication(mtm);
-    let Some(delegate) = app.delegate() else {
-        return;
-    };
-    let delegate_ref = &*delegate;
-    let delegate_object: &AnyObject = delegate_ref.as_ref();
+    let delegate_object: &AnyObject = &*delegate;
     let center: *mut AnyObject = msg_send![class!(MPRemoteCommandCenter), sharedCommandCenter];
     if center.is_null() {
         return;
@@ -380,10 +369,6 @@ unsafe fn release_cached_artwork(cache: &mut ArtworkCache) {
 
 unsafe fn media_action_imp(function: MediaActionImp) -> Imp {
     std::mem::transmute(function)
-}
-
-unsafe fn replace_method(class: *mut AnyClass, selector: Sel, imp: Imp, types: &'static [u8]) {
-    let _ = ffi::class_replaceMethod(class, selector, imp, types.as_ptr().cast());
 }
 
 unsafe extern "C-unwind" fn media_play(

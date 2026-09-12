@@ -30,6 +30,8 @@ mod linux_desktop_theme;
 #[cfg(target_os = "linux")]
 mod linux_media_controls;
 #[cfg(target_os = "macos")]
+mod macos_delegate;
+#[cfg(target_os = "macos")]
 mod macos_dock_menu;
 #[cfg(target_os = "macos")]
 mod macos_media_controls;

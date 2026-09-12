@@ -1,13 +1,14 @@
 use std::{ptr, sync::OnceLock};
 
 use objc2::{
-    ffi,
     rc::Retained,
     runtime::{AnyClass, AnyObject, Imp, Sel},
     sel, MainThreadOnly,
 };
 use objc2_app_kit::{NSApplication, NSMenu, NSMenuItem};
 use objc2_foundation::{MainThreadMarker, NSString};
+
+use crate::macos_delegate::{app_delegate, replace_method};
 
 static DOCK_APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 
@@ -22,16 +23,10 @@ pub fn install(app: &tauri::App) {
 }
 
 unsafe fn patch_application_delegate() {
-    let Some(mtm) = MainThreadMarker::new() else {
+    let Some(delegate) = app_delegate() else {
         return;
     };
-    let app = NSApplication::sharedApplication(mtm);
-    let Some(delegate) = app.delegate() else {
-        return;
-    };
-    let delegate_ref = &*delegate;
-    let delegate_object: &AnyObject = delegate_ref.as_ref();
-    let class = delegate_object.class() as *const AnyClass as *mut AnyClass;
+    let class = (*delegate).class() as *const AnyClass as *mut AnyClass;
 
     replace_method(
         class,
@@ -65,10 +60,6 @@ unsafe fn dock_menu_imp(function: DockMenuImp) -> Imp {
 
 unsafe fn dock_action_imp(function: DockActionImp) -> Imp {
     std::mem::transmute(function)
-}
-
-unsafe fn replace_method(class: *mut AnyClass, selector: Sel, imp: Imp, types: &'static [u8]) {
-    let _ = ffi::class_replaceMethod(class, selector, imp, types.as_ptr().cast());
 }
 
 unsafe extern "C-unwind" fn application_dock_menu(
