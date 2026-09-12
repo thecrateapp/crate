@@ -48,6 +48,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 @UnstableApi
 public class CrateNativePlaybackService extends MediaSessionService {
@@ -917,18 +918,33 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void bufferLatestPositionEvent(JSObject event) {
-        for (int index = bufferedEvents.size() - 1; index >= 0; index--) {
-            JSObject bufferedEvent = bufferedEvents.get(index);
-            if ("positionChanged".equals(bufferedEvent.optString("event", ""))) {
-                bufferedEvents.set(index, event);
-                return;
+        coalesceLatestPositionEvent(
+            bufferedEvents,
+            event,
+            candidate -> "positionChanged".equals(candidate.optString("event", ""))
+        );
+        trimBufferedEvents();
+    }
+
+    static <T> void coalesceLatestPositionEvent(
+        List<T> events,
+        T latestPosition,
+        Predicate<T> isPositionEvent
+    ) {
+        for (int index = events.size() - 1; index >= 0; index--) {
+            if (isPositionEvent.test(events.get(index))) {
+                events.remove(index);
             }
         }
-        bufferEvent(event);
+        events.add(latestPosition);
     }
 
     private void bufferEvent(JSObject event) {
         bufferedEvents.add(event);
+        trimBufferedEvents();
+    }
+
+    private void trimBufferedEvents() {
         while (bufferedEvents.size() > MAX_BUFFERED_EVENTS) {
             bufferedEvents.remove(0);
         }

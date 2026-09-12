@@ -6,6 +6,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import androidx.media3.common.Player;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.junit.Test;
 
 public class NativePlaybackContractTest {
@@ -59,5 +62,20 @@ public class NativePlaybackContractTest {
         long second = recreatedService.next();
 
         assertTrue(second > first);
+    }
+
+    @Test
+    public void positionCoalescingPreservesGlobalEventOrder() {
+        List<String> events = new ArrayList<>(
+            Arrays.asList("position:1", "track:2", "state:3")
+        );
+
+        CrateNativePlaybackService.coalesceLatestPositionEvent(
+            events,
+            "position:4",
+            event -> event.startsWith("position:")
+        );
+
+        assertEquals(Arrays.asList("track:2", "state:3", "position:4"), events);
     }
 }
