@@ -51,6 +51,9 @@ jobs:
       - name: Test iOS secure-session Keychain round trip
         run: app/listen/scripts/test-ios-secure-session.sh
 
+      - name: Test iOS offline asset integrity check
+        run: app/listen/scripts/test-ios-offline-integrity.sh
+
       - name: Build and sync Capacitor bundle
         run: npm run build:cap
         working-directory: app/listen

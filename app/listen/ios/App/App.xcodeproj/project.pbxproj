@@ -24,6 +24,7 @@
 		C0DEF0010000000000000012 /* CrateOfflineIntegrityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000013 /* CrateOfflineIntegrityPlugin.swift */; };
 		C0DEF0010000000000000014 /* ArtworkDownsampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000015 /* ArtworkDownsampler.swift */; };
 		C0DEF0010000000000000016 /* CrateSecureSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */; };
+		C0DEF0010000000000000018 /* OfflineAssetIntegrity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000019 /* OfflineAssetIntegrity.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +50,7 @@
 		C0DEF0010000000000000013 /* CrateOfflineIntegrityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateOfflineIntegrityPlugin.swift; sourceTree = "<group>"; };
 		C0DEF0010000000000000015 /* ArtworkDownsampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkDownsampler.swift; sourceTree = "<group>"; };
 		C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateSecureSessionStore.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000019 /* OfflineAssetIntegrity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAssetIntegrity.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +97,7 @@
 				C0DEF0010000000000000011 /* CrateSecureSessionPlugin.swift */,
 				C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */,
 				C0DEF0010000000000000013 /* CrateOfflineIntegrityPlugin.swift */,
+				C0DEF0010000000000000019 /* OfflineAssetIntegrity.swift */,
 				C0DEF0010000000000000015 /* ArtworkDownsampler.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -272,6 +275,7 @@
 				C0DEF0010000000000000008 /* CrateSocialSharePlugin.swift in Sources */,
 				C0DEF0010000000000000010 /* CrateSecureSessionPlugin.swift in Sources */,
 				C0DEF0010000000000000012 /* CrateOfflineIntegrityPlugin.swift in Sources */,
+				C0DEF0010000000000000018 /* OfflineAssetIntegrity.swift in Sources */,
 				C0DEF0010000000000000014 /* ArtworkDownsampler.swift in Sources */,
 				C0DEF0010000000000000016 /* CrateSecureSessionStore.swift in Sources */,
 			);

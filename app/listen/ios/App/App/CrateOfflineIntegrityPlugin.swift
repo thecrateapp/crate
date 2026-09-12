@@ -34,7 +34,7 @@ class CrateOfflineIntegrityPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
                 let expected = (input["expectedBytes"] as? NSNumber)?.int64Value ?? 0
-                let valid = expected <= 0 || size == 0 || size == expected
+                let valid = OfflineAssetIntegrity.isValid(size: size, expected: expected)
                 if !valid {
                     try? fileManager.removeItem(at: url)
                 }

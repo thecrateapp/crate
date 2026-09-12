@@ -323,13 +323,20 @@ export function loadOfflineNativeAssetIndex(
   }
 }
 
-export function saveOfflineNativeAssetIndex(
+export async function saveOfflineNativeAssetIndex(
   profileKey: string,
   assets: Record<string, OfflineNativeAssetRecord>,
-): void {
+): Promise<void> {
   if (isNative) {
+    // The in-memory cache is the source of truth for the running session
+    // and updates immediately regardless of how the disk write below
+    // goes. Callers that just finished writing a media file to disk
+    // (cacheNativeTrackAsset, deleteNativeCachedTrackAsset) await this so
+    // the index write isn't a fire-and-forget promise the process can be
+    // killed before flushing — otherwise a completed download can end up
+    // as an orphaned file on disk with no matching index entry.
     nativeAssetIndexCache.set(profileKey, assets);
-    void writeNativeJsonFile(
+    await writeNativeJsonFile(
       getOfflineNativeAssetIndexPath(profileKey),
       assets,
     );

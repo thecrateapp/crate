@@ -69,7 +69,7 @@ export async function hasCachedNativeTrackAssets(
       }
     }
   }
-  if (changed) saveOfflineNativeAssetIndex(profileKey, nextAssets);
+  if (changed) await saveOfflineNativeAssetIndex(profileKey, nextAssets);
   return found;
 }
 
@@ -113,7 +113,7 @@ function expectedTrackBytes(track: OfflineManifestTrack): number {
   return Math.max(0, Number(track.byte_length || 0));
 }
 
-async function assertNativeTrackIntegrity(
+export async function assertNativeTrackIntegrity(
   path: string,
   expectedBytes?: number | null,
 ): Promise<{ uri: string; size: number }> {
@@ -123,7 +123,12 @@ async function assertNativeTrackIntegrity(
   });
   const actualSize = Number(stat.size || 0);
   const expectedSize = Math.max(0, Number(expectedBytes ?? 0));
-  if (expectedSize > 0 && actualSize > 0 && actualSize !== expectedSize) {
+  // A 0-byte file is never a valid asset, even when we have no expected
+  // size to compare against — it means a download that started and
+  // produced an empty file, not one that legitimately has no content.
+  const isValid =
+    actualSize > 0 && (expectedSize === 0 || actualSize === expectedSize);
+  if (!isValid) {
     await Filesystem.deleteFile({
       path,
       directory: Directory.Data,
@@ -274,7 +279,7 @@ export async function cacheNativeTrackAsset(
     byteLength: downloadTarget.expectedBytes || size,
     updatedAt: track.updated_at ?? null,
   };
-  saveOfflineNativeAssetIndex(profileKey, nextAssets);
+  await saveOfflineNativeAssetIndex(profileKey, nextAssets);
 }
 
 export async function deleteNativeCachedTrackAsset(
@@ -298,7 +303,7 @@ export async function deleteNativeCachedTrackAsset(
     });
   }
   for (const alias of aliases) delete assets[alias];
-  saveOfflineNativeAssetIndex(profileKey, assets);
+  await saveOfflineNativeAssetIndex(profileKey, assets);
 }
 
 export async function clearNativeOfflineAssets(
@@ -316,7 +321,7 @@ export async function clearNativeOfflineAssets(
       }),
     ),
   );
-  saveOfflineNativeAssetIndex(profileKey, {});
+  await saveOfflineNativeAssetIndex(profileKey, {});
 }
 
 export function getNativeOfflinePlaybackUrl(

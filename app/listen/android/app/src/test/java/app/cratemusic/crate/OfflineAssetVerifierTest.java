@@ -36,4 +36,24 @@ public class OfflineAssetVerifierTest {
         );
         assertFalse(asset.exists());
     }
+
+    @Test
+    public void removesAZeroByteAssetEvenWithNoExpectedSize() throws Exception {
+        File root = Files.createTempDirectory("crate-offline").toFile();
+        File asset = new File(root, "offline-media/track.m4a");
+        assertTrue(asset.getParentFile().mkdirs());
+        Files.write(asset.toPath(), new byte[0]);
+
+        assertFalse(
+            OfflineAssetVerifier.verify(root, "offline-media/track.m4a", 0).valid
+        );
+        assertFalse(asset.exists());
+
+        File asset2 = new File(root, "offline-media/track2.m4a");
+        Files.write(asset2.toPath(), new byte[0]);
+        assertFalse(
+            OfflineAssetVerifier.verify(root, "offline-media/track2.m4a", 3).valid
+        );
+        assertFalse(asset2.exists());
+    }
 }
