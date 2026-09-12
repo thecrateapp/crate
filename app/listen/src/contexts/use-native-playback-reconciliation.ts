@@ -1,9 +1,27 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
 import type { EnginePositionEvent, EngineState } from "@/lib/playback-engine";
 
 type ValueRef<T> = { readonly current: T };
+
+// Buffered events drained on relaunch/reconnect and live events from the
+// listener can interleave out of order (a stale buffered event applied
+// right after a fresher live one). Each carries a nativeTimeMs — use it as
+// a watermark and drop anything older than what we've already applied,
+// rather than letting stale data (and its side effects: track rotation,
+// tracker sessions) regress state backward.
+export function isStaleNativeEvent(
+  nativeTimeMs: number | null | undefined,
+  watermarkRef: { current: number },
+): boolean {
+  if (typeof nativeTimeMs !== "number" || !Number.isFinite(nativeTimeMs)) {
+    return false;
+  }
+  if (nativeTimeMs < watermarkRef.current) return true;
+  watermarkRef.current = nativeTimeMs;
+  return false;
+}
 
 export function nativeTransitionFlushReason(
   reason: string | undefined,
@@ -101,8 +119,13 @@ export function useNativePlaybackReconciliation({
   rotateTrackerSession,
   scheduleNativeBufferingWatchdog,
 }: UseNativePlaybackReconciliationParams) {
+  const nativeEventWatermarkRef = useRef(0);
+
   const applyNativePosition = useCallback(
     (event: EnginePositionEvent) => {
+      if (isStaleNativeEvent(event.nativeTimeMs, nativeEventWatermarkRef)) {
+        return;
+      }
       const positionSeconds = projectedNativePositionSeconds(
         event.positionMs,
         event.nativeTimeMs,
@@ -137,6 +160,9 @@ export function useNativePlaybackReconciliation({
       state: EngineState,
       options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {},
     ) => {
+      if (isStaleNativeEvent(state.nativeTimeMs, nativeEventWatermarkRef)) {
+        return;
+      }
       const positionSeconds = projectedNativePositionSeconds(
         state.positionMs,
         state.nativeTimeMs,
@@ -231,6 +257,9 @@ export function useNativePlaybackReconciliation({
 
   const applyNativeTrackChange = useCallback(
     (event: EnginePositionEvent & { reason?: string }) => {
+      if (isStaleNativeEvent(event.nativeTimeMs, nativeEventWatermarkRef)) {
+        return;
+      }
       const queue = queueRef.current;
       if (event.index < 0 || event.index >= queue.length) return;
 

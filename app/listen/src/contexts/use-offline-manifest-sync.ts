@@ -26,7 +26,10 @@ interface UseOfflineManifestSyncOptions {
   profileKey: string | null;
   snapshotRef: MutableRefObject<OfflineSnapshot>;
   transferAbortRef: MutableRefObject<AbortController | null>;
-  commitSnapshot: (next: OfflineSnapshot, flush?: boolean) => void;
+  commitSnapshot: (
+    next: OfflineSnapshot,
+    flush?: boolean,
+  ) => void | Promise<void>;
 }
 
 export function useOfflineManifestSync({
@@ -223,7 +226,7 @@ export function useOfflineManifestSync({
           [itemKey]: nextItem,
         },
       };
-      commitSnapshot(nextSnapshot, true);
+      await commitSnapshot(nextSnapshot, true);
 
       const oldAssetKeys = new Set(
         (existing?.tracks || []).reduce<string[]>((keys, track) => {

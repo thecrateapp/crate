@@ -261,4 +261,26 @@ describe("cast sender", () => {
     await expect(castStop()).resolves.toEqual({ ok: true });
     expect(isCastSessionActive()).toBe(true);
   });
+
+  it("does not treat a rejected command as the Cast session ending", async () => {
+    runtimeMock.isNative = true;
+    nativeControlMock.mockResolvedValue({ ok: true });
+
+    await castPlay();
+    expect(isCastSessionActive()).toBe(true);
+
+    // A transient pause rejection (e.g. the receiver briefly refused the
+    // command) is not proof the device disconnected — only the
+    // sessionChanged listener or a fresh capabilities read gets to say
+    // that.
+    nativeControlMock.mockResolvedValueOnce({
+      ok: false,
+      message: "Cast command was rejected by the receiver.",
+    });
+    await expect(castPause()).resolves.toEqual({
+      ok: false,
+      message: "Cast command was rejected by the receiver.",
+    });
+    expect(isCastSessionActive()).toBe(true);
+  });
 });

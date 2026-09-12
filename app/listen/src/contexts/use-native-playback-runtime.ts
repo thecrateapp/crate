@@ -4,6 +4,7 @@ import type { PlaySource, Track } from "@/contexts/player-types";
 import { useNativeBufferingRecovery } from "@/contexts/use-native-buffering-recovery";
 import { useNativePlaybackReconciliation } from "@/contexts/use-native-playback-reconciliation";
 export {
+  isStaleNativeEvent,
   nativeTransitionFlushReason,
   projectedNativePositionSeconds,
 } from "@/contexts/use-native-playback-reconciliation";

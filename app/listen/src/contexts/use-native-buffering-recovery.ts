@@ -117,27 +117,39 @@ export function useNativeBufferingRecovery({
       if (nativeBufferingRecoveryKeyRef.current === retryKey) return false;
       nativeBufferingRecoveryKeyRef.current = retryKey;
 
-      if (options.forceRefresh && !(await refreshAuthToken())) {
-        return false;
-      }
+      // The key above only needs to dedup *successful* (or still in-
+      // flight) recoveries for this exact track/position/probe combo —
+      // if refreshAuthToken, track resolution, or loadQueue itself fails,
+      // clear it back out so a later attempt with the same key (very
+      // likely, since the underlying stuck condition hasn't changed)
+      // isn't silently rejected by the guard above forever.
+      try {
+        if (options.forceRefresh && !(await refreshAuthToken())) {
+          nativeBufferingRecoveryKeyRef.current = null;
+          return false;
+        }
 
-      const engineTracks = await toStartupEngineTracks(
-        queueSnapshot,
-        index,
-        undefined,
-        { target: "android-native" },
-      );
-      await androidNativeEngine.loadQueue({
-        revision: createQueueRevision(),
-        tracks: engineTracks,
-        currentIndex: index,
-        positionMs,
-        autoplay: options.autoplay ?? true,
-        repeat: repeatRef.current,
-        crossfadeMs: effectiveCrossfadeMsRef.current,
-        volume: lastNonZeroVolumeRef.current,
-      });
-      return true;
+        const engineTracks = await toStartupEngineTracks(
+          queueSnapshot,
+          index,
+          undefined,
+          { target: "android-native" },
+        );
+        await androidNativeEngine.loadQueue({
+          revision: createQueueRevision(),
+          tracks: engineTracks,
+          currentIndex: index,
+          positionMs,
+          autoplay: options.autoplay ?? true,
+          repeat: repeatRef.current,
+          crossfadeMs: effectiveCrossfadeMsRef.current,
+          volume: lastNonZeroVolumeRef.current,
+        });
+        return true;
+      } catch (error) {
+        nativeBufferingRecoveryKeyRef.current = null;
+        throw error;
+      }
     },
     [
       currentIndexRef,

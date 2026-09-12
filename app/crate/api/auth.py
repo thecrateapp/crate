@@ -385,7 +385,7 @@ def _validate_native_oauth_start(
             status_code=503,
             detail="Native OAuth exchange is not enabled",
         )
-    if mode != "login" or not _is_mobile_native_listen_app_id(app_id):
+    if mode != "login" or not _is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
     if return_to != _NATIVE_CALLBACK_URL:
         raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
@@ -412,21 +412,6 @@ def _is_listen_return_to(return_to: str | None) -> bool:
     except Exception:
         return False
     return host == "listen" or host.startswith("listen.")
-
-
-def _is_tauri_loopback_return_to(return_to: str | None) -> bool:
-    if not return_to:
-        return False
-    try:
-        parsed = urlparse(return_to)
-    except Exception:
-        return False
-    return (
-        parsed.scheme == "http"
-        and parsed.hostname in {"127.0.0.1", "localhost"}
-        and parsed.port == 17654
-        and parsed.path == "/oauth/callback"
-    )
 
 
 def _request_host(request: Request) -> str:
@@ -914,9 +899,7 @@ def _allowed_redirect_origins() -> set[str]:
 def _callback_origin(return_to: str | None = None, *, app_id: str | None = None) -> str:
     allowed = _allowed_redirect_origins()
     if return_to and (
-        return_to.startswith("cratemusic://")
-        or _is_tauri_loopback_return_to(return_to)
-        or _is_native_listen_app_id(app_id)
+        return_to.startswith("cratemusic://") or _is_native_listen_app_id(app_id)
     ):
         # Native/Tauri OAuth still needs an HTTPS callback registered with
         # Google/Apple. Keep it on Listen, not Admin, so desktop/mobile auth
@@ -943,8 +926,6 @@ def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> 
     if not return_to:
         return "/"
     if return_to.startswith("cratemusic://"):
-        return return_to
-    if app_id == "listen-tauri" and _is_tauri_loopback_return_to(return_to):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
         return return_to
@@ -2484,7 +2465,7 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             detail="Native OAuth exchange is not enabled",
         )
     app_id = (request.headers.get("x-crate-app") or "").strip().lower()
-    if not _is_mobile_native_listen_app_id(app_id):
+    if not _is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
     if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
         raise HTTPException(

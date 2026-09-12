@@ -650,13 +650,20 @@ class TestOAuthStart:
             == "https://listen.lespedants.org/api/auth/oauth/google/callback"
         )
 
-    def test_tauri_loopback_return_to_requires_tauri_app_id(self):
-        from crate.api.auth import _validate_return_to
+    def test_validate_native_oauth_start_accepts_tauri_app_id(self):
+        from crate.api.auth import _validate_native_oauth_start
 
-        return_to = "http://127.0.0.1:17654/oauth/callback?next=%2F"
-
-        assert _validate_return_to(return_to, app_id="listen-tauri") == return_to
-        assert _validate_return_to(return_to, app_id="listen-web") == "/"
+        with patch("crate.api.auth._native_oauth_exchange_enabled", return_value=True):
+            assert (
+                _validate_native_oauth_start(
+                    app_id="listen-tauri",
+                    mode="login",
+                    return_to="cratemusic://oauth/callback",
+                    challenge="a" * 43,
+                    state="b" * 32,
+                )
+                is True
+            )
 
     def test_post_auth_redirect_url_adds_token_for_tauri_loopback(self):
         from crate.api.auth import _post_auth_redirect_url

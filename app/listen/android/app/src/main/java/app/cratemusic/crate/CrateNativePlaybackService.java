@@ -297,6 +297,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                         (
                             playerCommand == Player.COMMAND_PLAY_PAUSE ||
                             playerCommand == Player.COMMAND_PREPARE ||
+                            playerCommand == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM ||
                             playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
                             playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
                             playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||

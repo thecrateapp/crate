@@ -4,8 +4,10 @@ import {
   removeSecureSessionValue,
   setSecureSessionValue,
 } from "@/lib/native-secure-session";
+import { isTauriRuntime } from "@/lib/platform";
 import {
   getCurrentServerId,
+  getServers,
   setCurrentServerId,
   waitForPendingSecureSessionWrites,
 } from "@/lib/server-store";
@@ -13,13 +15,6 @@ import {
 const OAUTH_NEXT_KEY = "crate-oauth-next";
 const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
-const DESKTOP_HANDOFF_KEY_PREFIX = "crate-oauth-desktop-state:";
-
-interface DesktopOAuthHandoffRecord {
-  next: string;
-  createdAt: number;
-  serverId: string | null;
-}
 
 type OAuthProvider = "google" | "apple";
 
@@ -63,6 +58,47 @@ function oauthRecordKey(state: string): string {
   return `crate.oauth.${state}`;
 }
 
+// Mobile (Capacitor) has an OS-backed Keychain/Keystore secure session
+// plugin; Tauri desktop doesn't, so the PKCE verifier record for desktop
+// lives in localStorage instead — the same trust tier the desktop app
+// already uses elsewhere (e.g. the pending-next redirect below). Both
+// platforms otherwise share the exact same PKCE + one-time-code exchange
+// flow, since Tauri already registers the `cratemusic://` scheme as an
+// OS-level deep link, same as mobile.
+async function writeNativeOAuthRecord(
+  key: string,
+  value: string,
+): Promise<void> {
+  if (isTauriRuntime) {
+    localStorage.setItem(key, value);
+    return;
+  }
+  await setSecureSessionValue(key, value);
+}
+
+async function readNativeOAuthRecord(key: string): Promise<string | null> {
+  if (isTauriRuntime) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+  return getSecureSessionValue(key);
+}
+
+async function removeNativeOAuthRecord(key: string): Promise<void> {
+  if (isTauriRuntime) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // best-effort
+    }
+    return;
+  }
+  await removeSecureSessionValue(key).catch(() => {});
+}
+
 export async function beginNativeOAuth(
   provider: OAuthProvider,
   next = "/",
@@ -82,7 +118,7 @@ export async function beginNativeOAuth(
     serverId: getCurrentServerId(),
   };
   const recordKey = oauthRecordKey(state);
-  await setSecureSessionValue(recordKey, JSON.stringify(record));
+  await writeNativeOAuthRecord(recordKey, JSON.stringify(record));
   try {
     const response = await api<{ provider: string; login_url: string }>(
       `/api/auth/oauth/${provider}/start`,
@@ -96,7 +132,7 @@ export async function beginNativeOAuth(
     );
     return response.login_url;
   } catch (error) {
-    await removeSecureSessionValue(recordKey).catch(() => {});
+    await removeNativeOAuthRecord(recordKey);
     throw error;
   }
 }
@@ -124,72 +160,6 @@ export function clearPendingOAuthNext(): void {
     localStorage.removeItem(OAUTH_NEXT_KEY);
   } catch {
     // Ignore storage failures.
-  }
-}
-
-/**
- * The desktop (Tauri) OAuth flow can't do the mobile PKCE dance — it opens
- * the system browser and relays the resulting token back through a local
- * loopback server into the `cratemusic://` deep link. That link has no
- * origin check: any other app or a webpage can invoke the same custom URL
- * scheme with an arbitrary `token`, and prior to this nonce there was
- * nothing distinguishing our own login from an attacker's crafted one
- * (login CSRF / session fixation). We generate this nonce before opening
- * the browser and require it to come back unchanged.
- */
-export function beginDesktopOAuthHandoff(next: string): string {
-  const state = randomBase64Url(32);
-  const record: DesktopOAuthHandoffRecord = {
-    next: next || "/",
-    createdAt: Date.now(),
-    serverId: getCurrentServerId(),
-  };
-  try {
-    localStorage.setItem(
-      DESKTOP_HANDOFF_KEY_PREFIX + state,
-      JSON.stringify(record),
-    );
-  } catch (error) {
-    // A flow that opens the system browser but can never validate its own
-    // callback (no nonce was actually persisted) would silently strand the
-    // user on an external login page — fail before opening the browser at
-    // all, instead of leaving peekDesktopOAuthHandoff to reject it later.
-    const failure = new Error("Could not start the desktop login flow");
-    (failure as { cause?: unknown }).cause = error;
-    throw failure;
-  }
-  return state;
-}
-
-function peekDesktopOAuthHandoff(
-  state: string,
-): DesktopOAuthHandoffRecord | null {
-  try {
-    const raw = localStorage.getItem(DESKTOP_HANDOFF_KEY_PREFIX + state);
-    if (!raw) return null;
-    const record = JSON.parse(raw) as Partial<DesktopOAuthHandoffRecord>;
-    if (
-      typeof record.next !== "string" ||
-      typeof record.createdAt !== "number" ||
-      Date.now() - record.createdAt > OAUTH_RECORD_MAX_AGE_MS
-    ) {
-      return null;
-    }
-    return {
-      next: record.next,
-      createdAt: record.createdAt,
-      serverId: typeof record.serverId === "string" ? record.serverId : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function consumeDesktopOAuthHandoff(state: string): void {
-  try {
-    localStorage.removeItem(DESKTOP_HANDOFF_KEY_PREFIX + state);
-  } catch {
-    // best-effort
   }
 }
 
@@ -224,41 +194,6 @@ export function persistOAuthCallbackPayload(search: string | URLSearchParams): {
   return { handled: true, next };
 }
 
-function consumeDesktopTokenHandoff(params: URLSearchParams): {
-  handled: boolean;
-  next: string;
-} {
-  const state = params.get("state");
-  if (!state) return { handled: false, next: "/" };
-
-  const record = peekDesktopOAuthHandoff(state);
-  if (!record) return { handled: false, next: "/" };
-
-  // The system browser can sit open for minutes; restore the server this
-  // flow was started against so the token lands there, not on whatever
-  // server the user may have switched "current" to in the meantime.
-  if (record.serverId && record.serverId !== getCurrentServerId()) {
-    setCurrentServerId(record.serverId);
-  }
-
-  const result = persistOAuthCallbackPayload(params);
-  if (!result.handled) {
-    // No token in this callback — could be a request the loopback server
-    // only read part of. Leave the nonce in place so a complete retry
-    // within the TTL can still succeed, instead of burning the one-time
-    // nonce on an incomplete attempt.
-    return result;
-  }
-
-  // Only consume the nonce once we've actually accepted a token under
-  // it, so a genuine login can't be replayed a second time.
-  consumeDesktopOAuthHandoff(state);
-  // Trust our own stored destination, not whatever `next` the URL itself
-  // carries, as a second layer of defense.
-  storePendingOAuthNext(record.next);
-  return { handled: true, next: record.next };
-}
-
 export async function consumeOAuthCallbackUrl(
   url: string,
 ): Promise<{ handled: boolean; next: string }> {
@@ -275,10 +210,10 @@ export async function consumeOAuthCallbackUrl(
 
     const code = parsed.searchParams.get("code");
     const state = parsed.searchParams.get("state");
-    const result =
-      code && state
-        ? await exchangeNativeOAuthCallback(code, state)
-        : consumeDesktopTokenHandoff(parsed.searchParams);
+    if (!code || !state) {
+      return { handled: false, next: "/" };
+    }
+    const result = await exchangeNativeOAuthCallback(code, state);
     if (!result.handled) {
       return result;
     }
@@ -298,7 +233,7 @@ async function exchangeNativeOAuthCallback(
 ): Promise<{ handled: boolean; next: string }> {
   const recordKey = oauthRecordKey(state);
   try {
-    const raw = await getSecureSessionValue(recordKey);
+    const raw = await readNativeOAuthRecord(recordKey);
     if (!raw) return { handled: false, next: "/" };
     const record = JSON.parse(raw) as Partial<NativeOAuthRecord>;
     if (
@@ -312,11 +247,18 @@ async function exchangeNativeOAuthCallback(
     // The system browser can sit open for a while; restore the server this
     // flow was started against so the exchanged token lands there, not on
     // whatever server the user may have switched "current" to meanwhile.
-    if (
-      typeof record.serverId === "string" &&
-      record.serverId !== getCurrentServerId()
-    ) {
-      setCurrentServerId(record.serverId);
+    if (typeof record.serverId === "string") {
+      if (!getServers().some((server) => server.id === record.serverId)) {
+        // The server was removed while the flow was in flight — switching
+        // "current" to it would just point at a dangling id, and the token
+        // write below would silently no-op against a server list with no
+        // matching entry. Fail the callback instead of reporting a login
+        // that doesn't actually attach to anything.
+        return { handled: false, next: "/" };
+      }
+      if (record.serverId !== getCurrentServerId()) {
+        setCurrentServerId(record.serverId);
+      }
     }
     const response = await api<NativeOAuthLoginResponse>(
       "/api/auth/native/exchange",
@@ -344,6 +286,6 @@ async function exchangeNativeOAuthCallback(
   } catch {
     return { handled: false, next: "/" };
   } finally {
-    await removeSecureSessionValue(recordKey).catch(() => {});
+    await removeNativeOAuthRecord(recordKey);
   }
 }

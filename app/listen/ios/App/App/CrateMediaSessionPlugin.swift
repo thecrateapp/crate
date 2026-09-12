@@ -88,7 +88,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         } else {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-            loadArtwork(from: artwork, into: info)
+            loadArtwork(from: artwork)
         }
         call.resolve()
     }
@@ -311,7 +311,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    private func loadArtwork(from artworkUrl: String, into baseInfo: [String: Any]) {
+    private func loadArtwork(from artworkUrl: String) {
         guard let url = URL(string: artworkUrl), !artworkUrl.isEmpty else { return }
         if pendingArtworkUrl == artworkUrl {
             // update() fires roughly once per second while playing. Without
@@ -349,7 +349,16 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
                 if self.pendingArtworkUrl == artworkUrl {
                     self.pendingArtworkUrl = nil
                 }
-                var nextInfo = baseInfo
+                // Merge into whatever is *currently* published, not the
+                // info snapshot captured when this download started —
+                // update() fires roughly once per second, so a slow
+                // download completing later would otherwise overwrite a
+                // since-advanced position/playbackRate with stale values.
+                // If nowPlayingInfo is nil, stop() cleared it in the
+                // meantime; don't resurrect stale info over that.
+                guard var nextInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo else {
+                    return
+                }
                 nextInfo[MPMediaItemPropertyArtwork] = mediaArtwork
                 MPNowPlayingInfoCenter.default().nowPlayingInfo = nextInfo
             }

@@ -46,30 +46,31 @@ const nativeAssetIndexLoaders = new Map<
   string,
   Promise<Record<string, OfflineNativeAssetRecord>>
 >();
-const nativeAssetIndexWriteChains = new Map<string, Promise<void>>();
-
-// Downloading several tracks at once (e.g. a whole album) means several
-// cacheNativeTrackAsset() calls race to read-modify-write the same
-// per-profile index. Each one's in-memory read/mutate is safe (JS has no
-// yield points in between), but the disk writes themselves are
-// concurrent — whichever one's write happens to finish last on disk wins,
-// even if it was issued first with an older, less complete snapshot. That
-// silently reverts the index and orphans a just-finished download. Chaining
-// writes per profile keeps them landing on disk in the order they were
-// issued, so the most recently issued (most complete) write always wins.
-function enqueueNativeAssetIndexWrite(
-  profileKey: string,
+// Concurrent writes for the same key (e.g. two cacheNativeTrackAsset()
+// calls racing to read-modify-write the per-profile asset index, or two
+// snapshot saves in quick succession) aren't guaranteed to land on disk in
+// the order they were issued — whichever write happens to finish last
+// wins, even if it was issued first with an older, less complete value.
+// That silently reverts anything a later write already applied. Chaining
+// writes per key keeps them landing on disk in issue order.
+function createKeyedWriteChain(): (
+  key: string,
   write: () => Promise<void>,
-): Promise<void> {
-  const previous =
-    nativeAssetIndexWriteChains.get(profileKey) ?? Promise.resolve();
-  const next = previous.then(write, write);
-  nativeAssetIndexWriteChains.set(
-    profileKey,
-    next.catch(() => undefined),
-  );
-  return next;
+) => Promise<void> {
+  const chains = new Map<string, Promise<void>>();
+  return (key, write) => {
+    const previous = chains.get(key) ?? Promise.resolve();
+    const next = previous.then(write, write);
+    chains.set(
+      key,
+      next.catch(() => undefined),
+    );
+    return next;
+  };
 }
+
+const enqueueNativeAssetIndexWrite = createKeyedWriteChain();
+const enqueueNativeSnapshotWrite = createKeyedWriteChain();
 
 export function getOfflineItemKey(
   kind: OfflineItemKind,
@@ -330,6 +331,34 @@ export async function ensureOfflineNativeAssetIndexLoaded(
   return loader;
 }
 
+// saveOfflineNativeAssetIndex only serializes the *write* of a snapshot the
+// caller already computed — if that snapshot was read long before (e.g.
+// after an intervening Filesystem.deleteFile/downloadFile await), it can
+// still be stale relative to another mutation that landed on disk in the
+// meantime, silently reverting it. This reads the *current* state from
+// inside the very write-chain slot being written, so `mutate` always sees
+// every previously-queued mutation already applied.
+export async function updateOfflineNativeAssetIndex(
+  profileKey: string,
+  mutate: (
+    current: Record<string, OfflineNativeAssetRecord>,
+  ) => Record<string, OfflineNativeAssetRecord>,
+): Promise<void> {
+  if (!isNative) {
+    saveOfflineNativeAssetIndex(
+      profileKey,
+      mutate(loadOfflineNativeAssetIndex(profileKey)),
+    );
+    return;
+  }
+  await enqueueNativeAssetIndexWrite(profileKey, async () => {
+    const current = await ensureOfflineNativeAssetIndexLoaded(profileKey);
+    const next = mutate(current);
+    nativeAssetIndexCache.set(profileKey, next);
+    await writeNativeJsonFile(getOfflineNativeAssetIndexPath(profileKey), next);
+  });
+}
+
 export function loadOfflineNativeAssetIndex(
   profileKey: string,
 ): Record<string, OfflineNativeAssetRecord> {
@@ -396,16 +425,19 @@ export function loadOfflineSnapshot(
 export function saveOfflineSnapshot(
   profileKey: string | null,
   snapshot: OfflineSnapshot,
-): void {
-  if (!profileKey || typeof window === "undefined") return;
+): Promise<void> {
+  if (!profileKey || typeof window === "undefined") return Promise.resolve();
   const normalized = normalizeOfflineSnapshot(snapshot);
   if (isNative) {
     nativeSnapshotCache.set(profileKey, normalized);
-    void writeNativeJsonFile(
-      getOfflineNativeSnapshotPath(profileKey),
-      normalized,
+    // Callers don't have to await this (it's routinely fired from a
+    // debounced coalescing writer), but it must still land on disk in the
+    // order it was issued — otherwise a later, more complete snapshot
+    // write finishing first could get reverted by an earlier one that
+    // just happened to take longer.
+    return enqueueNativeSnapshotWrite(profileKey, () =>
+      writeNativeJsonFile(getOfflineNativeSnapshotPath(profileKey), normalized),
     );
-    return;
   }
   try {
     localStorage.setItem(
@@ -415,6 +447,7 @@ export function saveOfflineSnapshot(
   } catch {
     // ignore persistence failures; cache may still hold usable media
   }
+  return Promise.resolve();
 }
 
 export async function hydrateOfflineProfileState(

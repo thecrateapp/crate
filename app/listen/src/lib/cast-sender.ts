@@ -242,14 +242,19 @@ async function castControl(
           volume: Math.max(0, Math.min(1, payload.volume ?? 1)),
         });
       } else result = await nativeCastPlugin.stop();
-      // "stop" only stops the receiver's current media, it doesn't end
-      // the Cast session — unlike the old `command === "stop" ? false :
-      // result.ok`, a successful stop must not flip this to false, or
-      // the very next play/pause looks like there's no active session
-      // when we're still connected to the device. The authoritative
-      // source is the "sessionChanged" listener (see getNativeCast); this
-      // is just an optimistic same-tick update for the common case.
-      nativeCastSessionActive = result.ok;
+      // A successful command proves the session is still alive — "stop"
+      // only stops the receiver's current media, it doesn't end the Cast
+      // session, and the same logic applies to any command. A *failed*
+      // command does not prove the opposite: a transient pause/seek/
+      // volume rejection isn't a disconnect, so only ever move this flag
+      // toward "active" here. "Inactive" comes exclusively from the
+      // authoritative "sessionChanged" listener (see getNativeCast) or a
+      // fresh getCapabilities() read — otherwise a command that merely
+      // failed would stomp over a more recent, real disconnect signal, or
+      // report "no session" while the device is still fully connected.
+      if (result.ok) {
+        nativeCastSessionActive = true;
+      }
       return result;
     } catch (error) {
       return {

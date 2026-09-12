@@ -17,6 +17,7 @@ import {
   getActiveOfflineProfileKey,
   loadOfflineNativeAssetIndex,
   saveOfflineNativeAssetIndex,
+  updateOfflineNativeAssetIndex,
 } from "./offline-storage";
 import type { OfflineTrackIdentityInput } from "./offline-track-identity";
 
@@ -53,8 +54,7 @@ export async function hasCachedNativeTrackAssets(
     expectations.map(({ path, expectedBytes }) => ({ path, expectedBytes })),
   );
   const found = new Set<string>();
-  const nextAssets = { ...assets };
-  let changed = false;
+  const staleAliases = new Set<string>();
   for (let index = 0; index < expectations.length; index += 1) {
     const expectation = expectations[index];
     const result = results[index];
@@ -63,14 +63,25 @@ export async function hasCachedNativeTrackAssets(
       found.add(expectation.assetKey);
       continue;
     }
-    for (const alias of expectation.aliases) {
-      if (nextAssets[alias]) {
-        delete nextAssets[alias];
-        changed = true;
-      }
-    }
+    for (const alias of expectation.aliases) staleAliases.add(alias);
   }
-  if (changed) await saveOfflineNativeAssetIndex(profileKey, nextAssets);
+  if (staleAliases.size) {
+    // The stat check above can take a while across many tracks — re-read
+    // the index from inside the atomic update instead of reusing the
+    // snapshot captured before it, so a concurrent cache/delete that
+    // landed in the meantime isn't clobbered by this stale-entry prune.
+    await updateOfflineNativeAssetIndex(profileKey, (current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const alias of staleAliases) {
+        if (next[alias]) {
+          delete next[alias];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }
   return found;
 }
 
@@ -269,18 +280,19 @@ export async function cacheNativeTrackAsset(
     downloadTarget.expectedBytes,
   );
 
-  const nextAssets = loadOfflineNativeAssetIndex(profileKey);
-  nextAssets[assetKey] = {
-    assetKey,
-    entityUid: track.entity_uid ?? null,
-    storageId: track.storage_id,
-    path: filePath,
-    uri,
-    playbackUrl: Capacitor.convertFileSrc(uri),
-    byteLength: downloadTarget.expectedBytes || size,
-    updatedAt: track.updated_at ?? null,
-  };
-  await saveOfflineNativeAssetIndex(profileKey, nextAssets);
+  await updateOfflineNativeAssetIndex(profileKey, (current) => ({
+    ...current,
+    [assetKey]: {
+      assetKey,
+      entityUid: track.entity_uid ?? null,
+      storageId: track.storage_id,
+      path: filePath,
+      uri,
+      playbackUrl: Capacitor.convertFileSrc(uri),
+      byteLength: downloadTarget.expectedBytes || size,
+      updatedAt: track.updated_at ?? null,
+    },
+  }));
 }
 
 export async function deleteNativeCachedTrackAsset(
@@ -291,10 +303,8 @@ export async function deleteNativeCachedTrackAsset(
   if (!isNative) return;
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return;
-  const assets = {
-    ...(await ensureOfflineNativeAssetIndexLoaded(profileKey)),
-  };
-  const entry = aliases.map((alias) => assets[alias]).find(Boolean);
+  const currentAssets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
+  const entry = aliases.map((alias) => currentAssets[alias]).find(Boolean);
   if (entry?.path) {
     await Filesystem.deleteFile({
       path: entry.path,
@@ -314,8 +324,15 @@ export async function deleteNativeCachedTrackAsset(
       );
     });
   }
-  for (const alias of aliases) delete assets[alias];
-  await saveOfflineNativeAssetIndex(profileKey, assets);
+  // Deleting the file happens above against a snapshot that may be stale
+  // by now; the index mutation itself reads fresh from inside the atomic
+  // update below, so a concurrent cache/delete for a different track
+  // can't be reverted by this one finishing later.
+  await updateOfflineNativeAssetIndex(profileKey, (current) => {
+    const next = { ...current };
+    for (const alias of aliases) delete next[alias];
+    return next;
+  });
 }
 
 export async function clearNativeOfflineAssets(

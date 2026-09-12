@@ -68,7 +68,6 @@ vi.mock("@/lib/server-store", () => ({
 }));
 
 import {
-  beginDesktopOAuthHandoff,
   beginNativeOAuth,
   consumeOAuthCallbackUrl,
   consumePendingOAuthNext,
@@ -87,18 +86,6 @@ describe("capacitor OAuth callback helpers", () => {
     waitForPendingSecureSessionWrites.mockResolvedValue(undefined);
   });
 
-  it("stores token and pending next for native OAuth callbacks", async () => {
-    const state = beginDesktopOAuthHandoff("/mixes");
-    const result = await consumeOAuthCallbackUrl(
-      `cratemusic://oauth/callback?token=abc123&state=${state}&next=%2Funtrusted`,
-    );
-
-    expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, undefined);
-    expect(consumePendingOAuthNext()).toBe("/mixes");
-    expect(consumePendingOAuthNext()).toBeNull();
-  });
-
   it("rejects desktop token callbacks without an expected state", async () => {
     const result = await consumeOAuthCallbackUrl(
       "cratemusic://oauth/callback?token=abc123&next=%2Fmixes",
@@ -115,20 +102,6 @@ describe("capacitor OAuth callback helpers", () => {
 
     expect(result).toEqual({ handled: false, next: "/" });
     expect(setAuthTokens).not.toHaveBeenCalled();
-  });
-
-  it("stores refresh token when the native callback includes one", async () => {
-    const state = beginDesktopOAuthHandoff("/mixes");
-    const result = await consumeOAuthCallbackUrl(
-      `cratemusic://oauth/callback?token=abc123&refresh_token=refresh456&state=${state}&next=%2Funtrusted`,
-    );
-
-    expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith(
-      "abc123",
-      "refresh456",
-      undefined,
-    );
   });
 
   it("ignores unrelated URLs", async () => {

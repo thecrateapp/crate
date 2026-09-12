@@ -136,7 +136,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   }, [profileKey]);
 
   const commitSnapshot = useCallback(
-    (next: OfflineSnapshot, flush = false) => {
+    (next: OfflineSnapshot, flush = false): void | Promise<void> => {
       if (activeProfileRef.current !== profileKey) return;
       snapshotRef.current = next;
       setSnapshot(next);
@@ -144,13 +144,16 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         persistenceRef.current?.writer.dispose();
         persistenceRef.current = {
           profileKey,
-          writer: createCoalescedOfflineWriter((snapshotToPersist) => {
-            saveOfflineSnapshot(profileKey, snapshotToPersist);
-          }),
+          writer: createCoalescedOfflineWriter((snapshotToPersist) =>
+            saveOfflineSnapshot(profileKey, snapshotToPersist),
+          ),
         };
       }
       persistenceRef.current.writer.schedule(next);
-      if (flush) persistenceRef.current.writer.flush();
+      // Callers that pass flush=true (profile teardown, clearing all
+      // offline content) can await the returned promise to know the write
+      // actually landed on disk, instead of it being fire-and-forget.
+      if (flush) return persistenceRef.current.writer.flush();
     },
     [profileKey],
   );
@@ -327,7 +330,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
 
   const clearActiveProfile = useCallback(async () => {
     if (!profileKey || !supported) return;
-    commitSnapshot(EMPTY_SNAPSHOT, true);
+    await commitSnapshot(EMPTY_SNAPSHOT, true);
     await clearOfflineAssets(profileKey);
   }, [commitSnapshot, profileKey, supported]);
 

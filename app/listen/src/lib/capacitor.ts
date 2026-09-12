@@ -1,5 +1,4 @@
 export {
-  beginDesktopOAuthHandoff,
   beginNativeOAuth,
   clearPendingOAuthNext,
   consumeOAuthCallbackUrl,
