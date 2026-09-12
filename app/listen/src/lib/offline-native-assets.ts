@@ -21,6 +21,20 @@ import {
 import type { OfflineTrackIdentityInput } from "./offline-track-identity";
 
 const ANDROID_OFFLINE_DELIVERY_POLICY = "balanced";
+const FILESYSTEM_NOT_FOUND_CODE = "OS-PLUG-FILE-0008";
+
+function isMissingNativeFileError(error: unknown): boolean {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === FILESYSTEM_NOT_FOUND_CODE
+  ) {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:does not exist|file not found)/i.test(message);
+}
 
 export async function hasCachedNativeTrackAssets(
   profileKey: string,
@@ -305,23 +319,22 @@ export async function deleteNativeCachedTrackAsset(
   const currentAssets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
   const entry = aliases.map((alias) => currentAssets[alias]).find(Boolean);
   if (entry?.path) {
-    await Filesystem.deleteFile({
-      path: entry.path,
-      directory: Directory.Data,
-    }).catch((error) => {
-      // We still clear the index entry below even on failure — the
-      // common case is the file is already gone, and refusing to drop
-      // stale metadata over that would be worse. But a failure for any
-      // other reason (permission error, file briefly locked) now leaves
-      // an orphaned, untracked file with no self-heal path, so at least
-      // make that observable instead of fully silent.
-      recordDevLog(
-        "offline",
-        "failed to delete cached track asset",
-        { path: entry.path, error: String(error) },
-        "warn",
-      );
-    });
+    try {
+      await Filesystem.deleteFile({
+        path: entry.path,
+        directory: Directory.Data,
+      });
+    } catch (error) {
+      if (!isMissingNativeFileError(error)) {
+        recordDevLog(
+          "offline",
+          "failed to delete cached track asset",
+          { path: entry.path, error: String(error) },
+          "warn",
+        );
+        throw error;
+      }
+    }
   }
   // Deleting the file happens above against a snapshot that may be stale
   // by now; the index mutation itself reads fresh from inside the atomic
@@ -338,26 +351,35 @@ export async function clearNativeOfflineAssets(
   profileKey: string,
 ): Promise<void> {
   if (!isNative) return;
+  const failures: unknown[] = [];
   await updateOfflineNativeAssetIndex(profileKey, async (assets) => {
+    const remaining = { ...assets };
     await Promise.all(
-      Object.values(assets).map((asset) =>
-        Filesystem.deleteFile({
-          path: asset.path,
-          directory: Directory.Data,
-        }).catch((error) => {
-          // See deleteNativeCachedTrackAsset — still clearing the whole
-          // index below, just no longer silently.
+      Object.entries(assets).map(async ([assetKey, asset]) => {
+        try {
+          await Filesystem.deleteFile({
+            path: asset.path,
+            directory: Directory.Data,
+          });
+          delete remaining[assetKey];
+        } catch (error) {
+          if (isMissingNativeFileError(error)) {
+            delete remaining[assetKey];
+            return;
+          }
+          failures.push(error);
           recordDevLog(
             "offline",
             "failed to delete cached asset during clear-all",
             { path: asset.path, error: String(error) },
             "warn",
           );
-        }),
-      ),
+        }
+      }),
     );
-    return {};
+    return remaining;
   });
+  if (failures.length) throw failures[0];
 }
 
 export function getNativeOfflinePlaybackUrl(
