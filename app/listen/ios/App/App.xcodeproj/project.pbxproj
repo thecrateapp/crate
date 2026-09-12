@@ -26,6 +26,7 @@
 		C0DEF0010000000000000016 /* CrateSecureSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */; };
 		C0DEF0010000000000000018 /* OfflineAssetIntegrity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000019 /* OfflineAssetIntegrity.swift */; };
 		C0DEF0010000000000000020 /* MediaSessionInterruptionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000021 /* MediaSessionInterruptionState.swift */; };
+		C0DEF0010000000000000022 /* MediaSessionArtworkState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000023 /* MediaSessionArtworkState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +54,7 @@
 		C0DEF0010000000000000017 /* CrateSecureSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateSecureSessionStore.swift; sourceTree = "<group>"; };
 		C0DEF0010000000000000019 /* OfflineAssetIntegrity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAssetIntegrity.swift; sourceTree = "<group>"; };
 		C0DEF0010000000000000021 /* MediaSessionInterruptionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSessionInterruptionState.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000023 /* MediaSessionArtworkState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaSessionArtworkState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +97,7 @@
 				C0DEF0010000000000000002 /* BridgeViewController.swift */,
 				C0DEF0010000000000000004 /* CrateMediaSessionPlugin.swift */,
 				C0DEF0010000000000000021 /* MediaSessionInterruptionState.swift */,
+				C0DEF0010000000000000023 /* MediaSessionArtworkState.swift */,
 				C0DEF0010000000000000007 /* CrateCastPlugin.swift */,
 				C0DEF0010000000000000009 /* CrateSocialSharePlugin.swift */,
 				C0DEF0010000000000000011 /* CrateSecureSessionPlugin.swift */,
@@ -282,6 +285,7 @@
 				C0DEF0010000000000000014 /* ArtworkDownsampler.swift in Sources */,
 				C0DEF0010000000000000016 /* CrateSecureSessionStore.swift in Sources */,
 				C0DEF0010000000000000020 /* MediaSessionInterruptionState.swift in Sources */,
+				C0DEF0010000000000000022 /* MediaSessionArtworkState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

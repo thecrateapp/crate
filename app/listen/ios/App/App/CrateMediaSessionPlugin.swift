@@ -18,10 +18,9 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private var remoteCommandTokens: [(MPRemoteCommand, Any)] = []
-    private var artworkRequestId = 0
+    private var artworkState = CrateMediaSessionArtworkState()
     private var cachedArtworkUrl: String?
     private var cachedArtwork: MPMediaItemArtwork?
-    private var pendingArtworkUrl: String?
     private var routePickerOverlay: UIView?
     private var routePickerDismissWorkItem: DispatchWorkItem?
     private var lastKnownIsPlaying = false
@@ -84,6 +83,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             // update() is called roughly once per second while playing —
             // without this, we were re-downloading and re-decoding the same
             // album art over and over for the whole length of a track.
+            artworkState.cancelPendingRequest()
             info[MPMediaItemPropertyArtwork] = cachedArtwork
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         } else {
@@ -175,8 +175,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stop(_ call: CAPPluginCall) {
-        artworkRequestId += 1
-        pendingArtworkUrl = nil
+        artworkState.stop()
         lastKnownIsPlaying = false
         interruptionState.stop()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
@@ -314,43 +313,19 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func loadArtwork(from artworkUrl: String) {
-        guard let url = URL(string: artworkUrl), !artworkUrl.isEmpty else { return }
-        if pendingArtworkUrl == artworkUrl {
-            // update() fires roughly once per second while playing. Without
-            // this guard, an artwork download/decode that takes longer than
-            // that would get a brand new request issued on every tick,
-            // which bumps artworkRequestId and invalidates the previous
-            // attempt before it can ever finish — the artwork never loads.
-            return
-        }
-        pendingArtworkUrl = artworkUrl
-        artworkRequestId += 1
-        let currentRequestId = artworkRequestId
+        guard let request = artworkState.beginRequest(for: artworkUrl) else { return }
 
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+        URLSession.shared.dataTask(with: request.url) { [weak self] data, _, _ in
             guard let self else { return }
-            guard
-                currentRequestId == self.artworkRequestId,
-                let data,
-                let decodedArtwork = CrateArtworkDownsampler.decode(data: data)
-            else {
-                DispatchQueue.main.async {
-                    if self.pendingArtworkUrl == artworkUrl {
-                        self.pendingArtworkUrl = nil
-                    }
-                }
-                return
+            let decodedArtwork = data.flatMap {
+                CrateArtworkDownsampler.decode(data: $0)
             }
-
-            let image = UIImage(cgImage: decodedArtwork)
-            let mediaArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
             DispatchQueue.main.async {
-                guard currentRequestId == self.artworkRequestId else { return }
+                guard self.artworkState.complete(request), let decodedArtwork else { return }
+                let image = UIImage(cgImage: decodedArtwork)
+                let mediaArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                 self.cachedArtworkUrl = artworkUrl
                 self.cachedArtwork = mediaArtwork
-                if self.pendingArtworkUrl == artworkUrl {
-                    self.pendingArtworkUrl = nil
-                }
                 // Merge into whatever is *currently* published, not the
                 // info snapshot captured when this download started —
                 // update() fires roughly once per second, so a slow

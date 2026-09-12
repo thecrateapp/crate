@@ -294,15 +294,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 ) {
                     if (
                         resumeAuthorizationPending &&
-                        (
-                            playerCommand == Player.COMMAND_PLAY_PAUSE ||
-                            playerCommand == Player.COMMAND_PREPARE ||
-                            playerCommand == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM ||
-                            playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
-                            playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
-                            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||
-                            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
-                        )
+                        isCommandBlockedDuringResumeAuthorization(playerCommand)
                     ) {
                         // Only an explicit play/pause press means the user
                         // is asking for playback to start — a bare seek or
@@ -329,6 +321,18 @@ public class CrateNativePlaybackService extends MediaSessionService {
             requestNotificationUpdate();
         }
         syncPositionTicker();
+    }
+
+    static boolean isCommandBlockedDuringResumeAuthorization(int playerCommand) {
+        return playerCommand == Player.COMMAND_PLAY_PAUSE ||
+            playerCommand == Player.COMMAND_PREPARE ||
+            playerCommand == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM ||
+            playerCommand == Player.COMMAND_SEEK_TO_DEFAULT_POSITION ||
+            playerCommand == Player.COMMAND_SEEK_TO_MEDIA_ITEM ||
+            playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
+            playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
+            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||
+            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM;
     }
 
     private void createNotificationChannel() {

@@ -3,7 +3,9 @@ package app.cratemusic.crate;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
+import androidx.media3.common.Player;
 import org.junit.Test;
 
 public class NativePlaybackContractTest {
@@ -33,5 +35,19 @@ public class NativePlaybackContractTest {
 
         assertFalse(redacted.contains("long-secret"));
         assertFalse(redacted.contains("short-secret"));
+    }
+
+    @Test
+    public void resumeAuthorizationBlocksEveryExternalSeekCommand() {
+        assertTrue(
+            CrateNativePlaybackService.isCommandBlockedDuringResumeAuthorization(
+                Player.COMMAND_SEEK_TO_DEFAULT_POSITION
+            )
+        );
+        assertTrue(
+            CrateNativePlaybackService.isCommandBlockedDuringResumeAuthorization(
+                Player.COMMAND_SEEK_TO_MEDIA_ITEM
+            )
+        );
     }
 }
