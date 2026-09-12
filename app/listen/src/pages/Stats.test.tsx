@@ -1,5 +1,5 @@
-import { screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -21,6 +21,59 @@ describe("Stats page", () => {
       error: null,
       refetch: vi.fn(),
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("refreshes the extracted stats controller while a snapshot is pending", () => {
+    vi.useFakeTimers();
+    const refetch = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: {
+        window: "30d",
+        overview: {
+          window: "30d",
+          play_count: 0,
+          complete_play_count: 0,
+          skip_count: 0,
+          minutes_listened: 0,
+          active_days: 0,
+          skip_rate: 0,
+          top_artist: null,
+        },
+        trends: { window: "30d", points: [] },
+        top_tracks: { window: "30d", items: [] },
+        top_artists: { window: "30d", items: [] },
+        top_albums: { window: "30d", items: [] },
+        top_genres: { window: "30d", items: [] },
+        replay: {
+          window: "30d",
+          title: "Replay",
+          subtitle: "Pending",
+          track_count: 0,
+          minutes_listened: 0,
+          items: [],
+        },
+        snapshot: { pending: true },
+      },
+      loading: false,
+      error: null,
+      refetch,
+    });
+
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it("localizes the main stats chrome", () => {

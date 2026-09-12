@@ -14,6 +14,7 @@ import {
 } from "@/components/stats/stats-model";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
+import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
   buildSoundProfile,
   formatMonthTitle,
@@ -159,8 +160,16 @@ export function useStatsPageController(): StatsPageController {
   );
   const { play, playAll } = usePlayerActions();
   const statsEndpoint = buildStatsEndpoint(isGlobalStats, username);
-  const { data: dashboard, loading: dashboardLoading } = useApi<StatsDashboard>(
+  const {
+    data: dashboard,
+    loading: dashboardLoading,
+    refetch: refetchDashboard,
+  } = useApi<StatsDashboard>(
     `${statsEndpoint}?${statsPeriodQuery}&tracks_limit=12&artists_limit=10&albums_limit=12&genres_limit=10&replay_limit=36`,
+  );
+  usePendingStatsSnapshotRefresh(
+    dashboard?.snapshot?.pending === true,
+    refetchDashboard,
   );
   const overview = dashboard?.overview;
   const trends = dashboard?.trends;

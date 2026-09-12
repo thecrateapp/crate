@@ -35,7 +35,6 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
     topDiscovery,
     topMover,
   } = page;
-
   return (
     <div className="relative -mx-4 -mt-2 overflow-hidden px-4 pb-12 pt-3 sm:-mx-6 sm:px-6">
       <div className="stats-page-atmosphere pointer-events-none absolute inset-0 -z-10" />
