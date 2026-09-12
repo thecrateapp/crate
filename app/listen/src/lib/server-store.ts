@@ -30,7 +30,7 @@ import { isCapacitorRuntime, usesConfigurableServer } from "@/lib/platform";
 
 export { waitForPendingSecureSessionWrites } from "@/lib/server-store-secrets";
 
-const SERVERS_KEY = "crate-servers:v1";
+const SERVERS_KEY = "crate-servers";
 const CURRENT_KEY = "crate-current-server";
 const LEGACY_TOKEN_KEY = "crate-auth-token";
 const ALLOW_INSECURE_LOOPBACK =
