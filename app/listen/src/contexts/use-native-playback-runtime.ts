@@ -88,26 +88,30 @@ export function useNativePlaybackRuntime({
     repeatRef,
   });
 
-  const { applyNativePosition, applyNativeState, applyNativeTrackChange } =
-    useNativePlaybackReconciliation({
-      clearNativeBufferingRecovery,
-      clearNativeBufferingWatchdog,
-      commitCurrentIndex,
-      commitCurrentTime,
-      commitDuration,
-      commitIsBuffering,
-      commitIsPlaying,
-      currentIndexRef,
-      currentTrackRef,
-      ensureTrackerSession,
-      playSourceRef,
-      queueRef,
-      recordProgress,
-      rememberActiveTrack,
-      repeatRef,
-      rotateTrackerSession,
-      scheduleNativeBufferingWatchdog,
-    });
+  const {
+    applyNativePosition,
+    applyNativeState,
+    applyNativeTrackChange,
+    isNativeEventStale,
+  } = useNativePlaybackReconciliation({
+    clearNativeBufferingRecovery,
+    clearNativeBufferingWatchdog,
+    commitCurrentIndex,
+    commitCurrentTime,
+    commitDuration,
+    commitIsBuffering,
+    commitIsPlaying,
+    currentIndexRef,
+    currentTrackRef,
+    ensureTrackerSession,
+    playSourceRef,
+    queueRef,
+    recordProgress,
+    rememberActiveTrack,
+    repeatRef,
+    rotateTrackerSession,
+    scheduleNativeBufferingWatchdog,
+  });
 
   useNativePlaybackEventBridge({
     applyNativePosition,
@@ -120,6 +124,7 @@ export function useNativePlaybackRuntime({
     commitIsPlaying,
     currentIndexRef,
     flushCurrentPlayEvent,
+    isNativeEventStale,
     queueRef,
     recoverNativeBuffering,
     retryNativePlaybackAfterAuthError,

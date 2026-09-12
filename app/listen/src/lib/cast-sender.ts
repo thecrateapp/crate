@@ -36,6 +36,22 @@ let webCastReady: Promise<boolean> | null = null;
 let webCastInitialized = false;
 let nativeCast: NativeCastPlugin | null = null;
 let nativeCastSessionActive = false;
+let nativeCastSessionGeneration = 0;
+
+function setAuthoritativeNativeCastSession(active: boolean): void {
+  nativeCastSessionGeneration += 1;
+  nativeCastSessionActive = active;
+}
+
+function applyNativeCastSuccess(
+  result: CastStartResult,
+  startedAtGeneration: number,
+): void {
+  if (result.ok && nativeCastSessionGeneration === startedAtGeneration) {
+    nativeCastSessionGeneration += 1;
+    nativeCastSessionActive = true;
+  }
+}
 
 function getNativeCast(): NativeCastPlugin {
   if (!nativeCast) {
@@ -46,7 +62,7 @@ function getNativeCast(): NativeCastPlugin {
     // a command *we* issued, so the first play/pause after an external
     // disconnect silently no-op'd against a session that no longer exists.
     void nativeCast.addListener("sessionChanged", (event) => {
-      nativeCastSessionActive = event.active;
+      setAuthoritativeNativeCastSession(event.active);
     });
   }
   return nativeCast;
@@ -168,13 +184,16 @@ function resolveWebCastMediaCommand(
 }
 
 async function getNativeCastCapabilities(): Promise<CastSenderCapabilities> {
+  const startedAtGeneration = nativeCastSessionGeneration;
   try {
     const capabilities = await getNativeCast().getCapabilities();
     // This is the freshest read of the native session state we ever get —
     // sync our local flag from it, since a session can end natively
     // (receiver disconnect before the plugin is registered/listening,
     // app restart, etc.) without a `sessionChanged` event ever reaching us.
-    nativeCastSessionActive = Boolean(capabilities.activeSession);
+    if (nativeCastSessionGeneration === startedAtGeneration) {
+      setAuthoritativeNativeCastSession(Boolean(capabilities.activeSession));
+    }
     return {
       platform: "native",
       visible: capabilities.visible,
@@ -231,6 +250,7 @@ async function castControl(
     try {
       let result: CastStartResult;
       const nativeCastPlugin = getNativeCast();
+      const startedAtGeneration = nativeCastSessionGeneration;
       if (command === "play") result = await nativeCastPlugin.play();
       else if (command === "pause") result = await nativeCastPlugin.pause();
       else if (command === "seek") {
@@ -252,9 +272,7 @@ async function castControl(
       // fresh getCapabilities() read — otherwise a command that merely
       // failed would stomp over a more recent, real disconnect signal, or
       // report "no session" while the device is still fully connected.
-      if (result.ok) {
-        nativeCastSessionActive = true;
-      }
+      applyNativeCastSuccess(result, startedAtGeneration);
       return result;
     } catch (error) {
       return {
@@ -355,10 +373,11 @@ export async function startCastSession(
     const media = await resolveCastMedia(ticket);
 
     if (isNative) {
+      const startedAtGeneration = nativeCastSessionGeneration;
       const result = await getNativeCast().requestSession(
         buildNativePayload(ticket, media, payload),
       );
-      nativeCastSessionActive = result.ok;
+      applyNativeCastSuccess(result, startedAtGeneration);
       return result;
     }
 

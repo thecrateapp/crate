@@ -37,4 +37,33 @@ describe("subscribeNativePlayerEvents", () => {
       expect(remove).toHaveBeenCalledTimes(1);
     }
   });
+
+  it("rolls back every attached listener when one registration fails", async () => {
+    const removers = NATIVE_PLAYER_EVENT_NAMES.map(() => vi.fn());
+    const engine = {
+      on: vi.fn((event: string) => {
+        const index = NATIVE_PLAYER_EVENT_NAMES.indexOf(
+          event as (typeof NATIVE_PLAYER_EVENT_NAMES)[number],
+        );
+        if (event === "bufferingChanged") {
+          return Promise.reject(new Error("native listener unavailable"));
+        }
+        return Promise.resolve(removers[index]!);
+      }),
+    } as unknown as Pick<PlaybackEngine, "on">;
+    const handlers = Object.fromEntries(
+      NATIVE_PLAYER_EVENT_NAMES.map((event) => [event, vi.fn()]),
+    ) as unknown as NativePlayerEventHandlers;
+
+    const subscription = subscribeNativePlayerEvents(engine, handlers);
+
+    await expect(subscription.ready).rejects.toThrow(
+      "native listener unavailable",
+    );
+    expect(engine.on).toHaveBeenCalledTimes(NATIVE_PLAYER_EVENT_NAMES.length);
+    for (const [index, remove] of removers.entries()) {
+      if (NATIVE_PLAYER_EVENT_NAMES[index] === "bufferingChanged") continue;
+      expect(remove).toHaveBeenCalledTimes(1);
+    }
+  });
 });

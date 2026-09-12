@@ -79,6 +79,7 @@ export interface EngineTransitionEvent {
 
 export interface EngineErrorEvent {
   revision: string;
+  nativeTimeMs?: number;
   code?: number;
   message: string;
   trackId?: string;
@@ -98,11 +99,20 @@ export interface EngineEventMap {
   transitionStarted: EngineTransitionEvent;
   transitionProgress: EngineTransitionEvent;
   transitionEnded: EngineTransitionEvent;
-  bufferingChanged: { revision: string; isBuffering: boolean };
-  queueEnded: { revision: string };
-  nearQueueEnd: { revision: string; remainingTracks: number };
+  bufferingChanged: {
+    revision: string;
+    nativeTimeMs?: number;
+    isBuffering: boolean;
+  };
+  queueEnded: { revision: string; nativeTimeMs?: number };
+  nearQueueEnd: {
+    revision: string;
+    nativeTimeMs?: number;
+    remainingTracks: number;
+  };
   resumeAuthorizationRequired: {
     revision: string;
+    nativeTimeMs?: number;
     index: number;
     positionMs: number;
     playWhenReady: boolean;

@@ -42,6 +42,7 @@ const {
   getSecureSessionValue,
   removeSecureSessionValue,
   setAuthTokens,
+  setAuthTokensForServer,
   setSecureSessionValue,
   waitForPendingSecureSessionWrites,
 } = vi.hoisted(() => ({
@@ -49,12 +50,15 @@ const {
   getSecureSessionValue: vi.fn(),
   removeSecureSessionValue: vi.fn(),
   setAuthTokens: vi.fn(),
+  setAuthTokensForServer: vi.fn(() => true),
   setSecureSessionValue: vi.fn(),
   waitForPendingSecureSessionWrites: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({
   api: apiMock,
+  apiForServer: apiMock,
   setAuthTokens,
+  setAuthTokensForServer,
 }));
 vi.mock("@/lib/native-secure-session", () => ({
   getSecureSessionValue,
@@ -63,7 +67,8 @@ vi.mock("@/lib/native-secure-session", () => ({
 }));
 vi.mock("@/lib/server-store", () => ({
   waitForPendingSecureSessionWrites,
-  getCurrentServerId: () => null,
+  getCurrentServerId: () => "server-a",
+  getServers: () => [{ id: "server-a" }],
   setCurrentServerId: () => {},
 }));
 
@@ -81,6 +86,7 @@ describe("capacitor OAuth callback helpers", () => {
     getSecureSessionValue.mockReset();
     removeSecureSessionValue.mockReset();
     setAuthTokens.mockReset();
+    setAuthTokensForServer.mockReset().mockReturnValue(true);
     setSecureSessionValue.mockReset();
     waitForPendingSecureSessionWrites.mockReset();
     waitForPendingSecureSessionWrites.mockResolvedValue(undefined);
@@ -123,6 +129,7 @@ describe("capacitor OAuth callback helpers", () => {
 
     expect(result).toBe("https://accounts.example/authorize");
     expect(apiMock).toHaveBeenCalledWith(
+      "server-a",
       "/api/auth/oauth/google/start",
       "POST",
       expect.objectContaining({
@@ -143,6 +150,7 @@ describe("capacitor OAuth callback helpers", () => {
         verifier: "v".repeat(43),
         next: "/stats",
         createdAt: Date.now(),
+        serverId: "server-a",
       }),
     );
     apiMock.mockResolvedValue({
@@ -159,12 +167,18 @@ describe("capacitor OAuth callback helpers", () => {
     );
 
     expect(result).toEqual({ handled: true, next: "/stats" });
-    expect(apiMock).toHaveBeenCalledWith("/api/auth/native/exchange", "POST", {
-      code: "one-time-code-token",
-      code_verifier: "v".repeat(43),
-      state: "s".repeat(43),
-    });
-    expect(setAuthTokens).toHaveBeenCalledWith(
+    expect(apiMock).toHaveBeenCalledWith(
+      "server-a",
+      "/api/auth/native/exchange",
+      "POST",
+      {
+        code: "one-time-code-token",
+        code_verifier: "v".repeat(43),
+        state: "s".repeat(43),
+      },
+    );
+    expect(setAuthTokensForServer).toHaveBeenCalledWith(
+      "server-a",
       "access-token",
       "refresh-token",
       "2030-01-01T00:00:00Z",
@@ -181,6 +195,7 @@ describe("capacitor OAuth callback helpers", () => {
         verifier: "v".repeat(43),
         next: "/",
         createdAt: Date.now(),
+        serverId: "server-a",
       }),
     );
     apiMock.mockRejectedValue(new Error("exchange failed"));
@@ -204,6 +219,7 @@ describe("capacitor OAuth callback helpers", () => {
         verifier: "v".repeat(43),
         next: "/stats",
         createdAt: Date.now(),
+        serverId: "server-a",
       }),
     );
     apiMock.mockResolvedValue({
@@ -222,7 +238,12 @@ describe("capacitor OAuth callback helpers", () => {
     );
 
     expect(result).toEqual({ handled: false, next: "/" });
-    expect(setAuthTokens).toHaveBeenLastCalledWith(null, null, null);
+    expect(setAuthTokensForServer).toHaveBeenLastCalledWith(
+      "server-a",
+      null,
+      null,
+      null,
+    );
   });
 
   it("parses token and next from plain search params too", () => {

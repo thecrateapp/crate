@@ -33,31 +33,36 @@ export function subscribeNativePlayerEvents(
   let disposed = false;
   const removers = new Set<() => void>();
 
-  const add = async <K extends NativePlayerEventName>(
+  const register = <K extends NativePlayerEventName>(
     event: K,
     listener: EngineEventListener<K>,
-  ) => {
-    const remove = await engine.on(event, listener);
-    if (disposed) {
-      remove();
-      return;
-    }
-    removers.add(remove);
-  };
+  ) => engine.on(event, listener);
 
   const ready = (async () => {
-    await add("positionChanged", handlers.positionChanged);
-    await add("playEventCheckpoint", handlers.playEventCheckpoint);
-    await add("stateChanged", handlers.stateChanged);
-    await add("trackChanged", handlers.trackChanged);
-    await add("bufferingChanged", handlers.bufferingChanged);
-    await add("nearQueueEnd", handlers.nearQueueEnd);
-    await add("queueEnded", handlers.queueEnded);
-    await add(
-      "resumeAuthorizationRequired",
-      handlers.resumeAuthorizationRequired,
+    const results = await Promise.allSettled([
+      register("positionChanged", handlers.positionChanged),
+      register("playEventCheckpoint", handlers.playEventCheckpoint),
+      register("stateChanged", handlers.stateChanged),
+      register("trackChanged", handlers.trackChanged),
+      register("bufferingChanged", handlers.bufferingChanged),
+      register("nearQueueEnd", handlers.nearQueueEnd),
+      register("queueEnded", handlers.queueEnded),
+      register(
+        "resumeAuthorizationRequired",
+        handlers.resumeAuthorizationRequired,
+      ),
+      register("error", handlers.error),
+    ]);
+    const attached = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
     );
-    await add("error", handlers.error);
+    const failed = results.find((result) => result.status === "rejected");
+    if (disposed || failed) {
+      for (const remove of attached) remove();
+      if (failed?.status === "rejected") throw failed.reason;
+      return;
+    }
+    for (const remove of attached) removers.add(remove);
   })();
 
   const dispose = () => {

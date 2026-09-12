@@ -5,6 +5,7 @@ const {
   runtimeMock,
   nativeCapabilitiesMock,
   nativeControlMock,
+  nativeRequestSessionMock,
   nativeListenerMock,
   sessionChangedListeners,
 } = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const {
   runtimeMock: { isNative: false },
   nativeCapabilitiesMock: vi.fn(),
   nativeControlMock: vi.fn(),
+  nativeRequestSessionMock: vi.fn(),
   nativeListenerMock: vi.fn(),
   sessionChangedListeners: [] as Array<(event: { active: boolean }) => void>,
 }));
@@ -22,6 +24,7 @@ vi.mock("@capacitor/core", () => ({
     play: nativeControlMock,
     pause: nativeControlMock,
     stop: nativeControlMock,
+    requestSession: nativeRequestSessionMock,
     addListener: nativeListenerMock.mockImplementation(
       (_event: string, listener: (event: { active: boolean }) => void) => {
         sessionChangedListeners.push(listener);
@@ -282,5 +285,70 @@ describe("cast sender", () => {
       message: "Cast command was rejected by the receiver.",
     });
     expect(isCastSessionActive()).toBe(true);
+  });
+
+  it("does not let a late command success resurrect a disconnected session", async () => {
+    runtimeMock.isNative = true;
+    let resolveCommand: ((result: { ok: boolean }) => void) | undefined;
+    nativeControlMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCommand = resolve;
+      }),
+    );
+
+    const command = castPlay();
+    await vi.waitFor(() => expect(nativeControlMock).toHaveBeenCalled());
+    sessionChangedListeners.forEach((listener) => listener({ active: false }));
+    resolveCommand!({ ok: true });
+
+    await expect(command).resolves.toEqual({ ok: true });
+    expect(isCastSessionActive()).toBe(false);
+  });
+
+  it("does not let a late session request resurrect a disconnected session", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+    });
+    apiMock.mockResolvedValue({
+      stream_url: "https://stream.example/track",
+      metadata_url: "https://stream.example/metadata",
+      expires_at: "2030-01-01T00:00:00Z",
+      delivery_policy: "direct",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          stream_url: "https://stream.example/track",
+          title: "Track",
+          artist: "Artist",
+        }),
+        { status: 200 },
+      ),
+    );
+    let resolveSession: ((result: { ok: boolean }) => void) | undefined;
+    nativeRequestSessionMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+
+    const request = startCastSession({
+      track: {
+        id: "track-1",
+        libraryTrackId: 1,
+        title: "Track",
+        artist: "Artist",
+      },
+    });
+    await vi.waitFor(() => expect(nativeRequestSessionMock).toHaveBeenCalled());
+    sessionChangedListeners.forEach((listener) => listener({ active: false }));
+    resolveSession!({ ok: true });
+
+    await expect(request).resolves.toEqual({ ok: true });
+    expect(isCastSessionActive()).toBe(false);
   });
 });

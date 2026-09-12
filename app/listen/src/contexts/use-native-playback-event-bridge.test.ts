@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { recoverNativeResumeAuthorizationWithRetry } from "@/contexts/use-native-playback-event-bridge";
+import {
+  recoverNativeResumeAuthorizationWithRetry,
+  shouldHandleNativeSideEffectEvent,
+} from "@/contexts/use-native-playback-event-bridge";
 
 describe("recoverNativeResumeAuthorizationWithRetry", () => {
   it("retries when the queue hasn't been rehydrated yet on a cold start", async () => {
@@ -54,5 +57,25 @@ describe("recoverNativeResumeAuthorizationWithRetry", () => {
       expect.objectContaining({ autoplay: false }),
     );
     vi.useRealTimers();
+  });
+});
+
+describe("shouldHandleNativeSideEffectEvent", () => {
+  it("drops an obsolete queue-ending event before it can mutate playback", () => {
+    const isNativeEventStale = vi.fn(() => true);
+
+    expect(
+      shouldHandleNativeSideEffectEvent(
+        { nativeTimeMs: 100 },
+        isNativeEventStale,
+      ),
+    ).toBe(false);
+    expect(isNativeEventStale).toHaveBeenCalledWith(100);
+  });
+
+  it("accepts a current native side-effect event", () => {
+    expect(
+      shouldHandleNativeSideEffectEvent({ nativeTimeMs: 200 }, () => false),
+    ).toBe(true);
   });
 });

@@ -120,10 +120,15 @@ export function useNativePlaybackReconciliation({
   scheduleNativeBufferingWatchdog,
 }: UseNativePlaybackReconciliationParams) {
   const nativeEventWatermarkRef = useRef(0);
+  const isNativeEventStale = useCallback(
+    (nativeTimeMs: number | null | undefined) =>
+      isStaleNativeEvent(nativeTimeMs, nativeEventWatermarkRef),
+    [],
+  );
 
   const applyNativePosition = useCallback(
     (event: EnginePositionEvent) => {
-      if (isStaleNativeEvent(event.nativeTimeMs, nativeEventWatermarkRef)) {
+      if (isNativeEventStale(event.nativeTimeMs)) {
         return;
       }
       const positionSeconds = projectedNativePositionSeconds(
@@ -152,6 +157,7 @@ export function useNativePlaybackReconciliation({
       currentTrackRef,
       queueRef,
       recordProgress,
+      isNativeEventStale,
     ],
   );
 
@@ -160,7 +166,7 @@ export function useNativePlaybackReconciliation({
       state: EngineState,
       options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {},
     ) => {
-      if (isStaleNativeEvent(state.nativeTimeMs, nativeEventWatermarkRef)) {
+      if (isNativeEventStale(state.nativeTimeMs)) {
         return;
       }
       const positionSeconds = projectedNativePositionSeconds(
@@ -245,6 +251,7 @@ export function useNativePlaybackReconciliation({
       commitIsPlaying,
       currentIndexRef,
       ensureTrackerSession,
+      isNativeEventStale,
       playSourceRef,
       queueRef,
       recordProgress,
@@ -257,7 +264,7 @@ export function useNativePlaybackReconciliation({
 
   const applyNativeTrackChange = useCallback(
     (event: EnginePositionEvent & { reason?: string }) => {
-      if (isStaleNativeEvent(event.nativeTimeMs, nativeEventWatermarkRef)) {
+      if (isNativeEventStale(event.nativeTimeMs)) {
         return;
       }
       const queue = queueRef.current;
@@ -318,6 +325,7 @@ export function useNativePlaybackReconciliation({
       commitIsPlaying,
       currentIndexRef,
       ensureTrackerSession,
+      isNativeEventStale,
       playSourceRef,
       queueRef,
       rememberActiveTrack,
@@ -326,5 +334,10 @@ export function useNativePlaybackReconciliation({
     ],
   );
 
-  return { applyNativePosition, applyNativeState, applyNativeTrackChange };
+  return {
+    applyNativePosition,
+    applyNativeState,
+    applyNativeTrackChange,
+    isNativeEventStale,
+  };
 }

@@ -22,6 +22,14 @@ import { toast } from "sonner";
 
 type ValueRef<T> = { readonly current: T };
 type MutableValueRef<T> = { current: T };
+type NativeTimedPayload = { nativeTimeMs?: number };
+
+export function shouldHandleNativeSideEffectEvent(
+  payload: NativeTimedPayload,
+  isNativeEventStale: (nativeTimeMs: number | undefined) => boolean,
+): boolean {
+  return !isNativeEventStale(payload.nativeTimeMs);
+}
 
 // The most common trigger for resumeAuthorizationRequired is Android
 // killing the whole process (not just the service) while a foreground
@@ -81,6 +89,7 @@ export interface UseNativePlaybackEventBridgeParams {
     reason: "completed" | "skipped",
     track?: Track,
   ) => void;
+  isNativeEventStale: (nativeTimeMs: number | undefined) => boolean;
   queueRef: ValueRef<Track[]>;
   recoverNativeBuffering: (options: {
     forceRefresh: boolean;
@@ -103,6 +112,7 @@ export function useNativePlaybackEventBridge({
   commitIsPlaying,
   currentIndexRef,
   flushCurrentPlayEvent,
+  isNativeEventStale,
   queueRef,
   recoverNativeBuffering,
   retryNativePlaybackAfterAuthError,
@@ -126,6 +136,14 @@ export function useNativePlaybackEventBridge({
         applyNativeTrackChange(
           payload as EnginePositionEvent & { reason?: string },
         );
+        return;
+      }
+      if (
+        !shouldHandleNativeSideEffectEvent(
+          payload as NativeTimedPayload,
+          isNativeEventStale,
+        )
+      ) {
         return;
       }
       if (eventName === "bufferingChanged") {
@@ -212,6 +230,7 @@ export function useNativePlaybackEventBridge({
       commitIsPlaying,
       currentIndexRef,
       flushCurrentPlayEvent,
+      isNativeEventStale,
       queueRef,
       recoverNativeBuffering,
       retryNativePlaybackAfterAuthError,
@@ -290,9 +309,6 @@ export function useNativePlaybackEventBridge({
     // drain also ensures the freshest snapshot is applied last, instead of
     // racing a stale buffered event for who gets applied second.
     void subscription.ready
-      .catch((error) => {
-        console.error("[native-player] failed to attach listeners:", error);
-      })
       .then(() => {
         if (disposed) return;
         return androidNativeEngine
@@ -308,6 +324,9 @@ export function useNativePlaybackEventBridge({
       .then(() => {
         if (disposed) return;
         reconcileNativePlayback();
+      })
+      .catch((error) => {
+        console.error("[native-player] failed to attach listeners:", error);
       });
 
     const onNativeResume = () => {
