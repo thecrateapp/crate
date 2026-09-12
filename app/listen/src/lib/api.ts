@@ -224,9 +224,11 @@ const apiAuthTransport = createApiAuthTransport({
   getApiAuthHeaders,
   getAuthToken,
   getAuthTokenExpiresAt,
+  getCurrentServerId,
   getRefreshToken,
   setAuthToken,
   setAuthTokens,
+  setAuthTokensForServer,
   usesConfigurableServer,
 });
 

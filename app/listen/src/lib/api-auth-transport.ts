@@ -16,6 +16,7 @@ export interface ApiAuthTransportDependencies {
   getApiAuthHeaders: () => Record<string, string>;
   getAuthToken: () => string | null;
   getAuthTokenExpiresAt: () => string | null;
+  getCurrentServerId: () => string | null;
   getRefreshToken: () => string | null;
   setAuthToken: (token: string | null, accessExpiresAt?: string | null) => void;
   setAuthTokens: (
@@ -23,6 +24,12 @@ export interface ApiAuthTransportDependencies {
     refreshToken?: string | null,
     accessExpiresAt?: string | null,
   ) => void;
+  setAuthTokensForServer: (
+    serverId: string,
+    token: string | null,
+    refreshToken?: string | null,
+    accessExpiresAt?: string | null,
+  ) => boolean;
   usesConfigurableServer: boolean;
 }
 
@@ -38,7 +45,38 @@ const AUTH_TOKEN_FRESHNESS_MARGIN_MS = 10 * 60 * 1000;
 export function createApiAuthTransport(
   dependencies: ApiAuthTransportDependencies,
 ): ApiAuthTransport {
-  let refreshPromise: Promise<boolean> | null = null;
+  interface AuthScope {
+    apiBase: string;
+    authHeaders: Record<string, string>;
+    authToken: string | null;
+    authTokenExpiresAt: string | null;
+    key: string;
+    refreshToken: string | null;
+    serverId: string | null;
+  }
+
+  const refreshPromises = new Map<string, Promise<boolean>>();
+
+  const captureAuthScope = (): AuthScope => {
+    const serverId = dependencies.usesConfigurableServer
+      ? dependencies.getCurrentServerId()
+      : null;
+    return {
+      apiBase: dependencies.apiBase(),
+      authHeaders: dependencies.getApiAuthHeaders(),
+      authToken: dependencies.getAuthToken(),
+      authTokenExpiresAt: dependencies.getAuthTokenExpiresAt(),
+      key: dependencies.usesConfigurableServer
+        ? `server:${serverId ?? "missing"}`
+        : "web",
+      refreshToken: dependencies.getRefreshToken(),
+      serverId,
+    };
+  };
+
+  const isCurrentScope = (scope: AuthScope): boolean =>
+    !dependencies.usesConfigurableServer ||
+    dependencies.getCurrentServerId() === scope.serverId;
 
   const shouldAttemptRefresh = (path: string): boolean =>
     !path.includes("/api/auth/login") &&
@@ -63,28 +101,36 @@ export function createApiAuthTransport(
     });
   };
 
-  const refreshAuthToken = async (): Promise<boolean> => {
-    if (refreshPromise) return refreshPromise;
-    refreshPromise = (async () => {
-      const refreshToken = dependencies.getRefreshToken();
-      const headers = dependencies.getApiAuthHeaders();
+  const clearRejectedSession = async (scope: AuthScope): Promise<void> => {
+    if (scope.serverId) {
+      dependencies.setAuthTokensForServer(scope.serverId, null, null, null);
+      return;
+    }
+    dependencies.setAuthToken(null);
+    await clearRejectedWebSession();
+  };
+
+  const refreshAuthScope = (scope: AuthScope): Promise<boolean> => {
+    const pending = refreshPromises.get(scope.key);
+    if (pending) return pending;
+    if (dependencies.usesConfigurableServer && !scope.serverId) {
+      return Promise.resolve(false);
+    }
+    const operation = (async () => {
+      const headers = { ...scope.authHeaders };
       headers["Content-Type"] = "application/json";
-      const response = await fetch(
-        `${dependencies.apiBase()}/api/auth/refresh`,
-        {
-          method: "POST",
-          credentials: dependencies.apiCredentials(),
-          headers,
-          body: JSON.stringify(
-            refreshToken ? { refresh_token: refreshToken } : {},
-          ),
-        },
-      ).catch(() => null);
+      const response = await fetch(`${scope.apiBase}/api/auth/refresh`, {
+        method: "POST",
+        credentials: dependencies.apiCredentials(),
+        headers,
+        body: JSON.stringify(
+          scope.refreshToken ? { refresh_token: scope.refreshToken } : {},
+        ),
+      }).catch(() => null);
       if (!response) return false;
       if (!response.ok) {
         if ([400, 401, 403].includes(response.status)) {
-          dependencies.setAuthToken(null);
-          await clearRejectedWebSession();
+          await clearRejectedSession(scope);
         }
         return false;
       }
@@ -94,9 +140,16 @@ export function createApiAuthTransport(
         refresh_token?: string | null;
       } | null;
       if (!data?.token) {
-        dependencies.setAuthToken(null);
-        await clearRejectedWebSession();
+        await clearRejectedSession(scope);
         return false;
+      }
+      if (scope.serverId) {
+        return dependencies.setAuthTokensForServer(
+          scope.serverId,
+          data.token,
+          data.refresh_token ?? undefined,
+          data.access_expires_at ?? undefined,
+        );
       }
       dependencies.setAuthTokens(
         data.token,
@@ -104,26 +157,33 @@ export function createApiAuthTransport(
         data.access_expires_at ?? undefined,
       );
       return true;
-    })().finally(() => {
-      refreshPromise = null;
+    })();
+    const tracked = operation.finally(() => {
+      if (refreshPromises.get(scope.key) === tracked) {
+        refreshPromises.delete(scope.key);
+      }
     });
-    return refreshPromise;
+    refreshPromises.set(scope.key, tracked);
+    return tracked;
   };
+
+  const refreshAuthToken = (): Promise<boolean> =>
+    refreshAuthScope(captureAuthScope());
 
   const ensureFreshAuthToken = async (
     minValidityMs = AUTH_TOKEN_FRESHNESS_MARGIN_MS,
   ): Promise<boolean> => {
-    const token = dependencies.getAuthToken();
-    if (!token) return true;
+    const scope = captureAuthScope();
+    if (!scope.authToken) return true;
 
-    const expiresAt = dependencies.getAuthTokenExpiresAt();
+    const expiresAt = scope.authTokenExpiresAt;
     if (!expiresAt) return true;
 
     const expiresMs = Date.parse(expiresAt);
     if (!Number.isFinite(expiresMs)) return true;
 
     if (expiresMs - Date.now() > minValidityMs) return true;
-    return refreshAuthToken();
+    return refreshAuthScope(scope);
   };
 
   const api = <T = unknown>(
@@ -131,39 +191,47 @@ export function createApiAuthTransport(
     method?: ApiMethod,
     body?: unknown,
     options?: { signal?: AbortSignal },
-  ): Promise<T> =>
-    dependencies
-      .apiClient<T>(`${dependencies.apiBase()}${path}`, method, body, options)
+  ): Promise<T> => {
+    const scope = captureAuthScope();
+    return dependencies
+      .apiClient<T>(`${scope.apiBase}${path}`, method, body, options)
       .catch(async (error) => {
         if (
           error instanceof ApiError &&
           error.status === 401 &&
           shouldAttemptRefresh(path) &&
-          (await refreshAuthToken())
+          (await refreshAuthScope(scope)) &&
+          isCurrentScope(scope)
         ) {
           return dependencies.apiClient<T>(
-            `${dependencies.apiBase()}${path}`,
+            `${scope.apiBase}${path}`,
             method,
             body,
             options,
           );
         }
-        if (error instanceof ApiError && error.status === 401) {
+        if (
+          error instanceof ApiError &&
+          error.status === 401 &&
+          isCurrentScope(scope)
+        ) {
           redirectAfterUnauthorized();
         }
         throw error;
       });
+  };
 
   const apiFetch = async (
     path: string,
     init?: RequestInit,
   ): Promise<Response> => {
+    const scope = captureAuthScope();
     const requestHeaders = (): Record<string, string> => ({
       ...((init?.headers as Record<string, string>) || {}),
       ...dependencies.getApiAuthHeaders(),
     });
     const request = () =>
-      fetch(`${dependencies.apiBase()}${path}`, {
+      fetch(`${scope.apiBase}${path}`, {
         ...init,
         credentials: dependencies.apiCredentials(),
         headers: requestHeaders(),
@@ -172,11 +240,14 @@ export function createApiAuthTransport(
     if (
       response.status === 401 &&
       shouldAttemptRefresh(path) &&
-      (await refreshAuthToken())
+      (await refreshAuthScope(scope)) &&
+      isCurrentScope(scope)
     ) {
       response = await request();
     }
-    if (response.status === 401) redirectAfterUnauthorized();
+    if (response.status === 401 && isCurrentScope(scope)) {
+      redirectAfterUnauthorized();
+    }
     return response;
   };
 
