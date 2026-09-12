@@ -205,9 +205,14 @@ export async function loadNativeServerSecrets(
   records: readonly LegacyServerSecretRecord[],
 ): Promise<Map<string, ServerSecret>> {
   await retryPendingSecretRemovals();
+  const pendingRemovals = readPendingSecretRemovals();
   const nextSecrets = new Map<string, ServerSecret>();
 
   for (const server of records) {
+    if (pendingRemovals.has(server.id)) {
+      nextSecrets.set(server.id, emptySecret());
+      continue;
+    }
     const legacySecret: ServerSecret = {
       token: server.token ?? null,
       refreshToken: server.refreshToken ?? null,

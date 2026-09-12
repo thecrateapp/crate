@@ -242,6 +242,43 @@ describe("native server credential migration", () => {
     ).toBeNull();
   });
 
+  it("does not rehydrate a secure session while its removal is pending", async () => {
+    localStorage.setItem(
+      "crate-servers",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem(
+      "crate-pending-session-removals:v1",
+      JSON.stringify({ "server-1": 1 }),
+    );
+    secureRemove.mockRejectedValue(new Error("keystore unavailable"));
+    secureGet.mockResolvedValue(
+      JSON.stringify({
+        token: "logged-out-access",
+        refreshToken: "logged-out-refresh",
+      }),
+    );
+    const store = await import("./server-store");
+
+    await store.bootstrapNativeSessionStore();
+
+    expect(store.getServers()[0]).toMatchObject({
+      token: null,
+      refreshToken: null,
+    });
+    expect(secureGet).not.toHaveBeenCalledWith("crate.session.server-1");
+    expect(localStorage.getItem("crate-pending-session-removals:v1")).toContain(
+      "server-1",
+    );
+  });
+
   it("does not let a failed logout tombstone delete a later login", async () => {
     localStorage.setItem(
       "crate-servers",
