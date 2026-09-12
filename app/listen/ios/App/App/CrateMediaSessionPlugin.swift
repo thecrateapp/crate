@@ -19,6 +19,8 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private var remoteCommandTokens: [Any] = []
     private var artworkRequestId = 0
+    private var cachedArtworkUrl: String?
+    private var cachedArtwork: MPMediaItemArtwork?
     private var routePickerOverlay: UIView?
     private var routePickerDismissWorkItem: DispatchWorkItem?
 
@@ -79,8 +81,16 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             info[MPMediaItemPropertyPlaybackDuration] = duration
         }
 
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        loadArtwork(from: artwork, into: info)
+        if artwork == cachedArtworkUrl, let cachedArtwork {
+            // update() is called roughly once per second while playing —
+            // without this, we were re-downloading and re-decoding the same
+            // album art over and over for the whole length of a track.
+            info[MPMediaItemPropertyArtwork] = cachedArtwork
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        } else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            loadArtwork(from: artwork, into: info)
+        }
         call.resolve()
     }
 
@@ -311,6 +321,8 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             let mediaArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
             DispatchQueue.main.async {
                 guard currentRequestId == self.artworkRequestId else { return }
+                self.cachedArtworkUrl = artworkUrl
+                self.cachedArtwork = mediaArtwork
                 var nextInfo = baseInfo
                 nextInfo[MPMediaItemPropertyArtwork] = mediaArtwork
                 MPNowPlayingInfoCenter.default().nowPlayingInfo = nextInfo
