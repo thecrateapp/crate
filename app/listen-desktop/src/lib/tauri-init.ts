@@ -26,7 +26,6 @@ export function initTauriRuntime(): void {
   installNativeHttpFetch();
   void initTrayBridge();
   void initBandcampCookieBridge();
-  installDeepLinkBridge();
   void initDeepLinks();
 }
 
@@ -55,11 +54,33 @@ function installNativeHttpFetch(): void {
   const browserFetch = window.fetch.bind(window);
   window.__crateTauriFetchInstalled = true;
   window.fetch = async (input, init) => {
-    if (!isHttpRequest(input)) return browserFetch(input, init);
+    if (!shouldUseTauriHttpPlugin(input)) return browserFetch(input, init);
 
     const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
     return tauriFetch(input, init);
   };
+}
+
+export function shouldUseTauriHttpPlugin(input: RequestInfo | URL): boolean {
+  if (!isHttpRequest(input)) return false;
+  try {
+    const value =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const url = new URL(value);
+    if (url.protocol === "https:") return true;
+    return (
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" ||
+        url.hostname === "127.0.0.1" ||
+        url.hostname === "[::1]")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isHttpRequest(
@@ -74,9 +95,7 @@ function isHttpRequest(
 
 async function initDeepLinks(): Promise<void> {
   try {
-    const { getCurrent, onOpenUrl } = await import(
-      "@tauri-apps/plugin-deep-link"
-    );
+    const { getCurrent } = await import("@tauri-apps/plugin-deep-link");
     const { listen } = await import("@tauri-apps/api/event");
 
     await listen<string[]>("crate:deep-link", (event) => {
@@ -85,11 +104,6 @@ async function initDeepLinks(): Promise<void> {
         `${event.payload.length} URL(s)`,
       );
       void handleDeepLinkUrls(event.payload);
-    });
-
-    await onOpenUrl((urls) => {
-      recordTauriAuthDiagnostic("Deep link opened", `${urls.length} URL(s)`);
-      void handleDeepLinkUrls(urls);
     });
 
     const launchUrls = await getCurrent();
@@ -146,17 +160,6 @@ async function initBandcampCookieBridge(): Promise<void> {
   }
 }
 
-function installDeepLinkBridge(): void {
-  if (typeof window === "undefined") return;
-  window.__crateHandleTauriDeepLinks = (urls) => {
-    recordTauriAuthDiagnostic(
-      "Deep link bridge invoked",
-      `${urls.length} URL(s)`,
-    );
-    void handleDeepLinkUrls(urls);
-  };
-}
-
 async function handleDeepLinkUrls(urls: string[]): Promise<void> {
   for (const url of urls) {
     const result = await consumeOAuthCallbackUrl(url);
@@ -184,7 +187,6 @@ function protocolForDiagnostic(url: string): string {
 declare global {
   interface Window {
     __crateTauriFetchInstalled?: boolean;
-    __crateHandleTauriDeepLinks?: (urls: string[]) => void;
     __crateTauriInvoke?: <T = unknown>(
       command: string,
       args?: Record<string, unknown>,

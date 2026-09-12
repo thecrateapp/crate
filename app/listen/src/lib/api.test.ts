@@ -948,6 +948,30 @@ describe("native (configurable server) mode", () => {
     return s;
   }
 
+  it("keeps a server-scoped OAuth request on its originating server", async () => {
+    const serverA = setupServer("https://api-a.example.com", "secret-a");
+    const serverB = serverStore.addServer("https://api-b.example.com");
+    serverStore.setCurrentServerId(serverB.id);
+    serverStore.setCurrentServerToken("secret-b");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(mockJsonResponse({ ok: true }));
+
+    await apiMod.apiForServer(serverA.id, "/api/auth/native/exchange", "POST", {
+      code: "one-time-code",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api-a.example.com/api/auth/native/exchange",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.not.objectContaining({
+          Authorization: expect.anything(),
+        }),
+      }),
+    );
+  });
+
   describe("getApiBase", () => {
     it("returns empty when no server configured", () => {
       expect(apiMod.getApiBase()).toBe("");

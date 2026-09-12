@@ -326,14 +326,7 @@ fn truncate_menu_text(value: &str, max_chars: usize) -> String {
 
 #[cfg(desktop)]
 fn dispatch_deep_link_urls<R: tauri::Runtime>(window: &WebviewWindow<R>, urls: Vec<String>) {
-    let _ = window.emit("crate:deep-link", urls.clone());
-
-    if let Ok(payload) = serde_json::to_string(&urls) {
-        let script = format!(
-            "window.__crateHandleTauriDeepLinks && window.__crateHandleTauriDeepLinks({payload});"
-        );
-        let _ = window.eval(script);
-    }
+    let _ = window.emit("crate:deep-link", urls);
 }
 
 #[cfg(desktop)]

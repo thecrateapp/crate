@@ -155,7 +155,11 @@ export function getCurrentServerId(): string | null {
 export function getCurrentServer(): ServerConfig | null {
   const id = getCurrentServerId();
   if (!id) return null;
-  return getServers().find((s) => s.id === id) ?? null;
+  return getServerById(id);
+}
+
+export function getServerById(id: string): ServerConfig | null {
+  return getServers().find((server) => server.id === id) ?? null;
 }
 
 function writeServers(servers: ServerConfig[]): void {
@@ -319,6 +323,17 @@ export function setCurrentServerAuthTokens(
 ): void {
   const id = getCurrentServerId();
   if (!id) return;
+  setServerAuthTokens(id, token, refreshToken, tokenExpiresAt);
+}
+
+export function setServerAuthTokens(
+  id: string,
+  token: string | null,
+  refreshToken?: string | null,
+  tokenExpiresAt?: string | null,
+): boolean {
+  const currentServer = getServerById(id);
+  if (!currentServer) return false;
   if (isCapacitorRuntime) {
     const current = getRuntimeServerSecret(id);
     const nextSecret = {
@@ -343,6 +358,7 @@ export function setCurrentServerAuthTokens(
   );
   writeServers(servers);
   dispatchChange();
+  return true;
 }
 
 export function updateServerLabel(id: string, label: string): void {

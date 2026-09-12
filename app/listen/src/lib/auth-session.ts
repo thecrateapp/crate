@@ -1,6 +1,8 @@
 import { getListenAppId, usesConfigurableServer } from "@/lib/platform";
 import {
   getCurrentServer,
+  getCurrentServerId,
+  setServerAuthTokens,
   setCurrentServerAuthTokens,
   setCurrentServerRefreshToken,
   setCurrentServerToken,
@@ -95,6 +97,26 @@ export function setAuthTokens(
   webAuthToken = token;
   webAuthTokenExpiresAt = nextAccessExpiresAt;
   emitAuthTokenChange();
+}
+
+export function setAuthTokensForServer(
+  serverId: string,
+  token: string | null,
+  refreshToken?: string | null,
+  accessExpiresAt?: string | null,
+): boolean {
+  const nextAccessExpiresAt =
+    accessExpiresAt === undefined ? decodeJwtExpiresAt(token) : accessExpiresAt;
+  const stored = setServerAuthTokens(
+    serverId,
+    token,
+    refreshToken,
+    nextAccessExpiresAt,
+  );
+  if (stored && getCurrentServerId() === serverId) {
+    emitAuthTokenChange();
+  }
+  return stored;
 }
 
 export function getApiAuthHeaders(): Record<string, string> {

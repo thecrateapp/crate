@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  apiMock: vi.fn(),
-  setAuthTokens: vi.fn(),
+  apiForServerMock: vi.fn(),
+  setAuthTokensForServer: vi.fn(() => true),
   getCurrentServerId: vi.fn<() => string | null>(() => null),
-  setCurrentServerId: vi.fn(),
   getServers: vi.fn<() => Array<{ id: string }>>(() => []),
   waitForPendingSecureSessionWrites: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
-  api: mocks.apiMock,
-  setAuthTokens: mocks.setAuthTokens,
+  apiForServer: mocks.apiForServerMock,
+  setAuthTokensForServer: mocks.setAuthTokensForServer,
+  setAuthTokens: vi.fn(),
 }));
 
 vi.mock("@/lib/native-secure-session", () => ({
@@ -27,7 +27,6 @@ vi.mock("@/lib/platform", () => ({
 vi.mock("@/lib/server-store", () => ({
   waitForPendingSecureSessionWrites: mocks.waitForPendingSecureSessionWrites,
   getCurrentServerId: mocks.getCurrentServerId,
-  setCurrentServerId: mocks.setCurrentServerId,
   getServers: mocks.getServers,
 }));
 
@@ -43,18 +42,17 @@ import {
 describe("desktop (Tauri) native OAuth via localStorage", () => {
   beforeEach(() => {
     localStorage.clear();
-    mocks.apiMock.mockReset();
-    mocks.setAuthTokens.mockReset();
-    mocks.getCurrentServerId.mockReset().mockReturnValue(null);
-    mocks.setCurrentServerId.mockReset();
-    mocks.getServers.mockReset().mockReturnValue([]);
+    mocks.apiForServerMock.mockReset();
+    mocks.setAuthTokensForServer.mockReset().mockReturnValue(true);
+    mocks.getCurrentServerId.mockReset().mockReturnValue("server-a");
+    mocks.getServers.mockReset().mockReturnValue([{ id: "server-a" }]);
     mocks.waitForPendingSecureSessionWrites
       .mockReset()
       .mockResolvedValue(undefined);
   });
 
   it("starts native OAuth and persists the PKCE verifier to localStorage", async () => {
-    mocks.apiMock.mockResolvedValue({
+    mocks.apiForServerMock.mockResolvedValue({
       provider: "google",
       login_url: "https://accounts.example/authorize",
     });
@@ -62,7 +60,8 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     const loginUrl = await beginNativeOAuth("google", "/library");
 
     expect(loginUrl).toBe("https://accounts.example/authorize");
-    expect(mocks.apiMock).toHaveBeenCalledWith(
+    expect(mocks.apiForServerMock).toHaveBeenCalledWith(
+      "server-a",
       "/api/auth/oauth/google/start",
       "POST",
       expect.objectContaining({
@@ -72,14 +71,15 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       }),
     );
 
-    const stateArg = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    const stateArg = mocks.apiForServerMock.mock.calls[0]?.[3]
+      .native_state as string;
     expect(localStorage.getItem(`crate.oauth.${stateArg}`)).toContain(
       '"next":"/library"',
     );
   });
 
   it("rolls back the stored verifier if the start request fails", async () => {
-    mocks.apiMock.mockRejectedValue(new Error("network error"));
+    mocks.apiForServerMock.mockRejectedValue(new Error("network error"));
 
     await expect(beginNativeOAuth("google", "/library")).rejects.toThrow(
       "network error",
@@ -96,10 +96,10 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
         verifier: "v".repeat(43),
         next: "/stats",
         createdAt: Date.now(),
-        serverId: null,
+        serverId: "server-a",
       }),
     );
-    mocks.apiMock.mockResolvedValue({
+    mocks.apiForServerMock.mockResolvedValue({
       token: "access-token",
       refresh_token: "refresh-token",
       access_expires_at: "2030-01-01T00:00:00Z",
@@ -110,7 +110,8 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
 
     expect(result).toEqual({ handled: true, next: "/stats" });
-    expect(mocks.apiMock).toHaveBeenCalledWith(
+    expect(mocks.apiForServerMock).toHaveBeenCalledWith(
+      "server-a",
       "/api/auth/native/exchange",
       "POST",
       {
@@ -119,7 +120,8 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
         state,
       },
     );
-    expect(mocks.setAuthTokens).toHaveBeenCalledWith(
+    expect(mocks.setAuthTokensForServer).toHaveBeenCalledWith(
+      "server-a",
       "access-token",
       "refresh-token",
       "2030-01-01T00:00:00Z",
@@ -134,7 +136,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
 
     expect(result).toEqual({ handled: false, next: "/" });
-    expect(mocks.setAuthTokens).not.toHaveBeenCalled();
+    expect(mocks.setAuthTokensForServer).not.toHaveBeenCalled();
   });
 
   it("restores the server the flow was started against if the user switched servers meanwhile", async () => {
@@ -150,14 +152,25 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
     mocks.getCurrentServerId.mockReturnValue("server-b");
     mocks.getServers.mockReturnValue([{ id: "server-a" }, { id: "server-b" }]);
-    mocks.apiMock.mockResolvedValue({ token: "access-token" });
+    mocks.apiForServerMock.mockResolvedValue({ token: "access-token" });
 
     const result = await consumeOAuthCallbackUrl(
       `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
     );
 
     expect(result).toEqual({ handled: true, next: "/library" });
-    expect(mocks.setCurrentServerId).toHaveBeenCalledWith("server-a");
+    expect(mocks.apiForServerMock).toHaveBeenCalledWith(
+      "server-a",
+      "/api/auth/native/exchange",
+      "POST",
+      expect.any(Object),
+    );
+    expect(mocks.setAuthTokensForServer).toHaveBeenCalledWith(
+      "server-a",
+      "access-token",
+      undefined,
+      undefined,
+    );
   });
 
   it("rejects the callback if the originating server was removed while the flow was in flight", async () => {
@@ -173,14 +186,71 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
     // The user removed "server-a" from their server list mid-flow.
     mocks.getServers.mockReturnValue([{ id: "server-b" }]);
-    mocks.apiMock.mockResolvedValue({ token: "access-token" });
+    mocks.apiForServerMock.mockResolvedValue({ token: "access-token" });
 
     const result = await consumeOAuthCallbackUrl(
       `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
     );
 
     expect(result).toEqual({ handled: false, next: "/" });
-    expect(mocks.setAuthTokens).not.toHaveBeenCalled();
-    expect(mocks.setCurrentServerId).not.toHaveBeenCalled();
+    expect(mocks.setAuthTokensForServer).not.toHaveBeenCalled();
+  });
+
+  it("does not persist a token if the originating server disappears during exchange", async () => {
+    const state = "s".repeat(32);
+    localStorage.setItem(
+      `crate.oauth.${state}`,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    mocks.apiForServerMock.mockImplementation(async () => {
+      mocks.getServers.mockReturnValue([]);
+      return { token: "access-token" };
+    });
+    mocks.setAuthTokensForServer.mockReturnValue(false);
+
+    const result = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
+    );
+
+    expect(result).toEqual({ handled: false, next: "/" });
+    expect(mocks.setAuthTokensForServer).toHaveBeenCalledWith(
+      "server-a",
+      "access-token",
+      undefined,
+      undefined,
+    );
+  });
+
+  it("exchanges a duplicated deep link only once", async () => {
+    const state = "s".repeat(32);
+    localStorage.setItem(
+      `crate.oauth.${state}`,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    let resolveExchange: ((value: { token: string }) => void) | undefined;
+    mocks.apiForServerMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveExchange = resolve;
+      }),
+    );
+
+    const callback = `cratemusic://oauth/callback?code=one-time-code&state=${state}`;
+    const first = consumeOAuthCallbackUrl(callback);
+    const duplicate = consumeOAuthCallbackUrl(callback);
+    await expect(duplicate).resolves.toEqual({ handled: false, next: "/" });
+    resolveExchange!({ token: "access-token" });
+    await expect(first).resolves.toEqual({ handled: true, next: "/library" });
+
+    expect(mocks.apiForServerMock).toHaveBeenCalledTimes(1);
   });
 });

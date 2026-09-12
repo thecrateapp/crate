@@ -5,6 +5,8 @@ import { shouldRedirectToLoginOnUnauthorized } from "@/lib/auth-route-policy";
 import { isTauriRuntime, usesConfigurableServer } from "@/lib/platform";
 import {
   getCurrentServer,
+  getCurrentServerId,
+  getServerById,
   migrateLegacyToken,
   seedDefaultServer,
 } from "@/lib/server-store";
@@ -15,6 +17,7 @@ import {
   getAuthTokenExpiresAt,
   getRefreshToken,
   setAuthTokens as setSessionAuthTokens,
+  setAuthTokensForServer as setSessionAuthTokensForServer,
   setRefreshToken,
 } from "@/lib/auth-session";
 import {
@@ -152,6 +155,25 @@ export function setAuthTokens(
     else void refreshMediaAccessTickets();
   }
 }
+
+export function setAuthTokensForServer(
+  serverId: string,
+  token: string | null,
+  refreshToken?: string | null,
+  accessExpiresAt?: string | null,
+): boolean {
+  const stored = setSessionAuthTokensForServer(
+    serverId,
+    token,
+    refreshToken,
+    accessExpiresAt,
+  );
+  if (stored && getCurrentServerId() === serverId) {
+    if (!token) clearMediaAccessTickets();
+    else void refreshMediaAccessTickets();
+  }
+  return stored;
+}
 export { shouldRedirectToLoginOnUnauthorized };
 
 if (typeof window !== "undefined") {
@@ -171,6 +193,29 @@ const innerApi = createApiClient({
   defaultHeaders: getApiAuthHeaders,
   onError: captureApiError,
 });
+
+const serverScopedApi = createApiClient({
+  credentials: "omit",
+  defaultHeaders: () => {
+    const headers = getApiAuthHeaders();
+    delete headers.Authorization;
+    return headers;
+  },
+  onError: captureApiError,
+});
+
+export function apiForServer<T = unknown>(
+  serverId: string,
+  path: string,
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET",
+  body?: unknown,
+): Promise<T> {
+  const server = getServerById(serverId);
+  if (!server) {
+    return Promise.reject(new Error("The OAuth server is no longer available"));
+  }
+  return serverScopedApi<T>(`${server.url}${path}`, method, body);
+}
 
 const apiAuthTransport = createApiAuthTransport({
   apiBase: getApiBase,

@@ -1,4 +1,4 @@
-import { api, setAuthTokens } from "@/lib/api";
+import { apiForServer, setAuthTokens, setAuthTokensForServer } from "@/lib/api";
 import {
   getSecureSessionValue,
   removeSecureSessionValue,
@@ -8,13 +8,13 @@ import { isTauriRuntime } from "@/lib/platform";
 import {
   getCurrentServerId,
   getServers,
-  setCurrentServerId,
   waitForPendingSecureSessionWrites,
 } from "@/lib/server-store";
 
 const OAUTH_NEXT_KEY = "crate-oauth-next";
 const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
+const activeOAuthStates = new Set<string>();
 
 type OAuthProvider = "google" | "apple";
 
@@ -22,7 +22,7 @@ interface NativeOAuthRecord {
   verifier: string;
   next: string;
   createdAt: number;
-  serverId: string | null;
+  serverId: string;
 }
 
 interface NativeOAuthLoginResponse {
@@ -107,6 +107,10 @@ export async function beginNativeOAuth(
   const verifier = randomBase64Url(64);
   const state = randomBase64Url(32);
   const challenge = await challengeForVerifier(verifier);
+  const serverId = getCurrentServerId();
+  if (!serverId || !getServers().some((server) => server.id === serverId)) {
+    throw new Error("Select a Crate server before signing in");
+  }
   const record: NativeOAuthRecord = {
     verifier,
     next: next || "/",
@@ -115,21 +119,20 @@ export async function beginNativeOAuth(
     // the "current server" in the meantime, a token minted for the server
     // this flow started against must not land on whatever server happens
     // to be current when the callback finally arrives.
-    serverId: getCurrentServerId(),
+    serverId,
   };
   const recordKey = oauthRecordKey(state);
   await writeNativeOAuthRecord(recordKey, JSON.stringify(record));
   try {
-    const response = await api<{ provider: string; login_url: string }>(
-      `/api/auth/oauth/${provider}/start`,
-      "POST",
-      {
-        return_to: NATIVE_CALLBACK_URL,
-        invite_token: inviteToken,
-        native_code_challenge: challenge,
-        native_state: state,
-      },
-    );
+    const response = await apiForServer<{
+      provider: string;
+      login_url: string;
+    }>(serverId, `/api/auth/oauth/${provider}/start`, "POST", {
+      return_to: NATIVE_CALLBACK_URL,
+      invite_token: inviteToken,
+      native_code_challenge: challenge,
+      native_state: state,
+    });
     return response.login_url;
   } catch (error) {
     await removeNativeOAuthRecord(recordKey);
@@ -231,6 +234,10 @@ async function exchangeNativeOAuthCallback(
   code: string,
   state: string,
 ): Promise<{ handled: boolean; next: string }> {
+  if (activeOAuthStates.has(state)) {
+    return { handled: false, next: "/" };
+  }
+  activeOAuthStates.add(state);
   const recordKey = oauthRecordKey(state);
   try {
     const raw = await readNativeOAuthRecord(recordKey);
@@ -239,28 +246,17 @@ async function exchangeNativeOAuthCallback(
     if (
       typeof record.verifier !== "string" ||
       typeof record.next !== "string" ||
+      typeof record.serverId !== "string" ||
       typeof record.createdAt !== "number" ||
       Date.now() - record.createdAt > OAUTH_RECORD_MAX_AGE_MS
     ) {
       return { handled: false, next: "/" };
     }
-    // The system browser can sit open for a while; restore the server this
-    // flow was started against so the exchanged token lands there, not on
-    // whatever server the user may have switched "current" to meanwhile.
-    if (typeof record.serverId === "string") {
-      if (!getServers().some((server) => server.id === record.serverId)) {
-        // The server was removed while the flow was in flight — switching
-        // "current" to it would just point at a dangling id, and the token
-        // write below would silently no-op against a server list with no
-        // matching entry. Fail the callback instead of reporting a login
-        // that doesn't actually attach to anything.
-        return { handled: false, next: "/" };
-      }
-      if (record.serverId !== getCurrentServerId()) {
-        setCurrentServerId(record.serverId);
-      }
+    if (!getServers().some((server) => server.id === record.serverId)) {
+      return { handled: false, next: "/" };
     }
-    const response = await api<NativeOAuthLoginResponse>(
+    const response = await apiForServer<NativeOAuthLoginResponse>(
+      record.serverId,
       "/api/auth/native/exchange",
       "POST",
       {
@@ -270,15 +266,17 @@ async function exchangeNativeOAuthCallback(
       },
     );
     if (!response.token) return { handled: false, next: "/" };
-    setAuthTokens(
+    const stored = setAuthTokensForServer(
+      record.serverId,
       response.token,
       response.refresh_token ?? undefined,
       response.access_expires_at ?? undefined,
     );
+    if (!stored) return { handled: false, next: "/" };
     try {
       await waitForPendingSecureSessionWrites();
     } catch (error) {
-      setAuthTokens(null, null, null);
+      setAuthTokensForServer(record.serverId, null, null, null);
       throw error;
     }
     storePendingOAuthNext(record.next);
@@ -287,5 +285,6 @@ async function exchangeNativeOAuthCallback(
     return { handled: false, next: "/" };
   } finally {
     await removeNativeOAuthRecord(recordKey);
+    activeOAuthStates.delete(state);
   }
 }

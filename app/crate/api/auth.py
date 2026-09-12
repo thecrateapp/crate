@@ -348,11 +348,11 @@ def _env_enabled(name: str, default: bool = False) -> bool:
 
 
 def _native_oauth_exchange_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", False)
+    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", True)
 
 
 def _native_oauth_legacy_redirect_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED", True)
+    return _env_enabled("NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED", False)
 
 
 _NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
@@ -372,7 +372,7 @@ def _validate_native_oauth_start(
     requested = challenge is not None or state is not None
     if not requested:
         if (
-            _is_mobile_native_listen_app_id(app_id)
+            _is_native_listen_app_id(app_id)
             and not _native_oauth_legacy_redirect_enabled()
         ):
             raise HTTPException(

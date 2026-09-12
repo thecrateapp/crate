@@ -16,6 +16,7 @@ import {
   removeServer,
   setCurrentServerToken,
   setCurrentServerRefreshToken,
+  setServerAuthTokens,
   updateServerLabel,
 } from "./server-store";
 
@@ -131,6 +132,31 @@ describe("setCurrentServerRefreshToken", () => {
     setCurrentServerId(s.id);
     setCurrentServerRefreshToken("ref123");
     expect(getCurrentServer()?.refreshToken).toBe("ref123");
+  });
+});
+
+describe("setServerAuthTokens", () => {
+  it("updates only the explicitly addressed server", () => {
+    const serverA = addServer("https://a.example.com");
+    const serverB = addServer("https://b.example.com");
+    setCurrentServerId(serverB.id);
+
+    expect(
+      setServerAuthTokens(serverA.id, "access-a", "refresh-a", "2030-01-01"),
+    ).toBe(true);
+
+    expect(
+      getServers().find((server) => server.id === serverA.id),
+    ).toMatchObject({
+      token: "access-a",
+      refreshToken: "refresh-a",
+      tokenExpiresAt: "2030-01-01",
+    });
+    expect(getCurrentServer()?.id).toBe(serverB.id);
+  });
+
+  it("rejects credentials for a removed server", () => {
+    expect(setServerAuthTokens("missing", "access", "refresh")).toBe(false);
   });
 });
 
