@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { secureGet, secureSet } = vi.hoisted(() => ({
+const { secureGet, secureRemove, secureSet } = vi.hoisted(() => ({
   secureGet: vi.fn(),
+  secureRemove: vi.fn(),
   secureSet: vi.fn(),
 }));
 
@@ -13,7 +14,7 @@ vi.mock("@/lib/platform", () => ({
 vi.mock("@/lib/native-secure-session", () => ({
   getSecureSessionValue: secureGet,
   setSecureSessionValue: secureSet,
-  removeSecureSessionValue: vi.fn(),
+  removeSecureSessionValue: secureRemove,
 }));
 
 describe("native server credential migration", () => {
@@ -165,5 +166,81 @@ describe("native server credential migration", () => {
     await expect(store.waitForPendingSecureSessionWrites()).rejects.toThrow(
       "Native session persistence failed",
     );
+  });
+
+  it("retries failed secure-session deletion during the next bootstrap", async () => {
+    localStorage.setItem(
+      "crate-servers:v1",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem("crate-current-server", "server-1");
+    secureGet.mockResolvedValue(null);
+    secureRemove.mockRejectedValueOnce(new Error("keystore unavailable"));
+    const firstStore = await import("./server-store");
+    await firstStore.bootstrapNativeSessionStore();
+
+    firstStore.removeServer("server-1");
+    await expect(
+      firstStore.waitForPendingSecureSessionWrites(),
+    ).rejects.toThrow("Native session persistence failed");
+    expect(localStorage.getItem("crate-pending-session-removals:v1")).toContain(
+      "server-1",
+    );
+
+    secureRemove.mockResolvedValue(undefined);
+    vi.resetModules();
+    const restartedStore = await import("./server-store");
+    await restartedStore.bootstrapNativeSessionStore();
+
+    expect(secureRemove).toHaveBeenLastCalledWith("crate.session.server-1");
+    expect(
+      localStorage.getItem("crate-pending-session-removals:v1"),
+    ).toBeNull();
+  });
+
+  it("does not let a failed logout tombstone delete a later login", async () => {
+    localStorage.setItem(
+      "crate-servers:v1",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem("crate-current-server", "server-1");
+    secureGet.mockResolvedValue(null);
+    secureRemove.mockRejectedValueOnce(new Error("keystore unavailable"));
+    secureSet.mockResolvedValue(undefined);
+    const store = await import("./server-store");
+    await store.bootstrapNativeSessionStore();
+
+    store.setCurrentServerAuthTokens(null, null, null);
+    await expect(store.waitForPendingSecureSessionWrites()).rejects.toThrow(
+      "Native session persistence failed",
+    );
+    expect(localStorage.getItem("crate-pending-session-removals:v1")).toContain(
+      "server-1",
+    );
+
+    store.setCurrentServerAuthTokens("new-access", "new-refresh", null);
+    await store.waitForPendingSecureSessionWrites();
+
+    expect(secureSet).toHaveBeenLastCalledWith(
+      "crate.session.server-1",
+      JSON.stringify({ token: "new-access", refreshToken: "new-refresh" }),
+    );
+    expect(
+      localStorage.getItem("crate-pending-session-removals:v1"),
+    ).toBeNull();
   });
 });

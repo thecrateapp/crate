@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { writeFileMock, readFileMock } = vi.hoisted(() => ({
-  writeFileMock: vi.fn(),
-  readFileMock: vi.fn(),
-}));
+const { deleteFileMock, renameMock, writeFileMock, readFileMock } = vi.hoisted(
+  () => ({
+    deleteFileMock: vi.fn(),
+    renameMock: vi.fn(),
+    writeFileMock: vi.fn(),
+    readFileMock: vi.fn(),
+  }),
+);
 
 vi.mock(import("@capacitor/core"), async (importOriginal) => {
   const actual = await importOriginal();
@@ -21,13 +25,18 @@ vi.mock("@capacitor/filesystem", () => ({
   Directory: { Data: "DATA" },
   Encoding: { UTF8: "utf8" },
   Filesystem: {
+    deleteFile: deleteFileMock,
     mkdir: vi.fn().mockResolvedValue(undefined),
     readFile: readFileMock,
+    rename: renameMock,
     writeFile: writeFileMock,
   },
 }));
 
-import { updateOfflineNativeAssetIndex } from "@/lib/offline-storage";
+import {
+  ensureOfflineNativeAssetIndexLoaded,
+  updateOfflineNativeAssetIndex,
+} from "@/lib/offline-storage";
 
 describe("updateOfflineNativeAssetIndex (native)", () => {
   let writtenFiles: Map<string, string>;
@@ -39,6 +48,17 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     readFileMock.mockImplementation(async ({ path }: { path: string }) => ({
       data: writtenFiles.get(path) ?? null,
     }));
+    deleteFileMock.mockImplementation(async ({ path }: { path: string }) => {
+      writtenFiles.delete(path);
+    });
+    renameMock.mockImplementation(
+      async ({ from, to }: { from: string; to: string }) => {
+        const data = writtenFiles.get(from);
+        if (data == null) throw new Error(`missing file: ${from}`);
+        writtenFiles.set(to, data);
+        writtenFiles.delete(from);
+      },
+    );
     writeFileMock.mockImplementation(
       async ({ path, data }: { path: string; data: string }) => {
         // Simulate slow disk I/O: whichever write is issued first can
@@ -74,5 +94,76 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     const final = JSON.parse(finalRaw ?? "{}");
     expect(final).toHaveProperty("trackA");
     expect(final).toHaveProperty("trackB");
+  });
+
+  it("promotes a verified temporary file instead of overwriting metadata in place", async () => {
+    await updateOfflineNativeAssetIndex("atomic-profile", (current) => ({
+      ...current,
+      trackA: { assetKey: "trackA" } as never,
+    }));
+
+    expect(writeFileMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "offline-meta/offline-assets-atomic-profile.json.next",
+      }),
+    );
+    expect(writeFileMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "offline-meta/offline-assets-atomic-profile.json",
+      }),
+    );
+    expect(renameMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "offline-meta/offline-assets-atomic-profile.json.next",
+        to: "offline-meta/offline-assets-atomic-profile.json",
+      }),
+    );
+  });
+
+  it("recovers valid metadata from the latest crash-safe candidate", async () => {
+    writtenFiles.set(
+      "offline-meta/offline-assets-recovery-profile.json",
+      "{truncated",
+    );
+    writtenFiles.set(
+      "offline-meta/offline-assets-recovery-profile.json.next",
+      JSON.stringify({ latest: { assetKey: "latest" } }),
+    );
+    writtenFiles.set(
+      "offline-meta/offline-assets-recovery-profile.json.backup",
+      JSON.stringify({ previous: { assetKey: "previous" } }),
+    );
+
+    await expect(
+      ensureOfflineNativeAssetIndexLoaded("recovery-profile"),
+    ).resolves.toEqual({ latest: { assetKey: "latest" } });
+  });
+
+  it("restores the previous metadata when promotion fails", async () => {
+    const path = "offline-meta/offline-assets-rollback-profile.json";
+    writtenFiles.set(
+      path,
+      JSON.stringify({ previous: { assetKey: "previous" } }),
+    );
+    renameMock.mockImplementation(
+      async ({ from, to }: { from: string; to: string }) => {
+        if (from.endsWith(".next")) throw new Error("promotion failed");
+        const data = writtenFiles.get(from);
+        if (data == null) throw new Error(`missing file: ${from}`);
+        writtenFiles.set(to, data);
+        writtenFiles.delete(from);
+      },
+    );
+
+    await expect(
+      updateOfflineNativeAssetIndex("rollback-profile", (current) => ({
+        ...current,
+        latest: { assetKey: "latest" } as never,
+      })),
+    ).rejects.toThrow("promotion failed");
+
+    expect(JSON.parse(writtenFiles.get(path) ?? "{}")).toEqual({
+      previous: { assetKey: "previous" },
+    });
   });
 });

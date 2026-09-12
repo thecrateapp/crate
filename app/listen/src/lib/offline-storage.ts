@@ -103,8 +103,8 @@ function getOfflineNativeAssetIndexPath(profileKey: string): string {
   return `${OFFLINE_NATIVE_META_DIR}/${OFFLINE_NATIVE_ASSET_FILE_PREFIX}${profileKey}.json`;
 }
 
-function parseOfflineSnapshot(raw: string | null): OfflineSnapshot {
-  if (!raw) return EMPTY_OFFLINE_SNAPSHOT;
+function tryParseOfflineSnapshot(raw: string | null): OfflineSnapshot | null {
+  if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
     if (
@@ -112,14 +112,18 @@ function parseOfflineSnapshot(raw: string | null): OfflineSnapshot {
       typeof parsed !== "object" ||
       typeof parsed.items !== "object"
     ) {
-      return EMPTY_OFFLINE_SNAPSHOT;
+      return null;
     }
     return normalizeOfflineSnapshot({
       items: parsed.items as Record<string, OfflineItemRecord>,
     });
   } catch {
-    return EMPTY_OFFLINE_SNAPSHOT;
+    return null;
   }
+}
+
+function parseOfflineSnapshot(raw: string | null): OfflineSnapshot {
+  return tryParseOfflineSnapshot(raw) ?? EMPTY_OFFLINE_SNAPSHOT;
 }
 
 function normalizeOfflineItemRecord(
@@ -180,18 +184,24 @@ export function normalizeOfflineSnapshot(
   return { items };
 }
 
-function parseOfflineNativeAssetIndex(
+function tryParseOfflineNativeAssetIndex(
   raw: string | null,
-): Record<string, OfflineNativeAssetRecord> {
-  if (!raw) return {};
+): Record<string, OfflineNativeAssetRecord> | null {
+  if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object"
       ? (parsed as Record<string, OfflineNativeAssetRecord>)
-      : {};
+      : null;
   } catch {
-    return {};
+    return null;
   }
+}
+
+function parseOfflineNativeAssetIndex(
+  raw: string | null,
+): Record<string, OfflineNativeAssetRecord> {
+  return tryParseOfflineNativeAssetIndex(raw) ?? {};
 }
 
 function getLegacyOfflineSnapshot(profileKey: string): OfflineSnapshot {
@@ -259,18 +269,75 @@ async function readNativeJsonFile(path: string): Promise<string | null> {
   }
 }
 
+async function readRecoverableNativeJson<T>(
+  path: string,
+  parse: (raw: string | null) => T | null,
+): Promise<T | null> {
+  for (const candidate of [path, `${path}.next`, `${path}.backup`]) {
+    // Recovery candidates are deliberately ordered: the canonical file is
+    // authoritative, followed by the verified pending promotion and then the
+    // previous known-good version retained during an interrupted replacement.
+    // react-doctor-disable-next-line async-await-in-loop
+    const parsed = parse(await readNativeJsonFile(candidate));
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
 async function writeNativeJsonFile(
   path: string,
   payload: unknown,
 ): Promise<void> {
   await ensureOfflineNativeMetaDir();
+  const nextPath = `${path}.next`;
+  const backupPath = `${path}.backup`;
+  const data = JSON.stringify(payload);
   await Filesystem.writeFile({
-    path,
+    path: nextPath,
     directory: Directory.Data,
     recursive: true,
     encoding: Encoding.UTF8,
-    data: JSON.stringify(payload),
+    data,
   });
+  if ((await readNativeJsonFile(nextPath)) !== data) {
+    throw new Error(`Failed to verify native metadata write: ${path}`);
+  }
+
+  const hasCurrent = (await readNativeJsonFile(path)) !== null;
+  await Filesystem.deleteFile({
+    path: backupPath,
+    directory: Directory.Data,
+  }).catch(() => undefined);
+  if (hasCurrent) {
+    await Filesystem.rename({
+      from: path,
+      to: backupPath,
+      directory: Directory.Data,
+      toDirectory: Directory.Data,
+    });
+  }
+  try {
+    await Filesystem.rename({
+      from: nextPath,
+      to: path,
+      directory: Directory.Data,
+      toDirectory: Directory.Data,
+    });
+  } catch (error) {
+    if (hasCurrent) {
+      await Filesystem.rename({
+        from: backupPath,
+        to: path,
+        directory: Directory.Data,
+        toDirectory: Directory.Data,
+      }).catch(() => undefined);
+    }
+    throw error;
+  }
+  await Filesystem.deleteFile({
+    path: backupPath,
+    directory: Directory.Data,
+  }).catch(() => undefined);
 }
 
 async function ensureOfflineSnapshotLoaded(
@@ -283,9 +350,12 @@ async function ensureOfflineSnapshotLoaded(
 
   const loader = (async () => {
     const filePath = getOfflineNativeSnapshotPath(profileKey);
-    const raw = await readNativeJsonFile(filePath);
-    let snapshot = parseOfflineSnapshot(raw);
-    if (raw == null) {
+    const persisted = await readRecoverableNativeJson(
+      filePath,
+      tryParseOfflineSnapshot,
+    );
+    let snapshot = persisted ?? EMPTY_OFFLINE_SNAPSHOT;
+    if (persisted == null) {
       const legacy = getLegacyOfflineSnapshot(profileKey);
       snapshot = legacy;
       if (Object.keys(legacy.items).length) {
@@ -312,9 +382,12 @@ export async function ensureOfflineNativeAssetIndexLoaded(
 
   const loader = (async () => {
     const filePath = getOfflineNativeAssetIndexPath(profileKey);
-    const raw = await readNativeJsonFile(filePath);
-    let assets = parseOfflineNativeAssetIndex(raw);
-    if (raw == null) {
+    const persisted = await readRecoverableNativeJson(
+      filePath,
+      tryParseOfflineNativeAssetIndex,
+    );
+    let assets = persisted ?? {};
+    if (persisted == null) {
       const legacy = getLegacyOfflineNativeAssetIndex(profileKey);
       assets = legacy;
       if (Object.keys(legacy).length) {

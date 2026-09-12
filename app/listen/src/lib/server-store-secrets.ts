@@ -19,6 +19,7 @@ export interface LegacyServerSecretRecord {
 const runtimeSecrets = new Map<string, ServerSecret>();
 const pendingSecretWrites = new Set<Promise<void>>();
 const writeChains = new Map<string, Promise<void>>();
+const PENDING_SECRET_REMOVALS_KEY = "crate-pending-session-removals:v1";
 
 function secureSessionKey(serverId: string): string {
   return `crate.session.${serverId}`;
@@ -26,6 +27,62 @@ function secureSessionKey(serverId: string): string {
 
 function emptySecret(): ServerSecret {
   return { token: null, refreshToken: null };
+}
+
+function readPendingSecretRemovals(): Set<string> {
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(PENDING_SECRET_REMOVALS_KEY) ?? "[]",
+    );
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writePendingSecretRemovals(serverIds: Set<string>): void {
+  try {
+    if (serverIds.size === 0) {
+      localStorage.removeItem(PENDING_SECRET_REMOVALS_KEY);
+      return;
+    }
+    localStorage.setItem(
+      PENDING_SECRET_REMOVALS_KEY,
+      JSON.stringify([...serverIds]),
+    );
+  } catch {
+    // Secure storage remains authoritative when local metadata is unavailable.
+  }
+}
+
+function markSecretRemovalPending(serverId: string): void {
+  const pending = readPendingSecretRemovals();
+  pending.add(serverId);
+  writePendingSecretRemovals(pending);
+}
+
+function clearPendingSecretRemoval(serverId: string): void {
+  const pending = readPendingSecretRemovals();
+  pending.delete(serverId);
+  writePendingSecretRemovals(pending);
+}
+
+async function retryPendingSecretRemovals(): Promise<void> {
+  for (const serverId of readPendingSecretRemovals()) {
+    try {
+      // Each tombstone is independent; one unavailable Keychain entry must not
+      // prevent the remaining active sessions from loading at startup.
+      // react-doctor-disable-next-line async-await-in-loop
+      await removeSecureSessionValue(secureSessionKey(serverId));
+      clearPendingSecretRemoval(serverId);
+    } catch {
+      // Keep the tombstone durable so the next bootstrap retries it again.
+    }
+  }
 }
 
 export function parseServerSecret(value: string | null): ServerSecret {
@@ -93,23 +150,33 @@ function enqueueSecretWrite(
 
 export function queueSecretWrite(serverId: string, secret: ServerSecret): void {
   if (!isCapacitorRuntime) return;
-  enqueueSecretWrite(serverId, () =>
-    secret.token || secret.refreshToken
-      ? setSecureSessionValue(
-          secureSessionKey(serverId),
-          serializeSecret(secret),
-        )
-      : removeSecureSessionValue(secureSessionKey(serverId)),
-  );
+  if (!secret.token && !secret.refreshToken) {
+    queueSecretRemoval(serverId);
+    return;
+  }
+  enqueueSecretWrite(serverId, async () => {
+    await setSecureSessionValue(
+      secureSessionKey(serverId),
+      serializeSecret(secret),
+    );
+    // A successful login supersedes any failed logout queued for this same
+    // server. Leaving that tombstone behind would delete the new session on
+    // the next bootstrap.
+    clearPendingSecretRemoval(serverId);
+  });
+}
+
+function queueSecretRemoval(serverId: string): void {
+  markSecretRemovalPending(serverId);
+  enqueueSecretWrite(serverId, async () => {
+    await removeSecureSessionValue(secureSessionKey(serverId));
+    clearPendingSecretRemoval(serverId);
+  });
 }
 
 export function removeQueuedSecret(serverId: string): void {
   if (!isCapacitorRuntime) return;
-  enqueueSecretWrite(serverId, () =>
-    removeSecureSessionValue(secureSessionKey(serverId)).catch(() => {
-      // The in-memory session is already removed; a later bootstrap can retry.
-    }),
-  );
+  queueSecretRemoval(serverId);
 }
 
 export async function waitForPendingSecureSessionWrites(): Promise<void> {
@@ -122,6 +189,7 @@ export async function waitForPendingSecureSessionWrites(): Promise<void> {
 export async function loadNativeServerSecrets(
   records: readonly LegacyServerSecretRecord[],
 ): Promise<Map<string, ServerSecret>> {
+  await retryPendingSecretRemovals();
   const nextSecrets = new Map<string, ServerSecret>();
 
   for (const server of records) {
