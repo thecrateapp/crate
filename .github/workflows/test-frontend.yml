@@ -80,6 +80,9 @@ jobs:
       - name: Test design-system tooling
         run: node --test scripts/design-system/*.test.mjs
 
+      - name: Check generated appearance tokens
+        run: npm run design-system:tokens:check
+
       - name: Check shared UI layer boundaries
         run: npm run design-system:layers
 

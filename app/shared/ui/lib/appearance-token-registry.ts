@@ -601,3 +601,29 @@ export const APPEARANCE_TOKEN_REGISTRY = Object.fromEntries(
 export const APPEARANCE_VARIABLE_ALLOWLIST = Object.keys(
   APPEARANCE_TOKEN_REGISTRY,
 );
+
+export const APPEARANCE_FOUNDATION_VARIABLES =
+  APPEARANCE_VARIABLE_ALLOWLIST.filter((name) =>
+    name.startsWith("--crate-token-"),
+  );
+
+export function renderDefaultThemeCss(): string {
+  const variables = APPEARANCE_FOUNDATION_VARIABLES.map((name) => {
+    const value = APPEARANCE_TOKEN_REGISTRY[name]!.defaults.default.dark;
+    return `  ${name}: ${value};`;
+  }).join("\n");
+
+  return `/* This file is generated from lib/appearance-token-registry.ts.
+   Run \`npm run design-system:tokens:generate\` after changing foundations. */
+
+:root {
+${variables}
+}
+
+/* Runtime mode hooks. The active scope supplies explicit dark/light values. */
+[data-crate-app="listen"][data-crate-mode="dark"],
+[data-crate-app="listen"][data-crate-mode="light"] {
+  --state-danger-foreground: var(--surface-canvas);
+}
+`;
+}
