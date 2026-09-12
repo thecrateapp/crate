@@ -44,6 +44,7 @@ describe("native server credential migration", () => {
       JSON.stringify({
         token: "access-secret",
         refreshToken: "refresh-secret",
+        generation: 1,
       }),
     );
     const store = await import("./server-store");
@@ -80,6 +81,7 @@ describe("native server credential migration", () => {
       JSON.stringify({
         token: "access-secret",
         refreshToken: "refresh-secret",
+        generation: 1,
       }),
     );
     const store = await import("./server-store");
@@ -91,6 +93,7 @@ describe("native server credential migration", () => {
       JSON.stringify({
         token: "access-secret",
         refreshToken: "refresh-secret",
+        generation: 1,
       }),
     );
     expect(store.getServers()[0]).toMatchObject({
@@ -162,6 +165,7 @@ describe("native server credential migration", () => {
       JSON.stringify({
         token: "access-secret",
         refreshToken: null,
+        generation: 1,
       }),
     );
     const store = await import("./server-store");
@@ -273,7 +277,7 @@ describe("native server credential migration", () => {
       token: null,
       refreshToken: null,
     });
-    expect(secureGet).not.toHaveBeenCalledWith("crate.session.server-1");
+    expect(secureGet).toHaveBeenCalledOnce();
     expect(localStorage.getItem("crate-pending-session-removals:v1")).toContain(
       "server-1",
     );
@@ -311,8 +315,51 @@ describe("native server credential migration", () => {
 
     expect(secureSet).toHaveBeenLastCalledWith(
       "crate.session.server-1",
-      JSON.stringify({ token: "new-access", refreshToken: "new-refresh" }),
+      JSON.stringify({
+        token: "new-access",
+        refreshToken: "new-refresh",
+        generation: 2,
+      }),
     );
+    expect(
+      localStorage.getItem("crate-pending-session-removals:v1"),
+    ).toBeNull();
+  });
+
+  it("does not let a stale logout tombstone delete a newer login after a crash", async () => {
+    localStorage.setItem(
+      "crate-servers",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem(
+      "crate-pending-session-removals:v1",
+      JSON.stringify({ "server-1": 1 }),
+    );
+    let secureValue: string | null = JSON.stringify({
+      token: "new-access",
+      refreshToken: "new-refresh",
+      generation: 2,
+    });
+    secureGet.mockImplementation(async () => secureValue);
+    secureRemove.mockImplementation(async () => {
+      secureValue = null;
+    });
+    const store = await import("./server-store");
+
+    await store.bootstrapNativeSessionStore();
+
+    expect(secureRemove).not.toHaveBeenCalled();
+    expect(store.getServers()[0]).toMatchObject({
+      token: "new-access",
+      refreshToken: "new-refresh",
+    });
     expect(
       localStorage.getItem("crate-pending-session-removals:v1"),
     ).toBeNull();

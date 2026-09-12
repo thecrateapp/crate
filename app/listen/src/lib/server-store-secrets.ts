@@ -20,6 +20,11 @@ const runtimeSecrets = new Map<string, ServerSecret>();
 const pendingSecretWrites = new Set<Promise<void>>();
 const writeChains = new Map<string, Promise<void>>();
 const PENDING_SECRET_REMOVALS_KEY = "crate-pending-session-removals:v1";
+const SECRET_GENERATIONS_KEY = "crate-session-generations:v1";
+
+interface SecureServerSecretRecord extends ServerSecret {
+  generation: number;
+}
 
 function secureSessionKey(serverId: string): string {
   return `crate.session.${serverId}`;
@@ -27,6 +32,53 @@ function secureSessionKey(serverId: string): string {
 
 function emptySecret(): ServerSecret {
   return { token: null, refreshToken: null };
+}
+
+function readSecretGenerations(): Map<string, number> {
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(SECRET_GENERATIONS_KEY) ?? "{}",
+    );
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return new Map();
+    }
+    return new Map(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, number] =>
+          typeof entry[1] === "number" &&
+          Number.isSafeInteger(entry[1]) &&
+          entry[1] >= 0,
+      ),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function writeSecretGenerations(generations: Map<string, number>): void {
+  localStorage.setItem(
+    SECRET_GENERATIONS_KEY,
+    JSON.stringify(Object.fromEntries(generations)),
+  );
+}
+
+function observeSecretGeneration(serverId: string, generation: number): void {
+  const generations = readSecretGenerations();
+  if ((generations.get(serverId) ?? 0) >= generation) return;
+  generations.set(serverId, generation);
+  writeSecretGenerations(generations);
+}
+
+function nextSecretGeneration(serverId: string): number {
+  const generations = readSecretGenerations();
+  const pendingGeneration = readPendingSecretRemovals().get(serverId) ?? 0;
+  const next = Math.max(generations.get(serverId) ?? 0, pendingGeneration) + 1;
+  if (!Number.isSafeInteger(next)) {
+    throw new Error("Native session generation exhausted");
+  }
+  generations.set(serverId, next);
+  writeSecretGenerations(generations);
+  return next;
 }
 
 function readPendingSecretRemovals(): Map<string, number> {
@@ -68,12 +120,10 @@ function writePendingSecretRemovals(removals: Map<string, number>): void {
   }
 }
 
-function markSecretRemovalPending(serverId: string): number {
+function markSecretRemovalPending(serverId: string, generation: number): void {
   const pending = readPendingSecretRemovals();
-  const generation = (pending.get(serverId) ?? 0) + 1;
   pending.set(serverId, generation);
   writePendingSecretRemovals(pending);
-  return generation;
 }
 
 function clearPendingSecretRemoval(serverId: string, generation: number): void {
@@ -86,6 +136,17 @@ function clearPendingSecretRemoval(serverId: string, generation: number): void {
 async function retryPendingSecretRemovals(): Promise<void> {
   for (const [serverId, generation] of readPendingSecretRemovals()) {
     try {
+      // A login that completed after this logout carries a newer generation.
+      // Keep it even if the process crashed before clearing the old tombstone.
+      // react-doctor-disable-next-line async-await-in-loop
+      const current = parseSecureServerSecret(
+        await getSecureSessionValue(secureSessionKey(serverId)),
+      );
+      observeSecretGeneration(serverId, current.generation);
+      if (current.generation > generation) {
+        clearPendingSecretRemoval(serverId, generation);
+        continue;
+      }
       // Each tombstone is independent; one unavailable Keychain entry must not
       // prevent the remaining active sessions from loading at startup.
       // react-doctor-disable-next-line async-await-in-loop
@@ -98,21 +159,36 @@ async function retryPendingSecretRemovals(): Promise<void> {
 }
 
 export function parseServerSecret(value: string | null): ServerSecret {
-  if (!value) return emptySecret();
+  return parseSecureServerSecret(value).secret;
+}
+
+function parseSecureServerSecret(value: string | null): {
+  secret: ServerSecret;
+  generation: number;
+} {
+  if (!value) return { secret: emptySecret(), generation: 0 };
   try {
-    const parsed = JSON.parse(value) as Partial<ServerSecret>;
+    const parsed = JSON.parse(value) as Partial<SecureServerSecretRecord>;
     return {
-      token: typeof parsed.token === "string" ? parsed.token : null,
-      refreshToken:
-        typeof parsed.refreshToken === "string" ? parsed.refreshToken : null,
+      secret: {
+        token: typeof parsed.token === "string" ? parsed.token : null,
+        refreshToken:
+          typeof parsed.refreshToken === "string" ? parsed.refreshToken : null,
+      },
+      generation:
+        typeof parsed.generation === "number" &&
+        Number.isSafeInteger(parsed.generation) &&
+        parsed.generation >= 0
+          ? parsed.generation
+          : 0,
     };
   } catch {
-    return emptySecret();
+    return { secret: emptySecret(), generation: 0 };
   }
 }
 
-function serializeSecret(secret: ServerSecret): string {
-  return JSON.stringify(secret);
+function serializeSecret(secret: ServerSecret, generation: number): string {
+  return JSON.stringify({ ...secret, generation });
 }
 
 export function getRuntimeServerSecret(serverId: string): ServerSecret {
@@ -166,11 +242,12 @@ export function queueSecretWrite(serverId: string, secret: ServerSecret): void {
     queueSecretRemoval(serverId);
     return;
   }
+  const generation = nextSecretGeneration(serverId);
   const supersededRemovalGeneration = readPendingSecretRemovals().get(serverId);
   enqueueSecretWrite(serverId, async () => {
     await setSecureSessionValue(
       secureSessionKey(serverId),
-      serializeSecret(secret),
+      serializeSecret(secret, generation),
     );
     // A successful login supersedes any failed logout queued for this same
     // server. Leaving that tombstone behind would delete the new session on
@@ -182,7 +259,8 @@ export function queueSecretWrite(serverId: string, secret: ServerSecret): void {
 }
 
 function queueSecretRemoval(serverId: string): void {
-  const generation = markSecretRemovalPending(serverId);
+  const generation = nextSecretGeneration(serverId);
+  markSecretRemovalPending(serverId, generation);
   enqueueSecretWrite(serverId, async () => {
     await removeSecureSessionValue(secureSessionKey(serverId));
     clearPendingSecretRemoval(serverId, generation);
@@ -218,7 +296,8 @@ export async function loadNativeServerSecrets(
       refreshToken: server.refreshToken ?? null,
     };
     if (legacySecret.token || legacySecret.refreshToken) {
-      const serialized = serializeSecret(legacySecret);
+      const generation = nextSecretGeneration(server.id);
+      const serialized = serializeSecret(legacySecret, generation);
       // Migrate and verify one server secret at a time to keep persistence atomic.
       // react-doctor-disable-next-line async-await-in-loop
       await setSecureSessionValue(secureSessionKey(server.id), serialized);
@@ -229,12 +308,11 @@ export async function loadNativeServerSecrets(
       nextSecrets.set(server.id, legacySecret);
       continue;
     }
-    nextSecrets.set(
-      server.id,
-      parseServerSecret(
-        await getSecureSessionValue(secureSessionKey(server.id)),
-      ),
+    const secureRecord = parseSecureServerSecret(
+      await getSecureSessionValue(secureSessionKey(server.id)),
     );
+    observeSecretGeneration(server.id, secureRecord.generation);
+    nextSecrets.set(server.id, secureRecord.secret);
   }
 
   return nextSecrets;
