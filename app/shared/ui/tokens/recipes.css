@@ -151,7 +151,13 @@
 }
 
 .player-analyzer-mask {
-  mask-image: var(--player-analyzer-mask);
+  mask-image: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, black 96%, transparent) 18%,
+    color-mix(in srgb, black 90%, transparent) 44%,
+    color-mix(in srgb, black 34%, transparent) 74%,
+    transparent 100%
+  );
   mask-repeat: no-repeat;
 }
 
@@ -315,7 +321,9 @@
 }
 
 .spectrum-play-button[data-active="true"] {
-  box-shadow: var(--play-button-active-shadow);
+  box-shadow:
+    0 0 7px var(--accent-action-glow-strong),
+    0 0 18px var(--accent-action-glow-medium);
 }
 
 .spectrum-play-button-aura {
@@ -342,8 +350,16 @@
 
 .spinning-disc-surface {
   border: 1px solid var(--border-quiet);
-  background: var(--disc-surface);
-  box-shadow: var(--disc-shadow);
+  background: radial-gradient(
+    circle at 50% 40%,
+    color-mix(in srgb, var(--text-primary) 14%, transparent),
+    color-mix(in srgb, var(--text-primary) 2%, transparent) 26%,
+    color-mix(in srgb, var(--surface-canvas) 88%, transparent) 68%,
+    var(--surface-canvas)
+  );
+  box-shadow:
+    0 32px 90px color-mix(in srgb, var(--surface-canvas) 75%, transparent),
+    0 12px 32px color-mix(in srgb, var(--surface-canvas) 52%, transparent);
 }
 
 .spinning-disc-rotor {
@@ -353,7 +369,8 @@
 
 .spinning-disc-overlay {
   border: 1px solid var(--border-quiet);
-  box-shadow: var(--disc-overlay-shadow);
+  box-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .spinning-disc-placeholder {
@@ -366,9 +383,15 @@
 
 .spinning-disc-control {
   border: 1px solid var(--border-control);
-  background: var(--disc-control-surface);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--surface-elevated) 96%, var(--state-info)),
+    color-mix(in srgb, var(--surface-canvas) 98%, var(--surface-elevated))
+  );
   color: var(--text-primary);
-  box-shadow: var(--disc-control-shadow);
+  box-shadow:
+    0 14px 34px color-mix(in srgb, var(--surface-canvas) 65%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 .spinning-disc-control-ring {
@@ -394,7 +417,8 @@
     color-mix(in srgb, var(--surface-canvas) 92%, transparent) 38%,
     var(--surface-canvas) 100%
   );
-  box-shadow: var(--info-hero-shadow);
+  box-shadow: 0 24px 80px
+    color-mix(in srgb, var(--surface-canvas) 28%, transparent);
 }
 
 .info-tab-hero-secondary {
@@ -486,7 +510,16 @@
 
 .home-playback-empty-card {
   border: 1px solid var(--border-quiet);
-  background: var(--home-playback-empty-gradient);
+  background: radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent-action) 18%, transparent),
+      transparent 50%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 4%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
 }
 
 .home-playback-badge,
@@ -508,7 +541,16 @@
 
 .home-replay-card {
   border: 1px solid var(--border-quiet);
-  background: var(--home-replay-card-surface);
+  background: radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent-action) 14%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 5%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
 }
 
 .home-replay-metric-card {
@@ -533,15 +575,38 @@
 
 .home-upcoming-feature {
   border: 1px solid var(--border-quiet);
-  background: var(--home-upcoming-feature-surface);
+  background: color-mix(
+    in srgb,
+    var(--surface-canvas) 92%,
+    var(--surface-elevated)
+  );
 }
 
 .home-upcoming-feature-glow {
-  background: var(--home-upcoming-feature-glow);
+  background: radial-gradient(
+      circle at 18% 20%,
+      color-mix(in srgb, var(--accent-action) 34%, transparent),
+      transparent 35%
+    ),
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--text-primary) 8%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
 }
 
 .home-upcoming-feature-overlay {
-  background: var(--home-upcoming-feature-overlay);
+  background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-canvas) 94%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 64%, transparent) 48%,
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent)
+    ),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--surface-canvas) 90%, transparent),
+      transparent 55%
+    );
 }
 
 .home-upcoming-badge,
@@ -876,7 +941,8 @@
 }
 
 .jam-artwork-shadow {
-  box-shadow: var(--jam-artwork-shadow);
+  box-shadow: 0 10px 25px
+    color-mix(in srgb, var(--surface-canvas) 30%, transparent);
 }
 
 .jam-request-action {
@@ -905,7 +971,8 @@
 .info-tab-artwork {
   border: 1px solid var(--border-quiet);
   background: var(--surface-quiet-subtle);
-  box-shadow: var(--info-artwork-shadow);
+  box-shadow: 0 12px 30px
+    color-mix(in srgb, var(--surface-canvas) 40%, transparent);
 }
 
 .info-tab-audio-pill {
@@ -923,7 +990,8 @@
 .info-tab-section-card {
   border: 1px solid var(--border-quiet);
   background: var(--surface-card);
-  box-shadow: var(--info-panel-shadow);
+  box-shadow: 0 12px 48px
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
 }
 
 .info-tab-section-header {
@@ -980,7 +1048,8 @@
 .listen-player-shell {
   border: 1px solid var(--border-quiet);
   background: var(--surface-chrome);
-  box-shadow: var(--player-shell-shadow);
+  box-shadow: 0 24px 56px
+    color-mix(in srgb, var(--surface-canvas) 34%, transparent);
   backdrop-filter: blur(24px);
 }
 
@@ -993,29 +1062,38 @@
 }
 
 .playlist-artwork-placeholder {
-  background: var(--playlist-artwork-placeholder-gradient);
+  background: linear-gradient(
+    145deg,
+    hsl(var(--playlist-artwork-hue-1), 42%, 30%),
+    hsl(var(--playlist-artwork-hue-2), 55%, 18%)
+  );
 }
 
 .listen-player-liked-indicator {
-  border: 1px solid var(--player-liked-border);
-  background: var(--player-liked-surface);
+  border: 1px solid color-mix(in srgb, var(--accent-action) 60%, transparent);
+  background: color-mix(in srgb, var(--surface-canvas) 80%, transparent);
   color: var(--accent-action);
-  box-shadow: var(--player-liked-shadow);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-action) 48%, transparent);
 }
 
 .listen-player-surface-fallback {
   border: 1px solid var(--border-quiet);
-  background: var(--player-fallback-surface);
+  background: color-mix(in srgb, var(--surface-canvas) 75%, transparent);
   color: var(--text-secondary-strong);
-  box-shadow: var(--player-fallback-shadow);
+  box-shadow: 0 12px 32px
+    color-mix(in srgb, var(--surface-canvas) 35%, transparent);
 }
 
 .listen-player-fullscreen-scrim {
-  background: var(--player-fullscreen-scrim);
+  background: color-mix(in srgb, var(--surface-canvas) 70%, transparent);
 }
 
 .fullscreen-player-surface {
-  background: var(--fullscreen-player-surface);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-elevated) 88%, var(--surface-canvas)) 0%,
+    var(--surface-canvas) 100%
+  );
 }
 
 .track-row {
@@ -1071,20 +1149,23 @@
 }
 
 .track-row-offline-ready {
-  color: var(--track-row-offline-ready);
+  color: color-mix(in srgb, var(--state-info) 75%, transparent);
 }
 
 .track-row-offline-busy {
-  color: var(--track-row-offline-busy);
+  color: color-mix(in srgb, var(--accent-action) 80%, transparent);
 }
 
 .track-row-offline-error {
-  color: var(--track-row-offline-error);
+  color: color-mix(in srgb, var(--state-warning) 80%, transparent);
 }
 
 .track-row-playback-progress {
   background: var(--surface-canvas-overlay);
-  box-shadow: var(--track-row-progress-shadow);
+  box-shadow:
+    0 8px 22px color-mix(in srgb, var(--surface-canvas) 40%, transparent),
+    0 0 12px var(--accent-action-glow-soft),
+    inset 0 1px 0 var(--border-quiet-subtle);
   color: var(--text-primary);
 }
 
@@ -1093,7 +1174,13 @@
 }
 
 .track-row-playback-rim {
-  background: var(--track-row-progress-rim);
+  background: radial-gradient(
+    circle at 48% 42%,
+    color-mix(in srgb, var(--text-primary) 18%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 16%, transparent) 28%,
+    color-mix(in srgb, var(--state-info) 8%, transparent) 54%,
+    transparent 74%
+  );
 }
 
 .track-row-playback-core {
@@ -1102,15 +1189,15 @@
 }
 
 .track-row-playback-gradient-start {
-  stop-color: var(--track-row-progress-ring-start);
+  stop-color: color-mix(in srgb, var(--text-primary) 98%, var(--accent-action));
 }
 
 .track-row-playback-gradient-mid {
-  stop-color: var(--track-row-progress-ring-mid);
+  stop-color: color-mix(in srgb, var(--accent-action) 96%, var(--text-primary));
 }
 
 .track-row-playback-gradient-end {
-  stop-color: var(--track-row-progress-ring-end);
+  stop-color: color-mix(in srgb, var(--accent-action) 72%, var(--state-info));
 }
 
 .track-row-playback-track {
@@ -1118,11 +1205,14 @@
 }
 
 .track-row-playback-ring {
-  filter: var(--track-row-progress-ring-filter);
+  filter: drop-shadow(0 0 5px var(--accent-action-glow-strong))
+    drop-shadow(0 0 12px var(--accent-action-glow-medium));
 }
 
 .track-row-playback-icon {
-  filter: var(--track-row-progress-icon-shadow);
+  filter: drop-shadow(
+    0 0 4px color-mix(in srgb, var(--text-primary) 35%, transparent)
+  );
 }
 
 .radio-station-card {
@@ -1145,7 +1235,16 @@
 }
 
 .radio-station-placeholder {
-  background: var(--radio-station-placeholder);
+  background: radial-gradient(
+      circle at 30% 20%,
+      var(--accent-action-glow-medium),
+      transparent 34%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--text-primary) 8%, transparent),
+      color-mix(in srgb, var(--text-primary) 1%, transparent)
+    );
 }
 
 .radio-station-placeholder[data-station-type="genre"] {
@@ -1153,7 +1252,12 @@
 }
 
 .radio-station-overlay {
-  background: var(--radio-station-overlay);
+  background: linear-gradient(
+    to top,
+    var(--surface-canvas),
+    color-mix(in srgb, var(--surface-canvas) 35%, transparent),
+    color-mix(in srgb, var(--surface-canvas) 10%, transparent)
+  );
 }
 
 .radio-station-type {
@@ -1339,7 +1443,7 @@
 
 .fullscreen-player-artwork,
 .fullscreen-player-artwork-placeholder {
-  box-shadow: var(--fullscreen-player-artwork-shadow);
+  box-shadow: 0 25px 50px -12px var(--surface-canvas-overlay);
 }
 
 .fullscreen-player-artwork-placeholder {
@@ -1355,11 +1459,33 @@
 }
 
 .stats-page-atmosphere {
-  background: var(--stats-page-atmosphere);
+  background: radial-gradient(
+      circle at 18% 12%,
+      color-mix(in srgb, var(--accent-action) 18%, transparent),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 82% 4%,
+      color-mix(in srgb, var(--stats-secondary-accent) 13%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+      transparent 34%
+    );
 }
 
 .stats-page-grid {
-  background-image: var(--stats-page-grid);
+  background-image: linear-gradient(
+      color-mix(in srgb, var(--text-primary) 5.5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--text-primary) 4.5%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 48px 48px;
 }
 
@@ -1367,7 +1493,7 @@
   border: 1px solid color-mix(in srgb, var(--accent-action) 25%, transparent);
   background: color-mix(in srgb, var(--accent-action) 10%, transparent);
   color: var(--accent-action);
-  box-shadow: var(--stats-hero-badge-shadow);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent-action) 14%, transparent);
 }
 
 .stats-hero-title {
@@ -1384,12 +1510,31 @@
 
 .stats-hero-surface {
   border: 1px solid var(--border-quiet);
-  background: var(--stats-hero-surface);
-  box-shadow: var(--stats-hero-shadow);
+  background: color-mix(
+    in srgb,
+    var(--surface-elevated) 86%,
+    var(--surface-canvas)
+  );
+  box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--surface-canvas) 35%, transparent);
 }
 
 .stats-hero-overlay {
-  background: var(--stats-hero-overlay);
+  background: radial-gradient(
+      circle at 68% 18%,
+      color-mix(in srgb, var(--accent-action) 28%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-canvas) 92%, transparent) 0%,
+      color-mix(in srgb, var(--surface-canvas) 58%, transparent) 44%,
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 90%, transparent)
+    );
 }
 
 .stats-hero-period-muted {
@@ -1464,8 +1609,13 @@
 
 .stats-affinity-card {
   border: 1px solid color-mix(in srgb, var(--accent-action) 20%, transparent);
-  background: var(--stats-affinity-surface);
-  box-shadow: var(--stats-affinity-shadow);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 13%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent) 45%,
+    color-mix(in srgb, var(--stats-secondary-accent) 10%, transparent)
+  );
+  box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--surface-canvas) 20%, transparent);
 }
 
 .stats-mosaic-cell,
@@ -1476,7 +1626,16 @@
 }
 
 .stats-mosaic-placeholder {
-  background: var(--stats-mosaic-placeholder);
+  background: radial-gradient(
+      circle at 30% 30%,
+      color-mix(in srgb, var(--accent-action) 35%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 12%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
 }
 
 .stats-mosaic-overlay {
@@ -1486,7 +1645,7 @@
 .stats-replay-card {
   border: 1px solid color-mix(in srgb, var(--accent-action) 20%, transparent);
   background: var(--accent-action-glow-soft);
-  box-shadow: var(--stats-replay-shadow);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--accent-action) 8%, transparent);
 }
 
 .stats-replay-badge {
@@ -1496,7 +1655,7 @@
 }
 
 .stats-replay-row {
-  background: var(--stats-replay-row-surface);
+  background: color-mix(in srgb, var(--surface-canvas) 15%, transparent);
 }
 
 .stats-replay-row:hover,
@@ -1510,20 +1669,44 @@
 }
 
 .stats-narrative-tone-cool {
-  background: var(--stats-narrative-cool);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 18%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+    transparent
+  );
 }
 
 .stats-narrative-tone-warm {
-  background: var(--stats-narrative-warm);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--stats-secondary-accent) 16%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+    transparent
+  );
 }
 
 .stats-narrative-tone-alert {
-  background: var(--stats-narrative-alert);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-warning) 16%, transparent),
+    color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+    transparent
+  );
 }
 
 .stats-pulse-surface {
   border: 1px solid var(--border-quiet);
-  background: var(--stats-pulse-surface);
+  background: radial-gradient(
+      circle at 18% 18%,
+      color-mix(in srgb, var(--accent-action) 16%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--text-primary) 3.5%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 18%, transparent)
+    );
 }
 
 .stats-pulse-plot {
@@ -1532,7 +1715,15 @@
 }
 
 .stats-pulse-grid {
-  background-image: var(--stats-pulse-grid);
+  background-image: linear-gradient(
+      color-mix(in srgb, var(--text-primary) 5.5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--text-primary) 3.5%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 28px 28px;
 }
 
@@ -1541,7 +1732,7 @@
 }
 
 .stats-pulse-point-idle {
-  color: var(--stats-pulse-idle-text);
+  color: color-mix(in srgb, var(--text-primary) 18%, transparent);
 }
 
 .stats-pulse-point-idle:hover {
@@ -1558,13 +1749,13 @@
 }
 
 .stats-pulse-point-active {
-  box-shadow: var(--stats-pulse-active-shadow);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--accent-action) 28%, transparent);
 }
 
 .stats-pulse-tooltip {
   border: 1px solid var(--border-quiet);
-  background: var(--stats-pulse-tooltip-surface);
-  box-shadow: var(--stats-pulse-tooltip-shadow);
+  background: color-mix(in srgb, var(--surface-canvas) 95%, transparent);
+  box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--surface-canvas) 45%, transparent);
 }
 
 .stats-pulse-tooltip-title,
@@ -1583,7 +1774,12 @@
 }
 
 .stats-profile-fill {
-  background: var(--stats-profile-gradient);
+  background: linear-gradient(
+    90deg,
+    var(--accent-action),
+    var(--state-warning),
+    var(--state-danger)
+  );
 }
 
 .stats-list-row {
@@ -1600,11 +1796,30 @@
 }
 
 .stats-artist-placeholder {
-  background: var(--stats-artist-placeholder);
+  background: radial-gradient(
+      circle at 26% 18%,
+      color-mix(in srgb, var(--accent-action) 28%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 10%, transparent),
+      color-mix(in srgb, var(--text-primary) 2%, transparent)
+    );
 }
 
 .stats-artist-overlay {
-  background: var(--stats-artist-overlay);
+  background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--surface-canvas) 92%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 46%, transparent) 58%,
+      color-mix(in srgb, var(--surface-canvas) 78%, transparent)
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-canvas) 8%, transparent),
+      color-mix(in srgb, var(--surface-canvas) 78%, transparent)
+    );
 }
 
 .stats-artist-index {
@@ -1755,11 +1970,20 @@
 .profile-hover-card {
   border-color: var(--border-quiet);
   background: var(--surface-overlay);
-  box-shadow: var(--profile-hover-card-shadow);
+  box-shadow: 0 28px 90px var(--surface-glass-shadow);
 }
 
 .profile-hover-glow {
-  background: var(--profile-hover-glow);
+  background: radial-gradient(
+      circle at 18% 12%,
+      color-mix(in srgb, var(--accent-action) 20%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text-primary) 8%, transparent),
+      transparent 42%
+    );
 }
 
 .profile-hover-watermark {
@@ -1772,7 +1996,8 @@
 }
 
 .profile-hover-avatar {
-  box-shadow: var(--profile-hover-avatar-shadow);
+  box-shadow: 0 18px 44px
+    color-mix(in srgb, var(--surface-canvas) 36%, transparent);
 }
 
 .profile-hover-avatar-placeholder {
@@ -1932,11 +2157,21 @@
 }
 
 .home-hero-scrim-horizontal {
-  background: var(--home-hero-scrim-horizontal);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--surface-canvas) 96%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 78%, transparent) 42%,
+    color-mix(in srgb, var(--surface-canvas) 20%, transparent) 100%
+  );
 }
 
 .home-hero-scrim-vertical {
-  background: var(--home-hero-scrim-vertical);
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--surface-canvas) 98%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 18%, transparent) 60%,
+    color-mix(in srgb, var(--surface-canvas) 45%, transparent) 100%
+  );
 }
 
 .home-hero-title {
@@ -2024,7 +2259,9 @@
 }
 
 .home-history-card {
-  box-shadow: var(--home-history-shadow);
+  box-shadow:
+    0 20px 25px -5px color-mix(in srgb, var(--surface-canvas) 20%, transparent),
+    0 8px 10px -6px color-mix(in srgb, var(--surface-canvas) 20%, transparent);
   transition:
     border-color var(--motion-duration-normal) ease,
     filter var(--motion-duration-normal) ease;
@@ -2036,27 +2273,57 @@
 }
 
 .home-history-tone-1 {
-  background: var(--home-history-tone-1);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 30%, transparent),
+    color-mix(in srgb, var(--accent-action) 15%, var(--surface-canvas) 65%),
+    var(--surface-canvas)
+  );
 }
 
 .home-history-tone-2 {
-  background: var(--home-history-tone-2);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-warning) 30%, transparent),
+    color-mix(in srgb, var(--state-warning) 15%, var(--surface-canvas) 70%),
+    var(--surface-canvas)
+  );
 }
 
 .home-history-tone-3 {
-  background: var(--home-history-tone-3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-info) 30%, transparent),
+    color-mix(in srgb, var(--state-info) 15%, var(--surface-canvas) 70%),
+    var(--surface-canvas)
+  );
 }
 
 .home-history-tone-4 {
-  background: var(--home-history-tone-4);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-danger) 30%, transparent),
+    color-mix(in srgb, var(--state-danger) 15%, var(--surface-canvas) 60%),
+    var(--surface-canvas)
+  );
 }
 
 .home-history-tone-5 {
-  background: var(--home-history-tone-5);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--state-success) 35%, transparent),
+    color-mix(in srgb, var(--state-success) 15%, var(--surface-canvas) 55%),
+    var(--surface-canvas)
+  );
 }
 
 .home-history-tone-6 {
-  background: var(--home-history-tone-6);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-action) 30%, transparent),
+    color-mix(in srgb, var(--state-info) 15%, var(--surface-canvas) 65%),
+    var(--surface-canvas)
+  );
 }
 
 .home-discovery-play-button {
@@ -2071,7 +2338,11 @@
 }
 
 .home-radio-overlay {
-  background: var(--home-radio-overlay);
+  background: linear-gradient(
+    180deg,
+    transparent 30%,
+    color-mix(in srgb, var(--surface-canvas) 92%, transparent) 100%
+  );
 }
 
 .home-radio-badge {
@@ -2093,8 +2364,13 @@
 
 .explore-feature-card {
   border: 1px solid var(--border-quiet);
-  background: var(--explore-feature-surface);
-  box-shadow: var(--explore-feature-shadow);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--text-primary) 8%, transparent),
+    color-mix(in srgb, var(--text-primary) 2.5%, transparent)
+  );
+  box-shadow: 0 18px 60px
+    color-mix(in srgb, var(--surface-canvas) 24%, transparent);
 }
 
 .explore-feature-card:hover {
@@ -2103,7 +2379,16 @@
 }
 
 .explore-feature-card-aura {
-  background: var(--explore-feature-aura);
+  background: radial-gradient(
+      circle at 18% 18%,
+      color-mix(in srgb, var(--accent-action) 28%, transparent),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at 90% 80%,
+      color-mix(in srgb, var(--text-primary) 11%, transparent),
+      transparent 38%
+    );
 }
 
 .explore-genre-card {
@@ -2118,11 +2403,24 @@
 
 .explore-genre-card-overlay-image,
 .explore-related-genre-overlay {
-  background: var(--explore-card-overlay);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-canvas) 16%, transparent) 0%,
+    color-mix(in srgb, var(--surface-canvas) 82%, transparent) 100%
+  );
 }
 
 .explore-genre-card-overlay-placeholder {
-  background: var(--explore-card-placeholder);
+  background: radial-gradient(
+      circle at var(--explore-card-glow-position) 20%,
+      color-mix(in srgb, var(--accent-action) 24%, transparent),
+      transparent 36%
+    ),
+    radial-gradient(
+      circle at 85% 85%,
+      color-mix(in srgb, var(--text-primary) 10%, transparent),
+      transparent 38%
+    );
 }
 
 .explore-genre-card-overlay-position-0 {
@@ -2142,11 +2440,17 @@
 }
 
 .explore-genre-hero-scrim {
-  background: var(--explore-hero-scrim);
+  background: color-mix(in srgb, var(--surface-canvas) 22%, transparent);
 }
 
 .explore-genre-hero-gradient {
-  background: var(--explore-hero-gradient);
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 14%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 46%, transparent) 60%,
+    var(--surface-canvas) 100%
+  );
 }
 
 .explore-related-genre-card {

@@ -236,7 +236,7 @@ test("enforces the normalized semantic token budget", () => {
 
   assert.deepEqual(metrics.nonFoundationAliases, []);
   assert.ok(
-    metrics.definitions <= 223,
+    metrics.definitions <= 150,
     `semantic token definitions grew to ${metrics.definitions}`,
   );
   assert.ok(
@@ -246,6 +246,10 @@ test("enforces the normalized semantic token budget", () => {
   assert.ok(
     metrics.domainDefinitions <= 114,
     `domain token definitions grew to ${metrics.domainDefinitions}`,
+  );
+  assert.ok(
+    metrics.oneShotTokens.length <= 25,
+    `single-use semantic tokens grew to ${metrics.oneShotTokens.length}`,
   );
   assert.equal(
     metrics.unreferencedTokens.length,
@@ -352,6 +356,6 @@ test("keeps semantic aliases, product slots and recipes physically separate", ()
   assert.match(semantic, /--surface-canvas:/);
   assert.doesNotMatch(semantic, /--(?:lyrics|stats|player|home)-/);
   assert.match(product, /--stats-/);
-  assert.match(product, /--player-/);
+  assert.match(product, /--visualizer-/);
   assert.match(recipes, /\.track-row\b/);
 });
