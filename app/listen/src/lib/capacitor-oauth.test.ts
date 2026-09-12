@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   setAuthTokensForServer: vi.fn(() => true),
   getCurrentServerId: vi.fn<() => string | null>(() => null),
   getServers: vi.fn<() => Array<{ id: string }>>(() => []),
+  setCurrentServerId: vi.fn(),
   waitForPendingSecureSessionWrites: vi.fn(),
 }));
 
@@ -28,6 +29,7 @@ vi.mock("@/lib/server-store", () => ({
   waitForPendingSecureSessionWrites: mocks.waitForPendingSecureSessionWrites,
   getCurrentServerId: mocks.getCurrentServerId,
   getServers: mocks.getServers,
+  setCurrentServerId: mocks.setCurrentServerId,
 }));
 
 import {
@@ -46,6 +48,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     mocks.setAuthTokensForServer.mockReset().mockReturnValue(true);
     mocks.getCurrentServerId.mockReset().mockReturnValue("server-a");
     mocks.getServers.mockReset().mockReturnValue([{ id: "server-a" }]);
+    mocks.setCurrentServerId.mockReset();
     mocks.waitForPendingSecureSessionWrites
       .mockReset()
       .mockResolvedValue(undefined);
@@ -171,6 +174,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       undefined,
       undefined,
     );
+    expect(mocks.setCurrentServerId).toHaveBeenCalledWith("server-a");
   });
 
   it("rejects the callback if the originating server was removed while the flow was in flight", async () => {
@@ -224,6 +228,31 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       undefined,
       undefined,
     );
+  });
+
+  it("does not reactivate a server removed while its token is being persisted", async () => {
+    const state = "s".repeat(32);
+    localStorage.setItem(
+      `crate.oauth.${state}`,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    mocks.apiForServerMock.mockResolvedValue({ token: "access-token" });
+    mocks.waitForPendingSecureSessionWrites.mockImplementation(async () => {
+      mocks.getServers.mockReturnValue([]);
+    });
+
+    const result = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
+    );
+
+    expect(result).toEqual({ handled: false, next: "/" });
+    expect(mocks.setCurrentServerId).not.toHaveBeenCalled();
+    expect(localStorage.getItem("crate-oauth-next")).toBeNull();
   });
 
   it("exchanges a duplicated deep link only once", async () => {

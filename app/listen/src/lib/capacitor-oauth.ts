@@ -8,6 +8,7 @@ import { isTauriRuntime } from "@/lib/platform";
 import {
   getCurrentServerId,
   getServers,
+  setCurrentServerId,
   waitForPendingSecureSessionWrites,
 } from "@/lib/server-store";
 
@@ -279,6 +280,10 @@ async function exchangeNativeOAuthCallback(
       setAuthTokensForServer(record.serverId, null, null, null);
       throw error;
     }
+    if (!getServers().some((server) => server.id === record.serverId)) {
+      return { handled: false, next: "/" };
+    }
+    setCurrentServerId(record.serverId);
     storePendingOAuthNext(record.next);
     return { handled: true, next: record.next };
   } catch {

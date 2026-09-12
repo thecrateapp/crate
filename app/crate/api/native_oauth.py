@@ -105,12 +105,17 @@ def issue_handoff(*, user_id: int, app_id: str, state: str, challenge: str) -> s
     serialized = _serialize(handoff)
     redis_client = _redis_client()
     if redis_client is not None:
-        stored = redis_client.set(
-            key,
-            serialized,
-            ex=NATIVE_OAUTH_HANDOFF_TTL_SECONDS,
-            nx=True,
-        )
+        try:
+            stored = redis_client.set(
+                key,
+                serialized,
+                ex=NATIVE_OAUTH_HANDOFF_TTL_SECONDS,
+                nx=True,
+            )
+        except Exception as exc:
+            raise NativeOAuthUnavailable(
+                "Native OAuth handoff store is unavailable"
+            ) from exc
         if stored:
             return code
         raise NativeOAuthUnavailable("Native OAuth handoff could not be stored")
@@ -124,7 +129,12 @@ def issue_handoff(*, user_id: int, app_id: str, state: str, challenge: str) -> s
 def _take_handoff(key: str) -> bytes | str | None:
     redis_client = _redis_client()
     if redis_client is not None:
-        return redis_client.getdel(key)
+        try:
+            return redis_client.getdel(key)
+        except Exception as exc:
+            raise NativeOAuthUnavailable(
+                "Native OAuth handoff store is unavailable"
+            ) from exc
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:

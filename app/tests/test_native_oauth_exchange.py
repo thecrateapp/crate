@@ -20,6 +20,14 @@ class _AtomicRedis:
         return self.values.pop(key, None)
 
 
+class _UnavailableRedis:
+    def set(self, key: str, value: str, *, ex: int, nx: bool = False) -> bool:
+        raise ConnectionError("redis unavailable")
+
+    def getdel(self, key: str) -> bytes | None:
+        raise ConnectionError("redis unavailable")
+
+
 def _request(
     *,
     method: str = "POST",
@@ -151,6 +159,39 @@ def test_native_handoff_fails_closed_without_redis_in_production() -> None:
                 app_id="listen-android",
                 state="state-token",
                 challenge=native_oauth.pkce_challenge("v" * 43),
+            )
+
+
+def test_native_handoff_translates_active_redis_write_failure() -> None:
+    from crate.api import native_oauth
+
+    with patch.object(
+        native_oauth,
+        "_redis_client",
+        return_value=_UnavailableRedis(),
+    ):
+        with pytest.raises(native_oauth.NativeOAuthUnavailable):
+            native_oauth.issue_handoff(
+                user_id=7,
+                app_id="listen-android",
+                state="state-token",
+                challenge=native_oauth.pkce_challenge("v" * 43),
+            )
+
+
+def test_native_handoff_translates_active_redis_read_failure() -> None:
+    from crate.api import native_oauth
+
+    with patch.object(
+        native_oauth,
+        "_redis_client",
+        return_value=_UnavailableRedis(),
+    ):
+        with pytest.raises(native_oauth.NativeOAuthUnavailable):
+            native_oauth.consume_handoff(
+                code="handoff-code",
+                state="state-token",
+                verifier="v" * 43,
             )
 
 

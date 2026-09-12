@@ -101,6 +101,12 @@ jobs:
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
         run: npm run --workspace=app/listen build
 
+      - name: Type check desktop app
+        run: npm run --workspace=app/listen-desktop typecheck
+
+      - name: Test desktop app
+        run: npm run --workspace=app/listen-desktop test
+
   appearance-chromium:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
