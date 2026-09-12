@@ -371,10 +371,20 @@ fn start_oauth_loopback<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
 }
 
 #[cfg(desktop)]
+const OAUTH_LOOPBACK_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+#[cfg(desktop)]
 fn handle_oauth_loopback_request<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     stream: &mut TcpStream,
 ) {
+    // This listens on a local port for the whole app lifetime; without a
+    // timeout, a connection that never sends anything (or another local
+    // process probing the port) would block this thread — and every
+    // request after it, since `listener.incoming()` handles connections
+    // one at a time — indefinitely.
+    let _ = stream.set_read_timeout(Some(OAUTH_LOOPBACK_READ_TIMEOUT));
+
     let mut buffer = [0_u8; 4096];
     let read = stream.read(&mut buffer).unwrap_or(0);
     let request = String::from_utf8_lossy(&buffer[..read]);
