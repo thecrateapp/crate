@@ -210,35 +210,49 @@ function getRawColorAllowlistMetadata() {
   }));
 }
 
-function extractRootBlock(content) {
-  const rootStart = content.indexOf(":root");
-  if (rootStart === -1) return "";
+function extractRootBlocks(content) {
+  const blocks = [];
+  let searchFrom = 0;
 
-  const openingBrace = content.indexOf("{", rootStart);
-  if (openingBrace === -1) return "";
+  while (searchFrom < content.length) {
+    const rootStart = content.indexOf(":root", searchFrom);
+    if (rootStart === -1) break;
 
-  let depth = 0;
-  for (let index = openingBrace; index < content.length; index += 1) {
-    if (content[index] === "{") depth += 1;
-    if (content[index] !== "}") continue;
+    const openingBrace = content.indexOf("{", rootStart);
+    if (openingBrace === -1) break;
 
-    depth -= 1;
-    if (depth === 0) return content.slice(openingBrace + 1, index);
+    let depth = 0;
+    let closingBrace = -1;
+    for (let index = openingBrace; index < content.length; index += 1) {
+      if (content[index] === "{") depth += 1;
+      if (content[index] !== "}") continue;
+
+      depth -= 1;
+      if (depth === 0) {
+        closingBrace = index;
+        break;
+      }
+    }
+
+    if (closingBrace === -1) break;
+    blocks.push(content.slice(openingBrace + 1, closingBrace));
+    searchFrom = closingBrace + 1;
   }
 
-  return "";
+  return blocks;
 }
 
 function extractRootTokenDefinitions(content) {
-  const rootBlock = extractRootBlock(content);
-  return [...rootBlock.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*([^;]+);/gim)].map(
-    ([, name, value]) => ({
-      name,
-      value: value
-        .replace(/\s+/g, " ")
-        .trim()
-        .replace(/\s*([(),])\s*/g, "$1"),
-    }),
+  return extractRootBlocks(content).flatMap((rootBlock) =>
+    [...rootBlock.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*([^;]+);/gim)].map(
+      ([, name, value]) => ({
+        name,
+        value: value
+          .replace(/\s+/g, " ")
+          .trim()
+          .replace(/\s*([(),])\s*/g, "$1"),
+      }),
+    ),
   );
 }
 
@@ -409,9 +423,8 @@ function collectFiles(directory, repoRoot, output) {
 export function buildDriftInventory(repoRoot = process.cwd()) {
   const resolvedRoot = resolve(repoRoot);
   const files = [];
-  const semanticTokenPath = join(
-    resolvedRoot,
-    "app/shared/ui/tokens/semantic.css",
+  const semanticTokenPaths = ["semantic.css", "product.css"].map((file) =>
+    join(resolvedRoot, "app/shared/ui/tokens", file),
   );
 
   SOURCE_DIRECTORIES.forEach((directory) => {
@@ -457,9 +470,13 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
     version: 4,
     roots: SOURCE_DIRECTORIES,
     rawColorAllowlist: getRawColorAllowlistMetadata(),
-    semanticTokens: statSync(semanticTokenPath, { throwIfNoEntry: false })
+    semanticTokens: semanticTokenPaths.every((path) =>
+      statSync(path, { throwIfNoEntry: false }),
+    )
       ? analyzeSemanticTokens(
-          readFileSync(semanticTokenPath, "utf8"),
+          semanticTokenPaths
+            .map((path) => readFileSync(path, "utf8"))
+            .join("\n"),
           sourceContents,
         )
       : null,

@@ -55,6 +55,23 @@ test("normalizes CSS whitespace when grouping semantic values", () => {
   assert.deepEqual(metrics.intentionalDuplicateGroups, []);
 });
 
+test("analyzes definitions across split semantic root blocks", () => {
+  const metrics = analyzeSemanticTokens(`
+    :root {
+      --surface-canvas: #000;
+    }
+    :root {
+      --lyrics-glow: radial-gradient(var(--surface-canvas), transparent);
+    }
+    .lyrics { background: var(--lyrics-glow); }
+  `);
+
+  assert.equal(metrics.definitions, 2);
+  assert.equal(metrics.foundationDefinitions, 1);
+  assert.equal(metrics.domainDefinitions, 1);
+  assert.deepEqual(metrics.unreferencedTokens, []);
+});
+
 test("classifies token layers and counts external consumers", () => {
   const metrics = analyzeSemanticTokens(
     `
@@ -259,7 +276,7 @@ test("enforces the normalized semantic token budget", () => {
         "The default skin shares the same value, but cards and destructive controls are separate semantic roles for future skins.",
     },
     {
-      tokens: ["--genre-tone-default", "--brand-logo-start"],
+      tokens: ["--brand-logo-start", "--genre-tone-default"],
       reason:
         "The logo and genre surfaces currently share the action accent while remaining independent theme slots.",
     },
@@ -271,7 +288,7 @@ test("enforces the normalized semantic token budget", () => {
   ]);
   assert.deepEqual(metrics.duplicateTokenGroups, [
     ["--surface-contrast", "--state-danger-foreground"],
-    ["--genre-tone-default", "--brand-logo-start"],
+    ["--brand-logo-start", "--genre-tone-default"],
     ["--brand-logo-end", "--jam-focus-border"],
   ]);
 });
@@ -312,4 +329,29 @@ test("keeps runtime mode hooks isolated from semantic recipes", () => {
     themes,
     /(?:^|[;{])\s*(?:margin|padding|width|height)\s*:/m,
   );
+});
+
+test("keeps semantic aliases, product slots and recipes physically separate", () => {
+  const semantic = readFileSync(
+    new URL("../../app/shared/ui/tokens/semantic.css", import.meta.url),
+    "utf8",
+  );
+  const product = readFileSync(
+    new URL("../../app/shared/ui/tokens/product.css", import.meta.url),
+    "utf8",
+  );
+  const recipes = readFileSync(
+    new URL("../../app/shared/ui/tokens/recipes.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(semantic, /^\s*\.[a-z]/m);
+  assert.doesNotMatch(product, /^\s*\.[a-z]/m);
+  assert.doesNotMatch(product, /@theme\b/);
+  assert.doesNotMatch(recipes, /:root\b|@theme\b/);
+  assert.match(semantic, /--surface-canvas:/);
+  assert.doesNotMatch(semantic, /--(?:lyrics|stats|player|home)-/);
+  assert.match(product, /--stats-/);
+  assert.match(product, /--player-/);
+  assert.match(recipes, /\.track-row\b/);
 });

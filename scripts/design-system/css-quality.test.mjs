@@ -28,15 +28,15 @@ test("uses explicit transition properties instead of transition-all", () => {
 });
 
 test("keeps shared Jam and Radio inputs visibly focused", () => {
-  const semantic = readFileSync(
-    new URL("app/shared/ui/tokens/semantic.css", ROOT),
+  const recipes = readFileSync(
+    new URL("app/shared/ui/tokens/recipes.css", ROOT),
     "utf8",
   );
 
-  const jamFocus = semantic.match(
+  const jamFocus = recipes.match(
     /\.jam-input:focus,[\s\S]*?\.jam-select-trigger:focus\s*\{([^}]*)\}/,
   )?.[1];
-  const radioFocus = semantic.match(
+  const radioFocus = recipes.match(
     /\.radio-seed-input:focus\s*\{([^}]*)\}/,
   )?.[1];
 
