@@ -232,6 +232,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test desktop native layer
+        run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
+
       - name: Build macOS tester bundles
         if: runner.os == 'macOS'
         env:
