@@ -316,6 +316,9 @@ export function useNativeBufferingRecovery({
           volume: lastNonZeroVolumeRef.current,
         });
       })().catch((error) => {
+        if (nativeAuthRetryKeyRef.current === retryKey) {
+          nativeAuthRetryKeyRef.current = null;
+        }
         const summary = nativePlaybackErrorMessage(nativeError);
         console.error("[native-player] failed to recover auth error:", error);
         persistNativePlaybackDiagnostic({
