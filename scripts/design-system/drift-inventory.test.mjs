@@ -146,7 +146,7 @@ test("separates foundation and intentional raw colors from product drift", () =>
   );
   assert.deepEqual(
     analyzeRawColorDrift(
-      "app/shared/ui/lib/theme-skin.ts",
+      "app/shared/ui/lib/appearance-token-registry.ts",
       '"--color-primary": "#a78bfa", "--surface-modal": "rgba(17, 16, 30, 0.96)"',
     ),
     { foundationRawColors: 0, allowlistedRawColors: 2, actionableRawColors: 0 },
@@ -171,16 +171,10 @@ test("exposes ownership metadata for every raw color exception", () => {
       reviewBy: "2026-12-31",
     },
     {
-      path: "app/shared/ui/lib/theme-skin.ts",
-      owner: "design-system",
-      reason: "Curated skin values are runtime inputs for the skin registry.",
-      reviewBy: "2026-12-31",
-    },
-    {
-      path: "app/shared/ui/lib/appearance-resolver.ts",
+      path: "app/shared/ui/lib/appearance-token-registry.ts",
       owner: "design-system",
       reason:
-        "Scoped appearance previews need explicit runtime palette values for each preset and mode.",
+        "The typed registry is the sole runtime authority for preset and mode palette values.",
       reviewBy: "2026-12-31",
     },
     {
@@ -188,12 +182,6 @@ test("exposes ownership metadata for every raw color exception", () => {
       owner: "design-system",
       reason:
         "Contrast selection uses stable foreground candidates for deterministic WCAG validation.",
-      reviewBy: "2026-12-31",
-    },
-    {
-      path: "app/listen/src/lib/theme-color.ts",
-      owner: "listen-platform",
-      reason: "Theme-color fallbacks must cover the pre-CSS cold-boot surface.",
       reviewBy: "2026-12-31",
     },
     {

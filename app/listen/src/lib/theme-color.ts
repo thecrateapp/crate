@@ -1,9 +1,5 @@
 import type { ResolvedColorMode } from "@crate/ui/lib/theme-skin";
-
-const FALLBACK_THEME_COLORS: Record<ResolvedColorMode, string> = {
-  dark: "#0a0a0f",
-  light: "#f8fafc",
-};
+import { getAppearanceThemeColor } from "@crate/ui/lib/appearance-token-registry";
 
 export function readThemeColor(
   root: HTMLElement,
@@ -13,7 +9,7 @@ export function readThemeColor(
   return (
     computed.getPropertyValue("--crate-token-surface-app").trim() ||
     computed.getPropertyValue("--surface-app").trim() ||
-    FALLBACK_THEME_COLORS[mode]
+    getAppearanceThemeColor("default", mode)
   );
 }
 

@@ -6,6 +6,7 @@ import {
   createDefaultAppearancePreferences,
   resolveAppearance,
 } from "@crate/ui/lib/appearance-resolver";
+import { SKIN_VARIABLE_ALLOWLIST } from "@crate/ui/lib/theme-skin";
 import { ThemeScope } from "./ThemeScope";
 
 const preview = resolveAppearance(
@@ -67,5 +68,20 @@ describe("ThemeScope", () => {
     expect(root.style.getPropertyValue("--unrelated-variable")).toBe("keep");
 
     root.remove();
+  });
+
+  it("owns every skin variable instead of inheriting part of the preview", () => {
+    render(
+      <ThemeScope appearance={preview} data-testid="complete-preview">
+        <span>Preview</span>
+      </ThemeScope>,
+    );
+
+    const scope = screen.getByTestId("complete-preview");
+    const missing = SKIN_VARIABLE_ALLOWLIST.filter(
+      (name) => scope.style.getPropertyValue(name) === "",
+    );
+
+    expect(missing).toEqual([]);
   });
 });

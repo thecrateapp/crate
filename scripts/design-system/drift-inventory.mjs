@@ -24,21 +24,12 @@ const RAW_COLOR_ALLOWLIST = new Map([
     },
   ],
   [
-    "app/shared/ui/lib/theme-skin.ts",
-    {
-      pattern: /#[0-9a-f]{3,8}\b|rgba?\(/gi,
-      owner: "design-system",
-      reason: "Curated skin values are runtime inputs for the skin registry.",
-      reviewBy: "2026-12-31",
-    },
-  ],
-  [
-    "app/shared/ui/lib/appearance-resolver.ts",
+    "app/shared/ui/lib/appearance-token-registry.ts",
     {
       pattern: /#[0-9a-f]{3,8}\b|rgba?\(/gi,
       owner: "design-system",
       reason:
-        "Scoped appearance previews need explicit runtime palette values for each preset and mode.",
+        "The typed registry is the sole runtime authority for preset and mode palette values.",
       reviewBy: "2026-12-31",
     },
   ],
@@ -49,15 +40,6 @@ const RAW_COLOR_ALLOWLIST = new Map([
       owner: "design-system",
       reason:
         "Contrast selection uses stable foreground candidates for deterministic WCAG validation.",
-      reviewBy: "2026-12-31",
-    },
-  ],
-  [
-    "app/listen/src/lib/theme-color.ts",
-    {
-      pattern: /#[0-9a-f]{3,8}\b/gi,
-      owner: "listen-platform",
-      reason: "Theme-color fallbacks must cover the pre-CSS cold-boot surface.",
       reviewBy: "2026-12-31",
     },
   ],
