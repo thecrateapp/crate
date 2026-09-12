@@ -243,4 +243,53 @@ describe("native server credential migration", () => {
       localStorage.getItem("crate-pending-session-removals:v1"),
     ).toBeNull();
   });
+
+  it("keeps a newer logout tombstone when an older login write completes", async () => {
+    localStorage.setItem(
+      "crate-servers:v1",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem("crate-current-server", "server-1");
+    secureGet.mockResolvedValue(null);
+    let resolveLoginWrite: (() => void) | undefined;
+    secureSet.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveLoginWrite = resolve;
+      }),
+    );
+    let rejectLogoutRemoval: ((error: Error) => void) | undefined;
+    secureRemove.mockReturnValue(
+      new Promise<void>((_, reject) => {
+        rejectLogoutRemoval = reject;
+      }),
+    );
+    const store = await import("./server-store");
+    await store.bootstrapNativeSessionStore();
+
+    store.setCurrentServerAuthTokens("access-secret", "refresh-secret");
+    await vi.waitFor(() => expect(secureSet).toHaveBeenCalledOnce());
+    store.setCurrentServerAuthTokens(null, null, null);
+
+    resolveLoginWrite!();
+    await vi.waitFor(() => expect(secureRemove).toHaveBeenCalledOnce());
+
+    expect(localStorage.getItem("crate-pending-session-removals:v1")).toContain(
+      "server-1",
+    );
+
+    rejectLogoutRemoval!(new Error("keystore unavailable"));
+    await expect(store.waitForPendingSecureSessionWrites()).rejects.toThrow(
+      "Native session persistence failed",
+    );
+    expect(localStorage.getItem("crate-pending-session-removals:v1")).toContain(
+      "server-1",
+    );
+  });
 });

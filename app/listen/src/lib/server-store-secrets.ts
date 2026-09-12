@@ -29,56 +29,68 @@ function emptySecret(): ServerSecret {
   return { token: null, refreshToken: null };
 }
 
-function readPendingSecretRemovals(): Set<string> {
+function readPendingSecretRemovals(): Map<string, number> {
   try {
     const parsed = JSON.parse(
-      localStorage.getItem(PENDING_SECRET_REMOVALS_KEY) ?? "[]",
+      localStorage.getItem(PENDING_SECRET_REMOVALS_KEY) ?? "{}",
     );
-    return new Set(
-      Array.isArray(parsed)
-        ? parsed.filter((value): value is string => typeof value === "string")
-        : [],
+    if (Array.isArray(parsed)) {
+      return new Map(
+        parsed
+          .filter((value): value is string => typeof value === "string")
+          .map((serverId) => [serverId, 1]),
+      );
+    }
+    if (!parsed || typeof parsed !== "object") return new Map();
+    return new Map(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, number] =>
+          typeof entry[1] === "number" && Number.isSafeInteger(entry[1]),
+      ),
     );
   } catch {
-    return new Set();
+    return new Map();
   }
 }
 
-function writePendingSecretRemovals(serverIds: Set<string>): void {
+function writePendingSecretRemovals(removals: Map<string, number>): void {
   try {
-    if (serverIds.size === 0) {
+    if (removals.size === 0) {
       localStorage.removeItem(PENDING_SECRET_REMOVALS_KEY);
       return;
     }
     localStorage.setItem(
       PENDING_SECRET_REMOVALS_KEY,
-      JSON.stringify([...serverIds]),
+      JSON.stringify(Object.fromEntries(removals)),
     );
   } catch {
     // Secure storage remains authoritative when local metadata is unavailable.
   }
 }
 
-function markSecretRemovalPending(serverId: string): void {
+function markSecretRemovalPending(serverId: string): number {
   const pending = readPendingSecretRemovals();
-  pending.add(serverId);
+  const generation = (pending.get(serverId) ?? 0) + 1;
+  pending.set(serverId, generation);
   writePendingSecretRemovals(pending);
+  return generation;
 }
 
-function clearPendingSecretRemoval(serverId: string): void {
+function clearPendingSecretRemoval(serverId: string, generation: number): void {
   const pending = readPendingSecretRemovals();
+  if (pending.get(serverId) !== generation) return;
   pending.delete(serverId);
   writePendingSecretRemovals(pending);
 }
 
 async function retryPendingSecretRemovals(): Promise<void> {
-  for (const serverId of readPendingSecretRemovals()) {
+  for (const [serverId, generation] of readPendingSecretRemovals()) {
     try {
       // Each tombstone is independent; one unavailable Keychain entry must not
       // prevent the remaining active sessions from loading at startup.
       // react-doctor-disable-next-line async-await-in-loop
       await removeSecureSessionValue(secureSessionKey(serverId));
-      clearPendingSecretRemoval(serverId);
+      clearPendingSecretRemoval(serverId, generation);
     } catch {
       // Keep the tombstone durable so the next bootstrap retries it again.
     }
@@ -154,6 +166,7 @@ export function queueSecretWrite(serverId: string, secret: ServerSecret): void {
     queueSecretRemoval(serverId);
     return;
   }
+  const supersededRemovalGeneration = readPendingSecretRemovals().get(serverId);
   enqueueSecretWrite(serverId, async () => {
     await setSecureSessionValue(
       secureSessionKey(serverId),
@@ -162,15 +175,17 @@ export function queueSecretWrite(serverId: string, secret: ServerSecret): void {
     // A successful login supersedes any failed logout queued for this same
     // server. Leaving that tombstone behind would delete the new session on
     // the next bootstrap.
-    clearPendingSecretRemoval(serverId);
+    if (supersededRemovalGeneration !== undefined) {
+      clearPendingSecretRemoval(serverId, supersededRemovalGeneration);
+    }
   });
 }
 
 function queueSecretRemoval(serverId: string): void {
-  markSecretRemovalPending(serverId);
+  const generation = markSecretRemovalPending(serverId);
   enqueueSecretWrite(serverId, async () => {
     await removeSecureSessionValue(secureSessionKey(serverId));
-    clearPendingSecretRemoval(serverId);
+    clearPendingSecretRemoval(serverId, generation);
   });
 }
 
