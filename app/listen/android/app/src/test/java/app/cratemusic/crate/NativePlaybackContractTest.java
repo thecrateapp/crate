@@ -50,4 +50,12 @@ public class NativePlaybackContractTest {
             )
         );
     }
+
+    @Test
+    public void nativeEventSequenceIsStrictlyMonotonic() {
+        NativeEventSequence sequence = new NativeEventSequence();
+
+        assertEquals(1L, sequence.next());
+        assertEquals(2L, sequence.next());
+    }
 }

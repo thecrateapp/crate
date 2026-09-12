@@ -12,6 +12,11 @@ export type EngineTransitionType =
   | "manual-skip"
   | "seek";
 
+export interface NativeEventMetadata {
+  nativeSequence?: number;
+  nativeTimeMs?: number;
+}
+
 export interface EngineTrack {
   id: string;
   url: string;
@@ -39,9 +44,8 @@ export interface EngineQueueSnapshot {
   volume: number;
 }
 
-export interface EngineState {
+export interface EngineState extends NativeEventMetadata {
   revision: string;
-  nativeTimeMs?: number;
   playbackState: EnginePlaybackState;
   isPlaying: boolean;
   index: number;
@@ -52,9 +56,8 @@ export interface EngineState {
   eqEnabled: boolean;
 }
 
-export interface EnginePositionEvent {
+export interface EnginePositionEvent extends NativeEventMetadata {
   revision: string;
-  nativeTimeMs?: number;
   trackId?: string;
   index: number;
   positionMs: number;
@@ -62,7 +65,7 @@ export interface EnginePositionEvent {
   isPlaying: boolean;
 }
 
-export interface EngineTransitionEvent {
+export interface EngineTransitionEvent extends NativeEventMetadata {
   revision: string;
   type: EngineTransitionType;
   outgoingTrackId?: string;
@@ -77,9 +80,8 @@ export interface EngineTransitionEvent {
   finalIndex?: number;
 }
 
-export interface EngineErrorEvent {
+export interface EngineErrorEvent extends NativeEventMetadata {
   revision: string;
-  nativeTimeMs?: number;
   code?: number;
   message: string;
   trackId?: string;
@@ -99,20 +101,17 @@ export interface EngineEventMap {
   transitionStarted: EngineTransitionEvent;
   transitionProgress: EngineTransitionEvent;
   transitionEnded: EngineTransitionEvent;
-  bufferingChanged: {
+  bufferingChanged: NativeEventMetadata & {
     revision: string;
-    nativeTimeMs?: number;
     isBuffering: boolean;
   };
-  queueEnded: { revision: string; nativeTimeMs?: number };
-  nearQueueEnd: {
+  queueEnded: NativeEventMetadata & { revision: string };
+  nearQueueEnd: NativeEventMetadata & {
     revision: string;
-    nativeTimeMs?: number;
     remainingTracks: number;
   };
-  resumeAuthorizationRequired: {
+  resumeAuthorizationRequired: NativeEventMetadata & {
     revision: string;
-    nativeTimeMs?: number;
     index: number;
     positionMs: number;
     playWhenReady: boolean;

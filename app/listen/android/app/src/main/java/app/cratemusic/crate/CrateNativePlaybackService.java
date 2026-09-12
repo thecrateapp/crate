@@ -111,6 +111,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     };
     private final List<JSObject> bufferedEvents = new ArrayList<>();
     private final List<NativeTrack> queue = new ArrayList<>();
+    private final NativeEventSequence nativeEventSequence = new NativeEventSequence();
 
     private ExoPlayer player;
     private DefaultHttpDataSource.Factory httpDataSourceFactory;
@@ -940,6 +941,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private JSObject basePayload() {
         JSObject payload = new JSObject();
         payload.put("revision", queueRevision);
+        payload.put("nativeSequence", nativeEventSequence.next());
         payload.put("nativeTimeMs", System.currentTimeMillis());
         return payload;
     }

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   isStaleNativeEvent,
+  type NativeEventWatermark,
   nativeTransitionFlushReason,
   projectedNativePositionSeconds,
 } from "./use-native-playback-runtime";
@@ -38,24 +39,56 @@ describe("native playback runtime helpers", () => {
   });
 
   it("drops a buffered event older than the freshest one already applied", () => {
-    const watermark = { current: 0 };
+    const watermark: { current: NativeEventWatermark } = { current: null };
 
-    expect(isStaleNativeEvent(5_000, watermark)).toBe(false);
-    expect(watermark.current).toBe(5_000);
+    expect(isStaleNativeEvent({ nativeTimeMs: 5_000 }, watermark)).toBe(false);
+    expect(watermark.current).toEqual({ kind: "timestamp", value: 5_000 });
 
     // A drained/buffered event describing an earlier moment than what a
     // live event already advanced state to.
-    expect(isStaleNativeEvent(3_000, watermark)).toBe(true);
-    expect(watermark.current).toBe(5_000);
+    expect(isStaleNativeEvent({ nativeTimeMs: 3_000 }, watermark)).toBe(true);
+    expect(watermark.current).toEqual({ kind: "timestamp", value: 5_000 });
 
-    expect(isStaleNativeEvent(5_001, watermark)).toBe(false);
-    expect(watermark.current).toBe(5_001);
+    expect(isStaleNativeEvent({ nativeTimeMs: 5_001 }, watermark)).toBe(false);
+    expect(watermark.current).toEqual({ kind: "timestamp", value: 5_001 });
   });
 
   it("lets events with no timestamp through without moving the watermark", () => {
-    const watermark = { current: 5_000 };
+    const watermark = {
+      current: { kind: "timestamp" as const, value: 5_000 },
+    };
 
-    expect(isStaleNativeEvent(undefined, watermark)).toBe(false);
-    expect(watermark.current).toBe(5_000);
+    expect(isStaleNativeEvent({}, watermark)).toBe(false);
+    expect(watermark.current).toEqual({ kind: "timestamp", value: 5_000 });
+  });
+
+  it("orders same-millisecond events by their monotonic native sequence", () => {
+    const watermark: { current: NativeEventWatermark } = { current: null };
+
+    expect(
+      isStaleNativeEvent(
+        { nativeSequence: 41, nativeTimeMs: 5_000 },
+        watermark,
+      ),
+    ).toBe(false);
+    expect(
+      isStaleNativeEvent(
+        { nativeSequence: 42, nativeTimeMs: 5_000 },
+        watermark,
+      ),
+    ).toBe(false);
+    expect(watermark.current).toEqual({ kind: "sequence", value: 42 });
+  });
+
+  it("rejects a lower sequence even when its wall clock is newer", () => {
+    const watermark: { current: NativeEventWatermark } = { current: null };
+
+    expect(
+      isStaleNativeEvent({ nativeSequence: 9, nativeTimeMs: 5_000 }, watermark),
+    ).toBe(false);
+    expect(
+      isStaleNativeEvent({ nativeSequence: 8, nativeTimeMs: 6_000 }, watermark),
+    ).toBe(true);
+    expect(watermark.current).toEqual({ kind: "sequence", value: 9 });
   });
 });

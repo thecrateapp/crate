@@ -11,6 +11,7 @@ import type {
   EngineEventName,
   EnginePositionEvent,
   EngineState,
+  NativeEventMetadata,
 } from "@/lib/playback-engine";
 import {
   nativePlaybackErrorMessage,
@@ -22,13 +23,12 @@ import { toast } from "sonner";
 
 type ValueRef<T> = { readonly current: T };
 type MutableValueRef<T> = { current: T };
-type NativeTimedPayload = { nativeTimeMs?: number };
 
 export function shouldHandleNativeSideEffectEvent(
-  payload: NativeTimedPayload,
-  isNativeEventStale: (nativeTimeMs: number | undefined) => boolean,
+  payload: NativeEventMetadata,
+  isNativeEventStale: (event: NativeEventMetadata) => boolean,
 ): boolean {
-  return !isNativeEventStale(payload.nativeTimeMs);
+  return !isNativeEventStale(payload);
 }
 
 // The most common trigger for resumeAuthorizationRequired is Android
@@ -89,7 +89,7 @@ export interface UseNativePlaybackEventBridgeParams {
     reason: "completed" | "skipped",
     track?: Track,
   ) => void;
-  isNativeEventStale: (nativeTimeMs: number | undefined) => boolean;
+  isNativeEventStale: (event: NativeEventMetadata) => boolean;
   queueRef: ValueRef<Track[]>;
   recoverNativeBuffering: (options: {
     forceRefresh: boolean;
@@ -140,7 +140,7 @@ export function useNativePlaybackEventBridge({
       }
       if (
         !shouldHandleNativeSideEffectEvent(
-          payload as NativeTimedPayload,
+          payload as NativeEventMetadata,
           isNativeEventStale,
         )
       ) {

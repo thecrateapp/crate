@@ -1,25 +1,48 @@
 import { useCallback, useRef } from "react";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
-import type { EnginePositionEvent, EngineState } from "@/lib/playback-engine";
+import type {
+  EnginePositionEvent,
+  EngineState,
+  NativeEventMetadata,
+} from "@/lib/playback-engine";
 
 type ValueRef<T> = { readonly current: T };
 
 // Buffered events drained on relaunch/reconnect and live events from the
 // listener can interleave out of order (a stale buffered event applied
-// right after a fresher live one). Each carries a nativeTimeMs — use it as
-// a watermark and drop anything older than what we've already applied,
-// rather than letting stale data (and its side effects: track rotation,
-// tracker sessions) regress state backward.
+// right after a fresher live one). Android supplies a process-local monotonic
+// sequence for ordering. nativeTimeMs remains a wall clock used only to
+// project playback position; older native shells fall back to that timestamp.
+export type NativeEventWatermark = {
+  kind: "sequence" | "timestamp";
+  value: number;
+} | null;
+
 export function isStaleNativeEvent(
-  nativeTimeMs: number | null | undefined,
-  watermarkRef: { current: number },
+  event: NativeEventMetadata,
+  watermarkRef: { current: NativeEventWatermark },
 ): boolean {
+  const nativeSequence = event.nativeSequence;
+  if (typeof nativeSequence === "number" && Number.isFinite(nativeSequence)) {
+    const watermark = watermarkRef.current;
+    if (watermark?.kind === "sequence" && nativeSequence <= watermark.value) {
+      return true;
+    }
+    watermarkRef.current = { kind: "sequence", value: nativeSequence };
+    return false;
+  }
+
+  const nativeTimeMs = event.nativeTimeMs;
   if (typeof nativeTimeMs !== "number" || !Number.isFinite(nativeTimeMs)) {
     return false;
   }
-  if (nativeTimeMs < watermarkRef.current) return true;
-  watermarkRef.current = nativeTimeMs;
+  const watermark = watermarkRef.current;
+  if (watermark?.kind === "sequence") return true;
+  if (watermark?.kind === "timestamp" && nativeTimeMs < watermark.value) {
+    return true;
+  }
+  watermarkRef.current = { kind: "timestamp", value: nativeTimeMs };
   return false;
 }
 
@@ -119,16 +142,16 @@ export function useNativePlaybackReconciliation({
   rotateTrackerSession,
   scheduleNativeBufferingWatchdog,
 }: UseNativePlaybackReconciliationParams) {
-  const nativeEventWatermarkRef = useRef(0);
+  const nativeEventWatermarkRef = useRef<NativeEventWatermark>(null);
   const isNativeEventStale = useCallback(
-    (nativeTimeMs: number | null | undefined) =>
-      isStaleNativeEvent(nativeTimeMs, nativeEventWatermarkRef),
+    (event: NativeEventMetadata) =>
+      isStaleNativeEvent(event, nativeEventWatermarkRef),
     [],
   );
 
   const applyNativePosition = useCallback(
     (event: EnginePositionEvent) => {
-      if (isNativeEventStale(event.nativeTimeMs)) {
+      if (isNativeEventStale(event)) {
         return;
       }
       const positionSeconds = projectedNativePositionSeconds(
@@ -166,7 +189,7 @@ export function useNativePlaybackReconciliation({
       state: EngineState,
       options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {},
     ) => {
-      if (isNativeEventStale(state.nativeTimeMs)) {
+      if (isNativeEventStale(state)) {
         return;
       }
       const positionSeconds = projectedNativePositionSeconds(
@@ -264,7 +287,7 @@ export function useNativePlaybackReconciliation({
 
   const applyNativeTrackChange = useCallback(
     (event: EnginePositionEvent & { reason?: string }) => {
-      if (isNativeEventStale(event.nativeTimeMs)) {
+      if (isNativeEventStale(event)) {
         return;
       }
       const queue = queueRef.current;

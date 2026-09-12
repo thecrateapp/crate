@@ -66,16 +66,22 @@ describe("shouldHandleNativeSideEffectEvent", () => {
 
     expect(
       shouldHandleNativeSideEffectEvent(
-        { nativeTimeMs: 100 },
+        { nativeSequence: 1, nativeTimeMs: 100 },
         isNativeEventStale,
       ),
     ).toBe(false);
-    expect(isNativeEventStale).toHaveBeenCalledWith(100);
+    expect(isNativeEventStale).toHaveBeenCalledWith({
+      nativeSequence: 1,
+      nativeTimeMs: 100,
+    });
   });
 
   it("accepts a current native side-effect event", () => {
     expect(
-      shouldHandleNativeSideEffectEvent({ nativeTimeMs: 200 }, () => false),
+      shouldHandleNativeSideEffectEvent(
+        { nativeSequence: 2, nativeTimeMs: 200 },
+        () => false,
+      ),
     ).toBe(true);
   });
 });

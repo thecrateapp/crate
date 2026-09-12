@@ -5,6 +5,7 @@ import { useNativeBufferingRecovery } from "@/contexts/use-native-buffering-reco
 import { useNativePlaybackReconciliation } from "@/contexts/use-native-playback-reconciliation";
 export {
   isStaleNativeEvent,
+  type NativeEventWatermark,
   nativeTransitionFlushReason,
   projectedNativePositionSeconds,
 } from "@/contexts/use-native-playback-reconciliation";
