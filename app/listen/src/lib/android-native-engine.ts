@@ -15,6 +15,10 @@ import type {
   EngineTrack,
   PlaybackEngine,
 } from "@/lib/playback-engine";
+import {
+  beginNativePlaybackIntent,
+  cancelNativePlaybackRecoveryIntent,
+} from "@/lib/native-playback-intent";
 
 const NATIVE_PLAYER_DISABLED_KEY = "crate-native-player-disabled";
 const NATIVE_PLAYER_CROSSFADE_KEY = "crate-native-player-crossfade-enabled";
@@ -199,17 +203,20 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async play(): Promise<EngineState> {
+    beginNativePlaybackIntent();
     await this.ensureReady();
     await this.ensureNotificationPermission();
     return nativePlayback.play();
   }
 
   async pause(): Promise<EngineState> {
+    cancelNativePlaybackRecoveryIntent("pause");
     await this.ensureReady();
     return nativePlayback.pause();
   }
 
   async stop(): Promise<EngineState> {
+    cancelNativePlaybackRecoveryIntent("stop");
     await this.ensureReady();
     return nativePlayback.stop();
   }
@@ -329,6 +336,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async destroy(): Promise<void> {
+    cancelNativePlaybackRecoveryIntent("stop");
     await this.ensureReady();
     await nativePlayback.stop();
   }

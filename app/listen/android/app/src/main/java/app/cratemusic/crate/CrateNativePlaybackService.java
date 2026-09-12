@@ -746,6 +746,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void pause() {
+        restoredPlayWhenReady = false;
         if (player != null) {
             player.pause();
             emitPosition();
@@ -754,6 +755,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void stopPlayback() {
+        restoredPlayWhenReady = false;
         if (player != null) {
             player.stop();
             persistCheckpoint();

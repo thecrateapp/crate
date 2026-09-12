@@ -12,6 +12,11 @@ import {
 import type { EngineEventMap } from "@/lib/playback-engine";
 import { createQueueRevision } from "@/lib/playback-engine";
 import { recordDevLog } from "@/lib/dev-logs";
+import {
+  captureNativePlaybackRecoveryIntent,
+  isNativePlaybackRecoveryIntentCurrent,
+  nativePlaybackRecoveryCancellationSince,
+} from "@/lib/native-playback-intent";
 import { toast } from "sonner";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
@@ -100,8 +105,14 @@ export function useNativeBufferingRecovery({
       forceRefresh: boolean;
       probeStatus: string;
       autoplay?: boolean;
+      intentGeneration?: number;
     }) => {
       if (!shouldUseAndroidNativePlayer()) return false;
+      const intentGeneration =
+        options.intentGeneration ?? captureNativePlaybackRecoveryIntent();
+      const isCurrentIntent = () =>
+        isNativePlaybackRecoveryIntentCurrent(intentGeneration);
+      if (!isCurrentIntent()) return false;
 
       const queueSnapshot = queueRef.current;
       if (queueSnapshot.length === 0) return false;
@@ -128,6 +139,7 @@ export function useNativeBufferingRecovery({
           nativeBufferingRecoveryKeyRef.current = null;
           return false;
         }
+        if (!isCurrentIntent()) return false;
 
         const engineTracks = await toStartupEngineTracks(
           queueSnapshot,
@@ -135,6 +147,7 @@ export function useNativeBufferingRecovery({
           undefined,
           { target: "android-native" },
         );
+        if (!isCurrentIntent()) return false;
         await androidNativeEngine.loadQueue({
           revision: createQueueRevision(),
           tracks: engineTracks,
@@ -145,6 +158,17 @@ export function useNativeBufferingRecovery({
           crossfadeMs: effectiveCrossfadeMsRef.current,
           volume: lastNonZeroVolumeRef.current,
         });
+        const cancellation =
+          nativePlaybackRecoveryCancellationSince(intentGeneration);
+        if (cancellation === "pause") {
+          await androidNativeEngine.pause();
+          return false;
+        }
+        if (cancellation === "stop") {
+          await androidNativeEngine.stop();
+          return false;
+        }
+        if (cancellation === "superseded") return false;
         return true;
       } catch (error) {
         nativeBufferingRecoveryKeyRef.current = null;
@@ -290,6 +314,7 @@ export function useNativeBufferingRecovery({
       ].join(":");
       if (nativeAuthRetryKeyRef.current === retryKey) return false;
       nativeAuthRetryKeyRef.current = retryKey;
+      const intentGeneration = captureNativePlaybackRecoveryIntent();
 
       bufferingIntentRef.current = true;
       commitIsBuffering(true);
@@ -299,12 +324,14 @@ export function useNativeBufferingRecovery({
         if (!(await refreshAuthToken())) {
           throw new Error("Could not refresh the native playback token");
         }
+        if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
         const engineTracks = await toStartupEngineTracks(
           queueSnapshot,
           index,
           undefined,
           { target: "android-native" },
         );
+        if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
         await androidNativeEngine.loadQueue({
           revision: createQueueRevision(),
           tracks: engineTracks,
@@ -315,6 +342,10 @@ export function useNativeBufferingRecovery({
           crossfadeMs: effectiveCrossfadeMsRef.current,
           volume: lastNonZeroVolumeRef.current,
         });
+        const cancellation =
+          nativePlaybackRecoveryCancellationSince(intentGeneration);
+        if (cancellation === "pause") await androidNativeEngine.pause();
+        if (cancellation === "stop") await androidNativeEngine.stop();
       })().catch((error) => {
         if (nativeAuthRetryKeyRef.current === retryKey) {
           nativeAuthRetryKeyRef.current = null;

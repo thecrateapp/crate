@@ -19,6 +19,10 @@ import {
   redactDiagnosticUrl,
 } from "@/contexts/use-native-buffering-recovery";
 import { recordDevLog } from "@/lib/dev-logs";
+import {
+  captureNativePlaybackRecoveryIntent,
+  isNativePlaybackRecoveryIntentCurrent,
+} from "@/lib/native-playback-intent";
 import { toast } from "sonner";
 
 type ValueRef<T> = { readonly current: T };
@@ -48,17 +52,22 @@ export async function recoverNativeResumeAuthorizationWithRetry(
     forceRefresh: boolean;
     probeStatus: string;
     autoplay?: boolean;
+    intentGeneration?: number;
   }) => Promise<boolean>,
   autoplay: boolean,
 ): Promise<boolean> {
+  const intentGeneration = captureNativePlaybackRecoveryIntent();
   for (const delay of RESUME_AUTHORIZATION_RETRY_DELAYS_MS) {
+    if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return false;
     if (delay > 0) {
       await new Promise((resolve) => window.setTimeout(resolve, delay));
     }
+    if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return false;
     const recovered = await recoverNativeBuffering({
       forceRefresh: false,
       probeStatus: "resume-authorization",
       autoplay,
+      intentGeneration,
     });
     if (recovered) return true;
   }
@@ -94,6 +103,8 @@ export interface UseNativePlaybackEventBridgeParams {
   recoverNativeBuffering: (options: {
     forceRefresh: boolean;
     probeStatus: string;
+    autoplay?: boolean;
+    intentGeneration?: number;
   }) => Promise<boolean>;
   retryNativePlaybackAfterAuthError: (
     nativeError: EngineEventMap["error"],

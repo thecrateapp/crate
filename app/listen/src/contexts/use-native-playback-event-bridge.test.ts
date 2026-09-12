@@ -4,6 +4,7 @@ import {
   recoverNativeResumeAuthorizationWithRetry,
   shouldHandleNativeSideEffectEvent,
 } from "@/contexts/use-native-playback-event-bridge";
+import { cancelNativePlaybackRecoveryIntent } from "@/lib/native-playback-intent";
 
 describe("recoverNativeResumeAuthorizationWithRetry", () => {
   it("retries when the queue hasn't been rehydrated yet on a cold start", async () => {
@@ -56,6 +57,33 @@ describe("recoverNativeResumeAuthorizationWithRetry", () => {
     expect(recoverNativeBuffering).toHaveBeenCalledWith(
       expect.objectContaining({ autoplay: false }),
     );
+    vi.useRealTimers();
+  });
+
+  it("stops retrying when an explicit transport action cancels recovery", async () => {
+    vi.useFakeTimers();
+    let resolveFirst!: (value: boolean) => void;
+    const recoverNativeBuffering = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+
+    const promise = recoverNativeResumeAuthorizationWithRetry(
+      recoverNativeBuffering,
+      true,
+    );
+    await vi.waitFor(() =>
+      expect(recoverNativeBuffering).toHaveBeenCalledTimes(1),
+    );
+
+    cancelNativePlaybackRecoveryIntent();
+    resolveFirst(false);
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toBe(false);
+    expect(recoverNativeBuffering).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
 });

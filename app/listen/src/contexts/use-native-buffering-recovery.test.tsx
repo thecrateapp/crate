@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Track } from "@/contexts/player-types";
+import { cancelNativePlaybackRecoveryIntent } from "@/lib/native-playback-intent";
 
 const mocks = vi.hoisted(() => ({
   refreshAuthToken: vi.fn(),
@@ -82,5 +83,43 @@ describe("useNativeBufferingRecovery", () => {
     );
 
     consoleError.mockRestore();
+  });
+
+  it("does not load an autoplay queue after playback recovery is cancelled", async () => {
+    const queue = [{ id: "track-1", title: "Track" }] as Track[];
+    let resolveTracks!: (tracks: []) => void;
+    mocks.toStartupEngineTracks.mockReturnValue(
+      new Promise<[]>((resolve) => {
+        resolveTracks = resolve;
+      }),
+    );
+    const { result } = renderHook(() =>
+      useNativeBufferingRecovery({
+        beginSoftInterruption: vi.fn(),
+        bufferingIntentRef: { current: false },
+        commitIsBuffering: vi.fn(),
+        commitIsPlaying: vi.fn(),
+        currentIndexRef: { current: 0 },
+        currentTimeRef: { current: 5 },
+        currentTrackRef: { current: queue[0] },
+        effectiveCrossfadeMsRef: { current: 0 },
+        lastNonZeroVolumeRef: { current: 1 },
+        queueRef: { current: queue },
+        repeatRef: { current: "off" },
+      }),
+    );
+
+    const recovery = result.current.recoverNativeBuffering({
+      forceRefresh: false,
+      probeStatus: "resume-authorization",
+      autoplay: true,
+    });
+    await waitFor(() => expect(mocks.toStartupEngineTracks).toHaveBeenCalled());
+
+    cancelNativePlaybackRecoveryIntent();
+    resolveTracks([]);
+
+    await expect(recovery).resolves.toBe(false);
+    expect(mocks.loadQueue).not.toHaveBeenCalled();
   });
 });
