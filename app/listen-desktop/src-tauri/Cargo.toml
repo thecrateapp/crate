@@ -30,3 +30,15 @@ block2 = "0.6.2"
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSMenu", "NSMenuItem", "NSResponder"] }
 objc2-foundation = { version = "0.3.2", features = ["NSString"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Pinned to the same major version already resolved transitively by
+# tauri/wry (HWND interop) so Cargo unifies into a single `windows` crate
+# instead of two incompatible versions of the same generated types.
+windows = { version = "0.61", features = [
+    "Media",
+    "Foundation",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_System_WinRT",
+] }

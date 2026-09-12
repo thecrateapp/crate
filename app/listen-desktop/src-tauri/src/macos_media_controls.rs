@@ -210,19 +210,22 @@ unsafe fn set_now_playing_info(payload: &DesktopMediaSessionPayload) {
 }
 
 unsafe fn cached_artwork_for_url(url: &str) -> Option<*mut AnyObject> {
-    if let Ok(cache) = artwork_cache().lock() {
+    {
+        let cache = lock_artwork_cache();
         if cache.url.as_deref() == Some(url) && cache.artwork != 0 {
             return Some(cache.artwork as *mut AnyObject);
         }
     }
 
     let loaded = load_artwork(url)?;
-    if let Ok(mut cache) = artwork_cache().lock() {
-        release_cached_artwork(&mut cache);
-        cache.url = Some(url.to_string());
-        cache.artwork = loaded.artwork as usize;
-        cache.retained_image = loaded.retained_image;
-    }
+    // Always store the retained artwork/image, even if a prior panic left
+    // the mutex poisoned — otherwise these +1 Cocoa references are never
+    // released and leak for the lifetime of the process.
+    let mut cache = lock_artwork_cache();
+    release_cached_artwork(&mut cache);
+    cache.url = Some(url.to_string());
+    cache.artwork = loaded.artwork as usize;
+    cache.retained_image = loaded.retained_image;
     Some(loaded.artwork)
 }
 
@@ -346,11 +349,20 @@ fn artwork_cache() -> &'static Mutex<ArtworkCache> {
     ARTWORK_CACHE.get_or_init(|| Mutex::new(ArtworkCache::default()))
 }
 
+// A panic elsewhere while this lock was held would poison it forever under
+// a plain `.lock()?` — recovering keeps the artwork cache (and the native
+// object releases it is responsible for) working instead of silently and
+// permanently going inert.
+fn lock_artwork_cache() -> std::sync::MutexGuard<'static, ArtworkCache> {
+    artwork_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 unsafe fn clear_artwork_cache() {
-    if let Ok(mut cache) = artwork_cache().lock() {
-        release_cached_artwork(&mut cache);
-        cache.url = None;
-    }
+    let mut cache = lock_artwork_cache();
+    release_cached_artwork(&mut cache);
+    cache.url = None;
 }
 
 unsafe fn release_cached_artwork(cache: &mut ArtworkCache) {
@@ -379,7 +391,7 @@ unsafe extern "C-unwind" fn media_play(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("play")
+    emit_media_command(crate::PlaybackCommand::Play)
 }
 
 unsafe extern "C-unwind" fn media_pause(
@@ -387,7 +399,7 @@ unsafe extern "C-unwind" fn media_pause(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("pause")
+    emit_media_command(crate::PlaybackCommand::Pause)
 }
 
 unsafe extern "C-unwind" fn media_toggle_play_pause(
@@ -395,7 +407,7 @@ unsafe extern "C-unwind" fn media_toggle_play_pause(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("play_pause")
+    emit_media_command(crate::PlaybackCommand::PlayPause)
 }
 
 unsafe extern "C-unwind" fn media_previous(
@@ -403,7 +415,7 @@ unsafe extern "C-unwind" fn media_previous(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("previous")
+    emit_media_command(crate::PlaybackCommand::Previous)
 }
 
 unsafe extern "C-unwind" fn media_next(
@@ -411,10 +423,10 @@ unsafe extern "C-unwind" fn media_next(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("next")
+    emit_media_command(crate::PlaybackCommand::Next)
 }
 
-fn emit_media_command(command: &str) -> isize {
+fn emit_media_command(command: crate::PlaybackCommand) -> isize {
     if let Some(app) = MEDIA_APP_HANDLE.get() {
         crate::emit_system_media_command(app, command);
     }

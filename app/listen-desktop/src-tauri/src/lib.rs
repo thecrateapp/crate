@@ -33,6 +33,8 @@ mod linux_media_controls;
 mod macos_dock_menu;
 #[cfg(target_os = "macos")]
 mod macos_media_controls;
+#[cfg(target_os = "windows")]
+mod windows_media_controls;
 
 #[cfg(desktop)]
 const DESKTOP_DEFAULT_WIDTH: f64 = 1280.0;
@@ -84,6 +86,57 @@ struct DesktopMenuState {
     is_playing: Arc<Mutex<bool>>,
 }
 
+/// Every command a tray/dock menu item, a media key, or a CLI activation
+/// arg can trigger. `Play`/`Pause`/`PlayPause`/`Previous`/`Next` are also
+/// the only ones forwarded to the frontend, as the string payload of a
+/// "crate:tray-command" event — that set must stay in sync with
+/// `DesktopTrayCommand` in `app/listen/src/lib/desktop-tray.ts`.
+/// `as_str`/`parse` are the single place mapping this enum to the wire
+/// string, so menu builders, native media keys (macOS/Linux) and menu
+/// event handling can't drift from each other by typo.
+#[cfg(desktop)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum PlaybackCommand {
+    Play,
+    Pause,
+    PlayPause,
+    Previous,
+    Next,
+    Show,
+    Hide,
+    Quit,
+}
+
+#[cfg(desktop)]
+impl PlaybackCommand {
+    fn as_str(self) -> &'static str {
+        match self {
+            PlaybackCommand::Play => "play",
+            PlaybackCommand::Pause => "pause",
+            PlaybackCommand::PlayPause => "play_pause",
+            PlaybackCommand::Previous => "previous",
+            PlaybackCommand::Next => "next",
+            PlaybackCommand::Show => "show",
+            PlaybackCommand::Hide => "hide",
+            PlaybackCommand::Quit => "quit",
+        }
+    }
+
+    fn parse(value: &str) -> Option<PlaybackCommand> {
+        Some(match value {
+            "play" => PlaybackCommand::Play,
+            "pause" => PlaybackCommand::Pause,
+            "play_pause" => PlaybackCommand::PlayPause,
+            "previous" => PlaybackCommand::Previous,
+            "next" => PlaybackCommand::Next,
+            "show" => PlaybackCommand::Show,
+            "hide" => PlaybackCommand::Hide,
+            "quit" => PlaybackCommand::Quit,
+            _ => return None,
+        })
+    }
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 fn update_now_playing(
@@ -130,6 +183,8 @@ fn update_desktop_media_session(payload: DesktopMediaSessionPayload) -> Result<(
     macos_media_controls::update_now_playing(&payload);
     #[cfg(target_os = "linux")]
     linux_media_controls::update_now_playing(&payload);
+    #[cfg(target_os = "windows")]
+    windows_media_controls::update_now_playing(&payload);
 
     Ok(())
 }
@@ -441,59 +496,63 @@ fn should_restore_desktop_window_size<R: tauri::Runtime>(window: &Window<R>) -> 
 #[cfg(desktop)]
 fn emit_playback_command<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    command: &str,
+    command: PlaybackCommand,
     focus_window: bool,
 ) {
     if focus_window {
         show_main_window(app);
     }
-    let _ = app.emit("crate:tray-command", command);
+    let _ = app.emit("crate:tray-command", command.as_str());
 }
 
 #[cfg(desktop)]
-fn emit_tray_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>, command: &str) {
+fn emit_tray_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>, command: PlaybackCommand) {
     emit_playback_command(app, command, false);
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-pub(crate) fn emit_system_media_command(app: &tauri::AppHandle, command: &str) {
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+pub(crate) fn emit_system_media_command(app: &tauri::AppHandle, command: PlaybackCommand) {
     emit_playback_command(app, command, false);
 }
 
 #[cfg(desktop)]
-fn current_play_pause_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> &'static str {
+fn current_play_pause_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PlaybackCommand {
     let Some(state) = app.try_state::<DesktopMenuState>() else {
-        return "play_pause";
+        return PlaybackCommand::PlayPause;
     };
 
     let command = match state.is_playing.lock() {
         Ok(is_playing) => play_pause_command_for_state(*is_playing),
-        Err(_) => "play_pause",
+        Err(_) => PlaybackCommand::PlayPause,
     };
     command
 }
 
 #[cfg(desktop)]
-fn play_pause_command_for_state(is_playing: bool) -> &'static str {
+fn play_pause_command_for_state(is_playing: bool) -> PlaybackCommand {
     if is_playing {
-        "pause"
+        PlaybackCommand::Pause
     } else {
-        "play"
+        PlaybackCommand::Play
     }
 }
 
 #[cfg(desktop)]
 fn handle_playback_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str) {
-    match id {
-        "play" => emit_tray_command(app, "play"),
-        "pause" => emit_tray_command(app, "pause"),
-        "play_pause" => emit_tray_command(app, current_play_pause_command(app)),
-        "previous" => emit_tray_command(app, "previous"),
-        "next" => emit_tray_command(app, "next"),
-        "show" => show_main_window(app),
-        "hide" => hide_main_window(app),
-        "quit" => app.exit(0),
-        _ => {}
+    let Some(command) = PlaybackCommand::parse(id) else {
+        return;
+    };
+    // No wildcard arm: adding a PlaybackCommand variant without handling
+    // it here is a compile error, not a silent no-op.
+    match command {
+        PlaybackCommand::Play => emit_tray_command(app, PlaybackCommand::Play),
+        PlaybackCommand::Pause => emit_tray_command(app, PlaybackCommand::Pause),
+        PlaybackCommand::PlayPause => emit_tray_command(app, current_play_pause_command(app)),
+        PlaybackCommand::Previous => emit_tray_command(app, PlaybackCommand::Previous),
+        PlaybackCommand::Next => emit_tray_command(app, PlaybackCommand::Next),
+        PlaybackCommand::Show => show_main_window(app),
+        PlaybackCommand::Hide => hide_main_window(app),
+        PlaybackCommand::Quit => app.exit(0),
     }
 }
 
@@ -584,17 +643,30 @@ fn set_desktop_window_icon<R: tauri::Runtime>(window: &WebviewWindow<R>) {
 
 #[cfg(desktop)]
 fn is_supported_activation_command(command: &str) -> bool {
+    // Deliberately narrower than every PlaybackCommand: Quit is a valid
+    // menu/dock/media-key command but must not be reachable from a CLI
+    // `--crate-command=` activation arg.
     matches!(
-        command,
-        "play" | "pause" | "play_pause" | "previous" | "next" | "show" | "hide"
+        PlaybackCommand::parse(command),
+        Some(
+            PlaybackCommand::Play
+                | PlaybackCommand::Pause
+                | PlaybackCommand::PlayPause
+                | PlaybackCommand::Previous
+                | PlaybackCommand::Next
+                | PlaybackCommand::Show
+                | PlaybackCommand::Hide
+        )
     )
 }
 
 #[cfg(target_os = "macos")]
 fn build_app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let play_pause = MenuItemBuilder::with_id("play_pause", "Play / Pause").build(app)?;
-    let previous = MenuItemBuilder::with_id("previous", "Previous").build(app)?;
-    let next = MenuItemBuilder::with_id("next", "Next").build(app)?;
+    let play_pause =
+        MenuItemBuilder::with_id(PlaybackCommand::PlayPause.as_str(), "Play / Pause").build(app)?;
+    let previous =
+        MenuItemBuilder::with_id(PlaybackCommand::Previous.as_str(), "Previous").build(app)?;
+    let next = MenuItemBuilder::with_id(PlaybackCommand::Next.as_str(), "Next").build(app)?;
     let playback = SubmenuBuilder::with_id(app, "playback", "Playback")
         .items(&[&play_pause, &previous, &next])
         .build()?;
@@ -643,12 +715,14 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<DesktopMenuState> {
     let now_artist = MenuItemBuilder::with_id("now_artist", "Crate")
         .enabled(false)
         .build(app)?;
-    let play_pause = MenuItemBuilder::with_id("play_pause", "Play / Pause").build(app)?;
-    let previous = MenuItemBuilder::with_id("previous", "Previous").build(app)?;
-    let next = MenuItemBuilder::with_id("next", "Next").build(app)?;
-    let show = MenuItemBuilder::with_id("show", "Show Crate").build(app)?;
-    let hide = MenuItemBuilder::with_id("hide", "Hide Crate").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Quit Crate").build(app)?;
+    let play_pause =
+        MenuItemBuilder::with_id(PlaybackCommand::PlayPause.as_str(), "Play / Pause").build(app)?;
+    let previous =
+        MenuItemBuilder::with_id(PlaybackCommand::Previous.as_str(), "Previous").build(app)?;
+    let next = MenuItemBuilder::with_id(PlaybackCommand::Next.as_str(), "Next").build(app)?;
+    let show = MenuItemBuilder::with_id(PlaybackCommand::Show.as_str(), "Show Crate").build(app)?;
+    let hide = MenuItemBuilder::with_id(PlaybackCommand::Hide.as_str(), "Hide Crate").build(app)?;
+    let quit = MenuItemBuilder::with_id(PlaybackCommand::Quit.as_str(), "Quit Crate").build(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
 
     let menu = MenuBuilder::new(app)
@@ -729,6 +803,8 @@ pub fn run() {
                 macos_media_controls::install(app);
                 #[cfg(target_os = "linux")]
                 linux_media_controls::install(app);
+                #[cfg(target_os = "windows")]
+                windows_media_controls::install(app);
 
                 let handle = app.handle().clone();
                 if let Some(window) = handle.get_webview_window("main") {
@@ -772,6 +848,7 @@ pub fn run() {
 mod tests {
     use super::{
         is_bandcamp_capture_url, is_supported_activation_command, play_pause_command_for_state,
+        PlaybackCommand,
     };
 
     #[test]
@@ -792,15 +869,39 @@ mod tests {
     }
 
     #[test]
+    fn quit_is_a_valid_menu_command_but_not_an_activation_arg() {
+        assert!(PlaybackCommand::parse("quit").is_some());
+        assert!(!is_supported_activation_command("quit"));
+    }
+
+    #[test]
     fn play_pause_menu_resolves_to_explicit_transport_commands() {
-        assert_eq!(play_pause_command_for_state(true), "pause");
-        assert_eq!(play_pause_command_for_state(false), "play");
+        assert_eq!(play_pause_command_for_state(true), PlaybackCommand::Pause);
+        assert_eq!(play_pause_command_for_state(false), PlaybackCommand::Play);
+    }
+
+    #[test]
+    fn transport_commands_match_the_frontend_contract() {
+        // Mirrors DesktopTrayCommand in app/listen/src/lib/desktop-tray.ts —
+        // update both together.
+        for (command, wire) in [
+            (PlaybackCommand::Play, "play"),
+            (PlaybackCommand::Pause, "pause"),
+            (PlaybackCommand::PlayPause, "play_pause"),
+            (PlaybackCommand::Previous, "previous"),
+            (PlaybackCommand::Next, "next"),
+        ] {
+            assert_eq!(command.as_str(), wire);
+            assert_eq!(PlaybackCommand::parse(wire), Some(command));
+        }
     }
 
     #[test]
     fn bandcamp_capture_url_is_restricted_to_bandcamp_hosts() {
         assert!(is_bandcamp_capture_url("https://bandcamp.com/login"));
         assert!(is_bandcamp_capture_url("https://foo.bandcamp.com/"));
-        assert!(!is_bandcamp_capture_url("https://evil.example.com/bandcamp.com"));
+        assert!(!is_bandcamp_capture_url(
+            "https://evil.example.com/bandcamp.com"
+        ));
     }
 }

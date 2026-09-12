@@ -122,19 +122,19 @@ fn dock_item(
 }
 
 unsafe extern "C-unwind" fn dock_play_pause(_delegate: &AnyObject, _cmd: Sel, _sender: &AnyObject) {
-    emit_dock_command("play_pause");
+    emit_dock_command(crate::PlaybackCommand::PlayPause);
 }
 
 unsafe extern "C-unwind" fn dock_previous(_delegate: &AnyObject, _cmd: Sel, _sender: &AnyObject) {
-    emit_dock_command("previous");
+    emit_dock_command(crate::PlaybackCommand::Previous);
 }
 
 unsafe extern "C-unwind" fn dock_next(_delegate: &AnyObject, _cmd: Sel, _sender: &AnyObject) {
-    emit_dock_command("next");
+    emit_dock_command(crate::PlaybackCommand::Next);
 }
 
-fn emit_dock_command(command: &str) {
+fn emit_dock_command(command: crate::PlaybackCommand) {
     if let Some(app) = DOCK_APP_HANDLE.get() {
-        super::handle_playback_menu_event(app, command);
+        super::handle_playback_menu_event(app, command.as_str());
     }
 }
