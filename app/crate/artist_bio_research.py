@@ -342,15 +342,27 @@ def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]
         f"Disambiguation: {payload.get('disambiguation', '')}",
     ]
     relations = payload.get("relations", payload.get("artist-relation-list", []))
-    if isinstance(relations, list):
+    if str(payload.get("type") or "").casefold() in {
+        "group",
+        "orchestra",
+        "choir",
+    } and isinstance(relations, list):
         for relation in relations[:60]:
             if not isinstance(relation, dict):
                 continue
             relation_type = str(relation.get("type") or "")
-            if relation_type not in {"member of band", "is person"}:
+            if (
+                relation_type != "member of band"
+                or str(relation.get("direction") or "") != "backward"
+                or str(relation.get("target-type") or "") != "artist"
+            ):
                 continue
             member = relation.get("artist")
-            if not isinstance(member, dict) or not member.get("name"):
+            if (
+                not isinstance(member, dict)
+                or str(member.get("type") or "") != "Person"
+                or not member.get("name")
+            ):
                 continue
             attributes = (
                 relation.get("attributes") or relation.get("attribute-list") or []

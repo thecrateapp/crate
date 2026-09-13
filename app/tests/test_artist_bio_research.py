@@ -356,10 +356,24 @@ def test_musicbrainz_source_includes_member_relations_for_bio_review(monkeypatch
                 "relations": [
                     {
                         "type": "member of band",
-                        "artist": {"name": "Current Member"},
+                        "direction": "backward",
+                        "target-type": "artist",
+                        "artist": {"name": "Current Member", "type": "Person"},
                         "begin": "2020",
                         "attributes": ["vocals"],
-                    }
+                    },
+                    {
+                        "type": "member of band",
+                        "direction": "forward",
+                        "target-type": "artist",
+                        "artist": {"name": "Another Band", "type": "Group"},
+                    },
+                    {
+                        "type": "is person",
+                        "direction": "backward",
+                        "target-type": "artist",
+                        "artist": {"name": "Legal Name", "type": "Person"},
+                    },
                 ],
             },
         ]
@@ -373,6 +387,41 @@ def test_musicbrainz_source_includes_member_relations_for_bio_review(monkeypatch
     assert "Member: Current Member" in sources[0]["excerpt"]
     assert "Roles: vocals" in sources[0]["excerpt"]
     assert "From: 2020 | To: present" in sources[0]["excerpt"]
+    assert "Another Band" not in sources[0]["excerpt"]
+    assert "Legal Name" not in sources[0]["excerpt"]
+
+
+def test_musicbrainz_source_rejects_non_person_membership_targets(monkeypatch):
+    responses = iter(
+        [
+            {"artists": [{"id": "mbid-1", "name": "Example Artist"}]},
+            {
+                "name": "Example Artist",
+                "type": "Group",
+                "relations": [
+                    {
+                        "type": "member of band",
+                        "direction": "backward",
+                        "target-type": "artist",
+                        "artist": {"name": "Nested Group", "type": "Group"},
+                    },
+                    {
+                        "type": "member of band",
+                        "direction": "backward",
+                        "target-type": "label",
+                        "artist": {"name": "Wrong Entity", "type": "Person"},
+                    },
+                ],
+            },
+        ]
+    )
+    monkeypatch.setattr(
+        research, "_get_json", lambda *_args, **_kwargs: next(responses)
+    )
+
+    sources = research._collect_musicbrainz("Example Artist", "mbid-1")
+
+    assert "Member:" not in sources[0]["excerpt"]
 
 
 def test_artist_research_rejects_private_or_credentialed_urls():
