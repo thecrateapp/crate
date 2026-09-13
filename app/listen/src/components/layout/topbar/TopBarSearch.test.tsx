@@ -451,4 +451,21 @@ describe("TopBarSearch", () => {
     expect(input).toHaveValue("Converge");
     expect(navigateMock).not.toHaveBeenCalled();
   });
+
+  it("migrates recents from the legacy storage key", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      "listen-search-recents",
+      JSON.stringify(["Legacy artist"]),
+    );
+    renderWithListenProviders(<TopBarSearch />);
+
+    await user.click(screen.getByRole("button", { name: "Search" }));
+
+    expect(await screen.findByText("Legacy artist")).toBeInTheDocument();
+    expect(localStorage.getItem("listen-search-recents")).toBeNull();
+    expect(
+      localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY),
+    ).not.toBeNull();
+  });
 });

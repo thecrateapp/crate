@@ -11,6 +11,7 @@ export const EQ_PREFS_EVENT = "listen-equalizer-prefs";
 const ENABLED_KEY = "listen-eq-enabled";
 const PRESET_KEY = "listen-eq-preset"; // "custom" or one of EQ_PRESETS keys
 const GAINS_KEY = "listen-eq-gains:v1"; // JSON array of numbers
+const LEGACY_GAINS_KEY = "listen-eq-gains";
 const SMART_KEY = "listen-eq-smart";
 const ADAPTIVE_KEY = "listen-eq-adaptive";
 const GENRE_ADAPTIVE_KEY = "listen-eq-genre-adaptive";
@@ -69,13 +70,22 @@ export function getEqualizerPreset(): EqPresetName | "custom" {
 
 export function getEqualizerGains(): number[] {
   try {
-    const raw = localStorage.getItem(GAINS_KEY);
+    const currentRaw = localStorage.getItem(GAINS_KEY);
+    const legacyRaw = currentRaw
+      ? null
+      : localStorage.getItem(LEGACY_GAINS_KEY);
+    const raw = currentRaw ?? legacyRaw;
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length === EQ_BAND_COUNT) {
-        return parsed.map((v) =>
+        const gains = parsed.map((v) =>
           typeof v === "number" && Number.isFinite(v) ? v : 0,
         );
+        if (legacyRaw) {
+          localStorage.setItem(GAINS_KEY, JSON.stringify(gains));
+          localStorage.removeItem(LEGACY_GAINS_KEY);
+        }
+        return gains;
       }
     }
   } catch {

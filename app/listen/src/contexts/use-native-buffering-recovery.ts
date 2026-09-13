@@ -28,7 +28,25 @@ type MutableValueRef<T> = { current: T };
 
 export function redactDiagnosticUrl(url: string | undefined): string {
   if (!url) return "";
-  return url.replace(/([?&]token=)[^&]+/g, "$1<redacted>");
+  try {
+    const absolute = /^[a-z][a-z\d+.-]*:/i.test(url);
+    const parsed = new URL(url, "https://diagnostic.invalid");
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (
+        key.toLowerCase() === "token" ||
+        key.toLowerCase() === "media_ticket"
+      ) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    if (absolute) return parsed.toString();
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return url.replace(
+      /([?&])(token|media_ticket)=[^&#]*&?/gi,
+      (_match, separator: string) => (separator === "?" ? "?" : ""),
+    );
+  }
 }
 
 export function persistNativePlaybackDiagnostic(

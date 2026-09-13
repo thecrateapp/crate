@@ -29,7 +29,26 @@ vi.mock("sonner", () => ({
   toast: { error: mocks.toastError },
 }));
 
-import { useNativeBufferingRecovery } from "./use-native-buffering-recovery";
+import {
+  redactDiagnosticUrl,
+  useNativeBufferingRecovery,
+} from "./use-native-buffering-recovery";
+
+describe("redactDiagnosticUrl", () => {
+  it("redacts every native media credential before diagnostics are persisted", () => {
+    expect(
+      redactDiagnosticUrl(
+        "https://api.example.test/api/stream?token=secret&media_ticket=ticket&safe=value#fragment",
+      ),
+    ).not.toMatch(/secret|ticket/);
+  });
+
+  it("redacts credentials from relative URLs", () => {
+    expect(
+      redactDiagnosticUrl("/api/stream?media_ticket=ticket&safe=value"),
+    ).not.toContain("ticket");
+  });
+});
 
 describe("useNativeBufferingRecovery", () => {
   beforeEach(() => {

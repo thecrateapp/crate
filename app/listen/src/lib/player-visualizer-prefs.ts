@@ -1,6 +1,7 @@
 const USE_ALBUM_PALETTE_KEY = "listen-viz-use-album-palette";
 const VISUALIZER_ENABLED_KEY = "listen-viz-enabled";
 const VISUALIZER_SETTINGS_KEY = "listen-viz-settings:v1";
+const LEGACY_VISUALIZER_SETTINGS_KEY = "listen-viz-settings";
 const TRACK_ADAPTIVE_VISUALIZER_KEY = "listen-viz-track-adaptive";
 const PLAYER_SURFACE_MODE_KEY = "listen-player-surface-mode";
 export const PLAYER_VIZ_PREFS_EVENT = "listen:viz-prefs-changed";
@@ -103,10 +104,14 @@ export function setTrackAdaptiveVisualizerPreference(value: boolean) {
 
 export function getVisualizerSettingsPreference(): VisualizerSettingsPreference {
   try {
-    const raw = localStorage.getItem(VISUALIZER_SETTINGS_KEY);
+    const currentRaw = localStorage.getItem(VISUALIZER_SETTINGS_KEY);
+    const legacyRaw = currentRaw
+      ? null
+      : localStorage.getItem(LEGACY_VISUALIZER_SETTINGS_KEY);
+    const raw = currentRaw ?? legacyRaw;
     if (!raw) return DEFAULT_VISUALIZER_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<VisualizerSettingsPreference>;
-    return {
+    const settings = {
       separation:
         typeof parsed.separation === "number"
           ? parsed.separation
@@ -128,6 +133,11 @@ export function getVisualizerSettingsPreference(): VisualizerSettingsPreference 
           ? parsed.octaves
           : DEFAULT_VISUALIZER_SETTINGS.octaves,
     };
+    if (legacyRaw) {
+      localStorage.setItem(VISUALIZER_SETTINGS_KEY, JSON.stringify(settings));
+      localStorage.removeItem(LEGACY_VISUALIZER_SETTINGS_KEY);
+    }
+    return settings;
   } catch {
     return DEFAULT_VISUALIZER_SETTINGS;
   }

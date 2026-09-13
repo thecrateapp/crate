@@ -67,6 +67,34 @@ describe("enqueueEvent", () => {
 });
 
 describe("flushQueue", () => {
+  it("migrates and sends events persisted with the legacy storage key", async () => {
+    localStorage.setItem(
+      "listen-pending-play-events",
+      JSON.stringify([
+        {
+          id: "legacy",
+          endpoint: "/api/legacy",
+          payload: { legacy: true },
+          queuedAt: new Date(0).toISOString(),
+          attempts: 0,
+          nextRetryAt: new Date(0).toISOString(),
+        },
+      ]),
+    );
+    mockApiFetch.mockResolvedValue(mkResponse(204));
+
+    await expect(flushQueue()).resolves.toEqual({
+      sent: 1,
+      failed: 0,
+      dropped: 0,
+    });
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/legacy",
+      expect.any(Object),
+    );
+    expect(localStorage.getItem("listen-pending-play-events")).toBeNull();
+  });
+
   it("sends queued events and removes successful ones", async () => {
     enqueueEvent("/api/foo", { a: 1 });
     enqueueEvent("/api/bar", { b: 2 });
@@ -234,6 +262,14 @@ describe("clearQueue", () => {
   it("is a no-op when the queue is already empty", () => {
     expect(() => clearQueue()).not.toThrow();
     expect(queueSize()).toBe(0);
+  });
+
+  it("also clears events persisted with the legacy storage key", () => {
+    localStorage.setItem("listen-pending-play-events", "[]");
+
+    clearQueue();
+
+    expect(localStorage.getItem("listen-pending-play-events")).toBeNull();
   });
 
   it("survives localStorage failures gracefully", () => {

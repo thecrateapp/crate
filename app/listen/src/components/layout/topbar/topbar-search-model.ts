@@ -104,6 +104,7 @@ export interface TopBarSearchRecentEntry {
 }
 
 export const TOP_BAR_SEARCH_RECENTS_STORAGE_KEY = "listen-search-recents:v1";
+const LEGACY_TOP_BAR_SEARCH_RECENTS_STORAGE_KEY = "listen-search-recents";
 const MAX_RECENTS = 5;
 
 function isTopBarSearchRecentEntry(
@@ -133,18 +134,30 @@ function dedupeRecentEntries(
 
 export function getTopBarSearchRecents(): TopBarSearchRecentEntry[] {
   try {
-    const raw = localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY);
+    const currentRaw = localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY);
+    const legacyRaw = currentRaw
+      ? null
+      : localStorage.getItem(LEGACY_TOP_BAR_SEARCH_RECENTS_STORAGE_KEY);
+    const raw = currentRaw ?? legacyRaw;
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.flatMap((entry: unknown) => {
+    const recents = parsed.flatMap((entry: unknown) => {
       if (isTopBarSearchRecentEntry(entry)) return [entry];
       if (typeof entry === "string") {
         return [{ label: entry, type: undefined, navigateTo: undefined }];
       }
       return [];
     });
+    if (legacyRaw) {
+      localStorage.setItem(
+        TOP_BAR_SEARCH_RECENTS_STORAGE_KEY,
+        JSON.stringify(recents),
+      );
+      localStorage.removeItem(LEGACY_TOP_BAR_SEARCH_RECENTS_STORAGE_KEY);
+    }
+    return recents;
   } catch {
     return [];
   }

@@ -57,21 +57,34 @@ interface SearchBarProps {
 }
 
 const RECENTS_KEY = "search-recents:v1";
+const LEGACY_RECENTS_KEY = "search-recents";
 const MAX_RECENTS = 5;
 
-function loadRecents(): string[] {
+export function loadSearchRecents(): string[] {
   try {
-    const raw = localStorage.getItem(RECENTS_KEY);
+    const currentRaw = localStorage.getItem(RECENTS_KEY);
+    const legacyRaw = currentRaw
+      ? null
+      : localStorage.getItem(LEGACY_RECENTS_KEY);
+    const raw = currentRaw ?? legacyRaw;
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_RECENTS) : [];
+    if (!Array.isArray(parsed)) return [];
+    const recents = parsed
+      .filter((entry): entry is string => typeof entry === "string")
+      .slice(0, MAX_RECENTS);
+    if (legacyRaw) {
+      localStorage.setItem(RECENTS_KEY, JSON.stringify(recents));
+      localStorage.removeItem(LEGACY_RECENTS_KEY);
+    }
+    return recents;
   } catch {
     return [];
   }
 }
 
 function saveRecent(query: string) {
-  const recents = loadRecents().filter(
+  const recents = loadSearchRecents().filter(
     (recent) => recent.toLowerCase() !== query.toLowerCase(),
   );
   recents.unshift(query);
@@ -125,7 +138,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
   const [localResults, setLocalResults] = useState<LocalResults | null>(null);
   const [open, setOpen] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
-  const [recents, setRecents] = useState<string[]>(loadRecents);
+  const [recents, setRecents] = useState<string[]>(loadSearchRecents);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const localTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -196,7 +209,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
   function addToRecents(value: string) {
     if (value.length < 2) return;
     saveRecent(value);
-    setRecents(loadRecents());
+    setRecents(loadSearchRecents());
   }
 
   function go(path: string) {
@@ -310,7 +323,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
 
   function handleFocus() {
     if (query.length === 0 && recents.length > 0) {
-      setRecents(loadRecents());
+      setRecents(loadSearchRecents());
       setOpen(true);
       setSelectedIdx(-1);
     } else if (localResults) {
