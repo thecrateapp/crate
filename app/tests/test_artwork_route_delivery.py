@@ -569,6 +569,75 @@ def test_artist_hero_pins_retained_revision_before_releasing_publication_lock(
     assert events == ["lock-enter", "lock-exit"]
 
 
+def test_artist_hero_pins_active_revision_before_releasing_publication_lock(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    from crate.api import browse_artist
+    from crate.artist_hero_artwork import ARTIST_HERO_RENDER_VERSION
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        publish_artist_hero_artifact,
+    )
+
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path))
+    artist = {"id": 5, "entity_uid": "artist-entity", "name": "Artist"}
+    active = publish_artist_hero_artifact(
+        ArtistHeroArtifactIdentity("artist-entity", "desktop", "revision-a"),
+        Image.new("RGB", (2960, 1200), color="blue"),
+        source_fingerprint="sha256:source-a",
+        recipe_hash="recipe-a",
+        renderer_version=ARTIST_HERO_RENDER_VERSION,
+        source_content=b"source-a",
+    )
+    expected_body = active.artifact_path.read_bytes()
+    events: list[str] = []
+
+    @contextmanager
+    def publication_lock(_root, artist_id):
+        assert artist_id == 5
+        events.append("lock-enter")
+        try:
+            yield
+        finally:
+            events.append("lock-exit")
+
+    monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(browse_artist, "artist_name_from_id", lambda _id: "Artist")
+    monkeypatch.setattr(browse_artist, "get_library_artist", lambda _name: artist)
+    monkeypatch.setattr(
+        browse_artist,
+        "get_artist_hero_artwork",
+        lambda _artist_id: {
+            "desktop_enabled": True,
+            "review_status": "approved",
+            "revision": "editorial-revision-a",
+            "render_manifest": {
+                "manifest_version": 1,
+                "editorial_revision": "editorial-revision-a",
+                "artifacts": {"desktop": active.manifest},
+            },
+        },
+    )
+    monkeypatch.setattr(browse_artist, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        browse_artist, "resolve_artist_dir", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(browse_artist, "artist_hero_publication_lock", publication_lock)
+    monkeypatch.setattr(browse_artist, "cache_root", lambda: tmp_path)
+
+    response = browse_artist.api_artist_hero_by_id(
+        SimpleNamespace(),
+        5,
+        composition="desktop",
+    )
+    active.artifact_path.unlink()
+
+    assert response.body == expected_body
+    assert events == ["lock-enter", "lock-exit"]
+
+
 def test_artist_hero_route_recomposes_legacy_renderer_output(monkeypatch, tmp_path):
     from crate.api import browse_artist
 

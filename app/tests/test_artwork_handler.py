@@ -154,6 +154,94 @@ class TestHandleMaterializeArtworkVariants:
         }
         assert events == ["lock-enter", "lock-exit"]
 
+    def test_artist_hero_materialization_rejects_a_deleted_composition(
+        self, monkeypatch
+    ):
+        artist = {"id": 42, "entity_uid": "artist-entity"}
+        _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: artist,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_artwork",
+            lambda _artist_id: {"desktop_enabled": False},
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("deleted compositions must not be rematerialized")
+            ),
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-deleted",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop:renderer:revision-a",
+            },
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-hero",
+            "entity_key": "artist-entity:desktop:renderer:revision-a",
+        }
+
+    def test_artist_hero_materialization_allows_a_retained_enabled_revision(
+        self, monkeypatch
+    ):
+        from crate.artwork_sources import ArtworkSource
+
+        artist = {"id": 42, "entity_uid": "artist-entity"}
+        _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: artist,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_artwork",
+            lambda _artist_id: {
+                "desktop_enabled": True,
+                "review_status": "approved",
+                "render_manifest": {
+                    "artifacts": {
+                        "desktop": {"render_revision": "renderer:revision-new"}
+                    }
+                },
+            },
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_render_revision",
+            lambda **_kwargs: {"render_revision": "renderer:revision-old"},
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: ArtworkSource(
+                b"image", "image/jpeg", "publication"
+            ),
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.materialize_artwork",
+            lambda *_args, **_kwargs: {
+                "source_revision": "source-a",
+                "variant_count": 1,
+            },
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-retained",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop:renderer:revision-old",
+            },
+            {},
+        )
+
+        assert result["status"] == "materialized"
+        assert result["revision"] == "source-a"
+
     def test_materializes_resolved_source(self, monkeypatch):
         from crate.artwork_sources import ArtworkSource
 

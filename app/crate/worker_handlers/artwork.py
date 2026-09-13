@@ -73,6 +73,7 @@ from crate.db.repositories.artist_hero_artwork import (
     delete_artist_hero_composition,
     get_artist_hero_artwork,
     get_artist_hero_manifest_history_entry,
+    get_artist_hero_render_revision,
     list_artist_hero_backfill_candidates,
     list_artist_hero_migration_candidates,
     rollback_artist_hero_manifest,
@@ -448,6 +449,38 @@ def _handle_materialize_artwork_variants(
         current_artist = get_library_artist_by_entity_uid(entity_uid)
         if current_artist is None or int(current_artist.get("id") or 0) != artist_id:
             return missing_result()
+        profile = get_artist_hero_artwork(artist_id)
+        key_parts = asset.entity_key.split(":", 2)
+        composition = key_parts[1] if len(key_parts) >= 2 else ""
+        render_revision = key_parts[2] if len(key_parts) == 3 else ""
+        if (
+            profile is None
+            or composition not in {"desktop", "mobile"}
+            or profile.get("review_status") == "rejected"
+            or profile.get(f"{composition}_enabled", True) is False
+        ):
+            return missing_result()
+        if render_revision:
+            manifest = profile.get("render_manifest")
+            artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
+            artifact = (
+                artifacts.get(composition) if isinstance(artifacts, dict) else None
+            )
+            active_revision = (
+                str(artifact.get("render_revision") or "")
+                if isinstance(artifact, dict)
+                else ""
+            )
+            if (
+                active_revision != render_revision
+                and get_artist_hero_render_revision(
+                    artist_id=artist_id,
+                    composition=composition,
+                    render_revision=render_revision,
+                )
+                is None
+            ):
+                return missing_result()
         return materialize_resolved_source()
 
 

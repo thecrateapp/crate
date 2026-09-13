@@ -57,6 +57,39 @@ def test_cleanup_removes_only_expired_temporary_directories(monkeypatch, tmp_pat
     assert result["temporary_removed"] == 1
 
 
+def test_generic_cleanup_skips_artist_hero_roots_owned_by_hero_gc(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artwork_variants
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    asset = ArtworkAsset("artist-hero", "artist-entity:desktop:revision-a")
+    root = artwork_asset_root(asset)
+    root.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.load_current_manifest",
+        lambda _asset: (_ for _ in ()).throw(
+            AssertionError("generic cleanup must not inspect artist hero roots")
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.cleanup_artist_hero_publications",
+        lambda **_kwargs: {
+            "artists_checked": 0,
+            "revisions_removed": 0,
+            "temporary_removed": 0,
+            "orphan_revisions_removed": 0,
+        },
+    )
+
+    result = cleanup_artwork_variants(max_assets=10)
+
+    assert result["assets_checked"] == 0
+    assert root.is_dir()
+
+
 def test_cleanup_artist_hero_publications_keeps_active_previous_and_fresh_orphans(
     monkeypatch, tmp_path
 ):

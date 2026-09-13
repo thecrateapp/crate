@@ -1521,16 +1521,13 @@ def api_artist_hero(
                 buffer_file=buffer_file,
             )
 
-        if retained_revision:
-            with artist_hero_publication_lock(cache_root(), artist_id):
-                if local_original is None or not local_original.is_file():
-                    return _artist_hero_revision_unavailable_response(composition)
-                response = deliver_hero(buffer_file=True)
-        else:
+        with artist_hero_publication_lock(cache_root(), artist_id):
             if local_original is None or not local_original.is_file():
+                if retained_revision:
+                    return _artist_hero_revision_unavailable_response(composition)
                 _queue_artist_hero_recompose(name, artist_id)
                 return _artist_hero_pending_response(composition, revision)
-            response = deliver_hero()
+            response = deliver_hero(buffer_file=True)
         return _decorate_artist_hero_response(
             response,
             composition,

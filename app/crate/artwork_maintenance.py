@@ -43,13 +43,19 @@ _TEMP_MAX_AGE_SECONDS = 24 * 3600
 log = logging.getLogger(__name__)
 
 
-def _iter_assets(max_assets: int) -> Iterator[ArtworkAsset]:
+def _iter_assets(
+    max_assets: int, *, exclude_kinds: set[ArtworkKind] | None = None
+) -> Iterator[ArtworkAsset]:
     root = artwork_variant_root()
     if not root.is_dir():
         return
     emitted = 0
     for kind_root in sorted(root.iterdir()):
-        if not kind_root.is_dir() or kind_root.name not in ARTWORK_KINDS:
+        if (
+            not kind_root.is_dir()
+            or kind_root.name not in ARTWORK_KINDS
+            or kind_root.name in (exclude_kinds or set())
+        ):
             continue
         for asset_root in sorted(kind_root.iterdir()):
             if not asset_root.is_dir():
@@ -189,7 +195,7 @@ def cleanup_artwork_variants(*, max_assets: int = 1000) -> dict[str, int]:
         "revisions_removed": 0,
         "temporary_removed": 0,
     }
-    for asset in _iter_assets(max(1, int(max_assets))):
+    for asset in _iter_assets(max(1, int(max_assets)), exclude_kinds={"artist-hero"}):
         result["assets_checked"] += 1
         root = artwork_variant_root() / asset.kind / asset.entity_key
         manifest = load_current_manifest(asset) or {}
