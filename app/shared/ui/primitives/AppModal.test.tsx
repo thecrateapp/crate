@@ -30,7 +30,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.tagName).toBe("DIALOG");
     expect(screen.getByText("Content")).toBeInTheDocument();
   });
 
@@ -77,7 +79,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    await userEvent.click(screen.getByRole("dialog"));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close dialog backdrop" }),
+    );
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -88,7 +92,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    const overlay = screen.getByRole("dialog");
+    const overlay = screen.getByRole("button", {
+      name: "Close dialog backdrop",
+    });
     fireEvent.pointerDown(overlay);
     fireEvent.click(overlay);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -102,7 +108,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     const handle = dialog.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -135,7 +143,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     const handle = dialog.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -168,7 +178,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     const handle = dialog.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -215,7 +227,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 280,
       height: 240,
@@ -247,7 +261,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 280,
       height: 240,
@@ -291,7 +307,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    await userEvent.click(screen.getByRole("dialog"));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close dialog backdrop" }),
+    );
     expect(onClose).not.toHaveBeenCalled();
   });
 

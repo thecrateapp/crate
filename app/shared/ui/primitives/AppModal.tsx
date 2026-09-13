@@ -296,7 +296,7 @@ export function AppModal({
   );
   const isDismissedRef = useRef(false);
   const handleOverlayPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (!closeOnOverlay) return;
       event.preventDefault();
       event.stopPropagation();
@@ -307,7 +307,7 @@ export function AppModal({
   );
 
   const handleOverlayClick = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>) => {
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
       if (!closeOnOverlay) return;
       if (isDismissedRef.current) {
         isDismissedRef.current = false;
@@ -414,23 +414,30 @@ export function AppModal({
   if (!open) return null;
 
   return createPortal(
-    <div
-      role="dialog"
+    <dialog
+      open
       aria-modal="true"
       aria-label="Dialog"
       tabIndex={-1}
       className={cn(
-        "z-app-modal fixed inset-0 flex items-end justify-center bg-surface-canvas/72 p-0 backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
+        "z-app-modal fixed inset-0 m-0 flex h-full max-h-none w-full max-w-none items-end justify-center border-0 bg-surface-canvas/72 p-0 text-inherit backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
         overlayClassName,
       )}
-      onClick={handleOverlayClick}
-      onPointerDown={handleOverlayPointerDown}
     >
+      <button
+        type="button"
+        aria-label="Close dialog backdrop"
+        tabIndex={-1}
+        className="absolute inset-0 h-full w-full cursor-default border-0 bg-transparent p-0"
+        onClick={handleOverlayClick}
+        onPointerDown={handleOverlayPointerDown}
+      />
       <div
         ref={panelRef}
+        data-app-modal-panel="true"
         tabIndex={-1}
         className={cn(
-          "bg-modal-surface w-full overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl sm:rounded-3xl",
+          "bg-modal-surface relative z-10 w-full overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl sm:rounded-3xl",
           isDragClosing
             ? undefined
             : isEntering && !isDragging
@@ -471,7 +478,7 @@ export function AppModal({
         </div>
         {children}
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }
