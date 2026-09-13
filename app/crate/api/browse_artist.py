@@ -15,6 +15,7 @@ from crate.artist_hero_publication import (
     ArtistHeroArtifactIdentity,
     artist_hero_artifact_asset,
     artist_hero_artifact_source_path,
+    artist_hero_publication_lock,
     resolve_artist_hero_publication_path,
 )
 from crate.artist_hero_contract import (
@@ -71,6 +72,7 @@ from crate.external_artist_artwork import (
     is_external_artist_artwork_missing,
     queue_external_artist_artwork,
 )
+from crate.streaming.paths import cache_root
 from crate.db.queries.user_library import get_top_artists
 from crate.db.repositories.library import (
     get_album_quality_map,
@@ -1468,15 +1470,8 @@ def api_artist_hero(
             if retained
             else None
         )
-        if retained_path is None or not retained_path.is_file() or not entity_uid:
-            return Response(
-                status_code=404,
-                headers={
-                    "Cache-Control": "no-store",
-                    "X-Crate-Artwork": "hero-revision-unavailable",
-                    "X-Crate-Hero-Composition": composition,
-                },
-            )
+        if retained_path is None or not entity_uid:
+            return _artist_hero_revision_unavailable_response(composition)
         artifact_identity = ArtistHeroArtifactIdentity(
             artist_entity_uid=entity_uid,
             composition=composition,
@@ -1498,23 +1493,21 @@ def api_artist_hero(
         renderer_is_current = retained_revision or (
             artist_hero_profile_composition_is_supported(profile, composition)
         )
-        if (
-            local_original is None
-            or not local_original.is_file()
-            or not renderer_is_current
-        ):
+        if not renderer_is_current:
             _queue_artist_hero_recompose(name, artist_id)
             return _artist_hero_pending_response(composition, revision)
         canonical_width = (
             DESKTOP_HERO_SIZE[0] if composition == "desktop" else MOBILE_HERO_SIZE[0]
         )
-        if size is None or size == canonical_width:
-            response = deliver_original_artwork(
-                local_original,
-                cache_control="private, no-cache, must-revalidate",
-            )
-        else:
-            response = deliver_artwork(
+
+        def deliver_hero(*, buffer_file: bool = False) -> Response:
+            if size is None or size == canonical_width:
+                return deliver_original_artwork(
+                    local_original,
+                    cache_control="private, no-cache, must-revalidate",
+                    buffer_file=buffer_file,
+                )
+            return deliver_artwork(
                 (
                     artist_hero_artifact_asset(artifact_identity)
                     if artifact_identity is not None
@@ -1525,7 +1518,19 @@ def api_artist_hero(
                 missing_response=Response(status_code=404),
                 cache_visibility="private",
                 validate_source_revision=True,
+                buffer_file=buffer_file,
             )
+
+        if retained_revision:
+            with artist_hero_publication_lock(cache_root(), artist_id):
+                if local_original is None or not local_original.is_file():
+                    return _artist_hero_revision_unavailable_response(composition)
+                response = deliver_hero(buffer_file=True)
+        else:
+            if local_original is None or not local_original.is_file():
+                _queue_artist_hero_recompose(name, artist_id)
+                return _artist_hero_pending_response(composition, revision)
+            response = deliver_hero()
         return _decorate_artist_hero_response(
             response,
             composition,
@@ -1584,6 +1589,17 @@ def _artist_hero_pending_response(composition: str, revision: str) -> Response:
             "Retry-After": "1",
             "X-Crate-Artwork": "hero-pending",
             "X-Crate-Artwork-Revision": revision,
+            "X-Crate-Hero-Composition": composition,
+        },
+    )
+
+
+def _artist_hero_revision_unavailable_response(composition: str) -> Response:
+    return Response(
+        status_code=404,
+        headers={
+            "Cache-Control": "no-store",
+            "X-Crate-Artwork": "hero-revision-unavailable",
             "X-Crate-Hero-Composition": composition,
         },
     )
