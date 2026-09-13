@@ -691,6 +691,45 @@ def test_artist_hero_source_endpoint_delivers_the_editable_original(test_app, tm
     assert response.content.startswith(b"\xff\xd8")
 
 
+def test_artist_hero_source_without_composition_keeps_shared_source_contract(
+    test_app, tmp_path
+):
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    shared_source = artist_dir / "artist-hero-source.jpg"
+    Image.new("RGB", (1600, 1000), color="red").save(shared_source, "JPEG")
+    cache_dir = tmp_path / "cache"
+    immutable_source = cache_dir / "published" / "desktop" / "source.jpg"
+    immutable_source.parent.mkdir(parents=True)
+    Image.new("RGB", (1600, 1000), color="blue").save(immutable_source, "JPEG")
+    profile = {
+        "desktop_enabled": True,
+        "mobile_enabled": True,
+        "render_manifest": {
+            "artifacts": {
+                "desktop": {
+                    "source_relative_path": "published/desktop/source.jpg",
+                }
+            }
+        },
+    }
+
+    with (
+        patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch(
+            "crate.api.artwork.get_library_artist",
+            return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
+        ),
+        patch("crate.api.artwork.library_path", return_value=tmp_path),
+        patch("crate.api.artwork.cache_root", return_value=cache_dir),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value=profile),
+    ):
+        response = test_app.get("/api/artwork/artists/7/hero-source")
+
+    assert response.status_code == 200
+    assert Image.open(io.BytesIO(response.content)).getpixel((0, 0))[0] > 200
+
+
 def test_artist_hero_source_endpoint_delivers_a_composition_override(
     test_app, tmp_path
 ):

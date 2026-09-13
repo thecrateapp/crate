@@ -580,22 +580,15 @@ def api_artist_hero_source(
 
     manifest = profile.get("render_manifest")
     artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
-    compositions = (composition,) if composition else ("desktop", "mobile")
     source_path = None
-    for candidate_composition in compositions:
-        artifact = (
-            artifacts.get(candidate_composition)
-            if isinstance(artifacts, dict)
-            else None
-        )
-        if not isinstance(artifact, dict):
-            continue
-        candidate = resolve_artist_hero_publication_path(
-            artifact.get("source_relative_path"), root=cache_root()
-        )
-        if candidate is not None and candidate.is_file():
-            source_path = candidate
-            break
+    if composition:
+        artifact = artifacts.get(composition) if isinstance(artifacts, dict) else None
+        if isinstance(artifact, dict):
+            candidate = resolve_artist_hero_publication_path(
+                artifact.get("source_relative_path"), root=cache_root()
+            )
+            if candidate is not None and candidate.is_file():
+                source_path = candidate
 
     if source_path is None:
         composition_path = (
