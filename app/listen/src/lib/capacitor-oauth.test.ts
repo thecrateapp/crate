@@ -241,6 +241,59 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
   });
 
+  it("continues past a retryable callback to recover another server", async () => {
+    const firstState = "a".repeat(32);
+    const secondState = "b".repeat(32);
+    const now = Date.now();
+    localStorage.setItem(
+      `crate.oauth.${firstState}`,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/first",
+        createdAt: now,
+        serverId: "server-a",
+      }),
+    );
+    localStorage.setItem(
+      `crate.oauth.${secondState}`,
+      JSON.stringify({
+        verifier: "w".repeat(43),
+        next: "/second",
+        createdAt: now + 1,
+        serverId: "server-b",
+      }),
+    );
+    localStorage.setItem(
+      "crate.oauth.pending-callback",
+      JSON.stringify({
+        version: 1,
+        callbacks: [
+          { code: "first-code", state: firstState, createdAt: now },
+          { code: "second-code", state: secondState, createdAt: now + 1 },
+        ],
+      }),
+    );
+    mocks.getServers.mockReturnValue([{ id: "server-a" }, { id: "server-b" }]);
+    mocks.apiForServerMock
+      .mockRejectedValueOnce(new ApiError(503, "first server unavailable"))
+      .mockResolvedValueOnce({ token: "second-token" });
+
+    await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
+      handled: true,
+      next: "/second",
+    });
+
+    expect(mocks.apiForServerMock).toHaveBeenCalledTimes(2);
+    expect(localStorage.getItem(`crate.oauth.${firstState}`)).not.toBeNull();
+    expect(localStorage.getItem(`crate.oauth.${secondState}`)).toBeNull();
+    expect(localStorage.getItem("crate.oauth.pending-callback")).toContain(
+      firstState,
+    );
+    expect(localStorage.getItem("crate.oauth.pending-callback")).not.toContain(
+      secondState,
+    );
+  });
+
   it("removes the PKCE verifier when exchange rejects the handoff", async () => {
     const state = "s".repeat(32);
     const recordKey = `crate.oauth.${state}`;

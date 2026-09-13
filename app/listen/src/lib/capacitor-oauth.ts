@@ -345,14 +345,16 @@ export async function retryPendingNativeOAuthCallback(): Promise<OAuthCallbackRe
       await removeNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
       return { handled: false, next: "/" };
     }
+    let retryableResult: OAuthCallbackResult | undefined;
     for (const pending of pendingCallbacks) {
       const result = await exchangeNativeOAuthCallback(
         pending.code,
         pending.state,
       );
-      if (result.handled || result.retryable) return result;
+      if (result.handled) return result;
+      if (result.retryable) retryableResult = result;
     }
-    return { handled: false, next: "/" };
+    return retryableResult ?? { handled: false, next: "/" };
   } catch {
     return { handled: false, next: "/" };
   }
