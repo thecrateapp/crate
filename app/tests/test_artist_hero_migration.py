@@ -213,7 +213,7 @@ def test_canary_execution_queues_each_target_only_after_planning(
         (
             "migrate_artist_heroes",
             {"after_artist_id": 42, "batch_size": 1, "dry_run": False},
-            "migrate-artist-heroes:canary:1:42:1",
+            "migrate-artist-heroes:canary:0:42:1",
         ),
     ]
 
@@ -346,11 +346,21 @@ def test_rollback_worker_activates_retained_manifest_and_materializes_it(
             "manifest_version": 1,
             "editorial_revision": "editorial-revision-1",
             "artifacts": {
-                "desktop": {"render_revision": "artifact-b"},
-                "mobile": {"render_revision": "artifact-b"},
+                "desktop": {
+                    "render_revision": "artifact-b",
+                    "relative_path": "desktop/artifact.webp",
+                },
+                "mobile": {
+                    "render_revision": "artifact-b",
+                    "relative_path": "mobile/artifact.webp",
+                },
             },
         },
     }
+    (tmp_path / "desktop").mkdir()
+    (tmp_path / "desktop" / "artifact.webp").write_bytes(b"desktop")
+    (tmp_path / "mobile").mkdir()
+    (tmp_path / "mobile" / "artifact.webp").write_bytes(b"mobile")
     profiles = iter((current, target))
     activated: list[dict] = []
     queued: list[str] = []
@@ -369,6 +379,12 @@ def test_rollback_worker_activates_retained_manifest_and_materializes_it(
         "rollback_artist_hero_manifest",
         lambda **kwargs: activated.append(kwargs) or True,
     )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_artist_hero_manifest_history_entry",
+        lambda **kwargs: {"manifest": target["render_manifest"]},
+    )
+    monkeypatch.setattr(artwork_handlers, "cache_root", lambda: tmp_path)
     monkeypatch.setattr(
         artwork_handlers,
         "queue_artwork_materialization",
@@ -396,3 +412,70 @@ def test_rollback_worker_activates_retained_manifest_and_materializes_it(
     assert activated[0]["expected_revision"] == "editorial-revision-1"
     assert activated[0]["expected_manifest"] == current["render_manifest"]
     assert queued == ["artist-42:desktop:artifact-b", "artist-42:mobile:artifact-b"]
+
+
+def test_rollback_worker_rejects_history_with_deleted_artifacts(
+    tmp_path: Path, monkeypatch
+) -> None:
+    current = _profile(
+        render_manifest={
+            "manifest_version": 1,
+            "editorial_revision": "editorial-revision-1",
+            "artifacts": {
+                "desktop": {
+                    "render_revision": "artifact-c",
+                    "relative_path": "desktop/current.webp",
+                }
+            },
+        }
+    )
+    target_manifest = {
+        "manifest_version": 1,
+        "editorial_revision": "editorial-revision-1",
+        "artifacts": {
+            "desktop": {
+                "render_revision": "artifact-b",
+                "relative_path": "desktop/deleted.webp",
+            }
+        },
+    }
+    activated: list[dict] = []
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_library_artist_by_id",
+        lambda _artist_id: _artist(),
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_artist_hero_artwork",
+        lambda _artist_id: current,
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_artist_hero_manifest_history_entry",
+        lambda **kwargs: {"manifest": target_manifest},
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "rollback_artist_hero_manifest",
+        lambda **kwargs: activated.append(kwargs) or True,
+    )
+    monkeypatch.setattr(artwork_handlers, "cache_root", lambda: tmp_path)
+
+    result = artwork_handlers._handle_rollback_artist_hero(
+        "task-rollback",
+        {
+            "artist_id": 42,
+            "expected_revision": "editorial-revision-1",
+            "target_manifest_id": "sha256:manifest-b",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {
+        "status": "skipped",
+        "reason": "artist-hero-artifacts-missing",
+        "artist_id": 42,
+        "target_manifest_id": "sha256:manifest-b",
+    }
+    assert activated == []

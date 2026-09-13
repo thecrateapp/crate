@@ -47,6 +47,7 @@ def test_manifest_history_persists_previous_and_uses_manifest_cas(pg_db) -> None
     from crate.db.repositories.artist_hero_artwork import (
         compare_and_swap_artist_hero_manifest,
         get_artist_hero_artwork,
+        get_artist_hero_manifest_history_entry,
         list_artist_hero_manifest_history,
         list_artist_hero_render_revisions,
         upsert_artist_hero_artwork,
@@ -102,6 +103,20 @@ def test_manifest_history_persists_previous_and_uses_manifest_cas(pg_db) -> None
     history = list_artist_hero_manifest_history(artist_id)
     assert [entry["manifest"] for entry in history] == [manifest_b, manifest_a]
     assert history[0]["previous_manifest"] == manifest_a
+    assert (
+        get_artist_hero_manifest_history_entry(
+            artist_id=artist_id,
+            manifest_id=history[0]["manifest_id"],
+        )["manifest"]
+        == manifest_b
+    )
+    assert (
+        get_artist_hero_manifest_history_entry(
+            artist_id=artist_id,
+            manifest_id="sha256:missing",
+        )
+        is None
+    )
 
     render_history = list_artist_hero_render_revisions(artist_id, composition="desktop")
     assert {entry["render_revision"] for entry in render_history} == {

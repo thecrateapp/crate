@@ -428,6 +428,36 @@ def list_artist_hero_manifest_history(artist_id: int, *, session=None) -> list[d
         return _read(active_session)
 
 
+def get_artist_hero_manifest_history_entry(
+    *, artist_id: int, manifest_id: str, session=None
+) -> dict | None:
+    """Return one retained manifest selected for rollback."""
+
+    def _read(active_session) -> dict | None:
+        row = (
+            active_session.execute(
+                text(
+                    """
+                    SELECT manifest_id, artist_id, editorial_revision,
+                           manifest, previous_manifest, created_at
+                    FROM artist_hero_manifest_history
+                    WHERE artist_id = :artist_id
+                      AND manifest_id = :manifest_id
+                    """
+                ),
+                {"artist_id": artist_id, "manifest_id": manifest_id},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+    if session is not None:
+        return _read(session)
+    with read_scope() as active_session:
+        return _read(active_session)
+
+
 def rollback_artist_hero_manifest(
     *,
     artist_id: int,

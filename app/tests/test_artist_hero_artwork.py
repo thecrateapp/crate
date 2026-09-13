@@ -876,6 +876,60 @@ def test_upload_handler_writes_hero_variants_and_profile(monkeypatch, tmp_path):
     warm.assert_called_once_with()
 
 
+def test_upload_handler_does_not_replace_legacy_files_when_profile_cas_loses(
+    monkeypatch, tmp_path
+):
+    from crate.worker_handlers.artwork import _handle_upload_image
+
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    source_path = artist_dir / "artist-hero-source.jpg"
+    desktop_path = artist_dir / "artist-hero-desktop.webp"
+    mobile_path = artist_dir / "artist-hero-mobile.webp"
+    Image.new("RGB", (1600, 1000), color=(160, 20, 20)).save(source_path, "JPEG")
+    Image.new("RGB", (1480, 600), color=(160, 20, 20)).save(desktop_path, "WEBP")
+    Image.new("RGB", (1080, 1350), color=(160, 20, 20)).save(mobile_path, "WEBP")
+    before = {
+        path: path.read_bytes() for path in (source_path, desktop_path, mobile_path)
+    }
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_library_artist",
+        lambda name: {"id": 7, "entity_uid": "artist-entity", "name": name},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.resolve_artist_dir",
+        lambda *args, **kwargs: artist_dir,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_artist_hero_artwork",
+        lambda _artist_id: {"revision": "winner-revision"},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.upsert_artist_hero_artwork",
+        lambda **kwargs: False,
+    )
+
+    result = _handle_upload_image(
+        "task-loser",
+        {
+            "type": "artist_hero",
+            "artist": "Converge",
+            "data_b64": base64.b64encode(_image_bytes()).decode(),
+            "desktop_recipe": _crop_recipe(1400, 600),
+            "mobile_recipe": _crop_recipe(800, 1000),
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {
+        "status": "conflict",
+        "reason": "artist-hero-profile-changed",
+        "artist_id": 7,
+    }
+    assert {path: path.read_bytes() for path in before} == before
+
+
 def test_upload_handler_normalizes_exif_orientation_before_persisting_hero_source(
     monkeypatch, tmp_path
 ):
