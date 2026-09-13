@@ -33,7 +33,9 @@ def _run_artist_change(
 ) -> T:
     artist = get_library_artist(name)
     if not artist or artist.get("id") is None or not artist.get("entity_uid"):
-        return operation()
+        raise ArtistIdentityChangedError(
+            f"Artist identity unavailable before lifecycle lock: {name}"
+        )
 
     artist_id = int(artist["id"])
     entity_uid = str(artist["entity_uid"])

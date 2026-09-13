@@ -223,6 +223,26 @@ def test_run_artist_deletion_aborts_when_identity_changes_before_lock(monkeypatc
     assert events == ["lock-enter", "lock-exit"]
 
 
+def test_run_artist_deletion_aborts_when_initial_identity_is_missing(monkeypatch):
+    from crate import artist_lifecycle
+
+    operation = pytest.fail
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist",
+        lambda _name: None,
+    )
+
+    with pytest.raises(
+        artist_lifecycle.ArtistIdentityChangedError,
+        match="Artist identity unavailable before lifecycle lock",
+    ):
+        artist_lifecycle.run_artist_deletion(
+            "Artist",
+            lambda: operation("destructive operation must not run"),
+        )
+
+
 def test_run_artist_deletion_preserves_storage_when_source_row_remains(monkeypatch):
     from crate import artist_lifecycle
 
