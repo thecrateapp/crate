@@ -65,6 +65,7 @@ from crate.api.native_oauth import (
     complete_exchange as complete_native_oauth_exchange,
     get_completed_exchange as get_completed_native_oauth_exchange,
     InvalidNativeOAuthHandoff,
+    NativeOAuthCompletionUnknown,
     NativeOAuthUnavailable,
     consume_handoff as consume_native_oauth_handoff,
     issue_handoff as issue_native_oauth_handoff,
@@ -1162,7 +1163,11 @@ def _build_apple_client_secret() -> str:
 
 
 def _create_login_session(
-    user: dict, request: Request, *, app_id: str | None = None
+    user: dict,
+    request: Request,
+    *,
+    app_id: str | None = None,
+    session_id: str | None = None,
 ) -> tuple[str, dict, str | None]:
     user = _ensure_user_active(user)
     app = app_id or request.headers.get("x-crate-app")
@@ -1170,7 +1175,7 @@ def _create_login_session(
     access_expiry_hours = _access_expiry_hours(request, app_id=app)
     expires_at_dt = datetime.now(timezone.utc) + timedelta(hours=session_expiry_hours)
     expires_at = expires_at_dt.isoformat()
-    session_id = secrets.token_urlsafe(24)
+    session_id = session_id or secrets.token_urlsafe(24)
     session = create_session(
         session_id,
         user["id"],
@@ -2490,11 +2495,14 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
         user = get_user_by_id(handoff.user_id)
         user = _ensure_user_active(user)
         update_user_last_login(user["id"])
+        requested_session_id = secrets.token_urlsafe(24)
         token, session, refresh_token = _create_login_session(
             user,
             request,
             app_id=app_id,
+            session_id=requested_session_id,
         )
+        session_was_created = session["id"] == requested_session_id
         payload = _auth_login_payload(user, token, session, refresh_token)
     except Exception:
         try:
@@ -2509,13 +2517,14 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             payload=payload,
         )
     except NativeOAuthUnavailable as exc:
-        try:
-            revoke_session(str(session["id"]))
-        except Exception:
-            log.error(
-                "Failed to revoke incomplete native OAuth session",
-                exc_info=True,
-            )
+        if session_was_created and not isinstance(exc, NativeOAuthCompletionUnknown):
+            try:
+                revoke_session(str(session["id"]))
+            except Exception:
+                log.error(
+                    "Failed to revoke incomplete native OAuth session",
+                    exc_info=True,
+                )
         try:
             restore_native_oauth_handoff(code=body.code, handoff=handoff)
         except NativeOAuthUnavailable:

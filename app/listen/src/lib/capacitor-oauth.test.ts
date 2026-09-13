@@ -234,6 +234,24 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     expect(localStorage.getItem(recordKey)).toBeNull();
   });
 
+  it("discards a corrupt PKCE record instead of retrying it forever", async () => {
+    const state = "s".repeat(32);
+    const recordKey = `crate.oauth.${state}`;
+    localStorage.setItem(recordKey, "{not-json");
+
+    const result = await consumeOAuthCallbackUrl(
+      `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
+    );
+
+    expect(result).toEqual({ handled: false, next: "/" });
+    expect(localStorage.getItem(recordKey)).toBeNull();
+    expect(mocks.apiForServerMock).not.toHaveBeenCalled();
+    await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
+      handled: false,
+      next: "/",
+    });
+  });
+
   it("rejects a callback whose state has no matching stored verifier", async () => {
     const result = await consumeOAuthCallbackUrl(
       "cratemusic://oauth/callback?code=one-time-code&state=unknown-state",

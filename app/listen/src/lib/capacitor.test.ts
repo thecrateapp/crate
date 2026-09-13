@@ -189,6 +189,42 @@ describe("capacitor OAuth callback helpers", () => {
     );
   });
 
+  it("releases the active callback when pending-record cleanup fails", async () => {
+    const state = "s".repeat(43);
+    const callbackUrl = `cratemusic://oauth/callback?code=one-time-code-token&state=${state}`;
+    const pendingKey = "crate.oauth.pending-callback";
+    const record = JSON.stringify({
+      verifier: "v".repeat(43),
+      next: "/stats",
+      createdAt: Date.now(),
+      serverId: "server-a",
+    });
+    let pendingReads = 0;
+    getSecureSessionValue.mockImplementation(async (key: string) => {
+      if (key === pendingKey) {
+        pendingReads += 1;
+        if (pendingReads === 2) {
+          throw new Error("keychain cleanup unavailable");
+        }
+        return null;
+      }
+      return record;
+    });
+    setSecureSessionValue.mockResolvedValue(undefined);
+    removeSecureSessionValue.mockResolvedValue(undefined);
+    apiMock.mockResolvedValue({ token: "access-token" });
+
+    await expect(consumeOAuthCallbackUrl(callbackUrl)).resolves.toEqual({
+      handled: true,
+      next: "/stats",
+    });
+    await expect(consumeOAuthCallbackUrl(callbackUrl)).resolves.toEqual({
+      handled: true,
+      next: "/stats",
+    });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps the verifier when native code exchange fails transiently", async () => {
     getSecureSessionValue.mockResolvedValue(
       JSON.stringify({

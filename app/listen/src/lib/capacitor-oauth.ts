@@ -423,17 +423,21 @@ async function exchangeNativeOAuthCallback(
     }
     return { handled: false, next: "/" };
   } finally {
-    if (removeRecord) {
-      await Promise.all([
-        removeNativeOAuthRecord(recordKey),
-        removePendingNativeOAuthCallback(state),
-      ]);
+    try {
+      if (removeRecord) {
+        await Promise.allSettled([
+          removeNativeOAuthRecord(recordKey),
+          removePendingNativeOAuthCallback(state),
+        ]);
+      }
+    } finally {
+      activeOAuthStates.delete(state);
     }
-    activeOAuthStates.delete(state);
   }
 }
 
 function isRetryableOAuthExchangeError(error: unknown): boolean {
+  if (error instanceof SyntaxError) return false;
   if (!(error instanceof ApiError)) return true;
   return error.status >= 500 || [408, 425, 429].includes(error.status);
 }

@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from threading import RLock
 
 NATIVE_OAUTH_HANDOFF_TTL_SECONDS = 15 * 60
-NATIVE_OAUTH_RESULT_TTL_SECONDS = 5 * 60
+NATIVE_OAUTH_RESULT_TTL_SECONDS = NATIVE_OAUTH_HANDOFF_TTL_SECONDS
 _HANDOFF_PREFIX = "crate:auth:native_oauth"
 _memory_handoffs: dict[str, str] = {}
 _memory_lock = RLock()
@@ -21,6 +21,10 @@ _memory_lock = RLock()
 
 class NativeOAuthUnavailable(RuntimeError):
     pass
+
+
+class NativeOAuthCompletionUnknown(NativeOAuthUnavailable):
+    """The exchange result write may have succeeded but cannot be verified."""
 
 
 class InvalidNativeOAuthHandoff(ValueError):
@@ -219,8 +223,18 @@ def complete_exchange(
         except NativeOAuthUnavailable:
             raise
         except Exception as exc:
+            try:
+                raw = redis_client.get(key)
+            except Exception as verification_exc:
+                raise NativeOAuthCompletionUnknown(
+                    "Native OAuth exchange result could not be verified"
+                ) from verification_exc
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
+            if isinstance(raw, str) and secrets.compare_digest(raw, serialized):
+                return
             raise NativeOAuthUnavailable(
-                "Native OAuth handoff store is unavailable"
+                "Native OAuth exchange result could not be stored"
             ) from exc
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
