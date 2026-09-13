@@ -837,6 +837,55 @@ def test_delete_artist_hero_storage_does_not_follow_namespace_symlinks(
     assert materialization_root.is_dir()
 
 
+def test_delete_artist_hero_artifact_does_not_follow_internal_artist_symlink(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import (
+        ARTIST_HERO_PUBLICATION_PREFIX,
+        ArtistHeroArtifactIdentity,
+        delete_artist_hero_artifact,
+    )
+
+    cache_root = tmp_path / "cache"
+    namespace = cache_root / ARTIST_HERO_PUBLICATION_PREFIX
+    target = namespace / "artist-b" / "desktop" / "revision-a"
+    target.mkdir(parents=True)
+    (target / "artifact.webp").write_bytes(b"artist-b")
+    (namespace / "artist-a").symlink_to("artist-b", target_is_directory=True)
+    monkeypatch.setenv("CACHE_DIR", str(cache_root))
+
+    result = delete_artist_hero_artifact(
+        ArtistHeroArtifactIdentity("artist-a", "desktop", "revision-a")
+    )
+
+    assert result["publications_removed"] == 0
+    assert target.is_dir()
+    assert (target / "artifact.webp").read_bytes() == b"artist-b"
+
+
+def test_delete_artist_hero_storage_unlinks_internal_artist_symlink(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import (
+        ARTIST_HERO_PUBLICATION_PREFIX,
+        delete_artist_hero_storage,
+    )
+
+    cache_root = tmp_path / "cache"
+    namespace = cache_root / ARTIST_HERO_PUBLICATION_PREFIX
+    target = namespace / "artist-b" / "desktop" / "revision-a"
+    target.mkdir(parents=True)
+    alias = namespace / "artist-a"
+    alias.symlink_to("artist-b", target_is_directory=True)
+    monkeypatch.setenv("CACHE_DIR", str(cache_root))
+
+    result = delete_artist_hero_storage("artist-a")
+
+    assert result["publication_roots_removed"] == 1
+    assert not alias.exists()
+    assert target.is_dir()
+
+
 def test_cleanup_artist_hero_publications_does_not_follow_namespace_symlinks(
     monkeypatch, tmp_path
 ):

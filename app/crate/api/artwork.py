@@ -588,16 +588,18 @@ def api_artist_hero_source(
     manifest = profile.get("render_manifest")
     artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
     source_path = None
+    has_versioned_source = False
     if composition:
         artifact = artifacts.get(composition) if isinstance(artifacts, dict) else None
         if isinstance(artifact, dict):
+            has_versioned_source = True
             candidate = resolve_artist_hero_publication_path(
                 artifact.get("source_relative_path"), root=cache_root()
             )
             if candidate is not None and candidate.is_file():
                 source_path = candidate
 
-    if source_path is None:
+    if source_path is None and not has_versioned_source:
         composition_path = (
             artist_dir / f"artist-hero-source-{composition}.jpg"
             if composition

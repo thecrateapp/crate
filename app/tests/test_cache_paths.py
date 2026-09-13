@@ -53,3 +53,18 @@ def test_resolve_confined_path_rejects_parent_symlink_escape(tmp_path):
     )
     assert resolve_confined_path(storage_root, "redirect/file") is None
     assert resolve_confined_path(storage_root, "../outside/file") is None
+
+
+def test_resolve_confined_entry_path_preserves_only_a_final_symlink(tmp_path):
+    from crate.streaming.paths import resolve_confined_entry_path
+
+    storage_root = tmp_path / "storage"
+    target_root = storage_root / "target"
+    target_root.mkdir(parents=True)
+    final_alias = storage_root / "alias"
+    final_alias.symlink_to("target", target_is_directory=True)
+    parent_alias = storage_root / "redirect"
+    parent_alias.symlink_to("target", target_is_directory=True)
+
+    assert resolve_confined_entry_path(storage_root, "alias") == final_alias
+    assert resolve_confined_entry_path(storage_root, "redirect/file") is None

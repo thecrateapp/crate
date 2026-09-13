@@ -33,6 +33,7 @@ public class CrateApplicationInstrumentedTest {
                 "Artist",
                 "Album",
                 "https://api.example/artwork/1?media_ticket=secret",
+                "",
                 180_000L,
                 null
             );

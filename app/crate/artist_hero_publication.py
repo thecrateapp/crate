@@ -24,7 +24,12 @@ from typing import Iterator, Literal
 from PIL.Image import Image
 
 from crate.artwork_variants import ArtworkAsset
-from crate.streaming.paths import cache_root, data_root, resolve_confined_path
+from crate.streaming.paths import (
+    cache_root,
+    data_root,
+    resolve_confined_entry_path,
+    resolve_confined_path,
+)
 
 ARTIST_HERO_PUBLICATION_VERSION = 1
 ARTIST_HERO_PUBLICATION_PREFIX = "artist-hero-publications/v1"
@@ -127,16 +132,18 @@ def _remove_storage_path(path: Path) -> bool:
 
 
 def _publication_namespace_root(*, root: Path | None = None) -> Path | None:
-    return resolve_confined_path(
+    namespace = resolve_confined_entry_path(
         root if root is not None else cache_root(),
         ARTIST_HERO_PUBLICATION_PREFIX,
     )
+    return namespace if namespace is not None and not namespace.is_symlink() else None
 
 
 def _materialization_namespace_root() -> Path | None:
-    return resolve_confined_path(
+    namespace = resolve_confined_entry_path(
         cache_root(), Path("artwork-variants") / "v1" / "artist-hero"
     )
+    return namespace if namespace is not None and not namespace.is_symlink() else None
 
 
 def delete_artist_hero_artifact(
@@ -146,7 +153,7 @@ def delete_artist_hero_artifact(
 
     publication_namespace = _publication_namespace_root()
     publication_root = (
-        resolve_confined_path(
+        resolve_confined_entry_path(
             publication_namespace,
             Path(identity.artist_entity_uid)
             / identity.composition
@@ -157,7 +164,7 @@ def delete_artist_hero_artifact(
     )
     materialization_namespace = _materialization_namespace_root()
     materialization_root = (
-        resolve_confined_path(
+        resolve_confined_entry_path(
             materialization_namespace,
             artist_hero_artifact_asset(identity).entity_key,
         )
@@ -181,7 +188,7 @@ def delete_artist_hero_storage(artist_entity_uid: str) -> dict[str, int]:
     _validate_segment(artist_entity_uid, "artist entity UID")
     publication_namespace = _publication_namespace_root()
     publication_root = (
-        resolve_confined_path(publication_namespace, artist_entity_uid)
+        resolve_confined_entry_path(publication_namespace, artist_entity_uid)
         if publication_namespace is not None
         else None
     )
@@ -209,11 +216,12 @@ def resolve_artist_hero_publication_path(
     relative_path: object, *, root: Path | None = None
 ) -> Path | None:
     stored = str(relative_path or "").strip()
-    if not stored or Path(stored).is_absolute() or ".." in Path(stored).parts:
+    if not stored:
         return None
-    base = (root if root is not None else cache_root()).resolve()
-    candidate = (base / stored).resolve()
-    return candidate if candidate.is_relative_to(base) else None
+    candidate = resolve_confined_entry_path(
+        root if root is not None else cache_root(), stored
+    )
+    return candidate if candidate is not None and not candidate.is_symlink() else None
 
 
 def resolve_artist_hero_artifact_source_path(
@@ -394,14 +402,14 @@ def publish_artist_hero_artifact(
         recipe_hash=recipe_hash,
         renderer_version=renderer_version,
     )
-    final_root = resolve_confined_path(
+    final_root = resolve_confined_entry_path(
         base,
         Path(ARTIST_HERO_PUBLICATION_PREFIX)
         / identity.artist_entity_uid
         / identity.composition
         / identity.render_revision,
     )
-    if final_root is None:
+    if final_root is None or final_root.is_symlink():
         raise ValueError("Artist hero publication path is outside the storage root")
     if final_root.exists():
         return _existing_publication(identity, manifest, root=base)

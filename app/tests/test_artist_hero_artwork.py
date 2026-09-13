@@ -244,6 +244,37 @@ def test_extended_hero_webp_round_trip_preserves_transparency(monkeypatch, tmp_p
     assert locked == [tmp_path.resolve()]
 
 
+@pytest.mark.parametrize(
+    "save_name,extension",
+    [
+        ("_save_artist_hero_webp_atomic", "webp"),
+        ("_save_artist_hero_jpeg_atomic", "jpg"),
+    ],
+)
+def test_atomic_artist_hero_save_replaces_destination_symlink(
+    monkeypatch, tmp_path, save_name, extension
+):
+    from crate.worker_handlers import artwork
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    artist_root = tmp_path / "library" / "artist"
+    artist_root.mkdir(parents=True)
+    outside = tmp_path / f"outside.{extension}"
+    outside.write_bytes(b"must-not-change")
+    destination = artist_root / f"artist-hero-desktop.{extension}"
+    destination.symlink_to(outside)
+
+    getattr(artwork, save_name)(
+        Image.new("RGB", (16, 8), color=(24, 118, 145)), destination
+    )
+
+    assert outside.read_bytes() == b"must-not-change"
+    assert destination.is_file()
+    assert not destination.is_symlink()
+    with Image.open(destination) as saved:
+        assert saved.size == (16, 8)
+
+
 def test_shared_geometry_fixtures_match_the_backend_bounds():
     from crate.artist_hero_artwork import get_artist_hero_artwork_bounds
 
@@ -851,6 +882,49 @@ def test_artist_hero_source_endpoint_prefers_the_active_immutable_source(
     with Image.open(io.BytesIO(response.content)) as source:
         red, _green, blue = source.getpixel((0, 0))
     assert blue > red
+
+
+def test_artist_hero_source_does_not_fall_back_when_active_path_is_unsafe(
+    test_app, tmp_path
+):
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    Image.new("RGB", (1600, 1000), color="red").save(
+        artist_dir / "artist-hero-source-desktop.jpg", "JPEG"
+    )
+    profile = {
+        "desktop_enabled": True,
+        "render_manifest": {
+            "manifest_version": 1,
+            "editorial_revision": "editorial-b",
+            "artifacts": {
+                "desktop": {
+                    "source_relative_path": "../outside/source.jpg",
+                }
+            },
+        },
+    }
+
+    with (
+        patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch(
+            "crate.api.artwork.get_library_artist",
+            return_value={
+                "id": 7,
+                "entity_uid": "artist-entity",
+                "name": "Converge",
+                "folder_name": "Converge",
+            },
+        ),
+        patch("crate.api.artwork.library_path", return_value=tmp_path),
+        patch("crate.api.artwork.cache_root", return_value=tmp_path / "cache"),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value=profile),
+    ):
+        response = test_app.get(
+            "/api/artwork/artists/7/hero-source?composition=desktop"
+        )
+
+    assert response.status_code == 404
 
 
 def test_artist_hero_source_buffers_the_publication_under_the_stable_lock(

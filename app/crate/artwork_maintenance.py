@@ -43,7 +43,12 @@ from crate.db.repositories.artist_hero_artwork import (
 from crate.db.repositories.library_artist_reads import (
     get_library_artist_by_entity_uid,
 )
-from crate.streaming.paths import cache_root, data_root, resolve_confined_path
+from crate.streaming.paths import (
+    cache_root,
+    data_root,
+    resolve_confined_entry_path,
+    resolve_confined_path,
+)
 
 _TEMP_MAX_AGE_SECONDS = 24 * 3600
 log = logging.getLogger(__name__)
@@ -351,12 +356,19 @@ def cleanup_artist_hero_publications(
     history_artists = list_artist_hero_render_revision_artists(limit=10_000)
     artists: list[dict] = []
     publication_root = cache_root()
-    namespace_root = resolve_confined_path(
+    namespace_root = resolve_confined_entry_path(
         publication_root, ARTIST_HERO_PUBLICATION_PREFIX
     )
-    materialization_namespace_root = resolve_confined_path(
+    if namespace_root is not None and namespace_root.is_symlink():
+        namespace_root = None
+    materialization_namespace_root = resolve_confined_entry_path(
         publication_root, Path("artwork-variants") / "v1" / "artist-hero"
     )
+    if (
+        materialization_namespace_root is not None
+        and materialization_namespace_root.is_symlink()
+    ):
+        materialization_namespace_root = None
 
     def _expired(path) -> bool:
         try:
@@ -486,7 +498,7 @@ def cleanup_artist_hero_publications(
             continue
         materialization_roots = materialization_roots_by_uid.get(entity_uid, [])
         entity_root = (
-            resolve_confined_path(namespace_root, entity_uid)
+            resolve_confined_entry_path(namespace_root, entity_uid)
             if namespace_root is not None
             else None
         )
@@ -610,7 +622,7 @@ def cleanup_artist_hero_publications(
                     "artist-hero", f"{entity_uid}:{composition}"
                 )
                 legacy_root = (
-                    resolve_confined_path(
+                    resolve_confined_entry_path(
                         materialization_namespace_root, legacy_asset.entity_key
                     )
                     if materialization_namespace_root is not None
@@ -642,7 +654,7 @@ def cleanup_artist_hero_publications(
                     continue
                 removed = False
                 path = (
-                    resolve_confined_path(
+                    resolve_confined_entry_path(
                         namespace_root,
                         Path(entity_uid) / composition / revision,
                     )
@@ -652,7 +664,7 @@ def cleanup_artist_hero_publications(
                 if path is not None and path.is_dir() and _remove_tree(path):
                     removed = True
                 variant_path = (
-                    resolve_confined_path(
+                    resolve_confined_entry_path(
                         materialization_namespace_root,
                         artist_hero_artifact_asset(identity).entity_key,
                     )

@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 import base64
 import hashlib
@@ -6,6 +6,7 @@ import io as _io
 import logging
 import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal, Mapping, cast
 
@@ -116,8 +117,8 @@ ARTIST_HERO_WEBP_METHOD = 6
 def _save_artist_hero_webp_atomic(image: PILImage, destination: Path) -> None:
     """Publish a complete Hero render without exposing a partial WebP."""
 
-    destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    destination = destination.parent.resolve() / destination.name
     with artist_hero_file_lock(destination.parent):
         temporary_path: Path | None = None
         try:
@@ -141,8 +142,8 @@ def _save_artist_hero_webp_atomic(image: PILImage, destination: Path) -> None:
 
 
 def _save_artist_hero_jpeg_atomic(image: PILImage, destination: Path) -> None:
-    destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    destination = destination.parent.resolve() / destination.name
     with artist_hero_file_lock(destination.parent):
         temporary_path: Path | None = None
         try:
@@ -376,6 +377,17 @@ def _rollback_unactivated_artist_hero_publications(
                 identity.asset_key,
                 exc_info=True,
             )
+
+
+@contextmanager
+def _artist_hero_activation_guard(
+    artist_id: int, identities: list[ArtistHeroArtifactIdentity]
+) -> Iterator[None]:
+    try:
+        yield
+    except Exception:
+        _rollback_unactivated_artist_hero_publications(artist_id, identities)
+        raise
 
 
 def _artist_hero_materialization_assets(
@@ -1680,7 +1692,10 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         )
         artist_id = int(artist_row["id"])
         created_publications: list[ArtistHeroArtifactIdentity] = []
-        with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+        with (
+            artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
+            _artist_hero_activation_guard(artist_id, created_publications),
+        ):
             render_manifest = _publish_artist_hero_manifest(
                 artist_row=artist_row,
                 revision=revision,
@@ -1936,7 +1951,10 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         else existing.get("mobile_enabled", True)
     )
     created_publications: list[ArtistHeroArtifactIdentity] = []
-    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+    with (
+        artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
+        _artist_hero_activation_guard(artist_id, created_publications),
+    ):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=revision,
@@ -2209,7 +2227,10 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
     desktop_enabled = existing.get("desktop_enabled", True) is not False
     mobile_enabled = existing.get("mobile_enabled", True) is not False
     created_publications: list[ArtistHeroArtifactIdentity] = []
-    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+    with (
+        artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
+        _artist_hero_activation_guard(artist_id, created_publications),
+    ):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=revision,
@@ -2335,7 +2356,10 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
     canonical_source = _artist_hero_jpeg_content(image)
     revision = artist_hero_revision(canonical_source, b":derived-hero")
     created_publications: list[ArtistHeroArtifactIdentity] = []
-    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+    with (
+        artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
+        _artist_hero_activation_guard(artist_id, created_publications),
+    ):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=revision,
@@ -2604,7 +2628,10 @@ def _handle_migrate_artist_hero(task_id: str, params: dict, config: dict) -> dic
         )
     artifact_revision = artist_hero_revision(*revision_parts)
     created_publications: list[ArtistHeroArtifactIdentity] = []
-    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+    with (
+        artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
+        _artist_hero_activation_guard(artist_id, created_publications),
+    ):
         manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=expected_revision,

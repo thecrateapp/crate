@@ -1481,7 +1481,9 @@ def api_artist_hero(
         retained_revision = True
     elif artifact_identity is not None:
         versioned_original = resolve_artist_hero_artifact_source_path(artifact_identity)
-    local_original = versioned_original or legacy_original
+    local_original = (
+        versioned_original if artifact_identity is not None else legacy_original
+    )
     has_eligible_profile = bool(
         entity_uid
         and profile

@@ -27,6 +27,25 @@ def resolve_confined_path(root: Path, relative_path: str | Path) -> Path | None:
     return candidate if candidate.is_relative_to(resolved_root) else None
 
 
+def resolve_confined_entry_path(root: Path, relative_path: str | Path) -> Path | None:
+    """Return a confined lexical entry without following its final symlink."""
+
+    stored = Path(relative_path)
+    if stored.is_absolute() or ".." in stored.parts:
+        return None
+    resolved_root = root.resolve()
+    current = resolved_root
+    for part in stored.parts[:-1]:
+        current /= part
+        if current.is_symlink():
+            return None
+    candidate = resolved_root / stored
+    resolved_parent = candidate.parent.resolve(strict=False)
+    if not resolved_parent.is_relative_to(resolved_root):
+        return None
+    return candidate
+
+
 def variant_relative_path(cache_key: str, preset: str, extension: str) -> str:
     safe_preset = "".join(
         ch if ch.isalnum() or ch in ("_", "-") else "-" for ch in preset

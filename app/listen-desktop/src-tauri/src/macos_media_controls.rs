@@ -1,6 +1,6 @@
 use std::{
     ptr,
-    sync::{Mutex, OnceLock},
+    sync::{Arc, Condvar, Mutex, OnceLock},
     thread,
 };
 
@@ -31,6 +31,7 @@ unsafe extern "C" {
 static MEDIA_APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static ARTWORK_CACHE: OnceLock<Mutex<ArtworkCache>> = OnceLock::new();
 static ARTWORK_REQUEST_STATE: OnceLock<Mutex<ArtworkRequestState>> = OnceLock::new();
+static ARTWORK_FETCH_QUEUE: OnceLock<Arc<ArtworkFetchQueue>> = OnceLock::new();
 
 #[derive(Default)]
 struct ArtworkCache {
@@ -94,6 +95,46 @@ impl ArtworkRequestState {
     }
 }
 
+#[derive(Default)]
+struct ArtworkFetchQueue {
+    pending: Mutex<Option<ArtworkRequest>>,
+    wake: Condvar,
+}
+
+impl ArtworkFetchQueue {
+    fn enqueue(&self, request: ArtworkRequest) {
+        *self
+            .pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(request);
+        self.wake.notify_one();
+    }
+
+    #[cfg(test)]
+    fn take_pending(&self) -> Option<ArtworkRequest> {
+        self.pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+    }
+
+    fn wait_for_pending(&self) -> ArtworkRequest {
+        let mut pending = self
+            .pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        loop {
+            if let Some(request) = pending.take() {
+                return request;
+            }
+            pending = self
+                .wake
+                .wait(pending)
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        }
+    }
+}
+
 type MediaActionImp = unsafe extern "C-unwind" fn(&AnyObject, Sel, &AnyObject) -> isize;
 
 #[cfg(target_pointer_width = "32")]
@@ -125,7 +166,6 @@ pub fn update_now_playing(payload: &DesktopMediaSessionPayload) {
     let payload = payload.clone();
     if let Some(app) = MEDIA_APP_HANDLE.get() {
         let app = app.clone();
-        let artwork_app = app.clone();
         let _ = app.run_on_main_thread(move || unsafe {
             let artwork_url = non_empty(payload.title.as_deref())
                 .and_then(|_| non_empty(payload.artwork.as_deref()));
@@ -133,16 +173,37 @@ pub fn update_now_playing(payload: &DesktopMediaSessionPayload) {
             clear_cached_artwork_unless(artwork_url);
             set_now_playing_info(&payload);
             if let Some(request) = request {
-                fetch_artwork_async(artwork_app, request);
+                fetch_artwork_async(request);
             }
         });
     }
 }
 
-fn fetch_artwork_async(app: tauri::AppHandle, request: ArtworkRequest) {
-    thread::spawn(move || {
+fn artwork_fetch_queue() -> &'static Arc<ArtworkFetchQueue> {
+    ARTWORK_FETCH_QUEUE.get_or_init(|| {
+        let queue = Arc::new(ArtworkFetchQueue::default());
+        let worker_queue = Arc::clone(&queue);
+        thread::Builder::new()
+            .name("crate-artwork-fetch".to_string())
+            .spawn(move || artwork_fetch_worker(worker_queue))
+            .expect("failed to start artwork fetch worker");
+        queue
+    })
+}
+
+fn fetch_artwork_async(request: ArtworkRequest) {
+    artwork_fetch_queue().enqueue(request);
+}
+
+fn artwork_fetch_worker(queue: Arc<ArtworkFetchQueue>) {
+    loop {
+        let request = queue.wait_for_pending();
         let bytes = fetch_artwork_bytes(&request.url);
         let completion_request = request.clone();
+        let Some(app) = MEDIA_APP_HANDLE.get() else {
+            lock_artwork_request_state().finish(&request, false);
+            continue;
+        };
         if app
             .run_on_main_thread(move || unsafe {
                 finish_artwork_fetch(completion_request, bytes);
@@ -151,7 +212,7 @@ fn fetch_artwork_async(app: tauri::AppHandle, request: ArtworkRequest) {
         {
             lock_artwork_request_state().finish(&request, false);
         }
-    });
+    }
 }
 
 fn fetch_artwork_bytes(url: &str) -> Option<Vec<u8>> {
@@ -545,7 +606,26 @@ fn emit_media_command(command: crate::PlaybackCommand) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use super::ArtworkRequestState;
+    use super::{ArtworkFetchQueue, ArtworkRequest, ArtworkRequestState};
+
+    #[test]
+    fn artwork_fetch_queue_keeps_only_the_latest_pending_request() {
+        let queue = ArtworkFetchQueue::default();
+        let first = ArtworkRequest {
+            generation: 1,
+            url: "https://example.test/a.jpg".to_string(),
+        };
+        let second = ArtworkRequest {
+            generation: 2,
+            url: "https://example.test/b.jpg".to_string(),
+        };
+
+        queue.enqueue(first);
+        queue.enqueue(second.clone());
+
+        assert_eq!(queue.take_pending(), Some(second));
+        assert_eq!(queue.take_pending(), None);
+    }
 
     #[test]
     fn artwork_requests_coalesce_and_reject_stale_completions() {

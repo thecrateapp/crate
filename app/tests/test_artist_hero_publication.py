@@ -198,6 +198,28 @@ def test_resolve_artist_hero_artifact_source_rejects_file_symlink_escape(tmp_pat
     assert resolve_artist_hero_artifact_source_path(identity, root=tmp_path) is None
 
 
+def test_resolve_artist_hero_artifact_source_rejects_internal_artist_symlink(tmp_path):
+    from crate.artist_hero_publication import (
+        ARTIST_HERO_PUBLICATION_PREFIX,
+        ArtistHeroArtifactIdentity,
+        resolve_artist_hero_artifact_source_path,
+    )
+
+    namespace = tmp_path / ARTIST_HERO_PUBLICATION_PREFIX
+    target = namespace / "artist-b" / "desktop" / "revision-a"
+    target.mkdir(parents=True)
+    (target / "artifact.webp").write_bytes(b"artist-b")
+    (namespace / "artist-a").symlink_to("artist-b", target_is_directory=True)
+
+    assert (
+        resolve_artist_hero_artifact_source_path(
+            ArtistHeroArtifactIdentity("artist-a", "desktop", "revision-a"),
+            root=tmp_path,
+        )
+        is None
+    )
+
+
 def test_publish_manifest_rolls_back_a_partial_composition_bundle(
     monkeypatch, tmp_path
 ):

@@ -463,6 +463,70 @@ def test_migration_target_rolls_back_new_publications_when_manifest_cas_loses(
     assert deleted == [identity]
 
 
+def test_migration_target_rolls_back_new_publications_when_manifest_cas_raises(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from crate.artist_hero_publication import ArtistHeroArtifactIdentity
+
+    source = tmp_path / "artist-hero-source.jpg"
+    Image.new("RGB", (1600, 1000), color=(20, 80, 120)).save(source, "JPEG")
+    profile = _profile(render_manifest=None)
+    identity = ArtistHeroArtifactIdentity("artist-42", "desktop", "artifact-1")
+    deleted: list[ArtistHeroArtifactIdentity] = []
+
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_library_artist_by_id",
+        lambda _artist_id: _artist(),
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_artist_hero_artwork",
+        lambda _artist_id: profile,
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "resolve_artist_dir",
+        lambda *_args, **_kwargs: tmp_path,
+    )
+
+    def publish(**kwargs):
+        kwargs["created_publications"].append(identity)
+        return {
+            "manifest_version": 1,
+            "editorial_revision": kwargs["editorial_revision"],
+            "artifacts": {
+                composition: {"render_revision": "artifact-1"}
+                for composition in kwargs["enabled"]
+            },
+        }
+
+    def fail_activation(**_kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(artwork_handlers, "_publish_artist_hero_manifest", publish)
+    monkeypatch.setattr(
+        artwork_handlers,
+        "compare_and_swap_artist_hero_manifest",
+        fail_activation,
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "delete_artist_hero_artifact",
+        lambda candidate: deleted.append(candidate),
+        raising=False,
+    )
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        artwork_handlers._handle_migrate_artist_hero(
+            "task-1",
+            {"artist_id": 42, "expected_revision": "editorial-revision-1"},
+            {"library_path": str(tmp_path)},
+        )
+
+    assert deleted == [identity]
+
+
 def test_rollback_worker_activates_retained_manifest_and_materializes_it(
     tmp_path: Path, monkeypatch
 ) -> None:
