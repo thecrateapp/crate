@@ -114,6 +114,18 @@ async function flushMediaAccessTargets(scope: string): Promise<boolean> {
   return promise;
 }
 
+function hasPendingMediaAccessTarget(
+  scope: string,
+  targetKeys: Set<string>,
+): boolean {
+  const queued = queuedMediaAccessTargets.get(scope);
+  const inFlight = inFlightMediaAccessTargets.get(scope);
+  for (const key of targetKeys) {
+    if (queued?.has(key) || inFlight?.has(key)) return true;
+  }
+  return false;
+}
+
 export async function refreshMediaAccessTickets(
   targets?: MediaAccessTarget[],
 ): Promise<boolean> {
@@ -128,7 +140,13 @@ export async function refreshMediaAccessTickets(
   for (const target of requested) {
     queueMediaAccessTarget(target.audience, target.path, server.id);
   }
-  return flushMediaAccessTargets(server.id);
+  const requestedKeys = new Set(requested.map(mediaAccessTargetKey));
+  let succeeded = true;
+  while (hasPendingMediaAccessTarget(server.id, requestedKeys)) {
+    if (getCurrentServer()?.id !== server.id) return false;
+    succeeded = (await flushMediaAccessTargets(server.id)) && succeeded;
+  }
+  return succeeded;
 }
 
 export interface MediaAccessUrlResolvers {

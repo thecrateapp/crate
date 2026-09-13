@@ -1336,6 +1336,75 @@ describe("native (configurable server) mode", () => {
       ).toBe("fresh-artwork-ticket");
     });
 
+    it("waits for targets queued behind an in-flight refresh", async () => {
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      let resolveFirst: ((response: Response) => void) | undefined;
+      let resolveSecond: ((response: Response) => void) | undefined;
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveFirst = resolve;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveSecond = resolve;
+            }),
+        );
+
+      const first = apiMod.refreshMediaAccessTickets([
+        { audience: "artwork", path: "/api/albums/1/cover" },
+      ]);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+      let secondSettled = false;
+      const second = apiMod
+        .refreshMediaAccessTickets([
+          { audience: "artwork", path: "/api/albums/2/cover" },
+        ])
+        .then((result) => {
+          secondSettled = true;
+          return result;
+        });
+      await Promise.resolve();
+      expect(secondSettled).toBe(false);
+
+      resolveFirst?.(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/1/cover",
+              ticket: "first-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+      await expect(first).resolves.toBe(true);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(secondSettled).toBe(false);
+
+      resolveSecond?.(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/2/cover",
+              ticket: "second-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+      await expect(second).resolves.toBe(true);
+    });
+
     it("waits for a cold exact-path ticket before returning a protected URL", async () => {
       mediaAccess.clearMediaAccessTickets();
       const expiresAt = new Date(Date.now() + 60_000).toISOString();
