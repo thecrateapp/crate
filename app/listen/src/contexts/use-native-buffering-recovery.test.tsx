@@ -133,6 +133,50 @@ describe("useNativeBufferingRecovery", () => {
     consoleError.mockRestore();
   });
 
+  it("allows the same auth recovery after playback intent is cancelled", async () => {
+    const queue = [{ id: "track-1", title: "Track" }] as Track[];
+    const error = {
+      message: "Unauthorized",
+      httpStatus: 401,
+      revision: "revision-1",
+      trackId: "track-1",
+    };
+    let resolveRefresh!: (refreshed: boolean) => void;
+    mocks.refreshAuthToken
+      .mockReturnValueOnce(
+        new Promise<boolean>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(false);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { result } = renderHook(() =>
+      useNativeBufferingRecovery({
+        beginSoftInterruption: vi.fn(),
+        bufferingIntentRef: { current: false },
+        commitIsBuffering: vi.fn(),
+        commitIsPlaying: vi.fn(),
+        currentIndexRef: { current: 0 },
+        currentTimeRef: { current: 5 },
+        currentTrackRef: { current: queue[0] },
+        effectiveCrossfadeMsRef: { current: 0 },
+        lastNonZeroVolumeRef: { current: 1 },
+        queueRef: { current: queue },
+        repeatRef: { current: "off" },
+      }),
+    );
+
+    expect(result.current.retryNativePlaybackAfterAuthError(error)).toBe(true);
+    act(() => cancelNativePlaybackRecoveryIntent("pause"));
+    resolveRefresh(true);
+    await waitFor(() => expect(mocks.refreshAuthToken).toHaveBeenCalledOnce());
+
+    expect(result.current.retryNativePlaybackAfterAuthError(error)).toBe(true);
+    await waitFor(() =>
+      expect(mocks.refreshAuthToken).toHaveBeenCalledTimes(2),
+    );
+  });
+
   it("does not load an autoplay queue after playback recovery is cancelled", async () => {
     const queue = [{ id: "track-1", title: "Track" }] as Track[];
     let resolveTracks!: (tracks: []) => void;

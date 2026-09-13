@@ -119,13 +119,22 @@ export function useNativeBufferingRecovery({
     nativeBufferingRecoveryKeyRef.current = null;
   }, []);
 
+  const clearNativeAuthRetry = useCallback(() => {
+    nativeAuthRetryKeyRef.current = null;
+  }, []);
+
   useEffect(
     () =>
       subscribeNativePlaybackIntentChanges(() => {
         clearNativeBufferingWatchdog();
         clearNativeBufferingRecovery();
+        clearNativeAuthRetry();
       }),
-    [clearNativeBufferingRecovery, clearNativeBufferingWatchdog],
+    [
+      clearNativeAuthRetry,
+      clearNativeBufferingRecovery,
+      clearNativeBufferingWatchdog,
+    ],
   );
 
   const recoverNativeBuffering = useCallback(
