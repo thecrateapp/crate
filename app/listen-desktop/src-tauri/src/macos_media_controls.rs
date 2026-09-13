@@ -729,7 +729,7 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        let result = fetch_artwork_bytes_with_timeout(&url, Duration::from_millis(50));
+        let result = fetch_artwork_bytes_with_timeout(&url.url, Duration::from_millis(50));
 
         assert_eq!(result, Some(b"local-artwork".to_vec()));
     }

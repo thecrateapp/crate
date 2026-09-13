@@ -130,4 +130,65 @@ describe("syncDesktopMediaSession", () => {
       });
     },
   );
+
+  it("rematerializes artwork evicted by the native cache", async () => {
+    const artworkA = "data:image/png;base64,ZXZpY3RlZC1jb3Zlcg==";
+    const artworkB = "data:image/png;base64,bmV3LWNvdmVy";
+    const fileA = "file:///tmp/crate-evicted-cover.jpg";
+    const fileB = "file:///tmp/crate-new-cover.jpg";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { "content-type": "image/jpeg" },
+          }),
+        ),
+      ),
+    );
+    const cacheCalls: string[] = [];
+    const invoke = vi.fn((command: string, args?: unknown) => {
+      if (command !== "cache_desktop_media_artwork") {
+        return Promise.resolve(undefined);
+      }
+      const cacheKey = (args as { cacheKey: string }).cacheKey;
+      cacheCalls.push(cacheKey);
+      return Promise.resolve(
+        cacheKey === artworkB
+          ? { url: fileB, evictedUrls: [fileA] }
+          : { url: fileA, evictedUrls: [] },
+      );
+    });
+    (window as any).__crateTauriInvoke = invoke;
+    const payload = (artwork: string): DesktopMediaSessionPayload => ({
+      title: artwork,
+      artist: "Artist",
+      album: "Album",
+      artwork,
+      isPlaying: true,
+      position: 0,
+      duration: 180,
+    });
+
+    syncDesktopMediaSession(payload(artworkA));
+    await vi.waitFor(() => expect(cacheCalls).toEqual([artworkA]));
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+        payload: { ...payload(artworkA), artwork: fileA },
+      }),
+    );
+    syncDesktopMediaSession(payload(artworkB));
+    await vi.waitFor(() => expect(cacheCalls).toEqual([artworkA, artworkB]));
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+        payload: { ...payload(artworkB), artwork: fileB },
+      }),
+    );
+    syncDesktopMediaSession(payload(artworkA));
+
+    await vi.waitFor(() =>
+      expect(cacheCalls).toEqual([artworkA, artworkB, artworkA]),
+    );
+  });
 });

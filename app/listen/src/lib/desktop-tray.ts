@@ -31,6 +31,11 @@ let desktopMediaSessionSequence = 0;
 const preparedDesktopArtwork = new Map<string, string>();
 const pendingDesktopArtwork = new Map<string, Promise<string | null>>();
 
+interface DesktopArtworkCacheResult {
+  url: string;
+  evictedUrls: string[];
+}
+
 export function dispatchDesktopTrayCommand(command: DesktopTrayCommand): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
@@ -147,15 +152,26 @@ async function fetchAndCacheDesktopArtwork(
   if (!blob.size || blob.size > MAX_DESKTOP_ARTWORK_BYTES) return null;
 
   const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
-  const result = await window.__crateTauriInvoke?.<string | null>(
-    "cache_desktop_media_artwork",
-    {
-      cacheKey: artwork,
-      bytes,
-      mimeType: blob.type || response.headers.get("content-type") || null,
-    },
-  );
-  return result || null;
+  const result = await window.__crateTauriInvoke?.<
+    DesktopArtworkCacheResult | string | null
+  >("cache_desktop_media_artwork", {
+    cacheKey: artwork,
+    bytes,
+    mimeType: blob.type || response.headers.get("content-type") || null,
+  });
+  if (!result) return null;
+  if (typeof result === "string") return result;
+  if (typeof result.url !== "string") return null;
+  forgetEvictedPreparedArtwork(result.evictedUrls);
+  return result.url;
+}
+
+function forgetEvictedPreparedArtwork(evictedUrls: string[]): void {
+  if (!Array.isArray(evictedUrls) || evictedUrls.length === 0) return;
+  const evicted = new Set(evictedUrls);
+  for (const [artwork, fileUrl] of preparedDesktopArtwork) {
+    if (evicted.has(fileUrl)) preparedDesktopArtwork.delete(artwork);
+  }
 }
 
 function rememberPreparedArtwork(artwork: string, fileUrl: string): void {
