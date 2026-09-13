@@ -48,6 +48,7 @@ def test_manifest_history_persists_previous_and_uses_manifest_cas(pg_db) -> None
         compare_and_swap_artist_hero_manifest,
         get_artist_hero_artwork,
         list_artist_hero_manifest_history,
+        list_artist_hero_render_revisions,
         upsert_artist_hero_artwork,
     )
     from crate.db.tx import read_scope
@@ -101,6 +102,13 @@ def test_manifest_history_persists_previous_and_uses_manifest_cas(pg_db) -> None
     history = list_artist_hero_manifest_history(artist_id)
     assert [entry["manifest"] for entry in history] == [manifest_b, manifest_a]
     assert history[0]["previous_manifest"] == manifest_a
+
+    render_history = list_artist_hero_render_revisions(artist_id, composition="desktop")
+    assert {entry["render_revision"] for entry in render_history} == {
+        "artifact-a",
+        "artifact-b",
+        "artifact-c",
+    }
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")

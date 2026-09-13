@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 from collections.abc import Mapping
 
 from sqlalchemy import text
@@ -72,6 +72,87 @@ def _record_manifest_history(
     )
 
 
+def _record_render_manifest_history(
+    active_session,
+    *,
+    artist_id: int,
+    manifest: Mapping[str, object] | None,
+) -> None:
+    if not isinstance(manifest, Mapping):
+        return
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        return
+    editorial_revision = str(manifest.get("editorial_revision") or "")
+    for composition in ("desktop", "mobile"):
+        artifact = artifacts.get(composition)
+        if not isinstance(artifact, Mapping):
+            continue
+        render_revision = str(artifact.get("render_revision") or "")
+        if not render_revision:
+            continue
+        immutable_metadata = {
+            "renderer_version": str(artifact.get("renderer_version") or ""),
+            "source_fingerprint": str(artifact.get("source_fingerprint") or ""),
+            "recipe_hash": str(artifact.get("recipe_hash") or ""),
+            "relative_path": str(artifact.get("relative_path") or ""),
+        }
+        metadata = {
+            "editorial_revision": editorial_revision,
+            **immutable_metadata,
+        }
+        existing = (
+            active_session.execute(
+                text(
+                    """
+                    SELECT editorial_revision, renderer_version,
+                           source_fingerprint, recipe_hash, relative_path
+                    FROM artist_hero_render_revisions
+                    WHERE artist_id = :artist_id
+                      AND composition = :composition
+                      AND render_revision = :render_revision
+                    FOR UPDATE
+                    """
+                ),
+                {
+                    "artist_id": artist_id,
+                    "composition": composition,
+                    "render_revision": render_revision,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if existing is not None:
+            if any(existing[key] != value for key, value in immutable_metadata.items()):
+                raise ValueError(
+                    "Artist hero render revision metadata conflict: "
+                    f"{artist_id}:{composition}:{render_revision}"
+                )
+            continue
+        active_session.execute(
+            text(
+                """
+                INSERT INTO artist_hero_render_revisions (
+                    artist_id, composition, render_revision,
+                    editorial_revision, renderer_version,
+                    source_fingerprint, recipe_hash, relative_path
+                ) VALUES (
+                    :artist_id, :composition, :render_revision,
+                    :editorial_revision, :renderer_version,
+                    :source_fingerprint, :recipe_hash, :relative_path
+                )
+                """
+            ),
+            {
+                "artist_id": artist_id,
+                "composition": composition,
+                "render_revision": render_revision,
+                **metadata,
+            },
+        )
+
+
 def get_artist_hero_artwork(artist_id: int, *, session=None) -> dict | None:
     def _read(active_session) -> dict | None:
         row = (
@@ -124,88 +205,6 @@ def upsert_artist_hero_artwork(
     expected_revision: str | None = None,
     session=None,
 ) -> bool:
-    def _record_render_manifest_history(
-        active_session, manifest: Mapping[str, object] | None
-    ) -> None:
-        if not isinstance(manifest, Mapping):
-            return
-        artifacts = manifest.get("artifacts")
-        if not isinstance(artifacts, Mapping):
-            return
-        editorial_revision = str(manifest.get("editorial_revision") or "")
-        for composition in ("desktop", "mobile"):
-            artifact = artifacts.get(composition)
-            if not isinstance(artifact, Mapping):
-                continue
-            render_revision = str(artifact.get("render_revision") or "")
-            if not render_revision:
-                continue
-            immutable_metadata = {
-                "renderer_version": str(artifact.get("renderer_version") or ""),
-                "source_fingerprint": str(artifact.get("source_fingerprint") or ""),
-                "recipe_hash": str(artifact.get("recipe_hash") or ""),
-                "relative_path": str(artifact.get("relative_path") or ""),
-            }
-            metadata = {
-                "editorial_revision": editorial_revision,
-                **immutable_metadata,
-            }
-            existing = (
-                active_session.execute(
-                    text(
-                        """
-                        SELECT editorial_revision, renderer_version,
-                               source_fingerprint, recipe_hash, relative_path
-                        FROM artist_hero_render_revisions
-                        WHERE artist_id = :artist_id
-                          AND composition = :composition
-                          AND render_revision = :render_revision
-                        FOR UPDATE
-                        """
-                    ),
-                    {
-                        "artist_id": artist_id,
-                        "composition": composition,
-                        "render_revision": render_revision,
-                    },
-                )
-                .mappings()
-                .first()
-            )
-            if existing is not None:
-                # A render can be reused by a later editorial manifest. Its
-                # technical identity is immutable, but the manifest revision
-                # that references it is intentionally not.
-                if any(
-                    existing[key] != value for key, value in immutable_metadata.items()
-                ):
-                    raise ValueError(
-                        "Artist hero render revision metadata conflict: "
-                        f"{artist_id}:{composition}:{render_revision}"
-                    )
-                continue
-            active_session.execute(
-                text(
-                    """
-                    INSERT INTO artist_hero_render_revisions (
-                        artist_id, composition, render_revision,
-                        editorial_revision, renderer_version,
-                        source_fingerprint, recipe_hash, relative_path
-                    ) VALUES (
-                        :artist_id, :composition, :render_revision,
-                        :editorial_revision, :renderer_version,
-                        :source_fingerprint, :recipe_hash, :relative_path
-                    )
-                    """
-                ),
-                {
-                    "artist_id": artist_id,
-                    "composition": composition,
-                    "render_revision": render_revision,
-                    **metadata,
-                },
-            )
-
     def _write(active_session) -> bool:
         current = (
             active_session.execute(
@@ -318,7 +317,11 @@ def upsert_artist_hero_artwork(
                 else None
             ),
         )
-        _record_render_manifest_history(active_session, render_manifest)
+        _record_render_manifest_history(
+            active_session,
+            artist_id=artist_id,
+            manifest=render_manifest,
+        )
         return True
 
     if session is not None:
@@ -352,6 +355,11 @@ def compare_and_swap_artist_hero_manifest(
             )
             .mappings()
             .first()
+        )
+        _record_render_manifest_history(
+            active_session,
+            artist_id=artist_id,
+            manifest=render_manifest,
         )
         if current is None or current["revision"] != expected_revision:
             return False
@@ -469,6 +477,12 @@ def rollback_artist_hero_manifest(
         target_manifest = target["manifest"] if target else None
         if not isinstance(target_manifest, Mapping):
             return False
+
+        _record_render_manifest_history(
+            active_session,
+            artist_id=artist_id,
+            manifest=target_manifest,
+        )
 
         _record_manifest_history(
             active_session,
