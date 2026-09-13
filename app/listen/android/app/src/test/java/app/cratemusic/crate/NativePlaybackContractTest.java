@@ -41,15 +41,30 @@ public class NativePlaybackContractTest {
     }
 
     @Test
-    public void resumeAuthorizationBlocksEveryExternalSeekCommand() {
-        assertTrue(
+    public void resumeAuthorizationLetsExternalSeekCommandsUpdateThePendingCursor() {
+        assertFalse(
             CrateNativePlaybackService.isCommandBlockedDuringResumeAuthorization(
                 Player.COMMAND_SEEK_TO_DEFAULT_POSITION
             )
         );
-        assertTrue(
+        assertFalse(
             CrateNativePlaybackService.isCommandBlockedDuringResumeAuthorization(
                 Player.COMMAND_SEEK_TO_MEDIA_ITEM
+            )
+        );
+        assertTrue(
+            CrateNativePlaybackService.isResumeAuthorizationCursorCommand(
+                Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM
+            )
+        );
+        assertTrue(
+            CrateNativePlaybackService.isResumeAuthorizationCursorCommand(
+                Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM
+            )
+        );
+        assertTrue(
+            CrateNativePlaybackService.isCommandBlockedDuringResumeAuthorization(
+                Player.COMMAND_PREPARE
             )
         );
     }

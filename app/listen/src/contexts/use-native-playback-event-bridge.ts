@@ -109,6 +109,8 @@ export function createNativeResumeAuthorizationCoordinator(
     string,
     {
       autoplay: boolean;
+      index: number;
+      positionMs: number;
       promise: Promise<NativeResumeAuthorizationOutcome>;
     }
   >();
@@ -118,7 +120,14 @@ export function createNativeResumeAuthorizationCoordinator(
   ): Promise<NativeResumeAuthorizationOutcome> | null => {
     const autoplay = Boolean(event.playWhenReady);
     const active = activeRevisions.get(event.revision);
-    if (disposed || active?.autoplay === autoplay) return null;
+    if (
+      disposed ||
+      (active?.autoplay === autoplay &&
+        active.index === event.index &&
+        active.positionMs === event.positionMs)
+    ) {
+      return null;
+    }
     const intentGeneration = beginNativePlaybackIntent();
     const recovery = recoverNativeResumeAuthorizationWithRetry(
       recoverNativeBuffering,
@@ -140,7 +149,12 @@ export function createNativeResumeAuthorizationCoordinator(
         activeRevisions.delete(event.revision);
       }
     });
-    activeRevisions.set(event.revision, { autoplay, promise: tracked });
+    activeRevisions.set(event.revision, {
+      autoplay,
+      index: event.index,
+      positionMs: event.positionMs,
+      promise: tracked,
+    });
     return tracked;
   };
 

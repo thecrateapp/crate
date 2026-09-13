@@ -226,6 +226,17 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 int reason
             ) {
                 resetPlayEventCheckpoint();
+                if (resumeAuthorizationPending) {
+                    ResumeAuthorizationIntent current = currentResumeAuthorizationIntent();
+                    resumeAuthorizationIntent = new ResumeAuthorizationIntent(
+                        newPosition.mediaItemIndex,
+                        newPosition.positionMs,
+                        current.playWhenReady,
+                        queue.size()
+                    );
+                    emitResumeAuthorizationRequired(resumeAuthorizationIntent);
+                    openAppForAuthorization();
+                }
                 emitPosition();
                 persistCheckpoint();
                 emitState("stateChanged");
@@ -322,6 +333,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
                         openAppForAuthorization();
                         return SessionError.ERROR_SESSION_AUTHENTICATION_EXPIRED;
                     }
+                    if (
+                        resumeAuthorizationPending &&
+                        isResumeAuthorizationCursorCommand(playerCommand)
+                    ) {
+                        emitResumeAuthorizationRequired(currentResumeAuthorizationIntent());
+                        openAppForAuthorization();
+                    }
                     return SessionResult.RESULT_SUCCESS;
                 }
             });
@@ -340,8 +358,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     static boolean isCommandBlockedDuringResumeAuthorization(int playerCommand) {
         return playerCommand == Player.COMMAND_PLAY_PAUSE ||
-            playerCommand == Player.COMMAND_PREPARE ||
-            playerCommand == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM ||
+            playerCommand == Player.COMMAND_PREPARE;
+    }
+
+    static boolean isResumeAuthorizationCursorCommand(int playerCommand) {
+        return playerCommand == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM ||
             playerCommand == Player.COMMAND_SEEK_TO_DEFAULT_POSITION ||
             playerCommand == Player.COMMAND_SEEK_TO_MEDIA_ITEM ||
             playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
@@ -507,14 +528,23 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 )
             );
         }
+        ResumeAuthorizationIntent pendingIntent = resumeAuthorizationPending
+            ? currentResumeAuthorizationIntent()
+            : null;
         checkpointStore.save(
             new PlaybackCheckpointStore.Checkpoint(
                 queueRevision,
                 safeTracks,
-                Math.max(0, player.getCurrentMediaItemIndex()),
-                Math.max(0L, player.getCurrentPosition()),
+                pendingIntent == null
+                    ? Math.max(0, player.getCurrentMediaItemIndex())
+                    : pendingIntent.index,
+                pendingIntent == null
+                    ? Math.max(0L, player.getCurrentPosition())
+                    : pendingIntent.positionMs,
                 repeatModeName(player.getRepeatMode()),
-                player.getPlayWhenReady()
+                pendingIntent == null
+                    ? player.getPlayWhenReady()
+                    : pendingIntent.playWhenReady
             )
         );
     }

@@ -158,6 +158,39 @@ describe("native resume authorization coordinator", () => {
     await Promise.all([first, updated]);
   });
 
+  it("starts a new recovery when the cursor changes for the same revision", async () => {
+    const pending: Array<(value: boolean) => void> = [];
+    const recoverNativeBuffering = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          pending.push(resolve);
+        }),
+    );
+    const coordinator = createNativeResumeAuthorizationCoordinator(
+      recoverNativeBuffering,
+    );
+
+    const first = coordinator.start(resumeEvent);
+    const updated = coordinator.start({
+      ...resumeEvent,
+      nativeSequence: 2,
+      index: 2,
+      positionMs: 42_000,
+    });
+
+    expect(updated).not.toBeNull();
+    expect(recoverNativeBuffering).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        autoplay: true,
+        index: 2,
+        positionMs: 42_000,
+      }),
+    );
+
+    pending.forEach((resolve) => resolve(true));
+    await Promise.all([first, updated]);
+  });
+
   it("cancels retries and suppresses late failure after disposal", async () => {
     vi.useFakeTimers();
     let resolveRecovery!: (value: boolean) => void;
