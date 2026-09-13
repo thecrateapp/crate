@@ -353,12 +353,12 @@ def test_musicbrainz_source_includes_member_relations_for_bio_review(monkeypatch
             {
                 "name": "Example Artist",
                 "type": "Group",
-                "artist-relation-list": [
+                "relations": [
                     {
                         "type": "member of band",
                         "artist": {"name": "Current Member"},
                         "begin": "2020",
-                        "attribute-list": ["vocals"],
+                        "attributes": ["vocals"],
                     }
                 ],
             },
@@ -371,6 +371,8 @@ def test_musicbrainz_source_includes_member_relations_for_bio_review(monkeypatch
     sources = research._collect_musicbrainz("Example Artist", "mbid-1")
 
     assert "Member: Current Member" in sources[0]["excerpt"]
+    assert "Roles: vocals" in sources[0]["excerpt"]
+    assert "From: 2020 | To: present" in sources[0]["excerpt"]
 
 
 def test_artist_research_rejects_private_or_credentialed_urls():

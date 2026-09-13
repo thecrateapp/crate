@@ -341,7 +341,7 @@ def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]
         f"Life-span: {payload.get('life-span', '')}",
         f"Disambiguation: {payload.get('disambiguation', '')}",
     ]
-    relations = payload.get("artist-relation-list", [])
+    relations = payload.get("relations", payload.get("artist-relation-list", []))
     if isinstance(relations, list):
         for relation in relations[:60]:
             if not isinstance(relation, dict):
@@ -352,7 +352,9 @@ def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]
             member = relation.get("artist")
             if not isinstance(member, dict) or not member.get("name"):
                 continue
-            attributes = relation.get("attribute-list") or []
+            attributes = (
+                relation.get("attributes") or relation.get("attribute-list") or []
+            )
             if isinstance(attributes, list):
                 roles = ", ".join(str(attribute)[:80] for attribute in attributes[:6])
             else:
