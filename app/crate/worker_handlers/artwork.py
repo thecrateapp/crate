@@ -65,6 +65,7 @@ from crate.db.repositories.library import (
     get_library_album_by_id,
     get_library_artist,
     get_library_artist_by_id,
+    get_library_artist_by_entity_uid,
 )
 from crate.db.repositories.artist_hero_artwork import (
     artist_hero_manifest_id,
@@ -381,35 +382,54 @@ def _handle_materialize_artwork_variants(
         force=True,
     )
     reason = str(params.get("reason") or "")
-    source = resolve_artwork_source(
-        asset,
-        allow_provider=reason not in {"backfill", "integrity-repair"},
-    )
-    if source is None:
+
+    def missing_result() -> dict:
         return {
             "status": "missing",
             "kind": asset.kind,
             "entity_key": asset.entity_key,
         }
 
-    materialized = materialize_artwork(
-        asset,
-        source.content,
-        source_media_type=source.media_type,
-    )
-    emit_progress(
-        task_id,
-        TaskProgress(phase="materialize_artwork", done=1, total=1),
-        force=True,
-    )
-    return {
-        "status": "materialized",
-        "kind": asset.kind,
-        "entity_key": asset.entity_key,
-        "origin": source.origin,
-        "revision": materialized.get("source_revision"),
-        "variant_count": int(materialized.get("variant_count") or 0),
-    }
+    def materialize_resolved_source() -> dict:
+        source = resolve_artwork_source(
+            asset,
+            allow_provider=reason not in {"backfill", "integrity-repair"},
+        )
+        if source is None:
+            return missing_result()
+
+        materialized = materialize_artwork(
+            asset,
+            source.content,
+            source_media_type=source.media_type,
+        )
+        emit_progress(
+            task_id,
+            TaskProgress(phase="materialize_artwork", done=1, total=1),
+            force=True,
+        )
+        return {
+            "status": "materialized",
+            "kind": asset.kind,
+            "entity_key": asset.entity_key,
+            "origin": source.origin,
+            "revision": materialized.get("source_revision"),
+            "variant_count": int(materialized.get("variant_count") or 0),
+        }
+
+    if asset.kind != "artist-hero":
+        return materialize_resolved_source()
+
+    entity_uid = asset.entity_key.split(":", 1)[0]
+    artist = get_library_artist_by_entity_uid(entity_uid)
+    if not artist or artist.get("id") is None:
+        return missing_result()
+    artist_id = int(artist["id"])
+    with artist_hero_publication_lock(cache_root(), artist_id):
+        current_artist = get_library_artist_by_entity_uid(entity_uid)
+        if current_artist is None or int(current_artist.get("id") or 0) != artist_id:
+            return missing_result()
+        return materialize_resolved_source()
 
 
 def _handle_backfill_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
