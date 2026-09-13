@@ -20,6 +20,7 @@ import {
 } from "@/contexts/use-native-buffering-recovery";
 import { recordDevLog } from "@/lib/dev-logs";
 import {
+  beginNativePlaybackIntent,
   captureNativePlaybackRecoveryIntent,
   isNativePlaybackRecoveryIntentCurrent,
 } from "@/lib/native-playback-intent";
@@ -52,14 +53,17 @@ type RecoverNativeBuffering = (options: {
   probeStatus: string;
   autoplay?: boolean;
   intentGeneration?: number;
+  index?: number;
+  positionMs?: number;
 }) => Promise<boolean>;
 
 export async function recoverNativeResumeAuthorizationWithRetry(
   recoverNativeBuffering: RecoverNativeBuffering,
   autoplay: boolean,
   shouldContinue: () => boolean = () => true,
+  cursor?: { index: number; positionMs: number },
+  intentGeneration = captureNativePlaybackRecoveryIntent(),
 ): Promise<boolean> {
-  const intentGeneration = captureNativePlaybackRecoveryIntent();
   for (const delay of RESUME_AUTHORIZATION_RETRY_DELAYS_MS) {
     if (
       !shouldContinue() ||
@@ -81,8 +85,16 @@ export async function recoverNativeResumeAuthorizationWithRetry(
       probeStatus: "resume-authorization",
       autoplay,
       intentGeneration,
+      index: cursor?.index,
+      positionMs: cursor?.positionMs,
     });
-    if (recovered) return true;
+    if (
+      recovered &&
+      shouldContinue() &&
+      isNativePlaybackRecoveryIntentCurrent(intentGeneration)
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -95,17 +107,25 @@ export function createNativeResumeAuthorizationCoordinator(
   let disposed = false;
   const activeRevisions = new Map<
     string,
-    Promise<NativeResumeAuthorizationOutcome>
+    {
+      autoplay: boolean;
+      promise: Promise<NativeResumeAuthorizationOutcome>;
+    }
   >();
 
   const start = (
     event: EngineEventMap["resumeAuthorizationRequired"],
   ): Promise<NativeResumeAuthorizationOutcome> | null => {
-    if (disposed || activeRevisions.has(event.revision)) return null;
+    const autoplay = Boolean(event.playWhenReady);
+    const active = activeRevisions.get(event.revision);
+    if (disposed || active?.autoplay === autoplay) return null;
+    const intentGeneration = beginNativePlaybackIntent();
     const recovery = recoverNativeResumeAuthorizationWithRetry(
       recoverNativeBuffering,
-      Boolean(event.playWhenReady),
+      autoplay,
       () => !disposed,
+      { index: event.index, positionMs: event.positionMs },
+      intentGeneration,
     )
       .then((recovered): NativeResumeAuthorizationOutcome => {
         if (disposed) return "cancelled";
@@ -116,11 +136,11 @@ export function createNativeResumeAuthorizationCoordinator(
         throw error;
       });
     const tracked = recovery.finally(() => {
-      if (activeRevisions.get(event.revision) === tracked) {
+      if (activeRevisions.get(event.revision)?.promise === tracked) {
         activeRevisions.delete(event.revision);
       }
     });
-    activeRevisions.set(event.revision, tracked);
+    activeRevisions.set(event.revision, { autoplay, promise: tracked });
     return tracked;
   };
 

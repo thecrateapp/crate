@@ -24,6 +24,10 @@ import {
   type EngineRepeatMode,
 } from "@/lib/playback-engine";
 import {
+  beginNativePlaybackIntent,
+  isNativePlaybackRecoveryIntentCurrent,
+} from "@/lib/native-playback-intent";
+import {
   loadQueue as gpLoadQueue,
   play as gpPlay,
   setLoop as gpSetLoop,
@@ -157,6 +161,7 @@ export function usePlayerStartActions({
       setPlaySource(nextSource);
 
       if (shouldUseAndroidNativePlayer()) {
+        const intentGeneration = beginNativePlaybackIntent();
         silenceGaplessEngine();
         commitQueue(tracks);
         commitCurrentIndex(normalizedIndex);
@@ -178,6 +183,7 @@ export function usePlayerStartActions({
             undefined,
             { target: "android-native" },
           );
+          if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
           return nativeEngine.loadQueue({
             revision: createQueueRevision(),
             tracks: engineTracks,
@@ -189,6 +195,7 @@ export function usePlayerStartActions({
             volume: lastNonZeroVolumeRef.current,
           });
         })().catch((error) => {
+          if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
           console.error("[native-player] failed to load queue:", error);
           commitIsPlaying(false);
           commitIsBuffering(false);

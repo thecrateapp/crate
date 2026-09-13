@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { Track } from "@/contexts/player-types";
 import { clampIndex } from "@/contexts/player-queue-helpers";
@@ -16,6 +16,7 @@ import {
   captureNativePlaybackRecoveryIntent,
   isNativePlaybackRecoveryIntentCurrent,
   nativePlaybackRecoveryCancellationSince,
+  subscribeNativePlaybackIntentChanges,
 } from "@/lib/native-playback-intent";
 import { toast } from "sonner";
 
@@ -100,12 +101,23 @@ export function useNativeBufferingRecovery({
     nativeBufferingRecoveryKeyRef.current = null;
   }, []);
 
+  useEffect(
+    () =>
+      subscribeNativePlaybackIntentChanges(() => {
+        clearNativeBufferingWatchdog();
+        clearNativeBufferingRecovery();
+      }),
+    [clearNativeBufferingRecovery, clearNativeBufferingWatchdog],
+  );
+
   const recoverNativeBuffering = useCallback(
     async (options: {
       forceRefresh: boolean;
       probeStatus: string;
       autoplay?: boolean;
       intentGeneration?: number;
+      index?: number;
+      positionMs?: number;
     }) => {
       if (!shouldUseAndroidNativePlayer()) return false;
       const intentGeneration =
@@ -117,9 +129,13 @@ export function useNativeBufferingRecovery({
       const queueSnapshot = queueRef.current;
       if (queueSnapshot.length === 0) return false;
 
-      const index = clampIndex(currentIndexRef.current, queueSnapshot.length);
+      const requestedIndex = options.index ?? currentIndexRef.current;
+      const index = clampIndex(requestedIndex, queueSnapshot.length);
       const targetTrack = queueSnapshot[index];
-      const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+      const positionMs = Math.max(
+        0,
+        Math.round(options.positionMs ?? currentTimeRef.current * 1000),
+      );
       const retryKey = [
         targetTrack?.id || index,
         Math.floor(positionMs / 10_000),
@@ -127,6 +143,7 @@ export function useNativeBufferingRecovery({
       ].join(":");
       if (nativeBufferingRecoveryKeyRef.current === retryKey) return false;
       nativeBufferingRecoveryKeyRef.current = retryKey;
+      let recovered = false;
 
       // The key above only needs to dedup *successful* (or still in-
       // flight) recoveries for this exact track/position/probe combo —
@@ -169,10 +186,12 @@ export function useNativeBufferingRecovery({
           return false;
         }
         if (cancellation === "superseded") return false;
+        recovered = true;
         return true;
-      } catch (error) {
-        nativeBufferingRecoveryKeyRef.current = null;
-        throw error;
+      } finally {
+        if (!recovered && nativeBufferingRecoveryKeyRef.current === retryKey) {
+          nativeBufferingRecoveryKeyRef.current = null;
+        }
       }
     },
     [
