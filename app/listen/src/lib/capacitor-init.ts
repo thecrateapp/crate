@@ -122,10 +122,7 @@ async function initializeCapacitor(): Promise<string | null> {
   });
 
   App.addListener("appUrlOpen", ({ url }) => {
-    void consumeOAuthCallbackUrl(url).then((result) => {
-      if (!result.handled) return;
-      window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
-    });
+    void consumeOAuthCallbackAndNotify(url);
   });
 
   App.addListener("pause", () => {
@@ -137,16 +134,18 @@ async function initializeCapacitor(): Promise<string | null> {
     void retryPendingOAuthExchange();
   });
 
+  let launchUrl: string | null = null;
   try {
-    const launch = await App.getLaunchUrl();
-    if (launch?.url) {
-      await consumeOAuthCallbackUrl(launch.url);
-    }
+    launchUrl = (await App.getLaunchUrl())?.url ?? null;
   } catch {
     // Ignore launch URL failures
   }
 
-  void retryPendingOAuthExchange();
+  if (launchUrl) {
+    void consumeLaunchOAuthAndRetry(launchUrl);
+  } else {
+    void retryPendingOAuthExchange();
+  }
 
   Network.addListener("networkStatusChange", (status) => {
     console.log(
@@ -160,6 +159,18 @@ async function initializeCapacitor(): Promise<string | null> {
   });
 
   return null;
+}
+
+async function consumeOAuthCallbackAndNotify(url: string): Promise<void> {
+  const result = await consumeOAuthCallbackUrl(url);
+  if (result.handled) {
+    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
+  }
+}
+
+async function consumeLaunchOAuthAndRetry(url: string): Promise<void> {
+  await consumeOAuthCallbackAndNotify(url);
+  await retryPendingOAuthExchange();
 }
 
 async function retryPendingOAuthExchange(): Promise<void> {

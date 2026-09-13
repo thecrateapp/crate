@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   appAddListener,
+  appGetLaunchUrl,
+  consumeOAuthCallbackUrl,
   networkAddListener,
   retryPendingNativeOAuthCallback,
   statusBarSetStyle,
 } = vi.hoisted(() => ({
   appAddListener: vi.fn(),
+  appGetLaunchUrl: vi.fn(),
+  consumeOAuthCallbackUrl: vi.fn(),
   networkAddListener: vi.fn(),
   retryPendingNativeOAuthCallback: vi.fn(),
   statusBarSetStyle: vi.fn(),
@@ -15,7 +19,7 @@ const {
 vi.mock("@capacitor/app", () => ({
   App: {
     addListener: appAddListener,
-    getLaunchUrl: vi.fn(async () => null),
+    getLaunchUrl: appGetLaunchUrl,
     exitApp: vi.fn(),
   },
 }));
@@ -48,7 +52,7 @@ vi.mock("@capacitor/status-bar", () => ({
 }));
 
 vi.mock("@/lib/capacitor-oauth", () => ({
-  consumeOAuthCallbackUrl: vi.fn(),
+  consumeOAuthCallbackUrl,
   retryPendingNativeOAuthCallback,
 }));
 
@@ -62,6 +66,10 @@ describe("Capacitor initialization", () => {
   beforeEach(() => {
     vi.resetModules();
     appAddListener.mockReset();
+    appGetLaunchUrl.mockReset().mockResolvedValue(null);
+    consumeOAuthCallbackUrl
+      .mockReset()
+      .mockResolvedValue({ handled: false, next: "/" });
     networkAddListener.mockReset();
     statusBarSetStyle.mockReset();
     retryPendingNativeOAuthCallback
@@ -82,6 +90,19 @@ describe("Capacitor initialization", () => {
 
   it("does not block native initialization on a pending OAuth retry", async () => {
     retryPendingNativeOAuthCallback.mockReturnValue(new Promise(() => {}));
+    const { initCapacitor } = await import("./capacitor-init");
+
+    const initialized = initCapacitor();
+
+    await vi.waitFor(() => expect(networkAddListener).toHaveBeenCalledOnce());
+    await expect(initialized).resolves.toBeNull();
+  });
+
+  it("does not block native initialization on a launch URL exchange", async () => {
+    appGetLaunchUrl.mockResolvedValue({
+      url: "cratemusic://oauth/callback?code=code&state=state",
+    });
+    consumeOAuthCallbackUrl.mockReturnValue(new Promise(() => {}));
     const { initCapacitor } = await import("./capacitor-init");
 
     const initialized = initCapacitor();
