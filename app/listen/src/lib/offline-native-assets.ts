@@ -63,6 +63,7 @@ export async function hasCachedNativeTrackAssets(
   const expectations: Array<{
     assetKey: string;
     aliases: string[];
+    entry: OfflineNativeAssetRecord;
     path: string;
     expectedBytes: number | null;
   }> = [];
@@ -75,6 +76,7 @@ export async function hasCachedNativeTrackAssets(
     expectations.push({
       assetKey,
       aliases,
+      entry,
       path: entry.path,
       expectedBytes: entry.byteLength ?? track.byte_length ?? null,
     });
@@ -84,7 +86,7 @@ export async function hasCachedNativeTrackAssets(
     expectations.map(({ path, expectedBytes }) => ({ path, expectedBytes })),
   );
   const found = new Set<string>();
-  const staleAliases = new Set<string>();
+  const staleEntries = new Map<string, OfflineNativeAssetRecord>();
   for (let index = 0; index < expectations.length; index += 1) {
     const expectation = expectations[index];
     const result = results[index];
@@ -93,9 +95,12 @@ export async function hasCachedNativeTrackAssets(
       found.add(expectation.assetKey);
       continue;
     }
-    for (const alias of expectation.aliases) staleAliases.add(alias);
+    for (const alias of expectation.aliases) {
+      const entry = assets[alias];
+      if (entry?.path === expectation.path) staleEntries.set(alias, entry);
+    }
   }
-  if (staleAliases.size) {
+  if (staleEntries.size) {
     // The stat check above can take a while across many tracks — re-read
     // the index from inside the atomic update instead of reusing the
     // snapshot captured before it, so a concurrent cache/delete that
@@ -103,11 +108,15 @@ export async function hasCachedNativeTrackAssets(
     await updateOfflineNativeAssetIndex(profileKey, (current) => {
       const next = { ...current };
       let changed = false;
-      for (const alias of staleAliases) {
-        if (next[alias]) {
-          delete next[alias];
-          changed = true;
-        }
+      for (const [alias, staleEntry] of staleEntries) {
+        const currentEntry = next[alias];
+        if (
+          currentEntry !== staleEntry ||
+          currentEntry.state !== staleEntry.state
+        )
+          continue;
+        delete next[alias];
+        changed = true;
       }
       return changed ? next : current;
     });

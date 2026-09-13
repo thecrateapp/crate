@@ -7,6 +7,7 @@ const {
   downloadFileMock,
   ensureAssetIndexMock,
   updateAssetIndexMock,
+  verifyNativeOfflineAssetsMock,
 } = vi.hoisted(() => ({
   apiMock: vi.fn(),
   statMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   downloadFileMock: vi.fn(),
   ensureAssetIndexMock: vi.fn(),
   updateAssetIndexMock: vi.fn(),
+  verifyNativeOfflineAssetsMock: vi.fn(),
 }));
 
 vi.mock(import("@capacitor/core"), async (importOriginal) => {
@@ -52,10 +54,17 @@ vi.mock("@/lib/offline-storage", () => ({
   updateOfflineNativeAssetIndex: updateAssetIndexMock,
 }));
 
+vi.mock("@/lib/offline-native", () => ({
+  excludeNativeOfflineAssetFromBackup: vi.fn(),
+  verifyNativeOfflineAssets: verifyNativeOfflineAssetsMock,
+}));
+
 import {
   assertNativeTrackIntegrity,
   cacheNativeTrackAsset,
+  hasCachedNativeTrackAssets,
 } from "@/lib/offline-native-assets";
+import { getOfflineTrackAssetAliases } from "@/lib/offline-track-identity";
 
 describe("assertNativeTrackIntegrity", () => {
   beforeEach(() => {
@@ -63,6 +72,49 @@ describe("assertNativeTrackIntegrity", () => {
     deleteFileMock.mockResolvedValue(undefined);
     ensureAssetIndexMock.mockResolvedValue({});
     apiMock.mockRejectedValue(new Error("playback resolution unavailable"));
+  });
+
+  it("does not prune a replacement downloaded during integrity verification", async () => {
+    const track = {
+      entity_uid: "track-1",
+      title: "Track",
+      artist: "Artist",
+      stream_url: "/stream/track-1",
+      download_url: "/download/track-1",
+      byte_length: 4096,
+    };
+    const aliases = getOfflineTrackAssetAliases(track);
+    const staleEntry = {
+      assetKey: aliases[0],
+      path: "offline-media/profile/stale-track.flac",
+      state: "ready" as const,
+      byteLength: 4096,
+    };
+    const replacement = {
+      ...staleEntry,
+      path: "offline-media/profile/replacement-track.flac",
+    };
+    let persistedAssets = Object.fromEntries(
+      aliases.map((alias) => [alias, staleEntry]),
+    );
+    ensureAssetIndexMock.mockImplementation(async () => persistedAssets);
+    verifyNativeOfflineAssetsMock.mockImplementation(async () => {
+      persistedAssets = Object.fromEntries(
+        aliases.map((alias) => [alias, replacement]),
+      );
+      return [{ exists: false, valid: false }];
+    });
+    updateAssetIndexMock.mockImplementation(async (_profileKey, mutate) => {
+      persistedAssets = await mutate(persistedAssets);
+    });
+
+    await expect(
+      hasCachedNativeTrackAssets("profile", [track]),
+    ).resolves.toEqual(new Set());
+
+    expect(Object.values(persistedAssets)).toEqual(
+      aliases.map(() => replacement),
+    );
   });
   it("rejects and deletes a 0-byte file even with no expected size on record", async () => {
     statMock.mockResolvedValue({ uri: "file:///track.flac", size: 0 });
