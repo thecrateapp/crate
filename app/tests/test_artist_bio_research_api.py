@@ -22,7 +22,36 @@ def test_artist_bio_research_endpoint_queues_deduplicated_worker_task(monkeypatc
     assert result == {"task_id": "task-1"}
     assert queued["task_type"] == "research_artist_bio"
     assert queued["params"]["language"] == "Spanish"
-    assert queued["dedup_key"] == "artist-bio-research:artist-uid"
+    assert queued["dedup_key"] == "artist-bio-research:artist-uid:spanish"
+
+
+def test_artist_bio_research_dedup_key_distinguishes_languages(monkeypatch):
+    from crate.api import artist_research
+
+    artist = {"id": 7, "entity_uid": "artist-uid", "name": "High Vis"}
+    monkeypatch.setattr(artist_research, "require_permission", lambda *_args: {})
+    keys: list[str] = []
+    monkeypatch.setattr(
+        artist_research,
+        "create_task_dedup",
+        lambda _task_type, _params, *, dedup_key: keys.append(dedup_key) or "task-1",
+    )
+
+    artist_research._queue_research(
+        MagicMock(),
+        artist,
+        artist_research.ArtistBioResearchRequest(language="English"),
+    )
+    artist_research._queue_research(
+        MagicMock(),
+        artist,
+        artist_research.ArtistBioResearchRequest(language="Spanish"),
+    )
+
+    assert keys == [
+        "artist-bio-research:artist-uid:english",
+        "artist-bio-research:artist-uid:spanish",
+    ]
 
 
 def test_artist_bio_research_status_reports_configured_search_providers(monkeypatch):

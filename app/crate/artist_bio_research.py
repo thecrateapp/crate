@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import html
+import http.client
 import ipaddress
 import logging
 import os
 import re
 import socket
+import ssl
 from collections.abc import Callable, Mapping, Sequence
-from urllib.parse import quote, urljoin, urlparse
+from dataclasses import dataclass
+from urllib.parse import quote, urljoin, urlparse, urlunsplit
 
 import requests
 
@@ -51,7 +54,28 @@ _BIO_STOP_WORDS = {
 _WEB_SEARCH_PROVIDER_LABELS = {"tavily": "Tavily", "brave": "Brave"}
 
 
-def _safe_public_url(value: str) -> str | None:
+@dataclass(frozen=True)
+class _PublicUrlTarget:
+    url: str
+    scheme: str
+    hostname: str
+    port: int
+    request_target: str
+    addresses: tuple[str, ...]
+
+
+def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return not (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+    )
+
+
+def _resolve_public_target(value: str) -> _PublicUrlTarget | None:
     try:
         parsed = urlparse(value.strip())
     except ValueError:
@@ -79,32 +103,98 @@ def _safe_public_url(value: str) -> str | None:
             }
         except OSError:
             return None
-    if any(
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_multicast
-        or address.is_reserved
-        or address.is_unspecified
-        for address in addresses
-    ):
+    if not addresses or any(not _is_public_address(address) for address in addresses):
         return None
-    return parsed.geturl()
+
+    normalized_hostname = hostname.encode("idna").decode("ascii")
+    normalized_port = port or (443 if parsed.scheme == "https" else 80)
+    request_target = urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+    return _PublicUrlTarget(
+        url=parsed.geturl(),
+        scheme=parsed.scheme,
+        hostname=normalized_hostname,
+        port=normalized_port,
+        request_target=request_target,
+        addresses=tuple(sorted(str(address) for address in addresses)),
+    )
 
 
-def _response_text(response: requests.Response, limit: int = 250_000) -> str:
-    chunks: list[bytes] = []
-    total = 0
-    for chunk in response.iter_content(chunk_size=8192):
-        if not chunk:
-            continue
-        remaining = limit - total
-        if remaining <= 0:
-            break
-        data = chunk[:remaining]
-        chunks.append(data)
-        total += len(data)
-    return b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+def _safe_public_url(value: str) -> str | None:
+    target = _resolve_public_target(value)
+    return target.url if target else None
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, target: _PublicUrlTarget, address: str) -> None:
+        super().__init__(target.hostname, target.port, timeout=15)
+        self._pinned_address = address
+
+    def connect(self) -> None:
+        self.sock = socket.create_connection(
+            (self._pinned_address, self.port),
+            self.timeout,
+            self.source_address,
+        )
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, target: _PublicUrlTarget, address: str) -> None:
+        super().__init__(
+            target.hostname,
+            target.port,
+            timeout=15,
+            context=ssl.create_default_context(),
+        )
+        self._pinned_address = address
+
+    def connect(self) -> None:
+        raw_socket = socket.create_connection(
+            (self._pinned_address, self.port),
+            self.timeout,
+            self.source_address,
+        )
+        try:
+            self.sock = self._context.wrap_socket(
+                raw_socket,
+                server_hostname=self.host,
+            )
+        except Exception:
+            raw_socket.close()
+            raise
+
+
+def _fetch_public_page(
+    target: _PublicUrlTarget,
+) -> tuple[int, dict[str, str], str]:
+    last_error: OSError | http.client.HTTPException | ssl.SSLError | None = None
+    for address in target.addresses:
+        connection: http.client.HTTPConnection
+        if target.scheme == "https":
+            connection = _PinnedHTTPSConnection(target, address)
+        else:
+            connection = _PinnedHTTPConnection(target, address)
+        try:
+            connection.request(
+                "GET",
+                target.request_target,
+                headers={
+                    "User-Agent": _USER_AGENT,
+                    "Accept": "text/html, text/plain",
+                    "Accept-Encoding": "identity",
+                },
+            )
+            response = connection.getresponse()
+            body = response.read(250_001)[:250_000]
+            encoding = response.headers.get_content_charset() or "utf-8"
+            headers = {key.casefold(): value for key, value in response.headers.items()}
+            return response.status, headers, body.decode(encoding, errors="replace")
+        except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+            last_error = exc
+        finally:
+            connection.close()
+    if last_error is not None:
+        raise last_error
+    raise OSError("Public URL resolved without a usable address")
 
 
 def _clean_excerpt(value: str, *, max_chars: int = MAX_EXCERPT_CHARS) -> str:
@@ -220,39 +310,27 @@ def _get_json(
 
 
 def _get_public_page(url: str) -> str | None:
-    safe_url = _safe_public_url(url)
-    if not safe_url:
-        return None
-
-    current_url = safe_url
+    current_url = url
     for _ in range(MAX_PUBLIC_PAGE_REDIRECTS + 1):
-        response = None
-        try:
-            response = requests.get(
-                current_url,
-                headers={"User-Agent": _USER_AGENT, "Accept": "text/html, text/plain"},
-                timeout=(5, 15),
-                stream=True,
-                allow_redirects=False,
-            )
-            if response.is_redirect:
-                location = response.headers.get("Location")
-                next_url = _safe_public_url(urljoin(current_url, location or ""))
-                if not next_url:
-                    return None
-                current_url = next_url
-                continue
-
-            response.raise_for_status()
-            return _clean_excerpt(_response_text(response))
-        except requests.RequestException:
-            log.info("Official artist page failed: %s", current_url, exc_info=True)
+        target = _resolve_public_target(current_url)
+        if not target:
             return None
-        finally:
-            if response is not None:
-                response.close()
+        try:
+            status, headers, response_text = _fetch_public_page(target)
+            if status in {301, 302, 303, 307, 308}:
+                location = headers.get("location")
+                if not location:
+                    return None
+                current_url = urljoin(target.url, location)
+                continue
+            if status >= 400:
+                return None
+            return _clean_excerpt(response_text)
+        except (OSError, http.client.HTTPException, ssl.SSLError):
+            log.info("Official artist page failed: %s", target.url, exc_info=True)
+            return None
 
-    log.info("Official artist page exceeded redirect limit: %s", safe_url)
+    log.info("Official artist page exceeded redirect limit: %s", url)
     return None
 
 
@@ -294,23 +372,23 @@ def _source(
 
 
 def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]:
-    candidates = _get_json(
-        "https://musicbrainz.org/ws/2/artist/",
-        params={"query": f'artist:"{name}"', "fmt": "json", "limit": 5},
-    )
-    artists = (candidates or {}).get("artists", [])
-    if not isinstance(artists, list):
-        artists = []
-    selected = (
-        next(
-            (
-                item
-                for item in artists
-                if isinstance(item, dict) and item.get("id") == mbid
-            ),
-            None,
+    selected_mbid = str(mbid or "").strip()
+    if selected_mbid:
+        payload = _get_json(
+            f"https://musicbrainz.org/ws/2/artist/{quote(selected_mbid)}",
+            params={"fmt": "json", "inc": "url-rels+artist-rels"},
         )
-        or next(
+        if not payload:
+            return []
+    else:
+        candidates = _get_json(
+            "https://musicbrainz.org/ws/2/artist/",
+            params={"query": f'artist:"{name}"', "fmt": "json", "limit": 5},
+        )
+        artists = (candidates or {}).get("artists", [])
+        if not isinstance(artists, list):
+            artists = []
+        selected = next(
             (
                 item
                 for item in artists
@@ -319,20 +397,17 @@ def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]
             ),
             None,
         )
-        or (artists[0] if artists and isinstance(artists[0], dict) else None)
-    )
-    if not selected:
-        return []
-    selected_mbid = str(selected.get("id") or "")
-    detail = (
-        _get_json(
+        if not selected:
+            return []
+        selected_mbid = str(selected.get("id") or "")
+        if not selected_mbid:
+            return []
+        payload = _get_json(
             f"https://musicbrainz.org/ws/2/artist/{quote(selected_mbid)}",
             params={"fmt": "json", "inc": "url-rels+artist-rels"},
         )
-        if selected_mbid
-        else None
-    )
-    payload = detail or selected
+        if not payload:
+            payload = selected
     excerpt_parts = [
         f"Name: {payload.get('name', name)}",
         f"Type: {payload.get('type', '')}",

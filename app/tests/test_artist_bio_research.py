@@ -348,9 +348,7 @@ def test_musicbrainz_source_includes_member_relations_for_bio_review(monkeypatch
     responses = iter(
         [
             {
-                "artists": [{"id": "mbid-1", "name": "Example Artist"}],
-            },
-            {
+                "id": "mbid-1",
                 "name": "Example Artist",
                 "type": "Group",
                 "relations": [
@@ -394,8 +392,8 @@ def test_musicbrainz_source_includes_member_relations_for_bio_review(monkeypatch
 def test_musicbrainz_source_rejects_non_person_membership_targets(monkeypatch):
     responses = iter(
         [
-            {"artists": [{"id": "mbid-1", "name": "Example Artist"}]},
             {
+                "id": "mbid-1",
                 "name": "Example Artist",
                 "type": "Group",
                 "relations": [
@@ -424,45 +422,150 @@ def test_musicbrainz_source_rejects_non_person_membership_targets(monkeypatch):
     assert "Member:" not in sources[0]["excerpt"]
 
 
+def test_musicbrainz_source_fetches_stored_mbid_directly(monkeypatch):
+    calls: list[str] = []
+
+    def fake_get_json(url, **_kwargs):
+        calls.append(url)
+        return {"id": "stored-mbid", "name": "Exact Artist", "type": "Group"}
+
+    monkeypatch.setattr(research, "_get_json", fake_get_json)
+
+    sources = research._collect_musicbrainz("Ambiguous Artist", "stored-mbid")
+
+    assert len(sources) == 1
+    assert calls == ["https://musicbrainz.org/ws/2/artist/stored-mbid"]
+
+
+def test_musicbrainz_source_rejects_ambiguous_search_fallback(monkeypatch):
+    monkeypatch.setattr(
+        research,
+        "_get_json",
+        lambda *_args, **_kwargs: {
+            "artists": [{"id": "wrong-mbid", "name": "Different Artist"}]
+        },
+    )
+
+    assert research._collect_musicbrainz("Requested Artist", None) == []
+
+
 def test_artist_research_rejects_private_or_credentialed_urls():
     assert research._safe_public_url("http://127.0.0.1:8080/admin") is None
     assert research._safe_public_url("https://user:pass@example.com") is None
 
 
-def test_artist_research_rejects_redirect_to_private_url(monkeypatch):
-    initial_url = "https://example.com/artist"
-    request = {}
+def test_artist_research_fetches_public_page_through_validated_address(
+    monkeypatch,
+):
+    captured = {}
+    monkeypatch.setattr(
+        research.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (
+                research.socket.AF_INET,
+                research.socket.SOCK_STREAM,
+                6,
+                "",
+                ("93.184.216.34", 443),
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        research.requests,
+        "get",
+        lambda *_args, **_kwargs: pytest.fail(
+            "public-page fetch must not perform a second DNS-resolving request"
+        ),
+    )
 
-    class RedirectResponse:
-        status_code = 302
-        is_redirect = True
-        headers = {"Location": "http://127.0.0.1/admin"}
-        encoding = "utf-8"
+    def fake_fetch(target):
+        captured["target"] = target
+        return 200, {}, "Verified public biography"
 
-        def raise_for_status(self):
-            return None
+    monkeypatch.setattr(research, "_fetch_public_page", fake_fetch, raising=False)
 
-        def iter_content(self, chunk_size):
-            del chunk_size
-            return [b"private response"]
+    assert research._get_public_page("https://artist.example/bio") == (
+        "Verified public biography"
+    )
+    assert captured["target"].addresses == ("93.184.216.34",)
 
+
+def test_artist_research_https_connection_uses_pinned_ip_and_original_sni(
+    monkeypatch,
+):
+    calls = {}
+
+    class FakeSocket:
         def close(self):
             return None
 
+    class FakeContext:
+        def wrap_socket(self, sock, *, server_hostname):
+            calls["wrapped_socket"] = sock
+            calls["server_hostname"] = server_hostname
+            return sock
+
+    raw_socket = FakeSocket()
     monkeypatch.setattr(
-        research,
-        "_safe_public_url",
-        lambda value: value if value == initial_url else None,
+        research.socket,
+        "create_connection",
+        lambda address, timeout, source_address: (
+            calls.update(
+                address=address,
+                timeout=timeout,
+                source_address=source_address,
+            )
+            or raw_socket
+        ),
+    )
+    monkeypatch.setattr(
+        research.ssl,
+        "create_default_context",
+        lambda: FakeContext(),
+    )
+    target = research._PublicUrlTarget(
+        url="https://artist.example/bio",
+        scheme="https",
+        hostname="artist.example",
+        port=443,
+        request_target="/bio",
+        addresses=("93.184.216.34",),
     )
 
-    def fake_get(url, **kwargs):
-        request.update(url=url, **kwargs)
-        return RedirectResponse()
+    connection = research._PinnedHTTPSConnection(target, "93.184.216.34")
+    connection.connect()
 
-    monkeypatch.setattr(research.requests, "get", fake_get)
+    assert calls["address"] == ("93.184.216.34", 443)
+    assert calls["server_hostname"] == "artist.example"
+    assert calls["wrapped_socket"] is raw_socket
+
+
+def test_artist_research_rejects_redirect_to_private_url(monkeypatch):
+    initial_url = "https://example.com/artist"
+    requests = []
+    monkeypatch.setattr(
+        research.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (
+                research.socket.AF_INET,
+                research.socket.SOCK_STREAM,
+                6,
+                "",
+                ("93.184.216.34", 443),
+            )
+        ],
+    )
+
+    def fake_fetch(target):
+        requests.append(target.url)
+        return 302, {"location": "http://127.0.0.1/admin"}, ""
+
+    monkeypatch.setattr(research, "_fetch_public_page", fake_fetch)
 
     assert research._get_public_page(initial_url) is None
-    assert request["allow_redirects"] is False
+    assert requests == [initial_url]
 
 
 def test_tavily_is_primary_and_brave_is_fallback_when_both_are_configured(
