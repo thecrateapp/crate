@@ -21,6 +21,7 @@ export interface EngineTrack {
   id: string;
   url: string;
   authorization?: string;
+  artworkAuthorization?: string;
   title: string;
   artist: string;
   album?: string;

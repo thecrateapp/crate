@@ -5,16 +5,12 @@ const {
   authState,
   ensureFreshAuthTokenMock,
   ensureMediaAccessUrlMock,
-  refreshMediaAccessTicketsMock,
-  artworkTicketState,
   offlineUrlState,
 } = vi.hoisted(() => ({
   apiMock: vi.fn(),
   authState: { token: "listen-token" },
   ensureFreshAuthTokenMock: vi.fn(),
   ensureMediaAccessUrlMock: vi.fn(),
-  refreshMediaAccessTicketsMock: vi.fn(),
-  artworkTicketState: { fresh: false },
   offlineUrlState: { url: null as string | null },
 }));
 
@@ -24,17 +20,14 @@ vi.mock("@/lib/api", () => ({
   getAuthToken: () => authState.token,
   ensureFreshAuthToken: ensureFreshAuthTokenMock,
   ensureMediaAccessUrl: ensureMediaAccessUrlMock,
-  refreshMediaAccessTickets: refreshMediaAccessTicketsMock,
   apiStreamUrl: (url: string) => url,
   resolveMaybeApiStreamUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/") ? `https://listen.example${url}` : url ?? null,
   resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/")
-      ? artworkTicketState.fresh
-        ? `https://listen.example${url}${
-            url.includes("?") ? "&" : "?"
-          }media_ticket=fresh-artwork`
-        : `https://listen.example${url}?token=${authState.token}`
+      ? `https://listen.example${url}${url.includes("?") ? "&" : "?"}token=${
+          authState.token
+        }`
       : url ?? null,
 }));
 
@@ -63,12 +56,6 @@ describe("player engine adapter", () => {
     ensureFreshAuthTokenMock.mockResolvedValue(true);
     ensureMediaAccessUrlMock.mockReset();
     ensureMediaAccessUrlMock.mockImplementation(async (url: string) => url);
-    artworkTicketState.fresh = false;
-    refreshMediaAccessTicketsMock.mockReset();
-    refreshMediaAccessTicketsMock.mockImplementation(async () => {
-      artworkTicketState.fresh = true;
-      return true;
-    });
     offlineUrlState.url = null;
   });
 
@@ -136,6 +123,42 @@ describe("player engine adapter", () => {
 
     expect(track.url).toBe("https://cdn.example.net/audio/track.flac");
     expect(track.authorization).toBeUndefined();
+  });
+
+  it("gives native artwork a durable bearer without URL credentials", () => {
+    const track = toEngineTrack(
+      {
+        id: "track-1",
+        title: "Track One",
+        artist: "Artist",
+        albumCover: "/api/albums/1/cover?size=512",
+      },
+      undefined,
+      undefined,
+      { target: "android-native" },
+    );
+
+    expect(track.artwork).toBe(
+      "https://listen.example/api/albums/1/cover?size=512",
+    );
+    expect(track.artworkAuthorization).toBe("Bearer listen-token");
+  });
+
+  it("never forwards the Crate bearer to external native artwork", () => {
+    const track = toEngineTrack(
+      {
+        id: "track-1",
+        title: "Track One",
+        artist: "Artist",
+        albumCover: "https://covers.example.net/albums/1.jpg",
+      },
+      undefined,
+      undefined,
+      { target: "android-native" },
+    );
+
+    expect(track.artwork).toBe("https://covers.example.net/albums/1.jpg");
+    expect(track.artworkAuthorization).toBeUndefined();
   });
 
   it("resolves global catalog playback before handing URLs to the engine", async () => {
@@ -293,7 +316,7 @@ describe("player engine adapter", () => {
     );
   });
 
-  it("refreshes queue artwork tickets before restoring the native player", async () => {
+  it("keeps native queue artwork authenticated without expiring tickets", async () => {
     const queue = [
       {
         id: "track-current",
@@ -315,61 +338,13 @@ describe("player engine adapter", () => {
       target: "android-native",
     });
 
-    expect(refreshMediaAccessTicketsMock).toHaveBeenCalledWith([
-      { audience: "artwork", path: "/api/albums/1/cover" },
-      { audience: "artwork", path: "/api/albums/2/cover" },
-    ]);
     expect(tracks.map((track) => track.artwork)).toEqual([
-      "https://listen.example/api/albums/1/cover?size=512&media_ticket=fresh-artwork",
-      "https://listen.example/api/albums/2/cover?size=512&media_ticket=fresh-artwork",
+      "https://listen.example/api/albums/1/cover?size=512",
+      "https://listen.example/api/albums/2/cover?size=512",
     ]);
-  });
-
-  it("awaits every artwork ticket batch before restoring a large native queue", async () => {
-    let resolveFirst: (() => void) | undefined;
-    let resolveSecond: (() => void) | undefined;
-    refreshMediaAccessTicketsMock
-      .mockImplementationOnce(
-        () =>
-          new Promise<boolean>((resolve) => {
-            resolveFirst = () => resolve(true);
-          }),
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise<boolean>((resolve) => {
-            resolveSecond = () => resolve(true);
-          }),
-      );
-    const queue = Array.from({ length: 129 }, (_, index) => ({
-      id: `track-${index}`,
-      entityUid: `entity-${index}`,
-      title: `Song ${index}`,
-      artist: "Band",
-      albumCover: `/api/albums/${index}/cover?size=512`,
-    }));
-
-    let restored = false;
-    const restoration = toStartupEngineTracks(queue, 0, undefined, {
-      target: "android-native",
-    }).then((tracks) => {
-      restored = true;
-      return tracks;
-    });
-
-    await vi.waitFor(() =>
-      expect(refreshMediaAccessTicketsMock).toHaveBeenCalledTimes(1),
-    );
-    resolveFirst?.();
-    await vi.waitFor(() =>
-      expect(refreshMediaAccessTicketsMock).toHaveBeenCalledTimes(2),
-    );
-    await Promise.resolve();
-    expect(restored).toBe(false);
-
-    resolveSecond?.();
-    await expect(restoration).resolves.toHaveLength(129);
-    expect(refreshMediaAccessTicketsMock.mock.calls[0]?.[0]).toHaveLength(128);
-    expect(refreshMediaAccessTicketsMock.mock.calls[1]?.[0]).toHaveLength(1);
+    expect(tracks.map((track) => track.artworkAuthorization)).toEqual([
+      "Bearer listen-token",
+      "Bearer listen-token",
+    ]);
   });
 });
