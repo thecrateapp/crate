@@ -15,6 +15,7 @@ import type {
 import {
   chooseAccessibleForeground,
   DEFAULT_DARK_FOREGROUND,
+  parseCssColor,
 } from "./color-contrast";
 
 export type AppearanceTokenType =
@@ -280,6 +281,76 @@ const RADIUS_VALUES: Record<Radius, Record<string, string>> = {
   },
 };
 
+const EFFECT_GLOW_WEIGHTS: Record<
+  Effects,
+  {
+    soft: number;
+    medium: number;
+    regular: number;
+    strong: number;
+    logo: number;
+  }
+> = {
+  off: { soft: 0, medium: 0, regular: 0, strong: 0, logo: 0 },
+  subtle: { soft: 8, medium: 18, regular: 28, strong: 34, logo: 28 },
+  expressive: { soft: 14, medium: 28, regular: 42, strong: 54, logo: 48 },
+};
+
+function mixSurfaceColor(base: string, tint: string, weight: number): string {
+  const baseColor = parseCssColor(base);
+  const tintColor = parseCssColor(tint);
+  if (!baseColor || !tintColor) return base;
+
+  const mix = (baseChannel: number, tintChannel: number) =>
+    Math.round(baseChannel * (1 - weight) + tintChannel * weight);
+  const red = mix(baseColor.red, tintColor.red);
+  const green = mix(baseColor.green, tintColor.green);
+  const blue = mix(baseColor.blue, tintColor.blue);
+
+  return baseColor.alpha === 1
+    ? `rgb(${red}, ${green}, ${blue})`
+    : `rgba(${red}, ${green}, ${blue}, ${baseColor.alpha})`;
+}
+
+function isSurfacePaintToken(name: string): boolean {
+  return (
+    name === "--crate-token-color-background" ||
+    (name.startsWith("--crate-token-surface-") &&
+      !name.includes("-foreground-") &&
+      !name.includes("-border-"))
+  );
+}
+
+function resolveSurfaceTone(
+  appearance: AppearanceResolution,
+  surfaces: Record<string, string>,
+): Record<string, string> {
+  const presetDefault = APPEARANCE_PRESET_REGISTRY[appearance.preset].defaults;
+  if (appearance.effective.surfaceTone === presetDefault.surfaceTone) {
+    return surfaces;
+  }
+
+  const tone = appearance.effective.surfaceTone;
+  const tint =
+    tone === "tinted"
+      ? getAppearanceAccentColor(appearance)
+      : tone === "warm"
+        ? appearance.mode === "dark"
+          ? "#f59e0b"
+          : "#b45309"
+        : appearance.mode === "dark"
+          ? "#64748b"
+          : "#94a3b8";
+  const weight = tone === "tinted" ? 0.08 : tone === "warm" ? 0.06 : 0.05;
+
+  return Object.fromEntries(
+    Object.entries(surfaces).map(([name, value]) => [
+      name,
+      isSurfacePaintToken(name) ? mixSurfaceColor(value, tint, weight) : value,
+    ]),
+  );
+}
+
 export const APPEARANCE_PRESET_REGISTRY = {
   default: {
     id: "default",
@@ -370,8 +441,10 @@ export function getAppearanceDangerColor(
 export function getAppearanceSurfaceColors(
   appearance: AppearanceResolution,
 ): Record<string, string> {
-  return APPEARANCE_PRESET_REGISTRY[appearance.preset].modes[appearance.mode]
-    .surfaces as Record<string, string>;
+  const surfaces = APPEARANCE_PRESET_REGISTRY[appearance.preset].modes[
+    appearance.mode
+  ].surfaces as Record<string, string>;
+  return resolveSurfaceTone(appearance, surfaces);
 }
 
 export function getAppearanceThemeColor(
@@ -388,7 +461,7 @@ export function resolveAppearanceVariables(
 ): Record<string, string> {
   const mode =
     APPEARANCE_PRESET_REGISTRY[appearance.preset].modes[appearance.mode];
-  const surfaces = mode.surfaces as Record<string, string>;
+  const surfaces = getAppearanceSurfaceColors(appearance);
   const extras = mode.extras;
   const materialSuffix = appearance.effective.material;
   const surfaceValue = (name: string): string => surfaces[name]!;
@@ -402,6 +475,9 @@ export function resolveAppearanceVariables(
   const success = appearance.mode === "dark" ? "#22c55e" : "#15803d";
   const warning = appearance.mode === "dark" ? "#f59e0b" : "#b45309";
   const info = appearance.mode === "dark" ? "#3b82f6" : "#2563eb";
+  const glowWeights = EFFECT_GLOW_WEIGHTS[appearance.effective.effects];
+  const accentGlow = (weight: number) =>
+    `color-mix(in srgb, ${accent} ${weight}%, transparent)`;
 
   return {
     ...surfaces,
@@ -485,6 +561,10 @@ export function resolveAppearanceVariables(
     "--focus-ring": accent,
     "--accent-action": accent,
     "--accent-action-foreground": accentForeground,
+    "--accent-action-glow-soft": accentGlow(glowWeights.soft),
+    "--accent-action-glow-medium": accentGlow(glowWeights.medium),
+    "--accent-action-glow": accentGlow(glowWeights.regular),
+    "--accent-action-glow-strong": accentGlow(glowWeights.strong),
     "--state-danger": danger,
     "--state-danger-foreground": dangerForeground,
     "--state-success": success,
@@ -509,7 +589,7 @@ export function resolveAppearanceVariables(
         : "Poppins",
     "--brand-logo-start": accent,
     "--brand-logo-end": accent,
-    "--brand-logo-glow": `color-mix(in srgb, ${accent} 28%, transparent)`,
+    "--brand-logo-glow": accentGlow(glowWeights.logo),
   };
 }
 

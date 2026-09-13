@@ -51,3 +51,35 @@ test("Cancel discards a draft and Reset clears only overrides", async ({
   await expect(page.getByTestId("accent-select")).toHaveValue("theme");
   await expect(page.getByTestId("preset-select")).toHaveValue("crateRed");
 });
+
+test("surface tone and effects overrides change the rendered token values", async ({
+  page,
+}) => {
+  await openAppearanceHarness(page);
+
+  const preview = page.getByTestId("preview-scope");
+  const initialTokens = await preview.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      surface: styles.getPropertyValue("--surface-app").trim(),
+      glow: styles.getPropertyValue("--accent-action-glow").trim(),
+    };
+  });
+
+  await page.getByTestId("surface-tone-select").selectOption("warm");
+  await page.getByTestId("effects-select").selectOption("expressive");
+  await page.getByTestId("apply-button").click();
+
+  const overriddenTokens = await preview.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      surface: styles.getPropertyValue("--surface-app").trim(),
+      glow: styles.getPropertyValue("--accent-action-glow").trim(),
+    };
+  });
+
+  expect(overriddenTokens.surface).not.toBe(initialTokens.surface);
+  expect(overriddenTokens.glow).not.toBe(initialTokens.glow);
+  await expect(preview).toHaveAttribute("data-crate-surface-tone", "warm");
+  await expect(preview).toHaveAttribute("data-crate-effects", "expressive");
+});

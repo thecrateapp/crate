@@ -16,6 +16,34 @@ import {
 const MODES: ResolvedColorMode[] = ["dark", "light"];
 const PRESETS: PresetId[] = ["default", "crateRed"];
 
+function resolveVariables(
+  preset: PresetId,
+  mode: ResolvedColorMode,
+  effectiveOverrides: Partial<AppearanceEffectiveValues> = {},
+) {
+  const effective: AppearanceEffectiveValues = {
+    ...APPEARANCE_PRESET_REGISTRY[preset].defaults,
+    ...effectiveOverrides,
+  };
+
+  return resolveAppearanceVariables({
+    mode,
+    preset,
+    preferences: {
+      version: 2,
+      mode,
+      preset,
+      overrides: effectiveOverrides,
+      presentation: { density: "comfortable" },
+      accessibility: { motion: "system" },
+    },
+    effective,
+    density: "comfortable",
+    motion: "system",
+    reducedMotion: false,
+  });
+}
+
 describe("appearance token registry", () => {
   it("is the typed authority for presets and override options", () => {
     expect(Object.keys(APPEARANCE_PRESET_REGISTRY)).toEqual(PRESETS);
@@ -79,5 +107,50 @@ describe("appearance token registry", () => {
         expect(Object.keys(variables)).toEqual(APPEARANCE_VARIABLE_ALLOWLIST);
       });
     });
+  });
+
+  it("changes resolved surfaces for every non-default surface tone", () => {
+    const neutral = resolveVariables("default", "dark");
+    const warm = resolveVariables("default", "dark", {
+      surfaceTone: "warm",
+    });
+    const tinted = resolveVariables("default", "dark", {
+      surfaceTone: "tinted",
+    });
+    const crateRedWarm = resolveVariables("crateRed", "dark");
+    const crateRedNeutral = resolveVariables("crateRed", "dark", {
+      surfaceTone: "neutral",
+    });
+
+    expect(warm["--crate-token-surface-app"]).not.toBe(
+      neutral["--crate-token-surface-app"],
+    );
+    expect(tinted["--crate-token-surface-app"]).not.toBe(
+      neutral["--crate-token-surface-app"],
+    );
+    expect(tinted["--crate-token-surface-app"]).not.toBe(
+      warm["--crate-token-surface-app"],
+    );
+    expect(crateRedWarm["--crate-token-surface-app"]).toBe("#1c1c1e");
+    expect(crateRedNeutral["--crate-token-surface-app"]).not.toBe(
+      crateRedWarm["--crate-token-surface-app"],
+    );
+  });
+
+  it("resolves distinct global glow strengths for every effects level", () => {
+    const off = resolveVariables("default", "dark", { effects: "off" });
+    const subtle = resolveVariables("default", "dark");
+    const expressive = resolveVariables("default", "dark", {
+      effects: "expressive",
+    });
+
+    expect(off["--accent-action-glow"]).toContain("0%");
+    expect(subtle["--accent-action-glow"]).toContain("28%");
+    expect(expressive["--accent-action-glow"]).toContain("42%");
+    expect(
+      new Set(
+        [off, subtle, expressive].map((value) => value["--brand-logo-glow"]),
+      ).size,
+    ).toBe(3);
   });
 });
