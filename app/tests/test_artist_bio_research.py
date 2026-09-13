@@ -451,6 +451,7 @@ def test_musicbrainz_source_rejects_ambiguous_search_fallback(monkeypatch):
 
 def test_artist_research_rejects_private_or_credentialed_urls():
     assert research._safe_public_url("http://127.0.0.1:8080/admin") is None
+    assert research._safe_public_url("http://100.64.0.1/metadata") is None
     assert research._safe_public_url("https://user:pass@example.com") is None
 
 

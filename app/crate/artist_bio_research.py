@@ -65,7 +65,7 @@ class _PublicUrlTarget:
 
 
 def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    return not (
+    return address.is_global and not (
         address.is_private
         or address.is_loopback
         or address.is_link_local
