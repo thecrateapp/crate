@@ -258,4 +258,74 @@ describe("syncDesktopMediaSession", () => {
       expect(cacheCalls).toEqual([artworkA, artworkB, artworkA]),
     );
   });
+
+  it("rematerializes current artwork when its shared pending result was evicted", async () => {
+    const artworkA = "data:image/png;base64,Y3VycmVudC1wZW5kaW5n";
+    const artworkB = "data:image/png;base64,ZXZpY3RpbmctcGVuZGluZw==";
+    const fileA = "file:///tmp/crate-current-pending.jpg";
+    const fileB = "file:///tmp/crate-evicting-pending.jpg";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { "content-type": "image/jpeg" },
+          }),
+        ),
+      ),
+    );
+    let resolveA: (value: unknown) => void = () => undefined;
+    let resolveB: (value: unknown) => void = () => undefined;
+    const resultA = new Promise((resolve) => {
+      resolveA = resolve;
+    });
+    const resultB = new Promise((resolve) => {
+      resolveB = resolve;
+    });
+    const cacheCalls: string[] = [];
+    const invoke = vi.fn((command: string, args?: unknown) => {
+      if (command !== "cache_desktop_media_artwork") {
+        return Promise.resolve(undefined);
+      }
+      const cacheKey = (args as { cacheKey: string }).cacheKey;
+      cacheCalls.push(cacheKey);
+      if (cacheCalls.filter((key) => key === artworkA).length > 1) {
+        return Promise.resolve({ url: fileA, evictedUrls: [] });
+      }
+      return cacheKey === artworkA ? resultA : resultB;
+    });
+    (window as any).__crateTauriInvoke = invoke;
+    const payload = (artwork: string): DesktopMediaSessionPayload => ({
+      title: artwork,
+      artist: "Artist",
+      album: "Album",
+      artwork,
+      isPlaying: true,
+      position: 0,
+      duration: 180,
+    });
+
+    syncDesktopMediaSession(payload(artworkA));
+    await vi.waitFor(() => expect(cacheCalls).toEqual([artworkA]));
+    syncDesktopMediaSession(payload(artworkB));
+    await vi.waitFor(() => expect(cacheCalls).toEqual([artworkA, artworkB]));
+    resolveB({ url: fileB, evictedUrls: [fileA] });
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+        payload: { ...payload(artworkB), artwork: fileB },
+      }),
+    );
+    syncDesktopMediaSession(payload(artworkA));
+    resolveA({ url: fileA, evictedUrls: [] });
+
+    await vi.waitFor(() =>
+      expect(cacheCalls).toEqual([artworkA, artworkB, artworkA]),
+    );
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+        payload: { ...payload(artworkA), artwork: fileA },
+      }),
+    );
+  });
 });

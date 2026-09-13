@@ -30,13 +30,21 @@ const MAX_CACHED_DESKTOP_ARTWORK = 24;
 let desktopMediaSessionSequence = 0;
 let desktopArtworkPreparationSequence = 0;
 const preparedDesktopArtwork = new Map<string, string>();
-const pendingDesktopArtwork = new Map<string, Promise<string | null>>();
+const pendingDesktopArtwork = new Map<
+  string,
+  Promise<DesktopArtworkPreparationResult>
+>();
 const pendingDesktopArtworkSequences = new Map<string, number>();
 const evictedDesktopArtworkSequences = new Map<string, number>();
 
 interface DesktopArtworkCacheResult {
   url: string;
   evictedUrls: string[];
+}
+
+interface DesktopArtworkPreparationResult {
+  url: string | null;
+  invalidated: boolean;
 }
 
 export function dispatchDesktopTrayCommand(command: DesktopTrayCommand): void {
@@ -85,12 +93,17 @@ export function syncDesktopMediaSession(
     return;
   }
 
-  void prepareDesktopArtwork(payload.artwork)
-    .then((artwork) => {
+  const artworkSource = payload.artwork;
+  void prepareDesktopArtwork(artworkSource)
+    .then(async (result) => {
+      if (sequence !== desktopMediaSessionSequence) return;
+      const currentResult = result.invalidated
+        ? await prepareDesktopArtwork(artworkSource)
+        : result;
       if (sequence !== desktopMediaSessionSequence) return;
       invokeDesktopMediaSession({
         ...payload,
-        artwork,
+        artwork: currentResult.url,
       });
     })
     .catch(() => undefined);
@@ -120,9 +133,13 @@ function shouldMaterializeDesktopArtwork(
   );
 }
 
-function prepareDesktopArtwork(artwork: string): Promise<string | null> {
+function prepareDesktopArtwork(
+  artwork: string,
+): Promise<DesktopArtworkPreparationResult> {
   const cached = preparedDesktopArtwork.get(artwork);
-  if (cached !== undefined) return Promise.resolve(cached);
+  if (cached !== undefined) {
+    return Promise.resolve({ url: cached, invalidated: false });
+  }
 
   const pending = pendingDesktopArtwork.get(artwork);
   if (pending) return pending;
@@ -132,19 +149,19 @@ function prepareDesktopArtwork(artwork: string): Promise<string | null> {
     .then((fileUrl) => {
       pendingDesktopArtwork.delete(artwork);
       pendingDesktopArtworkSequences.delete(artwork);
-      const usableFileUrl =
-        fileUrl && !wasDesktopArtworkEvictedAfter(fileUrl, preparationSequence)
-          ? fileUrl
-          : null;
+      const invalidated = Boolean(
+        fileUrl && wasDesktopArtworkEvictedAfter(fileUrl, preparationSequence),
+      );
+      const usableFileUrl = fileUrl && !invalidated ? fileUrl : null;
       if (usableFileUrl) rememberPreparedArtwork(artwork, usableFileUrl);
       pruneSettledDesktopArtworkEvictions();
-      return usableFileUrl;
+      return { url: usableFileUrl, invalidated };
     })
     .catch(() => {
       pendingDesktopArtwork.delete(artwork);
       pendingDesktopArtworkSequences.delete(artwork);
       pruneSettledDesktopArtworkEvictions();
-      return null;
+      return { url: null, invalidated: false };
     });
 
   pendingDesktopArtworkSequences.set(artwork, preparationSequence);
