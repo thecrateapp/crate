@@ -1,4 +1,6 @@
 use std::{
+    fs::File,
+    io::Read,
     ptr,
     sync::{Arc, Condvar, Mutex, OnceLock},
     thread,
@@ -223,6 +225,16 @@ fn fetch_artwork_bytes(url: &str) -> Option<Vec<u8>> {
 }
 
 fn fetch_artwork_bytes_with_timeout(url: &str, timeout: Duration) -> Option<Vec<u8>> {
+    let parsed = reqwest::Url::parse(url).ok()?;
+    if parsed.scheme() == "file" {
+        return read_bounded(
+            File::open(parsed.to_file_path().ok()?).ok()?,
+            MAX_ARTWORK_BYTES,
+        );
+    }
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return None;
+    }
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(timeout)
         .timeout(timeout)
@@ -235,8 +247,16 @@ fn fetch_artwork_bytes_with_timeout(url: &str, timeout: Duration) -> Option<Vec<
     {
         return None;
     }
-    let bytes = response.bytes().ok()?;
-    (bytes.len() <= MAX_ARTWORK_BYTES as usize).then(|| bytes.to_vec())
+    read_bounded(response, MAX_ARTWORK_BYTES)
+}
+
+fn read_bounded(reader: impl Read, max_bytes: u64) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    reader
+        .take(max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .ok()?;
+    (bytes.len() <= max_bytes as usize).then_some(bytes)
 }
 
 unsafe fn finish_artwork_fetch(request: ArtworkRequest, bytes: Option<Vec<u8>>) {
@@ -624,14 +644,43 @@ fn emit_media_command(command: crate::PlaybackCommand) -> isize {
 #[cfg(test)]
 mod tests {
     use std::{
+        fs,
+        io::Cursor,
         net::TcpListener,
-        thread,
-        time::{Duration, Instant},
+        process, thread,
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     };
 
     use super::{
-        fetch_artwork_bytes_with_timeout, ArtworkFetchQueue, ArtworkRequest, ArtworkRequestState,
+        fetch_artwork_bytes_with_timeout, read_bounded, ArtworkFetchQueue, ArtworkRequest,
+        ArtworkRequestState,
     };
+
+    #[test]
+    fn artwork_body_reader_rejects_bytes_beyond_the_limit() {
+        assert_eq!(read_bounded(Cursor::new(vec![1_u8; 5]), 4), None);
+        assert_eq!(
+            read_bounded(Cursor::new(vec![1_u8, 2, 3, 4]), 4),
+            Some(vec![1_u8, 2, 3, 4])
+        );
+    }
+
+    #[test]
+    fn artwork_fetch_supports_local_file_urls() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("crate-artwork-fetch-{}-{nonce}.jpg", process::id()));
+        fs::write(&path, b"local-artwork").unwrap();
+        let url = reqwest::Url::from_file_path(&path).unwrap().to_string();
+
+        let result = fetch_artwork_bytes_with_timeout(&url, Duration::from_millis(50));
+
+        fs::remove_file(path).unwrap();
+        assert_eq!(result, Some(b"local-artwork".to_vec()));
+    }
 
     #[test]
     fn artwork_fetch_timeout_bounds_a_stalled_request() {
