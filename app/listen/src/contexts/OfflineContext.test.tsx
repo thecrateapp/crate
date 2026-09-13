@@ -58,7 +58,9 @@ vi.mock("@/lib/offline", () => ({
   cacheTrackAsset: vi.fn(async () => {}),
   clearOfflineAssets: clearOfflineAssetsMock,
   deleteCachedTrackAsset: deleteCachedTrackAssetMock,
-  deriveOfflineProfileKey: vi.fn(() => "profile-1"),
+  deriveOfflineProfileKey: vi.fn((userId: number) =>
+    userId === 7 ? "profile-1" : `profile-${userId}`,
+  ),
   ensureOfflineStorageBudget: vi.fn(async () => {}),
   getOfflineItemKey: (kind: string, entityId: string | number) =>
     `${kind}:${entityId}`,
@@ -298,5 +300,51 @@ describe("OfflineProvider", () => {
         expect.objectContaining({ entity_uid: "entity-1" }),
       ),
     );
+  });
+
+  it("does not let an abandoned profile queue block the next profile", async () => {
+    let finishOldProfileSync: (() => void) | undefined;
+    offlineSyncOperationMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishOldProfileSync = resolve;
+      }),
+    );
+    const view = render(
+      <AuthContext.Provider value={createAuthValue()}>
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByText("ready")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "sync" }));
+    await waitFor(() =>
+      expect(offlineSyncOperationMock).toHaveBeenCalledOnce(),
+    );
+
+    view.rerender(
+      <AuthContext.Provider
+        value={createAuthValue({
+          user: {
+            id: 8,
+            email: "second@example.test",
+            name: "Second listener",
+            role: "user",
+          },
+        })}
+      >
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() =>
+      expect(setActiveOfflineProfileKeyMock).toHaveBeenCalledWith("profile-8"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "clear" }));
+    await act(async () => {});
+
+    expect(clearOfflineAssetsMock).toHaveBeenCalledWith("profile-8");
+    await act(async () => finishOldProfileSync!());
   });
 });

@@ -20,6 +20,8 @@ interface NativeOfflineIntegrityPlugin {
 }
 
 let nativeOfflineIntegrity: NativeOfflineIntegrityPlugin | null = null;
+const NATIVE_INTEGRITY_BATCH_SIZE = 500;
+const FILESYSTEM_VERIFY_CONCURRENCY = 8;
 
 function getNativeOfflineIntegrity(): NativeOfflineIntegrityPlugin {
   nativeOfflineIntegrity ??= registerPlugin<NativeOfflineIntegrityPlugin>(
@@ -31,8 +33,13 @@ function getNativeOfflineIntegrity(): NativeOfflineIntegrityPlugin {
 async function verifyWithFilesystem(
   assets: NativeOfflineAssetExpectation[],
 ): Promise<NativeOfflineAssetVerification[]> {
-  return Promise.all(
-    assets.map(async ({ path, expectedBytes }) => {
+  const results = new Array<NativeOfflineAssetVerification>(assets.length);
+  let nextIndex = 0;
+  const verifyNext = async () => {
+    while (nextIndex < assets.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const { path, expectedBytes } = assets[index]!;
       try {
         const stat = await Filesystem.stat({
           path,
@@ -52,18 +59,26 @@ async function verifyWithFilesystem(
             directory: Directory.Data,
           }).catch(() => undefined);
         }
-        return { path, exists: true, size, valid };
+        results[index] = { path, exists: true, size, valid };
       } catch {
-        return { path, exists: false, size: 0, valid: false };
+        results[index] = { path, exists: false, size: 0, valid: false };
       }
-    }),
+    }
+  };
+  await Promise.all(
+    Array.from(
+      {
+        length: Math.min(FILESYSTEM_VERIFY_CONCURRENCY, assets.length),
+      },
+      verifyNext,
+    ),
   );
+  return results;
 }
 
-export async function verifyNativeOfflineAssets(
+async function verifyNativeOfflineAssetBatch(
   assets: NativeOfflineAssetExpectation[],
 ): Promise<NativeOfflineAssetVerification[]> {
-  if (!assets.length) return [];
   try {
     const response = await getNativeOfflineIntegrity().verifyAssets({ assets });
     if (response.assets.length === assets.length) return response.assets;
@@ -71,4 +86,20 @@ export async function verifyNativeOfflineAssets(
     // Older native shells fall back until the bridge upgrade is installed.
   }
   return verifyWithFilesystem(assets);
+}
+
+export async function verifyNativeOfflineAssets(
+  assets: NativeOfflineAssetExpectation[],
+): Promise<NativeOfflineAssetVerification[]> {
+  if (!assets.length) return [];
+  const batches: NativeOfflineAssetExpectation[][] = [];
+  for (
+    let index = 0;
+    index < assets.length;
+    index += NATIVE_INTEGRITY_BATCH_SIZE
+  ) {
+    batches.push(assets.slice(index, index + NATIVE_INTEGRITY_BATCH_SIZE));
+  }
+  const results = await Promise.all(batches.map(verifyNativeOfflineAssetBatch));
+  return results.flat();
 }

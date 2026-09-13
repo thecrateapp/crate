@@ -134,11 +134,7 @@ export async function cacheTrackAsset(
     throw new Error("Offline copy requires entity_uid or storage_id");
   }
   if (isNative) {
-    // Capacitor's Filesystem.downloadFile has no cancellation primitive —
-    // an in-flight native download can't be aborted mid-transfer, only
-    // prevented from starting (the caller already checks signal.aborted
-    // before calling this).
-    await cacheNativeTrackAsset(profileKey, track);
+    await cacheNativeTrackAsset(profileKey, track, signal);
     return;
   }
 

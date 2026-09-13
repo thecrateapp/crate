@@ -5,10 +5,12 @@ vi.mock("@/lib/capacitor", () => ({
   onAppResume: vi.fn(() => () => {}),
 }));
 
+const isOfflineBusyMock = vi.hoisted(() => vi.fn(() => false));
+
 vi.mock("@/lib/offline", () => ({
   getOfflineTrackAssetKey: vi.fn(),
   getOfflineTrackManifestPaths: vi.fn(() => []),
-  isOfflineBusy: vi.fn(() => false),
+  isOfflineBusy: isOfflineBusyMock,
 }));
 
 import { EMPTY_OFFLINE_SNAPSHOT } from "@/lib/offline-model";
@@ -40,6 +42,7 @@ function renderSynchronization(abort: () => void) {
 describe("useOfflineSynchronization background abort", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    isOfflineBusyMock.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -90,5 +93,53 @@ describe("useOfflineSynchronization background abort", () => {
     await act(async () => result.current.syncAll());
 
     expect(enqueueCalls).toBe(1);
+  });
+
+  it("resumes pending work again after logout and login to the same profile", async () => {
+    isOfflineBusyMock.mockReturnValue(true);
+    const snapshot = {
+      items: {
+        "album:1": {
+          key: "album:1",
+          kind: "album" as const,
+          entityId: "1",
+          title: "Album",
+          state: "downloading" as const,
+          trackCount: 1,
+          readyTrackCount: 0,
+          tracks: [],
+        },
+      },
+    };
+    const syncManifestIntoItem = vi.fn(async () => {});
+    let enqueueCalls = 0;
+    const enqueue = <T>(fn: () => Promise<T>): Promise<T> => {
+      enqueueCalls += 1;
+      return fn();
+    };
+    const { rerender } = renderHook(
+      ({ profileKey }: { profileKey: string | null }) =>
+        useOfflineSynchronization({
+          enqueue,
+          profileKey,
+          snapshot,
+          snapshotRef: { current: snapshot },
+          supported: true,
+          syncManifestIntoItem,
+          transferAbortRef: { current: null },
+        }),
+      { initialProps: { profileKey: "user-1" as string | null } },
+    );
+    await act(async () => {});
+    expect(enqueueCalls).toBe(1);
+
+    await act(async () => {
+      rerender({ profileKey: null });
+    });
+    await act(async () => {
+      rerender({ profileKey: "user-1" });
+    });
+
+    expect(enqueueCalls).toBe(2);
   });
 });

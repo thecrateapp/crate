@@ -39,6 +39,13 @@ function isMissingNativeFileError(error: unknown): boolean {
   return /(?:does not exist|file not found)/i.test(message);
 }
 
+function throwIfOfflineTransferAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  const error = new Error("Offline transfer cancelled");
+  error.name = "AbortError";
+  throw error;
+}
+
 export async function hasCachedNativeTrackAssets(
   profileKey: string,
   tracks: OfflineManifestTrack[],
@@ -261,13 +268,16 @@ async function resolveNativeOfflineDownloadTarget(
 export async function cacheNativeTrackAsset(
   profileKey: string,
   track: OfflineManifestTrack,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (!isNative) return;
+  throwIfOfflineTransferAborted(signal);
   const assetKey = getOfflineTrackAssetKey(track);
   if (!assetKey) {
     throw new Error("Offline copy requires entity_uid or storage_id");
   }
   const existingAssets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
+  throwIfOfflineTransferAborted(signal);
   const existing = getOfflineTrackAssetAliases(track)
     .map((alias) => existingAssets[alias])
     .find(Boolean);
@@ -278,6 +288,7 @@ export async function cacheNativeTrackAsset(
   }
 
   const downloadTarget = await resolveNativeOfflineDownloadTarget(track);
+  throwIfOfflineTransferAborted(signal);
   const dirPath = `offline-media/${profileKey}`;
   const filePath = `${dirPath}/${safeOfflineFileStem(assetKey)}.${
     downloadTarget.extension
@@ -298,26 +309,53 @@ export async function cacheNativeTrackAsset(
     recursive: true,
     headers: getApiAuthHeaders(),
   });
+  if (signal?.aborted) {
+    await Filesystem.deleteFile({
+      path: filePath,
+      directory: Directory.Data,
+    }).catch(() => undefined);
+    throwIfOfflineTransferAborted(signal);
+  }
 
   const { uri, size } = await assertNativeTrackIntegrity(
     filePath,
     downloadTarget.expectedBytes,
   );
-
-  await updateOfflineNativeAssetIndex(profileKey, (current) => ({
-    ...current,
-    [assetKey]: {
-      assetKey,
-      entityUid: track.entity_uid ?? null,
-      storageId: track.storage_id,
+  if (signal?.aborted) {
+    await Filesystem.deleteFile({
       path: filePath,
-      uri,
-      playbackUrl: Capacitor.convertFileSrc(uri),
-      state: "ready",
-      byteLength: downloadTarget.expectedBytes || size,
-      updatedAt: track.updated_at ?? null,
-    },
-  }));
+      directory: Directory.Data,
+    }).catch(() => undefined);
+    throwIfOfflineTransferAborted(signal);
+  }
+
+  try {
+    await updateOfflineNativeAssetIndex(profileKey, (current) => {
+      throwIfOfflineTransferAborted(signal);
+      return {
+        ...current,
+        [assetKey]: {
+          assetKey,
+          entityUid: track.entity_uid ?? null,
+          storageId: track.storage_id,
+          path: filePath,
+          uri,
+          playbackUrl: Capacitor.convertFileSrc(uri),
+          state: "ready",
+          byteLength: downloadTarget.expectedBytes || size,
+          updatedAt: track.updated_at ?? null,
+        },
+      };
+    });
+  } catch (error) {
+    if (signal?.aborted) {
+      await Filesystem.deleteFile({
+        path: filePath,
+        directory: Directory.Data,
+      }).catch(() => undefined);
+    }
+    throw error;
+  }
 }
 
 export async function deleteNativeCachedTrackAsset(

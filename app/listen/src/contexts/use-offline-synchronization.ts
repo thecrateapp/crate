@@ -109,7 +109,10 @@ export function useOfflineSynchronization({
   }, [syncAll]);
 
   useEffect(() => {
-    if (!profileKey || !supported) return;
+    if (!profileKey || !supported) {
+      resumedProfileRef.current = null;
+      return;
+    }
     if (resumedProfileRef.current === profileKey) return;
     const hasPendingItems = Object.values(snapshot.items).some((item) =>
       isOfflineBusy(item.state),

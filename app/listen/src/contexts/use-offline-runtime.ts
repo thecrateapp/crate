@@ -133,6 +133,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   const activeProfileRef = useRef(profileKey);
   useLayoutEffect(() => {
     activeProfileRef.current = profileKey;
+    queueRef.current = Promise.resolve();
   }, [profileKey]);
 
   const commitSnapshot = useCallback(

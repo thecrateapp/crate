@@ -129,4 +129,28 @@ describe("native offline playback bootstrap", () => {
     expect(verifyAssetsMock).toHaveBeenCalledTimes(1);
     expect(results.map((result) => result.valid)).toEqual([true, false]);
   });
+
+  it("chunks integrity checks at the native bridge batch limit", async () => {
+    verifyAssetsMock.mockImplementation(async ({ assets }) => ({
+      assets: assets.map(({ path }: { path: string }) => ({
+        path,
+        exists: true,
+        size: 128,
+        valid: true,
+      })),
+    }));
+    const { verifyNativeOfflineAssets } = await import("@/lib/offline-native");
+    const assets = Array.from({ length: 501 }, (_, index) => ({
+      path: `offline-media/track-${index}.m4a`,
+      expectedBytes: 128,
+    }));
+
+    const results = await verifyNativeOfflineAssets(assets);
+
+    expect(results).toHaveLength(501);
+    expect(verifyAssetsMock).toHaveBeenCalledTimes(2);
+    expect(verifyAssetsMock.mock.calls[0]?.[0].assets).toHaveLength(500);
+    expect(verifyAssetsMock.mock.calls[1]?.[0].assets).toHaveLength(1);
+    expect(filesystemMock.stat).not.toHaveBeenCalled();
+  });
 });
