@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-import shutil
-import time
+import json
+import fcntl
 import logging
+import os
+import shutil
+import tempfile
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, cast
 
@@ -38,10 +43,69 @@ from crate.db.repositories.artist_hero_artwork import (
 from crate.db.repositories.library_artist_reads import (
     get_library_artist_by_entity_uid,
 )
-from crate.streaming.paths import cache_root
+from crate.streaming.paths import cache_root, data_root
 
 _TEMP_MAX_AGE_SECONDS = 24 * 3600
 log = logging.getLogger(__name__)
+
+
+@contextmanager
+def _artwork_cleanup_cursor_lock(cursor_name: str) -> Iterator[None]:
+    lock_root = (data_root() / ".crate-locks" / "artwork-maintenance").resolve()
+    lock_root.mkdir(parents=True, exist_ok=True)
+    with (lock_root / f"{cursor_name}.lock").open("a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _rotating_name_batch(names: set[str], *, limit: int, cursor_name: str) -> list[str]:
+    ordered = sorted(name for name in names if name)
+    if not ordered:
+        return []
+    batch_size = min(max(1, int(limit)), len(ordered))
+    cursor_root = (data_root() / ".crate-maintenance").resolve()
+    cursor_path = cursor_root / f"{cursor_name}.json"
+
+    with _artwork_cleanup_cursor_lock(cursor_name):
+        cursor = ""
+        try:
+            payload = json.loads(cursor_path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                cursor = str(payload.get("last_name") or "")
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            pass
+
+        start = next(
+            (index for index, name in enumerate(ordered) if name > cursor),
+            0,
+        )
+        selected = [
+            ordered[(start + offset) % len(ordered)] for offset in range(batch_size)
+        ]
+
+        try:
+            cursor_root.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{cursor_path.name}.",
+                suffix=".tmp",
+                dir=cursor_root,
+            )
+            temporary_path = Path(temporary_name)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    json.dump({"last_name": selected[-1]}, handle)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary_path, cursor_path)
+            except Exception:
+                temporary_path.unlink(missing_ok=True)
+                raise
+        except OSError:
+            log.warning("Could not persist artwork cleanup cursor %s", cursor_name)
+        return selected
 
 
 def _iter_assets(
@@ -278,7 +342,8 @@ def cleanup_artist_hero_publications(
         "orphan_revisions_removed": 0,
     }
     capped_limit = max(1, int(max_artists))
-    artists = list_artist_hero_render_revision_artists(limit=capped_limit)
+    history_artists = list_artist_hero_render_revision_artists(limit=10_000)
+    artists: list[dict] = []
     publication_root = cache_root()
     namespace_root = publication_root / ARTIST_HERO_PUBLICATION_PREFIX
     materialization_namespace_root = artwork_variant_root() / "artist-hero"
@@ -349,15 +414,22 @@ def cleanup_artist_hero_publications(
     def _cleanup_library_temporaries() -> int:
         if library_root is None:
             return 0
+        if library_root.is_symlink():
+            return 0
         resolved_library_root = library_root.resolve()
-        if not resolved_library_root.is_dir() or resolved_library_root.is_symlink():
+        if not resolved_library_root.is_dir():
             return 0
         removed = 0
         try:
-            artist_roots = list(resolved_library_root.iterdir())
+            artist_names = {path.name for path in resolved_library_root.iterdir()}
         except OSError:
             return 0
-        for artist_root in artist_roots:
+        for artist_name in _rotating_name_batch(
+            artist_names,
+            limit=capped_limit,
+            cursor_name="artist-hero-library-temporaries",
+        ):
+            artist_root = resolved_library_root / artist_name
             if not artist_root.is_dir() or artist_root.is_symlink():
                 continue
             try:
@@ -377,95 +449,89 @@ def cleanup_artist_hero_publications(
                     removed += 1
         return removed
 
-    known_entity_uids = {str(artist.get("entity_uid") or "") for artist in artists}
-    discovered_count = len(artists)
     materialization_roots_by_uid = _index_materialization_roots()
     result["temporary_removed"] += _cleanup_library_temporaries()
-    materialization_artists: dict[str, dict] = {}
-    for entity_uid, materialization_roots in materialization_roots_by_uid.items():
+    publication_uids: set[str] = set()
+    if namespace_root.is_dir() and not namespace_root.is_symlink():
+        try:
+            publication_uids = {path.name for path in namespace_root.iterdir()}
+        except OSError:
+            pass
+    history_uids = {str(artist.get("entity_uid") or "") for artist in history_artists}
+    selected_uids = _rotating_name_batch(
+        history_uids | set(materialization_roots_by_uid) | publication_uids,
+        limit=capped_limit,
+        cursor_name="artist-hero-publications",
+    )
+
+    for entity_uid in selected_uids:
+        try:
+            ArtistHeroArtifactIdentity(
+                artist_entity_uid=entity_uid,
+                composition="desktop",
+                render_revision="cleanup",
+            )
+        except ValueError:
+            continue
+        materialization_roots = materialization_roots_by_uid.get(entity_uid, [])
+        entity_root = namespace_root / entity_uid
+        get_library_artist_by_entity_uid(entity_uid)
         with artist_hero_publication_lock(entity_uid):
             artist = get_library_artist_by_entity_uid(entity_uid)
             if not artist:
                 removed = sum(1 for root in materialization_roots if _remove_tree(root))
-                if removed:
-                    result["revisions_removed"] += removed
-                    result["artists_checked"] += 1
+                result["revisions_removed"] += removed
+                if (
+                    entity_root.is_dir()
+                    and not entity_root.is_symlink()
+                    and _expired(entity_root)
+                ):
+                    revision_count = _count_revision_directories(entity_root)
+                    deleted = delete_artist_hero_storage(entity_uid)
+                    if deleted["publication_roots_removed"]:
+                        result["orphan_revisions_removed"] += revision_count
+                        result["revisions_removed"] += revision_count
+                result["artists_checked"] += 1
                 continue
-            materialization_artists[entity_uid] = artist
-            profile = get_artist_hero_artwork(int(artist["id"])) or {}
-            manifest = profile.get("render_manifest")
-            artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
-            for materialization_root in materialization_roots:
-                key_parts = materialization_root.name.split(":", 2)
-                if len(key_parts) == 2:
-                    composition = key_parts[1]
-                    artifact = (
-                        artifacts.get(composition)
-                        if isinstance(artifacts, dict)
-                        else None
-                    )
-                    if (
-                        not profile
-                        or profile.get(f"{composition}_enabled", True) is False
-                        or (
-                            isinstance(artifact, dict)
-                            and artifact.get("render_revision")
+            if materialization_roots:
+                profile = get_artist_hero_artwork(int(artist["id"])) or {}
+                manifest = profile.get("render_manifest")
+                artifacts = (
+                    manifest.get("artifacts") if isinstance(manifest, dict) else {}
+                )
+                for materialization_root in materialization_roots:
+                    key_parts = materialization_root.name.split(":", 2)
+                    if len(key_parts) == 2:
+                        composition = key_parts[1]
+                        artifact = (
+                            artifacts.get(composition)
+                            if isinstance(artifacts, dict)
+                            else None
                         )
-                    ):
-                        if _remove_tree(materialization_root):
-                            result["revisions_removed"] += 1
+                        if (
+                            not profile
+                            or profile.get(f"{composition}_enabled", True) is False
+                            or (
+                                isinstance(artifact, dict)
+                                and artifact.get("render_revision")
+                            )
+                        ):
+                            if _remove_tree(materialization_root):
+                                result["revisions_removed"] += 1
+                            continue
+                    try:
+                        materialization_children = list(materialization_root.iterdir())
+                    except OSError:
                         continue
-                try:
-                    materialization_children = list(materialization_root.iterdir())
-                except OSError:
-                    continue
-                for child in materialization_children:
-                    if (
-                        child.name.startswith(".")
-                        and child.name.endswith(".tmp")
-                        and _expired(child)
-                        and _remove_tree(child)
-                    ):
-                        result["temporary_removed"] += 1
-    if materialization_roots_by_uid and len(artists) < capped_limit:
-        for entity_uid in sorted(materialization_artists):
-            if discovered_count >= capped_limit:
-                break
-            if entity_uid in known_entity_uids:
-                continue
-            artist = materialization_artists[entity_uid]
+                    for child in materialization_children:
+                        if (
+                            child.name.startswith(".")
+                            and child.name.endswith(".tmp")
+                            and _expired(child)
+                            and _remove_tree(child)
+                        ):
+                            result["temporary_removed"] += 1
             artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
-            known_entity_uids.add(entity_uid)
-            discovered_count += 1
-    if namespace_root.is_dir() and len(artists) < capped_limit:
-        for entity_root in sorted(namespace_root.iterdir()):
-            entity_uid = entity_root.name
-            if (
-                discovered_count >= capped_limit
-                or not entity_root.is_dir()
-                or entity_root.is_symlink()
-                or entity_uid in known_entity_uids
-            ):
-                continue
-            artist = get_library_artist_by_entity_uid(entity_uid)
-            if not artist:
-                if not _expired(entity_root):
-                    continue
-                with artist_hero_publication_lock(entity_uid):
-                    artist = get_library_artist_by_entity_uid(entity_uid)
-                    if not artist:
-                        revision_count = _count_revision_directories(entity_root)
-                        removed = delete_artist_hero_storage(entity_uid)
-                        if removed["publication_roots_removed"]:
-                            result["orphan_revisions_removed"] += revision_count
-                            result["revisions_removed"] += revision_count
-                        result["artists_checked"] += 1
-                        discovered_count += 1
-                        known_entity_uids.add(entity_uid)
-                        continue
-            artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
-            known_entity_uids.add(entity_uid)
-            discovered_count += 1
 
     for artist in artists:
         result["artists_checked"] += 1

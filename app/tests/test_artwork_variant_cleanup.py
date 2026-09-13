@@ -290,6 +290,96 @@ def test_artist_hero_cleanup_removes_expired_library_temporaries(monkeypatch, tm
     assert result["artist_hero_temporary_removed"] == 2
 
 
+def test_artist_hero_cleanup_bounds_and_rotates_library_temporary_work(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    library_root = tmp_path / "music"
+    temporary_paths = []
+    for artist_name in ("artist-a", "artist-b", "artist-c"):
+        artist_root = library_root / artist_name
+        artist_root.mkdir(parents=True)
+        temporary_path = artist_root / ".artist-hero-source.jpg.crashed.tmp"
+        temporary_path.write_bytes(b"partial")
+        expired = time.time() - 90000
+        os.utime(temporary_path, (expired, expired))
+        temporary_paths.append(temporary_path)
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+
+    first = cleanup_artist_hero_publications(
+        max_artists=1,
+        library_root=library_root,
+    )
+    remaining_after_first = {path for path in temporary_paths if path.exists()}
+    second = cleanup_artist_hero_publications(
+        max_artists=1,
+        library_root=library_root,
+    )
+    remaining_after_second = {path for path in temporary_paths if path.exists()}
+
+    assert first["temporary_removed"] == 1
+    assert second["temporary_removed"] == 1
+    assert len(remaining_after_first) == 2
+    assert len(remaining_after_second) == 1
+
+
+def test_artist_hero_cleanup_bounds_and_rotates_materialization_queries(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    for entity_uid in ("artist-a", "artist-b", "artist-c"):
+        artwork_asset_root(ArtworkAsset("artist-hero", f"{entity_uid}:desktop")).mkdir(
+            parents=True
+        )
+    queried: list[str] = []
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+
+    def get_artist(entity_uid: str) -> dict:
+        queried.append(entity_uid)
+        return {"id": ord(entity_uid[-1]), "entity_uid": entity_uid}
+
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        get_artist,
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_artist_hero_artwork",
+        lambda _artist_id: {
+            "desktop_enabled": True,
+            "render_manifest": {"artifacts": {}},
+        },
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revisions",
+        lambda _artist_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_manifest_history",
+        lambda _artist_id: [],
+    )
+
+    cleanup_artist_hero_publications(max_artists=1)
+    first_uids = set(queried)
+    queried.clear()
+    cleanup_artist_hero_publications(max_artists=1)
+    second_uids = set(queried)
+
+    assert len(first_uids) == 1
+    assert len(second_uids) == 1
+    assert first_uids.isdisjoint(second_uids)
+
+
 def test_artist_hero_cleanup_does_not_starve_legacy_roots_when_history_is_full(
     monkeypatch, tmp_path
 ):
@@ -334,6 +424,7 @@ def test_artist_hero_cleanup_does_not_starve_legacy_roots_when_history_is_full(
         lambda _artist_id: [],
     )
 
+    cleanup_artist_hero_publications(max_artists=1)
     cleanup_artist_hero_publications(max_artists=1)
 
     assert not legacy_root.exists()
