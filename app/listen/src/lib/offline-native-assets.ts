@@ -2,9 +2,16 @@ import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 
 import { api, apiUrl, getApiAuthHeaders } from "@/lib/api";
-import { isAndroidNative, isNative } from "@/lib/capacitor-runtime";
+import {
+  isAndroidNative,
+  isIosNative,
+  isNative,
+} from "@/lib/capacitor-runtime";
 import { recordDevLog } from "@/lib/dev-logs";
-import { verifyNativeOfflineAssets } from "@/lib/offline-native";
+import {
+  excludeNativeOfflineAssetFromBackup,
+  verifyNativeOfflineAssets,
+} from "@/lib/offline-native";
 import type { PlaybackResolution } from "@/lib/track-playback";
 import {
   getOfflineTrackAssetAliases,
@@ -321,6 +328,17 @@ export async function cacheNativeTrackAsset(
     filePath,
     downloadTarget.expectedBytes,
   );
+  if (isIosNative) {
+    try {
+      await excludeNativeOfflineAssetFromBackup(filePath);
+    } catch (error) {
+      await Filesystem.deleteFile({
+        path: filePath,
+        directory: Directory.Data,
+      }).catch(() => undefined);
+      throw error;
+    }
+  }
   if (signal?.aborted) {
     await Filesystem.deleteFile({
       path: filePath,

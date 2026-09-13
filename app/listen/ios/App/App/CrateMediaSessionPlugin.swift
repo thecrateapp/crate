@@ -25,10 +25,10 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     private var routePickerDismissWorkItem: DispatchWorkItem?
     private var lastKnownIsPlaying = false
     private var interruptionState = CrateMediaSessionInterruptionState()
+    private var activationState = CrateMediaSessionActivationState()
 
     override func load() {
         super.load()
-        configureAudioSession()
         configureRemoteCommands()
         NotificationCenter.default.addObserver(
             self,
@@ -179,16 +179,32 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         lastKnownIsPlaying = false
         interruptionState.stop()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        deactivateAudioSession()
         call.resolve()
     }
 
     private func configureAudioSession() {
+        guard activationState.activate() else { return }
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP])
             try session.setActive(true)
         } catch {
+            _ = activationState.deactivate()
             NSLog("CrateMediaSessionPlugin failed to configure AVAudioSession: \(error.localizedDescription)")
+        }
+    }
+
+    private func deactivateAudioSession() {
+        guard activationState.deactivate() else { return }
+        do {
+            try AVAudioSession.sharedInstance().setActive(
+                false,
+                options: .notifyOthersOnDeactivation
+            )
+        } catch {
+            _ = activationState.activate()
+            NSLog("CrateMediaSessionPlugin failed to deactivate AVAudioSession: \(error.localizedDescription)")
         }
     }
 
@@ -205,6 +221,8 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             return .success
         }))
         remoteCommandTokens.append((commandCenter.pauseCommand, commandCenter.pauseCommand.addTarget { [weak self] _ in
+            self?.interruptionState.pause()
+            self?.lastKnownIsPlaying = false
             self?.sendControl("pause")
             return .success
         }))
@@ -260,6 +278,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             // already paused before the interruption" — resuming in the
             // latter case would silently undo the user's own pause.
             interruptionState.begin(wasPlaying: lastKnownIsPlaying)
+            activationState.interrupted()
             sendControl("pause")
         case .ended:
             let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0

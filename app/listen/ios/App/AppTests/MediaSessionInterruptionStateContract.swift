@@ -28,5 +28,24 @@ enum MediaSessionInterruptionStateContract {
         guard !deniedResume.end(systemAllowsResume: false) else {
             fatalError("The system resume policy must remain authoritative")
         }
+
+        var explicitlyPaused = CrateMediaSessionInterruptionState()
+        explicitlyPaused.begin(wasPlaying: true)
+        explicitlyPaused.pause()
+        guard !explicitlyPaused.end(systemAllowsResume: true) else {
+            fatalError("Explicit pause during interruption must cancel resume")
+        }
+
+        var activation = CrateMediaSessionActivationState()
+        guard activation.activate(), !activation.activate() else {
+            fatalError("Audio activation must be idempotent")
+        }
+        activation.interrupted()
+        guard activation.activate() else {
+            fatalError("An interrupted audio session must be re-activatable")
+        }
+        guard activation.deactivate(), !activation.deactivate() else {
+            fatalError("Audio deactivation must be idempotent")
+        }
     }
 }

@@ -24,5 +24,21 @@ enum OfflineAssetIntegrityContract {
         guard !OfflineAssetIntegrity.isValid(size: 4, expected: 3) else {
             fatalError("A size mismatch against a known expected size must be invalid")
         }
+
+        let temporaryUrl = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        FileManager.default.createFile(atPath: temporaryUrl.path, contents: Data([1]))
+        defer { try? FileManager.default.removeItem(at: temporaryUrl) }
+        do {
+            try OfflineAssetIntegrity.excludeFromBackup(url: temporaryUrl)
+            let values = try temporaryUrl.resourceValues(
+                forKeys: [.isExcludedFromBackupKey]
+            )
+            guard values.isExcludedFromBackup == true else {
+                fatalError("Offline media must be excluded from device backup")
+            }
+        } catch {
+            fatalError("Could not apply offline backup exclusion: \(error)")
+        }
     }
 }

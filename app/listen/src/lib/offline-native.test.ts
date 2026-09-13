@@ -9,7 +9,10 @@ const filesystemMock = vi.hoisted(() => ({
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
 }));
-const verifyAssetsMock = vi.hoisted(() => vi.fn());
+const { excludeFromBackupMock, verifyAssetsMock } = vi.hoisted(() => ({
+  excludeFromBackupMock: vi.fn(),
+  verifyAssetsMock: vi.fn(),
+}));
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
@@ -18,6 +21,7 @@ vi.mock("@capacitor/core", () => ({
     isNativePlatform: () => true,
   },
   registerPlugin: () => ({
+    excludeFromBackup: excludeFromBackupMock,
     verifyAssets: verifyAssetsMock,
   }),
 }));
@@ -152,5 +156,19 @@ describe("native offline playback bootstrap", () => {
     expect(verifyAssetsMock.mock.calls[0]?.[0].assets).toHaveLength(500);
     expect(verifyAssetsMock.mock.calls[1]?.[0].assets).toHaveLength(1);
     expect(filesystemMock.stat).not.toHaveBeenCalled();
+  });
+
+  it("protects iOS offline media from device backups", async () => {
+    excludeFromBackupMock.mockResolvedValue({ excluded: true });
+    const { excludeNativeOfflineAssetFromBackup } = await import(
+      "@/lib/offline-native"
+    );
+
+    await expect(
+      excludeNativeOfflineAssetFromBackup("offline-media/profile/song.m4a"),
+    ).resolves.toBeUndefined();
+    expect(excludeFromBackupMock).toHaveBeenCalledWith({
+      path: "offline-media/profile/song.m4a",
+    });
   });
 });

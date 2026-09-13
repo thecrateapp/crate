@@ -14,9 +14,19 @@ export interface NativeOfflineAssetVerification {
 }
 
 interface NativeOfflineIntegrityPlugin {
+  excludeFromBackup(options: { path: string }): Promise<{ excluded: boolean }>;
   verifyAssets(options: {
     assets: NativeOfflineAssetExpectation[];
   }): Promise<{ assets: NativeOfflineAssetVerification[] }>;
+}
+
+export async function excludeNativeOfflineAssetFromBackup(
+  path: string,
+): Promise<void> {
+  const result = await getNativeOfflineIntegrity().excludeFromBackup({ path });
+  if (!result.excluded) {
+    throw new Error("Offline asset could not be excluded from device backup");
+  }
 }
 
 let nativeOfflineIntegrity: NativeOfflineIntegrityPlugin | null = null;

@@ -7,4 +7,11 @@ enum OfflineAssetIntegrity {
     static func isValid(size: Int64, expected: Int64) -> Bool {
         size > 0 && (expected <= 0 || size == expected)
     }
+
+    static func excludeFromBackup(url: URL) throws {
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var mutableUrl = url
+        try mutableUrl.setResourceValues(values)
+    }
 }
