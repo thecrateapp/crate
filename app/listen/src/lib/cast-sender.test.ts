@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   apiMock,
+  ensureMediaAccessUrlMock,
   runtimeMock,
   nativeCapabilitiesMock,
   nativeControlMock,
@@ -10,6 +11,7 @@ const {
   sessionChangedListeners,
 } = vi.hoisted(() => ({
   apiMock: vi.fn(),
+  ensureMediaAccessUrlMock: vi.fn(),
   runtimeMock: { isNative: false },
   nativeCapabilitiesMock: vi.fn(),
   nativeControlMock: vi.fn(),
@@ -37,6 +39,7 @@ vi.mock("@capacitor/core", () => ({
 vi.mock("@/lib/api", () => ({
   api: apiMock,
   apiUrl: (path: string) => `https://crate.test${path}`,
+  ensureMediaAccessUrl: ensureMediaAccessUrlMock,
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -61,6 +64,10 @@ describe("cast sender", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeMock.isNative = false;
+    ensureMediaAccessUrlMock.mockImplementation(
+      async (url: string) =>
+        `${url}${url.includes("?") ? "&" : "?"}media_ticket=artwork-ticket`,
+    );
   });
 
   it("builds auto delivery cast tickets from stable track references", () => {
@@ -350,5 +357,53 @@ describe("cast sender", () => {
 
     await expect(request).resolves.toEqual({ ok: true });
     expect(isCastSessionActive()).toBe(false);
+  });
+
+  it("authorizes restored queue artwork before native Cast", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    apiMock.mockResolvedValue({
+      stream_url: "https://stream.example/track",
+      metadata_url: "https://stream.example/metadata",
+      expires_at: "2030-01-01T00:00:00Z",
+      delivery_policy: "direct",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          stream_url: "https://stream.example/track",
+          title: "Track",
+          artist: "Artist",
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await startCastSession({
+      track: {
+        id: "track-1",
+        libraryTrackId: 1,
+        title: "Track",
+        artist: "Artist",
+        albumCover: "/api/catalog/albums/album-1/cover?size=512",
+      },
+    });
+
+    expect(ensureMediaAccessUrlMock).toHaveBeenCalledWith(
+      "https://crate.test/api/catalog/albums/album-1/cover?size=512",
+      "artwork",
+    );
+    expect(nativeRequestSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artworkUrl:
+          "https://crate.test/api/catalog/albums/album-1/cover?size=512&media_ticket=artwork-ticket",
+      }),
+    );
   });
 });

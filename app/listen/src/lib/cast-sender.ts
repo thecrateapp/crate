@@ -6,8 +6,9 @@ import {
   buildCastTicketRequest,
   buildNativePayload,
   buildWebLoadRequest,
-  resolveCastMedia,
   DEFAULT_CAST_TARGET_ID,
+  resolveCastArtworkUrl,
+  resolveCastMedia,
 } from "./cast-sender-media";
 import type {
   CastSenderCapabilities,
@@ -371,11 +372,12 @@ export async function startCastSession(
       request,
     );
     const media = await resolveCastMedia(ticket);
+    const artworkUrl = await resolveCastArtworkUrl(payload.track.albumCover);
 
     if (isNative) {
       const startedAtGeneration = nativeCastSessionGeneration;
       const result = await getNativeCast().requestSession(
-        buildNativePayload(ticket, media, payload),
+        buildNativePayload(ticket, media, payload, artworkUrl),
       );
       applyNativeCastSuccess(result, startedAtGeneration);
       return result;
@@ -384,7 +386,7 @@ export async function startCastSession(
     const session = await requestWebCastSession();
     const chromeCast = castWindow()?.chrome?.cast;
     const loadRequest = chromeCast
-      ? buildWebLoadRequest(ticket, media, payload, chromeCast)
+      ? buildWebLoadRequest(ticket, media, payload, chromeCast, artworkUrl)
       : null;
     if (!session || !loadRequest) {
       return { ok: false, message: "Could not open the Cast device picker." };

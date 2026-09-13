@@ -1,5 +1,5 @@
 import type { Track } from "@/contexts/player-types";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, ensureMediaAccessUrl } from "@/lib/api";
 import type {
   CastMediaResponse,
   CastStartPayload,
@@ -41,6 +41,18 @@ function receiverArtworkUrl(
   }
 }
 
+export async function resolveCastArtworkUrl(
+  url: string | null | undefined,
+): Promise<string | undefined> {
+  const receiverUrl = receiverArtworkUrl(url);
+  if (!receiverUrl) return undefined;
+  try {
+    return await ensureMediaAccessUrl(receiverUrl, "artwork");
+  } catch {
+    return undefined;
+  }
+}
+
 function mediaDurationSeconds(
   media: CastMediaResponse,
   track: Track,
@@ -75,6 +87,7 @@ export function buildNativePayload(
   ticket: CastTicketResponse,
   media: CastMediaResponse,
   payload: CastStartPayload,
+  artworkUrl: string | undefined,
 ): NativeCastMediaPayload {
   const track = payload.track;
   return {
@@ -84,7 +97,7 @@ export function buildNativePayload(
     title: media.title || track.title,
     artist: media.artist || track.artist,
     album: media.album || track.album || "",
-    artworkUrl: receiverArtworkUrl(track.albumCover),
+    artworkUrl,
     duration: mediaDurationSeconds(media, track),
     currentTime: payload.currentTime,
   };
@@ -95,8 +108,9 @@ export function buildWebLoadRequest(
   media: CastMediaResponse,
   payload: CastStartPayload,
   chromeCast: ChromeCastNamespace,
+  artworkUrl: string | undefined,
 ): ChromeCastLoadRequest {
-  const nativePayload = buildNativePayload(ticket, media, payload);
+  const nativePayload = buildNativePayload(ticket, media, payload, artworkUrl);
   const mediaInfo = new chromeCast.media.MediaInfo(
     nativePayload.streamUrl,
     nativePayload.contentType,
