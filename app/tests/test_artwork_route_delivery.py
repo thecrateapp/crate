@@ -518,8 +518,8 @@ def test_artist_hero_pins_retained_revision_before_releasing_publication_lock(
     events: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, artist_id):
-        assert artist_id == 5
+    def publication_lock(_root, artist_entity_uid):
+        assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         yield
         events.append("lock-exit")
@@ -595,8 +595,8 @@ def test_artist_hero_pins_active_revision_before_releasing_publication_lock(
     events: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, artist_id):
-        assert artist_id == 5
+    def publication_lock(_root, artist_entity_uid):
+        assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         try:
             yield

@@ -1521,7 +1521,7 @@ def api_artist_hero(
                 buffer_file=buffer_file,
             )
 
-        with artist_hero_publication_lock(cache_root(), artist_id):
+        with artist_hero_publication_lock(cache_root(), entity_uid):
             if local_original is None or not local_original.is_file():
                 if retained_revision:
                     return _artist_hero_revision_unavailable_response(composition)

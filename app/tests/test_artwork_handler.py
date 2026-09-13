@@ -112,8 +112,8 @@ class TestHandleMaterializeArtworkVariants:
         events: list[str] = []
 
         @contextmanager
-        def publication_lock(_root, artist_id):
-            assert artist_id == 42
+        def publication_lock(_root, artist_entity_uid):
+            assert artist_entity_uid == "artist-entity"
             events.append("lock-enter")
             yield
             events.append("lock-exit")

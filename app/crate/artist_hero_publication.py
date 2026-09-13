@@ -265,16 +265,18 @@ def _existing_publication(
 
 @contextmanager
 def artist_hero_publication_lock(
-    coordination_root: Path, artist_id: int
+    coordination_root: Path, artist_entity_uid: str
 ) -> Iterator[None]:
-    """Serialize profile activation, rollback and cleanup for one artist."""
+    """Serialize publication and cleanup by the artist's stable storage identity."""
 
+    _validate_segment(artist_entity_uid, "artist entity UID")
     resolved_coordination_root = coordination_root.resolve()
     lock_root = (resolved_coordination_root / ".crate-locks" / "artist-hero").resolve()
     if not lock_root.is_relative_to(resolved_coordination_root):
         raise ValueError("Artist hero lock path is outside the coordination root")
     lock_root.mkdir(parents=True, exist_ok=True)
-    with (lock_root / f"{int(artist_id)}.lock").open("a+b") as handle:
+    lock_name = hashlib.sha256(artist_entity_uid.encode("utf-8")).hexdigest()
+    with (lock_root / f"{lock_name}.lock").open("a+b") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
             yield

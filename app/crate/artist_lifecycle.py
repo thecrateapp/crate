@@ -37,7 +37,7 @@ def _run_artist_change(
 
     artist_id = int(artist["id"])
     entity_uid = str(artist["entity_uid"])
-    with artist_hero_publication_lock(cache_root(), artist_id):
+    with artist_hero_publication_lock(cache_root(), entity_uid):
         current_artist = get_library_artist(name)
         if (
             not current_artist

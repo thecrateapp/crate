@@ -117,6 +117,10 @@ def test_cleanup_artist_hero_publications_keeps_active_previous_and_fresh_orphan
         ],
     )
     monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
         "crate.artwork_maintenance.get_artist_hero_artwork",
         lambda _artist_id: {
             "render_manifest": {
@@ -257,6 +261,10 @@ def test_cleanup_removes_a_known_render_that_lost_manifest_cas(monkeypatch, tmp_
         lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
     )
     monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
         "crate.artwork_maintenance.get_artist_hero_artwork",
         lambda _artist_id: {"render_manifest": active_manifest},
     )
@@ -335,6 +343,10 @@ def test_cleanup_artist_hero_publications_does_not_retain_disabled_compositions(
     monkeypatch.setattr(
         "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
         lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: {"id": 42, "entity_uid": "artist-entity"},
     )
     monkeypatch.setattr(
         "crate.artwork_maintenance.get_artist_hero_artwork",
@@ -437,6 +449,73 @@ def test_cleanup_artist_hero_publications_removes_expired_deleted_artist_storage
     assert not publication.exists()
     assert not materialization.exists()
     assert result["orphan_revisions_removed"] == 1
+
+
+def test_cleanup_artist_hero_publications_preserves_a_recreated_artist(
+    monkeypatch, tmp_path
+):
+    from contextlib import contextmanager
+
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_root,
+    )
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    identity = ArtistHeroArtifactIdentity(
+        "recreated-artist-entity", "desktop", "revision-a"
+    )
+    publication = artist_hero_artifact_root(identity)
+    publication.mkdir(parents=True)
+    expired = time.time() - 90000
+    os.utime(publication.parents[1], (expired, expired))
+    lookups = iter(
+        [
+            None,
+            {"id": 99, "entity_uid": "recreated-artist-entity"},
+            {"id": 100, "entity_uid": "recreated-artist-entity"},
+        ]
+    )
+    lock_keys: list[str] = []
+    profile_artist_ids: list[int] = []
+
+    @contextmanager
+    def publication_lock(_root, entity_uid):
+        lock_keys.append(entity_uid)
+        yield
+
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: next(lookups),
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.artist_hero_publication_lock",
+        publication_lock,
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_artist_hero_artwork",
+        lambda artist_id: profile_artist_ids.append(artist_id) or {},
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revisions",
+        lambda _artist_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_manifest_history",
+        lambda _artist_id: [],
+    )
+
+    result = cleanup_artist_hero_publications(max_artists=10)
+
+    assert publication.is_dir()
+    assert result["orphan_revisions_removed"] == 0
+    assert lock_keys == ["recreated-artist-entity", "recreated-artist-entity"]
+    assert profile_artist_ids == [100]
 
 
 def test_repair_manifest_permissions_makes_existing_assets_readplane_readable(

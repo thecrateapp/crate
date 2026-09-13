@@ -9,8 +9,8 @@ def test_run_artist_deletion_serializes_cleanup_and_database_change(monkeypatch)
     events: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, artist_id):
-        assert artist_id == 42
+    def publication_lock(_root, artist_entity_uid):
+        assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         try:
             yield
@@ -172,8 +172,8 @@ def test_run_artist_deletion_aborts_when_identity_changes_before_lock(monkeypatc
     )
 
     @contextmanager
-    def publication_lock(_root, artist_id):
-        assert artist_id == 42
+    def publication_lock(_root, artist_entity_uid):
+        assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         try:
             yield

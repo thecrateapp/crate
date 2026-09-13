@@ -305,30 +305,40 @@ def cleanup_artist_hero_publications(
             if not artist:
                 if not _expired(entity_root):
                     continue
-                revision_count = sum(
-                    1
-                    for composition_root in entity_root.iterdir()
-                    if composition_root.is_dir() and not composition_root.is_symlink()
-                    for revision_root in composition_root.iterdir()
-                    if revision_root.is_dir()
-                    and not revision_root.is_symlink()
-                    and not revision_root.name.startswith(".")
-                )
-                removed = delete_artist_hero_storage(entity_uid)
-                if removed["publication_roots_removed"]:
-                    result["orphan_revisions_removed"] += revision_count
-                    result["revisions_removed"] += revision_count
-                result["artists_checked"] += 1
-                discovered_count += 1
-                continue
+                with artist_hero_publication_lock(publication_root, entity_uid):
+                    artist = get_library_artist_by_entity_uid(entity_uid)
+                    if not artist:
+                        revision_count = sum(
+                            1
+                            for composition_root in entity_root.iterdir()
+                            if composition_root.is_dir()
+                            and not composition_root.is_symlink()
+                            for revision_root in composition_root.iterdir()
+                            if revision_root.is_dir()
+                            and not revision_root.is_symlink()
+                            and not revision_root.name.startswith(".")
+                        )
+                        removed = delete_artist_hero_storage(entity_uid)
+                        if removed["publication_roots_removed"]:
+                            result["orphan_revisions_removed"] += revision_count
+                            result["revisions_removed"] += revision_count
+                        result["artists_checked"] += 1
+                        discovered_count += 1
+                        continue
             artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
             known_entity_uids.add(entity_uid)
             discovered_count += 1
 
     for artist in artists:
         result["artists_checked"] += 1
-        artist_id = int(artist["artist_id"])
-        with artist_hero_publication_lock(publication_root, artist_id):
+        entity_uid = str(artist.get("entity_uid") or "")
+        if not entity_uid:
+            continue
+        with artist_hero_publication_lock(publication_root, entity_uid):
+            current_artist = get_library_artist_by_entity_uid(entity_uid)
+            if not current_artist:
+                continue
+            artist_id = int(current_artist["id"])
             profile = get_artist_hero_artwork(artist_id) or {}
             enabled_compositions = {
                 composition
@@ -372,7 +382,7 @@ def cleanup_artist_hero_publications(
                     continue
                 try:
                     identity = ArtistHeroArtifactIdentity(
-                        artist_entity_uid=str(artist.get("entity_uid") or ""),
+                        artist_entity_uid=entity_uid,
                         composition=composition,
                         render_revision=revision,
                     )
