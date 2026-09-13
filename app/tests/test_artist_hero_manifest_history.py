@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from tests.conftest import PG_AVAILABLE
@@ -127,6 +129,70 @@ def test_manifest_history_persists_previous_and_uses_manifest_cas(pg_db) -> None
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_profile_upsert_cas_covers_first_publish_and_active_manifest(pg_db) -> None:
+    from crate.db.repositories.artist_hero_artwork import (
+        get_artist_hero_artwork,
+        upsert_artist_hero_artwork,
+    )
+    from crate.db.tx import read_scope
+    from sqlalchemy import text
+
+    pg_db.upsert_artist({"name": "Strict Profile CAS Artist"})
+    with read_scope() as session:
+        artist_id = session.execute(
+            text(
+                "SELECT id FROM library_artists "
+                "WHERE name = 'Strict Profile CAS Artist'"
+            )
+        ).scalar_one()
+
+    base = {
+        "artist_id": artist_id,
+        "provenance": "manual",
+        "review_status": "approved",
+        "source_width": 1600,
+        "source_height": 1000,
+        "desktop_recipe": {"mode": "crop"},
+        "mobile_recipe": {"mode": "crop"},
+        "desktop_enabled": True,
+        "mobile_enabled": False,
+    }
+    manifest_a = _manifest("editorial-1", "artifact-a")
+    manifest_b = _manifest("editorial-1", "artifact-b")
+    manifest_c = _manifest("editorial-1", "artifact-c")
+
+    assert upsert_artist_hero_artwork(
+        **base,
+        revision="editorial-1",
+        render_manifest=manifest_a,
+        expected_revision=None,
+        expected_manifest=None,
+    )
+    assert not upsert_artist_hero_artwork(
+        **base,
+        revision="editorial-loser",
+        render_manifest=_manifest("editorial-loser", "artifact-loser"),
+        expected_revision=None,
+        expected_manifest=None,
+    )
+    assert upsert_artist_hero_artwork(
+        **base,
+        revision="editorial-1",
+        render_manifest=manifest_b,
+        expected_revision="editorial-1",
+        expected_manifest=manifest_a,
+    )
+    assert not upsert_artist_hero_artwork(
+        **base,
+        revision="editorial-1",
+        render_manifest=manifest_c,
+        expected_revision="editorial-1",
+        expected_manifest=manifest_a,
+    )
+    assert get_artist_hero_artwork(artist_id)["render_manifest"] == manifest_b
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 def test_render_history_allows_reusing_artifact_across_editorial_revisions(
     pg_db,
 ) -> None:
@@ -244,3 +310,72 @@ def test_manifest_rollback_rejects_a_stale_active_pointer(pg_db) -> None:
         target_manifest_id=artist_hero_manifest_id(manifest_b),
     )
     assert get_artist_hero_artwork(artist_id)["render_manifest"] == manifest_b
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_manifest_rollback_rejects_a_target_from_another_editorial_revision(
+    pg_db,
+) -> None:
+    from sqlalchemy import text
+
+    from crate.db.repositories.artist_hero_artwork import (
+        artist_hero_manifest_id,
+        get_artist_hero_artwork,
+        rollback_artist_hero_manifest,
+        upsert_artist_hero_artwork,
+    )
+    from crate.db.tx import read_scope, transaction_scope
+
+    pg_db.upsert_artist({"name": "Cross Revision Rollback Artist"})
+    with read_scope() as session:
+        artist_id = session.execute(
+            text(
+                "SELECT id FROM library_artists "
+                "WHERE name = 'Cross Revision Rollback Artist'"
+            )
+        ).scalar_one()
+
+    base = {
+        "artist_id": artist_id,
+        "provenance": "manual",
+        "review_status": "approved",
+        "source_width": 1600,
+        "source_height": 1000,
+        "desktop_recipe": {"mode": "crop"},
+        "mobile_recipe": {"mode": "crop"},
+        "desktop_enabled": True,
+        "mobile_enabled": False,
+    }
+    current_manifest = _manifest("editorial-1", "artifact-a")
+    foreign_manifest = _manifest("editorial-2", "artifact-b")
+    assert upsert_artist_hero_artwork(
+        **base, revision="editorial-1", render_manifest=current_manifest
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO artist_hero_manifest_history (
+                    manifest_id, artist_id, editorial_revision,
+                    manifest, previous_manifest
+                ) VALUES (
+                    :manifest_id, :artist_id, :editorial_revision,
+                    CAST(:manifest AS JSONB), NULL
+                )
+                """
+            ),
+            {
+                "manifest_id": artist_hero_manifest_id(foreign_manifest),
+                "artist_id": artist_id,
+                "editorial_revision": "editorial-2",
+                "manifest": json.dumps(foreign_manifest),
+            },
+        )
+
+    assert not rollback_artist_hero_manifest(
+        artist_id=artist_id,
+        expected_revision="editorial-1",
+        expected_manifest=current_manifest,
+        target_manifest_id=artist_hero_manifest_id(foreign_manifest),
+    )
+    assert get_artist_hero_artwork(artist_id)["render_manifest"] == current_manifest

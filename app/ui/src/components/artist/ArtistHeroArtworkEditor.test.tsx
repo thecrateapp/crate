@@ -688,6 +688,41 @@ describe("ArtistHeroArtworkEditor", () => {
     ).toBeNull();
   });
 
+  it("previews the active artifact revision instead of the editorial revision", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          ...manualProfile(),
+          revision: "editorial-revision",
+          compositions: {
+            desktop: {
+              schema_version: 1,
+              composition: "desktop",
+              render_revision: "cover-fit-v5-neutral-alpha:artifact-desktop",
+              recipe_hash: "desktop-recipe",
+              width: 1480,
+              height: 600,
+              bounds: { left: 0, top: 0, right: 1, bottom: 1 },
+              asset_path: "/api/artists/7/hero?composition=desktop",
+            },
+          },
+        }),
+      ),
+    );
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    expect(await screen.findByAltText("Converge desktop hero")).toHaveAttribute(
+      "src",
+      expect.stringContaining(
+        "v=cover-fit-v5-neutral-alpha%3Aartifact-desktop",
+      ),
+    );
+  });
+
   it("loads and uploads independent sources for desktop and mobile", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal(

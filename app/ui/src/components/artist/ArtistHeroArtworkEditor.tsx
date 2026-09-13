@@ -197,15 +197,17 @@ export function ArtistHeroArtworkEditor({
 
   const recipe = recipes[active];
   const aspect = active === "desktop" ? 1480 / 600 : 4 / 5;
+  const persistedRevision =
+    profile?.compositions?.[active]?.render_revision ?? profile?.revision;
   const persistedPreview = artistHeroApiUrl({ artistId }, active, {
     size: active === "desktop" ? 1480 : 1080,
-    version: profile?.revision,
+    version: persistedRevision,
   });
   const persistedSource = profile
     ? `${artistArtworkApiPath(
         { artistId },
         "hero-source",
-      )}?composition=${active}&v=${encodeURIComponent(profile.revision)}`
+      )}?composition=${active}&v=${encodeURIComponent(persistedRevision ?? "")}`
     : null;
   const activeCompositionEnabled =
     !profile || profile[`${active}_enabled`] !== false;

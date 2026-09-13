@@ -81,6 +81,11 @@ def _validated_render_manifest(profile: Mapping[str, object]) -> dict | None:
             **required,
             "relative_path": relative_path,
         }
+        source_relative_path = _safe_relative_path(artifact.get("source_relative_path"))
+        if source_relative_path:
+            normalized_artifacts[composition]["source_relative_path"] = (
+                source_relative_path
+            )
     if not normalized_artifacts:
         return None
     normalized["artifacts"] = normalized_artifacts

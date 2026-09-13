@@ -474,9 +474,21 @@ def test_artist_hero_profile_update_uses_expected_revision_as_cas(pg_db):
 def test_artist_hero_upload_endpoint_enqueues_original_and_both_recipes(test_app):
     desktop = _crop_recipe(1400, 600)
     mobile = _crop_recipe(800, 1000)
+    active_manifest = {
+        "manifest_version": 1,
+        "editorial_revision": "editorial-a",
+        "artifacts": {},
+    }
 
     with (
         patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch(
+            "crate.api.artwork.get_artist_hero_artwork",
+            return_value={
+                "revision": "editorial-a",
+                "render_manifest": active_manifest,
+            },
+        ),
         patch("crate.api.artwork.create_task", return_value="task-hero-1") as create,
     ):
         response = test_app.post(
@@ -496,6 +508,8 @@ def test_artist_hero_upload_endpoint_enqueues_original_and_both_recipes(test_app
     assert payload["artist"] == "Converge"
     assert payload["desktop_recipe"] == desktop
     assert payload["mobile_recipe"] == mobile
+    assert payload["expected_revision"] == "editorial-a"
+    assert payload["expected_active_manifest_id"].startswith("sha256:")
     assert base64.b64decode(payload["data_b64"]).startswith(b"\x89PNG")
 
 
@@ -505,6 +519,7 @@ def test_artist_hero_upload_can_replace_only_the_mobile_source(test_app):
 
     with (
         patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value=None),
         patch("crate.api.artwork.create_task", return_value="task-mobile-1") as create,
     ):
         response = test_app.post(
@@ -545,11 +560,25 @@ def test_artist_hero_upload_rejects_invalid_image_before_queueing(test_app):
 
 
 def test_artist_hero_compose_endpoint_reuses_persisted_source(test_app):
+    from crate.db.repositories.artist_hero_artwork import artist_hero_manifest_id
+
     desktop = _crop_recipe(1400, 600)
     mobile = _crop_recipe(800, 1000)
+    active_manifest = {
+        "manifest_version": 1,
+        "editorial_revision": "editorial-a",
+        "artifacts": {},
+    }
 
     with (
         patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch(
+            "crate.api.artwork.get_artist_hero_artwork",
+            return_value={
+                "revision": "editorial-a",
+                "render_manifest": active_manifest,
+            },
+        ),
         patch("crate.api.artwork.create_task", return_value="task-compose-1") as create,
     ):
         response = test_app.post(
@@ -566,6 +595,8 @@ def test_artist_hero_compose_endpoint_reuses_persisted_source(test_app):
             "desktop_recipe": desktop,
             "mobile_recipe": mobile,
             "composition": "shared",
+            "expected_revision": "editorial-a",
+            "expected_active_manifest_id": artist_hero_manifest_id(active_manifest),
         },
     )
 
@@ -576,6 +607,7 @@ def test_artist_hero_compose_endpoint_passes_active_desktop_composition(test_app
 
     with (
         patch("crate.api.artwork.artist_name_from_id", return_value="Crossed"),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value=None),
         patch(
             "crate.api.artwork.create_task", return_value="task-compose-desktop"
         ) as create,
@@ -676,6 +708,51 @@ def test_artist_hero_source_endpoint_delivers_a_composition_override(
 
     assert response.status_code == 200
     assert Image.open(io.BytesIO(response.content)).size == (1080, 1350)
+
+
+def test_artist_hero_source_endpoint_prefers_the_active_immutable_source(
+    test_app, tmp_path
+):
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    Image.new("RGB", (1600, 1000), color="red").save(
+        artist_dir / "artist-hero-source-desktop.jpg", "JPEG"
+    )
+    cache_dir = tmp_path / "cache"
+    immutable_source = cache_dir / "published" / "desktop" / "source.jpg"
+    immutable_source.parent.mkdir(parents=True)
+    Image.new("RGB", (1600, 1000), color="blue").save(immutable_source, "JPEG")
+    profile = {
+        "desktop_enabled": True,
+        "render_manifest": {
+            "manifest_version": 1,
+            "editorial_revision": "editorial-b",
+            "artifacts": {
+                "desktop": {
+                    "source_relative_path": "published/desktop/source.jpg",
+                }
+            },
+        },
+    }
+
+    with (
+        patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch(
+            "crate.api.artwork.get_library_artist",
+            return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
+        ),
+        patch("crate.api.artwork.library_path", return_value=tmp_path),
+        patch("crate.api.artwork.cache_root", return_value=cache_dir),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value=profile),
+    ):
+        response = test_app.get(
+            "/api/artwork/artists/7/hero-source?composition=desktop"
+        )
+
+    assert response.status_code == 200
+    with Image.open(io.BytesIO(response.content)) as source:
+        red, _green, blue = source.getpixel((0, 0))
+    assert blue > red
 
 
 def test_delete_artist_hero_composition_enqueues_persistent_delete(test_app):
@@ -1229,6 +1306,93 @@ def test_compose_handler_can_update_only_desktop_when_mobile_source_is_missing(
     assert profiles[0]["desktop_recipe"] == desktop_recipe
     assert profiles[0]["mobile_recipe"] == mobile_recipe
     assert queued == [("artist-hero", "artist-entity:desktop")]
+
+
+def test_compose_handler_uses_the_source_bound_to_the_active_manifest(
+    monkeypatch, tmp_path
+):
+    from crate.worker_handlers.artwork import _handle_compose_artist_hero
+
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    Image.new("RGB", (1800, 900), color="red").save(
+        artist_dir / "artist-hero-source-desktop.jpg", "JPEG"
+    )
+    cache_dir = tmp_path / "cache"
+    immutable_source = cache_dir / "published" / "desktop" / "source.jpg"
+    immutable_source.parent.mkdir(parents=True)
+    Image.new("RGB", (1800, 900), color="blue").save(immutable_source, "JPEG")
+    profile = {
+        "source_width": 1800,
+        "source_height": 900,
+        "desktop_source_width": 1800,
+        "desktop_source_height": 900,
+        "desktop_recipe": _crop_recipe(1400, 600),
+        "mobile_recipe": _crop_recipe(800, 1000),
+        "provenance": "manual",
+        "review_status": "approved",
+        "revision": "editorial-b",
+        "render_manifest": {
+            "manifest_version": 1,
+            "editorial_revision": "editorial-b",
+            "artifacts": {
+                "desktop": {
+                    "source_relative_path": "published/desktop/source.jpg",
+                }
+            },
+        },
+    }
+    published: list[dict] = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_library_artist",
+        lambda name: {"id": 7, "entity_uid": "artist-entity", "name": name},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.resolve_artist_dir",
+        lambda *args, **kwargs: artist_dir,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_artist_hero_artwork",
+        lambda _artist_id: profile,
+    )
+    monkeypatch.setattr("crate.worker_handlers.artwork.cache_root", lambda: cache_dir)
+
+    def capture_publication(**kwargs):
+        published.append(kwargs)
+        return profile["render_manifest"]
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork._publish_artist_hero_manifest",
+        capture_publication,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.upsert_artist_hero_artwork",
+        lambda **_kwargs: True,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.queue_artwork_materialization",
+        lambda *_args, **_kwargs: None,
+    )
+
+    with (
+        patch("crate.api.cache_events.broadcast_invalidation"),
+        patch("crate.db.home_warming.warm_recent_home_discovery_snapshots"),
+    ):
+        result = _handle_compose_artist_hero(
+            "task-1",
+            {
+                "artist": "Converge",
+                "composition": "desktop",
+                "desktop_recipe": _crop_recipe(1400, 600),
+                "mobile_recipe": _crop_recipe(800, 1000),
+            },
+            {"library_path": str(tmp_path)},
+        )
+
+    assert result["status"] == "composed"
+    with Image.open(io.BytesIO(published[0]["raw_sources"]["desktop"])) as source:
+        red, _green, blue = source.getpixel((0, 0))
+    assert blue > red
 
 
 def test_recompose_handler_refreshes_legacy_output_without_changing_profile(

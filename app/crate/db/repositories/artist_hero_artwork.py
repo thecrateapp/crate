@@ -11,6 +11,13 @@ from sqlalchemy import text
 from crate.db.tx import read_scope, transaction_scope
 
 
+class _ExpectedValueUnset:
+    pass
+
+
+_EXPECTED_VALUE_UNSET = _ExpectedValueUnset()
+
+
 def _canonical_manifest(manifest: Mapping[str, object]) -> str:
     return json.dumps(manifest, sort_keys=True, separators=(",", ":"))
 
@@ -202,10 +209,17 @@ def upsert_artist_hero_artwork(
     desktop_enabled: bool | None = None,
     mobile_enabled: bool | None = None,
     render_manifest: dict | None = None,
-    expected_revision: str | None = None,
+    expected_revision: str | None | _ExpectedValueUnset = _EXPECTED_VALUE_UNSET,
+    expected_manifest: Mapping[str, object] | None | _ExpectedValueUnset = (
+        _EXPECTED_VALUE_UNSET
+    ),
     session=None,
 ) -> bool:
     def _write(active_session) -> bool:
+        active_session.execute(
+            text("SELECT pg_advisory_xact_lock(:artist_id)"),
+            {"artist_id": artist_id},
+        )
         current = (
             active_session.execute(
                 text(
@@ -221,12 +235,25 @@ def upsert_artist_hero_artwork(
             .mappings()
             .first()
         )
-        if expected_revision is not None and (
-            current is None or current["revision"] != expected_revision
+        if not isinstance(expected_revision, _ExpectedValueUnset):
+            if expected_revision is None:
+                if current is not None:
+                    return False
+            elif current is None or current["revision"] != expected_revision:
+                return False
+        if not isinstance(expected_manifest, _ExpectedValueUnset) and not (
+            _manifests_equal(
+                current["render_manifest"] if current is not None else None,
+                expected_manifest,
+            )
         ):
             return False
+        if isinstance(render_manifest, Mapping) and str(
+            render_manifest.get("editorial_revision") or ""
+        ) != str(revision):
+            return False
 
-        active_session.execute(
+        result = active_session.execute(
             text(
                 """
                 INSERT INTO artist_hero_artwork (
@@ -306,6 +333,8 @@ def upsert_artist_hero_artwork(
                 ),
             },
         )
+        if result.rowcount <= 0:
+            return False
         _record_manifest_history(
             active_session,
             artist_id=artist_id,
@@ -341,6 +370,10 @@ def compare_and_swap_artist_hero_manifest(
     """Activate a prepared manifest only if the editorial state is unchanged."""
 
     def _write(active_session) -> bool:
+        if str(render_manifest.get("editorial_revision") or "") != str(
+            expected_revision
+        ):
+            return False
         current = (
             active_session.execute(
                 text(
@@ -458,6 +491,46 @@ def get_artist_hero_manifest_history_entry(
         return _read(active_session)
 
 
+def get_artist_hero_render_revision(
+    *, artist_id: int, composition: str, render_revision: str, session=None
+) -> dict | None:
+    """Return one retained immutable artifact revision."""
+
+    if composition not in {"desktop", "mobile"}:
+        return None
+
+    def _read(active_session) -> dict | None:
+        row = (
+            active_session.execute(
+                text(
+                    """
+                    SELECT artist_id, composition, render_revision,
+                           editorial_revision, renderer_version,
+                           source_fingerprint, recipe_hash, relative_path,
+                           created_at
+                    FROM artist_hero_render_revisions
+                    WHERE artist_id = :artist_id
+                      AND composition = :composition
+                      AND render_revision = :render_revision
+                    """
+                ),
+                {
+                    "artist_id": artist_id,
+                    "composition": composition,
+                    "render_revision": render_revision,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+    if session is not None:
+        return _read(session)
+    with read_scope() as active_session:
+        return _read(active_session)
+
+
 def rollback_artist_hero_manifest(
     *,
     artist_id: int,
@@ -493,7 +566,7 @@ def rollback_artist_hero_manifest(
             active_session.execute(
                 text(
                     """
-                    SELECT manifest
+                    SELECT editorial_revision, manifest
                     FROM artist_hero_manifest_history
                     WHERE artist_id = :artist_id
                       AND manifest_id = :manifest_id
@@ -505,7 +578,11 @@ def rollback_artist_hero_manifest(
             .first()
         )
         target_manifest = target["manifest"] if target else None
-        if not isinstance(target_manifest, Mapping):
+        if (
+            not isinstance(target_manifest, Mapping)
+            or str(target["editorial_revision"] or "") != expected_revision
+            or str(target_manifest.get("editorial_revision") or "") != expected_revision
+        ):
             return False
 
         _record_render_manifest_history(

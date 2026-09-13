@@ -1,13 +1,11 @@
 import base64
-import fcntl
 import hashlib
 import io as _io
 import logging
 import tempfile
 import time
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Literal, Mapping, cast
+from typing import Literal, Mapping, cast
 
 from PIL import Image, ImageOps
 from PIL.Image import Image as PILImage
@@ -47,8 +45,10 @@ from crate.artist_hero_migration import (
 from crate.artist_hero_publication import (
     ARTIST_HERO_PUBLICATION_VERSION,
     ArtistHeroArtifactIdentity,
+    artist_hero_publication_lock,
     artist_hero_source_fingerprint,
     publish_artist_hero_artifact,
+    resolve_artist_hero_publication_path,
 )
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
@@ -106,22 +106,6 @@ ARTIST_HERO_WEBP_QUALITY = 95
 ARTIST_HERO_WEBP_METHOD = 6
 
 
-@contextmanager
-def _artist_hero_publication_lock(library_root: Path, artist_id: int) -> Iterator[None]:
-    """Serialize one artist's mutable legacy aliases across worker processes."""
-
-    lock_root = (library_root.resolve() / ".crate-locks" / "artist-hero").resolve()
-    if not lock_root.is_relative_to(library_root.resolve()):
-        raise ValueError("Artist hero lock path is outside the library")
-    lock_root.mkdir(parents=True, exist_ok=True)
-    with (lock_root / f"{artist_id}.lock").open("a+b") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-
 def _save_artist_hero_webp_atomic(image: PILImage, destination: Path) -> None:
     """Publish a complete Hero render without exposing a partial WebP."""
 
@@ -165,6 +149,43 @@ def _save_artist_hero_jpeg_atomic(image: PILImage, destination: Path) -> None:
     finally:
         if temporary_path and temporary_path.exists():
             temporary_path.unlink()
+
+
+def _artist_hero_jpeg_content(image: PILImage) -> bytes:
+    output = _io.BytesIO()
+    image.save(output, "JPEG", quality=94)
+    return output.getvalue()
+
+
+def _active_artist_hero_source_path(
+    profile: Mapping[str, object], composition: str
+) -> Path | None:
+    manifest = profile.get("render_manifest")
+    artifacts = manifest.get("artifacts") if isinstance(manifest, Mapping) else None
+    artifact = artifacts.get(composition) if isinstance(artifacts, Mapping) else None
+    if not isinstance(artifact, Mapping):
+        return None
+    source_path = resolve_artist_hero_publication_path(
+        artifact.get("source_relative_path"), root=cache_root()
+    )
+    return source_path if source_path is not None and source_path.is_file() else None
+
+
+def _artist_hero_task_matches_profile(
+    profile: Mapping[str, object] | None, params: Mapping[str, object]
+) -> bool:
+    if "expected_revision" in params:
+        actual_revision = str(profile.get("revision") or "") if profile else None
+        if actual_revision != params.get("expected_revision"):
+            return False
+    if "expected_active_manifest_id" in params:
+        manifest = profile.get("render_manifest") if profile else None
+        actual_manifest_id = (
+            artist_hero_manifest_id(manifest) if isinstance(manifest, Mapping) else None
+        )
+        if actual_manifest_id != params.get("expected_active_manifest_id"):
+            return False
+    return True
 
 
 def _artist_hero_manifest_artifacts_available(
@@ -236,6 +257,7 @@ def _publish_artist_hero_manifest(
             source_fingerprint=artist_hero_source_fingerprint(raw_source),
             recipe_hash=artist_hero_recipe_hash(recipe),
             renderer_version=ARTIST_HERO_RENDER_VERSION,
+            source_content=raw_source,
         )
         artifacts[composition] = {
             key: publication.manifest[key]
@@ -245,6 +267,7 @@ def _publish_artist_hero_manifest(
                 "source_fingerprint",
                 "recipe_hash",
                 "relative_path",
+                "source_relative_path",
             )
         }
 
@@ -1256,7 +1279,7 @@ def _handle_delete_artist_hero_composition(
     delete_params = {"artist_id": artist_id, "composition": composition}
     if expected_revision:
         delete_params["expected_revision"] = expected_revision
-    with _artist_hero_publication_lock(lib, artist_id):
+    with artist_hero_publication_lock(cache_root(), artist_id):
         deleted = delete_artist_hero_composition(**delete_params)
         if deleted is not None:
             for path in dict.fromkeys(files_to_delete):
@@ -1385,6 +1408,12 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         if composition not in {"shared", "desktop", "mobile"}:
             return {"error": "Invalid artist hero composition"}
         existing = get_artist_hero_artwork(int(artist_row["id"])) or {}
+        if not _artist_hero_task_matches_profile(existing or None, params):
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-profile-changed",
+                "artist_id": int(artist_row["id"]),
+            }
         if composition == "desktop" and isinstance(existing.get("mobile_recipe"), dict):
             mobile_recipe = dict(existing["mobile_recipe"])
         elif composition == "mobile" and isinstance(
@@ -1399,7 +1428,8 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         dest = _safe_dest(found_dir / source_name)
         targets = ("desktop", "mobile") if composition == "shared" else (composition,)
         rendered_compositions: dict[str, PILImage] = {}
-        raw_sources = {target: raw for target in targets}
+        canonical_source = _artist_hero_jpeg_content(img)
+        raw_sources = {target: canonical_source for target in targets}
         for target in targets:
             recipe = desktop_recipe if target == "desktop" else mobile_recipe
             output_size = (
@@ -1426,7 +1456,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         if composition == "shared":
             legacy_width, legacy_height = img.size
         revision = artist_hero_revision(
-            raw,
+            canonical_source,
             repr(sorted(desktop_recipe.items())).encode(),
             repr(sorted(mobile_recipe.items())).encode(),
         )
@@ -1457,7 +1487,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             ),
         )
         artist_id = int(artist_row["id"])
-        with _artist_hero_publication_lock(lib, artist_id):
+        with artist_hero_publication_lock(cache_root(), artist_id):
             applied = upsert_artist_hero_artwork(
                 artist_id=artist_id,
                 provenance="manual",
@@ -1477,6 +1507,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
                 mobile_enabled=mobile_enabled,
                 render_manifest=render_manifest,
                 expected_revision=existing.get("revision"),
+                expected_manifest=existing.get("render_manifest"),
             )
             if applied is not False:
                 _save_artist_hero_jpeg_atomic(img, dest)
@@ -1577,6 +1608,14 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
     artist_row = get_library_artist(artist)
     if not artist_row:
         return {"error": "Artist not found"}
+    artist_id = int(artist_row["id"])
+    existing = get_artist_hero_artwork(artist_id) or {}
+    if not _artist_hero_task_matches_profile(existing or None, params):
+        return {
+            "status": "conflict",
+            "reason": "artist-hero-profile-changed",
+            "artist_id": artist_id,
+        }
 
     lib = Path(config["library_path"]).resolve()
     artist_dir = resolve_artist_dir(
@@ -1599,7 +1638,10 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
     }
     targets = ("desktop", "mobile") if composition == "shared" else (composition,)
     for target in targets:
-        if not source_paths[target].is_file():
+        active_source = _active_artist_hero_source_path(existing, target)
+        if active_source is not None:
+            source_paths[target] = active_source
+        elif not source_paths[target].is_file():
             source_paths[target] = legacy_source_path
         if not source_paths[target].is_file():
             return {"error": "Artist hero source not found"}
@@ -1617,8 +1659,6 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
     except (OSError, ValueError):
         return {"error": "Invalid artist hero source"}
 
-    artist_id = int(artist_row["id"])
-    existing = get_artist_hero_artwork(artist_id) or {}
     desktop_recipe = dict(params.get("desktop_recipe") or {})
     mobile_recipe = dict(params.get("mobile_recipe") or {})
     if composition == "desktop" and isinstance(existing.get("mobile_recipe"), dict):
@@ -1686,7 +1726,7 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
             if is_enabled
         ),
     )
-    with _artist_hero_publication_lock(lib, artist_id):
+    with artist_hero_publication_lock(cache_root(), artist_id):
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
             provenance="manual",
@@ -1708,6 +1748,7 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
             mobile_enabled=mobile_enabled,
             render_manifest=render_manifest,
             expected_revision=existing.get("revision"),
+            expected_manifest=existing.get("render_manifest"),
         )
         if applied is not False:
             for target, rendered in rendered_compositions.items():
@@ -1765,7 +1806,10 @@ def _handle_preview_artist_hero(task_id: str, params: dict, config: dict) -> dic
         )
         if not artist_dir or not artist_dir.is_dir():
             return {"error": "Artist directory not found"}
-        source_path = artist_dir / f"artist-hero-source-{composition}.jpg"
+        profile = get_artist_hero_artwork(int(artist_row["id"])) or {}
+        source_path = _active_artist_hero_source_path(profile, composition)
+        if source_path is None:
+            source_path = artist_dir / f"artist-hero-source-{composition}.jpg"
         if not source_path.is_file():
             source_path = artist_dir / "artist-hero-source.jpg"
         if not source_path.is_file():
@@ -1852,7 +1896,10 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
     for composition, specific_path in source_paths.items():
         if existing.get(f"{composition}_enabled", True) is False:
             continue
-        if specific_path.is_file():
+        active_source = _active_artist_hero_source_path(existing, composition)
+        if active_source is not None:
+            available_paths[composition] = active_source
+        elif specific_path.is_file():
             available_paths[composition] = specific_path
         elif legacy_source_path.is_file():
             available_paths[composition] = legacy_source_path
@@ -1932,7 +1979,7 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
             if is_enabled
         ),
     )
-    with _artist_hero_publication_lock(lib, artist_id):
+    with artist_hero_publication_lock(cache_root(), artist_id):
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
             provenance=str(existing["provenance"]),
@@ -1950,6 +1997,7 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
             mobile_source_origin=existing.get("mobile_source_origin"),
             render_manifest=render_manifest,
             expected_revision=existing.get("revision"),
+            expected_manifest=existing.get("render_manifest"),
         )
         if applied is not False:
             for composition, rendered in rendered_compositions.items():
@@ -2019,17 +2067,18 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
         desktop_recipe=desktop_recipe,
         mobile_recipe=mobile_recipe,
     )
-    revision = artist_hero_revision(raw, b":derived-hero")
+    canonical_source = _artist_hero_jpeg_content(image)
+    revision = artist_hero_revision(canonical_source, b":derived-hero")
     render_manifest = _publish_artist_hero_manifest(
         artist_row=artist_row,
         revision=revision,
         rendered=rendered,
-        raw_sources={"desktop": raw, "mobile": raw},
+        raw_sources={"desktop": canonical_source, "mobile": canonical_source},
         recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
         existing=existing or {},
         enabled=("desktop", "mobile"),
     )
-    with _artist_hero_publication_lock(lib, artist_id):
+    with artist_hero_publication_lock(cache_root(), artist_id):
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
             provenance="derived_background",
@@ -2043,6 +2092,7 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
             mobile_enabled=True,
             render_manifest=render_manifest,
             expected_revision=(existing or {}).get("revision"),
+            expected_manifest=(existing or {}).get("render_manifest"),
         )
         if applied is not False:
             _save_artist_hero_jpeg_atomic(
@@ -2350,71 +2400,72 @@ def _handle_rollback_artist_hero(task_id: str, params: dict, config: dict) -> di
         return {"status": "skipped", "reason": "invalid-rollback-target"}
 
     artist_row = get_library_artist_by_id(artist_id)
-    profile = get_artist_hero_artwork(artist_id)
-    if artist_row is None or profile is None:
-        return {
-            "status": "skipped",
-            "reason": "missing-profile",
-            "artist_id": artist_id,
-        }
-    if str(profile.get("revision") or "") != expected_revision:
-        return {
-            "status": "conflict",
-            "reason": "artist-hero-profile-changed",
-            "artist_id": artist_id,
-        }
-    if expected_active_manifest_id and not isinstance(
-        profile.get("render_manifest"), dict
-    ):
-        return {
-            "status": "conflict",
-            "reason": "artist-hero-profile-changed",
-            "artist_id": artist_id,
-        }
-    if expected_active_manifest_id and (
-        artist_hero_manifest_id(profile["render_manifest"])
-        != expected_active_manifest_id
-    ):
-        return {
-            "status": "conflict",
-            "reason": "artist-hero-profile-changed",
-            "artist_id": artist_id,
-        }
+    with artist_hero_publication_lock(cache_root(), artist_id):
+        profile = get_artist_hero_artwork(artist_id)
+        if artist_row is None or profile is None:
+            return {
+                "status": "skipped",
+                "reason": "missing-profile",
+                "artist_id": artist_id,
+            }
+        if str(profile.get("revision") or "") != expected_revision:
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-profile-changed",
+                "artist_id": artist_id,
+            }
+        if expected_active_manifest_id and not isinstance(
+            profile.get("render_manifest"), dict
+        ):
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-profile-changed",
+                "artist_id": artist_id,
+            }
+        if expected_active_manifest_id and (
+            artist_hero_manifest_id(profile["render_manifest"])
+            != expected_active_manifest_id
+        ):
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-profile-changed",
+                "artist_id": artist_id,
+            }
 
-    target = get_artist_hero_manifest_history_entry(
-        artist_id=artist_id,
-        manifest_id=target_manifest_id,
-    )
-    target_manifest = target.get("manifest") if target else None
-    enabled = tuple(
-        composition
-        for composition in ("desktop", "mobile")
-        if profile.get(f"{composition}_enabled", True) is not False
-    )
-    if not isinstance(target_manifest, Mapping) or not (
-        _artist_hero_manifest_artifacts_available(
-            target_manifest,
-            enabled=enabled,
+        target = get_artist_hero_manifest_history_entry(
+            artist_id=artist_id,
+            manifest_id=target_manifest_id,
         )
-    ):
-        return {
-            "status": "skipped",
-            "reason": "artist-hero-artifacts-missing",
-            "artist_id": artist_id,
-            "target_manifest_id": target_manifest_id,
-        }
+        target_manifest = target.get("manifest") if target else None
+        enabled = tuple(
+            composition
+            for composition in ("desktop", "mobile")
+            if profile.get(f"{composition}_enabled", True) is not False
+        )
+        if not isinstance(target_manifest, Mapping) or not (
+            _artist_hero_manifest_artifacts_available(
+                target_manifest,
+                enabled=enabled,
+            )
+        ):
+            return {
+                "status": "skipped",
+                "reason": "artist-hero-artifacts-missing",
+                "artist_id": artist_id,
+                "target_manifest_id": target_manifest_id,
+            }
 
-    if not rollback_artist_hero_manifest(
-        artist_id=artist_id,
-        expected_revision=expected_revision,
-        expected_manifest=profile.get("render_manifest"),
-        target_manifest_id=target_manifest_id,
-    ):
-        return {
-            "status": "conflict",
-            "reason": "artist-hero-profile-changed",
-            "artist_id": artist_id,
-        }
+        if not rollback_artist_hero_manifest(
+            artist_id=artist_id,
+            expected_revision=expected_revision,
+            expected_manifest=profile.get("render_manifest"),
+            target_manifest_id=target_manifest_id,
+        ):
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-profile-changed",
+                "artist_id": artist_id,
+            }
 
     restored = get_artist_hero_artwork(artist_id)
     manifest = restored.get("render_manifest") if restored else None

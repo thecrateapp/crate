@@ -14,9 +14,11 @@ import os
 import re
 import shutil
 import tempfile
+import fcntl
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Iterator, Literal
 
 from PIL.Image import Image
 
@@ -26,6 +28,7 @@ from crate.streaming.paths import cache_root
 ARTIST_HERO_PUBLICATION_VERSION = 1
 ARTIST_HERO_PUBLICATION_PREFIX = "artist-hero-publications/v1"
 ARTIST_HERO_ARTIFACT_FILENAME = "artifact.webp"
+ARTIST_HERO_SOURCE_FILENAME = "source.jpg"
 ARTIST_HERO_ARTIFACT_MANIFEST_FILENAME = "manifest.json"
 ArtistHeroComposition = Literal["desktop", "mobile"]
 
@@ -59,6 +62,7 @@ class ArtistHeroArtifactIdentity:
 class ArtistHeroArtifactPublication:
     identity: ArtistHeroArtifactIdentity
     artifact_path: Path
+    source_path: Path
     manifest_path: Path
     manifest: dict[str, str | int]
 
@@ -95,6 +99,12 @@ def artist_hero_artifact_source_path(
     )
 
 
+def artist_hero_artifact_original_source_path(
+    identity: ArtistHeroArtifactIdentity, *, root: Path | None = None
+) -> Path:
+    return artist_hero_artifact_root(identity, root=root) / ARTIST_HERO_SOURCE_FILENAME
+
+
 def artist_hero_artifact_manifest_path(
     identity: ArtistHeroArtifactIdentity, *, root: Path | None = None
 ) -> Path:
@@ -102,6 +112,17 @@ def artist_hero_artifact_manifest_path(
         artist_hero_artifact_root(identity, root=root)
         / ARTIST_HERO_ARTIFACT_MANIFEST_FILENAME
     )
+
+
+def resolve_artist_hero_publication_path(
+    relative_path: object, *, root: Path | None = None
+) -> Path | None:
+    stored = str(relative_path or "").strip()
+    if not stored or Path(stored).is_absolute() or ".." in Path(stored).parts:
+        return None
+    base = (root if root is not None else cache_root()).resolve()
+    candidate = (base / stored).resolve()
+    return candidate if candidate.is_relative_to(base) else None
 
 
 def artist_hero_source_fingerprint(source_content: bytes) -> str:
@@ -113,6 +134,14 @@ def _relative_artifact_path(identity: ArtistHeroArtifactIdentity) -> str:
         f"{ARTIST_HERO_PUBLICATION_PREFIX}/{identity.artist_entity_uid}/"
         f"{identity.composition}/{identity.render_revision}/"
         f"{ARTIST_HERO_ARTIFACT_FILENAME}"
+    )
+
+
+def _relative_source_path(identity: ArtistHeroArtifactIdentity) -> str:
+    return (
+        f"{ARTIST_HERO_PUBLICATION_PREFIX}/{identity.artist_entity_uid}/"
+        f"{identity.composition}/{identity.render_revision}/"
+        f"{ARTIST_HERO_SOURCE_FILENAME}"
     )
 
 
@@ -141,6 +170,7 @@ def build_artist_hero_artifact_manifest(
         "recipe_hash": recipe_hash,
         "renderer_version": renderer_version,
         "relative_path": _relative_artifact_path(identity),
+        "source_relative_path": _relative_source_path(identity),
     }
 
 
@@ -184,14 +214,38 @@ def _existing_publication(
     root: Path,
 ) -> ArtistHeroArtifactPublication:
     artifact_path = artist_hero_artifact_source_path(identity, root=root)
+    source_path = artist_hero_artifact_original_source_path(identity, root=root)
     manifest_path = artist_hero_artifact_manifest_path(identity, root=root)
-    if _read_manifest(manifest_path) != manifest or not artifact_path.is_file():
+    if (
+        _read_manifest(manifest_path) != manifest
+        or not artifact_path.is_file()
+        or not source_path.is_file()
+    ):
         raise ArtistHeroPublicationConflict(
             f"Artifact identity already exists with different contents: {identity.asset_key}"
         )
     return ArtistHeroArtifactPublication(
-        identity, artifact_path, manifest_path, manifest
+        identity, artifact_path, source_path, manifest_path, manifest
     )
+
+
+@contextmanager
+def artist_hero_publication_lock(
+    coordination_root: Path, artist_id: int
+) -> Iterator[None]:
+    """Serialize profile activation, rollback and cleanup for one artist."""
+
+    resolved_coordination_root = coordination_root.resolve()
+    lock_root = (resolved_coordination_root / ".crate-locks" / "artist-hero").resolve()
+    if not lock_root.is_relative_to(resolved_coordination_root):
+        raise ValueError("Artist hero lock path is outside the coordination root")
+    lock_root.mkdir(parents=True, exist_ok=True)
+    with (lock_root / f"{int(artist_id)}.lock").open("a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def publish_artist_hero_artifact(
@@ -201,6 +255,7 @@ def publish_artist_hero_artifact(
     source_fingerprint: str,
     recipe_hash: str,
     renderer_version: str,
+    source_content: bytes,
     root: Path | None = None,
 ) -> ArtistHeroArtifactPublication:
     """Publish one immutable hero artifact and its sidecar atomically.
@@ -210,6 +265,8 @@ def publish_artist_hero_artifact(
     different metadata is rejected rather than overwriting history.
     """
 
+    if not source_content:
+        raise ValueError("Artist hero source content is required")
     base = root if root is not None else cache_root()
     manifest = build_artist_hero_artifact_manifest(
         identity,
@@ -226,6 +283,11 @@ def publish_artist_hero_artifact(
         tempfile.mkdtemp(prefix=f".{identity.composition}-", dir=final_root.parent)
     )
     try:
+        source_path = staging_root / ARTIST_HERO_SOURCE_FILENAME
+        with source_path.open("wb") as handle:
+            handle.write(source_content)
+            handle.flush()
+            os.fsync(handle.fileno())
         artifact_path = staging_root / ARTIST_HERO_ARTIFACT_FILENAME
         image.save(artifact_path, "WEBP", quality=95, method=6)
         with artifact_path.open("rb") as handle:
@@ -245,6 +307,7 @@ def publish_artist_hero_artifact(
     return ArtistHeroArtifactPublication(
         identity=identity,
         artifact_path=artist_hero_artifact_source_path(identity, root=base),
+        source_path=artist_hero_artifact_original_source_path(identity, root=base),
         manifest_path=artist_hero_artifact_manifest_path(identity, root=base),
         manifest=manifest,
     )
@@ -253,6 +316,7 @@ def publish_artist_hero_artifact(
 __all__ = [
     "ARTIST_HERO_ARTIFACT_FILENAME",
     "ARTIST_HERO_ARTIFACT_MANIFEST_FILENAME",
+    "ARTIST_HERO_SOURCE_FILENAME",
     "ARTIST_HERO_PUBLICATION_PREFIX",
     "ARTIST_HERO_PUBLICATION_VERSION",
     "ArtistHeroArtifactIdentity",
@@ -260,8 +324,11 @@ __all__ = [
     "ArtistHeroPublicationConflict",
     "artist_hero_artifact_asset",
     "artist_hero_artifact_manifest_path",
+    "artist_hero_artifact_original_source_path",
     "artist_hero_artifact_root",
     "artist_hero_artifact_source_path",
+    "artist_hero_publication_lock",
+    "resolve_artist_hero_publication_path",
     "artist_hero_source_fingerprint",
     "build_artist_hero_artifact_manifest",
     "publish_artist_hero_artifact",

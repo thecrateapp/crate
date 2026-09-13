@@ -160,6 +160,7 @@ def get_home_hero_rows(
                         ELSE 'fallback'
                     END AS artwork_provenance,
                     hero.revision AS artwork_revision,
+                    hero.render_manifest AS _hero_render_manifest,
                     hero.source_width AS _hero_source_width,
                     hero.source_height AS _hero_source_height,
                     hero.desktop_source_width AS _hero_desktop_source_width,

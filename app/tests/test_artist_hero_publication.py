@@ -67,6 +67,7 @@ def test_publish_artist_hero_artifact_writes_durable_sidecar_and_is_idempotent(
 ):
     from crate.artist_hero_publication import (
         ArtistHeroArtifactIdentity,
+        artist_hero_artifact_original_source_path,
         artist_hero_artifact_manifest_path,
         artist_hero_artifact_source_path,
         publish_artist_hero_artifact,
@@ -83,6 +84,7 @@ def test_publish_artist_hero_artifact_writes_durable_sidecar_and_is_idempotent(
         source_fingerprint="sha256:source-a",
         recipe_hash="recipe-a",
         renderer_version="cover-fit-v5-neutral-alpha",
+        source_content=b"editable-source-a",
         root=tmp_path,
     )
     second = publish_artist_hero_artifact(
@@ -91,18 +93,26 @@ def test_publish_artist_hero_artifact_writes_durable_sidecar_and_is_idempotent(
         source_fingerprint="sha256:source-a",
         recipe_hash="recipe-a",
         renderer_version="cover-fit-v5-neutral-alpha",
+        source_content=b"editable-source-a",
         root=tmp_path,
     )
 
     assert first == second
     artifact_path = artist_hero_artifact_source_path(identity, root=tmp_path)
+    original_source_path = artist_hero_artifact_original_source_path(
+        identity, root=tmp_path
+    )
     manifest_path = artist_hero_artifact_manifest_path(identity, root=tmp_path)
     assert artifact_path.is_file()
+    assert original_source_path.read_bytes() == b"editable-source-a"
     assert manifest_path.is_file()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["render_revision"] == identity.render_revision
     assert manifest["relative_path"].endswith(
         "artist-hero-publications/v1/artist-1/desktop/cover-fit-v5:revision-a/artifact.webp"
+    )
+    assert manifest["source_relative_path"].endswith(
+        "artist-hero-publications/v1/artist-1/desktop/cover-fit-v5:revision-a/source.jpg"
     )
     with Image.open(BytesIO(artifact_path.read_bytes())) as rendered:
         assert rendered.mode == "RGBA"
@@ -123,6 +133,7 @@ def test_publish_artist_hero_artifact_rejects_conflicting_retry(tmp_path):
         source_fingerprint="sha256:source-a",
         recipe_hash="recipe-a",
         renderer_version="renderer-a",
+        source_content=b"editable-source-a",
         root=tmp_path,
     )
 
@@ -133,5 +144,6 @@ def test_publish_artist_hero_artifact_rejects_conflicting_retry(tmp_path):
             source_fingerprint="sha256:source-b",
             recipe_hash="recipe-a",
             renderer_version="renderer-a",
+            source_content=b"editable-source-b",
             root=tmp_path,
         )

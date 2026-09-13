@@ -10,6 +10,7 @@ from typing import Iterator, cast
 from crate.artist_hero_publication import (
     ArtistHeroArtifactIdentity,
     artist_hero_artifact_root,
+    artist_hero_publication_lock,
 )
 from crate.artist_hero_retention import (
     retained_artist_hero_revisions,
@@ -244,47 +245,48 @@ def cleanup_artist_hero_publications(
     for artist in artists:
         result["artists_checked"] += 1
         artist_id = int(artist["artist_id"])
-        profile = get_artist_hero_artwork(artist_id) or {}
-        manifest = profile.get("render_manifest")
-        artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
-        active_revisions = {
-            composition: str(artifact.get("render_revision") or "")
-            for composition, artifact in (artifacts or {}).items()
-            if composition in {"desktop", "mobile"} and isinstance(artifact, dict)
-        }
-        history = list_artist_hero_render_revisions(artist_id)
-        manifest_history = list_artist_hero_manifest_history(artist_id)
-        if isinstance(manifest, dict) and manifest_history:
-            retained = retained_artist_hero_revisions_from_manifests(
-                manifest_history,
-                artist_hero_manifest_id(manifest),
-                keep_manifest_count=max(2, keep_per_composition),
-            )
-            retained.update(active_revisions.items())
-        else:
-            retained = retained_artist_hero_revisions(
-                history,
-                active_revisions,
-                keep_per_composition=keep_per_composition,
-            )
-        for row in history:
-            composition = str(row.get("composition") or "")
-            revision = str(row.get("render_revision") or "")
-            if (composition, revision) in retained:
-                continue
-            try:
-                identity = ArtistHeroArtifactIdentity(
-                    artist_entity_uid=str(artist.get("entity_uid") or ""),
-                    composition=composition,
-                    render_revision=revision,
+        with artist_hero_publication_lock(publication_root, artist_id):
+            profile = get_artist_hero_artwork(artist_id) or {}
+            manifest = profile.get("render_manifest")
+            artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
+            active_revisions = {
+                composition: str(artifact.get("render_revision") or "")
+                for composition, artifact in (artifacts or {}).items()
+                if composition in {"desktop", "mobile"} and isinstance(artifact, dict)
+            }
+            history = list_artist_hero_render_revisions(artist_id)
+            manifest_history = list_artist_hero_manifest_history(artist_id)
+            if isinstance(manifest, dict) and manifest_history:
+                retained = retained_artist_hero_revisions_from_manifests(
+                    manifest_history,
+                    artist_hero_manifest_id(manifest),
+                    keep_manifest_count=max(2, keep_per_composition),
                 )
-            except ValueError:
-                continue
-            path = artist_hero_artifact_root(identity, root=publication_root)
-            if path.is_dir():
-                shutil.rmtree(path, ignore_errors=True)
-                if not path.exists():
-                    result["revisions_removed"] += 1
+                retained.update(active_revisions.items())
+            else:
+                retained = retained_artist_hero_revisions(
+                    history,
+                    active_revisions,
+                    keep_per_composition=keep_per_composition,
+                )
+            for row in history:
+                composition = str(row.get("composition") or "")
+                revision = str(row.get("render_revision") or "")
+                if (composition, revision) in retained:
+                    continue
+                try:
+                    identity = ArtistHeroArtifactIdentity(
+                        artist_entity_uid=str(artist.get("entity_uid") or ""),
+                        composition=composition,
+                        render_revision=revision,
+                    )
+                except ValueError:
+                    continue
+                path = artist_hero_artifact_root(identity, root=publication_root)
+                if path.is_dir():
+                    shutil.rmtree(path, ignore_errors=True)
+                    if not path.exists():
+                        result["revisions_removed"] += 1
     return result
 
 

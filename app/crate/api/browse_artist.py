@@ -15,6 +15,7 @@ from crate.artist_hero_publication import (
     ArtistHeroArtifactIdentity,
     artist_hero_artifact_asset,
     artist_hero_artifact_source_path,
+    resolve_artist_hero_publication_path,
 )
 from crate.artist_hero_contract import (
     artist_hero_profile_composition_is_supported,
@@ -78,7 +79,10 @@ from crate.db.repositories.library import (
     get_library_artist_by_entity_uid,
     get_library_artist_by_slug,
 )
-from crate.db.repositories.artist_hero_artwork import get_artist_hero_artwork
+from crate.db.repositories.artist_hero_artwork import (
+    get_artist_hero_artwork,
+    get_artist_hero_render_revision,
+)
 from crate.db.repositories.featured_artists import set_artist_featured
 from crate.db.repositories.playlists import get_public_system_playlists_for_artist
 from crate.db.repositories.tasks import create_task_dedup
@@ -1436,23 +1440,52 @@ def api_artist_hero(
     artifact_identity = _artist_hero_artifact_identity(
         profile, entity_uid=entity_uid, composition=composition
     )
-    if render_revision is not None and (
-        artifact_identity is None
-        or artifact_identity.render_revision != render_revision
-    ):
-        return Response(
-            status_code=404,
-            headers={
-                "Cache-Control": "no-store",
-                "X-Crate-Artwork": "hero-revision-unavailable",
-                "X-Crate-Hero-Composition": composition,
-            },
-        )
-    versioned_original = (
-        artist_hero_artifact_source_path(artifact_identity)
-        if artifact_identity is not None
-        else None
+    retained_revision = False
+    versioned_original = None
+    legacy_current_revision = bool(
+        render_revision is not None
+        and artifact_identity is None
+        and profile
+        and render_revision == str(profile.get("revision") or "")
+        and legacy_original is not None
+        and legacy_original.is_file()
     )
+    if (
+        not legacy_current_revision
+        and render_revision is not None
+        and (
+            artifact_identity is None
+            or artifact_identity.render_revision != render_revision
+        )
+    ):
+        retained = get_artist_hero_render_revision(
+            artist_id=artist_id,
+            composition=composition,
+            render_revision=render_revision,
+        )
+        retained_path = (
+            resolve_artist_hero_publication_path(retained.get("relative_path"))
+            if retained
+            else None
+        )
+        if retained_path is None or not retained_path.is_file() or not entity_uid:
+            return Response(
+                status_code=404,
+                headers={
+                    "Cache-Control": "no-store",
+                    "X-Crate-Artwork": "hero-revision-unavailable",
+                    "X-Crate-Hero-Composition": composition,
+                },
+            )
+        artifact_identity = ArtistHeroArtifactIdentity(
+            artist_entity_uid=entity_uid,
+            composition=composition,
+            render_revision=render_revision,
+        )
+        versioned_original = retained_path
+        retained_revision = True
+    elif artifact_identity is not None:
+        versioned_original = artist_hero_artifact_source_path(artifact_identity)
     local_original = versioned_original or legacy_original
     has_eligible_profile = bool(
         entity_uid
@@ -1462,8 +1495,8 @@ def api_artist_hero(
     )
     if has_eligible_profile and profile is not None:
         revision = str(profile.get("revision") or "")
-        renderer_is_current = artist_hero_profile_composition_is_supported(
-            profile, composition
+        renderer_is_current = retained_revision or (
+            artist_hero_profile_composition_is_supported(profile, composition)
         )
         if (
             local_original is None

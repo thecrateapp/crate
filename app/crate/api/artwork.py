@@ -54,6 +54,7 @@ from crate.artist_hero_contract import (
     artist_hero_profile_contract,
     artist_hero_profile_ready_compositions,
 )
+from crate.artist_hero_publication import resolve_artist_hero_publication_path
 from crate.db.repositories.library import get_albums_missing_covers, get_library_artist
 from crate.db.repositories.artist_artwork_assets import (
     get_artist_artwork_asset,
@@ -86,6 +87,17 @@ _ARTWORK_RESPONSES = merge_responses(
 
 def _require_artwork_editor(request: Request) -> dict:
     return require_permission(request, "library.metadata.write")
+
+
+def _artist_hero_expected_state(artist_id: int) -> dict[str, str | None]:
+    profile = get_artist_hero_artwork(artist_id)
+    manifest = profile.get("render_manifest") if profile else None
+    return {
+        "expected_revision": str(profile.get("revision") or "") if profile else None,
+        "expected_active_manifest_id": (
+            artist_hero_manifest_id(manifest) if isinstance(manifest, dict) else None
+        ),
+    }
 
 
 @router.get(
@@ -404,6 +416,7 @@ async def api_upload_background_by_entity_uid(
 async def api_upload_artist_hero(
     request: Request,
     name: str,
+    artist_id: int,
     file: UploadFile,
     desktop_recipe: str,
     mobile_recipe: str,
@@ -439,6 +452,7 @@ async def api_upload_artist_hero(
             "desktop_recipe": desktop.model_dump(),
             "mobile_recipe": mobile.model_dump(),
             "composition": composition,
+            **_artist_hero_expected_state(artist_id),
         },
     )
     return {"status": "queued", "task_id": task_id}
@@ -463,7 +477,13 @@ async def api_upload_artist_hero_by_id(
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
     return await api_upload_artist_hero(
-        request, artist_name, file, desktop_recipe, mobile_recipe, composition
+        request,
+        artist_name,
+        artist_id,
+        file,
+        desktop_recipe,
+        mobile_recipe,
+        composition,
     )
 
 
@@ -485,8 +505,17 @@ async def api_upload_artist_hero_by_entity_uid(
     artist_name = artist_name_from_entity_uid(artist_entity_uid)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
+    artist_row = get_library_artist(artist_name)
+    if not artist_row:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
     return await api_upload_artist_hero(
-        request, artist_name, file, desktop_recipe, mobile_recipe, composition
+        request,
+        artist_name,
+        int(artist_row["id"]),
+        file,
+        desktop_recipe,
+        mobile_recipe,
+        composition,
     )
 
 
@@ -542,21 +571,44 @@ def api_artist_hero_source(
 
     if composition not in {None, "desktop", "mobile"}:
         return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    profile = get_artist_hero_artwork(int(artist_id)) or {}
     if composition:
-        profile = get_artist_hero_artwork(int(artist_id))
         if profile and profile.get(f"{composition}_enabled", True) is False:
             return JSONResponse(
                 {"error": "Artist hero composition not found"}, status_code=404
             )
-    composition_path = (
-        artist_dir / f"artist-hero-source-{composition}.jpg"
-        if composition
-        else artist_dir / "artist-hero-source.jpg"
-    )
-    source_path = composition_path.resolve()
-    if composition and not source_path.is_file():
-        source_path = (artist_dir / "artist-hero-source.jpg").resolve()
-    if not source_path.is_relative_to(root) or not source_path.is_file():
+
+    manifest = profile.get("render_manifest")
+    artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
+    compositions = (composition,) if composition else ("desktop", "mobile")
+    source_path = None
+    for candidate_composition in compositions:
+        artifact = (
+            artifacts.get(candidate_composition)
+            if isinstance(artifacts, dict)
+            else None
+        )
+        if not isinstance(artifact, dict):
+            continue
+        candidate = resolve_artist_hero_publication_path(
+            artifact.get("source_relative_path"), root=cache_root()
+        )
+        if candidate is not None and candidate.is_file():
+            source_path = candidate
+            break
+
+    if source_path is None:
+        composition_path = (
+            artist_dir / f"artist-hero-source-{composition}.jpg"
+            if composition
+            else artist_dir / "artist-hero-source.jpg"
+        )
+        source_path = composition_path.resolve()
+        if composition and not source_path.is_file():
+            source_path = (artist_dir / "artist-hero-source.jpg").resolve()
+        if not source_path.is_relative_to(root):
+            source_path = None
+    if source_path is None or not source_path.is_file():
         return JSONResponse({"error": "Artist hero source not found"}, status_code=404)
     return deliver_original_artwork(
         source_path,
@@ -922,6 +974,7 @@ def api_compose_artist_hero(
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
+    expected_state = _artist_hero_expected_state(artist_id)
     task_id = create_task(
         "compose_artist_hero",
         {
@@ -929,6 +982,7 @@ def api_compose_artist_hero(
             "desktop_recipe": body.desktop_recipe.model_dump(),
             "mobile_recipe": body.mobile_recipe.model_dump(),
             "composition": body.composition,
+            **expected_state,
         },
     )
     return {"status": "queued", "task_id": task_id}

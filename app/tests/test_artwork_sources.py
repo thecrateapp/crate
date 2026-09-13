@@ -37,6 +37,7 @@ def test_revision_scoped_artist_hero_source_does_not_fall_back_to_legacy_file(
         source_fingerprint="sha256:source-a",
         recipe_hash="recipe-a",
         renderer_version="renderer",
+        source_content=b"editable-source-a",
     )
 
     source = artwork_sources.resolve_artwork_source(
