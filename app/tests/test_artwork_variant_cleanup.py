@@ -368,6 +368,44 @@ def test_delete_artist_hero_storage_removes_publications_and_materializations(
     assert unrelated.exists()
 
 
+def test_cleanup_artist_hero_publications_removes_expired_deleted_artist_storage(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_asset,
+        artist_hero_artifact_root,
+    )
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    identity = ArtistHeroArtifactIdentity(
+        "deleted-artist-entity", "desktop", "revision-a"
+    )
+    publication = artist_hero_artifact_root(identity)
+    materialization = artwork_asset_root(artist_hero_artifact_asset(identity))
+    publication.mkdir(parents=True)
+    materialization.mkdir(parents=True)
+    expired = time.time() - 90000
+    os.utime(publication.parents[1], (expired, expired))
+
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
+    )
+
+    result = cleanup_artist_hero_publications(max_artists=10)
+
+    assert not publication.exists()
+    assert not materialization.exists()
+    assert result["orphan_revisions_removed"] == 1
+
+
 def test_repair_manifest_permissions_makes_existing_assets_readplane_readable(
     monkeypatch, tmp_path
 ):

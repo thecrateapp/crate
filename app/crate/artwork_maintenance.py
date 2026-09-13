@@ -13,6 +13,7 @@ from crate.artist_hero_publication import (
     artist_hero_artifact_asset,
     artist_hero_artifact_root,
     artist_hero_publication_lock,
+    delete_artist_hero_storage,
 )
 from crate.artist_hero_retention import (
     retained_artist_hero_revisions,
@@ -265,22 +266,6 @@ def cleanup_artist_hero_publications(
     artists = list_artist_hero_render_revision_artists(limit=capped_limit)
     publication_root = cache_root()
     namespace_root = publication_root / ARTIST_HERO_PUBLICATION_PREFIX
-    known_entity_uids = {str(artist.get("entity_uid") or "") for artist in artists}
-    if namespace_root.is_dir() and len(artists) < capped_limit:
-        for entity_root in sorted(namespace_root.iterdir()):
-            entity_uid = entity_root.name
-            if (
-                len(artists) >= capped_limit
-                or not entity_root.is_dir()
-                or entity_root.is_symlink()
-                or entity_uid in known_entity_uids
-            ):
-                continue
-            artist = get_library_artist_by_entity_uid(entity_uid)
-            if not artist:
-                continue
-            artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
-            known_entity_uids.add(entity_uid)
 
     def _expired(path) -> bool:
         try:
@@ -297,6 +282,42 @@ def cleanup_artist_hero_publications(
         except OSError:
             return False
         return not path.exists()
+
+    known_entity_uids = {str(artist.get("entity_uid") or "") for artist in artists}
+    discovered_count = len(artists)
+    if namespace_root.is_dir() and len(artists) < capped_limit:
+        for entity_root in sorted(namespace_root.iterdir()):
+            entity_uid = entity_root.name
+            if (
+                discovered_count >= capped_limit
+                or not entity_root.is_dir()
+                or entity_root.is_symlink()
+                or entity_uid in known_entity_uids
+            ):
+                continue
+            artist = get_library_artist_by_entity_uid(entity_uid)
+            if not artist:
+                if not _expired(entity_root):
+                    continue
+                revision_count = sum(
+                    1
+                    for composition_root in entity_root.iterdir()
+                    if composition_root.is_dir() and not composition_root.is_symlink()
+                    for revision_root in composition_root.iterdir()
+                    if revision_root.is_dir()
+                    and not revision_root.is_symlink()
+                    and not revision_root.name.startswith(".")
+                )
+                removed = delete_artist_hero_storage(entity_uid)
+                if removed["publication_roots_removed"]:
+                    result["orphan_revisions_removed"] += revision_count
+                    result["revisions_removed"] += revision_count
+                result["artists_checked"] += 1
+                discovered_count += 1
+                continue
+            artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
+            known_entity_uids.add(entity_uid)
+            discovered_count += 1
 
     for artist in artists:
         result["artists_checked"] += 1
