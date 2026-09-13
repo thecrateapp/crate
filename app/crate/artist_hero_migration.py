@@ -6,6 +6,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from crate.artist_hero_publication import resolve_artist_hero_publication_path
+from crate.streaming.paths import cache_root
+
 
 ARTIST_HERO_COMPOSITIONS = ("desktop", "mobile")
 
@@ -37,11 +40,18 @@ def _manifest_covers_enabled_slots(manifest: object, enabled: tuple[str, ...]) -
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, Mapping):
         return False
-    return all(
-        isinstance(artifacts.get(composition), Mapping)
-        and bool(artifacts[composition].get("relative_path"))
-        for composition in enabled
-    )
+    root = cache_root()
+    for composition in enabled:
+        artifact = artifacts.get(composition)
+        if not isinstance(artifact, Mapping):
+            return False
+        for path_key in ("relative_path", "source_relative_path"):
+            path = resolve_artist_hero_publication_path(
+                artifact.get(path_key), root=root
+            )
+            if path is None or not path.is_file():
+                return False
+    return True
 
 
 def plan_artist_hero_migration(

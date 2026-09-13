@@ -73,12 +73,25 @@ def test_plan_reports_missing_recipe_before_reading_sources(tmp_path: Path) -> N
 
 
 def test_plan_is_idempotently_skipped_when_active_manifest_covers_enabled_slots(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch
 ) -> None:
+    cache_root = tmp_path / "cache"
+    monkeypatch.setenv("DATA_DIR", str(cache_root))
+    for composition in ("desktop", "mobile"):
+        publication = cache_root / "published" / composition
+        publication.mkdir(parents=True)
+        (publication / "artifact.webp").write_bytes(b"artifact")
+        (publication / "source.jpg").write_bytes(b"source")
     manifest = {
         "artifacts": {
-            "desktop": {"relative_path": "desktop.webp"},
-            "mobile": {"relative_path": "mobile.webp"},
+            "desktop": {
+                "relative_path": "published/desktop/artifact.webp",
+                "source_relative_path": "published/desktop/source.jpg",
+            },
+            "mobile": {
+                "relative_path": "published/mobile/artifact.webp",
+                "source_relative_path": "published/mobile/source.jpg",
+            },
         }
     }
 
@@ -89,6 +102,51 @@ def test_plan_is_idempotently_skipped_when_active_manifest_covers_enabled_slots(
     )
 
     assert plan.skip_reason == "already-published"
+
+
+@pytest.mark.parametrize(
+    "incomplete_artifact",
+    [
+        {"relative_path": "published/desktop/artifact.webp"},
+        {
+            "relative_path": "published/desktop/missing-artifact.webp",
+            "source_relative_path": "published/desktop/source.jpg",
+        },
+        {
+            "relative_path": "published/desktop/artifact.webp",
+            "source_relative_path": "published/desktop/missing-source.jpg",
+        },
+    ],
+)
+def test_plan_remigrates_incomplete_active_manifest(
+    tmp_path: Path, monkeypatch, incomplete_artifact: dict
+) -> None:
+    cache_root = tmp_path / "cache"
+    artist_dir = tmp_path / "artist"
+    monkeypatch.setenv("DATA_DIR", str(cache_root))
+    (cache_root / "published" / "desktop").mkdir(parents=True)
+    (cache_root / "published" / "desktop" / "artifact.webp").write_bytes(b"artifact")
+    (cache_root / "published" / "desktop" / "source.jpg").write_bytes(b"source")
+    artist_dir.mkdir()
+    (artist_dir / "artist-hero-source.jpg").write_bytes(b"legacy-source")
+    manifest = {
+        "artifacts": {
+            "desktop": incomplete_artifact,
+            "mobile": {
+                "relative_path": "published/desktop/artifact.webp",
+                "source_relative_path": "published/desktop/source.jpg",
+            },
+        }
+    }
+
+    plan = plan_artist_hero_migration(
+        artist_row=_artist(),
+        profile=_profile(render_manifest=manifest),
+        artist_dir=artist_dir,
+    )
+
+    assert plan.skip_reason is None
+    assert plan.enabled == ("desktop", "mobile")
 
 
 def test_migration_task_dedup_key_is_revision_scoped() -> None:
