@@ -50,9 +50,19 @@ def _run_artist_change(
 
         result = operation()
         should_cleanup = cleanup_storage_when(result)
-        remaining_artist = (
-            get_library_artist_by_id(artist_id) if should_cleanup else current_artist
-        )
+        try:
+            remaining_artist = (
+                get_library_artist_by_id(artist_id)
+                if should_cleanup
+                else current_artist
+            )
+        except Exception:
+            log.warning(
+                "Could not verify artist hero cleanup after changing %s",
+                name,
+                exc_info=True,
+            )
+            return result
         source_was_removed = (
             not remaining_artist
             or str(remaining_artist.get("entity_uid") or "") != entity_uid

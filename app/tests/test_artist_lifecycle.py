@@ -235,6 +235,40 @@ def test_run_artist_deletion_preserves_storage_when_source_row_remains(monkeypat
     assert cleanup_calls == []
 
 
+def test_run_artist_deletion_keeps_result_when_cleanup_verification_fails(monkeypatch):
+    from crate import artist_lifecycle
+
+    cleanup_calls: list[str] = []
+
+    @contextmanager
+    def publication_lock(_root, _artist_id):
+        yield
+
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist",
+        lambda _name: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_id",
+        lambda _artist_id: (_ for _ in ()).throw(RuntimeError("database unavailable")),
+    )
+    monkeypatch.setattr(
+        artist_lifecycle, "artist_hero_publication_lock", publication_lock
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "delete_artist_hero_storage",
+        lambda entity_uid: cleanup_calls.append(entity_uid),
+    )
+
+    result = artist_lifecycle.run_artist_deletion("Artist", lambda: "deleted")
+
+    assert result == "deleted"
+    assert cleanup_calls == []
+
+
 def test_delete_artist_uses_shared_deletion_lifecycle(monkeypatch):
     from crate import artist_lifecycle
 

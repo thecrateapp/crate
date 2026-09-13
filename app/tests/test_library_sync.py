@@ -1177,6 +1177,40 @@ class TestDuplicateArtistMerge:
         mock_merge.assert_not_called()
 
 
+class TestStaleArtistRemoval:
+    def test_stale_identity_does_not_abort_the_remaining_cleanup(self):
+        from crate.artist_lifecycle import ArtistIdentityChangedError
+        from crate.library_sync import LibrarySync
+
+        sync = LibrarySync({"library_path": "/tmp/fake", "audio_extensions": [".flac"]})
+        artists = [
+            {
+                "name": ".internal",
+                "folder_name": ".internal",
+                "album_count": 0,
+                "track_count": 0,
+            }
+        ]
+
+        with (
+            patch(
+                "crate.library_sync.get_library_artists",
+                return_value=(artists, 1),
+            ),
+            patch(
+                "crate.library_sync.delete_artist",
+                side_effect=ArtistIdentityChangedError("stale artist"),
+            ),
+            patch(
+                "crate.library_sync.get_all_album_paths", return_value=[]
+            ) as mock_album_scan,
+        ):
+            removed = sync.remove_stale()
+
+        assert removed == 0
+        mock_album_scan.assert_called_once()
+
+
 class TestParseInt:
     def test_normal_int(self):
         from crate.library_sync import _parse_int

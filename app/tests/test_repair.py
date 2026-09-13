@@ -4,6 +4,8 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 import tempfile
 
+import pytest
+
 APP_ROOT = Path(__file__).resolve().parents[1]
 CRATE_ROOT = APP_ROOT / "crate"
 
@@ -278,6 +280,37 @@ class TestFieldNormalization:
             repair.repair(report, dry_run=True)
             issue_arg = mock_fix.call_args[0][0]
             assert issue_arg["details"] == {"artist": "Dead Band"}
+
+
+class TestStaleArtistLifecycleRepair:
+    @pytest.mark.parametrize("check", ["stale_artists", "zombie_artists"])
+    def test_stale_identity_is_skipped_instead_of_failed(self, check):
+        from crate.artist_lifecycle import ArtistIdentityChangedError
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake_lib"})
+        report = {
+            "issues": [
+                {
+                    "check": check,
+                    "auto_fixable": True,
+                    "details": {"artist": "Changed Artist"},
+                }
+            ]
+        }
+
+        with patch(
+            "crate.repair.delete_artist",
+            side_effect=ArtistIdentityChangedError("stale artist"),
+        ):
+            result = repair.repair(report, dry_run=False, auto_only=False)
+
+        assert result["summary"]["skipped"] == 1
+        assert result["summary"]["failed"] == 0
+        assert result["item_results"][0]["outcome"] == "skipped"
+        assert result["item_results"][0]["details"] == {
+            "error": "stale artist identity"
+        }
 
 
 class TestDuplicateTrackRepair:
