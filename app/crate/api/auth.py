@@ -93,6 +93,7 @@ from crate.db.repositories.auth import (
     create_auth_invite,
     create_session,
     create_user,
+    delete_session,
     get_session,
     get_user_by_email,
     get_user_by_external_identity,
@@ -2523,10 +2524,10 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
     except NativeOAuthUnavailable as exc:
         if session_was_created and not isinstance(exc, NativeOAuthCompletionUnknown):
             try:
-                revoke_session(str(session["id"]))
+                delete_session(str(session["id"]))
             except Exception:
                 log.error(
-                    "Failed to revoke incomplete native OAuth session",
+                    "Failed to delete incomplete native OAuth session",
                     exc_info=True,
                 )
         try:

@@ -15,6 +15,18 @@ from threading import RLock
 NATIVE_OAUTH_HANDOFF_TTL_SECONDS = 15 * 60
 NATIVE_OAUTH_RESULT_TTL_SECONDS = NATIVE_OAUTH_HANDOFF_TTL_SECONDS
 _HANDOFF_PREFIX = "crate:auth:native_oauth"
+_CLAIM_HANDOFF_SCRIPT = """
+if redis.call('EXISTS', KEYS[2]) == 1 then
+  return {2}
+end
+local handoff = redis.call('GET', KEYS[1])
+if not handoff then
+  return {0}
+end
+redis.call('SET', KEYS[2], handoff, 'EX', ARGV[1])
+redis.call('DEL', KEYS[1])
+return {1, handoff}
+"""
 _memory_handoffs: dict[str, str] = {}
 _memory_lock = RLock()
 
@@ -25,6 +37,10 @@ class NativeOAuthUnavailable(RuntimeError):
 
 class NativeOAuthCompletionUnknown(NativeOAuthUnavailable):
     """The exchange result write may have succeeded but cannot be verified."""
+
+
+class NativeOAuthExchangePending(NativeOAuthUnavailable):
+    """Another request is already completing this exchange."""
 
 
 class InvalidNativeOAuthHandoff(ValueError):
@@ -52,6 +68,10 @@ def handoff_key(code: str) -> str:
 
 def exchange_result_key(code: str) -> str:
     return f"{handoff_key(code)}:result"
+
+
+def exchange_pending_key(code: str) -> str:
+    return f"{handoff_key(code)}:pending"
 
 
 def exchange_session_id(code: str) -> str:
@@ -142,11 +162,45 @@ def issue_handoff(*, user_id: int, app_id: str, state: str, challenge: str) -> s
     return code
 
 
-def _take_handoff(key: str) -> bytes | str | None:
+def _claim_handoff(code: str) -> tuple[int, bytes | str | None]:
+    key = handoff_key(code)
+    pending_key = exchange_pending_key(code)
     redis_client = _redis_client()
     if redis_client is not None:
         try:
-            return redis_client.getdel(key)
+            result = redis_client.eval(
+                _CLAIM_HANDOFF_SCRIPT,
+                2,
+                key,
+                pending_key,
+                NATIVE_OAUTH_HANDOFF_TTL_SECONDS,
+            )
+        except Exception as exc:
+            raise NativeOAuthUnavailable(
+                "Native OAuth handoff store is unavailable"
+            ) from exc
+        status = int(result[0])
+        raw = result[1] if len(result) > 1 else None
+        return status, raw
+    if not _local_memory_allowed():
+        raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
+    with _memory_lock:
+        if pending_key in _memory_handoffs:
+            return 2, None
+        raw = _memory_handoffs.pop(key, None)
+        if raw is None:
+            return 0, None
+        _memory_handoffs[pending_key] = raw
+        return 1, raw
+
+
+def _clear_pending_handoff(code: str) -> None:
+    key = exchange_pending_key(code)
+    redis_client = _redis_client()
+    if redis_client is not None:
+        try:
+            redis_client.delete(key)
+            return
         except Exception as exc:
             raise NativeOAuthUnavailable(
                 "Native OAuth handoff store is unavailable"
@@ -154,14 +208,20 @@ def _take_handoff(key: str) -> bytes | str | None:
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
-        return _memory_handoffs.pop(key, None)
+        _memory_handoffs.pop(key, None)
 
 
 def consume_handoff(*, code: str, state: str, verifier: str) -> NativeOAuthHandoff:
-    raw = _take_handoff(handoff_key(code))
-    if raw is None:
+    status, raw = _claim_handoff(code)
+    if status == 2:
+        raise NativeOAuthExchangePending("Native OAuth exchange is already in progress")
+    if status == 0 or raw is None:
         raise InvalidNativeOAuthHandoff("Native OAuth handoff is invalid or consumed")
-    handoff = _deserialize(raw)
+    try:
+        handoff = _deserialize(raw)
+    except InvalidNativeOAuthHandoff:
+        _clear_pending_handoff(code)
+        raise
     now = datetime.now(timezone.utc)
     state_valid = secrets.compare_digest(handoff.state, state)
     challenge_valid = secrets.compare_digest(
@@ -169,6 +229,7 @@ def consume_handoff(*, code: str, state: str, verifier: str) -> NativeOAuthHando
         pkce_challenge(verifier),
     )
     if handoff.expires_at <= now or not state_valid or not challenge_valid:
+        _clear_pending_handoff(code)
         raise InvalidNativeOAuthHandoff("Native OAuth handoff binding is invalid")
     return handoff
 
@@ -185,6 +246,7 @@ def restore_handoff(*, code: str, handoff: NativeOAuthHandoff) -> None:
     if redis_client is not None:
         try:
             redis_client.set(key, serialized, ex=remaining_seconds, nx=True)
+            redis_client.delete(exchange_pending_key(code))
             return
         except Exception as exc:
             raise NativeOAuthUnavailable(
@@ -194,6 +256,7 @@ def restore_handoff(*, code: str, handoff: NativeOAuthHandoff) -> None:
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
         _memory_handoffs.setdefault(key, serialized)
+        _memory_handoffs.pop(exchange_pending_key(code), None)
 
 
 def complete_exchange(
@@ -222,6 +285,10 @@ def complete_exchange(
                 serialized,
                 ex=NATIVE_OAUTH_RESULT_TTL_SECONDS,
             ):
+                try:
+                    redis_client.delete(exchange_pending_key(code))
+                except Exception:
+                    pass
                 return
             raise NativeOAuthUnavailable(
                 "Native OAuth exchange result could not be stored"
@@ -246,6 +313,7 @@ def complete_exchange(
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
         _memory_handoffs[key] = serialized
+        _memory_handoffs.pop(exchange_pending_key(code), None)
 
 
 def get_completed_exchange(
