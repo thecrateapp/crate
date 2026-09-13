@@ -36,6 +36,29 @@ def create_session(
         label = device_label or (parse_device_label(user_agent) if user_agent else None)
         fingerprint = (device_fingerprint or "").strip() or None
         now = datetime.now(timezone.utc)
+
+        def refresh_reusable(reusable: AuthSession) -> dict:
+            reusable.expires_at = coerce_datetime(expires_at)
+            reusable.last_seen_at = now
+            reusable.last_seen_ip = last_seen_ip
+            reusable.user_agent = user_agent
+            reusable.app_id = app_id
+            reusable.device_label = label
+            reusable.device_fingerprint = fingerprint
+            s.flush()
+            return model_to_dict(reusable)
+
+        existing = s.get(AuthSession, session_id)
+        if existing is not None:
+            if (
+                existing.user_id != user_id
+                or existing.app_id != app_id
+                or existing.revoked_at is not None
+                or existing.expires_at <= now
+            ):
+                raise ValueError("Session id is already in use")
+            return refresh_reusable(existing)
+
         if app_id and fingerprint:
             reusable = s.execute(
                 select(AuthSession)
@@ -54,15 +77,7 @@ def create_session(
                 .limit(1)
             ).scalar_one_or_none()
             if reusable is not None:
-                reusable.expires_at = coerce_datetime(expires_at)
-                reusable.last_seen_at = now
-                reusable.last_seen_ip = last_seen_ip
-                reusable.user_agent = user_agent
-                reusable.app_id = app_id
-                reusable.device_label = label
-                reusable.device_fingerprint = fingerprint
-                s.flush()
-                return model_to_dict(reusable)
+                return refresh_reusable(reusable)
 
         auth_session = AuthSession(
             id=session_id,

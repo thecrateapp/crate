@@ -63,6 +63,7 @@ from crate.api.schemas.auth import (
 )
 from crate.api.native_oauth import (
     complete_exchange as complete_native_oauth_exchange,
+    exchange_session_id as native_oauth_exchange_session_id,
     get_completed_exchange as get_completed_native_oauth_exchange,
     InvalidNativeOAuthHandoff,
     NativeOAuthCompletionUnknown,
@@ -2495,14 +2496,17 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
         user = get_user_by_id(handoff.user_id)
         user = _ensure_user_active(user)
         update_user_last_login(user["id"])
-        requested_session_id = secrets.token_urlsafe(24)
+        requested_session_id = native_oauth_exchange_session_id(body.code)
+        session_already_existed = get_session(requested_session_id) is not None
         token, session, refresh_token = _create_login_session(
             user,
             request,
             app_id=app_id,
             session_id=requested_session_id,
         )
-        session_was_created = session["id"] == requested_session_id
+        session_was_created = (
+            not session_already_existed and session["id"] == requested_session_id
+        )
         payload = _auth_login_payload(user, token, session, refresh_token)
     except Exception:
         try:

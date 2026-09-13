@@ -54,6 +54,12 @@ def exchange_result_key(code: str) -> str:
     return f"{handoff_key(code)}:result"
 
 
+def exchange_session_id(code: str) -> str:
+    """Return the stable login session id owned by one exchange code."""
+    digest = hashlib.sha256(f"session\0{code}".encode("utf-8")).hexdigest()
+    return f"native-{digest[:32]}"
+
+
 def _redis_client():
     if not os.environ.get("REDIS_URL"):
         return None

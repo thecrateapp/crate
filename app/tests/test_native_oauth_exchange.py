@@ -105,6 +105,16 @@ def test_native_handoff_is_hashed_bound_and_single_use() -> None:
             )
 
 
+def test_native_exchange_session_id_is_stable_and_does_not_embed_the_code() -> None:
+    from crate.api import native_oauth
+
+    first = native_oauth.exchange_session_id("one-time-secret-code")
+
+    assert first == native_oauth.exchange_session_id("one-time-secret-code")
+    assert first != native_oauth.exchange_session_id("another-code")
+    assert "one-time-secret-code" not in first
+
+
 def test_native_handoff_replays_a_completed_exchange_idempotently() -> None:
     from crate.api import native_oauth
 
@@ -363,6 +373,7 @@ def test_native_exchange_creates_session_only_after_consumption() -> None:
         patch("crate.api.auth.consume_native_oauth_handoff", return_value=handoff),
         patch("crate.api.auth.get_user_by_id", return_value=user),
         patch("crate.api.auth.update_user_last_login") as update_last_login,
+        patch("crate.api.auth.get_session", return_value=None),
         patch(
             "crate.api.auth._create_login_session",
             return_value=("jwt-token", {"id": "session-id"}, "refresh-token"),
@@ -481,6 +492,7 @@ def test_native_exchange_restores_handoff_when_session_creation_fails() -> None:
         ),
         patch("crate.api.auth.get_user_by_id", return_value=user),
         patch("crate.api.auth.update_user_last_login"),
+        patch("crate.api.auth.get_session", return_value=None),
         patch(
             "crate.api.auth._create_login_session",
             side_effect=RuntimeError("database unavailable"),
@@ -534,6 +546,11 @@ def test_native_exchange_revokes_session_and_restores_handoff_when_result_cache_
         ),
         patch("crate.api.auth.get_user_by_id", return_value=user),
         patch("crate.api.auth.update_user_last_login"),
+        patch("crate.api.auth.get_session", return_value=None),
+        patch(
+            "crate.api.auth.native_oauth_exchange_session_id",
+            return_value="session-id",
+        ),
         patch(
             "crate.api.auth._create_login_session",
             return_value=("jwt-token", {"id": "session-id"}, "refresh-token"),
@@ -599,6 +616,11 @@ def test_native_exchange_does_not_revoke_a_reused_session_when_result_cache_fail
         ),
         patch("crate.api.auth.get_user_by_id", return_value=user),
         patch("crate.api.auth.update_user_last_login"),
+        patch("crate.api.auth.get_session", return_value=None),
+        patch(
+            "crate.api.auth.native_oauth_exchange_session_id",
+            return_value="new-session",
+        ),
         patch(
             "crate.api.auth._create_login_session",
             return_value=("jwt-token", {"id": "existing-session"}, "refresh-token"),
@@ -671,6 +693,11 @@ def test_native_exchange_does_not_revoke_when_result_write_is_ambiguous() -> Non
         ),
         patch("crate.api.auth.get_user_by_id", return_value=user),
         patch("crate.api.auth.update_user_last_login"),
+        patch("crate.api.auth.get_session", return_value=None),
+        patch(
+            "crate.api.auth.native_oauth_exchange_session_id",
+            return_value="new-session",
+        ),
         patch(
             "crate.api.auth._create_login_session",
             return_value=("jwt-token", {"id": "new-session"}, "refresh-token"),
@@ -698,3 +725,88 @@ def test_native_exchange_does_not_revoke_when_result_write_is_ambiguous() -> Non
     assert exc_info.value.status_code == 503
     revoke_session.assert_not_called()
     restore_handoff.assert_called_once_with(code=body.code, handoff=handoff)
+
+
+def test_native_exchange_reuses_session_after_ambiguous_result_write() -> None:
+    from crate.api.auth import native_oauth_exchange
+    from crate.api.native_oauth import (
+        NativeOAuthCompletionUnknown,
+        NativeOAuthHandoff,
+    )
+    from crate.api.schemas.auth import NativeOAuthExchangeRequest
+
+    handoff = NativeOAuthHandoff(
+        user_id=7,
+        app_id="listen-tauri",
+        state="state-token-value",
+        challenge="challenge",
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=30),
+    )
+    body = NativeOAuthExchangeRequest(
+        code="handoff-code-token",
+        code_verifier="v" * 43,
+        state="state-token-value",
+    )
+    user = {
+        "id": 7,
+        "email": "user@example.com",
+        "role": "user",
+        "status": "active",
+    }
+    requested_session_ids: list[str] = []
+
+    def create_login_session(*_args, session_id: str, **_kwargs):
+        requested_session_ids.append(session_id)
+        return (
+            f"jwt-{session_id}",
+            {"id": session_id},
+            f"refresh-{session_id}",
+        )
+
+    with (
+        patch(
+            "crate.api.auth.get_completed_native_oauth_exchange",
+            return_value=None,
+        ),
+        patch(
+            "crate.api.auth.consume_native_oauth_handoff",
+            return_value=handoff,
+        ),
+        patch("crate.api.auth.get_user_by_id", return_value=user),
+        patch("crate.api.auth.update_user_last_login"),
+        patch(
+            "crate.api.auth.get_session",
+            side_effect=[None, {"id": "already-created"}],
+        ),
+        patch(
+            "crate.api.auth._create_login_session",
+            side_effect=create_login_session,
+        ),
+        patch(
+            "crate.api.auth._auth_login_payload",
+            side_effect=lambda _user, token, _session, _refresh: {"token": token},
+        ),
+        patch(
+            "crate.api.auth.complete_native_oauth_exchange",
+            side_effect=[
+                NativeOAuthCompletionUnknown("redis response lost"),
+                None,
+            ],
+        ),
+        patch("crate.api.auth.restore_native_oauth_handoff") as restore_handoff,
+        patch("crate.api.auth.revoke_session") as revoke_session,
+        patch.dict(
+            "os.environ",
+            {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+            clear=False,
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            native_oauth_exchange(_request(app_id="listen-tauri"), body)
+        payload = native_oauth_exchange(_request(app_id="listen-tauri"), body)
+
+    assert exc_info.value.status_code == 503
+    assert payload["token"].startswith("jwt-")
+    assert requested_session_ids[0] == requested_session_ids[1]
+    restore_handoff.assert_called_once_with(code=body.code, handoff=handoff)
+    revoke_session.assert_not_called()

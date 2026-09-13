@@ -2000,6 +2000,50 @@ class TestAuthIntegration:
         assert [session["id"] for session in sessions].count("listen-a") == 1
         assert "listen-b" not in {session["id"] for session in sessions}
 
+    def test_create_session_reuses_the_same_id_without_a_fingerprint(self, pg_db):
+        user = pg_db.create_user("session-idempotency@test.com")
+        now = datetime.now(timezone.utc)
+
+        first = pg_db.create_session(
+            "native-session",
+            user["id"],
+            (now + timedelta(days=30)).isoformat(),
+            app_id="listen-tauri",
+            device_label="Desktop A",
+        )
+        second = pg_db.create_session(
+            "native-session",
+            user["id"],
+            (now + timedelta(days=30)).isoformat(),
+            app_id="listen-tauri",
+            device_label="Desktop B",
+        )
+
+        sessions = pg_db.list_sessions(user["id"], include_revoked=True)
+        assert first["id"] == "native-session"
+        assert second["id"] == "native-session"
+        assert [session["id"] for session in sessions].count("native-session") == 1
+        assert second["device_label"] == "Desktop B"
+
+    def test_create_session_does_not_reassign_an_existing_id(self, pg_db):
+        first_user = pg_db.create_user("session-owner@test.com")
+        second_user = pg_db.create_user("session-attacker@test.com")
+        expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        pg_db.create_session(
+            "owned-session",
+            first_user["id"],
+            expires_at,
+            app_id="listen-tauri",
+        )
+
+        with pytest.raises(ValueError, match="already in use"):
+            pg_db.create_session(
+                "owned-session",
+                second_user["id"],
+                expires_at,
+                app_id="listen-tauri",
+            )
+
     def test_create_user_reuses_shared_session_for_username_lookup(self, pg_db):
         from crate.db.auth import create_user, get_user_by_id
         from crate.db.tx import transaction_scope
