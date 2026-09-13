@@ -9,7 +9,7 @@ def test_run_artist_deletion_serializes_cleanup_and_database_change(monkeypatch)
     events: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, artist_entity_uid):
+    def publication_lock(artist_entity_uid):
         assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         try:
@@ -56,7 +56,7 @@ def test_run_artist_deletion_preserves_storage_when_database_change_fails(monkey
     cleanup_calls: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, _artist_id):
+    def publication_lock(_artist_id):
         yield
 
     monkeypatch.setattr(
@@ -96,7 +96,7 @@ def test_run_artist_deletion_keeps_database_result_when_cleanup_fails(monkeypatc
     from crate import artist_lifecycle
 
     @contextmanager
-    def publication_lock(_root, _artist_id):
+    def publication_lock(_artist_id):
         yield
 
     monkeypatch.setattr(
@@ -130,7 +130,7 @@ def test_run_artist_merge_cleans_storage_only_when_source_is_removed(monkeypatch
     cleanup_calls: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, _artist_id):
+    def publication_lock(_artist_id):
         yield
 
     monkeypatch.setattr(
@@ -172,7 +172,7 @@ def test_run_artist_deletion_aborts_when_identity_changes_before_lock(monkeypatc
     )
 
     @contextmanager
-    def publication_lock(_root, artist_entity_uid):
+    def publication_lock(artist_entity_uid):
         assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         try:
@@ -210,7 +210,7 @@ def test_run_artist_deletion_preserves_storage_when_source_row_remains(monkeypat
     cleanup_calls: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, _artist_id):
+    def publication_lock(_artist_id):
         yield
 
     monkeypatch.setattr(artist_lifecycle, "get_library_artist", lambda _name: artist)
@@ -241,7 +241,7 @@ def test_run_artist_deletion_keeps_result_when_cleanup_verification_fails(monkey
     cleanup_calls: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, _artist_id):
+    def publication_lock(_artist_id):
         yield
 
     monkeypatch.setattr(

@@ -24,7 +24,7 @@ from typing import Iterator, Literal
 from PIL.Image import Image
 
 from crate.artwork_variants import ArtworkAsset, artwork_variant_root
-from crate.streaming.paths import cache_root
+from crate.streaming.paths import cache_root, data_root
 
 ARTIST_HERO_PUBLICATION_VERSION = 1
 ARTIST_HERO_PUBLICATION_PREFIX = "artist-hero-publications/v1"
@@ -264,13 +264,11 @@ def _existing_publication(
 
 
 @contextmanager
-def artist_hero_publication_lock(
-    coordination_root: Path, artist_entity_uid: str
-) -> Iterator[None]:
+def artist_hero_publication_lock(artist_entity_uid: str) -> Iterator[None]:
     """Serialize publication and cleanup by the artist's stable storage identity."""
 
     _validate_segment(artist_entity_uid, "artist entity UID")
-    resolved_coordination_root = coordination_root.resolve()
+    resolved_coordination_root = data_root()
     lock_root = (resolved_coordination_root / ".crate-locks" / "artist-hero").resolve()
     if not lock_root.is_relative_to(resolved_coordination_root):
         raise ValueError("Artist hero lock path is outside the coordination root")

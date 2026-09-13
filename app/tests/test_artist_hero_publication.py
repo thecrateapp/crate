@@ -276,3 +276,18 @@ def test_publish_artist_hero_artifact_accepts_concurrent_identical_winner(
 
     assert publication.artifact_path.is_file()
     assert publication.manifest_path.is_file()
+
+
+def test_artist_hero_publication_lock_uses_the_durable_data_root(monkeypatch, tmp_path):
+    from crate.artist_hero_publication import artist_hero_publication_lock
+
+    data_dir = tmp_path / "data"
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("CACHE_DIR", str(cache_dir))
+
+    with artist_hero_publication_lock("artist-entity"):
+        pass
+
+    assert len(list((data_dir / ".crate-locks" / "artist-hero").iterdir())) == 1
+    assert not (cache_dir / ".crate-locks").exists()

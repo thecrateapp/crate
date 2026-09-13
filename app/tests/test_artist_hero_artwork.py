@@ -866,7 +866,7 @@ def test_artist_hero_source_buffers_the_publication_under_the_stable_lock(
     events: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, entity_uid):
+    def publication_lock(entity_uid):
         assert entity_uid == "artist-entity"
         events.append("lock-enter")
         yield

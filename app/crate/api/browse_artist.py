@@ -72,7 +72,6 @@ from crate.external_artist_artwork import (
     is_external_artist_artwork_missing,
     queue_external_artist_artwork,
 )
-from crate.streaming.paths import cache_root
 from crate.db.queries.user_library import get_top_artists
 from crate.db.repositories.library import (
     get_album_quality_map,
@@ -1521,7 +1520,7 @@ def api_artist_hero(
                 buffer_file=buffer_file,
             )
 
-        with artist_hero_publication_lock(cache_root(), entity_uid):
+        with artist_hero_publication_lock(entity_uid):
             if local_original is None or not local_original.is_file():
                 if retained_revision:
                     return _artist_hero_revision_unavailable_response(composition)

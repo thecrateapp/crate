@@ -518,7 +518,7 @@ def test_artist_hero_pins_retained_revision_before_releasing_publication_lock(
     events: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, artist_entity_uid):
+    def publication_lock(artist_entity_uid):
         assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         yield
@@ -555,8 +555,6 @@ def test_artist_hero_pins_retained_revision_before_releasing_publication_lock(
         publication_lock,
         raising=False,
     )
-    monkeypatch.setattr(browse_artist, "cache_root", lambda: tmp_path, raising=False)
-
     response = browse_artist.api_artist_hero_by_id(
         SimpleNamespace(),
         5,
@@ -595,7 +593,7 @@ def test_artist_hero_pins_active_revision_before_releasing_publication_lock(
     events: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, artist_entity_uid):
+    def publication_lock(artist_entity_uid):
         assert artist_entity_uid == "artist-entity"
         events.append("lock-enter")
         try:
@@ -625,8 +623,6 @@ def test_artist_hero_pins_active_revision_before_releasing_publication_lock(
         browse_artist, "resolve_artist_dir", lambda *_args, **_kwargs: None
     )
     monkeypatch.setattr(browse_artist, "artist_hero_publication_lock", publication_lock)
-    monkeypatch.setattr(browse_artist, "cache_root", lambda: tmp_path)
-
     response = browse_artist.api_artist_hero_by_id(
         SimpleNamespace(),
         5,

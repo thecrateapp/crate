@@ -103,7 +103,7 @@ def test_artist_hero_cleanup_removes_legacy_variants_after_v2_activation(
     legacy_root.mkdir(parents=True)
     monkeypatch.setattr(
         "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
-        lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
+        lambda **_kwargs: [],
     )
     monkeypatch.setattr(
         "crate.artwork_maintenance.get_library_artist_by_entity_uid",
@@ -143,7 +143,7 @@ def test_artist_hero_cleanup_keeps_the_active_legacy_variant(monkeypatch, tmp_pa
     legacy_root.mkdir(parents=True)
     monkeypatch.setattr(
         "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
-        lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
+        lambda **_kwargs: [],
     )
     monkeypatch.setattr(
         "crate.artwork_maintenance.get_library_artist_by_entity_uid",
@@ -162,9 +162,10 @@ def test_artist_hero_cleanup_keeps_the_active_legacy_variant(monkeypatch, tmp_pa
         lambda _artist_id: [],
     )
 
-    cleanup_artist_hero_publications(max_artists=10)
+    result = cleanup_artist_hero_publications(max_artists=10)
 
     assert legacy_root.is_dir()
+    assert result["artists_checked"] == 1
 
 
 def test_artist_hero_cleanup_removes_a_legacy_variant_without_a_profile(
@@ -180,7 +181,7 @@ def test_artist_hero_cleanup_removes_a_legacy_variant_without_a_profile(
     legacy_root.mkdir(parents=True)
     monkeypatch.setattr(
         "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
-        lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
+        lambda **_kwargs: [],
     )
     monkeypatch.setattr(
         "crate.artwork_maintenance.get_library_artist_by_entity_uid",
@@ -202,6 +203,59 @@ def test_artist_hero_cleanup_removes_a_legacy_variant_without_a_profile(
     cleanup_artist_hero_publications(max_artists=10)
 
     assert not legacy_root.exists()
+
+
+def test_artist_hero_cleanup_removes_expired_materialization_temporaries(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    materialization_root = artwork_asset_root(
+        ArtworkAsset("artist-hero", "artist-entity:desktop:revision-a")
+    )
+    expired_directory = materialization_root / ".source-revision-crashed.tmp"
+    expired_manifest = materialization_root / ".current-crashed.json.tmp"
+    fresh_directory = materialization_root / ".source-revision-running.tmp"
+    expired_directory.mkdir(parents=True)
+    expired_manifest.write_text("{}", encoding="utf-8")
+    fresh_directory.mkdir()
+    expired = time.time() - 90000
+    os.utime(expired_directory, (expired, expired))
+    os.utime(expired_manifest, (expired, expired))
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_artist_hero_artwork",
+        lambda _artist_id: {
+            "desktop_enabled": True,
+            "render_manifest": {
+                "artifacts": {"desktop": {"render_revision": "revision-a"}}
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revisions",
+        lambda _artist_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_manifest_history",
+        lambda _artist_id: [],
+    )
+
+    result = cleanup_artist_hero_publications(max_artists=10)
+
+    assert not expired_directory.exists()
+    assert not expired_manifest.exists()
+    assert fresh_directory.is_dir()
+    assert result["temporary_removed"] == 2
 
 
 def test_cleanup_artist_hero_publications_keeps_active_previous_and_fresh_orphans(
@@ -587,7 +641,7 @@ def test_cleanup_artist_hero_publications_tolerates_an_orphan_removed_while_wait
     os.utime(entity_root, (expired, expired))
 
     @contextmanager
-    def publication_lock(_root, _entity_uid):
+    def publication_lock(_entity_uid):
         shutil.rmtree(entity_root)
         yield
 
@@ -640,7 +694,7 @@ def test_cleanup_artist_hero_publications_preserves_a_recreated_artist(
     profile_artist_ids: list[int] = []
 
     @contextmanager
-    def publication_lock(_root, entity_uid):
+    def publication_lock(entity_uid):
         lock_keys.append(entity_uid)
         yield
 

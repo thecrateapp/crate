@@ -15,7 +15,6 @@ from crate.db.repositories.library import (
     get_library_artist,
     get_library_artist_by_id,
 )
-from crate.streaming.paths import cache_root
 
 T = TypeVar("T")
 log = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ def _run_artist_change(
 
     artist_id = int(artist["id"])
     entity_uid = str(artist["entity_uid"])
-    with artist_hero_publication_lock(cache_root(), entity_uid):
+    with artist_hero_publication_lock(entity_uid):
         current_artist = get_library_artist(name)
         if (
             not current_artist

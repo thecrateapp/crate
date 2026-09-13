@@ -452,7 +452,7 @@ def _handle_materialize_artwork_variants(
     if not artist or artist.get("id") is None:
         return missing_result()
     artist_id = int(artist["id"])
-    with artist_hero_publication_lock(cache_root(), entity_uid):
+    with artist_hero_publication_lock(entity_uid):
         current_artist = get_library_artist_by_entity_uid(entity_uid)
         if current_artist is None or int(current_artist.get("id") or 0) != artist_id:
             return missing_result()
@@ -1417,9 +1417,7 @@ def _handle_delete_artist_hero_composition(
     delete_params = {"artist_id": artist_id, "composition": composition}
     if expected_revision:
         delete_params["expected_revision"] = expected_revision
-    with artist_hero_publication_lock(
-        cache_root(), _artist_hero_lock_identity(artist_row)
-    ):
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         deleted = delete_artist_hero_composition(**delete_params)
         if deleted is not None:
             for path in dict.fromkeys(files_to_delete):
@@ -1611,9 +1609,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             else existing.get("mobile_enabled", True)
         )
         artist_id = int(artist_row["id"])
-        with artist_hero_publication_lock(
-            cache_root(), _artist_hero_lock_identity(artist_row)
-        ):
+        with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
             render_manifest = _publish_artist_hero_manifest(
                 artist_row=artist_row,
                 revision=revision,
@@ -1863,9 +1859,7 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         if composition in {"shared", "mobile"}
         else existing.get("mobile_enabled", True)
     )
-    with artist_hero_publication_lock(
-        cache_root(), _artist_hero_lock_identity(artist_row)
-    ):
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=revision,
@@ -2132,9 +2126,7 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
         mobile_source_width, mobile_source_height = mobile_image.size
     desktop_enabled = existing.get("desktop_enabled", True) is not False
     mobile_enabled = existing.get("mobile_enabled", True) is not False
-    with artist_hero_publication_lock(
-        cache_root(), _artist_hero_lock_identity(artist_row)
-    ):
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=revision,
@@ -2254,9 +2246,7 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
     )
     canonical_source = _artist_hero_jpeg_content(image)
     revision = artist_hero_revision(canonical_source, b":derived-hero")
-    with artist_hero_publication_lock(
-        cache_root(), _artist_hero_lock_identity(artist_row)
-    ):
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=revision,
@@ -2519,9 +2509,7 @@ def _handle_migrate_artist_hero(task_id: str, params: dict, config: dict) -> dic
             image, recipe, render_sizes[composition]
         )
     artifact_revision = artist_hero_revision(*revision_parts)
-    with artist_hero_publication_lock(
-        cache_root(), _artist_hero_lock_identity(artist_row)
-    ):
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
             revision=expected_revision,
@@ -2601,9 +2589,7 @@ def _handle_rollback_artist_hero(task_id: str, params: dict, config: dict) -> di
             "reason": "missing-profile",
             "artist_id": artist_id,
         }
-    with artist_hero_publication_lock(
-        cache_root(), _artist_hero_lock_identity(artist_row)
-    ):
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         profile = get_artist_hero_artwork(artist_id)
         if profile is None:
             return {

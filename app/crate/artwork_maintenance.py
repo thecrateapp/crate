@@ -272,6 +272,7 @@ def cleanup_artist_hero_publications(
     artists = list_artist_hero_render_revision_artists(limit=capped_limit)
     publication_root = cache_root()
     namespace_root = publication_root / ARTIST_HERO_PUBLICATION_PREFIX
+    materialization_namespace_root = artwork_variant_root() / "artist-hero"
 
     def _expired(path) -> bool:
         try:
@@ -285,6 +286,8 @@ def cleanup_artist_hero_publications(
                 path.unlink()
             elif path.is_dir():
                 shutil.rmtree(path)
+            elif path.is_file():
+                path.unlink()
         except OSError:
             return False
         return not path.exists()
@@ -311,8 +314,46 @@ def cleanup_artist_hero_publications(
             )
         return count
 
+    def _index_materialization_roots() -> dict[str, list]:
+        if (
+            not materialization_namespace_root.is_dir()
+            or materialization_namespace_root.is_symlink()
+        ):
+            return {}
+        try:
+            candidates = list(materialization_namespace_root.iterdir())
+        except OSError:
+            return {}
+        indexed: dict[str, list] = {}
+        for candidate in candidates:
+            key_parts = candidate.name.split(":", 2)
+            if (
+                len(key_parts) < 2
+                or key_parts[1] not in {"desktop", "mobile"}
+                or not candidate.is_dir()
+                or candidate.is_symlink()
+            ):
+                continue
+            indexed.setdefault(key_parts[0], []).append(candidate)
+        return indexed
+
     known_entity_uids = {str(artist.get("entity_uid") or "") for artist in artists}
     discovered_count = len(artists)
+    materialization_roots_by_uid = _index_materialization_roots()
+    orphan_materialization_uids: set[str] = set()
+    if materialization_roots_by_uid and len(artists) < capped_limit:
+        for entity_uid in sorted(materialization_roots_by_uid):
+            if discovered_count >= capped_limit:
+                break
+            if entity_uid in known_entity_uids:
+                continue
+            artist = get_library_artist_by_entity_uid(entity_uid)
+            if not artist:
+                orphan_materialization_uids.add(entity_uid)
+                continue
+            artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
+            known_entity_uids.add(entity_uid)
+            discovered_count += 1
     if namespace_root.is_dir() and len(artists) < capped_limit:
         for entity_root in sorted(namespace_root.iterdir()):
             entity_uid = entity_root.name
@@ -327,7 +368,7 @@ def cleanup_artist_hero_publications(
             if not artist:
                 if not _expired(entity_root):
                     continue
-                with artist_hero_publication_lock(publication_root, entity_uid):
+                with artist_hero_publication_lock(entity_uid):
                     artist = get_library_artist_by_entity_uid(entity_uid)
                     if not artist:
                         revision_count = _count_revision_directories(entity_root)
@@ -337,17 +378,34 @@ def cleanup_artist_hero_publications(
                             result["revisions_removed"] += revision_count
                         result["artists_checked"] += 1
                         discovered_count += 1
+                        known_entity_uids.add(entity_uid)
                         continue
             artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
             known_entity_uids.add(entity_uid)
             discovered_count += 1
+
+    for entity_uid in sorted(orphan_materialization_uids - known_entity_uids):
+        if discovered_count >= capped_limit:
+            break
+        with artist_hero_publication_lock(entity_uid):
+            artist = get_library_artist_by_entity_uid(entity_uid)
+            if artist:
+                artists.append(
+                    {"artist_id": int(artist["id"]), "entity_uid": entity_uid}
+                )
+            else:
+                removed = delete_artist_hero_storage(entity_uid)
+                result["revisions_removed"] += removed["materializations_removed"]
+                result["artists_checked"] += 1
+        known_entity_uids.add(entity_uid)
+        discovered_count += 1
 
     for artist in artists:
         result["artists_checked"] += 1
         entity_uid = str(artist.get("entity_uid") or "")
         if not entity_uid:
             continue
-        with artist_hero_publication_lock(publication_root, entity_uid):
+        with artist_hero_publication_lock(entity_uid):
             current_artist = get_library_artist_by_entity_uid(entity_uid)
             if not current_artist:
                 continue
@@ -400,6 +458,21 @@ def cleanup_artist_hero_publications(
                 ) and legacy_root.is_dir():
                     if _remove_tree(legacy_root):
                         result["revisions_removed"] += 1
+            for materialization_root in materialization_roots_by_uid.get(
+                entity_uid, []
+            ):
+                try:
+                    materialization_children = list(materialization_root.iterdir())
+                except OSError:
+                    continue
+                for child in materialization_children:
+                    if (
+                        child.name.startswith(".")
+                        and child.name.endswith(".tmp")
+                        and _expired(child)
+                        and _remove_tree(child)
+                    ):
+                        result["temporary_removed"] += 1
             for row in history:
                 composition = str(row.get("composition") or "")
                 revision = str(row.get("render_revision") or "")

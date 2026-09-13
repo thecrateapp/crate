@@ -610,7 +610,7 @@ def api_artist_hero_source(
             source_path = None
     if source_path is None or not source_path.is_file():
         return JSONResponse({"error": "Artist hero source not found"}, status_code=404)
-    with artist_hero_publication_lock(cache_root(), entity_uid):
+    with artist_hero_publication_lock(entity_uid):
         if not source_path.is_file():
             return JSONResponse(
                 {"error": "Artist hero source not found"}, status_code=404

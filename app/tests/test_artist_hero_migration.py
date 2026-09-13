@@ -289,7 +289,7 @@ def test_migration_target_publishes_the_enabled_bundle_with_manifest_cas(
     lifecycle: list[str] = []
 
     @contextmanager
-    def publication_lock(_root, _artist_id):
+    def publication_lock(_artist_id):
         lifecycle.append("lock-enter")
         yield
         lifecycle.append("lock-exit")
