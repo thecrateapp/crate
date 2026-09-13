@@ -11,7 +11,10 @@ import {
   getOfflineTrackAssetKey,
   normalizeIdentityValue,
 } from "@/lib/offline-track-identity";
-import type { OfflineManifestTrack } from "./offline-model";
+import type {
+  OfflineManifestTrack,
+  OfflineNativeAssetRecord,
+} from "./offline-model";
 import {
   ensureOfflineNativeAssetIndexLoaded,
   getActiveOfflineProfileKey,
@@ -54,7 +57,7 @@ export async function hasCachedNativeTrackAssets(
     if (!assetKey) continue;
     const aliases = getOfflineTrackAssetAliases(track);
     const entry = aliases.map((alias) => assets[alias]).find(Boolean);
-    if (!entry?.path) continue;
+    if (!entry?.path || entry.state === "deleting") continue;
     expectations.push({
       assetKey,
       aliases,
@@ -103,7 +106,11 @@ export async function estimateNativeOfflineBytes(
 ): Promise<number> {
   const assets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
   return Object.values(assets).reduce(
-    (total, asset) => total + Math.max(0, Number(asset.byteLength || 0)),
+    (total, asset) =>
+      total +
+      (asset.state === "deleting"
+        ? 0
+        : Math.max(0, Number(asset.byteLength || 0))),
     0,
   );
 }
@@ -264,7 +271,11 @@ export async function cacheNativeTrackAsset(
   const existing = getOfflineTrackAssetAliases(track)
     .map((alias) => existingAssets[alias])
     .find(Boolean);
-  if (existing) return;
+  if (existing?.state === "deleting") {
+    await deleteNativeCachedTrackAsset(profileKey, track);
+  } else if (existing) {
+    return;
+  }
 
   const downloadTarget = await resolveNativeOfflineDownloadTarget(track);
   const dirPath = `offline-media/${profileKey}`;
@@ -302,6 +313,7 @@ export async function cacheNativeTrackAsset(
       path: filePath,
       uri,
       playbackUrl: Capacitor.convertFileSrc(uri),
+      state: "ready",
       byteLength: downloadTarget.expectedBytes || size,
       updatedAt: track.updated_at ?? null,
     },
@@ -316,8 +328,19 @@ export async function deleteNativeCachedTrackAsset(
   if (!isNative) return;
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return;
-  const currentAssets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-  const entry = aliases.map((alias) => currentAssets[alias]).find(Boolean);
+  let entry: OfflineNativeAssetRecord | undefined;
+  await updateOfflineNativeAssetIndex(profileKey, (current) => {
+    entry = aliases.map((alias) => current[alias]).find(Boolean);
+    if (!entry) return current;
+    const next = { ...current };
+    for (const alias of aliases) {
+      const candidate = current[alias];
+      if (candidate?.path === entry.path) {
+        next[alias] = { ...candidate, state: "deleting" };
+      }
+    }
+    return next;
+  });
   if (entry?.path) {
     try {
       await Filesystem.deleteFile({
@@ -336,13 +359,15 @@ export async function deleteNativeCachedTrackAsset(
       }
     }
   }
-  // Deleting the file happens above against a snapshot that may be stale
-  // by now; the index mutation itself reads fresh from inside the atomic
-  // update below, so a concurrent cache/delete for a different track
-  // can't be reverted by this one finishing later.
+  if (!entry) return;
   await updateOfflineNativeAssetIndex(profileKey, (current) => {
     const next = { ...current };
-    for (const alias of aliases) delete next[alias];
+    for (const alias of aliases) {
+      const candidate = next[alias];
+      if (candidate?.state === "deleting" && candidate.path === entry?.path) {
+        delete next[alias];
+      }
+    }
     return next;
   });
 }
@@ -352,31 +377,47 @@ export async function clearNativeOfflineAssets(
 ): Promise<void> {
   if (!isNative) return;
   const failures: unknown[] = [];
-  await updateOfflineNativeAssetIndex(profileKey, async (assets) => {
-    const remaining = { ...assets };
-    await Promise.all(
-      Object.entries(assets).map(async ([assetKey, asset]) => {
-        try {
-          await Filesystem.deleteFile({
-            path: asset.path,
-            directory: Directory.Data,
-          });
-          delete remaining[assetKey];
-        } catch (error) {
-          if (isMissingNativeFileError(error)) {
-            delete remaining[assetKey];
-            return;
-          }
-          failures.push(error);
-          recordDevLog(
-            "offline",
-            "failed to delete cached asset during clear-all",
-            { path: asset.path, error: String(error) },
-            "warn",
-          );
-        }
-      }),
+  let markedAssets: Record<string, OfflineNativeAssetRecord> = {};
+  await updateOfflineNativeAssetIndex(profileKey, (assets) => {
+    markedAssets = Object.fromEntries(
+      Object.entries(assets).map(([assetKey, asset]) => [
+        assetKey,
+        { ...asset, state: "deleting" as const },
+      ]),
     );
+    return markedAssets;
+  });
+  const deletedPaths = new Set<string>();
+  await Promise.all(
+    Object.values(markedAssets).map(async (asset) => {
+      try {
+        await Filesystem.deleteFile({
+          path: asset.path,
+          directory: Directory.Data,
+        });
+        deletedPaths.add(asset.path);
+      } catch (error) {
+        if (isMissingNativeFileError(error)) {
+          deletedPaths.add(asset.path);
+          return;
+        }
+        failures.push(error);
+        recordDevLog(
+          "offline",
+          "failed to delete cached asset during clear-all",
+          { path: asset.path, error: String(error) },
+          "warn",
+        );
+      }
+    }),
+  );
+  await updateOfflineNativeAssetIndex(profileKey, (assets) => {
+    const remaining = { ...assets };
+    for (const [assetKey, asset] of Object.entries(assets)) {
+      if (asset.state === "deleting" && deletedPaths.has(asset.path)) {
+        delete remaining[assetKey];
+      }
+    }
     return remaining;
   });
   if (failures.length) throw failures[0];
@@ -394,7 +435,7 @@ export function getNativeOfflinePlaybackUrl(
   const entry = getOfflineTrackAssetAliases(track, storageId)
     .map((alias) => assets[alias])
     .find(Boolean);
-  if (!entry) return null;
+  if (!entry || entry.state === "deleting") return null;
   return options.target === "android-native"
     ? entry.uri || null
     : entry.playbackUrl || null;

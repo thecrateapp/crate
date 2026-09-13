@@ -5,11 +5,15 @@ const {
   ensureOfflineNativeAssetIndexLoadedMock,
   saveOfflineNativeAssetIndexMock,
   updateOfflineNativeAssetIndexMock,
+  getActiveOfflineProfileKeyMock,
+  loadOfflineNativeAssetIndexMock,
 } = vi.hoisted(() => ({
   deleteFileMock: vi.fn(),
   ensureOfflineNativeAssetIndexLoadedMock: vi.fn(),
   saveOfflineNativeAssetIndexMock: vi.fn(),
   updateOfflineNativeAssetIndexMock: vi.fn(),
+  getActiveOfflineProfileKeyMock: vi.fn(() => "profile-1"),
+  loadOfflineNativeAssetIndexMock: vi.fn(),
 }));
 
 vi.mock(import("@capacitor/core"), async (importOriginal) => {
@@ -31,8 +35,8 @@ vi.mock("@capacitor/filesystem", () => ({
 
 vi.mock("@/lib/offline-storage", () => ({
   ensureOfflineNativeAssetIndexLoaded: ensureOfflineNativeAssetIndexLoadedMock,
-  getActiveOfflineProfileKey: vi.fn(),
-  loadOfflineNativeAssetIndex: vi.fn(() => ({})),
+  getActiveOfflineProfileKey: getActiveOfflineProfileKeyMock,
+  loadOfflineNativeAssetIndex: loadOfflineNativeAssetIndexMock,
   saveOfflineNativeAssetIndex: saveOfflineNativeAssetIndexMock,
   updateOfflineNativeAssetIndex: updateOfflineNativeAssetIndexMock,
 }));
@@ -43,7 +47,10 @@ import {
 } from "@/lib/offline-native-assets";
 
 describe("native offline asset deletion", () => {
-  let persistedAssets: Record<string, { assetKey: string; path: string }>;
+  let persistedAssets: Record<
+    string,
+    { assetKey: string; path: string; state?: "ready" | "deleting" }
+  >;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,6 +60,7 @@ describe("native offline asset deletion", () => {
     ensureOfflineNativeAssetIndexLoadedMock.mockImplementation(
       async () => persistedAssets,
     );
+    loadOfflineNativeAssetIndexMock.mockImplementation(() => persistedAssets);
     deleteFileMock.mockResolvedValue(undefined);
     updateOfflineNativeAssetIndexMock.mockImplementation(
       async (_profileKey, mutate) => {
@@ -61,10 +69,14 @@ describe("native offline asset deletion", () => {
     );
   });
 
-  it("deletes files and clears metadata inside one serialized index mutation", async () => {
+  it("marks every asset deleting before clear-all removes any file", async () => {
+    deleteFileMock.mockImplementation(async () => {
+      expect(persistedAssets.trackA?.state).toBe("deleting");
+    });
+
     await clearNativeOfflineAssets("profile-1");
 
-    expect(updateOfflineNativeAssetIndexMock).toHaveBeenCalledOnce();
+    expect(updateOfflineNativeAssetIndexMock).toHaveBeenCalledTimes(2);
     expect(deleteFileMock).toHaveBeenCalledWith({
       path: "offline-media/track-a.flac",
       directory: "DATA",
@@ -73,7 +85,7 @@ describe("native offline asset deletion", () => {
     expect(persistedAssets).toEqual({});
   });
 
-  it("retains track metadata and rejects when its file cannot be deleted", async () => {
+  it("persists a non-playable deletion marker before deleting a track file", async () => {
     deleteFileMock.mockRejectedValue(
       Object.assign(new Error("permission denied"), {
         code: "OS-PLUG-FILE-0007",
@@ -84,8 +96,10 @@ describe("native offline asset deletion", () => {
       deleteNativeCachedTrackAsset("profile-1", "trackA"),
     ).rejects.toThrow("permission denied");
 
-    expect(updateOfflineNativeAssetIndexMock).not.toHaveBeenCalled();
-    expect(persistedAssets).toHaveProperty("trackA");
+    expect(updateOfflineNativeAssetIndexMock).toHaveBeenCalledOnce();
+    expect(persistedAssets.trackA).toEqual(
+      expect.objectContaining({ state: "deleting" }),
+    );
   });
 
   it("drops stale track metadata when the file is already missing", async () => {
@@ -123,7 +137,17 @@ describe("native offline asset deletion", () => {
       trackB: {
         assetKey: "trackB",
         path: "offline-media/track-b.flac",
+        state: "deleting",
       },
     });
+  });
+
+  it("never resolves a deleting asset as playable", async () => {
+    persistedAssets.trackA!.state = "deleting";
+    const { getNativeOfflinePlaybackUrl } = await import(
+      "@/lib/offline-native-assets"
+    );
+
+    expect(getNativeOfflinePlaybackUrl("trackA")).toBeNull();
   });
 });

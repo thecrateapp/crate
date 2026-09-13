@@ -219,7 +219,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         items: { ...snapshotRef.current.items },
       };
       delete nextSnapshot.items[itemKey];
-      commitSnapshot(nextSnapshot);
+      await commitSnapshot(nextSnapshot, true);
       const usage = buildAssetUsage(nextSnapshot);
       await Promise.all(
         existing.tracks

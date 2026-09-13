@@ -16,6 +16,7 @@ const {
   setActiveOfflineProfileKeyMock,
   syncOfflineProfileToServiceWorkerMock,
   offlineSyncOperationMock,
+  deleteCachedTrackAssetMock,
 } = vi.hoisted(() => ({
   clearOfflineAssetsMock: vi.fn(async () => {}),
   abortOfflineTransferMock: vi.fn(),
@@ -49,13 +50,14 @@ const {
   setActiveOfflineProfileKeyMock: vi.fn(),
   syncOfflineProfileToServiceWorkerMock: vi.fn(),
   offlineSyncOperationMock: vi.fn(async () => {}),
+  deleteCachedTrackAssetMock: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/offline", () => ({
   buildAssetUsage: vi.fn(() => new Map()),
   cacheTrackAsset: vi.fn(async () => {}),
   clearOfflineAssets: clearOfflineAssetsMock,
-  deleteCachedTrackAsset: vi.fn(async () => {}),
+  deleteCachedTrackAsset: deleteCachedTrackAssetMock,
   deriveOfflineProfileKey: vi.fn(() => "profile-1"),
   ensureOfflineStorageBudget: vi.fn(async () => {}),
   getOfflineItemKey: (kind: string, entityId: string | number) =>
@@ -165,6 +167,16 @@ function OfflineProbe() {
       <div>{offline.getTrackState("entity-1")}</div>
       <button onClick={() => void offline.syncAll()}>sync</button>
       <button onClick={() => void offline.clearActiveProfile()}>clear</button>
+      <button
+        onClick={() =>
+          void offline.toggleTrackOffline({
+            entityUid: "entity-1",
+            storageId: "storage-1",
+          })
+        }
+      >
+        toggle track
+      </button>
     </div>
   );
 }
@@ -179,6 +191,7 @@ describe("OfflineProvider", () => {
     setActiveOfflineProfileKeyMock.mockClear();
     syncOfflineProfileToServiceWorkerMock.mockClear();
     offlineSyncOperationMock.mockReset().mockResolvedValue(undefined);
+    deleteCachedTrackAssetMock.mockClear();
   });
 
   afterEach(() => {
@@ -254,6 +267,36 @@ describe("OfflineProvider", () => {
     await act(async () => finishSync!());
     await waitFor(() =>
       expect(clearOfflineAssetsMock).toHaveBeenCalledWith("profile-1"),
+    );
+  });
+
+  it("persists removal before deleting the track asset", async () => {
+    let finishPersistence: (() => void) | undefined;
+    saveOfflineSnapshotMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishPersistence = resolve;
+      }),
+    );
+    render(
+      <AuthContext.Provider value={createAuthValue()}>
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByText("ready")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "toggle track" }));
+
+    await waitFor(() => expect(saveOfflineSnapshotMock).toHaveBeenCalled());
+    expect(deleteCachedTrackAssetMock).not.toHaveBeenCalled();
+
+    await act(async () => finishPersistence!());
+    await waitFor(() =>
+      expect(deleteCachedTrackAssetMock).toHaveBeenCalledWith(
+        "profile-1",
+        expect.objectContaining({ entity_uid: "entity-1" }),
+      ),
     );
   });
 });

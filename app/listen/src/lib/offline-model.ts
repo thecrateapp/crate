@@ -81,6 +81,7 @@ export interface OfflineNativeAssetRecord {
   path: string;
   uri?: string;
   playbackUrl?: string;
+  state?: "ready" | "deleting";
   byteLength?: number | null;
   updatedAt?: string | null;
 }
