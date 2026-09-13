@@ -34,6 +34,10 @@ export interface JamTransportControls {
   seek: (time: number) => void;
 }
 
+export interface PlayerPauseOptions {
+  preserveNativeResume?: boolean;
+}
+
 export interface PlayerActionsValue {
   queue: Track[];
   currentIndex: number;
@@ -47,7 +51,7 @@ export interface PlayerActionsValue {
   currentTrack: Track | undefined;
   play: (track: Track, source?: PlaySource) => void;
   playAll: (tracks: Track[], startIndex?: number, source?: PlaySource) => void;
-  pause: () => void;
+  pause: (options?: PlayerPauseOptions) => void;
   resume: () => void;
   next: () => void;
   prev: () => void;

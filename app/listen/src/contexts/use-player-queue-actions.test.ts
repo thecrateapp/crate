@@ -10,6 +10,7 @@ const {
   castPlayMock,
   castSeekMock,
   castSetVolumeMock,
+  cancelNativeMediaSessionResumeMock,
   isCastSessionActiveMock,
   startCastSessionMock,
 } = vi.hoisted(() => ({
@@ -21,6 +22,7 @@ const {
   castPlayMock: vi.fn(),
   castSeekMock: vi.fn(),
   castSetVolumeMock: vi.fn(),
+  cancelNativeMediaSessionResumeMock: vi.fn(async () => {}),
   isCastSessionActiveMock: vi.fn(),
   startCastSessionMock: vi.fn(),
 }));
@@ -52,7 +54,7 @@ vi.mock("@/lib/android-native-engine", () => ({
 vi.mock("@/lib/gapless-player", () => ({
   addTrack: vi.fn(),
   fadeInAndPlay: vi.fn(),
-  fadeOutAndPause: vi.fn(),
+  fadeOutAndPause: vi.fn(async () => {}),
   getPosition: vi.fn(() => 0),
   gotoTrack: vi.fn(),
   insertTrack: vi.fn(),
@@ -78,6 +80,10 @@ vi.mock("@/lib/cast-sender", () => ({
   castStop: vi.fn(),
   isCastSessionActive: isCastSessionActiveMock,
   startCastSession: startCastSessionMock,
+}));
+
+vi.mock("@/lib/native-media-session", () => ({
+  cancelNativeMediaSessionResume: cancelNativeMediaSessionResumeMock,
 }));
 
 const TRACK: Track = {
@@ -550,6 +556,25 @@ describe("usePlayerQueueActions", () => {
 
     expect(gaplessPlayer.pause).toHaveBeenCalledTimes(1);
     expect(gaplessPlayer.fadeOutAndPause).not.toHaveBeenCalled();
+  });
+
+  it("cancels a pending native resume even when playback is already paused", () => {
+    const params = createParams();
+    params.isPlayingRef.current = false;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.pause();
+
+    expect(cancelNativeMediaSessionResumeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves native resume only for the interruption-originated pause", () => {
+    const params = createParams();
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.pause({ preserveNativeResume: true });
+
+    expect(cancelNativeMediaSessionResumeMock).not.toHaveBeenCalled();
   });
 
   it("resumes immediately when the app is hidden", () => {

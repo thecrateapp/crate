@@ -5,6 +5,7 @@ import {
   type SetStateAction,
 } from "react";
 
+import type { PlayerPauseOptions } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 import {
   androidNativeEngine as nativeEngine,
@@ -28,6 +29,7 @@ import {
   castSetVolume,
   isCastSessionActive,
 } from "@/lib/cast-sender";
+import { cancelNativeMediaSessionResume } from "@/lib/native-media-session";
 
 const SOFT_PAUSE_FADE_MS = 220;
 
@@ -64,39 +66,45 @@ export function usePlayerTransportControls({
   cancelSoftInterruption,
   silenceGaplessEngine,
 }: UsePlayerTransportControlsParams) {
-  const pause = useCallback(() => {
-    if (isCastSessionActive()) {
-      void castPause().catch((error) => {
-        console.error("[cast] failed to pause:", error);
+  const pause = useCallback(
+    (options?: PlayerPauseOptions) => {
+      if (!options?.preserveNativeResume) {
+        void cancelNativeMediaSessionResume();
+      }
+      if (isCastSessionActive()) {
+        void castPause().catch((error) => {
+          console.error("[cast] failed to pause:", error);
+        });
+        commitIsPlaying(false);
+        return;
+      }
+      cancelSoftInterruption();
+      bufferingIntentRef.current = false;
+      commitIsBuffering(false);
+      if (shouldUseAndroidNativePlayer()) {
+        silenceGaplessEngine();
+        void nativeEngine.pause().catch((error) => {
+          console.error("[native-player] failed to pause:", error);
+        });
+        commitIsPlaying(false);
+        return;
+      }
+      if (shouldUseImmediateTransportAction()) {
+        gpPause();
+        return;
+      }
+      void gpFadeOutAndPause(SOFT_PAUSE_FADE_MS).catch(() => {
+        gpPause();
       });
-      commitIsPlaying(false);
-      return;
-    }
-    cancelSoftInterruption();
-    bufferingIntentRef.current = false;
-    commitIsBuffering(false);
-    if (shouldUseAndroidNativePlayer()) {
-      silenceGaplessEngine();
-      void nativeEngine.pause().catch((error) => {
-        console.error("[native-player] failed to pause:", error);
-      });
-      commitIsPlaying(false);
-      return;
-    }
-    if (shouldUseImmediateTransportAction()) {
-      gpPause();
-      return;
-    }
-    void gpFadeOutAndPause(SOFT_PAUSE_FADE_MS).catch(() => {
-      gpPause();
-    });
-  }, [
-    bufferingIntentRef,
-    cancelSoftInterruption,
-    commitIsBuffering,
-    commitIsPlaying,
-    silenceGaplessEngine,
-  ]);
+    },
+    [
+      bufferingIntentRef,
+      cancelSoftInterruption,
+      commitIsBuffering,
+      commitIsPlaying,
+      silenceGaplessEngine,
+    ],
+  );
 
   const resume = useCallback(() => {
     if (!queueRef.current.length) return;

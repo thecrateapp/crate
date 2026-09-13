@@ -186,6 +186,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func cancelPendingResume(_ call: CAPPluginCall) {
         interruptionState.pause()
+        lastKnownIsPlaying = false
         call.resolve()
     }
 

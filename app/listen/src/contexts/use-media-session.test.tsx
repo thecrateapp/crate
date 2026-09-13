@@ -208,15 +208,6 @@ describe("useMediaSession", () => {
     expect(mediaSession.playbackState).toBe("playing");
   });
 
-  it("cancels native interruption resume for an app-initiated pause", async () => {
-    runtime.isNative = true;
-    const { rerender } = renderSession(TRACK_A, 0, true);
-
-    rerender({ track: TRACK_A, time: 0, playing: false });
-
-    expect(nativeMediaSession.cancelPendingResume).toHaveBeenCalledTimes(1);
-  });
-
   it("preserves native interruption resume for the pause requested by iOS", async () => {
     runtime.isNative = true;
     const { rerender } = renderSession(TRACK_A, 0, true);
@@ -231,6 +222,7 @@ describe("useMediaSession", () => {
     rerender({ track: TRACK_A, time: 0, playing: false });
 
     expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(controls.pause).toHaveBeenCalledWith({ preserveNativeResume: true });
     expect(nativeMediaSession.cancelPendingResume).not.toHaveBeenCalled();
   });
 });
