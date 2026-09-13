@@ -20,6 +20,8 @@ export {
 
 export const STORAGE_KEY = "listen-player-state:v1";
 export const RECENTLY_PLAYED_KEY = "listen-recently-played:v1";
+export const LEGACY_STORAGE_KEY = "listen-player-state";
+export const LEGACY_RECENTLY_PLAYED_KEY = "listen-recently-played";
 export const MAX_RECENT = 10;
 export function getStoredVolume(): number {
   if (isNative) return 1;
@@ -53,7 +55,11 @@ export interface StoredQueue {
 
 export function getStoredQueue(): StoredQueue {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const currentRaw = localStorage.getItem(STORAGE_KEY);
+    const fromLegacy = currentRaw === null;
+    const raw = fromLegacy
+      ? localStorage.getItem(LEGACY_STORAGE_KEY)
+      : currentRaw;
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.queue) && parsed.queue.length > 0) {
@@ -61,7 +67,7 @@ export function getStoredQueue(): StoredQueue {
         const unshuffledQueue = Array.isArray(parsed.unshuffledQueue)
           ? parsed.unshuffledQueue.map(normalizeStoredTrack)
           : null;
-        return {
+        const storedQueue = {
           queue,
           currentIndex: parsed.currentIndex ?? 0,
           currentTime: parsed.currentTime ?? 0,
@@ -70,6 +76,15 @@ export function getStoredQueue(): StoredQueue {
           unshuffledQueue,
           savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
         };
+        if (fromLegacy) {
+          try {
+            localStorage.setItem(STORAGE_KEY, raw);
+            localStorage.removeItem(LEGACY_STORAGE_KEY);
+          } catch {
+            // Migration is best effort; the restored queue remains usable.
+          }
+        }
+        return storedQueue;
       }
     }
   } catch {
@@ -174,8 +189,24 @@ function canonicalMediaUrl(url: string | null | undefined): string | undefined {
 
 export function getStoredRecentlyPlayed(): Track[] {
   try {
-    const raw = localStorage.getItem(RECENTLY_PLAYED_KEY);
-    if (raw) return JSON.parse(raw);
+    const currentRaw = localStorage.getItem(RECENTLY_PLAYED_KEY);
+    const fromLegacy = currentRaw === null;
+    const raw = fromLegacy
+      ? localStorage.getItem(LEGACY_RECENTLY_PLAYED_KEY)
+      : currentRaw;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      if (fromLegacy) {
+        try {
+          localStorage.setItem(RECENTLY_PLAYED_KEY, raw);
+          localStorage.removeItem(LEGACY_RECENTLY_PLAYED_KEY);
+        } catch {
+          // Migration is best effort; the restored history remains usable.
+        }
+      }
+      return parsed;
+    }
   } catch {
     /* ignore */
   }

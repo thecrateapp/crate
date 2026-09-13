@@ -106,57 +106,60 @@ export function usePlayerQueueStateActions({
   silenceGaplessEngine,
   stopNativeEngineIfAvailable,
 }: UsePlayerQueueStateActionsParams) {
-  const clearQueue = useCallback(() => {
-    if (jamQueueLockedRef.current) return;
-    if (isCastSessionActive()) {
-      void castStop().catch((error) => {
-        console.error("[cast] failed to stop:", error);
-      });
-    }
-    cancelSoftInterruption();
-    pendingRestoreTimeRef.current = 0;
-    resumeAfterReloadRef.current = false;
-    cancelRestoreAutoplay();
-    bufferingIntentRef.current = false;
-    resetPlaybackIntelligence();
-    flushCurrentPlayEvent("interrupted");
-    stopNativeEngineIfAvailable("clear queue");
-    silenceGaplessEngine();
-    resetEngineTrackMap();
-    commitQueue([]);
-    commitCurrentIndex(0);
-    commitCurrentTime(0);
-    commitDuration(0);
-    commitIsPlaying(false);
-    commitIsBuffering(false);
-    setPlaySource(null);
-    activatedTrackKeyRef.current = null;
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore persistence failures
-    }
-  }, [
-    activatedTrackKeyRef,
-    bufferingIntentRef,
-    cancelRestoreAutoplay,
-    cancelSoftInterruption,
-    commitCurrentIndex,
-    commitCurrentTime,
-    commitDuration,
-    commitIsBuffering,
-    commitIsPlaying,
-    commitQueue,
-    flushCurrentPlayEvent,
-    jamQueueLockedRef,
-    pendingRestoreTimeRef,
-    resetEngineTrackMap,
-    resetPlaybackIntelligence,
-    resumeAfterReloadRef,
-    setPlaySource,
-    silenceGaplessEngine,
-    stopNativeEngineIfAvailable,
-  ]);
+  const clearQueue = useCallback(
+    (options: { force?: boolean } = {}) => {
+      if (jamQueueLockedRef.current && !options.force) return;
+      if (isCastSessionActive()) {
+        void castStop().catch((error) => {
+          console.error("[cast] failed to stop:", error);
+        });
+      }
+      cancelSoftInterruption();
+      pendingRestoreTimeRef.current = 0;
+      resumeAfterReloadRef.current = false;
+      cancelRestoreAutoplay();
+      bufferingIntentRef.current = false;
+      resetPlaybackIntelligence();
+      flushCurrentPlayEvent("interrupted");
+      stopNativeEngineIfAvailable("clear queue");
+      silenceGaplessEngine();
+      resetEngineTrackMap();
+      commitQueue([]);
+      commitCurrentIndex(0);
+      commitCurrentTime(0);
+      commitDuration(0);
+      commitIsPlaying(false);
+      commitIsBuffering(false);
+      setPlaySource(null);
+      activatedTrackKeyRef.current = null;
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore persistence failures
+      }
+    },
+    [
+      activatedTrackKeyRef,
+      bufferingIntentRef,
+      cancelRestoreAutoplay,
+      cancelSoftInterruption,
+      commitCurrentIndex,
+      commitCurrentTime,
+      commitDuration,
+      commitIsBuffering,
+      commitIsPlaying,
+      commitQueue,
+      flushCurrentPlayEvent,
+      jamQueueLockedRef,
+      pendingRestoreTimeRef,
+      resetEngineTrackMap,
+      resetPlaybackIntelligence,
+      resumeAfterReloadRef,
+      setPlaySource,
+      silenceGaplessEngine,
+      stopNativeEngineIfAvailable,
+    ],
+  );
 
   const toggleShuffle = useCallback(() => {
     if (jamQueueLockedRef.current) return;

@@ -10,7 +10,7 @@ interface Ref<T> {
 }
 
 interface UsePlayerLifecycleRuntimeOptions {
-  clearQueueRef: Ref<() => void>;
+  clearQueueRef: Ref<(options?: { force?: boolean }) => void>;
   clearTransferPlaybackGuard: () => void;
   currentTrack: Track | undefined;
   isPlaying: boolean;
@@ -39,7 +39,7 @@ export function usePlayerLifecycleRuntime({
 
   useEffect(() => {
     const handleAuthRuntimeReset = () => {
-      clearQueueRef.current();
+      clearQueueRef.current({ force: true });
     };
     window.addEventListener(AUTH_RUNTIME_RESET_EVENT, handleAuthRuntimeReset);
     return () => {

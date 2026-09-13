@@ -10,9 +10,12 @@ import {
   setStoredAuthUserId,
 } from "@/lib/auth-user-storage";
 import { clearQueue as clearPlayEventQueue } from "@/lib/play-event-queue";
-
-const PLAYER_STATE_KEY = "listen-player-state";
-const RECENTLY_PLAYED_KEY = "listen-recently-played";
+import {
+  LEGACY_RECENTLY_PLAYED_KEY,
+  LEGACY_STORAGE_KEY,
+  RECENTLY_PLAYED_KEY,
+  STORAGE_KEY,
+} from "@/contexts/player-utils";
 
 export const AUTH_RUNTIME_RESET_EVENT = "crate:auth-runtime-reset";
 
@@ -34,8 +37,12 @@ function safeRemoveStorageItem(key: string) {
 }
 
 export function resetPlaybackPersistence() {
-  safeRemoveStorageItem(PLAYER_STATE_KEY);
-  safeRemoveStorageItem(RECENTLY_PLAYED_KEY);
+  [
+    STORAGE_KEY,
+    RECENTLY_PLAYED_KEY,
+    LEGACY_STORAGE_KEY,
+    LEGACY_RECENTLY_PLAYED_KEY,
+  ].forEach(safeRemoveStorageItem);
 }
 
 export function resetStoredAuthUser() {

@@ -87,5 +87,6 @@ describe("usePlayerLifecycleRuntime", () => {
     });
 
     expect(clearQueue).toHaveBeenCalledOnce();
+    expect(clearQueue).toHaveBeenCalledWith({ force: true });
   });
 });
