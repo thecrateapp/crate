@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -1282,7 +1283,9 @@ function UserDetailDialog({
   const { user: currentUser, refetch } = useAuth();
   const open = !!user;
   const [detail, setDetail] = useState<UserDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const detailRequestRef = useRef(0);
+  const [loadingRequest, setLoadingRequest] = useState<number | null>(null);
+  const loading = loadingRequest !== null;
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [revokingAll, setRevokingAll] = useState(false);
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("active");
@@ -1295,7 +1298,8 @@ function UserDetailDialog({
 
   const fetchDetail = useCallback(
     async (userId: number, signal?: AbortSignal) => {
-      setLoading(true);
+      const requestId = ++detailRequestRef.current;
+      setLoadingRequest(requestId);
       try {
         const data = await api<UserDetail>(
           `/api/auth/users/${userId}`,
@@ -1306,12 +1310,20 @@ function UserDetailDialog({
         if (signal?.aborted) return;
         setDetail(data);
       } catch (err) {
+        if (
+          signal?.aborted ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
+          return;
+        }
         toast.error(
           err instanceof ApiError ? err.message : "Failed to load user detail",
         );
         setDetail(null);
       } finally {
-        setLoading(false);
+        setLoadingRequest((activeRequest) =>
+          activeRequest === requestId ? null : activeRequest,
+        );
       }
     },
     [],

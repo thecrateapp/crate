@@ -1,10 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 
-const { apiMock } = vi.hoisted(() => ({
+const { apiMock, toastErrorMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -25,7 +26,7 @@ vi.mock("@/components/users/UserMap", () => ({
 
 vi.mock("sonner", () => ({
   toast: {
-    error: vi.fn(),
+    error: toastErrorMock,
     success: vi.fn(),
   },
 }));
@@ -63,6 +64,7 @@ const users = Array.from({ length: 21 }, (_, index) => {
 describe("Users", () => {
   beforeEach(() => {
     apiMock.mockReset();
+    toastErrorMock.mockReset();
     apiMock.mockImplementation((path: string) => {
       if (path === "/api/auth/users") return Promise.resolve(users);
       return Promise.resolve({});
@@ -106,5 +108,48 @@ describe("Users", () => {
 
     expect(screen.getByText("Showing 21-21 of 21 users")).toBeInTheDocument();
     expect(screen.getByText("user-21@example.com")).toBeInTheDocument();
+  });
+
+  it("does not report an aborted user detail request as a failure", async () => {
+    const user = userEvent.setup();
+    let detailSignal: AbortSignal | undefined;
+    apiMock.mockImplementation(
+      (
+        path: string,
+        _method?: string,
+        _body?: unknown,
+        options?: RequestInit,
+      ) => {
+        if (path === "/api/auth/users") return Promise.resolve(users);
+        if (path === "/api/auth/users/1") {
+          detailSignal = options?.signal ?? undefined;
+          return new Promise((_resolve, reject) => {
+            detailSignal?.addEventListener("abort", () => {
+              reject(new DOMException("The request was aborted", "AbortError"));
+            });
+          });
+        }
+        return Promise.resolve({});
+      },
+    );
+
+    render(
+      <MemoryRouter>
+        <Users />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Showing 1-20 of 21 users");
+    const inspectButton = screen.getAllByRole("button", {
+      name: "Inspect",
+    })[0];
+    expect(inspectButton).toBeDefined();
+    await user.click(inspectButton!);
+    await waitFor(() => expect(detailSignal).toBeDefined());
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(detailSignal?.aborted).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(toastErrorMock).not.toHaveBeenCalled();
   });
 });
