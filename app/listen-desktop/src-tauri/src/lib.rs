@@ -83,6 +83,33 @@ struct DesktopMenuState {
     is_playing: Arc<Mutex<bool>>,
 }
 
+#[cfg(desktop)]
+#[derive(Default)]
+struct DeepLinkBuffer {
+    frontend_ready: bool,
+    pending_urls: Vec<String>,
+}
+
+#[cfg(desktop)]
+impl DeepLinkBuffer {
+    fn dispatch(&mut self, urls: Vec<String>) -> Option<Vec<String>> {
+        if self.frontend_ready {
+            return Some(urls);
+        }
+        self.pending_urls.extend(urls);
+        None
+    }
+
+    fn mark_ready(&mut self) -> Vec<String> {
+        self.frontend_ready = true;
+        std::mem::take(&mut self.pending_urls)
+    }
+}
+
+#[cfg(desktop)]
+#[derive(Default)]
+struct DeepLinkState(Mutex<DeepLinkBuffer>);
+
 /// Every command a tray/dock menu item, a media key, or a CLI activation
 /// arg can trigger. `Play`/`Pause`/`PlayPause`/`Previous`/`Next` are also
 /// the only ones forwarded to the frontend, as the string payload of a
@@ -227,34 +254,31 @@ fn open_bandcamp_cookie_interceptor(app: tauri::AppHandle) -> Result<(), String>
     let login_url = "https://bandcamp.com/login"
         .parse()
         .map_err(|err| format!("invalid Bandcamp login URL: {err}"))?;
-    let window = WebviewWindowBuilder::new(
-        &app,
-        "bandcamp-connect",
-        WebviewUrl::External(login_url),
-    )
-    .title("Connect Bandcamp")
-    .inner_size(980.0, 760.0)
-    .min_inner_size(720.0, 560.0)
-    .on_page_load(move |window, payload| {
-        if !matches!(payload.event(), PageLoadEvent::Finished) {
-            return;
-        }
-        if !is_bandcamp_capture_url(payload.url().as_str()) {
-            return;
-        }
-        let Some(cookie) = bandcamp_cookie_header_from_window(&window) else {
-            return;
-        };
+    let window =
+        WebviewWindowBuilder::new(&app, "bandcamp-connect", WebviewUrl::External(login_url))
+            .title("Connect Bandcamp")
+            .inner_size(980.0, 760.0)
+            .min_inner_size(720.0, 560.0)
+            .on_page_load(move |window, payload| {
+                if !matches!(payload.event(), PageLoadEvent::Finished) {
+                    return;
+                }
+                if !is_bandcamp_capture_url(payload.url().as_str()) {
+                    return;
+                }
+                let Some(cookie) = bandcamp_cookie_header_from_window(&window) else {
+                    return;
+                };
 
-        if let Some(main) = app_for_load.get_webview_window("main") {
-            let _ = main.emit("crate:bandcamp-cookie", BandcampCookiePayload { cookie });
-            let _ = main.show();
-            let _ = main.set_focus();
-        }
-        let _ = window.close();
-    })
-    .build()
-    .map_err(|err| err.to_string())?;
+                if let Some(main) = app_for_load.get_webview_window("main") {
+                    let _ = main.emit("crate:bandcamp-cookie", BandcampCookiePayload { cookie });
+                    let _ = main.show();
+                    let _ = main.set_focus();
+                }
+                let _ = window.close();
+            })
+            .build()
+            .map_err(|err| err.to_string())?;
 
     set_desktop_window_icon(&window);
     Ok(())
@@ -274,6 +298,18 @@ fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, String> {
     {
         Ok(None)
     }
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn register_deep_link_listener(
+    state: tauri::State<'_, DeepLinkState>,
+) -> Result<Vec<String>, String> {
+    state
+        .0
+        .lock()
+        .map(|mut buffer| buffer.mark_ready())
+        .map_err(|_| "deep-link buffer is unavailable".to_string())
 }
 
 #[cfg(desktop)]
@@ -326,7 +362,17 @@ fn truncate_menu_text(value: &str, max_chars: usize) -> String {
 
 #[cfg(desktop)]
 fn dispatch_deep_link_urls<R: tauri::Runtime>(window: &WebviewWindow<R>, urls: Vec<String>) {
-    let _ = window.emit("crate:deep-link", urls);
+    let state = window.state::<DeepLinkState>();
+    match state.0.lock() {
+        Ok(mut buffer) => {
+            if let Some(urls) = buffer.dispatch(urls) {
+                let _ = window.emit("crate:deep-link", urls);
+            }
+        }
+        Err(_) => {
+            let _ = window.emit("crate:deep-link", urls);
+        }
+    };
 }
 
 #[cfg(desktop)]
@@ -678,9 +724,12 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            handle_activation_args(app, argv);
-        }));
+        builder =
+            builder
+                .manage(DeepLinkState::default())
+                .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+                    handle_activation_args(app, argv);
+                }));
     }
 
     #[cfg(target_os = "macos")]
@@ -745,7 +794,8 @@ pub fn run() {
             cache_desktop_media_artwork,
             ensure_desktop_window_size,
             open_bandcamp_cookie_interceptor,
-            linux_desktop_theme_snapshot
+            linux_desktop_theme_snapshot,
+            register_deep_link_listener
         ])
         .build(tauri::generate_context!())
         .expect("error while building Crate desktop")
@@ -756,8 +806,33 @@ pub fn run() {
 mod tests {
     use super::{
         is_bandcamp_capture_url, is_supported_activation_command, play_pause_command_for_state,
-        PlaybackCommand,
+        DeepLinkBuffer, PlaybackCommand,
     };
+
+    #[test]
+    fn deep_links_are_buffered_until_the_frontend_listener_is_ready() {
+        let mut buffer = DeepLinkBuffer::default();
+
+        assert_eq!(
+            buffer.dispatch(vec!["cratemusic://oauth/callback?code=one".into()]),
+            None
+        );
+        assert_eq!(
+            buffer.mark_ready(),
+            vec!["cratemusic://oauth/callback?code=one"]
+        );
+    }
+
+    #[test]
+    fn deep_links_dispatch_immediately_after_the_frontend_handshake() {
+        let mut buffer = DeepLinkBuffer::default();
+        assert!(buffer.mark_ready().is_empty());
+
+        assert_eq!(
+            buffer.dispatch(vec!["cratemusic://oauth/callback?code=two".into()]),
+            Some(vec!["cratemusic://oauth/callback?code=two".into()])
+        );
+    }
 
     #[test]
     fn activation_commands_include_system_media_controls() {

@@ -1,7 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-import { shouldUseTauriHttpPlugin } from "./tauri-init";
+import {
+  mergeInitialDeepLinkUrls,
+  shouldUseTauriHttpPlugin,
+} from "./tauri-init";
+
+describe("mergeInitialDeepLinkUrls", () => {
+  it("preserves buffered callbacks and deduplicates launch URLs", () => {
+    expect(
+      mergeInitialDeepLinkUrls(
+        ["cratemusic://oauth/callback?code=buffered"],
+        [
+          "cratemusic://oauth/callback?code=buffered",
+          "cratemusic://oauth/callback?code=launch",
+        ],
+      ),
+    ).toEqual([
+      "cratemusic://oauth/callback?code=buffered",
+      "cratemusic://oauth/callback?code=launch",
+    ]);
+  });
+});
 
 describe("shouldUseTauriHttpPlugin", () => {
   it("uses the privileged client for HTTPS servers", () => {

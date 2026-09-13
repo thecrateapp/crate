@@ -112,13 +112,18 @@ async function initDeepLinks(): Promise<void> {
       void handleDeepLinkUrls(event.payload);
     });
 
+    const bufferedUrls =
+      (await window.__crateTauriInvoke?.<string[]>(
+        "register_deep_link_listener",
+      )) ?? [];
     const launchUrls = await getCurrent();
-    if (launchUrls?.length) {
+    const initialUrls = mergeInitialDeepLinkUrls(bufferedUrls, launchUrls);
+    if (initialUrls.length) {
       recordTauriAuthDiagnostic(
         "Launch deep link found",
-        `${launchUrls.length} URL(s)`,
+        `${initialUrls.length} URL(s)`,
       );
-      await handleDeepLinkUrls(launchUrls);
+      await handleDeepLinkUrls(initialUrls);
     } else {
       recordTauriAuthDiagnostic("OAuth bridge ready");
     }
@@ -130,6 +135,13 @@ async function initDeepLinks(): Promise<void> {
     );
     console.warn("[tauri] deep-link init failed", err);
   }
+}
+
+export function mergeInitialDeepLinkUrls(
+  bufferedUrls: string[],
+  launchUrls: string[] | null,
+): string[] {
+  return [...new Set([...bufferedUrls, ...(launchUrls ?? [])])];
 }
 
 async function retryDeferredOAuth(): Promise<void> {
