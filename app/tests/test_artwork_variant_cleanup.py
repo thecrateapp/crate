@@ -62,9 +62,11 @@ def test_cleanup_artist_hero_publications_keeps_active_previous_and_unknown_orph
 ):
     from crate.artist_hero_publication import (
         ArtistHeroArtifactIdentity,
+        artist_hero_artifact_asset,
         artist_hero_artifact_root,
     )
     from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import artwork_asset_root
 
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     current = ArtistHeroArtifactIdentity("artist-entity", "desktop", "current")
@@ -73,6 +75,7 @@ def test_cleanup_artist_hero_publications_keeps_active_previous_and_unknown_orph
     orphan = ArtistHeroArtifactIdentity("artist-entity", "desktop", "orphan")
     for identity in (current, previous, stale, orphan):
         artist_hero_artifact_root(identity).mkdir(parents=True)
+        artwork_asset_root(artist_hero_artifact_asset(identity)).mkdir(parents=True)
 
     monkeypatch.setattr(
         "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
@@ -120,6 +123,10 @@ def test_cleanup_artist_hero_publications_keeps_active_previous_and_unknown_orph
     assert artist_hero_artifact_root(current).exists()
     assert artist_hero_artifact_root(previous).exists()
     assert artist_hero_artifact_root(orphan).exists()
+    assert not artwork_asset_root(artist_hero_artifact_asset(stale)).exists()
+    assert artwork_asset_root(artist_hero_artifact_asset(current)).exists()
+    assert artwork_asset_root(artist_hero_artifact_asset(previous)).exists()
+    assert artwork_asset_root(artist_hero_artifact_asset(orphan)).exists()
     assert result == {"artists_checked": 1, "revisions_removed": 1}
 
 

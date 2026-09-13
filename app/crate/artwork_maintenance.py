@@ -9,6 +9,7 @@ from typing import Iterator, cast
 
 from crate.artist_hero_publication import (
     ArtistHeroArtifactIdentity,
+    artist_hero_artifact_asset,
     artist_hero_artifact_root,
     artist_hero_publication_lock,
 )
@@ -20,6 +21,7 @@ from crate.artwork_variants import (
     ARTWORK_KINDS,
     ArtworkAsset,
     ArtworkKind,
+    artwork_asset_root,
     artwork_variant_root,
     load_current_manifest,
 )
@@ -282,11 +284,19 @@ def cleanup_artist_hero_publications(
                     )
                 except ValueError:
                     continue
+                removed = False
                 path = artist_hero_artifact_root(identity, root=publication_root)
                 if path.is_dir():
                     shutil.rmtree(path, ignore_errors=True)
                     if not path.exists():
-                        result["revisions_removed"] += 1
+                        removed = True
+                variant_path = artwork_asset_root(artist_hero_artifact_asset(identity))
+                if variant_path.is_dir():
+                    shutil.rmtree(variant_path, ignore_errors=True)
+                    if not variant_path.exists():
+                        removed = True
+                if removed:
+                    result["revisions_removed"] += 1
     return result
 
 
