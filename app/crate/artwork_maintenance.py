@@ -16,8 +16,9 @@ from typing import Iterator, cast
 from crate.artist_hero_publication import (
     ARTIST_HERO_PUBLICATION_PREFIX,
     ArtistHeroArtifactIdentity,
+    ArtistHeroComposition,
     artist_hero_artifact_asset,
-    artist_hero_artifact_root,
+    artist_hero_file_lock,
     artist_hero_publication_lock,
     delete_artist_hero_storage,
 )
@@ -29,7 +30,6 @@ from crate.artwork_variants import (
     ARTWORK_KINDS,
     ArtworkAsset,
     ArtworkKind,
-    artwork_asset_root,
     artwork_variant_root,
     load_current_manifest,
 )
@@ -43,7 +43,7 @@ from crate.db.repositories.artist_hero_artwork import (
 from crate.db.repositories.library_artist_reads import (
     get_library_artist_by_entity_uid,
 )
-from crate.streaming.paths import cache_root, data_root
+from crate.streaming.paths import cache_root, data_root, resolve_confined_path
 
 _TEMP_MAX_AGE_SECONDS = 24 * 3600
 log = logging.getLogger(__name__)
@@ -51,7 +51,11 @@ log = logging.getLogger(__name__)
 
 @contextmanager
 def _artwork_cleanup_cursor_lock(cursor_name: str) -> Iterator[None]:
-    lock_root = (data_root() / ".crate-locks" / "artwork-maintenance").resolve()
+    lock_root = resolve_confined_path(
+        data_root(), Path(".crate-locks") / "artwork-maintenance"
+    )
+    if lock_root is None:
+        raise ValueError("Artwork cleanup lock path is outside the data root")
     lock_root.mkdir(parents=True, exist_ok=True)
     with (lock_root / f"{cursor_name}.lock").open("a+b") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -66,7 +70,9 @@ def _rotating_name_batch(names: set[str], *, limit: int, cursor_name: str) -> li
     if not ordered:
         return []
     batch_size = min(max(1, int(limit)), len(ordered))
-    cursor_root = (data_root() / ".crate-maintenance").resolve()
+    cursor_root = resolve_confined_path(data_root(), ".crate-maintenance")
+    if cursor_root is None:
+        raise ValueError("Artwork cleanup cursor path is outside the data root")
     cursor_path = cursor_root / f"{cursor_name}.json"
 
     with _artwork_cleanup_cursor_lock(cursor_name):
@@ -345,8 +351,12 @@ def cleanup_artist_hero_publications(
     history_artists = list_artist_hero_render_revision_artists(limit=10_000)
     artists: list[dict] = []
     publication_root = cache_root()
-    namespace_root = publication_root / ARTIST_HERO_PUBLICATION_PREFIX
-    materialization_namespace_root = artwork_variant_root() / "artist-hero"
+    namespace_root = resolve_confined_path(
+        publication_root, ARTIST_HERO_PUBLICATION_PREFIX
+    )
+    materialization_namespace_root = resolve_confined_path(
+        publication_root, Path("artwork-variants") / "v1" / "artist-hero"
+    )
 
     def _expired(path) -> bool:
         try:
@@ -366,12 +376,12 @@ def cleanup_artist_hero_publications(
             return False
         return not path.exists()
 
-    def _count_revision_directories(entity_root) -> int:
+    def _revision_directory_keys(entity_root) -> set[tuple[str, str]]:
         try:
             composition_roots = list(entity_root.iterdir())
         except OSError:
-            return 0
-        count = 0
+            return set()
+        keys: set[tuple[str, str]] = set()
         for composition_root in composition_roots:
             if not composition_root.is_dir() or composition_root.is_symlink():
                 continue
@@ -379,19 +389,19 @@ def cleanup_artist_hero_publications(
                 revision_roots = list(composition_root.iterdir())
             except OSError:
                 continue
-            count += sum(
-                1
+            keys.update(
+                (composition_root.name, revision_root.name)
                 for revision_root in revision_roots
                 if revision_root.is_dir()
                 and not revision_root.is_symlink()
                 and not revision_root.name.startswith(".")
             )
-        return count
+        return keys
 
     def _index_materialization_roots() -> dict[str, list]:
         if (
-            not materialization_namespace_root.is_dir()
-            or materialization_namespace_root.is_symlink()
+            materialization_namespace_root is None
+            or not materialization_namespace_root.is_dir()
         ):
             return {}
         try:
@@ -432,27 +442,28 @@ def cleanup_artist_hero_publications(
             artist_root = resolved_library_root / artist_name
             if not artist_root.is_dir() or artist_root.is_symlink():
                 continue
-            try:
-                children = list(artist_root.iterdir())
-            except OSError:
-                continue
-            for child in children:
-                if (
-                    child.is_symlink()
-                    or not child.is_file()
-                    or not child.name.startswith(".artist-hero-")
-                    or not child.name.endswith(".tmp")
-                    or not _expired(child)
-                ):
+            with artist_hero_file_lock(artist_root.resolve()):
+                try:
+                    children = list(artist_root.iterdir())
+                except OSError:
                     continue
-                if _remove_tree(child):
-                    removed += 1
+                for child in children:
+                    if (
+                        child.is_symlink()
+                        or not child.is_file()
+                        or not child.name.startswith(".artist-hero-")
+                        or not child.name.endswith(".tmp")
+                        or not _expired(child)
+                    ):
+                        continue
+                    if _remove_tree(child):
+                        removed += 1
         return removed
 
     materialization_roots_by_uid = _index_materialization_roots()
     result["temporary_removed"] += _cleanup_library_temporaries()
     publication_uids: set[str] = set()
-    if namespace_root.is_dir() and not namespace_root.is_symlink():
+    if namespace_root is not None and namespace_root.is_dir():
         try:
             publication_uids = {path.name for path in namespace_root.iterdir()}
         except OSError:
@@ -474,23 +485,38 @@ def cleanup_artist_hero_publications(
         except ValueError:
             continue
         materialization_roots = materialization_roots_by_uid.get(entity_uid, [])
-        entity_root = namespace_root / entity_uid
+        entity_root = (
+            resolve_confined_path(namespace_root, entity_uid)
+            if namespace_root is not None
+            else None
+        )
         get_library_artist_by_entity_uid(entity_uid)
         with artist_hero_publication_lock(entity_uid):
             artist = get_library_artist_by_entity_uid(entity_uid)
             if not artist:
-                removed = sum(1 for root in materialization_roots if _remove_tree(root))
-                result["revisions_removed"] += removed
+                removed_keys: set[tuple[str, str]] = set()
+                for root in materialization_roots:
+                    key_parts = root.name.split(":", 2)
+                    if _remove_tree(root):
+                        removed_keys.add(
+                            (
+                                key_parts[1],
+                                key_parts[2] if len(key_parts) == 3 else "",
+                            )
+                        )
                 if (
-                    entity_root.is_dir()
+                    entity_root is not None
+                    and entity_root.is_dir()
                     and not entity_root.is_symlink()
                     and _expired(entity_root)
                 ):
-                    revision_count = _count_revision_directories(entity_root)
+                    revision_keys = _revision_directory_keys(entity_root)
                     deleted = delete_artist_hero_storage(entity_uid)
                     if deleted["publication_roots_removed"]:
-                        result["orphan_revisions_removed"] += revision_count
-                        result["revisions_removed"] += revision_count
+                        removed_keys.update(revision_keys)
+                orphan_revisions_removed = len(removed_keys)
+                result["orphan_revisions_removed"] += orphan_revisions_removed
+                result["revisions_removed"] += orphan_revisions_removed
                 result["artists_checked"] += 1
                 continue
             if materialization_roots:
@@ -583,12 +609,22 @@ def cleanup_artist_hero_publications(
                 legacy_asset = ArtworkAsset(
                     "artist-hero", f"{entity_uid}:{composition}"
                 )
-                legacy_root = artwork_asset_root(legacy_asset)
+                legacy_root = (
+                    resolve_confined_path(
+                        materialization_namespace_root, legacy_asset.entity_key
+                    )
+                    if materialization_namespace_root is not None
+                    else None
+                )
                 if (
-                    not profile
-                    or composition not in enabled_compositions
-                    or active_revisions.get(composition)
-                ) and legacy_root.is_dir():
+                    (
+                        not profile
+                        or composition not in enabled_compositions
+                        or active_revisions.get(composition)
+                    )
+                    and legacy_root is not None
+                    and legacy_root.is_dir()
+                ):
                     if _remove_tree(legacy_root):
                         result["revisions_removed"] += 1
             for row in history:
@@ -599,24 +635,46 @@ def cleanup_artist_hero_publications(
                 try:
                     identity = ArtistHeroArtifactIdentity(
                         artist_entity_uid=entity_uid,
-                        composition=composition,
+                        composition=cast(ArtistHeroComposition, composition),
                         render_revision=revision,
                     )
                 except ValueError:
                     continue
                 removed = False
-                path = artist_hero_artifact_root(identity, root=publication_root)
-                if path.is_dir() and _remove_tree(path):
+                path = (
+                    resolve_confined_path(
+                        namespace_root,
+                        Path(entity_uid) / composition / revision,
+                    )
+                    if namespace_root is not None
+                    else None
+                )
+                if path is not None and path.is_dir() and _remove_tree(path):
                     removed = True
-                variant_path = artwork_asset_root(artist_hero_artifact_asset(identity))
-                if variant_path.is_dir() and _remove_tree(variant_path):
+                variant_path = (
+                    resolve_confined_path(
+                        materialization_namespace_root,
+                        artist_hero_artifact_asset(identity).entity_key,
+                    )
+                    if materialization_namespace_root is not None
+                    else None
+                )
+                if (
+                    variant_path is not None
+                    and variant_path.is_dir()
+                    and _remove_tree(variant_path)
+                ):
                     removed = True
                 if removed:
                     result["revisions_removed"] += 1
 
-            entity_root = namespace_root / entity_uid
-            if not entity_root.is_dir() or entity_root.is_symlink():
+            if (
+                entity_root is None
+                or not entity_root.is_dir()
+                or entity_root.is_symlink()
+            ):
                 continue
+            entity_root = cast(Path, entity_root)
             for composition in ("desktop", "mobile"):
                 composition_root = entity_root / composition
                 if not composition_root.is_dir() or composition_root.is_symlink():

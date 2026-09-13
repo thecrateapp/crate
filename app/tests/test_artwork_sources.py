@@ -49,6 +49,34 @@ def test_revision_scoped_artist_hero_source_does_not_fall_back_to_legacy_file(
     assert source.origin == "revision-artifact"
 
 
+def test_revision_scoped_artist_hero_source_rejects_artifact_symlink_escape(
+    monkeypatch, tmp_path
+):
+    from crate import artwork_sources
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_source_path,
+    )
+    from crate.artwork_variants import ArtworkAsset
+
+    cache_root = tmp_path / "cache"
+    outside_artifact = tmp_path / "outside.webp"
+    outside_artifact.write_bytes(b"outside")
+    monkeypatch.setenv("CACHE_DIR", str(cache_root))
+    identity = ArtistHeroArtifactIdentity(
+        "artist-entity", "desktop", "renderer:revision-a"
+    )
+    artifact_path = artist_hero_artifact_source_path(identity)
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.symlink_to(outside_artifact)
+
+    source = artwork_sources.resolve_artwork_source(
+        ArtworkAsset("artist-hero", identity.asset_key)
+    )
+
+    assert source is None
+
+
 def test_album_source_prefers_canonical_cover(monkeypatch, tmp_path):
     from crate import artwork_sources
     from crate.artwork_variants import ArtworkAsset

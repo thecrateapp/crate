@@ -211,9 +211,11 @@ def test_crop_composition_remains_opaque_rgb():
     assert result.mode == "RGB"
 
 
-def test_extended_hero_webp_round_trip_preserves_transparency(tmp_path):
+def test_extended_hero_webp_round_trip_preserves_transparency(monkeypatch, tmp_path):
+    from contextlib import contextmanager
+
     from crate.artist_hero_artwork import render_artist_hero_composition
-    from crate.worker_handlers.artwork import _save_artist_hero_webp_atomic
+    from crate.worker_handlers import artwork
 
     source = Image.new("RGB", (100, 50), color=(0, 0, 0))
     recipe = {
@@ -223,14 +225,23 @@ def test_extended_hero_webp_round_trip_preserves_transparency(tmp_path):
     }
     rendered = render_artist_hero_composition(source, recipe, (100, 50))
     destination = tmp_path / "hero.webp"
+    locked: list[Path] = []
 
-    _save_artist_hero_webp_atomic(rendered, destination)
+    @contextmanager
+    def file_lock(directory):
+        locked.append(directory)
+        yield
+
+    monkeypatch.setattr(artwork, "artist_hero_file_lock", file_lock)
+
+    artwork._save_artist_hero_webp_atomic(rendered, destination)
 
     with Image.open(destination) as reopened:
         reopened.load()
         assert reopened.mode == "RGBA"
         assert reopened.getpixel((0, 0))[3] == 0
         assert reopened.getpixel((50, 25)) == (0, 0, 0, 255)
+    assert locked == [tmp_path.resolve()]
 
 
 def test_shared_geometry_fixtures_match_the_backend_bounds():

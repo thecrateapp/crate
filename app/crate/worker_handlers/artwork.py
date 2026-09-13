@@ -48,8 +48,10 @@ from crate.artist_hero_publication import (
     ARTIST_HERO_PUBLICATION_VERSION,
     ArtistHeroArtifactIdentity,
     artist_hero_artifact_asset,
+    artist_hero_file_lock,
     artist_hero_publication_lock,
     artist_hero_source_fingerprint,
+    delete_artist_hero_artifact,
     publish_artist_hero_artifact,
     resolve_artist_hero_publication_path,
 )
@@ -116,44 +118,46 @@ def _save_artist_hero_webp_atomic(image: PILImage, destination: Path) -> None:
 
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            dir=destination.parent,
-            prefix=f".{destination.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as temporary:
-            temporary_path = Path(temporary.name)
-        image.save(
-            temporary_path,
-            "WEBP",
-            quality=ARTIST_HERO_WEBP_QUALITY,
-            method=ARTIST_HERO_WEBP_METHOD,
-        )
-        temporary_path.replace(destination)
-    finally:
-        if temporary_path and temporary_path.exists():
-            temporary_path.unlink()
+    with artist_hero_file_lock(destination.parent):
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+            image.save(
+                temporary_path,
+                "WEBP",
+                quality=ARTIST_HERO_WEBP_QUALITY,
+                method=ARTIST_HERO_WEBP_METHOD,
+            )
+            temporary_path.replace(destination)
+        finally:
+            if temporary_path and temporary_path.exists():
+                temporary_path.unlink()
 
 
 def _save_artist_hero_jpeg_atomic(image: PILImage, destination: Path) -> None:
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            dir=destination.parent,
-            prefix=f".{destination.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as temporary:
-            temporary_path = Path(temporary.name)
-        image.save(temporary_path, "JPEG", quality=94)
-        temporary_path.replace(destination)
-    finally:
-        if temporary_path and temporary_path.exists():
-            temporary_path.unlink()
+    with artist_hero_file_lock(destination.parent):
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+            image.save(temporary_path, "JPEG", quality=94)
+            temporary_path.replace(destination)
+        finally:
+            if temporary_path and temporary_path.exists():
+                temporary_path.unlink()
 
 
 def _artist_hero_jpeg_content(image: PILImage) -> bytes:
@@ -228,6 +232,7 @@ def _publish_artist_hero_manifest(
     enabled: tuple[str, ...],
     editorial_revision: str | None = None,
     artifact_revision: str | None = None,
+    created_publications: list[ArtistHeroArtifactIdentity] | None = None,
 ) -> dict | None:
     """Publish immutable renders before exposing their active manifest."""
 
@@ -270,35 +275,50 @@ def _publish_artist_hero_manifest(
     ):
         return None
 
-    for composition, image in rendered.items():
-        raw_source = raw_sources.get(composition)
-        recipe = recipes.get(composition)
-        if raw_source is None or recipe is None:
-            continue
-        identity = ArtistHeroArtifactIdentity(
-            artist_entity_uid=entity_uid,
-            composition=composition,
-            render_revision=artifact_revision,
-        )
-        publication = publish_artist_hero_artifact(
-            identity,
-            image,
-            source_fingerprint=artist_hero_source_fingerprint(raw_source),
-            recipe_hash=artist_hero_recipe_hash(recipe),
-            renderer_version=ARTIST_HERO_RENDER_VERSION,
-            source_content=raw_source,
-        )
-        artifacts[composition] = {
-            key: publication.manifest[key]
-            for key in (
-                "renderer_version",
-                "render_revision",
-                "source_fingerprint",
-                "recipe_hash",
-                "relative_path",
-                "source_relative_path",
+    created_here: list[ArtistHeroArtifactIdentity] = []
+    try:
+        for composition, image in rendered.items():
+            raw_source = raw_sources.get(composition)
+            recipe = recipes.get(composition)
+            if raw_source is None or recipe is None:
+                continue
+            identity = ArtistHeroArtifactIdentity(
+                artist_entity_uid=entity_uid,
+                composition=cast(Literal["desktop", "mobile"], composition),
+                render_revision=artifact_revision,
             )
-        }
+            publication = publish_artist_hero_artifact(
+                identity,
+                image,
+                source_fingerprint=artist_hero_source_fingerprint(raw_source),
+                recipe_hash=artist_hero_recipe_hash(recipe),
+                renderer_version=ARTIST_HERO_RENDER_VERSION,
+                source_content=raw_source,
+            )
+            if publication.created:
+                created_here.append(identity)
+            artifacts[composition] = {
+                key: publication.manifest[key]
+                for key in (
+                    "renderer_version",
+                    "render_revision",
+                    "source_fingerprint",
+                    "recipe_hash",
+                    "relative_path",
+                    "source_relative_path",
+                )
+            }
+    except Exception:
+        for identity in reversed(created_here):
+            try:
+                delete_artist_hero_artifact(identity)
+            except (OSError, ValueError):
+                log.warning(
+                    "Could not roll back partial artist hero publication %s",
+                    identity.asset_key,
+                    exc_info=True,
+                )
+        raise
 
     candidate_manifest = {
         "manifest_version": ARTIST_HERO_PUBLICATION_VERSION,
@@ -308,8 +328,54 @@ def _publish_artist_hero_manifest(
     if not _artist_hero_manifest_artifacts_available(
         candidate_manifest, enabled=enabled
     ):
+        for identity in reversed(created_here):
+            try:
+                delete_artist_hero_artifact(identity)
+            except (OSError, ValueError):
+                log.warning(
+                    "Could not roll back incomplete artist hero publication %s",
+                    identity.asset_key,
+                    exc_info=True,
+                )
         return None
+    if created_publications is not None:
+        created_publications.extend(created_here)
     return candidate_manifest
+
+
+def _rollback_unactivated_artist_hero_publications(
+    artist_id: int, identities: list[ArtistHeroArtifactIdentity]
+) -> None:
+    if not identities:
+        return
+    try:
+        profile = get_artist_hero_artwork(artist_id) or {}
+    except Exception:
+        log.warning(
+            "Could not verify unactivated artist hero publications for artist %s",
+            artist_id,
+            exc_info=True,
+        )
+        return
+    manifest = profile.get("render_manifest")
+    raw_artifacts = manifest.get("artifacts") if isinstance(manifest, Mapping) else None
+    artifacts = raw_artifacts if isinstance(raw_artifacts, Mapping) else {}
+    active = {
+        (composition, str(artifact.get("render_revision") or ""))
+        for composition, artifact in artifacts.items()
+        if isinstance(artifact, Mapping)
+    }
+    for identity in reversed(identities):
+        if (identity.composition, identity.render_revision) in active:
+            continue
+        try:
+            delete_artist_hero_artifact(identity)
+        except (OSError, ValueError):
+            log.warning(
+                "Could not roll back artist hero publication %s",
+                identity.asset_key,
+                exc_info=True,
+            )
 
 
 def _artist_hero_materialization_assets(
@@ -1613,6 +1679,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             else existing.get("mobile_enabled", True)
         )
         artist_id = int(artist_row["id"])
+        created_publications: list[ArtistHeroArtifactIdentity] = []
         with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
             render_manifest = _publish_artist_hero_manifest(
                 artist_row=artist_row,
@@ -1629,6 +1696,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
                     )
                     if is_enabled
                 ),
+                created_publications=created_publications,
             )
             if render_manifest is None and isinstance(
                 existing.get("render_manifest"), Mapping
@@ -1659,6 +1727,10 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
                 expected_revision=existing.get("revision"),
                 expected_manifest=existing.get("render_manifest"),
             )
+            if applied is False:
+                _rollback_unactivated_artist_hero_publications(
+                    artist_id, created_publications
+                )
             if applied is not False:
                 _save_artist_hero_jpeg_atomic(img, dest)
                 for target, rendered in rendered_compositions.items():
@@ -1863,6 +1935,7 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         if composition in {"shared", "mobile"}
         else existing.get("mobile_enabled", True)
     )
+    created_publications: list[ArtistHeroArtifactIdentity] = []
     with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
@@ -1881,6 +1954,7 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
                 )
                 if is_enabled
             ),
+            created_publications=created_publications,
         )
         if render_manifest is None and isinstance(
             existing.get("render_manifest"), Mapping
@@ -1913,6 +1987,10 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
             expected_revision=existing.get("revision"),
             expected_manifest=existing.get("render_manifest"),
         )
+        if applied is False:
+            _rollback_unactivated_artist_hero_publications(
+                artist_id, created_publications
+            )
         if applied is not False:
             for target, rendered in rendered_compositions.items():
                 _save_artist_hero_webp_atomic(
@@ -2130,6 +2208,7 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
         mobile_source_width, mobile_source_height = mobile_image.size
     desktop_enabled = existing.get("desktop_enabled", True) is not False
     mobile_enabled = existing.get("mobile_enabled", True) is not False
+    created_publications: list[ArtistHeroArtifactIdentity] = []
     with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
@@ -2148,6 +2227,7 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
                 )
                 if is_enabled
             ),
+            created_publications=created_publications,
         )
         if render_manifest is None and isinstance(
             existing.get("render_manifest"), Mapping
@@ -2176,6 +2256,10 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
             expected_revision=existing.get("revision"),
             expected_manifest=existing.get("render_manifest"),
         )
+        if applied is False:
+            _rollback_unactivated_artist_hero_publications(
+                artist_id, created_publications
+            )
         if applied is not False:
             for composition, rendered in rendered_compositions.items():
                 _save_artist_hero_webp_atomic(
@@ -2250,6 +2334,7 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
     )
     canonical_source = _artist_hero_jpeg_content(image)
     revision = artist_hero_revision(canonical_source, b":derived-hero")
+    created_publications: list[ArtistHeroArtifactIdentity] = []
     with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         render_manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
@@ -2259,6 +2344,7 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
             recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
             existing=existing or {},
             enabled=("desktop", "mobile"),
+            created_publications=created_publications,
         )
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
@@ -2275,6 +2361,10 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
             expected_revision=(existing or {}).get("revision"),
             expected_manifest=(existing or {}).get("render_manifest"),
         )
+        if applied is False:
+            _rollback_unactivated_artist_hero_publications(
+                artist_id, created_publications
+            )
         if applied is not False:
             _save_artist_hero_jpeg_atomic(
                 image,
@@ -2513,6 +2603,7 @@ def _handle_migrate_artist_hero(task_id: str, params: dict, config: dict) -> dic
             image, recipe, render_sizes[composition]
         )
     artifact_revision = artist_hero_revision(*revision_parts)
+    created_publications: list[ArtistHeroArtifactIdentity] = []
     with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
         manifest = _publish_artist_hero_manifest(
             artist_row=artist_row,
@@ -2527,6 +2618,7 @@ def _handle_migrate_artist_hero(task_id: str, params: dict, config: dict) -> dic
             recipes=plan.recipes,
             existing=profile,
             enabled=plan.enabled,
+            created_publications=created_publications,
         )
         if manifest is None:
             return {
@@ -2541,6 +2633,9 @@ def _handle_migrate_artist_hero(task_id: str, params: dict, config: dict) -> dic
             expected_manifest=profile.get("render_manifest"),
             render_manifest=manifest,
         ):
+            _rollback_unactivated_artist_hero_publications(
+                artist_id, created_publications
+            )
             return {
                 "status": "conflict",
                 "reason": "artist-hero-profile-changed",

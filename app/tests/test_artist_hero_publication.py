@@ -152,6 +152,116 @@ def test_publish_artist_hero_artifact_rejects_conflicting_retry(tmp_path):
         )
 
 
+def test_publish_artist_hero_artifact_rejects_namespace_symlink_escape(tmp_path):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        publish_artist_hero_artifact,
+    )
+
+    cache_root = tmp_path / "cache"
+    outside_root = tmp_path / "outside"
+    cache_root.mkdir()
+    outside_root.mkdir()
+    (cache_root / "artist-hero-publications").symlink_to(
+        outside_root, target_is_directory=True
+    )
+    identity = ArtistHeroArtifactIdentity("artist-1", "desktop", "revision-a")
+
+    with pytest.raises(ValueError, match="outside the storage root"):
+        publish_artist_hero_artifact(
+            identity,
+            _image(),
+            source_fingerprint="sha256:source-a",
+            recipe_hash="recipe-a",
+            renderer_version="renderer-a",
+            source_content=b"editable-source-a",
+            root=cache_root,
+        )
+
+    assert list(outside_root.iterdir()) == []
+
+
+def test_resolve_artist_hero_artifact_source_rejects_file_symlink_escape(tmp_path):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_source_path,
+        resolve_artist_hero_artifact_source_path,
+    )
+
+    identity = ArtistHeroArtifactIdentity("artist-1", "desktop", "revision-a")
+    artifact_path = artist_hero_artifact_source_path(identity, root=tmp_path)
+    outside_path = tmp_path.parent / f"{tmp_path.name}-outside.webp"
+    artifact_path.parent.mkdir(parents=True)
+    outside_path.write_bytes(b"outside")
+    artifact_path.symlink_to(outside_path)
+
+    assert resolve_artist_hero_artifact_source_path(identity, root=tmp_path) is None
+
+
+def test_publish_manifest_rolls_back_a_partial_composition_bundle(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_root,
+    )
+    from crate.worker_handlers import artwork
+
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        artwork,
+        "get_library_artist_by_id",
+        lambda _artist_id: {"id": 42, "entity_uid": "artist-1"},
+    )
+    publish = artwork.publish_artist_hero_artifact
+
+    def fail_second_composition(identity, *args, **kwargs):
+        if identity.composition == "mobile":
+            raise RuntimeError("mobile publication failed")
+        return publish(identity, *args, **kwargs)
+
+    monkeypatch.setattr(
+        artwork, "publish_artist_hero_artifact", fail_second_composition
+    )
+    desktop = ArtistHeroArtifactIdentity("artist-1", "desktop", "revision-a")
+
+    with pytest.raises(RuntimeError, match="mobile publication failed"):
+        artwork._publish_artist_hero_manifest(
+            artist_row={"id": 42, "entity_uid": "artist-1"},
+            revision="revision-a",
+            rendered={"desktop": _image(), "mobile": _image()},
+            raw_sources={"desktop": b"desktop", "mobile": b"mobile"},
+            recipes={"desktop": {"mode": "cover"}, "mobile": {"mode": "cover"}},
+            existing={},
+            enabled=("desktop", "mobile"),
+        )
+
+    assert not artist_hero_artifact_root(desktop).exists()
+
+
+def test_manifest_rollback_preserves_identity_activated_by_cas_winner(monkeypatch):
+    from crate.artist_hero_publication import ArtistHeroArtifactIdentity
+    from crate.worker_handlers import artwork
+
+    identity = ArtistHeroArtifactIdentity("artist-1", "desktop", "revision-a")
+    monkeypatch.setattr(
+        artwork,
+        "get_artist_hero_artwork",
+        lambda _artist_id: {
+            "render_manifest": {
+                "artifacts": {"desktop": {"render_revision": identity.render_revision}}
+            }
+        },
+    )
+    monkeypatch.setattr(
+        artwork,
+        "delete_artist_hero_artifact",
+        lambda _identity: pytest.fail("the CAS winner owns this publication"),
+    )
+
+    artwork._rollback_unactivated_artist_hero_publications(42, [identity])
+
+
 def test_publish_manifest_skips_artist_deleted_before_lock(monkeypatch):
     from crate.worker_handlers import artwork
 

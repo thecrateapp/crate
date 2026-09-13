@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import mutagen
 import requests
 
 from crate.artist_hero_publication import (
     ArtistHeroArtifactIdentity,
-    artist_hero_artifact_source_path,
+    ArtistHeroComposition,
+    resolve_artist_hero_artifact_source_path,
 )
 from crate.artwork_variants import ArtworkAsset
 from crate.audio import get_audio_files
@@ -209,15 +211,20 @@ def _artist_hero_source(asset: ArtworkAsset) -> ArtworkSource | None:
     identity_parts = asset.entity_key.split(":", 2)
     if len(identity_parts) == 3:
         entity_uid, composition, render_revision = identity_parts
+        if composition not in {"desktop", "mobile"}:
+            return None
         try:
             identity = ArtistHeroArtifactIdentity(
                 artist_entity_uid=entity_uid,
-                composition=composition,
+                composition=cast(ArtistHeroComposition, composition),
                 render_revision=render_revision,
             )
         except ValueError:
             return None
-        source = _file_source(artist_hero_artifact_source_path(identity))
+        source_path = resolve_artist_hero_artifact_source_path(identity)
+        if source_path is None:
+            return None
+        source = _file_source(source_path)
         if source is None:
             return None
         return ArtworkSource(source.content, source.media_type, "revision-artifact")

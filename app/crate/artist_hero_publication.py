@@ -17,14 +17,14 @@ import shutil
 import tempfile
 import fcntl
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, Literal
 
 from PIL.Image import Image
 
-from crate.artwork_variants import ArtworkAsset, artwork_variant_root
-from crate.streaming.paths import cache_root, data_root
+from crate.artwork_variants import ArtworkAsset
+from crate.streaming.paths import cache_root, data_root, resolve_confined_path
 
 ARTIST_HERO_PUBLICATION_VERSION = 1
 ARTIST_HERO_PUBLICATION_PREFIX = "artist-hero-publications/v1"
@@ -66,6 +66,7 @@ class ArtistHeroArtifactPublication:
     source_path: Path
     manifest_path: Path
     manifest: dict[str, str | int]
+    created: bool = field(compare=False)
 
 
 def _validate_segment(value: str, label: str) -> None:
@@ -125,16 +126,72 @@ def _remove_storage_path(path: Path) -> bool:
     return True
 
 
+def _publication_namespace_root(*, root: Path | None = None) -> Path | None:
+    return resolve_confined_path(
+        root if root is not None else cache_root(),
+        ARTIST_HERO_PUBLICATION_PREFIX,
+    )
+
+
+def _materialization_namespace_root() -> Path | None:
+    return resolve_confined_path(
+        cache_root(), Path("artwork-variants") / "v1" / "artist-hero"
+    )
+
+
+def delete_artist_hero_artifact(
+    identity: ArtistHeroArtifactIdentity,
+) -> dict[str, int]:
+    """Remove one immutable publication and its matching materialization."""
+
+    publication_namespace = _publication_namespace_root()
+    publication_root = (
+        resolve_confined_path(
+            publication_namespace,
+            Path(identity.artist_entity_uid)
+            / identity.composition
+            / identity.render_revision,
+        )
+        if publication_namespace is not None
+        else None
+    )
+    materialization_namespace = _materialization_namespace_root()
+    materialization_root = (
+        resolve_confined_path(
+            materialization_namespace,
+            artist_hero_artifact_asset(identity).entity_key,
+        )
+        if materialization_namespace is not None
+        else None
+    )
+    return {
+        "materializations_removed": int(
+            materialization_root is not None
+            and _remove_storage_path(materialization_root)
+        ),
+        "publications_removed": int(
+            publication_root is not None and _remove_storage_path(publication_root)
+        ),
+    }
+
+
 def delete_artist_hero_storage(artist_entity_uid: str) -> dict[str, int]:
     """Remove every published and materialized hero artifact for one artist."""
 
     _validate_segment(artist_entity_uid, "artist entity UID")
-    publication_root = cache_root() / ARTIST_HERO_PUBLICATION_PREFIX / artist_entity_uid
-    publication_roots_removed = int(_remove_storage_path(publication_root))
+    publication_namespace = _publication_namespace_root()
+    publication_root = (
+        resolve_confined_path(publication_namespace, artist_entity_uid)
+        if publication_namespace is not None
+        else None
+    )
+    publication_roots_removed = int(
+        publication_root is not None and _remove_storage_path(publication_root)
+    )
 
     materializations_removed = 0
-    materialization_root = artwork_variant_root() / "artist-hero"
-    if materialization_root.is_dir() and not materialization_root.is_symlink():
+    materialization_root = _materialization_namespace_root()
+    if materialization_root is not None and materialization_root.is_dir():
         asset_prefix = f"{artist_entity_uid}:"
         for asset_root in materialization_root.iterdir():
             if asset_root.name.startswith(asset_prefix) and _remove_storage_path(
@@ -157,6 +214,14 @@ def resolve_artist_hero_publication_path(
     base = (root if root is not None else cache_root()).resolve()
     candidate = (base / stored).resolve()
     return candidate if candidate.is_relative_to(base) else None
+
+
+def resolve_artist_hero_artifact_source_path(
+    identity: ArtistHeroArtifactIdentity, *, root: Path | None = None
+) -> Path | None:
+    return resolve_artist_hero_publication_path(
+        _relative_artifact_path(identity), root=root
+    )
 
 
 def artist_hero_source_fingerprint(source_content: bytes) -> str:
@@ -259,7 +324,7 @@ def _existing_publication(
             f"Artifact identity already exists with different contents: {identity.asset_key}"
         )
     return ArtistHeroArtifactPublication(
-        identity, artifact_path, source_path, manifest_path, manifest
+        identity, artifact_path, source_path, manifest_path, manifest, False
     )
 
 
@@ -274,6 +339,27 @@ def artist_hero_publication_lock(artist_entity_uid: str) -> Iterator[None]:
         raise ValueError("Artist hero lock path is outside the coordination root")
     lock_root.mkdir(parents=True, exist_ok=True)
     lock_name = hashlib.sha256(artist_entity_uid.encode("utf-8")).hexdigest()
+    with (lock_root / f"{lock_name}.lock").open("a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def artist_hero_file_lock(directory: Path) -> Iterator[None]:
+    """Serialize legacy hero file writes and their temporary-file cleanup."""
+
+    lock_root = resolve_confined_path(
+        data_root(), Path(".crate-locks") / "artist-hero-files"
+    )
+    if lock_root is None:
+        raise ValueError("Artist hero file lock path is outside the coordination root")
+    lock_root.mkdir(parents=True, exist_ok=True)
+    lock_name = hashlib.sha256(
+        str(directory.resolve(strict=False)).encode("utf-8")
+    ).hexdigest()
     with (lock_root / f"{lock_name}.lock").open("a+b") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
@@ -301,14 +387,22 @@ def publish_artist_hero_artifact(
 
     if not source_content:
         raise ValueError("Artist hero source content is required")
-    base = root if root is not None else cache_root()
+    base = (root if root is not None else cache_root()).resolve()
     manifest = build_artist_hero_artifact_manifest(
         identity,
         source_fingerprint=source_fingerprint,
         recipe_hash=recipe_hash,
         renderer_version=renderer_version,
     )
-    final_root = artist_hero_artifact_root(identity, root=base)
+    final_root = resolve_confined_path(
+        base,
+        Path(ARTIST_HERO_PUBLICATION_PREFIX)
+        / identity.artist_entity_uid
+        / identity.composition
+        / identity.render_revision,
+    )
+    if final_root is None:
+        raise ValueError("Artist hero publication path is outside the storage root")
     if final_root.exists():
         return _existing_publication(identity, manifest, root=base)
 
@@ -346,6 +440,7 @@ def publish_artist_hero_artifact(
         source_path=artist_hero_artifact_original_source_path(identity, root=base),
         manifest_path=artist_hero_artifact_manifest_path(identity, root=base),
         manifest=manifest,
+        created=True,
     )
 
 
@@ -367,6 +462,9 @@ __all__ = [
     "resolve_artist_hero_publication_path",
     "artist_hero_source_fingerprint",
     "build_artist_hero_artifact_manifest",
+    "delete_artist_hero_artifact",
     "delete_artist_hero_storage",
+    "artist_hero_file_lock",
     "publish_artist_hero_artifact",
+    "resolve_artist_hero_artifact_source_path",
 ]

@@ -6,6 +6,7 @@ import stat
 import time
 from io import BytesIO
 
+import pytest
 from PIL import Image
 
 
@@ -326,6 +327,49 @@ def test_artist_hero_cleanup_bounds_and_rotates_library_temporary_work(
     assert second["temporary_removed"] == 1
     assert len(remaining_after_first) == 2
     assert len(remaining_after_second) == 1
+
+
+def test_artist_hero_cleanup_rechecks_library_temporary_inside_writer_lock(
+    monkeypatch, tmp_path
+):
+    from contextlib import contextmanager
+
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    library_root = tmp_path / "music"
+    artist_root = library_root / "artist-a"
+    artist_root.mkdir(parents=True)
+    temporary_path = artist_root / ".artist-hero-source.jpg.live.tmp"
+    temporary_path.write_bytes(b"partial")
+    expired = time.time() - 90000
+    os.utime(temporary_path, (expired, expired))
+    locked: list[object] = []
+
+    @contextmanager
+    def writer_lock(path):
+        locked.append(path)
+        os.utime(temporary_path, None)
+        yield
+
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.artist_hero_file_lock",
+        writer_lock,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+
+    result = cleanup_artist_hero_publications(
+        max_artists=1,
+        library_root=library_root,
+    )
+
+    assert temporary_path.is_file()
+    assert result["temporary_removed"] == 0
+    assert locked == [artist_root.resolve()]
 
 
 def test_artist_hero_cleanup_bounds_and_rotates_materialization_queries(
@@ -753,6 +797,136 @@ def test_delete_artist_hero_storage_removes_publications_and_materializations(
     assert unrelated.exists()
 
 
+def test_delete_artist_hero_storage_does_not_follow_namespace_symlinks(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import delete_artist_hero_storage
+
+    cache_root = tmp_path / "cache"
+    outside_root = tmp_path / "outside"
+    publication_root = (
+        outside_root
+        / "publications"
+        / "v1"
+        / "artist-entity"
+        / "desktop"
+        / "revision-a"
+    )
+    materialization_root = (
+        outside_root
+        / "variants"
+        / "v1"
+        / "artist-hero"
+        / "artist-entity:desktop:revision-a"
+    )
+    publication_root.mkdir(parents=True)
+    materialization_root.mkdir(parents=True)
+    cache_root.mkdir()
+    (cache_root / "artist-hero-publications").symlink_to(
+        outside_root / "publications", target_is_directory=True
+    )
+    (cache_root / "artwork-variants").symlink_to(
+        outside_root / "variants", target_is_directory=True
+    )
+    monkeypatch.setenv("CACHE_DIR", str(cache_root))
+
+    result = delete_artist_hero_storage("artist-entity")
+
+    assert result == {"materializations_removed": 0, "publication_roots_removed": 0}
+    assert publication_root.is_dir()
+    assert materialization_root.is_dir()
+
+
+def test_cleanup_artist_hero_publications_does_not_follow_namespace_symlinks(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+
+    data_root = tmp_path / "data"
+    cache_root = tmp_path / "cache"
+    outside_root = tmp_path / "outside"
+    publication_root = (
+        outside_root
+        / "publications"
+        / "v1"
+        / "artist-entity"
+        / "desktop"
+        / "revision-a"
+    )
+    materialization_root = (
+        outside_root
+        / "variants"
+        / "v1"
+        / "artist-hero"
+        / "artist-entity:desktop:revision-a"
+    )
+    publication_root.mkdir(parents=True)
+    materialization_root.mkdir(parents=True)
+    data_root.mkdir()
+    cache_root.mkdir()
+    (cache_root / "artist-hero-publications").symlink_to(
+        outside_root / "publications", target_is_directory=True
+    )
+    (cache_root / "artwork-variants").symlink_to(
+        outside_root / "variants", target_is_directory=True
+    )
+    monkeypatch.setenv("DATA_DIR", str(data_root))
+    monkeypatch.setenv("CACHE_DIR", str(cache_root))
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
+    )
+
+    result = cleanup_artist_hero_publications(max_artists=10)
+
+    assert result == {
+        "artists_checked": 0,
+        "revisions_removed": 0,
+        "temporary_removed": 0,
+        "orphan_revisions_removed": 0,
+    }
+    assert publication_root.is_dir()
+    assert materialization_root.is_dir()
+
+
+def test_cleanup_cursor_rejects_lock_directory_symlink_escape(monkeypatch, tmp_path):
+    from crate.artwork_maintenance import _rotating_name_batch
+
+    data_root = tmp_path / "data"
+    outside_root = tmp_path / "outside"
+    data_root.mkdir()
+    outside_root.mkdir()
+    (data_root / ".crate-locks").symlink_to(outside_root, target_is_directory=True)
+    monkeypatch.setenv("DATA_DIR", str(data_root))
+
+    with pytest.raises(ValueError, match="outside the data root"):
+        _rotating_name_batch({"artist-1"}, limit=1, cursor_name="test-lock")
+
+    assert list(outside_root.iterdir()) == []
+
+
+def test_cleanup_cursor_rejects_cursor_directory_symlink_escape(monkeypatch, tmp_path):
+    from crate.artwork_maintenance import _rotating_name_batch
+
+    data_root = tmp_path / "data"
+    outside_root = tmp_path / "outside"
+    data_root.mkdir()
+    outside_root.mkdir()
+    (data_root / ".crate-maintenance").symlink_to(
+        outside_root, target_is_directory=True
+    )
+    monkeypatch.setenv("DATA_DIR", str(data_root))
+
+    with pytest.raises(ValueError, match="outside the data root"):
+        _rotating_name_batch({"artist-1"}, limit=1, cursor_name="test-cursor")
+
+    assert list(outside_root.iterdir()) == []
+
+
 def test_cleanup_artist_hero_publications_removes_expired_deleted_artist_storage(
     monkeypatch, tmp_path
 ):
@@ -788,6 +962,38 @@ def test_cleanup_artist_hero_publications_removes_expired_deleted_artist_storage
 
     assert not publication.exists()
     assert not materialization.exists()
+    assert result["orphan_revisions_removed"] == 1
+
+
+def test_cleanup_counts_materialization_only_deleted_artist_as_orphan(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_asset,
+    )
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    identity = ArtistHeroArtifactIdentity(
+        "deleted-artist-entity", "desktop", "revision-a"
+    )
+    materialization = artwork_asset_root(artist_hero_artifact_asset(identity))
+    materialization.mkdir(parents=True)
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
+    )
+
+    result = cleanup_artist_hero_publications(max_artists=10)
+
+    assert not materialization.exists()
+    assert result["revisions_removed"] == 1
     assert result["orphan_revisions_removed"] == 1
 
 

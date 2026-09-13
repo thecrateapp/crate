@@ -1,6 +1,6 @@
 import logging
 import json
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Query, Request
@@ -13,8 +13,9 @@ from crate.artist_hero_artwork import (
 )
 from crate.artist_hero_publication import (
     ArtistHeroArtifactIdentity,
+    ArtistHeroComposition,
     artist_hero_artifact_asset,
-    artist_hero_artifact_source_path,
+    resolve_artist_hero_artifact_source_path,
     artist_hero_publication_lock,
     resolve_artist_hero_publication_path,
 )
@@ -1473,13 +1474,13 @@ def api_artist_hero(
             return _artist_hero_revision_unavailable_response(composition)
         artifact_identity = ArtistHeroArtifactIdentity(
             artist_entity_uid=entity_uid,
-            composition=composition,
+            composition=cast(ArtistHeroComposition, composition),
             render_revision=render_revision,
         )
         versioned_original = retained_path
         retained_revision = True
     elif artifact_identity is not None:
-        versioned_original = artist_hero_artifact_source_path(artifact_identity)
+        versioned_original = resolve_artist_hero_artifact_source_path(artifact_identity)
     local_original = versioned_original or legacy_original
     has_eligible_profile = bool(
         entity_uid
@@ -1501,6 +1502,8 @@ def api_artist_hero(
 
         def deliver_hero(*, buffer_file: bool = False) -> Response:
             if size is None or size == canonical_width:
+                if local_original is None or not local_original.is_file():
+                    return Response(status_code=404)
                 return deliver_original_artwork(
                     local_original,
                     cache_control="private, no-cache, must-revalidate",
@@ -1556,7 +1559,7 @@ def _artist_hero_artifact_identity(
     try:
         return ArtistHeroArtifactIdentity(
             artist_entity_uid=entity_uid,
-            composition=composition,
+            composition=cast(ArtistHeroComposition, composition),
             render_revision=str(artifact.get("render_revision") or ""),
         )
     except ValueError:
