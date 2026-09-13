@@ -947,8 +947,8 @@ def test_upload_handler_writes_hero_variants_and_profile(monkeypatch, tmp_path):
         for artifact in manifest["artifacts"].values()
     )
     assert queued == [
-        ("artist-hero", "artist-entity:desktop"),
-        ("artist-hero", "artist-entity:mobile"),
+        ("artist-hero", f"artist-entity:desktop:{profiles[0]['revision']}"),
+        ("artist-hero", f"artist-entity:mobile:{profiles[0]['revision']}"),
     ]
     warm.assert_called_once_with()
 
@@ -1222,8 +1222,8 @@ def test_compose_handler_rerenders_the_persisted_hero_source(monkeypatch, tmp_pa
     assert profiles[0]["provenance"] == "manual"
     assert profiles[0]["review_status"] == "approved"
     assert queued == [
-        ("artist-hero", "artist-entity:desktop"),
-        ("artist-hero", "artist-entity:mobile"),
+        ("artist-hero", f"artist-entity:desktop:{profiles[0]['revision']}"),
+        ("artist-hero", f"artist-entity:mobile:{profiles[0]['revision']}"),
     ]
     invalidate.assert_called_once_with("artist:7", "library", "home")
     assert events == ["broadcast", "wait", "warm"]
@@ -1484,8 +1484,16 @@ def test_recompose_handler_refreshes_legacy_output_without_changing_profile(
 
     assert profiles[0]["revision"].startswith(f"{ARTIST_HERO_RENDER_VERSION}:")
     assert queued == [
-        ("artist-hero", "artist-entity:desktop", "renderer-migration"),
-        ("artist-hero", "artist-entity:mobile", "renderer-migration"),
+        (
+            "artist-hero",
+            f"artist-entity:desktop:{profiles[0]['revision']}",
+            "renderer-migration",
+        ),
+        (
+            "artist-hero",
+            f"artist-entity:mobile:{profiles[0]['revision']}",
+            "renderer-migration",
+        ),
     ]
     assert events == ["broadcast", "wait", "warm"]
 
@@ -1501,6 +1509,7 @@ def test_derive_handler_creates_unreviewed_hero_from_large_background(
         artist_dir / "background.jpg"
     )
     profiles: list[dict] = []
+    queued: list[tuple[str, str]] = []
     monkeypatch.setattr(
         "crate.worker_handlers.artwork.get_library_artist",
         lambda name: {"id": 7, "entity_uid": "artist-entity", "name": name},
@@ -1519,7 +1528,7 @@ def test_derive_handler_creates_unreviewed_hero_from_large_background(
     )
     monkeypatch.setattr(
         "crate.worker_handlers.artwork.queue_artwork_materialization",
-        lambda *args, **kwargs: None,
+        lambda asset, *, reason: queued.append((asset.kind, asset.entity_key)),
     )
 
     with (
@@ -1534,6 +1543,10 @@ def test_derive_handler_creates_unreviewed_hero_from_large_background(
     assert profiles[0]["provenance"] == "derived_background"
     assert profiles[0]["review_status"] == "unreviewed"
     assert (artist_dir / "artist-hero-mobile.webp").is_file()
+    assert queued == [
+        ("artist-hero", f"artist-entity:desktop:{profiles[0]['revision']}"),
+        ("artist-hero", f"artist-entity:mobile:{profiles[0]['revision']}"),
+    ]
     warm.assert_called_once_with()
 
 

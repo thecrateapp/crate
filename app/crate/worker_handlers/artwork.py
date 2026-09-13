@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 import base64
 import hashlib
 import io as _io
@@ -45,6 +47,7 @@ from crate.artist_hero_migration import (
 from crate.artist_hero_publication import (
     ARTIST_HERO_PUBLICATION_VERSION,
     ArtistHeroArtifactIdentity,
+    artist_hero_artifact_asset,
     artist_hero_publication_lock,
     artist_hero_source_fingerprint,
     publish_artist_hero_artifact,
@@ -278,6 +281,54 @@ def _publish_artist_hero_manifest(
         "editorial_revision": editorial_revision,
         "artifacts": artifacts,
     }
+
+
+def _artist_hero_materialization_assets(
+    *,
+    entity_uid: str,
+    render_manifest: Mapping[str, object] | None,
+    compositions: Iterable[str],
+) -> list[ArtworkAsset]:
+    if not entity_uid:
+        return []
+    valid_compositions = [
+        composition
+        for composition in compositions
+        if composition in {"desktop", "mobile"}
+    ]
+    if not isinstance(render_manifest, Mapping):
+        return [
+            ArtworkAsset("artist-hero", f"{entity_uid}:{composition}")
+            for composition in valid_compositions
+        ]
+    artifacts = render_manifest.get("artifacts")
+    if not isinstance(artifacts, Mapping):
+        return [
+            ArtworkAsset("artist-hero", f"{entity_uid}:{composition}")
+            for composition in valid_compositions
+        ]
+
+    assets: list[ArtworkAsset] = []
+    for composition in valid_compositions:
+        artifact = artifacts.get(composition)
+        render_revision = (
+            str(artifact.get("render_revision") or "")
+            if isinstance(artifact, Mapping)
+            else ""
+        )
+        if not render_revision:
+            assets.append(ArtworkAsset("artist-hero", f"{entity_uid}:{composition}"))
+            continue
+        try:
+            identity = ArtistHeroArtifactIdentity(
+                artist_entity_uid=entity_uid,
+                composition=cast(Literal["desktop", "mobile"], composition),
+                render_revision=render_revision,
+            )
+        except ValueError:
+            continue
+        assets.append(artist_hero_artifact_asset(identity))
+    return assets
 
 
 def _broadcast_artwork_invalidation(*scopes: str) -> None:
@@ -1525,8 +1576,11 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         entity_uid = str(artist_row.get("entity_uid") or "")
         if entity_uid:
             materialization_assets.extend(
-                ArtworkAsset("artist-hero", f"{entity_uid}:{target}")
-                for target in targets
+                _artist_hero_materialization_assets(
+                    entity_uid=entity_uid,
+                    render_manifest=render_manifest,
+                    compositions=targets,
+                )
             )
         invalidation_scopes.extend([f"artist:{artist_id}", "library", "home"])
     elif img_type == "genre_cover":
@@ -1764,9 +1818,13 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         }
     entity_uid = str(artist_row.get("entity_uid") or "")
     if entity_uid:
-        for target in targets:
+        for asset in _artist_hero_materialization_assets(
+            entity_uid=entity_uid,
+            render_manifest=render_manifest,
+            compositions=targets,
+        ):
             queue_artwork_materialization(
-                ArtworkAsset("artist-hero", f"{entity_uid}:{target}"),
+                asset,
                 reason="source-write",
             )
     _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
@@ -2013,9 +2071,13 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
         }
     entity_uid = str(artist_row.get("entity_uid") or "")
     if entity_uid:
-        for composition in loaded_sources:
+        for asset in _artist_hero_materialization_assets(
+            entity_uid=entity_uid,
+            render_manifest=render_manifest,
+            compositions=loaded_sources,
+        ):
             queue_artwork_materialization(
-                ArtworkAsset("artist-hero", f"{entity_uid}:{composition}"),
+                asset,
                 reason="renderer-migration",
             )
     _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
@@ -2113,9 +2175,13 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
         }
     entity_uid = str(artist_row.get("entity_uid") or "")
     if entity_uid:
-        for composition in ("desktop", "mobile"):
+        for asset in _artist_hero_materialization_assets(
+            entity_uid=entity_uid,
+            render_manifest=render_manifest,
+            compositions=("desktop", "mobile"),
+        ):
             queue_artwork_materialization(
-                ArtworkAsset("artist-hero", f"{entity_uid}:{composition}"),
+                asset,
                 reason="source-write",
             )
     _broadcast_artwork_invalidation(f"artist:{artist_id}", "library", "home")
