@@ -289,6 +289,28 @@ def cleanup_artist_hero_publications(
             return False
         return not path.exists()
 
+    def _count_revision_directories(entity_root) -> int:
+        try:
+            composition_roots = list(entity_root.iterdir())
+        except OSError:
+            return 0
+        count = 0
+        for composition_root in composition_roots:
+            if not composition_root.is_dir() or composition_root.is_symlink():
+                continue
+            try:
+                revision_roots = list(composition_root.iterdir())
+            except OSError:
+                continue
+            count += sum(
+                1
+                for revision_root in revision_roots
+                if revision_root.is_dir()
+                and not revision_root.is_symlink()
+                and not revision_root.name.startswith(".")
+            )
+        return count
+
     known_entity_uids = {str(artist.get("entity_uid") or "") for artist in artists}
     discovered_count = len(artists)
     if namespace_root.is_dir() and len(artists) < capped_limit:
@@ -308,16 +330,7 @@ def cleanup_artist_hero_publications(
                 with artist_hero_publication_lock(publication_root, entity_uid):
                     artist = get_library_artist_by_entity_uid(entity_uid)
                     if not artist:
-                        revision_count = sum(
-                            1
-                            for composition_root in entity_root.iterdir()
-                            if composition_root.is_dir()
-                            and not composition_root.is_symlink()
-                            for revision_root in composition_root.iterdir()
-                            if revision_root.is_dir()
-                            and not revision_root.is_symlink()
-                            and not revision_root.name.startswith(".")
-                        )
+                        revision_count = _count_revision_directories(entity_root)
                         removed = delete_artist_hero_storage(entity_uid)
                         if removed["publication_roots_removed"]:
                             result["orphan_revisions_removed"] += revision_count
@@ -375,6 +388,18 @@ def cleanup_artist_hero_publications(
                     keep_per_composition=keep_per_composition,
                 )
             retained = {item for item in retained if item[0] in enabled_compositions}
+            for composition in ("desktop", "mobile"):
+                legacy_asset = ArtworkAsset(
+                    "artist-hero", f"{entity_uid}:{composition}"
+                )
+                legacy_root = artwork_asset_root(legacy_asset)
+                if (
+                    not profile
+                    or composition not in enabled_compositions
+                    or active_revisions.get(composition)
+                ) and legacy_root.is_dir():
+                    if _remove_tree(legacy_root):
+                        result["revisions_removed"] += 1
             for row in history:
                 composition = str(row.get("composition") or "")
                 revision = str(row.get("render_revision") or "")
@@ -398,7 +423,7 @@ def cleanup_artist_hero_publications(
                 if removed:
                     result["revisions_removed"] += 1
 
-            entity_root = namespace_root / str(artist.get("entity_uid") or "")
+            entity_root = namespace_root / entity_uid
             if not entity_root.is_dir() or entity_root.is_symlink():
                 continue
             for composition in ("desktop", "mobile"):

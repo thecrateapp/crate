@@ -242,6 +242,49 @@ class TestHandleMaterializeArtworkVariants:
         assert result["status"] == "materialized"
         assert result["revision"] == "source-a"
 
+    def test_artist_hero_materialization_rejects_a_stale_legacy_asset(
+        self, monkeypatch
+    ):
+        artist = {"id": 42, "entity_uid": "artist-entity"}
+        _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: artist,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_artwork",
+            lambda _artist_id: {
+                "desktop_enabled": True,
+                "review_status": "approved",
+                "render_manifest": {
+                    "artifacts": {
+                        "desktop": {"render_revision": "renderer:revision-new"}
+                    }
+                },
+            },
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("stale legacy assets must not be rematerialized")
+            ),
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-stale-legacy",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop",
+            },
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-hero",
+            "entity_key": "artist-entity:desktop",
+        }
+
     def test_materializes_resolved_source(self, monkeypatch):
         from crate.artwork_sources import ArtworkSource
 

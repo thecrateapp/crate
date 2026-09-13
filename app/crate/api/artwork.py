@@ -54,7 +54,10 @@ from crate.artist_hero_contract import (
     artist_hero_profile_contract,
     artist_hero_profile_ready_compositions,
 )
-from crate.artist_hero_publication import resolve_artist_hero_publication_path
+from crate.artist_hero_publication import (
+    artist_hero_publication_lock,
+    resolve_artist_hero_publication_path,
+)
 from crate.db.repositories.library import get_albums_missing_covers, get_library_artist
 from crate.db.repositories.artist_artwork_assets import (
     get_artist_artwork_asset,
@@ -560,9 +563,13 @@ def api_artist_hero_source(
         return JSONResponse({"error": "Artist not found"}, status_code=404)
 
     root = library_path().resolve()
+    artist = get_library_artist(artist_name)
+    entity_uid = str((artist or {}).get("entity_uid") or "")
+    if not entity_uid:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
     artist_dir = resolve_artist_dir(
         root,
-        get_library_artist(artist_name),
+        artist,
         fallback_name=artist_name,
         existing_only=True,
     )
@@ -603,10 +610,16 @@ def api_artist_hero_source(
             source_path = None
     if source_path is None or not source_path.is_file():
         return JSONResponse({"error": "Artist hero source not found"}, status_code=404)
-    return deliver_original_artwork(
-        source_path,
-        cache_control="private, max-age=300, stale-while-revalidate=3600",
-    )
+    with artist_hero_publication_lock(cache_root(), entity_uid):
+        if not source_path.is_file():
+            return JSONResponse(
+                {"error": "Artist hero source not found"}, status_code=404
+            )
+        return deliver_original_artwork(
+            source_path,
+            cache_control="private, max-age=300, stale-while-revalidate=3600",
+            buffer_file=True,
+        )
 
 
 @router.post(

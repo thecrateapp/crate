@@ -467,17 +467,15 @@ def _handle_materialize_artwork_variants(
             or profile.get(f"{composition}_enabled", True) is False
         ):
             return missing_result()
+        manifest = profile.get("render_manifest")
+        artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
+        artifact = artifacts.get(composition) if isinstance(artifacts, dict) else None
+        active_revision = (
+            str(artifact.get("render_revision") or "")
+            if isinstance(artifact, dict)
+            else ""
+        )
         if render_revision:
-            manifest = profile.get("render_manifest")
-            artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
-            artifact = (
-                artifacts.get(composition) if isinstance(artifacts, dict) else None
-            )
-            active_revision = (
-                str(artifact.get("render_revision") or "")
-                if isinstance(artifact, dict)
-                else ""
-            )
             if (
                 active_revision != render_revision
                 and get_artist_hero_render_revision(
@@ -488,6 +486,8 @@ def _handle_materialize_artwork_variants(
                 is None
             ):
                 return missing_result()
+        elif active_revision:
+            return missing_result()
         return materialize_resolved_source()
 
 

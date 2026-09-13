@@ -90,6 +90,120 @@ def test_generic_cleanup_skips_artist_hero_roots_owned_by_hero_gc(
     assert root.is_dir()
 
 
+def test_artist_hero_cleanup_removes_legacy_variants_after_v2_activation(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    legacy_root = artwork_asset_root(
+        ArtworkAsset("artist-hero", "artist-entity:desktop")
+    )
+    legacy_root.mkdir(parents=True)
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_artist_hero_artwork",
+        lambda _artist_id: {
+            "desktop_enabled": True,
+            "render_manifest": {
+                "artifacts": {"desktop": {"render_revision": "renderer:revision-new"}}
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revisions",
+        lambda _artist_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_manifest_history",
+        lambda _artist_id: [],
+    )
+
+    cleanup_artist_hero_publications(max_artists=10)
+
+    assert not legacy_root.exists()
+
+
+def test_artist_hero_cleanup_keeps_the_active_legacy_variant(monkeypatch, tmp_path):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    legacy_root = artwork_asset_root(
+        ArtworkAsset("artist-hero", "artist-entity:desktop")
+    )
+    legacy_root.mkdir(parents=True)
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_artist_hero_artwork",
+        lambda _artist_id: {"desktop_enabled": True},
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revisions",
+        lambda _artist_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_manifest_history",
+        lambda _artist_id: [],
+    )
+
+    cleanup_artist_hero_publications(max_artists=10)
+
+    assert legacy_root.is_dir()
+
+
+def test_artist_hero_cleanup_removes_a_legacy_variant_without_a_profile(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    legacy_root = artwork_asset_root(
+        ArtworkAsset("artist-hero", "artist-entity:desktop")
+    )
+    legacy_root.mkdir(parents=True)
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [{"artist_id": 42, "entity_uid": "artist-entity"}],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_artist_hero_artwork",
+        lambda _artist_id: None,
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revisions",
+        lambda _artist_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_manifest_history",
+        lambda _artist_id: [],
+    )
+
+    cleanup_artist_hero_publications(max_artists=10)
+
+    assert not legacy_root.exists()
+
+
 def test_cleanup_artist_hero_publications_keeps_active_previous_and_fresh_orphans(
     monkeypatch, tmp_path
 ):
@@ -449,6 +563,51 @@ def test_cleanup_artist_hero_publications_removes_expired_deleted_artist_storage
     assert not publication.exists()
     assert not materialization.exists()
     assert result["orphan_revisions_removed"] == 1
+
+
+def test_cleanup_artist_hero_publications_tolerates_an_orphan_removed_while_waiting(
+    monkeypatch, tmp_path
+):
+    from contextlib import contextmanager
+    import shutil
+
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_root,
+    )
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    identity = ArtistHeroArtifactIdentity(
+        "deleted-artist-entity", "desktop", "revision-a"
+    )
+    entity_root = artist_hero_artifact_root(identity).parents[1]
+    artist_hero_artifact_root(identity).mkdir(parents=True)
+    expired = time.time() - 90000
+    os.utime(entity_root, (expired, expired))
+
+    @contextmanager
+    def publication_lock(_root, _entity_uid):
+        shutil.rmtree(entity_root)
+        yield
+
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.artist_hero_publication_lock",
+        publication_lock,
+    )
+
+    result = cleanup_artist_hero_publications(max_artists=10)
+
+    assert result["artists_checked"] == 1
+    assert result["orphan_revisions_removed"] == 0
 
 
 def test_cleanup_artist_hero_publications_preserves_a_recreated_artist(

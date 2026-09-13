@@ -675,7 +675,12 @@ def test_artist_hero_source_endpoint_delivers_the_editable_original(test_app, tm
         patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
         patch(
             "crate.api.artwork.get_library_artist",
-            return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
+            return_value={
+                "id": 7,
+                "entity_uid": "artist-entity",
+                "name": "Converge",
+                "folder_name": "Converge",
+            },
         ),
         patch("crate.api.artwork.library_path", return_value=tmp_path),
         patch(
@@ -689,6 +694,26 @@ def test_artist_hero_source_endpoint_delivers_the_editable_original(test_app, tm
     assert response.headers["content-type"] == "image/jpeg"
     assert response.headers["cache-control"].startswith("private")
     assert response.content.startswith(b"\xff\xd8")
+
+
+def test_artist_hero_source_does_not_serve_after_the_artist_row_disappears(
+    test_app, tmp_path
+):
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    Image.new("RGB", (1600, 1000), color="blue").save(
+        artist_dir / "artist-hero-source.jpg", "JPEG"
+    )
+
+    with (
+        patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch("crate.api.artwork.get_library_artist", return_value=None),
+        patch("crate.api.artwork.library_path", return_value=tmp_path),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value={}),
+    ):
+        response = test_app.get("/api/artwork/artists/7/hero-source")
+
+    assert response.status_code == 404
 
 
 def test_artist_hero_source_without_composition_keeps_shared_source_contract(
@@ -718,7 +743,12 @@ def test_artist_hero_source_without_composition_keeps_shared_source_contract(
         patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
         patch(
             "crate.api.artwork.get_library_artist",
-            return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
+            return_value={
+                "id": 7,
+                "entity_uid": "artist-entity",
+                "name": "Converge",
+                "folder_name": "Converge",
+            },
         ),
         patch("crate.api.artwork.library_path", return_value=tmp_path),
         patch("crate.api.artwork.cache_root", return_value=cache_dir),
@@ -743,7 +773,12 @@ def test_artist_hero_source_endpoint_delivers_a_composition_override(
         patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
         patch(
             "crate.api.artwork.get_library_artist",
-            return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
+            return_value={
+                "id": 7,
+                "entity_uid": "artist-entity",
+                "name": "Converge",
+                "folder_name": "Converge",
+            },
         ),
         patch("crate.api.artwork.library_path", return_value=tmp_path),
         patch(
@@ -786,7 +821,12 @@ def test_artist_hero_source_endpoint_prefers_the_active_immutable_source(
         patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
         patch(
             "crate.api.artwork.get_library_artist",
-            return_value={"id": 7, "name": "Converge", "folder_name": "Converge"},
+            return_value={
+                "id": 7,
+                "entity_uid": "artist-entity",
+                "name": "Converge",
+                "folder_name": "Converge",
+            },
         ),
         patch("crate.api.artwork.library_path", return_value=tmp_path),
         patch("crate.api.artwork.cache_root", return_value=cache_dir),
@@ -800,6 +840,62 @@ def test_artist_hero_source_endpoint_prefers_the_active_immutable_source(
     with Image.open(io.BytesIO(response.content)) as source:
         red, _green, blue = source.getpixel((0, 0))
     assert blue > red
+
+
+def test_artist_hero_source_buffers_the_publication_under_the_stable_lock(
+    test_app, tmp_path
+):
+    from contextlib import contextmanager
+
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    cache_dir = tmp_path / "cache"
+    immutable_source = cache_dir / "published" / "desktop" / "source.jpg"
+    immutable_source.parent.mkdir(parents=True)
+    Image.new("RGB", (1600, 1000), color="blue").save(immutable_source, "JPEG")
+    profile = {
+        "desktop_enabled": True,
+        "render_manifest": {
+            "artifacts": {
+                "desktop": {
+                    "source_relative_path": "published/desktop/source.jpg",
+                }
+            },
+        },
+    }
+    events: list[str] = []
+
+    @contextmanager
+    def publication_lock(_root, entity_uid):
+        assert entity_uid == "artist-entity"
+        events.append("lock-enter")
+        yield
+        immutable_source.unlink()
+        events.append("lock-exit")
+
+    with (
+        patch("crate.api.artwork.artist_name_from_id", return_value="Converge"),
+        patch(
+            "crate.api.artwork.get_library_artist",
+            return_value={
+                "id": 7,
+                "entity_uid": "artist-entity",
+                "name": "Converge",
+                "folder_name": "Converge",
+            },
+        ),
+        patch("crate.api.artwork.library_path", return_value=tmp_path),
+        patch("crate.api.artwork.cache_root", return_value=cache_dir),
+        patch("crate.api.artwork.get_artist_hero_artwork", return_value=profile),
+        patch("crate.api.artwork.artist_hero_publication_lock", publication_lock),
+    ):
+        response = test_app.get(
+            "/api/artwork/artists/7/hero-source?composition=desktop"
+        )
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"\xff\xd8")
+    assert events == ["lock-enter", "lock-exit"]
 
 
 def test_delete_artist_hero_composition_enqueues_persistent_delete(test_app):
