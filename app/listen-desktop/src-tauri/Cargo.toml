@@ -29,7 +29,7 @@ zbus = "5.15.0"
 block2 = "0.6.2"
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSMenu", "NSMenuItem", "NSResponder"] }
-objc2-foundation = { version = "0.3.2", features = ["NSString"] }
+objc2-foundation = { version = "0.3.2", features = ["NSData", "NSString", "NSURL"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # Pinned to the same major version already resolved transitively by
