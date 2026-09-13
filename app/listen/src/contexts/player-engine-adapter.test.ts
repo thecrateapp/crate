@@ -324,4 +324,52 @@ describe("player engine adapter", () => {
       "https://listen.example/api/albums/2/cover?size=512&media_ticket=fresh-artwork",
     ]);
   });
+
+  it("awaits every artwork ticket batch before restoring a large native queue", async () => {
+    let resolveFirst: (() => void) | undefined;
+    let resolveSecond: (() => void) | undefined;
+    refreshMediaAccessTicketsMock
+      .mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveFirst = () => resolve(true);
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveSecond = () => resolve(true);
+          }),
+      );
+    const queue = Array.from({ length: 129 }, (_, index) => ({
+      id: `track-${index}`,
+      entityUid: `entity-${index}`,
+      title: `Song ${index}`,
+      artist: "Band",
+      albumCover: `/api/albums/${index}/cover?size=512`,
+    }));
+
+    let restored = false;
+    const restoration = toStartupEngineTracks(queue, 0, undefined, {
+      target: "android-native",
+    }).then((tracks) => {
+      restored = true;
+      return tracks;
+    });
+
+    await vi.waitFor(() =>
+      expect(refreshMediaAccessTicketsMock).toHaveBeenCalledTimes(1),
+    );
+    resolveFirst?.();
+    await vi.waitFor(() =>
+      expect(refreshMediaAccessTicketsMock).toHaveBeenCalledTimes(2),
+    );
+    await Promise.resolve();
+    expect(restored).toBe(false);
+
+    resolveSecond?.();
+    await expect(restoration).resolves.toHaveLength(129);
+    expect(refreshMediaAccessTicketsMock.mock.calls[0]?.[0]).toHaveLength(128);
+    expect(refreshMediaAccessTicketsMock.mock.calls[1]?.[0]).toHaveLength(1);
+  });
 });
