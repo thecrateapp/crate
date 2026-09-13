@@ -1,5 +1,7 @@
 from contextlib import contextmanager
 
+import pytest
+
 
 def test_run_artist_deletion_serializes_cleanup_and_database_change(monkeypatch):
     from crate import artist_lifecycle
@@ -10,8 +12,10 @@ def test_run_artist_deletion_serializes_cleanup_and_database_change(monkeypatch)
     def publication_lock(_root, artist_id):
         assert artist_id == 42
         events.append("lock-enter")
-        yield
-        events.append("lock-exit")
+        try:
+            yield
+        finally:
+            events.append("lock-exit")
 
     monkeypatch.setattr(
         artist_lifecycle,
@@ -171,8 +175,10 @@ def test_run_artist_deletion_aborts_when_identity_changes_before_lock(monkeypatc
     def publication_lock(_root, artist_id):
         assert artist_id == 42
         events.append("lock-enter")
-        yield
-        events.append("lock-exit")
+        try:
+            yield
+        finally:
+            events.append("lock-exit")
 
     monkeypatch.setattr(
         artist_lifecycle, "get_library_artist", lambda _name: next(lookups)
@@ -186,11 +192,14 @@ def test_run_artist_deletion_aborts_when_identity_changes_before_lock(monkeypatc
         lambda entity_uid: events.append(f"cleanup:{entity_uid}"),
     )
 
-    result = artist_lifecycle.run_artist_deletion(
-        "Artist", lambda: events.append("database-change") or "deleted"
-    )
+    with pytest.raises(
+        artist_lifecycle.ArtistIdentityChangedError,
+        match="Artist identity changed while waiting for lifecycle lock",
+    ):
+        artist_lifecycle.run_artist_deletion(
+            "Artist", lambda: events.append("database-change") or "deleted"
+        )
 
-    assert result is None
     assert events == ["lock-enter", "lock-exit"]
 
 

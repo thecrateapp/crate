@@ -9,7 +9,11 @@ import mutagen
 
 from crate.artwork_tasks import queue_artwork_materialization
 from crate.artwork_variants import ArtworkAsset
-from crate.artist_lifecycle import delete_artist, run_artist_deletion
+from crate.artist_lifecycle import (
+    ArtistIdentityChangedError,
+    delete_artist,
+    run_artist_deletion,
+)
 from crate.audio import read_tags
 from crate.db.advisory_locks import artist_sync_lock as _artist_sync_lock
 from crate.db.repositories.library import (
@@ -932,7 +936,16 @@ class LibrarySync:
             keep = artists[0]["name"]
             for other in artists[1:]:
                 discard = other["name"]
-                run_artist_deletion(discard, lambda: merge_artist_into(discard, keep))
+                try:
+                    run_artist_deletion(
+                        discard, lambda: merge_artist_into(discard, keep)
+                    )
+                except ArtistIdentityChangedError:
+                    log.info(
+                        "Skipped duplicate artist merge for stale identity '%s'",
+                        discard,
+                    )
+                    continue
                 merged += 1
                 log.info("Merged duplicate artist '%s' into '%s'", discard, keep)
 

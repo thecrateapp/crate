@@ -1,5 +1,11 @@
+from unittest.mock import MagicMock
+
+import pytest
+
+from crate.artist_lifecycle import ArtistIdentityChangedError
 from crate.worker_handlers.management import (
     _handle_delete_artist,
+    _handle_merge_artist,
     _handle_move_artist,
     _handle_repair,
     _handle_repair_duplicate_tracks,
@@ -50,6 +56,160 @@ def test_delete_artist_uses_shared_artist_deletion_lifecycle(monkeypatch, tmp_pa
         "lifecycle:Artist",
         "db-delete:Artist",
     ]
+
+
+def test_delete_artist_reports_stale_identity_without_success_side_effects(
+    monkeypatch, tmp_path
+):
+    audit = MagicMock()
+    task_event = MagicMock()
+    cache_delete = MagicMock()
+    scan = MagicMock()
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist",
+        lambda _name: {"folder_name": "Artist"},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion",
+        MagicMock(
+            side_effect=ArtistIdentityChangedError(
+                "Artist identity changed while waiting for lifecycle lock: Artist"
+            )
+        ),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", task_event)
+    monkeypatch.setattr("crate.worker_handlers.management.delete_cache", cache_delete)
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", scan)
+
+    result = _handle_delete_artist(
+        "delete-artist-stale",
+        {"name": "Artist", "mode": "full"},
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {"error": "Artist changed before deletion; retry the task: Artist"}
+    audit.assert_not_called()
+    task_event.assert_not_called()
+    cache_delete.assert_not_called()
+    scan.assert_not_called()
+
+
+def test_merge_artist_checks_identity_before_moving_files(monkeypatch, tmp_path):
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    album_dir = source_dir / "Album"
+    album_dir.mkdir(parents=True)
+    target_dir.mkdir()
+    source_track = album_dir / "01.flac"
+    source_track.write_bytes(b"audio")
+
+    def get_artist(artist_id: int):
+        if artist_id == 1:
+            return {
+                "id": 1,
+                "entity_uid": "source-uid",
+                "name": "Source",
+                "folder_name": "source",
+            }
+        return {
+            "id": 2,
+            "entity_uid": "target-uid",
+            "name": "Target",
+            "folder_name": "target",
+        }
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist_by_id", get_artist
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_albums",
+        lambda _name: [{"name": "Album", "track_count": 1}],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album",
+        lambda _artist, _album: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion",
+        MagicMock(
+            side_effect=ArtistIdentityChangedError(
+                "Artist identity changed while waiting for lifecycle lock: Source"
+            )
+        ),
+    )
+    audit = MagicMock()
+    task_event = MagicMock()
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", task_event)
+
+    result = _handle_merge_artist(
+        "merge-stale",
+        {"source_artist_id": 1, "target_artist_id": 2},
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {"error": "Source artist changed before merge; retry the task"}
+    assert source_track.read_bytes() == b"audio"
+    assert not (target_dir / "Album").exists()
+    audit.assert_not_called()
+    task_event.assert_not_called()
+
+
+def test_merge_artist_restores_files_when_database_merge_fails(monkeypatch, tmp_path):
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    album_dir = source_dir / "Album"
+    album_dir.mkdir(parents=True)
+    target_dir.mkdir()
+    source_track = album_dir / "01.flac"
+    source_track.write_bytes(b"audio")
+
+    def get_artist(artist_id: int):
+        if artist_id == 1:
+            return {
+                "id": 1,
+                "entity_uid": "source-uid",
+                "name": "Source",
+                "folder_name": "source",
+            }
+        return {
+            "id": 2,
+            "entity_uid": "target-uid",
+            "name": "Target",
+            "folder_name": "target",
+        }
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist_by_id", get_artist
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_albums",
+        lambda _name: [{"name": "Album", "track_count": 1}],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album",
+        lambda _artist, _album: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion",
+        lambda _name, operation: operation(),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.merge_artist_into_artist",
+        MagicMock(side_effect=RuntimeError("database merge failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="database merge failed"):
+        _handle_merge_artist(
+            "merge-failed",
+            {"source_artist_id": 1, "target_artist_id": 2},
+            {"library_path": str(tmp_path)},
+        )
+
+    assert source_track.read_bytes() == b"audio"
+    assert not (target_dir / "Album").exists()
 
 
 def test_handle_index_genres_broadcasts_library_cache_invalidation(monkeypatch):

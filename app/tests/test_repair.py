@@ -1183,6 +1183,33 @@ class TestCanonicalMismatchRepair:
         assert result["applied"] is False
         mock_lifecycle.assert_not_called()
 
+    def test_stale_artist_identity_is_reported_as_not_applied(self):
+        from crate.artist_lifecycle import ArtistIdentityChangedError
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake"})
+        issue = {
+            "details": {
+                "artist": "Source Artist",
+                "tag_name": "Canonical Artist",
+                "folder": "source-artist",
+            }
+        }
+
+        with (
+            patch(
+                "crate.repair.run_artist_merge",
+                side_effect=ArtistIdentityChangedError("stale artist"),
+            ),
+            patch("crate.repair.log_audit") as mock_audit,
+        ):
+            result = repair._fix_canonical_mismatch(issue, dry_run=False)
+
+        assert result is not None
+        assert result["applied"] is False
+        assert result["details"]["error"] == "stale artist identity"
+        mock_audit.assert_not_called()
+
 
 class TestRepairOrchestration:
     """Test the top-level repair() method orchestration."""
