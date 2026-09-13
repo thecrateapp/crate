@@ -75,3 +75,16 @@ describe("shouldUseTauriHttpPlugin", () => {
     );
   });
 });
+
+describe("desktop appearance bootstrap", () => {
+  it("restores the persisted theme and renders a mode-aware toaster", () => {
+    const source = readFileSync(
+      new URL("../main.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("initializeThemeSkin();");
+    expect(source).toContain("<ThemeAwareToaster />");
+    expect(source).not.toContain('<Toaster theme="dark"');
+  });
+});

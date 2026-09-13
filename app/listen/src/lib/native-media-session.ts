@@ -32,6 +32,15 @@ export async function stopNativeMediaSession(options?: {
   }
 }
 
+export async function cancelNativeMediaSessionResume(): Promise<void> {
+  if (!isNative) return;
+  try {
+    await getNativeMediaSessionBridge().cancelPendingResume();
+  } catch {
+    // Older native shells may not expose interruption intent tracking.
+  }
+}
+
 export async function onNativeMediaControl(
   listener: (event: NativeMediaControlEvent) => void,
 ): Promise<() => void> {

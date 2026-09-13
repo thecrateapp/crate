@@ -122,35 +122,35 @@ describe("AuthCallback", () => {
     expect(mockSetAuthTokens).not.toHaveBeenCalled();
   });
 
-  it("bridges Tauri desktop callbacks back to the app without hydrating web auth", () => {
+  it("bridges one-time Tauri callbacks back to the app without hydrating web auth", async () => {
     window.history.replaceState(
       {},
       "",
-      "/auth/callback?desktop=tauri&token=oauth-token&refresh_token=refresh-token&next=%2Fstats",
+      "/auth/callback?desktop=tauri&code=one-time-code&state=oauth-state&next=%2Fstats",
     );
 
     renderWithI18n();
 
-    const link = screen.getByRole("link", { name: "Open Crate" });
+    const link = await screen.findByRole("link", { name: "Open Crate" });
     expect(link.getAttribute("href")).toBe(
-      "cratemusic://oauth/callback?token=oauth-token&refresh_token=refresh-token&next=%2Fstats",
+      "cratemusic://oauth/callback?code=one-time-code&state=oauth-state&next=%2Fstats",
     );
     expect(mockSetAuthTokens).not.toHaveBeenCalled();
     expect(mockRefetch).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("renders the desktop callback handoff in the active locale", () => {
+  it("renders the desktop callback handoff in the active locale", async () => {
     window.history.replaceState(
       {},
       "",
-      "/auth/callback?desktop=tauri&token=oauth-token&refresh_token=refresh-token&next=%2Fstats",
+      "/auth/callback?desktop=tauri&code=one-time-code&state=oauth-state&next=%2Fstats",
     );
 
     renderWithI18n("es");
 
     expect(
-      screen.getByRole("heading", { name: "Volver a Crate" }),
+      await screen.findByRole("heading", { name: "Volver a Crate" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -163,5 +163,21 @@ describe("AuthCallback", () => {
         .closest(".shadow-card"),
     ).toHaveClass("shadow-card");
     expect(screen.getByRole("link", { name: "Abrir Crate" })).toBeVisible();
+  });
+
+  it("never forwards bearer tokens through a Tauri deep link", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/callback?desktop=tauri&token=oauth-token&next=%2Fstats",
+    );
+
+    renderWithI18n();
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true });
+    });
+    expect(screen.queryByRole("link", { name: "Open Crate" })).toBeNull();
+    expect(mockSetAuthTokens).not.toHaveBeenCalled();
   });
 });

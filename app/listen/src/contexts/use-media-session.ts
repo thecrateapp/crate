@@ -6,6 +6,7 @@ import { isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
+  cancelNativeMediaSessionResume,
   onNativeMediaControl,
   stopNativeMediaSession,
   syncNativeMediaSession,
@@ -39,6 +40,8 @@ export function useMediaSession({
   seek: (time: number) => void;
 }) {
   const mediaAccessVersion = useMediaAccessVersion();
+  const previousNativeIsPlayingRef = useRef(isPlaying);
+  const preserveNextNativePauseRef = useRef(false);
   const actionsRef = useRef({
     pause,
     resume,
@@ -74,6 +77,8 @@ export function useMediaSession({
           actions.resume();
           break;
         case "pause":
+          preserveNextNativePauseRef.current =
+            event.source === "audio-interruption";
           actions.pause();
           break;
         case "next":
@@ -105,6 +110,22 @@ export function useMediaSession({
       cleanup?.();
     };
   }, []);
+
+  useEffect(() => {
+    const wasPlaying = previousNativeIsPlayingRef.current;
+    previousNativeIsPlayingRef.current = isPlaying;
+    if (!isNative) return;
+    if (isPlaying) {
+      preserveNextNativePauseRef.current = false;
+      return;
+    }
+    if (!wasPlaying) return;
+    if (preserveNextNativePauseRef.current) {
+      preserveNextNativePauseRef.current = false;
+      return;
+    }
+    void cancelNativeMediaSessionResume();
+  }, [isPlaying]);
 
   // Update metadata when track changes
   useEffect(() => {

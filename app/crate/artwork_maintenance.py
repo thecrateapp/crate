@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import time
 import logging
+from pathlib import Path
 from typing import Iterator, cast
 
 from crate.artist_hero_publication import (
@@ -188,7 +189,9 @@ def repair_artwork_manifest_permissions(*, max_assets: int = 1000) -> dict[str, 
     return result
 
 
-def cleanup_artwork_variants(*, max_assets: int = 1000) -> dict[str, int]:
+def cleanup_artwork_variants(
+    *, max_assets: int = 1000, library_root: Path | None = None
+) -> dict[str, int]:
     now = time.time()
     result = {
         "assets_checked": 0,
@@ -234,7 +237,10 @@ def cleanup_artwork_variants(*, max_assets: int = 1000) -> dict[str, int]:
             shutil.rmtree(revision, ignore_errors=True)
             result["revisions_removed"] += 1
     try:
-        hero_result = cleanup_artist_hero_publications(max_artists=max_assets)
+        hero_result = cleanup_artist_hero_publications(
+            max_artists=max_assets,
+            library_root=library_root,
+        )
     except Exception:
         log.warning("Artist hero publication cleanup failed", exc_info=True)
         hero_result = {
@@ -257,7 +263,10 @@ def cleanup_artwork_variants(*, max_assets: int = 1000) -> dict[str, int]:
 
 
 def cleanup_artist_hero_publications(
-    *, max_artists: int = 1000, keep_per_composition: int = 2
+    *,
+    max_artists: int = 1000,
+    keep_per_composition: int = 2,
+    library_root: Path | None = None,
 ) -> dict[str, int]:
     """Remove stale publications and expired artifacts left by crashed workers."""
 
@@ -337,20 +346,94 @@ def cleanup_artist_hero_publications(
             indexed.setdefault(key_parts[0], []).append(candidate)
         return indexed
 
+    def _cleanup_library_temporaries() -> int:
+        if library_root is None:
+            return 0
+        resolved_library_root = library_root.resolve()
+        if not resolved_library_root.is_dir() or resolved_library_root.is_symlink():
+            return 0
+        removed = 0
+        try:
+            artist_roots = list(resolved_library_root.iterdir())
+        except OSError:
+            return 0
+        for artist_root in artist_roots:
+            if not artist_root.is_dir() or artist_root.is_symlink():
+                continue
+            try:
+                children = list(artist_root.iterdir())
+            except OSError:
+                continue
+            for child in children:
+                if (
+                    child.is_symlink()
+                    or not child.is_file()
+                    or not child.name.startswith(".artist-hero-")
+                    or not child.name.endswith(".tmp")
+                    or not _expired(child)
+                ):
+                    continue
+                if _remove_tree(child):
+                    removed += 1
+        return removed
+
     known_entity_uids = {str(artist.get("entity_uid") or "") for artist in artists}
     discovered_count = len(artists)
     materialization_roots_by_uid = _index_materialization_roots()
-    orphan_materialization_uids: set[str] = set()
+    result["temporary_removed"] += _cleanup_library_temporaries()
+    materialization_artists: dict[str, dict] = {}
+    for entity_uid, materialization_roots in materialization_roots_by_uid.items():
+        with artist_hero_publication_lock(entity_uid):
+            artist = get_library_artist_by_entity_uid(entity_uid)
+            if not artist:
+                removed = sum(1 for root in materialization_roots if _remove_tree(root))
+                if removed:
+                    result["revisions_removed"] += removed
+                    result["artists_checked"] += 1
+                continue
+            materialization_artists[entity_uid] = artist
+            profile = get_artist_hero_artwork(int(artist["id"])) or {}
+            manifest = profile.get("render_manifest")
+            artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
+            for materialization_root in materialization_roots:
+                key_parts = materialization_root.name.split(":", 2)
+                if len(key_parts) == 2:
+                    composition = key_parts[1]
+                    artifact = (
+                        artifacts.get(composition)
+                        if isinstance(artifacts, dict)
+                        else None
+                    )
+                    if (
+                        not profile
+                        or profile.get(f"{composition}_enabled", True) is False
+                        or (
+                            isinstance(artifact, dict)
+                            and artifact.get("render_revision")
+                        )
+                    ):
+                        if _remove_tree(materialization_root):
+                            result["revisions_removed"] += 1
+                        continue
+                try:
+                    materialization_children = list(materialization_root.iterdir())
+                except OSError:
+                    continue
+                for child in materialization_children:
+                    if (
+                        child.name.startswith(".")
+                        and child.name.endswith(".tmp")
+                        and _expired(child)
+                        and _remove_tree(child)
+                    ):
+                        result["temporary_removed"] += 1
     if materialization_roots_by_uid and len(artists) < capped_limit:
-        for entity_uid in sorted(materialization_roots_by_uid):
+        for entity_uid in sorted(materialization_artists):
             if discovered_count >= capped_limit:
                 break
             if entity_uid in known_entity_uids:
                 continue
-            artist = get_library_artist_by_entity_uid(entity_uid)
-            if not artist:
-                orphan_materialization_uids.add(entity_uid)
-                continue
+            artist = materialization_artists[entity_uid]
             artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
             known_entity_uids.add(entity_uid)
             discovered_count += 1
@@ -383,22 +466,6 @@ def cleanup_artist_hero_publications(
             artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
             known_entity_uids.add(entity_uid)
             discovered_count += 1
-
-    for entity_uid in sorted(orphan_materialization_uids - known_entity_uids):
-        if discovered_count >= capped_limit:
-            break
-        with artist_hero_publication_lock(entity_uid):
-            artist = get_library_artist_by_entity_uid(entity_uid)
-            if artist:
-                artists.append(
-                    {"artist_id": int(artist["id"]), "entity_uid": entity_uid}
-                )
-            else:
-                removed = delete_artist_hero_storage(entity_uid)
-                result["revisions_removed"] += removed["materializations_removed"]
-                result["artists_checked"] += 1
-        known_entity_uids.add(entity_uid)
-        discovered_count += 1
 
     for artist in artists:
         result["artists_checked"] += 1
@@ -458,21 +525,6 @@ def cleanup_artist_hero_publications(
                 ) and legacy_root.is_dir():
                     if _remove_tree(legacy_root):
                         result["revisions_removed"] += 1
-            for materialization_root in materialization_roots_by_uid.get(
-                entity_uid, []
-            ):
-                try:
-                    materialization_children = list(materialization_root.iterdir())
-                except OSError:
-                    continue
-                for child in materialization_children:
-                    if (
-                        child.name.startswith(".")
-                        and child.name.endswith(".tmp")
-                        and _expired(child)
-                        and _remove_tree(child)
-                    ):
-                        result["temporary_removed"] += 1
             for row in history:
                 composition = str(row.get("composition") or "")
                 revision = str(row.get("render_revision") or "")

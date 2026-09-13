@@ -20,6 +20,7 @@ export type NativeMediaSessionPayload = {
 export type NativeMediaControlEvent = {
   control?: NativeMediaControl;
   position?: number;
+  source?: "audio-interruption";
 };
 
 export interface NativeOutputCapabilities {
@@ -46,6 +47,7 @@ type CrateMediaSessionBridge = {
   start(options: NativeMediaSessionPayload): Promise<void>;
   update(options: NativeMediaSessionPayload): Promise<void>;
   stop(options?: { suppressControl?: boolean }): Promise<void>;
+  cancelPendingResume(): Promise<void>;
   getOutputCapabilities(): Promise<NativeOutputCapabilities>;
   getCurrentRoute(): Promise<{ route?: NativeOutputRoute | null }>;
   showSystemOutputSwitcher(): Promise<NativeOutputPickerResult>;

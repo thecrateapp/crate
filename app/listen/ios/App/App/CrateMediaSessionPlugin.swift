@@ -12,6 +12,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelPendingResume", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getOutputCapabilities", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getCurrentRoute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "presentRoutePicker", returnType: CAPPluginReturnPromise)
@@ -183,6 +184,11 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    @objc func cancelPendingResume(_ call: CAPPluginCall) {
+        interruptionState.pause()
+        call.resolve()
+    }
+
     private func configureAudioSession() {
         guard activationState.activate() else { return }
         do {
@@ -241,10 +247,17 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         }))
     }
 
-    private func sendControl(_ control: String, position: Double? = nil) {
+    private func sendControl(
+        _ control: String,
+        position: Double? = nil,
+        source: String? = nil
+    ) {
         var payload: [String: Any] = ["control": control]
         if let position {
             payload["position"] = position
+        }
+        if let source {
+            payload["source"] = source
         }
         notifyListeners("control", data: payload, retainUntilConsumed: true)
     }
@@ -279,7 +292,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             // latter case would silently undo the user's own pause.
             interruptionState.begin(wasPlaying: lastKnownIsPlaying)
             activationState.interrupted()
-            sendControl("pause")
+            sendControl("pause", source: "audio-interruption")
         case .ended:
             let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let shouldResume = AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume)

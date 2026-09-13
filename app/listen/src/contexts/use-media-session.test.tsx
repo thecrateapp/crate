@@ -1,10 +1,16 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { NativeMediaControlEvent } from "@/lib/native-media-session-bridge";
+
 import type { Track } from "./player-types";
 import { useMediaSession } from "./use-media-session";
 
 const runtime = vi.hoisted(() => ({ isNative: false }));
+const nativeMediaSession = vi.hoisted(() => ({
+  cancelPendingResume: vi.fn(async () => {}),
+  controlListener: null as ((event: NativeMediaControlEvent) => void) | null,
+}));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
   get isNative() {
@@ -25,7 +31,15 @@ vi.mock("@/lib/desktop-tray", () => ({
 }));
 
 vi.mock("@/lib/native-media-session", () => ({
-  onNativeMediaControl: vi.fn(async () => () => {}),
+  cancelNativeMediaSessionResume: nativeMediaSession.cancelPendingResume,
+  onNativeMediaControl: vi.fn(
+    async (listener: (event: NativeMediaControlEvent) => void) => {
+      nativeMediaSession.controlListener = listener;
+      return () => {
+        nativeMediaSession.controlListener = null;
+      };
+    },
+  ),
   stopNativeMediaSession: vi.fn(async () => {}),
   syncNativeMediaSession: vi.fn(async () => {}),
 }));
@@ -100,6 +114,7 @@ function renderSession(
 
 beforeEach(() => {
   runtime.isNative = false;
+  nativeMediaSession.controlListener = null;
   vi.clearAllMocks();
   mediaSession = {
     metadata: null,
@@ -191,5 +206,31 @@ describe("useMediaSession", () => {
 
     expect(mediaSession.metadata).not.toBeNull();
     expect(mediaSession.playbackState).toBe("playing");
+  });
+
+  it("cancels native interruption resume for an app-initiated pause", async () => {
+    runtime.isNative = true;
+    const { rerender } = renderSession(TRACK_A, 0, true);
+
+    rerender({ track: TRACK_A, time: 0, playing: false });
+
+    expect(nativeMediaSession.cancelPendingResume).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves native interruption resume for the pause requested by iOS", async () => {
+    runtime.isNative = true;
+    const { rerender } = renderSession(TRACK_A, 0, true);
+    await vi.waitFor(() => {
+      expect(nativeMediaSession.controlListener).not.toBeNull();
+    });
+
+    nativeMediaSession.controlListener?.({
+      control: "pause",
+      source: "audio-interruption",
+    });
+    rerender({ track: TRACK_A, time: 0, playing: false });
+
+    expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(nativeMediaSession.cancelPendingResume).not.toHaveBeenCalled();
   });
 });

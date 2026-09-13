@@ -258,6 +258,87 @@ def test_artist_hero_cleanup_removes_expired_materialization_temporaries(
     assert result["temporary_removed"] == 2
 
 
+def test_artist_hero_cleanup_removes_expired_library_temporaries(monkeypatch, tmp_path):
+    from crate.artwork_maintenance import cleanup_artwork_variants
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    library_root = tmp_path / "music"
+    artist_root = library_root / "artist-entity"
+    artist_root.mkdir(parents=True)
+    expired_source = artist_root / ".artist-hero-source.jpg.crashed.tmp"
+    expired_render = artist_root / ".artist-hero-desktop.webp.crashed.tmp"
+    fresh_source = artist_root / ".artist-hero-source.jpg.running.tmp"
+    expired_source.write_bytes(b"partial")
+    expired_render.write_bytes(b"partial")
+    fresh_source.write_bytes(b"partial")
+    expired = time.time() - 90000
+    os.utime(expired_source, (expired, expired))
+    os.utime(expired_render, (expired, expired))
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [],
+    )
+
+    result = cleanup_artwork_variants(
+        max_assets=10,
+        library_root=library_root,
+    )
+
+    assert not expired_source.exists()
+    assert not expired_render.exists()
+    assert fresh_source.is_file()
+    assert result["artist_hero_temporary_removed"] == 2
+
+
+def test_artist_hero_cleanup_does_not_starve_legacy_roots_when_history_is_full(
+    monkeypatch, tmp_path
+):
+    from crate.artwork_maintenance import cleanup_artist_hero_publications
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    legacy_root = artwork_asset_root(
+        ArtworkAsset("artist-hero", "legacy-artist:desktop")
+    )
+    legacy_root.mkdir(parents=True)
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revision_artists",
+        lambda **_kwargs: [{"artist_id": 1, "entity_uid": "history-artist"}],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_library_artist_by_entity_uid",
+        lambda entity_uid: {
+            "id": 2 if entity_uid == "legacy-artist" else 1,
+            "entity_uid": entity_uid,
+        },
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.get_artist_hero_artwork",
+        lambda artist_id: (
+            {
+                "desktop_enabled": True,
+                "render_manifest": {
+                    "artifacts": {"desktop": {"render_revision": "current-revision"}}
+                },
+            }
+            if artist_id == 2
+            else {}
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_render_revisions",
+        lambda _artist_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.artwork_maintenance.list_artist_hero_manifest_history",
+        lambda _artist_id: [],
+    )
+
+    cleanup_artist_hero_publications(max_artists=1)
+
+    assert not legacy_root.exists()
+
+
 def test_cleanup_artist_hero_publications_keeps_active_previous_and_fresh_orphans(
     monkeypatch, tmp_path
 ):

@@ -390,16 +390,18 @@ class TestHandleMaterializeArtworkVariants:
 
 class TestHandleArtworkVariantMaintenance:
     def test_cleanup_defaults_to_a_bounded_full_library_pass(self, monkeypatch):
-        seen: list[int] = []
+        seen: list[dict] = []
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.cleanup_artwork_variants",
-            lambda *, max_assets: seen.append(max_assets) or {"assets_checked": 0},
+            lambda **kwargs: seen.append(kwargs) or {"assets_checked": 0},
         )
 
-        result = _handle_cleanup_artwork_variants("task-1", {}, {})
+        result = _handle_cleanup_artwork_variants(
+            "task-1", {}, {"library_path": "/music"}
+        )
 
         assert result == {"assets_checked": 0}
-        assert seen == [10_000]
+        assert seen == [{"max_assets": 10_000, "library_root": Path("/music")}]
 
 
 # ── _handle_fetch_cover ──────────────────────────────────────────

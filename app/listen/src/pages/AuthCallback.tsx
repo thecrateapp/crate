@@ -11,11 +11,12 @@ import {
 function buildDesktopDeepLink(search: string): string | null {
   const params = new URLSearchParams(search);
   if (params.get("desktop") !== "tauri") return null;
-  const token = params.get("token");
-  if (!token) return null;
+  const code = params.get("code");
+  const state = params.get("state");
+  if (!code || !state) return null;
 
   const deepLink = new URL("cratemusic://oauth/callback");
-  for (const key of ["token", "refresh_token", "access_expires_at", "next"]) {
+  for (const key of ["code", "state", "next"]) {
     const value = params.get(key);
     if (value) deepLink.searchParams.set(key, value);
   }
@@ -36,10 +37,16 @@ export function AuthCallback() {
   const awaitingAuthRef = useRef(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
     const deepLink = buildDesktopDeepLink(window.location.search);
     if (deepLink) {
       setDesktopDeepLink(deepLink);
       openDesktopDeepLink(deepLink);
+      return;
+    }
+    if (params.get("desktop") === "tauri") {
+      clearPendingOAuthNext();
+      navigate("/login", { replace: true });
       return;
     }
 

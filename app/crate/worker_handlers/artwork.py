@@ -608,9 +608,13 @@ def _handle_backfill_artwork_variants(task_id: str, params: dict, config: dict) 
 
 
 def _handle_cleanup_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
-    del task_id, config
+    del task_id
     max_assets = max(1, min(int(params.get("max_assets") or 10_000), 100_000))
-    return cleanup_artwork_variants(max_assets=max_assets)
+    library_path = config.get("library_path")
+    return cleanup_artwork_variants(
+        max_assets=max_assets,
+        library_root=Path(str(library_path)) if library_path else None,
+    )
 
 
 def _handle_repair_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
