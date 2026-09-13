@@ -13,6 +13,7 @@ from crate.artist_hero_publication import (
 from crate.db.repositories.library import (
     delete_artist as db_delete_artist,
     get_library_artist,
+    get_library_artist_by_id,
 )
 from crate.streaming.paths import cache_root
 
@@ -25,16 +26,34 @@ def _run_artist_change(
     operation: Callable[[], T],
     *,
     cleanup_storage_when: Callable[[T], bool],
-) -> T:
+) -> T | None:
     artist = get_library_artist(name)
     if not artist or artist.get("id") is None or not artist.get("entity_uid"):
         return operation()
 
-    with artist_hero_publication_lock(cache_root(), int(artist["id"])):
+    artist_id = int(artist["id"])
+    entity_uid = str(artist["entity_uid"])
+    with artist_hero_publication_lock(cache_root(), artist_id):
+        current_artist = get_library_artist(name)
+        if (
+            not current_artist
+            or current_artist.get("id") != artist_id
+            or str(current_artist.get("entity_uid") or "") != entity_uid
+        ):
+            return None
+
         result = operation()
-        if cleanup_storage_when(result):
+        should_cleanup = cleanup_storage_when(result)
+        remaining_artist = (
+            get_library_artist_by_id(artist_id) if should_cleanup else current_artist
+        )
+        source_was_removed = (
+            not remaining_artist
+            or str(remaining_artist.get("entity_uid") or "") != entity_uid
+        )
+        if should_cleanup and source_was_removed:
             try:
-                delete_artist_hero_storage(str(artist["entity_uid"]))
+                delete_artist_hero_storage(entity_uid)
             except Exception:
                 log.warning(
                     "Artist hero storage cleanup failed after deleting %s",
@@ -44,7 +63,7 @@ def _run_artist_change(
         return result
 
 
-def run_artist_deletion(name: str, operation: Callable[[], T]) -> T:
+def run_artist_deletion(name: str, operation: Callable[[], T]) -> T | None:
     """Run a destructive DB operation and best-effort cleanup under one lock."""
 
     return _run_artist_change(
@@ -52,7 +71,7 @@ def run_artist_deletion(name: str, operation: Callable[[], T]) -> T:
     )
 
 
-def run_artist_merge(name: str, operation: Callable[[], bool]) -> bool:
+def run_artist_merge(name: str, operation: Callable[[], bool]) -> bool | None:
     """Run a possible merge and clean storage only when it removes the source."""
 
     return _run_artist_change(name, operation, cleanup_storage_when=bool)

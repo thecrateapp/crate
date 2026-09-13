@@ -19,6 +19,12 @@ def test_run_artist_deletion_serializes_cleanup_and_database_change(monkeypatch)
         lambda _name: {"id": 42, "entity_uid": "artist-entity"},
     )
     monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_id",
+        lambda _artist_id: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
     )
     monkeypatch.setattr(
@@ -55,6 +61,12 @@ def test_run_artist_deletion_preserves_storage_when_database_change_fails(monkey
         lambda _name: {"id": 42, "entity_uid": "artist-entity"},
     )
     monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_id",
+        lambda _artist_id: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
     )
     monkeypatch.setattr(
@@ -89,6 +101,12 @@ def test_run_artist_deletion_keeps_database_result_when_cleanup_fails(monkeypatc
         lambda _name: {"id": 42, "entity_uid": "artist-entity"},
     )
     monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_id",
+        lambda _artist_id: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
     )
 
@@ -117,6 +135,12 @@ def test_run_artist_merge_cleans_storage_only_when_source_is_removed(monkeypatch
         lambda _name: {"id": 42, "entity_uid": "artist-entity"},
     )
     monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_id",
+        lambda _artist_id: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
     )
     monkeypatch.setattr(
@@ -130,6 +154,76 @@ def test_run_artist_merge_cleans_storage_only_when_source_is_removed(monkeypatch
 
     assert artist_lifecycle.run_artist_merge("Artist", lambda: True) is True
     assert cleanup_calls == ["artist-entity"]
+
+
+def test_run_artist_deletion_aborts_when_identity_changes_before_lock(monkeypatch):
+    from crate import artist_lifecycle
+
+    events: list[str] = []
+    lookups = iter(
+        [
+            {"id": 42, "entity_uid": "artist-entity"},
+            None,
+        ]
+    )
+
+    @contextmanager
+    def publication_lock(_root, artist_id):
+        assert artist_id == 42
+        events.append("lock-enter")
+        yield
+        events.append("lock-exit")
+
+    monkeypatch.setattr(
+        artist_lifecycle, "get_library_artist", lambda _name: next(lookups)
+    )
+    monkeypatch.setattr(
+        artist_lifecycle, "artist_hero_publication_lock", publication_lock
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "delete_artist_hero_storage",
+        lambda entity_uid: events.append(f"cleanup:{entity_uid}"),
+    )
+
+    result = artist_lifecycle.run_artist_deletion(
+        "Artist", lambda: events.append("database-change") or "deleted"
+    )
+
+    assert result is None
+    assert events == ["lock-enter", "lock-exit"]
+
+
+def test_run_artist_deletion_preserves_storage_when_source_row_remains(monkeypatch):
+    from crate import artist_lifecycle
+
+    artist = {"id": 42, "entity_uid": "artist-entity"}
+    cleanup_calls: list[str] = []
+
+    @contextmanager
+    def publication_lock(_root, _artist_id):
+        yield
+
+    monkeypatch.setattr(artist_lifecycle, "get_library_artist", lambda _name: artist)
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_id",
+        lambda _artist_id: artist,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        artist_lifecycle, "artist_hero_publication_lock", publication_lock
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "delete_artist_hero_storage",
+        lambda entity_uid: cleanup_calls.append(entity_uid),
+    )
+
+    result = artist_lifecycle.run_artist_deletion("Artist", lambda: "no-op")
+
+    assert result == "no-op"
+    assert cleanup_calls == []
 
 
 def test_delete_artist_uses_shared_deletion_lifecycle(monkeypatch):
