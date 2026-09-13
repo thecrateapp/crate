@@ -128,7 +128,6 @@ def test_manifest_history_persists_previous_and_uses_manifest_cas(pg_db) -> None
     assert {entry["render_revision"] for entry in render_history} == {
         "artifact-a",
         "artifact-b",
-        "artifact-c",
     }
 
 
@@ -198,7 +197,7 @@ def test_profile_upsert_cas_covers_first_publish_and_active_manifest(pg_db) -> N
     assert {
         entry["render_revision"]
         for entry in list_artist_hero_render_revisions(artist_id, composition="desktop")
-    } == {"artifact-a", "artifact-b", "artifact-c", "artifact-loser"}
+    } == {"artifact-a", "artifact-b"}
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")

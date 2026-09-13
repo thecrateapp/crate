@@ -249,11 +249,6 @@ def upsert_artist_hero_artwork(
             render_manifest.get("editorial_revision") or ""
         ) != str(revision):
             return False
-        _record_render_manifest_history(
-            active_session,
-            artist_id=artist_id,
-            manifest=render_manifest,
-        )
         if not isinstance(expected_revision, _ExpectedValueUnset):
             if expected_revision is None:
                 if current is not None:
@@ -403,26 +398,11 @@ def compare_and_swap_artist_hero_manifest(
             .mappings()
             .first()
         )
-        _record_render_manifest_history(
-            active_session,
-            artist_id=artist_id,
-            manifest=render_manifest,
-        )
         if current is None or current["revision"] != expected_revision:
             return False
         if not _manifests_equal(current["render_manifest"], expected_manifest):
             return False
 
-        _record_manifest_history(
-            active_session,
-            artist_id=artist_id,
-            manifest=render_manifest,
-            previous_manifest=(
-                current["render_manifest"]
-                if isinstance(current["render_manifest"], Mapping)
-                else None
-            ),
-        )
         result = active_session.execute(
             text(
                 """
@@ -439,7 +419,24 @@ def compare_and_swap_artist_hero_manifest(
                 "render_manifest": json.dumps(render_manifest),
             },
         )
-        return result.rowcount > 0
+        if result.rowcount <= 0:
+            return False
+        _record_manifest_history(
+            active_session,
+            artist_id=artist_id,
+            manifest=render_manifest,
+            previous_manifest=(
+                current["render_manifest"]
+                if isinstance(current["render_manifest"], Mapping)
+                else None
+            ),
+        )
+        _record_render_manifest_history(
+            active_session,
+            artist_id=artist_id,
+            manifest=render_manifest,
+        )
+        return True
 
     if session is not None:
         return _write(session)

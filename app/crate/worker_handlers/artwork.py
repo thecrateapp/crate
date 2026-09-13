@@ -231,7 +231,7 @@ def _artist_hero_manifest_artifacts_available(
 
 def _publish_artist_hero_manifest(
     *,
-    artist_row: dict,
+    artist_row: Mapping[str, object],
     revision: str,
     rendered: dict[str, PILImage],
     raw_sources: dict[str, bytes],
@@ -247,7 +247,10 @@ def _publish_artist_hero_manifest(
     entity_uid = str(artist_row.get("entity_uid") or "")
     if not entity_uid:
         return None
-    artist_id = int(artist_row.get("id") or 0)
+    artist_id_value = artist_row.get("id")
+    if not isinstance(artist_id_value, int):
+        return None
+    artist_id = artist_id_value
     current_artist = get_library_artist_by_id(artist_id) if artist_id > 0 else None
     if (
         current_artist is None
@@ -449,7 +452,7 @@ def _artist_hero_lock_identity(artist_row: Mapping[str, object]) -> str:
     entity_uid = str(artist_row.get("entity_uid") or "")
     if entity_uid:
         return entity_uid
-    return f"legacy-artist-id:{int(artist_row.get('id') or 0)}"
+    return f"legacy-artist-id:{artist_row.get('id') or 0}"
 
 
 def _broadcast_artwork_invalidation(*scopes: str) -> None:
@@ -571,7 +574,7 @@ def _handle_materialize_artwork_variants(
                 is None
             ):
                 return missing_result()
-        elif active_revision:
+        elif isinstance(artifact, Mapping):
             return missing_result()
         return materialize_resolved_source()
 
@@ -2514,14 +2517,14 @@ def _handle_migrate_artist_heroes(task_id: str, params: dict, config: dict) -> d
                     artist_dir=artist_dir.resolve(),
                 )
                 reason = plan.skip_reason
-                if reason is None:
+                if reason is None and plan.artist_id is not None:
                     planned += 1
                     targets.append(
                         {
                             "artist_id": plan.artist_id,
                             "expected_revision": plan.expected_revision,
                             "dedup_key": migration_task_dedup_key(
-                                int(plan.artist_id), plan.expected_revision
+                                plan.artist_id, plan.expected_revision
                             ),
                         }
                     )
@@ -2529,14 +2532,15 @@ def _handle_migrate_artist_heroes(task_id: str, params: dict, config: dict) -> d
                         create_task_dedup(
                             "migrate_artist_hero",
                             {
-                                "artist_id": int(plan.artist_id),
+                                "artist_id": plan.artist_id,
                                 "expected_revision": plan.expected_revision,
                             },
                             dedup_key=migration_task_dedup_key(
-                                int(plan.artist_id), plan.expected_revision
+                                plan.artist_id, plan.expected_revision
                             ),
                         )
                     continue
+                reason = reason or "missing-artist-id"
         skipped[reason] = skipped.get(reason, 0) + 1
 
     next_queued = len(candidates) >= batch_size

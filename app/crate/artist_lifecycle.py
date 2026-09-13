@@ -14,6 +14,7 @@ from crate.db.repositories.library import (
     delete_artist as db_delete_artist,
     get_library_artist,
     get_library_artist_by_id,
+    get_library_artist_by_entity_uid,
 )
 
 T = TypeVar("T")
@@ -55,6 +56,15 @@ def _run_artist_change(
                 if should_cleanup
                 else current_artist
             )
+            remaining_identity = (
+                get_library_artist_by_entity_uid(entity_uid)
+                if should_cleanup
+                and (
+                    not remaining_artist
+                    or str(remaining_artist.get("entity_uid") or "") != entity_uid
+                )
+                else remaining_artist
+            )
         except Exception:
             log.warning(
                 "Could not verify artist hero cleanup after changing %s",
@@ -63,8 +73,8 @@ def _run_artist_change(
             )
             return result
         source_was_removed = (
-            not remaining_artist
-            or str(remaining_artist.get("entity_uid") or "") != entity_uid
+            not remaining_identity
+            or str(remaining_identity.get("entity_uid") or "") != entity_uid
         )
         if should_cleanup and source_was_removed:
             try:

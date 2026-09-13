@@ -29,6 +29,11 @@ def test_run_artist_deletion_serializes_cleanup_and_database_change(monkeypatch)
         raising=False,
     )
     monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
+    )
+    monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
     )
     monkeypatch.setattr(
@@ -71,6 +76,11 @@ def test_run_artist_deletion_preserves_storage_when_database_change_fails(monkey
         raising=False,
     )
     monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
+    )
+    monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
     )
     monkeypatch.setattr(
@@ -111,6 +121,11 @@ def test_run_artist_deletion_keeps_database_result_when_cleanup_fails(monkeypatc
         raising=False,
     )
     monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
+    )
+    monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
     )
 
@@ -143,6 +158,11 @@ def test_run_artist_merge_cleans_storage_only_when_source_is_removed(monkeypatch
         "get_library_artist_by_id",
         lambda _artist_id: None,
         raising=False,
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_entity_uid",
+        lambda _entity_uid: None,
     )
     monkeypatch.setattr(
         artist_lifecycle, "artist_hero_publication_lock", publication_lock
@@ -232,6 +252,46 @@ def test_run_artist_deletion_preserves_storage_when_source_row_remains(monkeypat
     result = artist_lifecycle.run_artist_deletion("Artist", lambda: "no-op")
 
     assert result == "no-op"
+    assert cleanup_calls == []
+
+
+def test_run_artist_deletion_preserves_storage_when_entity_uid_is_recreated(
+    monkeypatch,
+):
+    from crate import artist_lifecycle
+
+    old_artist = {"id": 42, "entity_uid": "artist-entity"}
+    recreated_artist = {"id": 84, "entity_uid": "artist-entity"}
+    cleanup_calls: list[str] = []
+
+    @contextmanager
+    def publication_lock(_entity_uid):
+        yield
+
+    monkeypatch.setattr(
+        artist_lifecycle, "get_library_artist", lambda _name: old_artist
+    )
+    monkeypatch.setattr(
+        artist_lifecycle, "get_library_artist_by_id", lambda _artist_id: None
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist_by_entity_uid",
+        lambda _entity_uid: recreated_artist,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        artist_lifecycle, "artist_hero_publication_lock", publication_lock
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "delete_artist_hero_storage",
+        lambda entity_uid: cleanup_calls.append(entity_uid),
+    )
+
+    result = artist_lifecycle.run_artist_deletion("Artist", lambda: "deleted")
+
+    assert result == "deleted"
     assert cleanup_calls == []
 
 

@@ -549,10 +549,7 @@ def cleanup_artist_hero_publications(
                         if (
                             not profile
                             or profile.get(f"{composition}_enabled", True) is False
-                            or (
-                                isinstance(artifact, dict)
-                                and artifact.get("render_revision")
-                            )
+                            or isinstance(artifact, dict)
                         ):
                             if _remove_tree(materialization_root):
                                 result["revisions_removed"] += 1
@@ -594,6 +591,11 @@ def cleanup_artist_hero_publications(
                 for composition, artifact in (artifacts or {}).items()
                 if composition in enabled_compositions and isinstance(artifact, dict)
             }
+            manifested_compositions = {
+                composition
+                for composition, artifact in (artifacts or {}).items()
+                if composition in enabled_compositions and isinstance(artifact, dict)
+            }
             history = list_artist_hero_render_revisions(artist_id)
             known_revisions = {
                 (
@@ -617,6 +619,22 @@ def cleanup_artist_hero_publications(
                     keep_per_composition=keep_per_composition,
                 )
             retained = {item for item in retained if item[0] in enabled_compositions}
+            for materialization_root in materialization_roots_by_uid.get(
+                entity_uid, []
+            ):
+                key_parts = materialization_root.name.split(":", 2)
+                if len(key_parts) != 3:
+                    continue
+                identity_key = (key_parts[1], key_parts[2])
+                if (
+                    identity_key in known_revisions
+                    or identity_key in retained
+                    or not _expired(materialization_root)
+                ):
+                    continue
+                if _remove_tree(materialization_root):
+                    result["orphan_revisions_removed"] += 1
+                    result["revisions_removed"] += 1
             for composition in ("desktop", "mobile"):
                 legacy_asset = ArtworkAsset(
                     "artist-hero", f"{entity_uid}:{composition}"
@@ -632,7 +650,7 @@ def cleanup_artist_hero_publications(
                     (
                         not profile
                         or composition not in enabled_compositions
-                        or active_revisions.get(composition)
+                        or composition in manifested_compositions
                     )
                     and legacy_root is not None
                     and legacy_root.is_dir()
