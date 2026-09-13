@@ -19,6 +19,17 @@ export const AUTH_TOKEN_EVENT = "crate:auth-token-updated";
 let webAuthToken: string | null = null;
 let webAuthTokenExpiresAt: string | null = null;
 
+function clearLegacyWebAuthStorage(): void {
+  try {
+    localStorage.removeItem("listen-auth-token");
+    localStorage.removeItem("listen-auth-refresh-token");
+  } catch {
+    // Current sessions never read from legacy bearer storage.
+  }
+}
+
+clearLegacyWebAuthStorage();
+
 export function getAuthToken(): string | null {
   if (usesConfigurableServer) return getCurrentServer()?.token ?? null;
   return webAuthToken;
@@ -85,6 +96,7 @@ export function setAuthTokens(
   refreshToken?: string | null,
   accessExpiresAt?: string | null,
 ): void {
+  if (!token) clearLegacyWebAuthStorage();
   const nextAccessExpiresAt =
     accessExpiresAt === undefined ? decodeJwtExpiresAt(token) : accessExpiresAt;
   if (usesConfigurableServer) {

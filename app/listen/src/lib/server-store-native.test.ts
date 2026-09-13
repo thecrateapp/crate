@@ -409,6 +409,60 @@ describe("native server credential migration", () => {
     ).toBeNull();
   });
 
+  it("does not let a corrupted generation index make logout older than its secure session", async () => {
+    localStorage.setItem(
+      "crate-servers",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          tokenExpiresAt: null,
+        },
+      ]),
+    );
+    localStorage.setItem("crate-current-server", "server-1");
+    secureGet.mockResolvedValue(
+      JSON.stringify({
+        token: "access-secret",
+        refreshToken: "refresh-secret",
+        generation: 5,
+      }),
+    );
+    secureRemove.mockRejectedValue(new Error("keystore unavailable"));
+    const store = await import("./server-store");
+    await store.bootstrapNativeSessionStore();
+    localStorage.setItem("crate-session-generations:v1", "corrupt");
+
+    store.setCurrentServerAuthTokens(null, null, null);
+    await expect(store.waitForPendingSecureSessionWrites()).rejects.toThrow(
+      "Native session persistence failed",
+    );
+
+    expect(
+      JSON.parse(
+        localStorage.getItem("crate-pending-session-removals:v1") ?? "{}",
+      ),
+    ).toEqual({ "server-1": 6 });
+  });
+
+  it("does not delete secure credentials without a durable logout tombstone", async () => {
+    const secrets = await import("./server-store-secrets");
+    const setItem = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((key) => {
+        if (key === "crate-pending-session-removals:v1") {
+          throw new Error("storage unavailable");
+        }
+      });
+
+    expect(() => secrets.removeQueuedSecret("server-1")).toThrow(
+      "storage unavailable",
+    );
+    expect(secureRemove).not.toHaveBeenCalled();
+    setItem.mockRestore();
+  });
+
   it("keeps a newer logout tombstone when an older login write completes", async () => {
     localStorage.setItem(
       "crate-servers",

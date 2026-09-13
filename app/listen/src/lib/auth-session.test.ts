@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getApiAuthHeaders,
@@ -13,6 +13,16 @@ beforeEach(() => {
 });
 
 describe("auth session", () => {
+  it("removes legacy bearer tokens when the upgraded module loads", async () => {
+    localStorage.setItem("listen-auth-token", "legacy-access");
+    localStorage.setItem("listen-auth-refresh-token", "legacy-refresh");
+    vi.resetModules();
+    await import("./auth-session");
+
+    expect(localStorage.getItem("listen-auth-token")).toBeNull();
+    expect(localStorage.getItem("listen-auth-refresh-token")).toBeNull();
+  });
+
   it("stores the web session token and its expiry", () => {
     setAuthTokens("access-token", null, "2026-09-06T12:00:00.000Z");
 

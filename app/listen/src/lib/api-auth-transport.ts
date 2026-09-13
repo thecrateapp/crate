@@ -18,6 +18,10 @@ export interface ApiAuthTransportDependencies {
   getAuthTokenExpiresAt: () => string | null;
   getCurrentServerId: () => string | null;
   getRefreshToken: () => string | null;
+  getServerAuthTokens: (serverId: string) => {
+    token: string | null;
+    refreshToken: string | null;
+  } | null;
   setAuthToken: (token: string | null, accessExpiresAt?: string | null) => void;
   setAuthTokens: (
     token: string | null,
@@ -55,7 +59,14 @@ export function createApiAuthTransport(
     serverId: string | null;
   }
 
-  const refreshPromises = new Map<string, Promise<boolean>>();
+  const refreshPromises = new Map<
+    string,
+    {
+      authToken: string | null;
+      refreshToken: string | null;
+      promise: Promise<boolean>;
+    }
+  >();
 
   const captureAuthScope = (): AuthScope => {
     const serverId = dependencies.usesConfigurableServer
@@ -77,6 +88,21 @@ export function createApiAuthTransport(
   const isCurrentScope = (scope: AuthScope): boolean =>
     !dependencies.usesConfigurableServer ||
     dependencies.getCurrentServerId() === scope.serverId;
+
+  const hasCurrentCredentials = (scope: AuthScope): boolean => {
+    if (!dependencies.usesConfigurableServer) {
+      return (
+        dependencies.getAuthToken() === scope.authToken &&
+        dependencies.getRefreshToken() === scope.refreshToken
+      );
+    }
+    if (!scope.serverId) return false;
+    const current = dependencies.getServerAuthTokens(scope.serverId);
+    return (
+      current?.token === scope.authToken &&
+      current.refreshToken === scope.refreshToken
+    );
+  };
 
   const shouldAttemptRefresh = (path: string): boolean =>
     !path.includes("/api/auth/login") &&
@@ -102,6 +128,7 @@ export function createApiAuthTransport(
   };
 
   const clearRejectedSession = async (scope: AuthScope): Promise<void> => {
+    if (!hasCurrentCredentials(scope)) return;
     if (scope.serverId) {
       dependencies.setAuthTokensForServer(scope.serverId, null, null, null);
       return;
@@ -112,7 +139,13 @@ export function createApiAuthTransport(
 
   const refreshAuthScope = (scope: AuthScope): Promise<boolean> => {
     const pending = refreshPromises.get(scope.key);
-    if (pending) return pending;
+    if (
+      pending &&
+      pending.authToken === scope.authToken &&
+      pending.refreshToken === scope.refreshToken
+    ) {
+      return pending.promise;
+    }
     if (dependencies.usesConfigurableServer && !scope.serverId) {
       return Promise.resolve(false);
     }
@@ -143,6 +176,7 @@ export function createApiAuthTransport(
         await clearRejectedSession(scope);
         return false;
       }
+      if (!hasCurrentCredentials(scope)) return false;
       if (scope.serverId) {
         return dependencies.setAuthTokensForServer(
           scope.serverId,
@@ -159,11 +193,15 @@ export function createApiAuthTransport(
       return true;
     })();
     const tracked = operation.finally(() => {
-      if (refreshPromises.get(scope.key) === tracked) {
+      if (refreshPromises.get(scope.key)?.promise === tracked) {
         refreshPromises.delete(scope.key);
       }
     });
-    refreshPromises.set(scope.key, tracked);
+    refreshPromises.set(scope.key, {
+      authToken: scope.authToken,
+      refreshToken: scope.refreshToken,
+      promise: tracked,
+    });
     return tracked;
   };
 

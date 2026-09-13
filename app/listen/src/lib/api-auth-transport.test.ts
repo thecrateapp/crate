@@ -28,6 +28,83 @@ function refreshResponse(token: string, refreshToken: string): Response {
 }
 
 describe("createApiAuthTransport configurable-server refresh", () => {
+  it("does not let a stale refresh overwrite a newer session on the same server", async () => {
+    const session = {
+      token: "access-a",
+      refreshToken: "refresh-a",
+    };
+    const response = deferred<Response>();
+    vi.spyOn(globalThis, "fetch").mockReturnValue(response.promise);
+    const setAuthTokensForServer = vi.fn(
+      (
+        _serverId: string,
+        token: string | null,
+        refreshToken?: string | null,
+      ) => {
+        session.token = token ?? "";
+        session.refreshToken = refreshToken ?? "";
+        return true;
+      },
+    );
+    const transport = createApiAuthTransport({
+      apiBase: () => "https://a.example.com",
+      apiClient: vi.fn(),
+      apiCredentials: () => "omit",
+      getApiAuthHeaders: () => ({ Authorization: `Bearer ${session.token}` }),
+      getAuthToken: () => session.token,
+      getAuthTokenExpiresAt: () => null,
+      getCurrentServerId: () => "server-a",
+      getRefreshToken: () => session.refreshToken,
+      getServerAuthTokens: () => ({ ...session }),
+      setAuthToken: vi.fn(),
+      setAuthTokens: vi.fn(),
+      setAuthTokensForServer,
+      usesConfigurableServer: true,
+    });
+
+    const refresh = transport.refreshAuthToken();
+    session.token = "access-b";
+    session.refreshToken = "refresh-b";
+    response.resolve(refreshResponse("stale-access-a", "stale-refresh-a"));
+
+    await expect(refresh).resolves.toBe(false);
+    expect(session).toEqual({ token: "access-b", refreshToken: "refresh-b" });
+    expect(setAuthTokensForServer).not.toHaveBeenCalled();
+  });
+
+  it("does not let a stale rejected refresh clear a newer session", async () => {
+    const session = {
+      token: "access-a",
+      refreshToken: "refresh-a",
+    };
+    const response = deferred<Response>();
+    vi.spyOn(globalThis, "fetch").mockReturnValue(response.promise);
+    const setAuthTokensForServer = vi.fn(() => true);
+    const transport = createApiAuthTransport({
+      apiBase: () => "https://a.example.com",
+      apiClient: vi.fn(),
+      apiCredentials: () => "omit",
+      getApiAuthHeaders: () => ({ Authorization: `Bearer ${session.token}` }),
+      getAuthToken: () => session.token,
+      getAuthTokenExpiresAt: () => null,
+      getCurrentServerId: () => "server-a",
+      getRefreshToken: () => session.refreshToken,
+      getServerAuthTokens: () => ({ ...session }),
+      setAuthToken: vi.fn(),
+      setAuthTokens: vi.fn(),
+      setAuthTokensForServer,
+      usesConfigurableServer: true,
+    });
+
+    const refresh = transport.refreshAuthToken();
+    session.token = "access-b";
+    session.refreshToken = "refresh-b";
+    response.resolve({ ok: false, status: 401 } as Response);
+
+    await expect(refresh).resolves.toBe(false);
+    expect(setAuthTokensForServer).not.toHaveBeenCalled();
+  });
+
   it("isolates concurrent refreshes when the active server changes", async () => {
     let currentServerId = "server-a";
     const servers: Record<
@@ -65,6 +142,12 @@ describe("createApiAuthTransport configurable-server refresh", () => {
       getAuthTokenExpiresAt: () => null,
       getCurrentServerId: () => currentServerId,
       getRefreshToken: () => currentServer().refreshToken,
+      getServerAuthTokens: (serverId) => {
+        const server = servers[serverId];
+        return server
+          ? { token: server.token, refreshToken: server.refreshToken }
+          : null;
+      },
       setAuthToken: vi.fn(),
       setAuthTokens: vi.fn(),
       setAuthTokensForServer: (serverId, token) => {
@@ -138,6 +221,12 @@ describe("createApiAuthTransport configurable-server refresh", () => {
       getAuthTokenExpiresAt: () => null,
       getCurrentServerId: () => currentServerId,
       getRefreshToken: () => currentServer().refreshToken,
+      getServerAuthTokens: (serverId) => {
+        const server = servers[serverId];
+        return server
+          ? { token: server.token, refreshToken: server.refreshToken }
+          : null;
+      },
       setAuthToken: vi.fn(),
       setAuthTokens: vi.fn(),
       setAuthTokensForServer: vi.fn(() => true),

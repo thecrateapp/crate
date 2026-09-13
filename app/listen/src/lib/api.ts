@@ -226,6 +226,12 @@ const apiAuthTransport = createApiAuthTransport({
   getAuthTokenExpiresAt,
   getCurrentServerId,
   getRefreshToken,
+  getServerAuthTokens: (serverId) => {
+    const server = getServerById(serverId);
+    return server
+      ? { token: server.token, refreshToken: server.refreshToken }
+      : null;
+  },
   setAuthToken,
   setAuthTokens,
   setAuthTokensForServer,

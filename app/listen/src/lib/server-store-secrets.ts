@@ -17,6 +17,7 @@ export interface LegacyServerSecretRecord {
 }
 
 const runtimeSecrets = new Map<string, ServerSecret>();
+const runtimeSecretGenerations = new Map<string, number>();
 const pendingSecretWrites = new Set<Promise<void>>();
 const writeChains = new Map<string, Promise<void>>();
 const PENDING_SECRET_REMOVALS_KEY = "crate-pending-session-removals:v1";
@@ -63,6 +64,10 @@ function writeSecretGenerations(generations: Map<string, number>): void {
 }
 
 function observeSecretGeneration(serverId: string, generation: number): void {
+  const runtimeGeneration = runtimeSecretGenerations.get(serverId) ?? 0;
+  if (generation > runtimeGeneration) {
+    runtimeSecretGenerations.set(serverId, generation);
+  }
   const generations = readSecretGenerations();
   if ((generations.get(serverId) ?? 0) >= generation) return;
   generations.set(serverId, generation);
@@ -72,11 +77,18 @@ function observeSecretGeneration(serverId: string, generation: number): void {
 function nextSecretGeneration(serverId: string): number {
   const generations = readSecretGenerations();
   const pendingGeneration = readPendingSecretRemovals().get(serverId) ?? 0;
-  const next = Math.max(generations.get(serverId) ?? 0, pendingGeneration) + 1;
+  const runtimeGeneration = runtimeSecretGenerations.get(serverId) ?? 0;
+  const next =
+    Math.max(
+      generations.get(serverId) ?? 0,
+      pendingGeneration,
+      runtimeGeneration,
+    ) + 1;
   if (!Number.isSafeInteger(next)) {
     throw new Error("Native session generation exhausted");
   }
   generations.set(serverId, next);
+  runtimeSecretGenerations.set(serverId, next);
   writeSecretGenerations(generations);
   return next;
 }
@@ -106,18 +118,14 @@ function readPendingSecretRemovals(): Map<string, number> {
 }
 
 function writePendingSecretRemovals(removals: Map<string, number>): void {
-  try {
-    if (removals.size === 0) {
-      localStorage.removeItem(PENDING_SECRET_REMOVALS_KEY);
-      return;
-    }
-    localStorage.setItem(
-      PENDING_SECRET_REMOVALS_KEY,
-      JSON.stringify(Object.fromEntries(removals)),
-    );
-  } catch {
-    // Secure storage remains authoritative when local metadata is unavailable.
+  if (removals.size === 0) {
+    localStorage.removeItem(PENDING_SECRET_REMOVALS_KEY);
+    return;
   }
+  localStorage.setItem(
+    PENDING_SECRET_REMOVALS_KEY,
+    JSON.stringify(Object.fromEntries(removals)),
+  );
 }
 
 function markSecretRemovalPending(serverId: string, generation: number): void {
