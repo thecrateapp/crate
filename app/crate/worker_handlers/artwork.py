@@ -1586,6 +1586,14 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
                     if is_enabled
                 ),
             )
+            if render_manifest is None and isinstance(
+                existing.get("render_manifest"), Mapping
+            ):
+                return {
+                    "status": "conflict",
+                    "reason": "artist-hero-manifest-incomplete",
+                    "artist_id": artist_id,
+                }
             applied = upsert_artist_hero_artwork(
                 artist_id=artist_id,
                 provenance="manual",
@@ -1830,6 +1838,14 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
                 if is_enabled
             ),
         )
+        if render_manifest is None and isinstance(
+            existing.get("render_manifest"), Mapping
+        ):
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-manifest-incomplete",
+                "artist_id": artist_id,
+            }
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
             provenance="manual",
