@@ -29,7 +29,10 @@ import {
   castSetVolume,
   isCastSessionActive,
 } from "@/lib/cast-sender";
-import { cancelNativeMediaSessionResume } from "@/lib/native-media-session";
+import {
+  cancelNativeMediaSessionResume,
+  markNativeMediaSessionPlayingIntent,
+} from "@/lib/native-media-session";
 
 const SOFT_PAUSE_FADE_MS = 220;
 
@@ -108,6 +111,7 @@ export function usePlayerTransportControls({
 
   const resume = useCallback(() => {
     if (!queueRef.current.length) return;
+    markNativeMediaSessionPlayingIntent();
     if (isCastSessionActive()) {
       void castPlay().catch((error) => {
         console.error("[cast] failed to resume:", error);

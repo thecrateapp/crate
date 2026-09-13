@@ -10,6 +10,7 @@ const runtime = vi.hoisted(() => ({ isNative: false }));
 const nativeMediaSession = vi.hoisted(() => ({
   cancelPendingResume: vi.fn(async () => {}),
   controlListener: null as ((event: NativeMediaControlEvent) => void) | null,
+  resumeAllowed: true,
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -40,6 +41,8 @@ vi.mock("@/lib/native-media-session", () => ({
       };
     },
   ),
+  markNativeMediaSessionPlayingIntent: vi.fn(),
+  shouldResumeAfterNativeInterruption: () => nativeMediaSession.resumeAllowed,
   stopNativeMediaSession: vi.fn(async () => {}),
   syncNativeMediaSession: vi.fn(async () => {}),
 }));
@@ -115,6 +118,7 @@ function renderSession(
 beforeEach(() => {
   runtime.isNative = false;
   nativeMediaSession.controlListener = null;
+  nativeMediaSession.resumeAllowed = true;
   vi.clearAllMocks();
   mediaSession = {
     metadata: null,
@@ -224,5 +228,21 @@ describe("useMediaSession", () => {
     expect(controls.pause).toHaveBeenCalledTimes(1);
     expect(controls.pause).toHaveBeenCalledWith({ preserveNativeResume: true });
     expect(nativeMediaSession.cancelPendingResume).not.toHaveBeenCalled();
+  });
+
+  it("ignores an interruption resume invalidated by an explicit pause", async () => {
+    runtime.isNative = true;
+    nativeMediaSession.resumeAllowed = false;
+    renderSession(TRACK_A, 0, false);
+    await vi.waitFor(() => {
+      expect(nativeMediaSession.controlListener).not.toBeNull();
+    });
+
+    nativeMediaSession.controlListener?.({
+      control: "play",
+      source: "audio-interruption-resume",
+    });
+
+    expect(controls.resume).not.toHaveBeenCalled();
   });
 });

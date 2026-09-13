@@ -10,6 +10,16 @@ export type {
   NativeMediaSessionPayload,
 } from "@/lib/native-media-session-bridge";
 
+let nativeInterruptionResumeAllowed = true;
+
+export function markNativeMediaSessionPlayingIntent(): void {
+  nativeInterruptionResumeAllowed = true;
+}
+
+export function shouldResumeAfterNativeInterruption(): boolean {
+  return nativeInterruptionResumeAllowed;
+}
+
 export async function syncNativeMediaSession(
   payload: NativeMediaSessionPayload,
 ): Promise<void> {
@@ -25,6 +35,7 @@ export async function stopNativeMediaSession(options?: {
   suppressControl?: boolean;
 }): Promise<void> {
   if (!isNative) return;
+  nativeInterruptionResumeAllowed = false;
   try {
     await getNativeMediaSessionBridge().stop(options);
   } catch {
@@ -34,6 +45,7 @@ export async function stopNativeMediaSession(options?: {
 
 export async function cancelNativeMediaSessionResume(): Promise<void> {
   if (!isNative) return;
+  nativeInterruptionResumeAllowed = false;
   try {
     await getNativeMediaSessionBridge().cancelPendingResume();
   } catch {

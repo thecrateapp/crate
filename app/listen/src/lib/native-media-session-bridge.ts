@@ -20,7 +20,7 @@ export type NativeMediaSessionPayload = {
 export type NativeMediaControlEvent = {
   control?: NativeMediaControl;
   position?: number;
-  source?: "audio-interruption";
+  source?: "audio-interruption" | "audio-interruption-resume";
 };
 
 export interface NativeOutputCapabilities {

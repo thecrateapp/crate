@@ -299,7 +299,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             let shouldResume = AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume)
             if interruptionState.end(systemAllowsResume: shouldResume) {
                 configureAudioSession()
-                sendControl("play")
+                sendControl("play", source: "audio-interruption-resume")
             }
         @unknown default:
             break

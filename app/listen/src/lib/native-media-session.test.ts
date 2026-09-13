@@ -64,4 +64,30 @@ describe("native media session bridge", () => {
 
     expect(pluginMock.cancelPendingResume).toHaveBeenCalledTimes(1);
   });
+
+  it("blocks an interruption resume synchronously before native acknowledges pause", async () => {
+    let acknowledgePause: (() => void) | undefined;
+    pluginMock.cancelPendingResume.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          acknowledgePause = resolve;
+        }),
+    );
+    const mediaSession = await import("@/lib/native-media-session");
+
+    const pendingPause = mediaSession.cancelNativeMediaSessionResume();
+
+    expect(mediaSession.shouldResumeAfterNativeInterruption()).toBe(false);
+    acknowledgePause?.();
+    await pendingPause;
+  });
+
+  it("allows interruption resume again after an explicit play intent", async () => {
+    const mediaSession = await import("@/lib/native-media-session");
+    await mediaSession.cancelNativeMediaSessionResume();
+
+    mediaSession.markNativeMediaSessionPlayingIntent();
+
+    expect(mediaSession.shouldResumeAfterNativeInterruption()).toBe(true);
+  });
 });

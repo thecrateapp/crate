@@ -7,7 +7,9 @@ import { isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
+  markNativeMediaSessionPlayingIntent,
   onNativeMediaControl,
+  shouldResumeAfterNativeInterruption,
   stopNativeMediaSession,
   syncNativeMediaSession,
 } from "@/lib/native-media-session";
@@ -72,6 +74,12 @@ export function useMediaSession({
       const actions = actionsRef.current;
       switch (event.control) {
         case "play":
+          if (
+            event.source === "audio-interruption-resume" &&
+            !shouldResumeAfterNativeInterruption()
+          ) {
+            break;
+          }
           actions.resume();
           break;
         case "pause":
@@ -110,6 +118,12 @@ export function useMediaSession({
       cleanup?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (isPlaying) {
+      markNativeMediaSessionPlayingIntent();
+    }
+  }, [isPlaying]);
 
   // Update metadata when track changes
   useEffect(() => {

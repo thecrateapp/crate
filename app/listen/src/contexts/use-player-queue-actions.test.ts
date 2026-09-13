@@ -11,6 +11,7 @@ const {
   castSeekMock,
   castSetVolumeMock,
   cancelNativeMediaSessionResumeMock,
+  markNativeMediaSessionPlayingIntentMock,
   isCastSessionActiveMock,
   startCastSessionMock,
 } = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ const {
   castSeekMock: vi.fn(),
   castSetVolumeMock: vi.fn(),
   cancelNativeMediaSessionResumeMock: vi.fn(async () => {}),
+  markNativeMediaSessionPlayingIntentMock: vi.fn(),
   isCastSessionActiveMock: vi.fn(),
   startCastSessionMock: vi.fn(),
 }));
@@ -84,6 +86,7 @@ vi.mock("@/lib/cast-sender", () => ({
 
 vi.mock("@/lib/native-media-session", () => ({
   cancelNativeMediaSessionResume: cancelNativeMediaSessionResumeMock,
+  markNativeMediaSessionPlayingIntent: markNativeMediaSessionPlayingIntentMock,
 }));
 
 const TRACK: Track = {
@@ -575,6 +578,20 @@ describe("usePlayerQueueActions", () => {
     result.current.pause({ preserveNativeResume: true });
 
     expect(cancelNativeMediaSessionResumeMock).not.toHaveBeenCalled();
+  });
+
+  it("restores native resume permission for an explicit resume", () => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.resume();
+
+    expect(markNativeMediaSessionPlayingIntentMock).toHaveBeenCalledTimes(1);
   });
 
   it("resumes immediately when the app is hidden", () => {
