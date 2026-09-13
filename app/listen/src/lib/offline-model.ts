@@ -79,8 +79,8 @@ export interface OfflineNativeAssetRecord {
   entityUid?: string | null;
   storageId?: string | null;
   path: string;
-  uri: string;
-  playbackUrl: string;
+  uri?: string;
+  playbackUrl?: string;
   byteLength?: number | null;
   updatedAt?: string | null;
 }

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const filesystemMock = vi.hoisted(() => ({
   readFile: vi.fn(),
+  getUri: vi.fn(),
   writeFile: vi.fn(async () => undefined),
   mkdir: vi.fn(async () => undefined),
   stat: vi.fn(),
@@ -50,6 +51,9 @@ describe("native offline playback bootstrap", () => {
 
   it("loads persisted native media assets before resolving playback URLs", async () => {
     localStorage.setItem("listen-auth-user-id", "42");
+    filesystemMock.getUri.mockResolvedValue({
+      uri: "file:///current-container/offline-media/profile/song.m4a",
+    });
     filesystemMock.readFile.mockImplementation(async ({ path }) => {
       if (String(path).includes("offline-index-")) {
         return { data: JSON.stringify({ items: {} }) };
@@ -83,13 +87,13 @@ describe("native offline playback bootstrap", () => {
     await primeOfflineRuntimeProfile("https://api.example.test");
 
     expect(getOfflineNativePlaybackUrl({ entityUid: "track-entity-1" })).toBe(
-      "capacitor://localhost/_capacitor_file_/offline-media/profile/song.m4a",
+      "capacitor://localhost/file:///current-container/offline-media/profile/song.m4a",
     );
     expect(
       getOfflineNativePlaybackUrl({ entityUid: "track-entity-1" }, undefined, {
         target: "android-native",
       }),
-    ).toBe("file:///offline-media/profile/song.m4a");
+    ).toBe("file:///current-container/offline-media/profile/song.m4a");
   });
 
   it("verifies a bounded asset batch in one native bridge call", async () => {

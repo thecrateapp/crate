@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 
 import { isNative } from "@/lib/capacitor-runtime";
@@ -71,6 +72,19 @@ function createKeyedWriteChain(): (
 
 const enqueueNativeAssetIndexWrite = createKeyedWriteChain();
 const enqueueNativeSnapshotWrite = createKeyedWriteChain();
+
+function isMissingNativeFileError(error: unknown): boolean {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "OS-PLUG-FILE-0008"
+  ) {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:does not exist|file not found)/i.test(message);
+}
 
 export function getOfflineItemKey(
   kind: OfflineItemKind,
@@ -204,6 +218,55 @@ function parseOfflineNativeAssetIndex(
   return tryParseOfflineNativeAssetIndex(raw) ?? {};
 }
 
+function portableNativeAssetIndex(
+  assets: Record<string, OfflineNativeAssetRecord>,
+): Record<string, Omit<OfflineNativeAssetRecord, "uri" | "playbackUrl">> {
+  return Object.fromEntries(
+    Object.entries(assets).map(([key, asset]) => [
+      key,
+      portableNativeAsset(asset),
+    ]),
+  );
+}
+
+function portableNativeAsset(
+  asset: OfflineNativeAssetRecord,
+): Omit<OfflineNativeAssetRecord, "uri" | "playbackUrl"> {
+  const portable = { ...asset };
+  delete portable.uri;
+  delete portable.playbackUrl;
+  return portable;
+}
+
+async function hydrateNativeAssetLocators(
+  assets: Record<string, OfflineNativeAssetRecord>,
+): Promise<Record<string, OfflineNativeAssetRecord>> {
+  const hydrated = await Promise.all(
+    Object.entries(assets).map(async ([key, asset]) => {
+      if (!asset.path) {
+        return [key, portableNativeAsset(asset)] as const;
+      }
+      try {
+        const { uri } = await Filesystem.getUri({
+          path: asset.path,
+          directory: Directory.Data,
+        });
+        return [
+          key,
+          {
+            ...asset,
+            uri,
+            playbackUrl: Capacitor.convertFileSrc(uri),
+          },
+        ] as const;
+      } catch {
+        return [key, portableNativeAsset(asset)] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(hydrated);
+}
+
 function getLegacyOfflineSnapshot(profileKey: string): OfflineSnapshot {
   if (typeof window === "undefined") return EMPTY_OFFLINE_SNAPSHOT;
   try {
@@ -264,8 +327,9 @@ async function readNativeJsonFile(path: string): Promise<string | null> {
       encoding: Encoding.UTF8,
     });
     return typeof result.data === "string" ? result.data : null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (isMissingNativeFileError(error)) return null;
+    throw error;
   }
 }
 
@@ -364,12 +428,15 @@ async function ensureOfflineSnapshotLoaded(
       }
     }
     nativeSnapshotCache.set(profileKey, snapshot);
-    nativeSnapshotLoaders.delete(profileKey);
     return snapshot;
   })();
-
-  nativeSnapshotLoaders.set(profileKey, loader);
-  return loader;
+  const tracked = loader.finally(() => {
+    if (nativeSnapshotLoaders.get(profileKey) === tracked) {
+      nativeSnapshotLoaders.delete(profileKey);
+    }
+  });
+  nativeSnapshotLoaders.set(profileKey, tracked);
+  return tracked;
 }
 
 export async function ensureOfflineNativeAssetIndexLoaded(
@@ -391,17 +458,21 @@ export async function ensureOfflineNativeAssetIndexLoaded(
       const legacy = getLegacyOfflineNativeAssetIndex(profileKey);
       assets = legacy;
       if (Object.keys(legacy).length) {
-        await writeNativeJsonFile(filePath, legacy);
+        await writeNativeJsonFile(filePath, portableNativeAssetIndex(legacy));
         clearLegacyOfflineNativeAssetIndex(profileKey);
       }
     }
-    nativeAssetIndexCache.set(profileKey, assets);
-    nativeAssetIndexLoaders.delete(profileKey);
-    return assets;
+    const hydrated = await hydrateNativeAssetLocators(assets);
+    nativeAssetIndexCache.set(profileKey, hydrated);
+    return hydrated;
   })();
-
-  nativeAssetIndexLoaders.set(profileKey, loader);
-  return loader;
+  const tracked = loader.finally(() => {
+    if (nativeAssetIndexLoaders.get(profileKey) === tracked) {
+      nativeAssetIndexLoaders.delete(profileKey);
+    }
+  });
+  nativeAssetIndexLoaders.set(profileKey, tracked);
+  return tracked;
 }
 
 // saveOfflineNativeAssetIndex only serializes the *write* of a snapshot the
@@ -427,7 +498,10 @@ export async function updateOfflineNativeAssetIndex(
   await enqueueNativeAssetIndexWrite(profileKey, async () => {
     const current = await ensureOfflineNativeAssetIndexLoaded(profileKey);
     const next = await mutate(current);
-    await writeNativeJsonFile(getOfflineNativeAssetIndexPath(profileKey), next);
+    await writeNativeJsonFile(
+      getOfflineNativeAssetIndexPath(profileKey),
+      portableNativeAssetIndex(next),
+    );
     nativeAssetIndexCache.set(profileKey, next);
   });
 }
@@ -457,7 +531,7 @@ export async function saveOfflineNativeAssetIndex(
     await enqueueNativeAssetIndexWrite(profileKey, async () => {
       await writeNativeJsonFile(
         getOfflineNativeAssetIndexPath(profileKey),
-        assets,
+        portableNativeAssetIndex(assets),
       );
       nativeAssetIndexCache.set(profileKey, assets);
     });

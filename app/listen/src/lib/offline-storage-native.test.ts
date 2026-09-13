@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { deleteFileMock, renameMock, writeFileMock, readFileMock } = vi.hoisted(
-  () => ({
+const { deleteFileMock, getUriMock, renameMock, writeFileMock, readFileMock } =
+  vi.hoisted(() => ({
     deleteFileMock: vi.fn(),
+    getUriMock: vi.fn(),
     renameMock: vi.fn(),
     writeFileMock: vi.fn(),
     readFileMock: vi.fn(),
-  }),
-);
+  }));
 
 vi.mock(import("@capacitor/core"), async (importOriginal) => {
   const actual = await importOriginal();
@@ -26,6 +26,7 @@ vi.mock("@capacitor/filesystem", () => ({
   Encoding: { UTF8: "utf8" },
   Filesystem: {
     deleteFile: deleteFileMock,
+    getUri: getUriMock,
     mkdir: vi.fn().mockResolvedValue(undefined),
     readFile: readFileMock,
     rename: renameMock,
@@ -74,6 +75,9 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
         writtenFiles.set(path, data);
       },
     );
+    getUriMock.mockImplementation(async ({ path }: { path: string }) => ({
+      uri: `file:///current-container/${path}`,
+    }));
   });
 
   it("keeps both mutations even when the first-issued write finishes last", async () => {
@@ -202,5 +206,70 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     expect(loadOfflineNativeAssetIndex("failed-save-profile")).toEqual({
       previous: { assetKey: "previous" },
     });
+  });
+
+  it("propagates native read failures and retries the loader later", async () => {
+    readFileMock.mockRejectedValueOnce(new Error("filesystem unavailable"));
+
+    await expect(
+      ensureOfflineNativeAssetIndexLoaded("read-error-profile"),
+    ).rejects.toThrow("filesystem unavailable");
+
+    writtenFiles.set(
+      "offline-meta/offline-assets-read-error-profile.json",
+      JSON.stringify({ trackA: { assetKey: "trackA", path: "track-a.flac" } }),
+    );
+    await expect(
+      ensureOfflineNativeAssetIndexLoaded("read-error-profile"),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        trackA: expect.objectContaining({
+          uri: "file:///current-container/track-a.flac",
+        }),
+      }),
+    );
+  });
+
+  it("rebuilds runtime locators when the native container path changes", async () => {
+    writtenFiles.set(
+      "offline-meta/offline-assets-relocated-profile.json",
+      JSON.stringify({
+        trackA: {
+          assetKey: "trackA",
+          path: "offline-media/profile/track-a.flac",
+          uri: "file:///old-container/track-a.flac",
+          playbackUrl: "capacitor://old-container/track-a.flac",
+        },
+      }),
+    );
+
+    const assets =
+      await ensureOfflineNativeAssetIndexLoaded("relocated-profile");
+
+    expect(assets.trackA).toEqual(
+      expect.objectContaining({
+        uri: "file:///current-container/offline-media/profile/track-a.flac",
+      }),
+    );
+    expect(assets.trackA?.playbackUrl).not.toContain("old-container");
+  });
+
+  it("persists only relocatable paths, never container-specific URLs", async () => {
+    await saveOfflineNativeAssetIndex("portable-profile", {
+      trackA: {
+        assetKey: "trackA",
+        path: "offline-media/profile/track-a.flac",
+        uri: "file:///current-container/track-a.flac",
+        playbackUrl: "capacitor://current-container/track-a.flac",
+      },
+    });
+
+    const persisted = JSON.parse(
+      writtenFiles.get("offline-meta/offline-assets-portable-profile.json") ??
+        "{}",
+    );
+    expect(persisted.trackA.path).toBe("offline-media/profile/track-a.flac");
+    expect(persisted.trackA).not.toHaveProperty("uri");
+    expect(persisted.trackA).not.toHaveProperty("playbackUrl");
   });
 });
