@@ -146,7 +146,7 @@ async function initializeCapacitor(): Promise<string | null> {
     // Ignore launch URL failures
   }
 
-  await retryPendingOAuthExchange();
+  void retryPendingOAuthExchange();
 
   Network.addListener("networkStatusChange", (status) => {
     console.log(

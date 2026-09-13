@@ -80,6 +80,16 @@ describe("Capacitor initialization", () => {
     expect(networkAddListener).toHaveBeenCalledTimes(1);
   });
 
+  it("does not block native initialization on a pending OAuth retry", async () => {
+    retryPendingNativeOAuthCallback.mockReturnValue(new Promise(() => {}));
+    const { initCapacitor } = await import("./capacitor-init");
+
+    const initialized = initCapacitor();
+
+    await vi.waitFor(() => expect(networkAddListener).toHaveBeenCalledOnce());
+    await expect(initialized).resolves.toBeNull();
+  });
+
   it("maps the resolved appearance mode to the native status bar", async () => {
     const { applyNativeColorMode } = await import("./capacitor-init");
 
