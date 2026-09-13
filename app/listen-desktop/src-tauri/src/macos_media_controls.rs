@@ -2,17 +2,17 @@ use std::{
     ptr,
     sync::{Arc, Condvar, Mutex, OnceLock},
     thread,
+    time::Duration,
 };
 
 use objc2::{
     class,
     encode::{Encode, Encoding},
     msg_send,
-    rc::autoreleasepool,
     runtime::{AnyClass, AnyObject, Imp, Sel},
     sel,
 };
-use objc2_foundation::{NSData, NSString, NSURL};
+use objc2_foundation::{NSData, NSString};
 
 use crate::macos_delegate::{app_delegate, replace_method};
 use crate::DesktopMediaSessionPayload;
@@ -32,6 +32,9 @@ static MEDIA_APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static ARTWORK_CACHE: OnceLock<Mutex<ArtworkCache>> = OnceLock::new();
 static ARTWORK_REQUEST_STATE: OnceLock<Mutex<ArtworkRequestState>> = OnceLock::new();
 static ARTWORK_FETCH_QUEUE: OnceLock<Arc<ArtworkFetchQueue>> = OnceLock::new();
+
+const ARTWORK_FETCH_TIMEOUT: Duration = Duration::from_secs(8);
+const MAX_ARTWORK_BYTES: u64 = 20 * 1024 * 1024;
 
 #[derive(Default)]
 struct ArtworkCache {
@@ -216,10 +219,24 @@ fn artwork_fetch_worker(queue: Arc<ArtworkFetchQueue>) {
 }
 
 fn fetch_artwork_bytes(url: &str) -> Option<Vec<u8>> {
-    autoreleasepool(|_| {
-        let url = NSURL::URLWithString(&NSString::from_str(url))?;
-        NSData::dataWithContentsOfURL(&url).map(|data| data.to_vec())
-    })
+    fetch_artwork_bytes_with_timeout(url, ARTWORK_FETCH_TIMEOUT)
+}
+
+fn fetch_artwork_bytes_with_timeout(url: &str, timeout: Duration) -> Option<Vec<u8>> {
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(timeout)
+        .timeout(timeout)
+        .build()
+        .ok()?;
+    let response = client.get(url).send().ok()?.error_for_status().ok()?;
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_ARTWORK_BYTES)
+    {
+        return None;
+    }
+    let bytes = response.bytes().ok()?;
+    (bytes.len() <= MAX_ARTWORK_BYTES as usize).then(|| bytes.to_vec())
 }
 
 unsafe fn finish_artwork_fetch(request: ArtworkRequest, bytes: Option<Vec<u8>>) {
@@ -606,7 +623,35 @@ fn emit_media_command(command: crate::PlaybackCommand) -> isize {
 
 #[cfg(test)]
 mod tests {
-    use super::{ArtworkFetchQueue, ArtworkRequest, ArtworkRequestState};
+    use std::{
+        net::TcpListener,
+        thread,
+        time::{Duration, Instant},
+    };
+
+    use super::{
+        fetch_artwork_bytes_with_timeout, ArtworkFetchQueue, ArtworkRequest, ArtworkRequestState,
+    };
+
+    #[test]
+    fn artwork_fetch_timeout_bounds_a_stalled_request() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let _ = listener.accept();
+            thread::sleep(Duration::from_millis(200));
+        });
+        let started = Instant::now();
+
+        let result = fetch_artwork_bytes_with_timeout(
+            &format!("http://{address}/artwork.jpg"),
+            Duration::from_millis(50),
+        );
+
+        assert_eq!(result, None);
+        assert!(started.elapsed() < Duration::from_millis(175));
+        server.join().unwrap();
+    }
 
     #[test]
     fn artwork_fetch_queue_keeps_only_the_latest_pending_request() {
