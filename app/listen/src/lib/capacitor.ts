@@ -5,6 +5,7 @@ export {
   consumePendingOAuthNext,
   getOAuthCallbackPayload,
   persistOAuthCallbackPayload,
+  retryPendingNativeOAuthCallback,
 } from "@/lib/capacitor-oauth";
 export { initCapacitor } from "@/lib/capacitor-init";
 export {

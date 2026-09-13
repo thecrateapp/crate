@@ -5,13 +5,15 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import os
 import secrets
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from threading import RLock
 
-NATIVE_OAUTH_HANDOFF_TTL_SECONDS = 60
+NATIVE_OAUTH_HANDOFF_TTL_SECONDS = 15 * 60
+NATIVE_OAUTH_RESULT_TTL_SECONDS = 5 * 60
 _HANDOFF_PREFIX = "crate:auth:native_oauth"
 _memory_handoffs: dict[str, str] = {}
 _memory_lock = RLock()
@@ -42,6 +44,10 @@ def pkce_challenge(verifier: str) -> str:
 def handoff_key(code: str) -> str:
     digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
     return f"{_HANDOFF_PREFIX}:{digest}"
+
+
+def exchange_result_key(code: str) -> str:
+    return f"{handoff_key(code)}:result"
 
 
 def _redis_client():
@@ -155,3 +161,112 @@ def consume_handoff(*, code: str, state: str, verifier: str) -> NativeOAuthHando
     if handoff.expires_at <= now or not state_valid or not challenge_valid:
         raise InvalidNativeOAuthHandoff("Native OAuth handoff binding is invalid")
     return handoff
+
+
+def restore_handoff(*, code: str, handoff: NativeOAuthHandoff) -> None:
+    remaining_seconds = math.ceil(
+        (handoff.expires_at - datetime.now(timezone.utc)).total_seconds()
+    )
+    if remaining_seconds <= 0:
+        return
+    key = handoff_key(code)
+    serialized = _serialize(handoff)
+    redis_client = _redis_client()
+    if redis_client is not None:
+        try:
+            redis_client.set(key, serialized, ex=remaining_seconds, nx=True)
+            return
+        except Exception as exc:
+            raise NativeOAuthUnavailable(
+                "Native OAuth handoff store is unavailable"
+            ) from exc
+    if not _local_memory_allowed():
+        raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
+    with _memory_lock:
+        _memory_handoffs.setdefault(key, serialized)
+
+
+def complete_exchange(
+    *, code: str, handoff: NativeOAuthHandoff, payload: dict[str, object]
+) -> None:
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        seconds=NATIVE_OAUTH_RESULT_TTL_SECONDS
+    )
+    serialized = json.dumps(
+        {
+            "app_id": handoff.app_id,
+            "state": handoff.state,
+            "challenge": handoff.challenge,
+            "expires_at": expires_at.isoformat(),
+            "payload": payload,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    key = exchange_result_key(code)
+    redis_client = _redis_client()
+    if redis_client is not None:
+        try:
+            if redis_client.set(
+                key,
+                serialized,
+                ex=NATIVE_OAUTH_RESULT_TTL_SECONDS,
+            ):
+                return
+            raise NativeOAuthUnavailable(
+                "Native OAuth exchange result could not be stored"
+            )
+        except NativeOAuthUnavailable:
+            raise
+        except Exception as exc:
+            raise NativeOAuthUnavailable(
+                "Native OAuth handoff store is unavailable"
+            ) from exc
+    if not _local_memory_allowed():
+        raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
+    with _memory_lock:
+        _memory_handoffs[key] = serialized
+
+
+def get_completed_exchange(
+    *, code: str, state: str, verifier: str, app_id: str
+) -> dict[str, object] | None:
+    key = exchange_result_key(code)
+    redis_client = _redis_client()
+    if redis_client is not None:
+        try:
+            raw = redis_client.get(key)
+        except Exception as exc:
+            raise NativeOAuthUnavailable(
+                "Native OAuth handoff store is unavailable"
+            ) from exc
+    else:
+        if not _local_memory_allowed():
+            raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
+        with _memory_lock:
+            raw = _memory_handoffs.get(key)
+    if raw is None:
+        return None
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    try:
+        record = json.loads(raw)
+        expires_at = datetime.fromisoformat(
+            str(record["expires_at"]).replace("Z", "+00:00")
+        )
+        payload = record["payload"]
+        valid = (
+            isinstance(payload, dict)
+            and expires_at > datetime.now(timezone.utc)
+            and secrets.compare_digest(str(record["state"]), state)
+            and secrets.compare_digest(
+                str(record["challenge"]), pkce_challenge(verifier)
+            )
+            and secrets.compare_digest(str(record["app_id"]), app_id)
+        )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        valid = False
+        payload = None
+    if not valid:
+        raise InvalidNativeOAuthHandoff("Native OAuth exchange result is invalid")
+    return payload

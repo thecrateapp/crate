@@ -62,10 +62,13 @@ from crate.api.schemas.auth import (
     UpdateUserStatusRequest,
 )
 from crate.api.native_oauth import (
+    complete_exchange as complete_native_oauth_exchange,
+    get_completed_exchange as get_completed_native_oauth_exchange,
     InvalidNativeOAuthHandoff,
     NativeOAuthUnavailable,
     consume_handoff as consume_native_oauth_handoff,
     issue_handoff as issue_native_oauth_handoff,
+    restore_handoff as restore_native_oauth_handoff,
 )
 from crate.api.schemas.common import OkResponse
 from crate.auth import (
@@ -2458,6 +2461,14 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
     if not _NATIVE_STATE_RE.fullmatch(body.state):
         raise HTTPException(status_code=400, detail="Invalid native OAuth state")
     try:
+        completed = get_completed_native_oauth_exchange(
+            code=body.code,
+            state=body.state,
+            verifier=body.code_verifier,
+            app_id=app_id,
+        )
+        if completed is not None:
+            return completed
         handoff = consume_native_oauth_handoff(
             code=body.code,
             state=body.state,
@@ -2475,15 +2486,31 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
         ) from exc
     if not secrets.compare_digest(handoff.app_id, app_id):
         raise HTTPException(status_code=401, detail="Native OAuth client mismatch")
-    user = get_user_by_id(handoff.user_id)
-    user = _ensure_user_active(user)
-    update_user_last_login(user["id"])
-    token, session, refresh_token = _create_login_session(
-        user,
-        request,
-        app_id=app_id,
-    )
-    return _auth_login_payload(user, token, session, refresh_token)
+    try:
+        user = get_user_by_id(handoff.user_id)
+        user = _ensure_user_active(user)
+        update_user_last_login(user["id"])
+        token, session, refresh_token = _create_login_session(
+            user,
+            request,
+            app_id=app_id,
+        )
+        payload = _auth_login_payload(user, token, session, refresh_token)
+    except Exception:
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.warning("Failed to restore native OAuth handoff", exc_info=True)
+        raise
+    try:
+        complete_native_oauth_exchange(
+            code=body.code,
+            handoff=handoff,
+            payload=payload,
+        )
+    except NativeOAuthUnavailable:
+        log.warning("Failed to cache native OAuth exchange result", exc_info=True)
+    return payload
 
 
 @router.post(

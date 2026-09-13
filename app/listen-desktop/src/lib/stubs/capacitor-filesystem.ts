@@ -51,6 +51,8 @@ export const Filesystem = {
   stat: (
     _options: FilesystemPathOptions,
   ): Promise<{ size?: number; uri: string }> => unsupported(),
+  getUri: (_options: FilesystemPathOptions): Promise<{ uri: string }> =>
+    unsupported(),
   deleteFile: (_options: FilesystemPathOptions): Promise<void> => unsupported(),
   rename: (_options: FilesystemRenameOptions): Promise<void> => unsupported(),
   downloadFile: (

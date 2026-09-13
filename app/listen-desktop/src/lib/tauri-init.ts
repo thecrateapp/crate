@@ -1,4 +1,7 @@
-import { consumeOAuthCallbackUrl } from "@/lib/capacitor-oauth";
+import {
+  consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthCallback,
+} from "@/lib/capacitor-oauth";
 import { recordDevLog } from "@/lib/dev-logs";
 import {
   dispatchDesktopTrayCommand,
@@ -27,6 +30,9 @@ export function initTauriRuntime(): void {
   void initTrayBridge();
   void initBandcampCookieBridge();
   void initDeepLinks();
+  window.addEventListener("online", () => {
+    void retryDeferredOAuth();
+  });
 }
 
 function ensureDesktopWindowSize(): void {
@@ -116,6 +122,7 @@ async function initDeepLinks(): Promise<void> {
     } else {
       recordTauriAuthDiagnostic("OAuth bridge ready");
     }
+    await retryDeferredOAuth();
   } catch (err) {
     recordTauriAuthDiagnostic(
       "OAuth bridge failed",
@@ -123,6 +130,13 @@ async function initDeepLinks(): Promise<void> {
     );
     console.warn("[tauri] deep-link init failed", err);
   }
+}
+
+async function retryDeferredOAuth(): Promise<void> {
+  const result = await retryPendingNativeOAuthCallback();
+  if (!result.handled) return;
+  recordTauriAuthDiagnostic("OAuth token stored", result.next);
+  window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
 }
 
 async function initTrayBridge(): Promise<void> {

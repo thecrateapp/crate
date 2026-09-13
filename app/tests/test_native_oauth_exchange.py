@@ -19,6 +19,12 @@ class _AtomicRedis:
     def getdel(self, key: str) -> bytes | None:
         return self.values.pop(key, None)
 
+    def get(self, key: str) -> bytes | None:
+        return self.values.get(key)
+
+    def delete(self, key: str) -> None:
+        self.values.pop(key, None)
+
 
 class _UnavailableRedis:
     def set(self, key: str, value: str, *, ex: int, nx: bool = False) -> bool:
@@ -87,6 +93,72 @@ def test_native_handoff_is_hashed_bound_and_single_use() -> None:
                 state="state-token",
                 verifier=verifier,
             )
+
+
+def test_native_handoff_replays_a_completed_exchange_idempotently() -> None:
+    from crate.api import native_oauth
+
+    redis = _AtomicRedis()
+    verifier = "v" * 43
+    with (
+        patch.object(native_oauth, "_redis_client", return_value=redis),
+        patch.object(native_oauth.secrets, "token_urlsafe", return_value="raw-code"),
+    ):
+        code = native_oauth.issue_handoff(
+            user_id=7,
+            app_id="listen-tauri",
+            state="state-token",
+            challenge=native_oauth.pkce_challenge(verifier),
+        )
+        handoff = native_oauth.consume_handoff(
+            code=code,
+            state="state-token",
+            verifier=verifier,
+        )
+        native_oauth.complete_exchange(
+            code=code,
+            handoff=handoff,
+            payload={"token": "jwt-token"},
+        )
+
+        assert native_oauth.get_completed_exchange(
+            code=code,
+            state="state-token",
+            verifier=verifier,
+            app_id="listen-tauri",
+        ) == {"token": "jwt-token"}
+
+
+def test_native_handoff_can_be_restored_after_exchange_failure() -> None:
+    from crate.api import native_oauth
+
+    redis = _AtomicRedis()
+    verifier = "v" * 43
+    with (
+        patch.object(native_oauth, "_redis_client", return_value=redis),
+        patch.object(native_oauth.secrets, "token_urlsafe", return_value="raw-code"),
+    ):
+        code = native_oauth.issue_handoff(
+            user_id=7,
+            app_id="listen-tauri",
+            state="state-token",
+            challenge=native_oauth.pkce_challenge(verifier),
+        )
+        handoff = native_oauth.consume_handoff(
+            code=code,
+            state="state-token",
+            verifier=verifier,
+        )
+        native_oauth.restore_handoff(code=code, handoff=handoff)
+
+        assert (
+            native_oauth.consume_handoff(
+                code=code,
+                state="state-token",
+                verifier=verifier,
+            )
+            == handoff
+        )
 
 
 @pytest.mark.parametrize(
@@ -279,3 +351,83 @@ def test_native_exchange_rejects_app_mismatch_without_session() -> None:
 
     assert exc_info.value.status_code == 401
     create_session.assert_not_called()
+
+
+def test_native_exchange_replays_completed_response_without_new_session() -> None:
+    from crate.api.auth import native_oauth_exchange
+    from crate.api.schemas.auth import NativeOAuthExchangeRequest
+
+    body = NativeOAuthExchangeRequest(
+        code="handoff-code-token",
+        code_verifier="v" * 43,
+        state="state-token-value",
+    )
+    with (
+        patch(
+            "crate.api.auth.get_completed_native_oauth_exchange",
+            return_value={"token": "existing-token"},
+        ),
+        patch("crate.api.auth.consume_native_oauth_handoff") as consume_handoff,
+        patch("crate.api.auth._create_login_session") as create_session,
+        patch.dict(
+            "os.environ",
+            {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+            clear=False,
+        ),
+    ):
+        payload = native_oauth_exchange(_request(app_id="listen-tauri"), body)
+
+    assert payload == {"token": "existing-token"}
+    consume_handoff.assert_not_called()
+    create_session.assert_not_called()
+
+
+def test_native_exchange_restores_handoff_when_session_creation_fails() -> None:
+    from crate.api.auth import native_oauth_exchange
+    from crate.api.native_oauth import NativeOAuthHandoff
+    from crate.api.schemas.auth import NativeOAuthExchangeRequest
+
+    handoff = NativeOAuthHandoff(
+        user_id=7,
+        app_id="listen-tauri",
+        state="state-token-value",
+        challenge="challenge",
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=30),
+    )
+    body = NativeOAuthExchangeRequest(
+        code="handoff-code-token",
+        code_verifier="v" * 43,
+        state="state-token-value",
+    )
+    user = {
+        "id": 7,
+        "email": "user@example.com",
+        "role": "user",
+        "status": "active",
+    }
+    with (
+        patch(
+            "crate.api.auth.get_completed_native_oauth_exchange",
+            return_value=None,
+        ),
+        patch(
+            "crate.api.auth.consume_native_oauth_handoff",
+            return_value=handoff,
+        ),
+        patch("crate.api.auth.get_user_by_id", return_value=user),
+        patch("crate.api.auth.update_user_last_login"),
+        patch(
+            "crate.api.auth._create_login_session",
+            side_effect=RuntimeError("database unavailable"),
+        ),
+        patch("crate.api.auth.restore_native_oauth_handoff") as restore_handoff,
+        patch.dict(
+            "os.environ",
+            {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+            clear=False,
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="database unavailable"):
+            native_oauth_exchange(_request(app_id="listen-tauri"), body)
+
+    restore_handoff.assert_called_once_with(code=body.code, handoff=handoff)

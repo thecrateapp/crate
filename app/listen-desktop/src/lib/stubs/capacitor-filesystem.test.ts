@@ -13,4 +13,13 @@ describe("Tauri Capacitor Filesystem stub", () => {
       }),
     ).toThrow("not available in the Tauri shell");
   });
+
+  it("exposes the URI lookup contract used by shared offline storage", () => {
+    expect(() =>
+      Filesystem.getUri({
+        path: "offline-media/profile/song.m4a",
+        directory: Directory.Data,
+      }),
+    ).toThrow("not available in the Tauri shell");
+  });
 });

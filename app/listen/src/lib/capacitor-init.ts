@@ -3,7 +3,10 @@ import { Keyboard, KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 import { Network } from "@capacitor/network";
 import { StatusBar, Style } from "@capacitor/status-bar";
 
-import { consumeOAuthCallbackUrl } from "@/lib/capacitor-oauth";
+import {
+  consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthCallback,
+} from "@/lib/capacitor-oauth";
 import { isIosRuntime, isNative, platform } from "@/lib/capacitor-runtime";
 import {
   getAppliedThemeSkin,
@@ -131,6 +134,7 @@ async function initializeCapacitor(): Promise<string | null> {
 
   App.addListener("resume", () => {
     window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+    void retryPendingOAuthExchange();
   });
 
   try {
@@ -142,6 +146,8 @@ async function initializeCapacitor(): Promise<string | null> {
     // Ignore launch URL failures
   }
 
+  await retryPendingOAuthExchange();
+
   Network.addListener("networkStatusChange", (status) => {
     console.log(
       "[capacitor] network:",
@@ -149,10 +155,18 @@ async function initializeCapacitor(): Promise<string | null> {
     );
     if (status.connected) {
       window.dispatchEvent(new CustomEvent("crate:network-restored"));
+      void retryPendingOAuthExchange();
     }
   });
 
   return null;
+}
+
+async function retryPendingOAuthExchange(): Promise<void> {
+  const result = await retryPendingNativeOAuthCallback();
+  if (result.handled) {
+    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
+  }
 }
 
 export async function applyNativeColorMode(

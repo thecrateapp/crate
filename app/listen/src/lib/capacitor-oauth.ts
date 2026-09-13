@@ -14,6 +14,7 @@ import {
 } from "@/lib/server-store";
 
 const OAUTH_NEXT_KEY = "crate-oauth-next";
+const NATIVE_OAUTH_PENDING_CALLBACK_KEY = "crate.oauth.pending-callback";
 const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
 const activeOAuthStates = new Set<string>();
@@ -37,6 +38,11 @@ interface OAuthCallbackResult {
   handled: boolean;
   next: string;
   retryable?: true;
+}
+
+interface NativeOAuthPendingCallback {
+  code: string;
+  state: string;
 }
 
 function base64Url(bytes: Uint8Array): string {
@@ -105,6 +111,19 @@ async function removeNativeOAuthRecord(key: string): Promise<void> {
     return;
   }
   await removeSecureSessionValue(key).catch(() => {});
+}
+
+async function writePendingNativeOAuthCallback(
+  callback: NativeOAuthPendingCallback,
+): Promise<void> {
+  await writeNativeOAuthRecord(
+    NATIVE_OAUTH_PENDING_CALLBACK_KEY,
+    JSON.stringify(callback),
+  );
+}
+
+async function removePendingNativeOAuthCallback(): Promise<void> {
+  await removeNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
 }
 
 export async function beginNativeOAuth(
@@ -224,6 +243,7 @@ export async function consumeOAuthCallbackUrl(
     if (!code || !state) {
       return { handled: false, next: "/" };
     }
+    await writePendingNativeOAuthCallback({ code, state });
     const result = await exchangeNativeOAuthCallback(code, state);
     if (!result.handled) {
       return result;
@@ -233,6 +253,26 @@ export async function consumeOAuthCallbackUrl(
       .catch(() => {});
 
     return result;
+  } catch {
+    return { handled: false, next: "/" };
+  }
+}
+
+export async function retryPendingNativeOAuthCallback(): Promise<OAuthCallbackResult> {
+  try {
+    const raw = await readNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
+    if (!raw) return { handled: false, next: "/" };
+    const pending = JSON.parse(raw) as Partial<NativeOAuthPendingCallback>;
+    if (
+      typeof pending.code !== "string" ||
+      !pending.code ||
+      typeof pending.state !== "string" ||
+      !pending.state
+    ) {
+      await removePendingNativeOAuthCallback();
+      return { handled: false, next: "/" };
+    }
+    return exchangeNativeOAuthCallback(pending.code, pending.state);
   } catch {
     return { handled: false, next: "/" };
   }
@@ -304,7 +344,10 @@ async function exchangeNativeOAuthCallback(
     return { handled: false, next: "/" };
   } finally {
     if (removeRecord) {
-      await removeNativeOAuthRecord(recordKey);
+      await Promise.all([
+        removeNativeOAuthRecord(recordKey),
+        removePendingNativeOAuthCallback(),
+      ]);
     }
     activeOAuthStates.delete(state);
   }

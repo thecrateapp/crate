@@ -37,6 +37,7 @@ vi.mock("@/lib/server-store", () => ({
 import {
   beginNativeOAuth,
   consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthCallback,
 } from "@/lib/capacitor-oauth";
 
 // Tauri desktop has no OS-backed secure session plugin, so its PKCE
@@ -157,6 +158,13 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
     expect(result).toEqual({ handled: false, next: "/", retryable: true });
     expect(localStorage.getItem(recordKey)).not.toBeNull();
+
+    mocks.apiForServerMock.mockResolvedValue({ token: "access-token" });
+    await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
+      handled: true,
+      next: "/library",
+    });
+    expect(mocks.apiForServerMock).toHaveBeenCalledTimes(2);
   });
 
   it("removes the PKCE verifier when exchange rejects the handoff", async () => {

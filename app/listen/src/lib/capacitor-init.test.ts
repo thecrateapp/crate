@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { appAddListener, networkAddListener, statusBarSetStyle } = vi.hoisted(
-  () => ({
-    appAddListener: vi.fn(),
-    networkAddListener: vi.fn(),
-    statusBarSetStyle: vi.fn(),
-  }),
-);
+const {
+  appAddListener,
+  networkAddListener,
+  retryPendingNativeOAuthCallback,
+  statusBarSetStyle,
+} = vi.hoisted(() => ({
+  appAddListener: vi.fn(),
+  networkAddListener: vi.fn(),
+  retryPendingNativeOAuthCallback: vi.fn(),
+  statusBarSetStyle: vi.fn(),
+}));
 
 vi.mock("@capacitor/app", () => ({
   App: {
@@ -45,6 +49,7 @@ vi.mock("@capacitor/status-bar", () => ({
 
 vi.mock("@/lib/capacitor-oauth", () => ({
   consumeOAuthCallbackUrl: vi.fn(),
+  retryPendingNativeOAuthCallback,
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -59,6 +64,9 @@ describe("Capacitor initialization", () => {
     appAddListener.mockReset();
     networkAddListener.mockReset();
     statusBarSetStyle.mockReset();
+    retryPendingNativeOAuthCallback
+      .mockReset()
+      .mockResolvedValue({ handled: false, next: "/" });
     appAddListener.mockResolvedValue({ remove: vi.fn() });
     networkAddListener.mockResolvedValue({ remove: vi.fn() });
   });
