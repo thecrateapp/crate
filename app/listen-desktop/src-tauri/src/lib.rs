@@ -1,5 +1,14 @@
 #[cfg(desktop)]
 use std::sync::{Arc, Mutex};
+#[cfg(all(desktop, not(target_os = "linux")))]
+use std::{
+    collections::hash_map::DefaultHasher,
+    fs::{self, OpenOptions},
+    hash::{Hash, Hasher},
+    io::{self, Write},
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, SubmenuBuilder};
 #[cfg(desktop)]
@@ -228,9 +237,112 @@ fn cache_desktop_media_artwork(
 
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (cache_key, bytes, mime_type);
-        Ok(None)
+        cache_native_desktop_artwork(&cache_key, &bytes, mime_type.as_deref())
+            .map_err(|err| err.to_string())
     }
+}
+
+#[cfg(all(desktop, not(target_os = "linux")))]
+const MAX_NATIVE_DESKTOP_ARTWORK_BYTES: usize = 8 * 1024 * 1024;
+
+#[cfg(all(desktop, not(target_os = "linux")))]
+fn native_desktop_artwork_cache_root() -> PathBuf {
+    std::env::temp_dir()
+        .join("crate-desktop")
+        .join("media-artwork-v1")
+}
+
+#[cfg(all(desktop, not(target_os = "linux")))]
+pub(crate) fn is_native_desktop_artwork_path(path: &Path) -> bool {
+    path.parent() == Some(native_desktop_artwork_cache_root().as_path())
+        && fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_file())
+}
+
+#[cfg(all(desktop, not(target_os = "linux")))]
+fn native_desktop_artwork_extension(mime_type: Option<&str>, source: &str) -> &'static str {
+    let mime = mime_type
+        .and_then(|value| value.split(';').next())
+        .map(str::trim)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match mime.as_str() {
+        "image/jpeg" | "image/jpg" => return "jpg",
+        "image/png" => return "png",
+        "image/webp" => return "webp",
+        "image/gif" => return "gif",
+        _ => {}
+    }
+    let source_without_query = source.split_once('?').map_or(source, |(path, _)| path);
+    let source_without_fragment = source_without_query
+        .split_once('#')
+        .map_or(source_without_query, |(path, _)| path);
+    match Path::new(source_without_fragment)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("png") => "png",
+        Some("webp") => "webp",
+        Some("gif") => "gif",
+        _ => "jpg",
+    }
+}
+
+#[cfg(all(desktop, not(target_os = "linux")))]
+fn native_desktop_artwork_url(path: &Path) -> io::Result<String> {
+    tauri::Url::from_file_path(path)
+        .map(|url| url.to_string())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid artwork path"))
+}
+
+#[cfg(all(desktop, not(target_os = "linux")))]
+fn cache_native_desktop_artwork(
+    cache_key: &str,
+    bytes: &[u8],
+    mime_type: Option<&str>,
+) -> io::Result<Option<String>> {
+    if bytes.is_empty() || bytes.len() > MAX_NATIVE_DESKTOP_ARTWORK_BYTES {
+        return Ok(None);
+    }
+
+    let mut hasher = DefaultHasher::new();
+    cache_key.hash(&mut hasher);
+    bytes.hash(&mut hasher);
+    let cache_id = format!("{:016x}", hasher.finish());
+    let cache_root = native_desktop_artwork_cache_root();
+    fs::create_dir_all(&cache_root)?;
+    let destination = cache_root.join(format!(
+        "{}.{}",
+        cache_id,
+        native_desktop_artwork_extension(mime_type, cache_key)
+    ));
+    if is_native_desktop_artwork_path(&destination) {
+        return native_desktop_artwork_url(&destination).map(Some);
+    }
+
+    if fs::symlink_metadata(&destination).is_ok() {
+        fs::remove_file(&destination)?;
+    }
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = cache_root.join(format!(".{cache_id}-{}-{nonce}.tmp", std::process::id()));
+    let write_result = (|| {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        fs::rename(&temporary, &destination)
+    })();
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    write_result?;
+    native_desktop_artwork_url(&destination).map(Some)
 }
 
 #[cfg(desktop)]
@@ -808,6 +920,29 @@ mod tests {
         is_bandcamp_capture_url, is_supported_activation_command, play_pause_command_for_state,
         DeepLinkBuffer, PlaybackCommand,
     };
+
+    #[cfg(not(target_os = "linux"))]
+    use super::{cache_native_desktop_artwork, is_native_desktop_artwork_path};
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn native_artwork_cache_materializes_bounded_regular_files() {
+        let url = cache_native_desktop_artwork(
+            "data:image/png;base64,Y292ZXI=",
+            b"native-cover",
+            Some("image/png"),
+        )
+        .unwrap()
+        .unwrap();
+        let path = tauri::Url::parse(&url).unwrap().to_file_path().unwrap();
+
+        assert!(is_native_desktop_artwork_path(&path));
+        assert_eq!(std::fs::read(path).unwrap(), b"native-cover");
+        assert_eq!(
+            cache_native_desktop_artwork("oversized", &vec![0; 8 * 1024 * 1024 + 1], None).unwrap(),
+            None,
+        );
+    }
 
     #[test]
     fn deep_links_are_buffered_until_the_frontend_listener_is_ready() {

@@ -1,8 +1,9 @@
 use std::{
-    fs::File,
+    fs::OpenOptions,
     io::Read,
+    os::unix::fs::OpenOptionsExt,
     ptr,
-    sync::{mpsc, Arc, Condvar, Mutex, OnceLock},
+    sync::{Arc, Condvar, Mutex, OnceLock},
     thread,
     time::Duration,
 };
@@ -253,9 +254,23 @@ fn fetch_artwork_with_timeout(url: &str, timeout: Duration) -> ArtworkFetchResul
         let Ok(path) = parsed.to_file_path() else {
             return ArtworkFetchResult::PermanentFailure;
         };
-        return run_artwork_fetch_with_timeout(timeout, move || {
-            read_bounded(File::open(path).ok()?, MAX_ARTWORK_BYTES)
-        });
+        if !crate::is_native_desktop_artwork_path(&path) {
+            return ArtworkFetchResult::PermanentFailure;
+        }
+        let Some(file) = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
+            .open(path)
+            .ok()
+        else {
+            return ArtworkFetchResult::RetryableFailure;
+        };
+        if !file.metadata().is_ok_and(|metadata| metadata.is_file()) {
+            return ArtworkFetchResult::PermanentFailure;
+        }
+        return read_bounded(file, MAX_ARTWORK_BYTES)
+            .map(ArtworkFetchResult::Loaded)
+            .unwrap_or(ArtworkFetchResult::RetryableFailure);
     }
     if !matches!(parsed.scheme(), "http" | "https") {
         return ArtworkFetchResult::PermanentFailure;
@@ -285,29 +300,6 @@ fn fetch_artwork_with_timeout(url: &str, timeout: Duration) -> ArtworkFetchResul
     read_bounded(response, MAX_ARTWORK_BYTES)
         .map(ArtworkFetchResult::Loaded)
         .unwrap_or(ArtworkFetchResult::RetryableFailure)
-}
-
-fn run_artwork_fetch_with_timeout(
-    timeout: Duration,
-    operation: impl FnOnce() -> Option<Vec<u8>> + Send + 'static,
-) -> ArtworkFetchResult {
-    let (sender, receiver) = mpsc::sync_channel(1);
-    if thread::Builder::new()
-        .name("crate-artwork-file-read".to_string())
-        .spawn(move || {
-            let _ = sender.send(operation());
-        })
-        .is_err()
-    {
-        return ArtworkFetchResult::RetryableFailure;
-    }
-    match receiver.recv_timeout(timeout) {
-        Ok(Some(bytes)) => ArtworkFetchResult::Loaded(bytes),
-        Ok(None) | Err(mpsc::RecvTimeoutError::Disconnected) => {
-            ArtworkFetchResult::RetryableFailure
-        }
-        Err(mpsc::RecvTimeoutError::Timeout) => ArtworkFetchResult::PermanentFailure,
-    }
 }
 
 fn read_bounded(reader: impl Read, max_bytes: u64) -> Option<Vec<u8>> {
@@ -714,8 +706,8 @@ mod tests {
     };
 
     use super::{
-        fetch_artwork_bytes_with_timeout, read_bounded, run_artwork_fetch_with_timeout,
-        ArtworkFetchQueue, ArtworkFetchResult, ArtworkRequest, ArtworkRequestState,
+        fetch_artwork_bytes_with_timeout, read_bounded, ArtworkFetchQueue, ArtworkRequest,
+        ArtworkRequestState,
     };
 
     #[test]
@@ -729,19 +721,36 @@ mod tests {
 
     #[test]
     fn artwork_fetch_supports_local_file_urls() {
+        let url = crate::cache_native_desktop_artwork(
+            "local-artwork",
+            b"local-artwork",
+            Some("image/jpeg"),
+        )
+        .unwrap()
+        .unwrap();
+
+        let result = fetch_artwork_bytes_with_timeout(&url, Duration::from_millis(50));
+
+        assert_eq!(result, Some(b"local-artwork".to_vec()));
+    }
+
+    #[test]
+    fn artwork_fetch_rejects_files_outside_the_managed_cache() {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path =
-            std::env::temp_dir().join(format!("crate-artwork-fetch-{}-{nonce}.jpg", process::id()));
-        fs::write(&path, b"local-artwork").unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "crate-unmanaged-artwork-{}-{nonce}.jpg",
+            process::id()
+        ));
+        fs::write(&path, b"unmanaged-artwork").unwrap();
         let url = reqwest::Url::from_file_path(&path).unwrap().to_string();
 
         let result = fetch_artwork_bytes_with_timeout(&url, Duration::from_millis(50));
 
         fs::remove_file(path).unwrap();
-        assert_eq!(result, Some(b"local-artwork".to_vec()));
+        assert_eq!(result, None);
     }
 
     #[test]
@@ -762,19 +771,6 @@ mod tests {
         assert_eq!(result, None);
         assert!(started.elapsed() < Duration::from_millis(175));
         server.join().unwrap();
-    }
-
-    #[test]
-    fn local_artwork_timeout_does_not_block_the_fetch_worker() {
-        let started = Instant::now();
-
-        let result = run_artwork_fetch_with_timeout(Duration::from_millis(25), || {
-            thread::sleep(Duration::from_millis(200));
-            Some(b"late-artwork".to_vec())
-        });
-
-        assert_eq!(result, ArtworkFetchResult::PermanentFailure);
-        assert!(started.elapsed() < Duration::from_millis(150));
     }
 
     #[test]
