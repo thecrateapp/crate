@@ -152,6 +152,77 @@ def test_publish_artist_hero_artifact_rejects_conflicting_retry(tmp_path):
         )
 
 
+def test_publish_artist_hero_artifact_rejects_symlinked_retry(tmp_path):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        ArtistHeroPublicationConflict,
+        artist_hero_artifact_source_path,
+        publish_artist_hero_artifact,
+    )
+
+    identity = ArtistHeroArtifactIdentity("artist-1", "desktop", "revision-a")
+    publish_artist_hero_artifact(
+        identity,
+        _image(),
+        source_fingerprint="sha256:source-a",
+        recipe_hash="recipe-a",
+        renderer_version="renderer-a",
+        source_content=b"editable-source-a",
+        root=tmp_path,
+    )
+    artifact_path = artist_hero_artifact_source_path(identity, root=tmp_path)
+    replacement = tmp_path / "replacement.webp"
+    replacement.write_bytes(artifact_path.read_bytes())
+    artifact_path.unlink()
+    artifact_path.symlink_to(replacement)
+
+    with pytest.raises(ArtistHeroPublicationConflict):
+        publish_artist_hero_artifact(
+            identity,
+            _image(),
+            source_fingerprint="sha256:source-a",
+            recipe_hash="recipe-a",
+            renderer_version="renderer-a",
+            source_content=b"editable-source-a",
+            root=tmp_path,
+        )
+
+
+def test_publish_artist_hero_artifact_removes_install_when_parent_fsync_fails(
+    monkeypatch, tmp_path
+):
+    from crate import artist_hero_publication
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_root,
+        publish_artist_hero_artifact,
+    )
+
+    identity = ArtistHeroArtifactIdentity("artist-1", "desktop", "revision-a")
+    final_root = artist_hero_artifact_root(identity, root=tmp_path)
+    original_fsync_directory = artist_hero_publication._fsync_directory
+
+    def fail_parent_fsync(path: Path) -> None:
+        if path == final_root.parent:
+            raise OSError("parent fsync failed")
+        original_fsync_directory(path)
+
+    monkeypatch.setattr(artist_hero_publication, "_fsync_directory", fail_parent_fsync)
+
+    with pytest.raises(OSError, match="parent fsync failed"):
+        publish_artist_hero_artifact(
+            identity,
+            _image(),
+            source_fingerprint="sha256:source-a",
+            recipe_hash="recipe-a",
+            renderer_version="renderer-a",
+            source_content=b"editable-source-a",
+            root=tmp_path,
+        )
+
+    assert not final_root.exists()
+
+
 def test_publish_artist_hero_artifact_rejects_namespace_symlink_escape(tmp_path):
     from crate.artist_hero_publication import (
         ArtistHeroArtifactIdentity,
@@ -372,6 +443,28 @@ def test_publish_manifest_does_not_write_when_existing_composition_files_are_mis
     )
 
     assert manifest is None
+
+
+def test_manifest_preflight_rejects_symlinked_publication_files(monkeypatch, tmp_path):
+    from crate.worker_handlers import artwork
+
+    cache_dir = tmp_path / "cache"
+    target = cache_dir / "target.webp"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"target")
+    artifact = cache_dir / "published" / "artifact.webp"
+    source = cache_dir / "published" / "source.jpg"
+    artifact.parent.mkdir(parents=True)
+    artifact.symlink_to(target)
+    source.write_bytes(b"source")
+    monkeypatch.setattr(artwork, "cache_root", lambda: cache_dir)
+
+    assert not artwork._artist_hero_manifest_artifact_available(
+        {
+            "relative_path": "published/artifact.webp",
+            "source_relative_path": "published/source.jpg",
+        }
+    )
 
 
 def test_publish_artist_hero_artifact_accepts_concurrent_identical_winner(

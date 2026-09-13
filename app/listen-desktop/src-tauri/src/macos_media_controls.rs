@@ -2,7 +2,7 @@ use std::{
     fs::File,
     io::Read,
     ptr,
-    sync::{Arc, Condvar, Mutex, OnceLock},
+    sync::{mpsc, Arc, Condvar, Mutex, OnceLock},
     thread,
     time::Duration,
 };
@@ -56,12 +56,19 @@ struct ArtworkRequest {
     url: String,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+enum ArtworkFetchResult {
+    Loaded(Vec<u8>),
+    RetryableFailure,
+    PermanentFailure,
+}
+
 #[derive(Default)]
 struct ArtworkRequestState {
     generation: u64,
     url: Option<String>,
     loading: bool,
-    loaded: bool,
+    settled: bool,
 }
 
 impl ArtworkRequestState {
@@ -71,10 +78,10 @@ impl ArtworkRequestState {
             self.generation = self.generation.wrapping_add(1);
             self.url = url.map(str::to_owned);
             self.loading = false;
-            self.loaded = false;
+            self.settled = false;
         }
         let url = self.url.clone()?;
-        if self.loading || self.loaded {
+        if self.loading || self.settled {
             return None;
         }
         self.loading = true;
@@ -90,12 +97,12 @@ impl ArtworkRequestState {
             && self.url.as_deref() == Some(request.url.as_str())
     }
 
-    fn finish(&mut self, request: &ArtworkRequest, loaded: bool) -> bool {
+    fn finish(&mut self, request: &ArtworkRequest, settled: bool) -> bool {
         if !self.is_current(request) {
             return false;
         }
         self.loading = false;
-        self.loaded = loaded;
+        self.settled = settled;
         true
     }
 }
@@ -203,7 +210,7 @@ fn fetch_artwork_async(request: ArtworkRequest) {
 fn artwork_fetch_worker(queue: Arc<ArtworkFetchQueue>) {
     loop {
         let request = queue.wait_for_pending();
-        let bytes = fetch_artwork_bytes(&request.url);
+        let result = fetch_artwork(&request.url);
         let completion_request = request.clone();
         let Some(app) = MEDIA_APP_HANDLE.get() else {
             lock_artwork_request_state().finish(&request, false);
@@ -211,7 +218,7 @@ fn artwork_fetch_worker(queue: Arc<ArtworkFetchQueue>) {
         };
         if app
             .run_on_main_thread(move || unsafe {
-                finish_artwork_fetch(completion_request, bytes);
+                finish_artwork_fetch(completion_request, result);
             })
             .is_err()
         {
@@ -220,34 +227,87 @@ fn artwork_fetch_worker(queue: Arc<ArtworkFetchQueue>) {
     }
 }
 
-fn fetch_artwork_bytes(url: &str) -> Option<Vec<u8>> {
-    fetch_artwork_bytes_with_timeout(url, ARTWORK_FETCH_TIMEOUT)
+#[cfg(test)]
+fn fetch_artwork_bytes_with_timeout(url: &str, timeout: Duration) -> Option<Vec<u8>> {
+    fetch_artwork_with_timeout(url, timeout).into_bytes()
 }
 
-fn fetch_artwork_bytes_with_timeout(url: &str, timeout: Duration) -> Option<Vec<u8>> {
-    let parsed = reqwest::Url::parse(url).ok()?;
+impl ArtworkFetchResult {
+    fn into_bytes(self) -> Option<Vec<u8>> {
+        match self {
+            Self::Loaded(bytes) => Some(bytes),
+            Self::RetryableFailure | Self::PermanentFailure => None,
+        }
+    }
+}
+
+fn fetch_artwork(url: &str) -> ArtworkFetchResult {
+    fetch_artwork_with_timeout(url, ARTWORK_FETCH_TIMEOUT)
+}
+
+fn fetch_artwork_with_timeout(url: &str, timeout: Duration) -> ArtworkFetchResult {
+    let Some(parsed) = reqwest::Url::parse(url).ok() else {
+        return ArtworkFetchResult::PermanentFailure;
+    };
     if parsed.scheme() == "file" {
-        return read_bounded(
-            File::open(parsed.to_file_path().ok()?).ok()?,
-            MAX_ARTWORK_BYTES,
-        );
+        let Ok(path) = parsed.to_file_path() else {
+            return ArtworkFetchResult::PermanentFailure;
+        };
+        return run_artwork_fetch_with_timeout(timeout, move || {
+            read_bounded(File::open(path).ok()?, MAX_ARTWORK_BYTES)
+        });
     }
     if !matches!(parsed.scheme(), "http" | "https") {
-        return None;
+        return ArtworkFetchResult::PermanentFailure;
     }
-    let client = reqwest::blocking::Client::builder()
+    let Some(client) = reqwest::blocking::Client::builder()
         .connect_timeout(timeout)
         .timeout(timeout)
         .build()
-        .ok()?;
-    let response = client.get(url).send().ok()?.error_for_status().ok()?;
+        .ok()
+    else {
+        return ArtworkFetchResult::RetryableFailure;
+    };
+    let Some(response) = client
+        .get(url)
+        .send()
+        .ok()
+        .and_then(|response| response.error_for_status().ok())
+    else {
+        return ArtworkFetchResult::RetryableFailure;
+    };
     if response
         .content_length()
         .is_some_and(|length| length > MAX_ARTWORK_BYTES)
     {
-        return None;
+        return ArtworkFetchResult::RetryableFailure;
     }
     read_bounded(response, MAX_ARTWORK_BYTES)
+        .map(ArtworkFetchResult::Loaded)
+        .unwrap_or(ArtworkFetchResult::RetryableFailure)
+}
+
+fn run_artwork_fetch_with_timeout(
+    timeout: Duration,
+    operation: impl FnOnce() -> Option<Vec<u8>> + Send + 'static,
+) -> ArtworkFetchResult {
+    let (sender, receiver) = mpsc::sync_channel(1);
+    if thread::Builder::new()
+        .name("crate-artwork-file-read".to_string())
+        .spawn(move || {
+            let _ = sender.send(operation());
+        })
+        .is_err()
+    {
+        return ArtworkFetchResult::RetryableFailure;
+    }
+    match receiver.recv_timeout(timeout) {
+        Ok(Some(bytes)) => ArtworkFetchResult::Loaded(bytes),
+        Ok(None) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+            ArtworkFetchResult::RetryableFailure
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => ArtworkFetchResult::PermanentFailure,
+    }
 }
 
 fn read_bounded(reader: impl Read, max_bytes: u64) -> Option<Vec<u8>> {
@@ -259,14 +319,16 @@ fn read_bounded(reader: impl Read, max_bytes: u64) -> Option<Vec<u8>> {
     (bytes.len() <= max_bytes as usize).then_some(bytes)
 }
 
-unsafe fn finish_artwork_fetch(request: ArtworkRequest, bytes: Option<Vec<u8>>) {
+unsafe fn finish_artwork_fetch(request: ArtworkRequest, result: ArtworkFetchResult) {
     if !lock_artwork_request_state().is_current(&request) {
         return;
     }
-    let artwork = bytes
+    let permanent_failure = result == ArtworkFetchResult::PermanentFailure;
+    let artwork = result
+        .into_bytes()
         .as_deref()
         .and_then(|bytes| cache_artwork_bytes(&request.url, bytes));
-    if !lock_artwork_request_state().finish(&request, artwork.is_some()) {
+    if !lock_artwork_request_state().finish(&request, artwork.is_some() || permanent_failure) {
         return;
     }
     if let Some(artwork) = artwork {
@@ -652,8 +714,8 @@ mod tests {
     };
 
     use super::{
-        fetch_artwork_bytes_with_timeout, read_bounded, ArtworkFetchQueue, ArtworkRequest,
-        ArtworkRequestState,
+        fetch_artwork_bytes_with_timeout, read_bounded, run_artwork_fetch_with_timeout,
+        ArtworkFetchQueue, ArtworkFetchResult, ArtworkRequest, ArtworkRequestState,
     };
 
     #[test]
@@ -700,6 +762,19 @@ mod tests {
         assert_eq!(result, None);
         assert!(started.elapsed() < Duration::from_millis(175));
         server.join().unwrap();
+    }
+
+    #[test]
+    fn local_artwork_timeout_does_not_block_the_fetch_worker() {
+        let started = Instant::now();
+
+        let result = run_artwork_fetch_with_timeout(Duration::from_millis(25), || {
+            thread::sleep(Duration::from_millis(200));
+            Some(b"late-artwork".to_vec())
+        });
+
+        assert_eq!(result, ArtworkFetchResult::PermanentFailure);
+        assert!(started.elapsed() < Duration::from_millis(150));
     }
 
     #[test]

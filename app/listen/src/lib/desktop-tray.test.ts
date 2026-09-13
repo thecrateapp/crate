@@ -7,9 +7,18 @@ import {
   type DesktopMediaSessionPayload,
 } from "./desktop-tray";
 
+const originalUserAgent = Object.getOwnPropertyDescriptor(
+  navigator,
+  "userAgent",
+);
+
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   delete (window as any).__crateTauriInvoke;
+  if (originalUserAgent) {
+    Object.defineProperty(navigator, "userAgent", originalUserAgent);
+  }
 });
 
 describe("dispatchDesktopTrayCommand", () => {
@@ -70,4 +79,55 @@ describe("syncDesktopMediaSession", () => {
       payload,
     });
   });
+
+  it.each([
+    "data:image/png;base64,Y292ZXI=",
+    "blob:https://listen.example/cover",
+    "capacitor://localhost/_capacitor_file_/cover.jpg",
+  ])(
+    "materializes web-only artwork before sending %s to macOS",
+    async (artwork) => {
+      Object.defineProperty(navigator, "userAgent", {
+        configurable: true,
+        value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { "content-type": "image/jpeg" },
+          }),
+        ),
+      );
+      const invoke = vi.fn((command: string) =>
+        Promise.resolve(
+          command === "cache_desktop_media_artwork"
+            ? "file:///tmp/crate-cover.jpg"
+            : undefined,
+        ),
+      );
+      (window as any).__crateTauriInvoke = invoke;
+      const payload: DesktopMediaSessionPayload = {
+        title: "Song",
+        artist: "Artist",
+        album: "Album",
+        artwork,
+        isPlaying: true,
+        position: 0,
+        duration: 180,
+      };
+
+      syncDesktopMediaSession(payload);
+
+      expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+        payload: { ...payload, artwork: null },
+      });
+      await vi.waitFor(() => {
+        expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+          payload: { ...payload, artwork: "file:///tmp/crate-cover.jpg" },
+        });
+      });
+    },
+  );
 });

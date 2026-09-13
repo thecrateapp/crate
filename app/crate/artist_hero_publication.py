@@ -252,6 +252,14 @@ def _relative_source_path(identity: ArtistHeroArtifactIdentity) -> str:
     )
 
 
+def _relative_manifest_path(identity: ArtistHeroArtifactIdentity) -> str:
+    return (
+        f"{ARTIST_HERO_PUBLICATION_PREFIX}/{identity.artist_entity_uid}/"
+        f"{identity.composition}/{identity.render_revision}/"
+        f"{ARTIST_HERO_ARTIFACT_MANIFEST_FILENAME}"
+    )
+
+
 def build_artist_hero_artifact_manifest(
     identity: ArtistHeroArtifactIdentity,
     *,
@@ -320,11 +328,20 @@ def _existing_publication(
     *,
     root: Path,
 ) -> ArtistHeroArtifactPublication:
-    artifact_path = artist_hero_artifact_source_path(identity, root=root)
-    source_path = artist_hero_artifact_original_source_path(identity, root=root)
-    manifest_path = artist_hero_artifact_manifest_path(identity, root=root)
+    artifact_path = resolve_artist_hero_publication_path(
+        _relative_artifact_path(identity), root=root
+    )
+    source_path = resolve_artist_hero_publication_path(
+        _relative_source_path(identity), root=root
+    )
+    manifest_path = resolve_artist_hero_publication_path(
+        _relative_manifest_path(identity), root=root
+    )
     if (
-        _read_manifest(manifest_path) != manifest
+        artifact_path is None
+        or source_path is None
+        or manifest_path is None
+        or _read_manifest(manifest_path) != manifest
         or not artifact_path.is_file()
         or not source_path.is_file()
     ):
@@ -418,6 +435,7 @@ def publish_artist_hero_artifact(
     staging_root = Path(
         tempfile.mkdtemp(prefix=f".{identity.composition}-", dir=final_root.parent)
     )
+    installed = False
     try:
         source_path = staging_root / ARTIST_HERO_SOURCE_FILENAME
         with source_path.open("wb") as handle:
@@ -437,9 +455,10 @@ def publish_artist_hero_artifact(
                 raise
             shutil.rmtree(staging_root, ignore_errors=True)
             return _existing_publication(identity, manifest, root=base)
+        installed = True
         _fsync_directory(final_root.parent)
     except Exception:
-        shutil.rmtree(staging_root, ignore_errors=True)
+        shutil.rmtree(final_root if installed else staging_root, ignore_errors=True)
         raise
 
     return ArtistHeroArtifactPublication(

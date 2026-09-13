@@ -170,15 +170,22 @@ def _artist_hero_jpeg_content(image: PILImage) -> bytes:
 def _active_artist_hero_source_path(
     profile: Mapping[str, object], composition: str
 ) -> Path | None:
-    manifest = profile.get("render_manifest")
-    artifacts = manifest.get("artifacts") if isinstance(manifest, Mapping) else None
-    artifact = artifacts.get(composition) if isinstance(artifacts, Mapping) else None
-    if not isinstance(artifact, Mapping):
+    artifact = _active_artist_hero_artifact(profile, composition)
+    if artifact is None:
         return None
     source_path = resolve_artist_hero_publication_path(
         artifact.get("source_relative_path"), root=cache_root()
     )
     return source_path if source_path is not None and source_path.is_file() else None
+
+
+def _active_artist_hero_artifact(
+    profile: Mapping[str, object], composition: str
+) -> Mapping[str, object] | None:
+    manifest = profile.get("render_manifest")
+    artifacts = manifest.get("artifacts") if isinstance(manifest, Mapping) else None
+    artifact = artifacts.get(composition) if isinstance(artifacts, Mapping) else None
+    return artifact if isinstance(artifact, Mapping) else None
 
 
 def _artist_hero_task_matches_profile(
@@ -206,8 +213,8 @@ def _artist_hero_manifest_artifact_available(artifact: object) -> bool:
         relative_path = str(artifact.get(path_key) or "")
         if not relative_path:
             return False
-        candidate = (root / relative_path).resolve()
-        if not candidate.is_relative_to(root) or not candidate.is_file():
+        candidate = resolve_artist_hero_publication_path(relative_path, root=root)
+        if candidate is None or not candidate.is_file():
             return False
     return True
 
@@ -1881,6 +1888,12 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         active_source = _active_artist_hero_source_path(existing, target)
         if active_source is not None:
             source_paths[target] = active_source
+        elif _active_artist_hero_artifact(existing, target) is not None:
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-manifest-incomplete",
+                "artist_id": artist_id,
+            }
         elif not source_paths[target].is_file():
             source_paths[target] = legacy_source_path
         if not source_paths[target].is_file():
@@ -2071,6 +2084,11 @@ def _handle_preview_artist_hero(task_id: str, params: dict, config: dict) -> dic
             return {"error": "Artist directory not found"}
         profile = get_artist_hero_artwork(int(artist_row["id"])) or {}
         source_path = _active_artist_hero_source_path(profile, composition)
+        if (
+            source_path is None
+            and _active_artist_hero_artifact(profile, composition) is not None
+        ):
+            return {"error": "Active artist hero source unavailable"}
         if source_path is None:
             source_path = artist_dir / f"artist-hero-source-{composition}.jpg"
         if not source_path.is_file():
@@ -2162,6 +2180,12 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
         active_source = _active_artist_hero_source_path(existing, composition)
         if active_source is not None:
             available_paths[composition] = active_source
+        elif _active_artist_hero_artifact(existing, composition) is not None:
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-manifest-incomplete",
+                "artist_id": int(artist_row["id"]),
+            }
         elif specific_path.is_file():
             available_paths[composition] = specific_path
         elif legacy_source_path.is_file():

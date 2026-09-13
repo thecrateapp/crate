@@ -54,7 +54,7 @@ export function syncDesktopMediaSession(
 
   const sequence = ++desktopMediaSessionSequence;
   const cachedArtwork =
-    payload.artwork && shouldCacheArtworkForLinuxMpris(payload.artwork)
+    payload.artwork && shouldMaterializeDesktopArtwork(payload.artwork)
       ? preparedDesktopArtwork.get(payload.artwork)
       : undefined;
 
@@ -68,12 +68,12 @@ export function syncDesktopMediaSession(
 
   invokeDesktopMediaSession({
     ...payload,
-    artwork: shouldCacheArtworkForLinuxMpris(payload.artwork)
+    artwork: shouldMaterializeDesktopArtwork(payload.artwork)
       ? null
       : payload.artwork,
   });
 
-  if (!payload.artwork || !shouldCacheArtworkForLinuxMpris(payload.artwork)) {
+  if (!payload.artwork || !shouldMaterializeDesktopArtwork(payload.artwork)) {
     return;
   }
 
@@ -94,16 +94,21 @@ function invokeDesktopMediaSession(payload: DesktopMediaSessionPayload): void {
     .catch(() => undefined);
 }
 
-function shouldCacheArtworkForLinuxMpris(
+function shouldMaterializeDesktopArtwork(
   artwork: string | null | undefined,
 ): artwork is string {
-  if (!artwork || typeof navigator === "undefined") return false;
-  if (!/\bLinux\b/i.test(navigator.userAgent)) return false;
-  return (
-    artwork.startsWith("http://") ||
-    artwork.startsWith("https://") ||
+  if (!artwork) return false;
+  if (
     artwork.startsWith("data:") ||
-    artwork.startsWith("blob:")
+    artwork.startsWith("blob:") ||
+    artwork.startsWith("capacitor:")
+  ) {
+    return true;
+  }
+  return (
+    typeof navigator !== "undefined" &&
+    /\bLinux\b/i.test(navigator.userAgent) &&
+    (artwork.startsWith("http://") || artwork.startsWith("https://"))
   );
 }
 
