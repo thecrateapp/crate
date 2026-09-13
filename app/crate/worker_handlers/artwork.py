@@ -202,12 +202,13 @@ def _artist_hero_manifest_artifacts_available(
         artifact = artifacts.get(composition)
         if not isinstance(artifact, Mapping):
             return False
-        relative_path = str(artifact.get("relative_path") or "")
-        if not relative_path:
-            return False
-        candidate = (root / relative_path).resolve()
-        if not candidate.is_relative_to(root) or not candidate.is_file():
-            return False
+        for path_key in ("relative_path", "source_relative_path"):
+            relative_path = str(artifact.get(path_key) or "")
+            if not relative_path:
+                return False
+            candidate = (root / relative_path).resolve()
+            if not candidate.is_relative_to(root) or not candidate.is_file():
+                return False
     return True
 
 
@@ -1521,24 +1522,24 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             if composition in {"shared", "mobile"}
             else existing.get("mobile_enabled", True)
         )
-        render_manifest = _publish_artist_hero_manifest(
-            artist_row=artist_row,
-            revision=revision,
-            rendered=rendered_compositions,
-            raw_sources=raw_sources,
-            recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
-            existing=existing,
-            enabled=tuple(
-                composition
-                for composition, is_enabled in (
-                    ("desktop", desktop_enabled),
-                    ("mobile", mobile_enabled),
-                )
-                if is_enabled
-            ),
-        )
         artist_id = int(artist_row["id"])
         with artist_hero_publication_lock(cache_root(), artist_id):
+            render_manifest = _publish_artist_hero_manifest(
+                artist_row=artist_row,
+                revision=revision,
+                rendered=rendered_compositions,
+                raw_sources=raw_sources,
+                recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
+                existing=existing,
+                enabled=tuple(
+                    composition
+                    for composition, is_enabled in (
+                        ("desktop", desktop_enabled),
+                        ("mobile", mobile_enabled),
+                    )
+                    if is_enabled
+                ),
+            )
             applied = upsert_artist_hero_artwork(
                 artist_id=artist_id,
                 provenance="manual",
@@ -1764,23 +1765,25 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         if composition in {"shared", "mobile"}
         else existing.get("mobile_enabled", True)
     )
-    render_manifest = _publish_artist_hero_manifest(
-        artist_row=artist_row,
-        revision=revision,
-        rendered=rendered_compositions,
-        raw_sources={target: raw for target, (raw, _image) in loaded_sources.items()},
-        recipes=recipes,
-        existing=existing,
-        enabled=tuple(
-            composition
-            for composition, is_enabled in (
-                ("desktop", desktop_enabled),
-                ("mobile", mobile_enabled),
-            )
-            if is_enabled
-        ),
-    )
     with artist_hero_publication_lock(cache_root(), artist_id):
+        render_manifest = _publish_artist_hero_manifest(
+            artist_row=artist_row,
+            revision=revision,
+            rendered=rendered_compositions,
+            raw_sources={
+                target: raw for target, (raw, _image) in loaded_sources.items()
+            },
+            recipes=recipes,
+            existing=existing,
+            enabled=tuple(
+                composition
+                for composition, is_enabled in (
+                    ("desktop", desktop_enabled),
+                    ("mobile", mobile_enabled),
+                )
+                if is_enabled
+            ),
+        )
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
             provenance="manual",
@@ -2021,23 +2024,25 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
         mobile_source_width, mobile_source_height = mobile_image.size
     desktop_enabled = existing.get("desktop_enabled", True) is not False
     mobile_enabled = existing.get("mobile_enabled", True) is not False
-    render_manifest = _publish_artist_hero_manifest(
-        artist_row=artist_row,
-        revision=revision,
-        rendered=rendered_compositions,
-        raw_sources={target: raw for target, (raw, _image) in loaded_sources.items()},
-        recipes=recipes,
-        existing=existing,
-        enabled=tuple(
-            composition
-            for composition, is_enabled in (
-                ("desktop", desktop_enabled),
-                ("mobile", mobile_enabled),
-            )
-            if is_enabled
-        ),
-    )
     with artist_hero_publication_lock(cache_root(), artist_id):
+        render_manifest = _publish_artist_hero_manifest(
+            artist_row=artist_row,
+            revision=revision,
+            rendered=rendered_compositions,
+            raw_sources={
+                target: raw for target, (raw, _image) in loaded_sources.items()
+            },
+            recipes=recipes,
+            existing=existing,
+            enabled=tuple(
+                composition
+                for composition, is_enabled in (
+                    ("desktop", desktop_enabled),
+                    ("mobile", mobile_enabled),
+                )
+                if is_enabled
+            ),
+        )
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
             provenance=str(existing["provenance"]),
@@ -2131,16 +2136,16 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
     )
     canonical_source = _artist_hero_jpeg_content(image)
     revision = artist_hero_revision(canonical_source, b":derived-hero")
-    render_manifest = _publish_artist_hero_manifest(
-        artist_row=artist_row,
-        revision=revision,
-        rendered=rendered,
-        raw_sources={"desktop": canonical_source, "mobile": canonical_source},
-        recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
-        existing=existing or {},
-        enabled=("desktop", "mobile"),
-    )
     with artist_hero_publication_lock(cache_root(), artist_id):
+        render_manifest = _publish_artist_hero_manifest(
+            artist_row=artist_row,
+            revision=revision,
+            rendered=rendered,
+            raw_sources={"desktop": canonical_source, "mobile": canonical_source},
+            recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
+            existing=existing or {},
+            enabled=("desktop", "mobile"),
+        )
         applied = upsert_artist_hero_artwork(
             artist_id=artist_id,
             provenance="derived_background",
@@ -2394,37 +2399,39 @@ def _handle_migrate_artist_hero(task_id: str, params: dict, config: dict) -> dic
             image, recipe, render_sizes[composition]
         )
     artifact_revision = artist_hero_revision(*revision_parts)
-    manifest = _publish_artist_hero_manifest(
-        artist_row=artist_row,
-        revision=expected_revision,
-        editorial_revision=expected_revision,
-        artifact_revision=artifact_revision,
-        rendered=rendered,
-        raw_sources={
-            composition: raw for composition, (raw, _image) in loaded_sources.items()
-        },
-        recipes=plan.recipes,
-        existing=profile,
-        enabled=plan.enabled,
-    )
-    if manifest is None:
-        return {
-            "status": "skipped",
-            "reason": "missing-artist-entity-uid",
-            "artist_id": artist_id,
-        }
+    with artist_hero_publication_lock(cache_root(), artist_id):
+        manifest = _publish_artist_hero_manifest(
+            artist_row=artist_row,
+            revision=expected_revision,
+            editorial_revision=expected_revision,
+            artifact_revision=artifact_revision,
+            rendered=rendered,
+            raw_sources={
+                composition: raw
+                for composition, (raw, _image) in loaded_sources.items()
+            },
+            recipes=plan.recipes,
+            existing=profile,
+            enabled=plan.enabled,
+        )
+        if manifest is None:
+            return {
+                "status": "skipped",
+                "reason": "missing-artist-entity-uid",
+                "artist_id": artist_id,
+            }
 
-    if not compare_and_swap_artist_hero_manifest(
-        artist_id=artist_id,
-        expected_revision=expected_revision,
-        expected_manifest=profile.get("render_manifest"),
-        render_manifest=manifest,
-    ):
-        return {
-            "status": "conflict",
-            "reason": "artist-hero-profile-changed",
-            "artist_id": artist_id,
-        }
+        if not compare_and_swap_artist_hero_manifest(
+            artist_id=artist_id,
+            expected_revision=expected_revision,
+            expected_manifest=profile.get("render_manifest"),
+            render_manifest=manifest,
+        ):
+            return {
+                "status": "conflict",
+                "reason": "artist-hero-profile-changed",
+                "artist_id": artist_id,
+            }
 
     entity_uid = str(artist_row.get("entity_uid") or "")
     for composition in plan.enabled:

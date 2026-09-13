@@ -21,6 +21,10 @@ def _manifest(editorial_revision: str, render_revision: str) -> dict:
                     "artist-hero-publications/v1/artist-42/desktop/"
                     f"{render_revision}/artifact.webp"
                 ),
+                "source_relative_path": (
+                    "artist-hero-publications/v1/artist-42/desktop/"
+                    f"{render_revision}/source.jpg"
+                ),
             }
         },
     }
@@ -258,6 +262,7 @@ def test_manifest_rollback_rejects_a_stale_active_pointer(pg_db) -> None:
         artist_hero_manifest_id,
         compare_and_swap_artist_hero_manifest,
         get_artist_hero_artwork,
+        get_artist_hero_manifest_history_entry,
         rollback_artist_hero_manifest,
         upsert_artist_hero_artwork,
     )
@@ -315,6 +320,63 @@ def test_manifest_rollback_rejects_a_stale_active_pointer(pg_db) -> None:
         target_manifest_id=artist_hero_manifest_id(manifest_b),
     )
     assert get_artist_hero_artwork(artist_id)["render_manifest"] == manifest_b
+    reactivated = get_artist_hero_manifest_history_entry(
+        artist_id=artist_id,
+        manifest_id=artist_hero_manifest_id(manifest_b),
+    )
+    assert reactivated["previous_manifest"] == manifest_c
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_delete_composition_removes_it_from_the_active_manifest(pg_db) -> None:
+    from sqlalchemy import text
+
+    from crate.db.repositories.artist_hero_artwork import (
+        delete_artist_hero_composition,
+        get_artist_hero_artwork,
+        upsert_artist_hero_artwork,
+    )
+    from crate.db.tx import read_scope
+
+    pg_db.upsert_artist({"name": "Delete Manifest Composition Artist"})
+    with read_scope() as session:
+        artist_id = session.execute(
+            text(
+                "SELECT id FROM library_artists "
+                "WHERE name = 'Delete Manifest Composition Artist'"
+            )
+        ).scalar_one()
+
+    desktop = _manifest("editorial-1", "desktop-a")["artifacts"]["desktop"]
+    mobile = _manifest("editorial-1", "mobile-a")["artifacts"]["desktop"]
+    manifest = {
+        "manifest_version": 1,
+        "editorial_revision": "editorial-1",
+        "artifacts": {"desktop": desktop, "mobile": mobile},
+    }
+    assert upsert_artist_hero_artwork(
+        artist_id=artist_id,
+        provenance="manual",
+        review_status="approved",
+        source_width=1600,
+        source_height=1000,
+        desktop_recipe={"mode": "crop"},
+        mobile_recipe={"mode": "crop"},
+        revision="editorial-1",
+        desktop_enabled=True,
+        mobile_enabled=True,
+        render_manifest=manifest,
+    )
+
+    result = delete_artist_hero_composition(
+        artist_id, "desktop", expected_revision="editorial-1"
+    )
+
+    assert result == {"remaining_compositions": ["mobile"]}
+    profile = get_artist_hero_artwork(artist_id)
+    assert profile["desktop_enabled"] is False
+    assert set(profile["render_manifest"]["artifacts"]) == {"mobile"}
+    assert profile["render_manifest"]["editorial_revision"] == profile["revision"]
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")

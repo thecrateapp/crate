@@ -46,15 +46,25 @@ def _record_manifest_history(
     artist_id: int,
     manifest: Mapping[str, object] | None,
     previous_manifest: Mapping[str, object] | None,
+    replace_previous: bool = False,
 ) -> None:
     if not isinstance(manifest, Mapping):
         return
     editorial_revision = str(manifest.get("editorial_revision") or "")
     if not editorial_revision:
         return
+    conflict_clause = (
+        """
+        ON CONFLICT (manifest_id) DO UPDATE
+        SET previous_manifest = EXCLUDED.previous_manifest,
+            created_at = NOW()
+        """
+        if replace_previous
+        else "ON CONFLICT (manifest_id) DO NOTHING"
+    )
     active_session.execute(
         text(
-            """
+            f"""
             INSERT INTO artist_hero_manifest_history (
                 manifest_id, artist_id, editorial_revision,
                 manifest, previous_manifest
@@ -62,7 +72,7 @@ def _record_manifest_history(
                 :manifest_id, :artist_id, :editorial_revision,
                 CAST(:manifest AS JSONB), CAST(:previous_manifest AS JSONB)
             )
-            ON CONFLICT (manifest_id) DO NOTHING
+            {conflict_clause}
             """
         ),
         {
@@ -604,6 +614,7 @@ def rollback_artist_hero_manifest(
                 if isinstance(current["render_manifest"], Mapping)
                 else None
             ),
+            replace_previous=True,
         )
         result = active_session.execute(
             text(
@@ -746,7 +757,8 @@ def delete_artist_hero_composition(
             active_session.execute(
                 text(
                     f"""
-                    SELECT revision, {enabled_column}, {other}_enabled
+                    SELECT revision, render_manifest,
+                           {enabled_column}, {other}_enabled
                     FROM artist_hero_artwork
                     WHERE artist_id = :artist_id
                     FOR UPDATE
@@ -762,7 +774,7 @@ def delete_artist_hero_composition(
         if expected_revision is not None and row["revision"] != expected_revision:
             return None
 
-        active_session.execute(
+        updated_revision = active_session.execute(
             text(
                 f"""
                 UPDATE artist_hero_artwork
@@ -778,9 +790,57 @@ def delete_artist_hero_composition(
                     ),
                     updated_at = NOW()
                 WHERE artist_id = :artist_id
+                RETURNING revision
                 """
             ),
             {"artist_id": artist_id},
+        ).scalar_one()
+
+        current_manifest = row["render_manifest"]
+        updated_manifest: dict[str, object] | None = None
+        if isinstance(current_manifest, Mapping):
+            current_artifacts = current_manifest.get("artifacts")
+            if isinstance(current_artifacts, Mapping):
+                remaining_artifacts = {
+                    key: dict(value)
+                    for key, value in current_artifacts.items()
+                    if key != composition and isinstance(value, Mapping)
+                }
+                if remaining_artifacts:
+                    updated_manifest = {
+                        **dict(current_manifest),
+                        "editorial_revision": str(updated_revision),
+                        "artifacts": remaining_artifacts,
+                    }
+
+        if updated_manifest is not None:
+            _record_render_manifest_history(
+                active_session,
+                artist_id=artist_id,
+                manifest=updated_manifest,
+            )
+            _record_manifest_history(
+                active_session,
+                artist_id=artist_id,
+                manifest=updated_manifest,
+                previous_manifest=current_manifest,
+            )
+        active_session.execute(
+            text(
+                """
+                UPDATE artist_hero_artwork
+                SET render_manifest = CAST(:render_manifest AS JSONB)
+                WHERE artist_id = :artist_id
+                """
+            ),
+            {
+                "artist_id": artist_id,
+                "render_manifest": (
+                    json.dumps(updated_manifest)
+                    if updated_manifest is not None
+                    else None
+                ),
+            },
         )
 
         from crate.db.repositories.featured_artists import (

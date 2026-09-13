@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 from PIL import Image
@@ -227,6 +228,13 @@ def test_migration_target_publishes_the_enabled_bundle_with_manifest_cas(
     published: list[dict] = []
     activated: list[dict] = []
     queued: list[tuple[str, str]] = []
+    lifecycle: list[str] = []
+
+    @contextmanager
+    def publication_lock(_root, _artist_id):
+        lifecycle.append("lock-enter")
+        yield
+        lifecycle.append("lock-exit")
 
     monkeypatch.setattr(
         artwork_handlers,
@@ -247,7 +255,8 @@ def test_migration_target_publishes_the_enabled_bundle_with_manifest_cas(
         artwork_handlers,
         "_publish_artist_hero_manifest",
         lambda **kwargs: (
-            published.append(kwargs)
+            lifecycle.append("publish")
+            or published.append(kwargs)
             or {
                 "manifest_version": 1,
                 "editorial_revision": kwargs["editorial_revision"],
@@ -261,7 +270,12 @@ def test_migration_target_publishes_the_enabled_bundle_with_manifest_cas(
     monkeypatch.setattr(
         artwork_handlers,
         "compare_and_swap_artist_hero_manifest",
-        lambda **kwargs: activated.append(kwargs) or True,
+        lambda **kwargs: (
+            lifecycle.append("activate") or activated.append(kwargs) or True
+        ),
+    )
+    monkeypatch.setattr(
+        artwork_handlers, "artist_hero_publication_lock", publication_lock
     )
     monkeypatch.setattr(
         artwork_handlers,
@@ -286,6 +300,7 @@ def test_migration_target_publishes_the_enabled_bundle_with_manifest_cas(
     assert published[0]["artifact_revision"]
     assert activated[0]["expected_revision"] == "editorial-revision-1"
     assert activated[0]["expected_manifest"] is None
+    assert lifecycle == ["lock-enter", "publish", "activate", "lock-exit"]
     assert queued == [
         ("artist-42:desktop:artifact-1", "renderer-migration"),
         ("artist-42:mobile:artifact-1", "renderer-migration"),
@@ -349,18 +364,22 @@ def test_rollback_worker_activates_retained_manifest_and_materializes_it(
                 "desktop": {
                     "render_revision": "artifact-b",
                     "relative_path": "desktop/artifact.webp",
+                    "source_relative_path": "desktop/source.jpg",
                 },
                 "mobile": {
                     "render_revision": "artifact-b",
                     "relative_path": "mobile/artifact.webp",
+                    "source_relative_path": "mobile/source.jpg",
                 },
             },
         },
     }
     (tmp_path / "desktop").mkdir()
     (tmp_path / "desktop" / "artifact.webp").write_bytes(b"desktop")
+    (tmp_path / "desktop" / "source.jpg").write_bytes(b"desktop-source")
     (tmp_path / "mobile").mkdir()
     (tmp_path / "mobile" / "artifact.webp").write_bytes(b"mobile")
+    (tmp_path / "mobile" / "source.jpg").write_bytes(b"mobile-source")
     profiles = iter((current, target))
     activated: list[dict] = []
     queued: list[str] = []
@@ -439,6 +458,78 @@ def test_rollback_worker_rejects_history_with_deleted_artifacts(
             }
         },
     }
+    activated: list[dict] = []
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_library_artist_by_id",
+        lambda _artist_id: _artist(),
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_artist_hero_artwork",
+        lambda _artist_id: current,
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "get_artist_hero_manifest_history_entry",
+        lambda **kwargs: {"manifest": target_manifest},
+    )
+    monkeypatch.setattr(
+        artwork_handlers,
+        "rollback_artist_hero_manifest",
+        lambda **kwargs: activated.append(kwargs) or True,
+    )
+    monkeypatch.setattr(artwork_handlers, "cache_root", lambda: tmp_path)
+
+    result = artwork_handlers._handle_rollback_artist_hero(
+        "task-rollback",
+        {
+            "artist_id": 42,
+            "expected_revision": "editorial-revision-1",
+            "target_manifest_id": "sha256:manifest-b",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {
+        "status": "skipped",
+        "reason": "artist-hero-artifacts-missing",
+        "artist_id": 42,
+        "target_manifest_id": "sha256:manifest-b",
+    }
+    assert activated == []
+
+
+def test_rollback_worker_rejects_history_with_deleted_editable_source(
+    tmp_path: Path, monkeypatch
+) -> None:
+    current = _profile(
+        mobile_enabled=False,
+        render_manifest={
+            "manifest_version": 1,
+            "editorial_revision": "editorial-revision-1",
+            "artifacts": {
+                "desktop": {
+                    "render_revision": "artifact-c",
+                    "relative_path": "desktop/current.webp",
+                    "source_relative_path": "desktop/current.jpg",
+                }
+            },
+        },
+    )
+    target_manifest = {
+        "manifest_version": 1,
+        "editorial_revision": "editorial-revision-1",
+        "artifacts": {
+            "desktop": {
+                "render_revision": "artifact-b",
+                "relative_path": "desktop/artifact.webp",
+                "source_relative_path": "desktop/missing-source.jpg",
+            }
+        },
+    }
+    (tmp_path / "desktop").mkdir()
+    (tmp_path / "desktop" / "artifact.webp").write_bytes(b"desktop")
     activated: list[dict] = []
     monkeypatch.setattr(
         artwork_handlers,
