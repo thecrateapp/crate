@@ -229,6 +229,13 @@ def _publish_artist_hero_manifest(
     entity_uid = str(artist_row.get("entity_uid") or "")
     if not entity_uid:
         return None
+    artist_id = int(artist_row.get("id") or 0)
+    current_artist = get_library_artist_by_id(artist_id) if artist_id > 0 else None
+    if (
+        current_artist is None
+        or str(current_artist.get("entity_uid") or "") != entity_uid
+    ):
+        return None
     editorial_revision = editorial_revision or revision
     artifact_revision = artifact_revision or revision
 

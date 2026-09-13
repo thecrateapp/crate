@@ -1,8 +1,69 @@
+from contextlib import contextmanager
+
 from crate.worker_handlers.management import (
+    _handle_delete_artist,
     _handle_move_artist,
     _handle_repair,
     _handle_repair_duplicate_tracks,
 )
+
+
+def test_delete_artist_cleans_hero_storage_inside_publication_lock(
+    monkeypatch, tmp_path
+):
+    events: list[str] = []
+
+    @contextmanager
+    def publication_lock(_root, artist_id):
+        assert artist_id == 42
+        events.append("lock-enter")
+        yield
+        events.append("lock-exit")
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist",
+        lambda _name: {
+            "id": 42,
+            "entity_uid": "artist-entity",
+            "folder_name": "Artist",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.artist_hero_publication_lock",
+        publication_lock,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.delete_artist_hero_storage",
+        lambda entity_uid: events.append(f"cleanup:{entity_uid}"),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.db_delete_artist",
+        lambda name: events.append(f"db-delete:{name}"),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.delete_cache", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.emit_task_event",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.log_audit", lambda *_args, **_kwargs: None
+    )
+
+    result = _handle_delete_artist(
+        "delete-artist-1",
+        {"name": "Artist", "mode": "db_only"},
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {"deleted": "Artist", "mode": "db_only"}
+    assert events == [
+        "lock-enter",
+        "cleanup:artist-entity",
+        "db-delete:Artist",
+        "lock-exit",
+    ]
 
 
 def test_handle_index_genres_broadcasts_library_cache_invalidation(monkeypatch):

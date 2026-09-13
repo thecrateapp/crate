@@ -12,6 +12,14 @@ from PIL import Image
 from tests.conftest import PG_AVAILABLE
 
 
+@pytest.fixture(autouse=True)
+def _keep_worker_artist_present(monkeypatch):
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_library_artist_by_id",
+        lambda artist_id: {"id": artist_id, "entity_uid": "artist-entity"},
+    )
+
+
 def _image_bytes(size: tuple[int, int] = (1600, 1000)) -> bytes:
     buffer = io.BytesIO()
     Image.new("RGB", size, color=(24, 118, 145)).save(buffer, "PNG")

@@ -23,7 +23,7 @@ from typing import Iterator, Literal
 
 from PIL.Image import Image
 
-from crate.artwork_variants import ArtworkAsset
+from crate.artwork_variants import ArtworkAsset, artwork_variant_root
 from crate.streaming.paths import cache_root
 
 ARTIST_HERO_PUBLICATION_VERSION = 1
@@ -113,6 +113,39 @@ def artist_hero_artifact_manifest_path(
         artist_hero_artifact_root(identity, root=root)
         / ARTIST_HERO_ARTIFACT_MANIFEST_FILENAME
     )
+
+
+def _remove_storage_path(path: Path) -> bool:
+    if not path.exists() and not path.is_symlink():
+        return False
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    else:
+        shutil.rmtree(path)
+    return True
+
+
+def delete_artist_hero_storage(artist_entity_uid: str) -> dict[str, int]:
+    """Remove every published and materialized hero artifact for one artist."""
+
+    _validate_segment(artist_entity_uid, "artist entity UID")
+    publication_root = cache_root() / ARTIST_HERO_PUBLICATION_PREFIX / artist_entity_uid
+    publication_roots_removed = int(_remove_storage_path(publication_root))
+
+    materializations_removed = 0
+    materialization_root = artwork_variant_root() / "artist-hero"
+    if materialization_root.is_dir() and not materialization_root.is_symlink():
+        asset_prefix = f"{artist_entity_uid}:"
+        for asset_root in materialization_root.iterdir():
+            if asset_root.name.startswith(asset_prefix) and _remove_storage_path(
+                asset_root
+            ):
+                materializations_removed += 1
+
+    return {
+        "materializations_removed": materializations_removed,
+        "publication_roots_removed": publication_roots_removed,
+    }
 
 
 def resolve_artist_hero_publication_path(
@@ -334,5 +367,6 @@ __all__ = [
     "resolve_artist_hero_publication_path",
     "artist_hero_source_fingerprint",
     "build_artist_hero_artifact_manifest",
+    "delete_artist_hero_storage",
     "publish_artist_hero_artifact",
 ]

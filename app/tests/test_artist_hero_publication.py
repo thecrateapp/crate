@@ -152,6 +152,29 @@ def test_publish_artist_hero_artifact_rejects_conflicting_retry(tmp_path):
         )
 
 
+def test_publish_manifest_skips_artist_deleted_before_lock(monkeypatch):
+    from crate.worker_handlers import artwork
+
+    monkeypatch.setattr(artwork, "get_library_artist_by_id", lambda _artist_id: None)
+
+    def fail_publish(*_args, **_kwargs):
+        raise AssertionError("deleted artists must not publish new files")
+
+    monkeypatch.setattr(artwork, "publish_artist_hero_artifact", fail_publish)
+
+    manifest = artwork._publish_artist_hero_manifest(
+        artist_row={"id": 42, "entity_uid": "artist-1"},
+        revision="revision-a",
+        rendered={"desktop": _image()},
+        raw_sources={"desktop": b"source"},
+        recipes={"desktop": {"mode": "cover"}},
+        existing={},
+        enabled=("desktop",),
+    )
+
+    assert manifest is None
+
+
 def test_publish_artist_hero_artifact_accepts_concurrent_identical_winner(
     monkeypatch, tmp_path
 ):

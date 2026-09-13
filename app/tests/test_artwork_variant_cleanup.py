@@ -340,6 +340,34 @@ def test_cleanup_artist_hero_publications_does_not_retain_disabled_compositions(
     assert result["revisions_removed"] == 1
 
 
+def test_delete_artist_hero_storage_removes_publications_and_materializations(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_asset,
+        artist_hero_artifact_root,
+        delete_artist_hero_storage,
+    )
+    from crate.artwork_variants import ArtworkAsset, artwork_asset_root
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    identity = ArtistHeroArtifactIdentity("artist-entity", "desktop", "revision-a")
+    publication = artist_hero_artifact_root(identity)
+    materialization = artwork_asset_root(artist_hero_artifact_asset(identity))
+    unrelated = artwork_asset_root(ArtworkAsset("artist-hero", "other:desktop:rev"))
+    publication.mkdir(parents=True)
+    materialization.mkdir(parents=True)
+    unrelated.mkdir(parents=True)
+
+    result = delete_artist_hero_storage("artist-entity")
+
+    assert result == {"materializations_removed": 1, "publication_roots_removed": 1}
+    assert not publication.exists()
+    assert not materialization.exists()
+    assert unrelated.exists()
+
+
 def test_repair_manifest_permissions_makes_existing_assets_readplane_readable(
     monkeypatch, tmp_path
 ):
