@@ -244,6 +244,12 @@ fn cache_desktop_media_artwork(
 
 #[cfg(all(desktop, not(target_os = "linux")))]
 const MAX_NATIVE_DESKTOP_ARTWORK_BYTES: usize = 8 * 1024 * 1024;
+#[cfg(all(desktop, not(target_os = "linux")))]
+const MAX_NATIVE_DESKTOP_ARTWORK_CACHE_BYTES: u64 = 128 * 1024 * 1024;
+#[cfg(all(desktop, not(target_os = "linux")))]
+const MAX_NATIVE_DESKTOP_ARTWORK_CACHE_ENTRIES: usize = 128;
+#[cfg(all(desktop, not(target_os = "linux")))]
+const MAX_NATIVE_DESKTOP_ARTWORK_TEMP_AGE_SECS: u64 = 60 * 60;
 
 #[cfg(all(desktop, not(target_os = "linux")))]
 fn native_desktop_artwork_cache_root() -> PathBuf {
@@ -297,6 +303,66 @@ fn native_desktop_artwork_url(path: &Path) -> io::Result<String> {
 }
 
 #[cfg(all(desktop, not(target_os = "linux")))]
+fn prune_native_desktop_artwork_cache(
+    cache_root: &Path,
+    preserve: &Path,
+    max_entries: usize,
+    max_bytes: u64,
+) -> io::Result<()> {
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(cache_root)? {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !metadata.file_type().is_file() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') && name.ends_with(".tmp") {
+            let expired = metadata
+                .modified()
+                .ok()
+                .and_then(|modified| modified.elapsed().ok())
+                .is_some_and(|age| age.as_secs() > MAX_NATIVE_DESKTOP_ARTWORK_TEMP_AGE_SECS);
+            if expired {
+                let _ = fs::remove_file(path);
+            }
+            continue;
+        }
+        entries.push((
+            path,
+            metadata.modified().unwrap_or(UNIX_EPOCH),
+            metadata.len(),
+        ));
+    }
+
+    let mut retained_entries = entries.len();
+    let mut retained_bytes = entries.iter().map(|(_, _, len)| len).sum::<u64>();
+    entries.sort_by_key(|(_, modified, _)| *modified);
+    for (path, _, len) in entries {
+        if retained_entries <= max_entries && retained_bytes <= max_bytes {
+            break;
+        }
+        if path == preserve {
+            continue;
+        }
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        retained_entries = retained_entries.saturating_sub(1);
+        retained_bytes = retained_bytes.saturating_sub(len);
+    }
+    Ok(())
+}
+
+#[cfg(all(desktop, not(target_os = "linux")))]
 fn cache_native_desktop_artwork(
     cache_key: &str,
     bytes: &[u8],
@@ -318,6 +384,12 @@ fn cache_native_desktop_artwork(
         native_desktop_artwork_extension(mime_type, cache_key)
     ));
     if is_native_desktop_artwork_path(&destination) {
+        let _ = prune_native_desktop_artwork_cache(
+            &cache_root,
+            &destination,
+            MAX_NATIVE_DESKTOP_ARTWORK_CACHE_ENTRIES,
+            MAX_NATIVE_DESKTOP_ARTWORK_CACHE_BYTES,
+        );
         return native_desktop_artwork_url(&destination).map(Some);
     }
 
@@ -342,6 +414,12 @@ fn cache_native_desktop_artwork(
         let _ = fs::remove_file(&temporary);
     }
     write_result?;
+    let _ = prune_native_desktop_artwork_cache(
+        &cache_root,
+        &destination,
+        MAX_NATIVE_DESKTOP_ARTWORK_CACHE_ENTRIES,
+        MAX_NATIVE_DESKTOP_ARTWORK_CACHE_BYTES,
+    );
     native_desktop_artwork_url(&destination).map(Some)
 }
 
@@ -922,7 +1000,46 @@ mod tests {
     };
 
     #[cfg(not(target_os = "linux"))]
-    use super::{cache_native_desktop_artwork, is_native_desktop_artwork_path};
+    use super::{
+        cache_native_desktop_artwork, is_native_desktop_artwork_path,
+        prune_native_desktop_artwork_cache,
+    };
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn native_artwork_cache_prunes_old_entries_within_budgets() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "crate-desktop-artwork-prune-test-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let preserve = root.join("preserve.webp");
+        for name in ["a.webp", "b.webp", "c.webp", "preserve.webp"] {
+            std::fs::write(root.join(name), b"data").unwrap();
+        }
+
+        prune_native_desktop_artwork_cache(&root, &preserve, 2, 7).unwrap();
+
+        let retained = std::fs::read_dir(&root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+            .collect::<Vec<_>>();
+        let retained_bytes = retained
+            .iter()
+            .filter_map(|entry| entry.metadata().ok())
+            .map(|metadata| metadata.len())
+            .sum::<u64>();
+        assert!(preserve.is_file());
+        assert!(retained.len() <= 2);
+        assert!(retained_bytes <= 7);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[cfg(not(target_os = "linux"))]
     #[test]
