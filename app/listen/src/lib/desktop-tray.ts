@@ -28,8 +28,11 @@ const MAX_DESKTOP_ARTWORK_BYTES = 8 * 1024 * 1024;
 const MAX_CACHED_DESKTOP_ARTWORK = 24;
 
 let desktopMediaSessionSequence = 0;
+let desktopArtworkPreparationSequence = 0;
 const preparedDesktopArtwork = new Map<string, string>();
 const pendingDesktopArtwork = new Map<string, Promise<string | null>>();
+const pendingDesktopArtworkSequences = new Map<string, number>();
+const evictedDesktopArtworkSequences = new Map<string, number>();
 
 interface DesktopArtworkCacheResult {
   url: string;
@@ -124,23 +127,34 @@ function prepareDesktopArtwork(artwork: string): Promise<string | null> {
   const pending = pendingDesktopArtwork.get(artwork);
   if (pending) return pending;
 
-  const promise = fetchAndCacheDesktopArtwork(artwork)
+  const preparationSequence = ++desktopArtworkPreparationSequence;
+  const promise = fetchAndCacheDesktopArtwork(artwork, preparationSequence)
     .then((fileUrl) => {
       pendingDesktopArtwork.delete(artwork);
-      if (fileUrl) rememberPreparedArtwork(artwork, fileUrl);
-      return fileUrl;
+      pendingDesktopArtworkSequences.delete(artwork);
+      const usableFileUrl =
+        fileUrl && !wasDesktopArtworkEvictedAfter(fileUrl, preparationSequence)
+          ? fileUrl
+          : null;
+      if (usableFileUrl) rememberPreparedArtwork(artwork, usableFileUrl);
+      pruneSettledDesktopArtworkEvictions();
+      return usableFileUrl;
     })
     .catch(() => {
       pendingDesktopArtwork.delete(artwork);
+      pendingDesktopArtworkSequences.delete(artwork);
+      pruneSettledDesktopArtworkEvictions();
       return null;
     });
 
+  pendingDesktopArtworkSequences.set(artwork, preparationSequence);
   pendingDesktopArtwork.set(artwork, promise);
   return promise;
 }
 
 async function fetchAndCacheDesktopArtwork(
   artwork: string,
+  preparationSequence: number,
 ): Promise<string | null> {
   const response = await fetch(artwork);
   if (!response.ok) return null;
@@ -162,15 +176,49 @@ async function fetchAndCacheDesktopArtwork(
   if (!result) return null;
   if (typeof result === "string") return result;
   if (typeof result.url !== "string") return null;
-  forgetEvictedPreparedArtwork(result.evictedUrls);
+  forgetEvictedPreparedArtwork(result.evictedUrls, preparationSequence);
   return result.url;
 }
 
-function forgetEvictedPreparedArtwork(evictedUrls: string[]): void {
+function forgetEvictedPreparedArtwork(
+  evictedUrls: string[],
+  preparationSequence: number,
+): void {
   if (!Array.isArray(evictedUrls) || evictedUrls.length === 0) return;
-  const evicted = new Set(evictedUrls);
+  const evicted = new Set(
+    evictedUrls.filter(
+      (fileUrl): fileUrl is string => typeof fileUrl === "string",
+    ),
+  );
+  for (const fileUrl of evicted) {
+    evictedDesktopArtworkSequences.set(fileUrl, preparationSequence);
+  }
   for (const [artwork, fileUrl] of preparedDesktopArtwork) {
     if (evicted.has(fileUrl)) preparedDesktopArtwork.delete(artwork);
+  }
+}
+
+function wasDesktopArtworkEvictedAfter(
+  fileUrl: string,
+  preparationSequence: number,
+): boolean {
+  return (
+    (evictedDesktopArtworkSequences.get(fileUrl) ?? 0) > preparationSequence
+  );
+}
+
+function pruneSettledDesktopArtworkEvictions(): void {
+  if (pendingDesktopArtworkSequences.size === 0) {
+    evictedDesktopArtworkSequences.clear();
+    return;
+  }
+  const oldestPendingSequence = Math.min(
+    ...pendingDesktopArtworkSequences.values(),
+  );
+  for (const [fileUrl, evictionSequence] of evictedDesktopArtworkSequences) {
+    if (evictionSequence <= oldestPendingSequence) {
+      evictedDesktopArtworkSequences.delete(fileUrl);
+    }
   }
 }
 
