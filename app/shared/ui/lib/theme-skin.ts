@@ -234,11 +234,17 @@ export function readStoredThemeSkin(
 }
 
 const systemListenerCleanup = new WeakMap<HTMLElement, () => void>();
+const reducedMotionListenerCleanup = new WeakMap<HTMLElement, () => void>();
 const runtimeAppearanceCleanup = new WeakMap<HTMLElement, () => void>();
 
 function clearSystemListener(root: HTMLElement): void {
   systemListenerCleanup.get(root)?.();
   systemListenerCleanup.delete(root);
+}
+
+function clearReducedMotionListener(root: HTMLElement): void {
+  reducedMotionListenerCleanup.get(root)?.();
+  reducedMotionListenerCleanup.delete(root);
 }
 
 function clearRuntimeAppearance(root: HTMLElement): void {
@@ -293,6 +299,7 @@ export function applyThemeSkin(
 
   if (root) {
     clearSystemListener(root);
+    clearReducedMotionListener(root);
     clearRuntimeAppearance(root);
     root.dataset.crateApp = "listen";
     root.dataset.crateMode = resolvedMode;
@@ -328,6 +335,31 @@ export function applyThemeSkin(
       mediaQuery.addEventListener("change", onChange);
       systemListenerCleanup.set(root, () =>
         mediaQuery.removeEventListener("change", onChange),
+      );
+    }
+
+    if (reducedMotionQuery) {
+      const onReducedMotionChange = (event: MediaQueryListEvent) => {
+        const nextMode = resolveColorMode(
+          selection.mode,
+          mediaQuery?.matches ?? resolvedMode === "dark",
+        );
+        applyRuntimeAppearance(
+          root,
+          selection,
+          nextMode,
+          event.matches,
+          storage,
+        );
+        publishThemeSkin({
+          ...selection,
+          resolvedMode: nextMode,
+        });
+      };
+
+      reducedMotionQuery.addEventListener("change", onReducedMotionChange);
+      reducedMotionListenerCleanup.set(root, () =>
+        reducedMotionQuery.removeEventListener("change", onReducedMotionChange),
       );
     }
   }

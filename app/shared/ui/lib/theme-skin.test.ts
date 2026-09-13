@@ -16,15 +16,18 @@ import {
   APPEARANCE_STORAGE_KEY,
 } from "./appearance-types";
 
-function createMatchMedia(initiallyDark: boolean) {
-  let matches = initiallyDark;
+function createMatchMedia(
+  initialMatches: boolean,
+  media = "(prefers-color-scheme: dark)",
+) {
+  let matches = initialMatches;
   const listeners = new Set<(event: MediaQueryListEvent) => void>();
 
   const mediaQuery = {
     get matches() {
       return matches;
     },
-    media: "(prefers-color-scheme: dark)",
+    media,
     onchange: null,
     addEventListener: (_type: string, listener: EventListener) => {
       listeners.add(listener as (event: MediaQueryListEvent) => void);
@@ -40,6 +43,12 @@ function createMatchMedia(initiallyDark: boolean) {
   return {
     mediaQuery,
     setDark(next: boolean) {
+      matches = next;
+      listeners.forEach((listener) =>
+        listener({ matches, media: mediaQuery.media } as MediaQueryListEvent),
+      );
+    },
+    setMatches(next: boolean) {
       matches = next;
       listeners.forEach((listener) =>
         listener({ matches, media: mediaQuery.media } as MediaQueryListEvent),
@@ -248,9 +257,16 @@ describe("theme and skin runtime", () => {
     const root = document.documentElement;
     const darkMedia = createMatchMedia(true);
     const lightMedia = createMatchMedia(false);
+    const reducedMotionMedia = createMatchMedia(
+      false,
+      "(prefers-reduced-motion: reduce)",
+    );
     let currentMedia = darkMedia;
 
-    const matchMedia = () => currentMedia.mediaQuery;
+    const matchMedia = (query: string) =>
+      query.includes("reduced-motion")
+        ? reducedMotionMedia.mediaQuery
+        : currentMedia.mediaQuery;
     applyThemeSkin("system", "crateRed", {
       root,
       storage: undefined,
@@ -274,6 +290,46 @@ describe("theme and skin runtime", () => {
     expect(darkMedia.listenerCount()).toBe(0);
     expect(lightMedia.listenerCount()).toBe(0);
     expect(root.dataset.crateMode).toBe("light");
+  });
+
+  it("reacts to reduced-motion changes and removes the old listener", () => {
+    const root = document.documentElement;
+    const colorMedia = createMatchMedia(true, "(prefers-color-scheme: dark)");
+    const reducedMotionMedia = createMatchMedia(
+      true,
+      "(prefers-reduced-motion: reduce)",
+    );
+    const replacementMotionMedia = createMatchMedia(
+      false,
+      "(prefers-reduced-motion: reduce)",
+    );
+    let currentMotionMedia = reducedMotionMedia;
+    const matchMedia = (query: string) =>
+      query.includes("reduced-motion")
+        ? currentMotionMedia.mediaQuery
+        : colorMedia.mediaQuery;
+
+    applyThemeSkin("system", "default", {
+      root,
+      storage: undefined,
+      matchMedia,
+    });
+
+    expect(root.dataset.crateMotion).toBe("reduced");
+    expect(reducedMotionMedia.listenerCount()).toBe(1);
+
+    reducedMotionMedia.setMatches(false);
+    expect(root.dataset.crateMotion).toBe("system");
+
+    currentMotionMedia = replacementMotionMedia;
+    applyThemeSkin("dark", "crateRed", {
+      root,
+      storage: undefined,
+      matchMedia,
+    });
+
+    expect(reducedMotionMedia.listenerCount()).toBe(0);
+    expect(replacementMotionMedia.listenerCount()).toBe(1);
   });
 
   it("notifies app surfaces when the resolved appearance changes", () => {
