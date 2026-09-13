@@ -375,6 +375,32 @@ def test_home_hero_uses_the_active_artifact_revision_after_migration():
     )
 
 
+def test_home_hero_keeps_active_artifact_after_editorial_metadata_changes():
+    from crate.artist_hero_artwork import ARTIST_HERO_RENDER_VERSION
+    from crate.db import home_builder_discovery_queries as queries
+
+    row = _prepared_hero_row("Reviewed Hero")
+    row["artwork_revision"] = "review-status-revision"
+    row["_hero_render_manifest"] = {
+        "manifest_version": 1,
+        "editorial_revision": "published-editorial-revision",
+        "artifacts": {
+            "desktop": {
+                "renderer_version": ARTIST_HERO_RENDER_VERSION,
+                "render_revision": f"{ARTIST_HERO_RENDER_VERSION}:artifact-desktop",
+                "recipe_hash": "desktop-recipe",
+            },
+        },
+    }
+
+    assert queries._canonical_surface_ready(row, "desktop") is True
+    queries._add_hero_artwork_bounds(row)
+
+    assert row["hero_compositions"]["desktop"]["render_revision"].endswith(
+        ":artifact-desktop"
+    )
+
+
 def test_home_hero_bundle_selects_ready_artists_per_surface(monkeypatch):
     from crate.db import home_builder_discovery_queries as queries
 

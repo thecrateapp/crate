@@ -68,9 +68,7 @@ def _hero_render_artifact(
     item: Mapping[str, object], composition: str
 ) -> Mapping[str, object] | None:
     manifest = item.get("_hero_render_manifest")
-    if not isinstance(manifest, Mapping) or str(
-        manifest.get("editorial_revision") or ""
-    ) != str(item.get("artwork_revision") or ""):
+    if not isinstance(manifest, Mapping):
         return None
     artifacts = manifest.get("artifacts")
     artifact = artifacts.get(composition) if isinstance(artifacts, Mapping) else None
