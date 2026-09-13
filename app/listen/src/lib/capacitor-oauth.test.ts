@@ -167,6 +167,49 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     expect(mocks.apiForServerMock).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps a retryable callback when an unrelated stale deep link arrives", async () => {
+    const retryableState = "a".repeat(32);
+    localStorage.setItem(
+      `crate.oauth.${retryableState}`,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    mocks.apiForServerMock.mockRejectedValueOnce(
+      new ApiError(503, "exchange unavailable"),
+    );
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/callback?code=retryable-code&state=${retryableState}`,
+      ),
+    ).resolves.toEqual({ handled: false, next: "/", retryable: true });
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/callback?code=stale-code&state=${"b".repeat(32)}`,
+      ),
+    ).resolves.toEqual({ handled: false, next: "/" });
+
+    mocks.apiForServerMock.mockResolvedValue({ token: "access-token" });
+    await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
+      handled: true,
+      next: "/library",
+    });
+    expect(mocks.apiForServerMock).toHaveBeenLastCalledWith(
+      "server-a",
+      "/api/auth/native/exchange",
+      "POST",
+      expect.objectContaining({
+        code: "retryable-code",
+        state: retryableState,
+      }),
+    );
+  });
+
   it("removes the PKCE verifier when exchange rejects the handoff", async () => {
     const state = "s".repeat(32);
     const recordKey = `crate.oauth.${state}`;

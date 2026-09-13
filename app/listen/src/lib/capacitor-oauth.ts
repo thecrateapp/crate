@@ -43,7 +43,15 @@ interface OAuthCallbackResult {
 interface NativeOAuthPendingCallback {
   code: string;
   state: string;
+  createdAt: number;
 }
+
+interface NativeOAuthPendingCallbacks {
+  version: 1;
+  callbacks: NativeOAuthPendingCallback[];
+}
+
+let pendingCallbackMutation: Promise<void> = Promise.resolve();
 
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -113,17 +121,80 @@ async function removeNativeOAuthRecord(key: string): Promise<void> {
   await removeSecureSessionValue(key).catch(() => {});
 }
 
+function parsePendingNativeOAuthCallbacks(
+  raw: string | null,
+): NativeOAuthPendingCallback[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Partial<
+      NativeOAuthPendingCallbacks & NativeOAuthPendingCallback
+    >;
+    const candidates = Array.isArray(parsed.callbacks)
+      ? parsed.callbacks
+      : [parsed];
+    return candidates.flatMap((candidate) => {
+      if (
+        typeof candidate?.code !== "string" ||
+        !candidate.code ||
+        typeof candidate.state !== "string" ||
+        !candidate.state
+      ) {
+        return [];
+      }
+      return [
+        {
+          code: candidate.code,
+          state: candidate.state,
+          createdAt:
+            typeof candidate.createdAt === "number"
+              ? candidate.createdAt
+              : Date.now(),
+        },
+      ];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function mutatePendingNativeOAuthCallbacks(
+  mutate: (
+    callbacks: NativeOAuthPendingCallback[],
+  ) => NativeOAuthPendingCallback[],
+): Promise<void> {
+  const operation = pendingCallbackMutation.then(async () => {
+    const raw = await readNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
+    const callbacks = mutate(parsePendingNativeOAuthCallbacks(raw));
+    if (callbacks.length === 0) {
+      await removeNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
+      return;
+    }
+    const pending: NativeOAuthPendingCallbacks = {
+      version: 1,
+      callbacks,
+    };
+    await writeNativeOAuthRecord(
+      NATIVE_OAUTH_PENDING_CALLBACK_KEY,
+      JSON.stringify(pending),
+    );
+  });
+  pendingCallbackMutation = operation.catch(() => {});
+  return operation;
+}
+
 async function writePendingNativeOAuthCallback(
   callback: NativeOAuthPendingCallback,
 ): Promise<void> {
-  await writeNativeOAuthRecord(
-    NATIVE_OAUTH_PENDING_CALLBACK_KEY,
-    JSON.stringify(callback),
-  );
+  await mutatePendingNativeOAuthCallbacks((callbacks) => [
+    ...callbacks.filter((entry) => entry.state !== callback.state),
+    callback,
+  ]);
 }
 
-async function removePendingNativeOAuthCallback(): Promise<void> {
-  await removeNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
+async function removePendingNativeOAuthCallback(state: string): Promise<void> {
+  await mutatePendingNativeOAuthCallbacks((callbacks) =>
+    callbacks.filter((callback) => callback.state !== state),
+  );
 }
 
 export async function beginNativeOAuth(
@@ -243,7 +314,11 @@ export async function consumeOAuthCallbackUrl(
     if (!code || !state) {
       return { handled: false, next: "/" };
     }
-    await writePendingNativeOAuthCallback({ code, state });
+    await writePendingNativeOAuthCallback({
+      code,
+      state,
+      createdAt: Date.now(),
+    });
     const result = await exchangeNativeOAuthCallback(code, state);
     if (!result.handled) {
       return result;
@@ -260,19 +335,24 @@ export async function consumeOAuthCallbackUrl(
 
 export async function retryPendingNativeOAuthCallback(): Promise<OAuthCallbackResult> {
   try {
+    await pendingCallbackMutation;
     const raw = await readNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
     if (!raw) return { handled: false, next: "/" };
-    const pending = JSON.parse(raw) as Partial<NativeOAuthPendingCallback>;
-    if (
-      typeof pending.code !== "string" ||
-      !pending.code ||
-      typeof pending.state !== "string" ||
-      !pending.state
-    ) {
-      await removePendingNativeOAuthCallback();
+    const pendingCallbacks = parsePendingNativeOAuthCallbacks(raw).sort(
+      (left, right) => left.createdAt - right.createdAt,
+    );
+    if (pendingCallbacks.length === 0) {
+      await removeNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
       return { handled: false, next: "/" };
     }
-    return exchangeNativeOAuthCallback(pending.code, pending.state);
+    for (const pending of pendingCallbacks) {
+      const result = await exchangeNativeOAuthCallback(
+        pending.code,
+        pending.state,
+      );
+      if (result.handled || result.retryable) return result;
+    }
+    return { handled: false, next: "/" };
   } catch {
     return { handled: false, next: "/" };
   }
@@ -346,7 +426,7 @@ async function exchangeNativeOAuthCallback(
     if (removeRecord) {
       await Promise.all([
         removeNativeOAuthRecord(recordKey),
-        removePendingNativeOAuthCallback(),
+        removePendingNativeOAuthCallback(state),
       ]);
     }
     activeOAuthStates.delete(state);

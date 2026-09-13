@@ -431,3 +431,67 @@ def test_native_exchange_restores_handoff_when_session_creation_fails() -> None:
             native_oauth_exchange(_request(app_id="listen-tauri"), body)
 
     restore_handoff.assert_called_once_with(code=body.code, handoff=handoff)
+
+
+def test_native_exchange_revokes_session_and_restores_handoff_when_result_cache_fails() -> (
+    None
+):
+    from crate.api.auth import native_oauth_exchange
+    from crate.api.native_oauth import NativeOAuthHandoff, NativeOAuthUnavailable
+    from crate.api.schemas.auth import NativeOAuthExchangeRequest
+
+    handoff = NativeOAuthHandoff(
+        user_id=7,
+        app_id="listen-tauri",
+        state="state-token-value",
+        challenge="challenge",
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=30),
+    )
+    body = NativeOAuthExchangeRequest(
+        code="handoff-code-token",
+        code_verifier="v" * 43,
+        state="state-token-value",
+    )
+    user = {
+        "id": 7,
+        "email": "user@example.com",
+        "role": "user",
+        "status": "active",
+    }
+    with (
+        patch(
+            "crate.api.auth.get_completed_native_oauth_exchange",
+            return_value=None,
+        ),
+        patch(
+            "crate.api.auth.consume_native_oauth_handoff",
+            return_value=handoff,
+        ),
+        patch("crate.api.auth.get_user_by_id", return_value=user),
+        patch("crate.api.auth.update_user_last_login"),
+        patch(
+            "crate.api.auth._create_login_session",
+            return_value=("jwt-token", {"id": "session-id"}, "refresh-token"),
+        ),
+        patch(
+            "crate.api.auth._auth_login_payload",
+            return_value={"token": "jwt-token"},
+        ),
+        patch(
+            "crate.api.auth.complete_native_oauth_exchange",
+            side_effect=NativeOAuthUnavailable("redis unavailable"),
+        ),
+        patch("crate.api.auth.revoke_session") as revoke_session,
+        patch("crate.api.auth.restore_native_oauth_handoff") as restore_handoff,
+        patch.dict(
+            "os.environ",
+            {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+            clear=False,
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            native_oauth_exchange(_request(app_id="listen-tauri"), body)
+
+    assert exc_info.value.status_code == 503
+    revoke_session.assert_called_once_with("session-id")
+    restore_handoff.assert_called_once_with(code=body.code, handoff=handoff)

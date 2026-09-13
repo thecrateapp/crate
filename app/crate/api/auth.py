@@ -2508,8 +2508,25 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             handoff=handoff,
             payload=payload,
         )
-    except NativeOAuthUnavailable:
-        log.warning("Failed to cache native OAuth exchange result", exc_info=True)
+    except NativeOAuthUnavailable as exc:
+        try:
+            revoke_session(str(session["id"]))
+        except Exception:
+            log.error(
+                "Failed to revoke incomplete native OAuth session",
+                exc_info=True,
+            )
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.error(
+                "Failed to restore native OAuth handoff after cache failure",
+                exc_info=True,
+            )
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is temporarily unavailable",
+        ) from exc
     return payload
 
 
