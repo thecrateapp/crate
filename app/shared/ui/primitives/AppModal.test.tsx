@@ -307,6 +307,19 @@ describe("AppModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("handles a bubbling Escape event exactly once", () => {
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose}>
+        Content
+      </AppModal>,
+    );
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("does not call onClose when escape is disabled", () => {
     const onClose = vi.fn();
     render(

@@ -40,8 +40,6 @@ interface AppearanceModeDefinition {
   danger: string;
   surfaces: Record<string, string>;
   extras: {
-    scrollbarThumb: string;
-    scrollbarHover: string;
     textSecondary: string;
     textSubtle: string;
     textFaint: string;
@@ -92,6 +90,8 @@ const DEFAULT_DARK_SURFACES = {
   "--crate-token-color-background": "#0a0a0f",
   "--crate-token-color-foreground": "#f1f5f9",
   "--crate-token-color-muted-foreground": "#94a3b8",
+  "--crate-token-scrollbar-thumb": "#252535",
+  "--crate-token-scrollbar-hover": "#353545",
   "--crate-token-surface-app": "#0a0a0f",
   "--crate-token-surface-card-solid": "#16161e",
   "--crate-token-surface-card-foreground-solid": "#f1f5f9",
@@ -129,6 +129,8 @@ const DEFAULT_LIGHT_SURFACES = {
   "--crate-token-color-background": "#f8fafc",
   "--crate-token-color-foreground": "#0f172a",
   "--crate-token-color-muted-foreground": "#64748b",
+  "--crate-token-scrollbar-thumb": "#cbd5e1",
+  "--crate-token-scrollbar-hover": "#94a3b8",
   "--crate-token-surface-app": "#f8fafc",
   "--crate-token-surface-card-solid": "#ffffff",
   "--crate-token-surface-card-foreground-solid": "#0f172a",
@@ -167,6 +169,8 @@ const CRATE_RED_DARK_SURFACES = {
   "--crate-token-color-background": "#1c1c1e",
   "--crate-token-color-foreground": "#f5f5f7",
   "--crate-token-color-muted-foreground": "#a1a1aa",
+  "--crate-token-scrollbar-thumb": "#48484a",
+  "--crate-token-scrollbar-hover": "#636366",
   "--crate-token-surface-app": "#1c1c1e",
   "--crate-token-surface-card-solid": "#242426",
   "--crate-token-surface-card-foreground-solid": "#f5f5f7",
@@ -203,6 +207,8 @@ const CRATE_RED_LIGHT_SURFACES = {
   "--crate-token-color-background": "#f5f5f7",
   "--crate-token-color-foreground": "#1d1d1f",
   "--crate-token-color-muted-foreground": "#6e6e73",
+  "--crate-token-scrollbar-thumb": "#d1d1d6",
+  "--crate-token-scrollbar-hover": "#aeaeb2",
   "--crate-token-surface-app": "#f5f5f7",
   "--crate-token-surface-card-foreground-solid": "#1d1d1f",
   "--crate-token-surface-card-foreground-glass": "#1d1d1f",
@@ -227,8 +233,6 @@ const CRATE_RED_LIGHT_SURFACES = {
 };
 
 const DEFAULT_DARK_EXTRAS: AppearanceModeDefinition["extras"] = {
-  scrollbarThumb: "#252535",
-  scrollbarHover: "#353545",
   textSecondary: "rgba(255, 255, 255, 0.78)",
   textSubtle: "#94a3b8",
   textFaint: "#475569",
@@ -247,8 +251,6 @@ const DEFAULT_DARK_EXTRAS: AppearanceModeDefinition["extras"] = {
 };
 
 const DEFAULT_LIGHT_EXTRAS: AppearanceModeDefinition["extras"] = {
-  scrollbarThumb: "#cbd5e1",
-  scrollbarHover: "#94a3b8",
   textSecondary: "rgba(15, 23, 42, 0.75)",
   textSubtle: "#475569",
   textFaint: "#94a3b8",
@@ -394,8 +396,6 @@ export const APPEARANCE_PRESET_REGISTRY = {
         surfaces: CRATE_RED_DARK_SURFACES,
         extras: {
           ...DEFAULT_DARK_EXTRAS,
-          scrollbarThumb: "#48484a",
-          scrollbarHover: "#636366",
           textSubtle: "#8e8e93",
           textFaint: "#636366",
           borderSubtle: "#3a3a3c",
@@ -410,8 +410,6 @@ export const APPEARANCE_PRESET_REGISTRY = {
         surfaces: CRATE_RED_LIGHT_SURFACES,
         extras: {
           ...DEFAULT_LIGHT_EXTRAS,
-          scrollbarThumb: "#d1d1d6",
-          scrollbarHover: "#aeaeb2",
           textSubtle: "#636366",
           textFaint: "#aeaeb2",
           borderSubtle: "#d1d1d6",
@@ -548,8 +546,8 @@ export function resolveAppearanceVariables(
     "--surface-popover": surfaceValue(
       `--crate-token-surface-overlay-${materialSuffix}`,
     ),
-    "--scrollbar-thumb": extras.scrollbarThumb,
-    "--scrollbar-hover": extras.scrollbarHover,
+    "--scrollbar-thumb": surfaceValue("--crate-token-scrollbar-thumb"),
+    "--scrollbar-hover": surfaceValue("--crate-token-scrollbar-hover"),
     "--text-primary": surfaceValue("--crate-token-color-foreground"),
     "--text-secondary": extras.textSecondary,
     "--text-muted": surfaceValue("--crate-token-color-muted-foreground"),

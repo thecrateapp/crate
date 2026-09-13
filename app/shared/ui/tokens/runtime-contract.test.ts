@@ -29,6 +29,12 @@ describe("runtime token bridge", () => {
       "--color-card: var(--crate-token-surface-card-glass)",
     );
     expect(surfaces).toContain("--surface-app: var(--crate-token-surface-app)");
+    expect(surfaces).toContain(
+      "--scrollbar-thumb: var(--crate-token-scrollbar-thumb)",
+    );
+    expect(surfaces).toContain(
+      "--scrollbar-hover: var(--crate-token-scrollbar-hover)",
+    );
   });
 
   it("derives runtime defaults in the theme layer", () => {
@@ -38,5 +44,18 @@ describe("runtime token bridge", () => {
     expect(themes).toContain("--crate-token-surface-card-solid: #16161e");
     expect(themes).toContain("--crate-token-surface-card-glass:");
     expect(themes).toContain("--crate-token-radius-md: 0.25rem");
+    expect(themes).toContain("--crate-token-scrollbar-thumb: #252535");
+    expect(themes).toContain("--crate-token-scrollbar-hover: #353545");
+  });
+
+  it("disables root view transitions when motion is reduced", () => {
+    const animations = readTokenFile("animations.css");
+
+    expect(animations).toContain(
+      ':root[data-crate-motion="reduced"]::view-transition-old(root)',
+    );
+    expect(animations).toContain(
+      ':root[data-crate-motion="reduced"]::view-transition-new(root)',
+    );
   });
 });

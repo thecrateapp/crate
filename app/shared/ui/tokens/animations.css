@@ -530,6 +530,19 @@
 ::view-transition-new(root) {
   animation: 0.2s ease both vt-in;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+:root[data-crate-motion="reduced"]::view-transition-old(root),
+:root[data-crate-motion="reduced"]::view-transition-new(root) {
+  animation: none !important;
+}
+
 @keyframes vt-out {
   to {
     opacity: 0;

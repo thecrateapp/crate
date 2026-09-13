@@ -424,12 +424,6 @@ export function AppModal({
         overlayClassName,
       )}
       onClick={handleOverlayClick}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && closeOnEscape) {
-          event.preventDefault();
-          onClose();
-        }
-      }}
       onPointerDown={handleOverlayPointerDown}
     >
       <div

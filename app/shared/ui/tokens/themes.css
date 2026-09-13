@@ -5,6 +5,8 @@
   --crate-token-color-background: #0a0a0f;
   --crate-token-color-foreground: #f1f5f9;
   --crate-token-color-muted-foreground: #94a3b8;
+  --crate-token-scrollbar-thumb: #252535;
+  --crate-token-scrollbar-hover: #353545;
   --crate-token-surface-app: #0a0a0f;
   --crate-token-surface-card-solid: #16161e;
   --crate-token-surface-card-foreground-solid: #f1f5f9;
