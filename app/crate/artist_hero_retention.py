@@ -60,8 +60,31 @@ def retained_artist_hero_revisions_from_manifests(
         reverse=True,
     )
     retained_ids: list[str] = []
+    rows_by_id = {
+        str(row.get("manifest_id") or ""): row
+        for row in ordered
+        if str(row.get("manifest_id") or "")
+    }
+
+    def _manifest_id(manifest: object) -> str:
+        if not isinstance(manifest, Mapping):
+            return ""
+        for row in ordered:
+            candidate = row.get("manifest")
+            if isinstance(candidate, Mapping) and candidate == manifest:
+                return str(row.get("manifest_id") or "")
+        return ""
+
     if active_manifest_id:
         retained_ids.append(active_manifest_id)
+    cursor = active_manifest_id
+    while cursor and len(retained_ids) < keep_count:
+        row = rows_by_id.get(cursor)
+        previous_id = _manifest_id(row.get("previous_manifest") if row else None)
+        if not previous_id or previous_id in retained_ids:
+            break
+        retained_ids.append(previous_id)
+        cursor = previous_id
     for row in ordered:
         manifest_id = str(row.get("manifest_id") or "")
         if manifest_id and manifest_id not in retained_ids:

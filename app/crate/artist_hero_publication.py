@@ -9,6 +9,7 @@ reference.
 from __future__ import annotations
 
 import hashlib
+import errno
 import json
 import os
 import re
@@ -296,7 +297,9 @@ def publish_artist_hero_artifact(
         _fsync_directory(staging_root)
         try:
             os.rename(staging_root, final_root)
-        except FileExistsError:
+        except OSError as exc:
+            if exc.errno not in {errno.EEXIST, errno.ENOTEMPTY}:
+                raise
             shutil.rmtree(staging_root, ignore_errors=True)
             return _existing_publication(identity, manifest, root=base)
         _fsync_directory(final_root.parent)

@@ -124,3 +124,61 @@ def test_manifest_retention_keeps_active_and_previous_complete_bundles():
         ("mobile", "artifact-c"),
         ("mobile", "artifact-b"),
     }
+
+
+def test_manifest_retention_follows_actual_previous_after_rollback_and_republish():
+    from crate.artist_hero_retention import (
+        retained_artist_hero_revisions_from_manifests,
+    )
+
+    def manifest(revision: str) -> dict:
+        return {
+            "artifacts": {
+                "desktop": {"render_revision": revision},
+                "mobile": {"render_revision": revision},
+            }
+        }
+
+    manifest_a = manifest("artifact-a")
+    manifest_b = manifest("artifact-b")
+    manifest_c = manifest("artifact-c")
+    manifest_d = manifest("artifact-d")
+    history = [
+        {
+            "manifest_id": "manifest-d",
+            "created_at": "2026-09-08T13:00:00+00:00",
+            "manifest": manifest_d,
+            "previous_manifest": manifest_a,
+        },
+        {
+            "manifest_id": "manifest-c",
+            "created_at": "2026-09-08T12:00:00+00:00",
+            "manifest": manifest_c,
+            "previous_manifest": manifest_b,
+        },
+        {
+            "manifest_id": "manifest-b",
+            "created_at": "2026-09-08T11:00:00+00:00",
+            "manifest": manifest_b,
+            "previous_manifest": manifest_a,
+        },
+        {
+            "manifest_id": "manifest-a",
+            "created_at": "2026-09-08T10:00:00+00:00",
+            "manifest": manifest_a,
+            "previous_manifest": None,
+        },
+    ]
+
+    retained = retained_artist_hero_revisions_from_manifests(
+        history,
+        active_manifest_id="manifest-d",
+        keep_manifest_count=2,
+    )
+
+    assert retained == {
+        ("desktop", "artifact-d"),
+        ("desktop", "artifact-a"),
+        ("mobile", "artifact-d"),
+        ("mobile", "artifact-a"),
+    }

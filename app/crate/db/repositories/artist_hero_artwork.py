@@ -235,6 +235,15 @@ def upsert_artist_hero_artwork(
             .mappings()
             .first()
         )
+        if isinstance(render_manifest, Mapping) and str(
+            render_manifest.get("editorial_revision") or ""
+        ) != str(revision):
+            return False
+        _record_render_manifest_history(
+            active_session,
+            artist_id=artist_id,
+            manifest=render_manifest,
+        )
         if not isinstance(expected_revision, _ExpectedValueUnset):
             if expected_revision is None:
                 if current is not None:
@@ -248,11 +257,6 @@ def upsert_artist_hero_artwork(
             )
         ):
             return False
-        if isinstance(render_manifest, Mapping) and str(
-            render_manifest.get("editorial_revision") or ""
-        ) != str(revision):
-            return False
-
         result = active_session.execute(
             text(
                 """

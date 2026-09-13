@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import errno
 import json
+import os
+import shutil
 from io import BytesIO
 from pathlib import Path
 
@@ -147,3 +150,39 @@ def test_publish_artist_hero_artifact_rejects_conflicting_retry(tmp_path):
             source_content=b"editable-source-b",
             root=tmp_path,
         )
+
+
+def test_publish_artist_hero_artifact_accepts_concurrent_identical_winner(
+    monkeypatch, tmp_path
+):
+    from crate import artist_hero_publication
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_root,
+        publish_artist_hero_artifact,
+    )
+
+    identity = ArtistHeroArtifactIdentity("artist-1", "desktop", "revision-race")
+    final_root = artist_hero_artifact_root(identity, root=tmp_path)
+    original_rename = os.rename
+
+    def lose_install_race(source, destination):
+        if Path(destination) == final_root:
+            shutil.copytree(source, destination)
+            raise OSError(errno.ENOTEMPTY, "Directory not empty", destination)
+        return original_rename(source, destination)
+
+    monkeypatch.setattr(artist_hero_publication.os, "rename", lose_install_race)
+
+    publication = publish_artist_hero_artifact(
+        identity,
+        _image(),
+        source_fingerprint="sha256:source-a",
+        recipe_hash="recipe-a",
+        renderer_version="renderer-a",
+        source_content=b"editable-source-a",
+        root=tmp_path,
+    )
+
+    assert publication.artifact_path.is_file()
+    assert publication.manifest_path.is_file()
