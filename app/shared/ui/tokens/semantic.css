@@ -1,0 +1,393 @@
+/* crate-ui — Semantic aliases
+   Application code should consume these intent-based names instead of primitives. */
+
+:root {
+  --text-primary: var(--color-foreground);
+  --text-secondary: var(--idle-text);
+  --text-muted: var(--color-muted-foreground);
+  --text-subtle: var(--idle-text-subtle);
+  --text-faint: color-mix(in srgb, var(--text-primary) 20%, transparent);
+  --surface-canvas: var(--surface-app);
+  --surface-contrast: var(--text-primary);
+  --text-on-contrast: var(--surface-canvas);
+  --surface-container: var(--surface-panel);
+  --surface-elevated: var(--surface-raised);
+  --surface-overlay: var(--surface-modal);
+  --surface-chrome: color-mix(in srgb, var(--surface-canvas) 68%, transparent);
+  --surface-glass-accent: color-mix(
+    in srgb,
+    var(--accent-action) 14%,
+    transparent
+  );
+  --surface-glass-top: color-mix(
+    in srgb,
+    var(--surface-elevated) 84%,
+    transparent
+  );
+  --surface-glass-bottom: color-mix(
+    in srgb,
+    var(--surface-canvas) 78%,
+    transparent
+  );
+  --surface-quiet: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --surface-quiet-subtle: color-mix(
+    in srgb,
+    var(--text-primary) 6%,
+    transparent
+  );
+  --surface-glass-shadow: rgba(0, 0, 0, 0.48);
+  --surface-accent-shadow: color-mix(
+    in srgb,
+    var(--accent-action) 6%,
+    transparent
+  );
+  --accent-action-glow: color-mix(
+    in srgb,
+    var(--accent-action) 28%,
+    transparent
+  );
+  --accent-action-strong: color-mix(
+    in srgb,
+    var(--accent-action) 50%,
+    transparent
+  );
+  --surface-glass-hover-shadow: color-mix(
+    in srgb,
+    var(--surface-glass-shadow) 79%,
+    transparent
+  );
+  --surface-accent-subtle: color-mix(
+    in srgb,
+    var(--accent-action) 12%,
+    transparent
+  );
+  --surface-control: var(--hover-bg);
+  --surface-control-hover: var(--hover-bg-strong);
+  --surface-icon-control: rgba(0, 0, 0, 0.55);
+  --surface-placeholder: color-mix(
+    in srgb,
+    var(--text-primary) 5%,
+    transparent
+  );
+  --border-control-muted: color-mix(
+    in srgb,
+    var(--text-primary) 12%,
+    transparent
+  );
+  --border-control: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  --accent-action-glow-medium: color-mix(
+    in srgb,
+    var(--accent-action) 18%,
+    transparent
+  );
+  --surface-card: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --state-info-border: color-mix(in srgb, var(--state-info) 20%, transparent);
+  --state-info-surface: color-mix(in srgb, var(--state-info) 10%, transparent);
+  --text-secondary-strong: color-mix(
+    in srgb,
+    var(--text-primary) 70%,
+    transparent
+  );
+  --surface-canvas-overlay: color-mix(
+    in srgb,
+    var(--surface-canvas) 60%,
+    transparent
+  );
+  --surface-canvas-control: color-mix(
+    in srgb,
+    var(--surface-canvas) 35%,
+    transparent
+  );
+  --text-muted-strong: color-mix(in srgb, var(--text-primary) 45%, transparent);
+  --surface-canvas-panel: color-mix(
+    in srgb,
+    var(--surface-canvas) 20%,
+    transparent
+  );
+  --accent-action-glow-soft: color-mix(
+    in srgb,
+    var(--accent-action) 8%,
+    transparent
+  );
+  --accent-action-glow-strong: color-mix(
+    in srgb,
+    var(--accent-action) 34%,
+    transparent
+  );
+  --text-quiet: color-mix(in srgb, var(--text-primary) 35%, transparent);
+  --text-secondary-soft: color-mix(
+    in srgb,
+    var(--text-primary) 60%,
+    transparent
+  );
+  --control-progress-glow-horizontal: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 44%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 82%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
+  --control-progress-glow-vertical: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 38%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 78%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
+  --control-progress-fill-horizontal: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
+  --control-progress-fill-vertical: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
+  --control-thumb: color-mix(
+    in srgb,
+    var(--accent-action) 30%,
+    var(--text-primary)
+  );
+  --control-thumb-shadow: 0 0 6px
+      color-mix(in srgb, var(--accent-action) 62%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent-action) 34%, transparent);
+  --control-thumb-ring-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --border-subtle: var(--color-border);
+  --border-quiet: var(--surface-quiet);
+  --border-quiet-subtle: var(--surface-quiet-subtle);
+  --border-interactive: var(--hover-border);
+  --focus-ring: var(--color-ring);
+  --accent-action: var(--color-primary);
+  --accent-action-foreground: var(--color-primary-foreground);
+  --accent-action-hover: color-mix(
+    in srgb,
+    var(--accent-action) 90%,
+    transparent
+  );
+  --state-danger: var(--color-destructive);
+  --state-danger-foreground: var(--text-primary);
+  --state-danger-glow: color-mix(in srgb, var(--state-danger) 35%, transparent);
+  --state-success: var(--color-success);
+  --state-warning: var(--color-warning);
+  --state-info: var(--color-info);
+  --brand-logo-start: var(--accent-action);
+  --brand-logo-end: var(--accent-action-strong);
+  --brand-logo-glow: var(--accent-action-glow);
+  --brand-bandcamp: #1da0c3;
+  --brand-bandcamp-foreground: #7ee7ff;
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 250ms;
+  --font-brand: "Poppins";
+  --action-shadow: 0 14px 28px
+    color-mix(in srgb, var(--accent-action) 22%, transparent);
+  --focus-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--focus-ring) 8%, transparent);
+  --control-inset-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--text-primary) 4%, transparent);
+  --icon-control-shadow: 0 8px 24px
+    color-mix(in srgb, var(--surface-glass-shadow) 58%, transparent);
+  --chrome-shadow: 0 12px 32px
+    color-mix(in srgb, var(--surface-glass-shadow) 38%, transparent);
+  --menu-shadow: 0 25px 50px -12px color-mix(in srgb, var(
+          --surface-glass-shadow
+        )
+        52%, transparent);
+  --scrim-hero-strong: rgba(0, 0, 0, 0.65);
+  --scrim-hero-medium: rgba(0, 0, 0, 0.3);
+  --surface-accent: color-mix(in srgb, var(--accent-action) 10%, transparent);
+  --border-accent: color-mix(in srgb, var(--accent-action) 30%, transparent);
+  --surface-canvas-hover: color-mix(
+    in srgb,
+    var(--surface-canvas) 40%,
+    transparent
+  );
+  --border-accent-subtle: color-mix(
+    in srgb,
+    var(--accent-action) 15%,
+    transparent
+  );
+  --surface-canvas-raised: color-mix(
+    in srgb,
+    var(--surface-canvas) 30%,
+    transparent
+  );
+  --border-accent-focus: color-mix(
+    in srgb,
+    var(--accent-action) 40%,
+    transparent
+  );
+  --text-meta: color-mix(in srgb, var(--text-primary) 40%, transparent);
+  --border-accent-soft: color-mix(
+    in srgb,
+    var(--accent-action) 20%,
+    transparent
+  );
+  --border-accent-hover: color-mix(
+    in srgb,
+    var(--accent-action) 25%,
+    transparent
+  );
+  --text-accent: color-mix(
+    in srgb,
+    var(--accent-action) 82%,
+    var(--text-primary)
+  );
+  --state-warning-surface: color-mix(
+    in srgb,
+    var(--state-warning) 10%,
+    transparent
+  );
+  --state-warning-text: color-mix(
+    in srgb,
+    var(--state-warning) 82%,
+    var(--text-primary)
+  );
+  --state-danger-surface: color-mix(
+    in srgb,
+    var(--state-danger) 10%,
+    transparent
+  );
+  --state-danger-text: color-mix(
+    in srgb,
+    var(--state-danger) 82%,
+    var(--text-primary)
+  );
+  --state-success-surface: color-mix(
+    in srgb,
+    var(--state-success) 10%,
+    transparent
+  );
+  --state-success-text: color-mix(
+    in srgb,
+    var(--state-success) 82%,
+    var(--text-primary)
+  );
+  --text-control: color-mix(in srgb, var(--text-primary) 75%, transparent);
+  --state-warning-border: color-mix(
+    in srgb,
+    var(--state-warning) 30%,
+    transparent
+  );
+  --state-success-border: color-mix(
+    in srgb,
+    var(--state-success) 30%,
+    transparent
+  );
+  --text-hero: color-mix(in srgb, var(--text-primary) 80%, transparent);
+}
+
+@theme inline {
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-text-faint: var(--text-faint);
+  --color-text-secondary-strong: var(--text-secondary-strong);
+  --color-text-muted-strong: var(--text-muted-strong);
+  --color-text-meta: var(--text-meta);
+  --color-text-quiet: var(--text-quiet);
+  --color-text-hero: var(--text-hero);
+  --color-text-accent: var(--text-accent);
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-container: var(--surface-container);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-chrome: var(--surface-chrome);
+  --color-surface-canvas-overlay: var(--surface-canvas-overlay);
+  --color-surface-quiet: var(--surface-quiet);
+  --color-surface-quiet-subtle: var(--surface-quiet-subtle);
+  --color-surface-control: var(--surface-control);
+  --color-surface-control-hover: var(--surface-control-hover);
+  --color-surface-icon-control: var(--surface-icon-control);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-quiet: var(--border-quiet);
+  --color-border-interactive: var(--border-interactive);
+  --color-border-focus: var(--focus-ring);
+  --color-accent-action: var(--accent-action);
+  --color-state-success: var(--state-success);
+  --color-state-success-text: var(--state-success-text);
+  --color-state-warning: var(--state-warning);
+  --color-state-warning-text: var(--state-warning-text);
+  --color-state-danger: var(--state-danger);
+  --color-state-danger-text: var(--state-danger-text);
+  --color-state-info: var(--state-info);
+  --color-accent-action-foreground: var(--accent-action-foreground);
+  --color-accent-action-hover: var(--accent-action-hover);
+  --color-state-danger-foreground: var(--state-danger-foreground);
+  --color-focus-ring: var(--focus-ring);
+  --shadow-action: var(--action-shadow);
+  --shadow-action-solid: 0 0 18px
+    color-mix(in srgb, var(--accent-action) 24%, transparent);
+  --shadow-action-solid-hover: 0 0 24px
+    color-mix(in srgb, var(--accent-action) 34%, transparent);
+  --shadow-focus: var(--focus-shadow);
+  --shadow-control-inset: var(--control-inset-shadow);
+  --shadow-icon-control: var(--icon-control-shadow);
+  --shadow-chrome: var(--chrome-shadow);
+  --shadow-menu: var(--menu-shadow);
+  --shadow-card: 0 24px 64px
+    color-mix(in srgb, var(--surface-glass-shadow) 46%, transparent);
+  --shadow-accent-action-status: 0 18px 40px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --shadow-state-success: 0 18px 40px
+    color-mix(in srgb, var(--state-success) 14%, transparent);
+  --shadow-state-warning: 0 18px 40px
+    color-mix(in srgb, var(--state-warning) 14%, transparent);
+  --shadow-state-danger: 0 18px 40px
+    color-mix(in srgb, var(--state-danger) 14%, transparent);
+  --shadow-accent-action-card: 0 12px 40px
+    color-mix(in srgb, var(--accent-action) 10%, transparent);
+  --shadow-accent-action-card-featured: 0 18px 60px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --shadow-translation-marker: 0 18px 48px
+      color-mix(in srgb, var(--surface-glass-shadow) 87.5%, transparent),
+    0 0 18px var(--accent-action-glow-medium);
+  --shadow-translation-marker-muted: 0 18px 48px
+    color-mix(in srgb, var(--surface-glass-shadow) 75%, transparent);
+  --shadow-translation-editor: 0 24px 80px
+      color-mix(in srgb, var(--surface-glass-shadow) 92.31%, black 7.69%),
+    0 0 28px color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --shadow-share-preview: 0 16px 40px
+    color-mix(in srgb, var(--surface-glass-shadow) 72.92%, transparent);
+  --shadow-share-action-icon: inset 0 1px 0
+    color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --shadow-player-artwork: 0 28px 100px
+    color-mix(in srgb, var(--surface-glass-shadow) 48%, black 52%);
+  --shadow-player-artwork-layered: 0 28px 100px
+      color-mix(in srgb, var(--surface-glass-shadow) 48%, black 52%),
+    0 10px 28px
+      color-mix(in srgb, var(--surface-glass-shadow) 93.75%, transparent);
+  --shadow-popover: 0 24px 64px
+    color-mix(in srgb, var(--surface-glass-shadow) 88%, transparent);
+  --shadow-modal: 0 32px 80px
+    color-mix(in srgb, var(--surface-glass-shadow) 96%, transparent);
+  --shadow-sheet: 0 32px 80px
+    color-mix(in srgb, var(--surface-glass-shadow) 88%, transparent);
+  --shadow-accent-action: 0 0 20px var(--accent-action-glow);
+  --shadow-accent-action-glow: 0 0 18px var(--accent-action-glow);
+  --shadow-accent-action-soft: 0 0 18px var(--accent-action-glow-soft);
+  --shadow-accent-action-medium: 0 0 18px var(--accent-action-glow-medium);
+  --shadow-accent-action-strong: 0 0 24px var(--accent-action-glow-strong);
+  --shadow-accent-action-indicator: 0 0 10px var(--accent-action-glow);
+  --shadow-accent-action-indicator-active: 0 0 8px
+    var(--accent-action-glow-strong);
+  --shadow-glass-hover: 0 18px 42px var(--surface-glass-hover-shadow);
+  --shadow-border-soft: 0 0 0 1px
+    color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --drop-shadow-accent-action: 0 0 8px var(--accent-action-glow);
+  --drop-shadow-accent-action-soft: 0 0 8px var(--accent-action-glow-soft);
+  --drop-shadow-accent-action-active: 0 0 8px var(--accent-action-glow-strong);
+  --drop-shadow-accent-action-icon: 0 0 12px var(--accent-action-glow);
+  --drop-shadow-accent-action-feature: 0 0 16px var(--accent-action-glow-strong);
+  --drop-shadow-accent-action-hover: 0 0 10px var(--accent-action-glow-medium);
+  --drop-shadow-accent-action-strong: 0 0 10px var(--accent-action-glow-strong);
+  --drop-shadow-state-danger: 0 0 8px var(--state-danger-glow);
+  --drop-shadow-artwork-mark: var(--artwork-mark-shadow);
+  --drop-shadow-artwork-text: var(--artwork-text-shadow);
+  --drop-shadow-artwork-kicker: var(--artwork-kicker-shadow);
+  --drop-shadow-artwork-compact-mark: var(--artwork-compact-mark-shadow);
+}

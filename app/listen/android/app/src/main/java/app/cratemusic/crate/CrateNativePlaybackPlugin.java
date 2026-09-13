@@ -338,6 +338,7 @@ public class CrateNativePlaybackPlugin extends Plugin {
             track.optString("artist", ""),
             track.optString("album", ""),
             track.optString("artwork", ""),
+            track.optString("artworkAuthorization", ""),
             Math.round(track.optDouble("durationMs", 0.0)),
             parseGains(track.optJSONArray("eqGains"))
         );

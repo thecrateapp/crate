@@ -1135,6 +1135,55 @@ class TestDuplicateFoldersRepair:
         assert result["action"] == "merge_duplicate_folders"
 
 
+class TestCanonicalMismatchRepair:
+    def test_rename_runs_through_artist_merge_lifecycle(self):
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake"})
+        issue = {
+            "details": {
+                "artist": "Source Artist",
+                "tag_name": "Canonical Artist",
+                "folder": "source-artist",
+            }
+        }
+
+        with (
+            patch("crate.repair.rename_artist", return_value=True) as mock_rename,
+            patch(
+                "crate.repair.run_artist_merge",
+                side_effect=lambda _name, operation: operation(),
+            ) as mock_lifecycle,
+            patch("crate.repair.log_audit"),
+        ):
+            result = repair._fix_canonical_mismatch(issue, dry_run=False)
+
+        assert result is not None
+        assert result["applied"] is True
+        mock_lifecycle.assert_called_once()
+        mock_rename.assert_called_once_with(
+            "Source Artist", "Canonical Artist", "source-artist"
+        )
+
+    def test_dry_run_does_not_start_artist_merge_lifecycle(self):
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake"})
+        issue = {
+            "details": {
+                "artist": "Source Artist",
+                "tag_name": "Canonical Artist",
+            }
+        }
+
+        with patch("crate.repair.run_artist_merge") as mock_lifecycle:
+            result = repair._fix_canonical_mismatch(issue, dry_run=True)
+
+        assert result is not None
+        assert result["applied"] is False
+        mock_lifecycle.assert_not_called()
+
+
 class TestRepairOrchestration:
     """Test the top-level repair() method orchestration."""
 

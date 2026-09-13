@@ -1,0 +1,191 @@
+/* crate-ui — Product-level appearance slots
+   These roles belong to product surfaces and may vary independently by skin. */
+
+:root {
+  --play-button-rim: conic-gradient(
+    from 218deg,
+    color-mix(in srgb, var(--state-info) 65%, var(--accent-action)) 0deg,
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary)) 84deg,
+    color-mix(in srgb, var(--text-primary) 64%, var(--accent-action)) 166deg,
+    var(--accent-action) 248deg,
+    color-mix(in srgb, var(--state-info) 65%, var(--accent-action)) 360deg
+  );
+  --play-button-rim-surface: conic-gradient(
+    from 218deg,
+    color-mix(in srgb, var(--state-info) 78%, var(--accent-action)) 0deg,
+    color-mix(in srgb, var(--accent-action) 92%, var(--text-primary)) 92deg,
+    color-mix(in srgb, var(--text-primary) 72%, var(--accent-action)) 170deg,
+    color-mix(in srgb, var(--accent-action) 92%, var(--state-info)) 250deg,
+    color-mix(in srgb, var(--state-info) 72%, var(--accent-action)) 360deg
+  );
+  --playback-aura: radial-gradient(
+      ellipse 58% 46% at 46% 57%,
+      var(--accent-action-glow-strong) 0%,
+      var(--accent-action-glow-medium) 24%,
+      var(--accent-action-glow-soft) 42%,
+      transparent 64%
+    ),
+    radial-gradient(
+      ellipse 38% 32% at 68% 34%,
+      color-mix(in srgb, var(--text-primary) 22%, transparent) 0%,
+      color-mix(in srgb, var(--text-primary) 9%, transparent) 34%,
+      transparent 66%
+    ),
+    radial-gradient(
+      ellipse 34% 42% at 30% 66%,
+      color-mix(in srgb, var(--state-info) 25%, transparent) 0%,
+      color-mix(in srgb, var(--state-info) 9%, transparent) 38%,
+      transparent 68%
+    );
+  --play-button-shadow: 0 0 5px var(--accent-action-glow),
+    0 0 9px var(--accent-action-glow-soft);
+  --playback-core-shadow: inset 0 0 0 1px var(--border-quiet),
+    inset 0 -10px 24px var(--surface-glass-shadow);
+  --play-button-icon-shadow: 0 0 4px
+    color-mix(in srgb, var(--text-primary) 35%, transparent);
+  --stats-secondary-accent: color-mix(
+    in srgb,
+    var(--accent-action) 52%,
+    var(--state-danger)
+  );
+  --genre-tone-default: var(--accent-action);
+  --genre-tone-ink: color-mix(
+    in srgb,
+    var(--surface-canvas) 80%,
+    var(--text-primary)
+  );
+  --genre-tone-ink-strong: color-mix(
+    in srgb,
+    var(--surface-canvas) 70%,
+    var(--text-primary)
+  );
+  --genre-tone-warm: var(--state-warning);
+  --genre-tone-warm-strong: var(--state-danger);
+  --genre-tone-cool: var(--state-info);
+  --genre-tone-cool-accent: color-mix(
+    in srgb,
+    var(--state-info) 58%,
+    var(--accent-action)
+  );
+  --genre-tone-muted: var(--text-muted);
+  --genre-tone-success: var(--state-success);
+  --visualizer-ribbon-stop-0: color-mix(
+    in srgb,
+    var(--accent-action) 0%,
+    transparent
+  );
+  --visualizer-ribbon-stop-1: color-mix(
+    in srgb,
+    var(--accent-action) 55%,
+    transparent
+  );
+  --visualizer-ribbon-stop-2: color-mix(
+    in srgb,
+    var(--accent-action) 78%,
+    transparent
+  );
+  --visualizer-ribbon-stop-3: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 72%, var(--text-primary)) 94%,
+    transparent
+  );
+  --visualizer-ribbon-stop-4: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 56%, var(--text-primary)) 76%,
+    transparent
+  );
+  --visualizer-ribbon-stop-5: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 34%, var(--text-primary)) 45%,
+    transparent
+  );
+  --visualizer-ribbon-stop-6: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--accent-action) 34%, var(--text-primary)) 0%,
+    transparent
+  );
+  --visualizer-ribbon-trace: color-mix(
+    in srgb,
+    var(--accent-action) 66%,
+    transparent
+  );
+  --visualizer-ribbon-trace-shadow: color-mix(
+    in srgb,
+    var(--accent-action) 70%,
+    transparent
+  );
+  --visualizer-ribbon-shadow: color-mix(
+    in srgb,
+    var(--accent-action) 32%,
+    transparent
+  );
+  --visualizer-sphere-color-2: color-mix(
+    in srgb,
+    var(--accent-action) 58%,
+    var(--text-primary)
+  );
+  --visualizer-sphere-color-3: color-mix(
+    in srgb,
+    var(--state-info) 76%,
+    var(--accent-action)
+  );
+  --visualizer-waveform-peak-active: color-mix(
+    in srgb,
+    var(--accent-action) 95%,
+    transparent
+  );
+  --map-popup-shadow: 0 10px 30px
+    color-mix(in srgb, var(--surface-glass-shadow) 93.75%, transparent);
+  --home-upcoming-empty-surface: radial-gradient(
+      circle at top left,
+      color-mix(in srgb, var(--accent-action) 16%, transparent),
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--text-primary) 3%, transparent);
+  --jam-focus-border: var(--accent-action-strong);
+  --jam-accent-soft-surface: color-mix(
+    in srgb,
+    var(--accent-action) 4%,
+    transparent
+  );
+  --jam-info-text: color-mix(
+    in srgb,
+    var(--state-info) 82%,
+    var(--text-primary)
+  );
+  --jam-dark-surface: color-mix(
+    in srgb,
+    var(--surface-canvas) 25%,
+    transparent
+  );
+  --artwork-mark-shadow: 0 1px 8px var(--surface-glass-shadow);
+  --artwork-text-shadow: 0 2px 18px var(--surface-glass-shadow);
+  --artwork-kicker-shadow: 0 1px 10px var(--surface-glass-shadow);
+  --artwork-compact-mark-shadow: 0 1px 6px var(--surface-glass-shadow);
+  --user-profile-badge-rose-border: color-mix(
+    in srgb,
+    var(--state-danger) 30%,
+    transparent
+  );
+  --hero-artwork-gradient-mobile: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 4%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 28%, transparent) 64%,
+    var(--surface-canvas) 100%
+  );
+  --hero-artwork-gradient-desktop: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 16%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 50%, transparent) 64%,
+    var(--surface-canvas) 100%
+  );
+  --hero-artwork-gradient-desktop-strong: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--surface-canvas) 16%, transparent) 34%,
+    color-mix(in srgb, var(--surface-canvas) 52%, transparent) 66%,
+    var(--surface-canvas) 100%
+  );
+}

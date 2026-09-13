@@ -163,7 +163,7 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
             <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
               <div
                 className={cn(
-                  "h-full rounded-sm transition-all",
+                  "h-full rounded-sm transition-[width,background-color]",
                   completionTone(artist.pct),
                 )}
                 style={{ width: `${Math.min(artist.pct, 100)}%` }}
@@ -628,9 +628,8 @@ export function Discover() {
   const opportunityArtists = useMemo(() => {
     const source = completeness ?? [];
     return source
-      .filter((artist) => artist.pct < 100)
-      .filter((artist) => artist.missing.length > 0)
       .filter((artist) => {
+        if (artist.pct >= 100 || artist.missing.length === 0) return false;
         if (!normalizedSearch) return true;
         return `${artist.artist} ${artist.missing
           .map((album) => album.title)

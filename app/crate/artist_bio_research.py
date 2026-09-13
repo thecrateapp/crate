@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import html
+import http.client
 import ipaddress
 import logging
 import os
 import re
 import socket
-from collections.abc import Callable, Mapping
-from urllib.parse import quote, urljoin, urlparse
+import ssl
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from urllib.parse import quote, urljoin, urlparse, urlunsplit
 
 import requests
 
@@ -19,6 +22,9 @@ log = logging.getLogger(__name__)
 
 MAX_SOURCES = 8
 MAX_EXCERPT_CHARS = 3000
+MIN_SUBSTANTIAL_BIO_CHARS = 600
+MIN_ACCEPTED_BIO_RATIO = 0.8
+MIN_BIO_CONTENT_COVERAGE = 0.45
 MAX_PUBLIC_PAGE_REDIRECTS = 3
 _USER_AGENT = "Crate/artist-bio-research (+https://cratemusic.app)"
 _BLOCKED_HOSTS = {"localhost", "metadata.google.internal", "host.docker.internal"}
@@ -26,10 +32,50 @@ _TAG_RE = re.compile(r"<[^>]+>")
 _UNSAFE_HTML_RE = re.compile(
     r"<(script|style|noscript|svg|template)\b[^>]*>.*?</\1>", re.I | re.S
 )
+_BIO_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9'’\-]{2,}", re.I)
+_BIO_STOP_WORDS = {
+    "about",
+    "after",
+    "also",
+    "been",
+    "from",
+    "have",
+    "into",
+    "more",
+    "that",
+    "their",
+    "them",
+    "they",
+    "this",
+    "were",
+    "which",
+    "with",
+}
 _WEB_SEARCH_PROVIDER_LABELS = {"tavily": "Tavily", "brave": "Brave"}
 
 
-def _safe_public_url(value: str) -> str | None:
+@dataclass(frozen=True)
+class _PublicUrlTarget:
+    url: str
+    scheme: str
+    hostname: str
+    port: int
+    request_target: str
+    addresses: tuple[str, ...]
+
+
+def _is_public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return not (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+    )
+
+
+def _resolve_public_target(value: str) -> _PublicUrlTarget | None:
     try:
         parsed = urlparse(value.strip())
     except ValueError:
@@ -57,32 +103,98 @@ def _safe_public_url(value: str) -> str | None:
             }
         except OSError:
             return None
-    if any(
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_multicast
-        or address.is_reserved
-        or address.is_unspecified
-        for address in addresses
-    ):
+    if not addresses or any(not _is_public_address(address) for address in addresses):
         return None
-    return parsed.geturl()
+
+    normalized_hostname = hostname.encode("idna").decode("ascii")
+    normalized_port = port or (443 if parsed.scheme == "https" else 80)
+    request_target = urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+    return _PublicUrlTarget(
+        url=parsed.geturl(),
+        scheme=parsed.scheme,
+        hostname=normalized_hostname,
+        port=normalized_port,
+        request_target=request_target,
+        addresses=tuple(sorted(str(address) for address in addresses)),
+    )
 
 
-def _response_text(response: requests.Response, limit: int = 250_000) -> str:
-    chunks: list[bytes] = []
-    total = 0
-    for chunk in response.iter_content(chunk_size=8192):
-        if not chunk:
-            continue
-        remaining = limit - total
-        if remaining <= 0:
-            break
-        data = chunk[:remaining]
-        chunks.append(data)
-        total += len(data)
-    return b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+def _safe_public_url(value: str) -> str | None:
+    target = _resolve_public_target(value)
+    return target.url if target else None
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, target: _PublicUrlTarget, address: str) -> None:
+        super().__init__(target.hostname, target.port, timeout=15)
+        self._pinned_address = address
+
+    def connect(self) -> None:
+        self.sock = socket.create_connection(
+            (self._pinned_address, self.port),
+            self.timeout,
+            self.source_address,
+        )
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, target: _PublicUrlTarget, address: str) -> None:
+        super().__init__(
+            target.hostname,
+            target.port,
+            timeout=15,
+            context=ssl.create_default_context(),
+        )
+        self._pinned_address = address
+
+    def connect(self) -> None:
+        raw_socket = socket.create_connection(
+            (self._pinned_address, self.port),
+            self.timeout,
+            self.source_address,
+        )
+        try:
+            self.sock = self._context.wrap_socket(
+                raw_socket,
+                server_hostname=self.host,
+            )
+        except Exception:
+            raw_socket.close()
+            raise
+
+
+def _fetch_public_page(
+    target: _PublicUrlTarget,
+) -> tuple[int, dict[str, str], str]:
+    last_error: OSError | http.client.HTTPException | ssl.SSLError | None = None
+    for address in target.addresses:
+        connection: http.client.HTTPConnection
+        if target.scheme == "https":
+            connection = _PinnedHTTPSConnection(target, address)
+        else:
+            connection = _PinnedHTTPConnection(target, address)
+        try:
+            connection.request(
+                "GET",
+                target.request_target,
+                headers={
+                    "User-Agent": _USER_AGENT,
+                    "Accept": "text/html, text/plain",
+                    "Accept-Encoding": "identity",
+                },
+            )
+            response = connection.getresponse()
+            body = response.read(250_001)[:250_000]
+            encoding = response.headers.get_content_charset() or "utf-8"
+            headers = {key.casefold(): value for key, value in response.headers.items()}
+            return response.status, headers, body.decode(encoding, errors="replace")
+        except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+            last_error = exc
+        finally:
+            connection.close()
+    if last_error is not None:
+        raise last_error
+    raise OSError("Public URL resolved without a usable address")
 
 
 def _clean_excerpt(value: str, *, max_chars: int = MAX_EXCERPT_CHARS) -> str:
@@ -91,6 +203,92 @@ def _clean_excerpt(value: str, *, max_chars: int = MAX_EXCERPT_CHARS) -> str:
     value = html.unescape(value)
     value = re.sub(r"\s+", " ", value).strip()
     return value[:max_chars]
+
+
+def _bio_paragraphs(value: str) -> list[str]:
+    return [paragraph.strip() for paragraph in value.split("\n\n") if paragraph.strip()]
+
+
+def _draft_loses_substantial_detail(current_bio: str, draft: str) -> bool:
+    if len(current_bio) < MIN_SUBSTANTIAL_BIO_CHARS:
+        return False
+    if len(draft) < len(current_bio) * MIN_ACCEPTED_BIO_RATIO:
+        return True
+    current_paragraphs = _bio_paragraphs(current_bio)
+    draft_paragraphs = _bio_paragraphs(draft)
+    return (
+        len(current_paragraphs) >= 4
+        and len(draft_paragraphs) < len(current_paragraphs) - 1
+    )
+
+
+def _bio_content_tokens(value: str) -> set[str]:
+    return {
+        token.casefold()
+        for token in _BIO_TOKEN_RE.findall(value)
+        if token.casefold() not in _BIO_STOP_WORDS
+    }
+
+
+def _content_coverage(expected: str, candidate: str) -> float:
+    expected_tokens = _bio_content_tokens(expected)
+    if not expected_tokens:
+        return 1.0
+    return len(expected_tokens & _bio_content_tokens(candidate)) / len(expected_tokens)
+
+
+def _draft_omits_existing_content(
+    current_bio: str,
+    draft: str,
+    changes: Sequence[object],
+) -> bool:
+    """Reject a rewrite that silently drops existing factual paragraphs.
+
+    The LLM is asked to return a semantic diff, but this guard treats the
+    existing text as the safer source of truth when a paragraph is neither
+    represented in the draft nor explicitly marked as removed or updated. An
+    unchanged item must still be present in the draft itself. It is deliberately
+    conservative because the result is only a review proposal, not an automatic
+    replacement.
+    """
+    current_paragraphs = _bio_paragraphs(current_bio)
+    if len(current_paragraphs) < 3:
+        return False
+
+    candidates = _bio_paragraphs(draft)
+    for change in changes:
+        status = getattr(change, "status", None)
+        if status not in {"removed", "updated"}:
+            continue
+        text = getattr(change, "text", None)
+        previous_text = getattr(change, "previous_text", None)
+        candidates.extend(
+            value
+            for value in (text, previous_text)
+            if isinstance(value, str) and value.strip()
+        )
+
+    omitted = sum(
+        max(
+            (_content_coverage(paragraph, candidate) for candidate in candidates),
+            default=0.0,
+        )
+        < MIN_BIO_CONTENT_COVERAGE
+        for paragraph in current_paragraphs
+    )
+    return omitted >= max(1, len(current_paragraphs) // 4)
+
+
+def _unchanged_bio_changes(current_bio: str) -> list[dict[str, object]]:
+    return [
+        {
+            "status": "unchanged",
+            "text": paragraph,
+            "previous_text": None,
+            "source_ids": [],
+        }
+        for paragraph in _bio_paragraphs(current_bio)
+    ]
 
 
 def _get_json(
@@ -112,39 +310,27 @@ def _get_json(
 
 
 def _get_public_page(url: str) -> str | None:
-    safe_url = _safe_public_url(url)
-    if not safe_url:
-        return None
-
-    current_url = safe_url
+    current_url = url
     for _ in range(MAX_PUBLIC_PAGE_REDIRECTS + 1):
-        response = None
-        try:
-            response = requests.get(
-                current_url,
-                headers={"User-Agent": _USER_AGENT, "Accept": "text/html, text/plain"},
-                timeout=(5, 15),
-                stream=True,
-                allow_redirects=False,
-            )
-            if response.is_redirect:
-                location = response.headers.get("Location")
-                next_url = _safe_public_url(urljoin(current_url, location or ""))
-                if not next_url:
-                    return None
-                current_url = next_url
-                continue
-
-            response.raise_for_status()
-            return _clean_excerpt(_response_text(response))
-        except requests.RequestException:
-            log.info("Official artist page failed: %s", current_url, exc_info=True)
+        target = _resolve_public_target(current_url)
+        if not target:
             return None
-        finally:
-            if response is not None:
-                response.close()
+        try:
+            status, headers, response_text = _fetch_public_page(target)
+            if status in {301, 302, 303, 307, 308}:
+                location = headers.get("location")
+                if not location:
+                    return None
+                current_url = urljoin(target.url, location)
+                continue
+            if status >= 400:
+                return None
+            return _clean_excerpt(response_text)
+        except (OSError, http.client.HTTPException, ssl.SSLError):
+            log.info("Official artist page failed: %s", target.url, exc_info=True)
+            return None
 
-    log.info("Official artist page exceeded redirect limit: %s", safe_url)
+    log.info("Official artist page exceeded redirect limit: %s", url)
     return None
 
 
@@ -186,23 +372,23 @@ def _source(
 
 
 def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]:
-    candidates = _get_json(
-        "https://musicbrainz.org/ws/2/artist/",
-        params={"query": f'artist:"{name}"', "fmt": "json", "limit": 5},
-    )
-    artists = (candidates or {}).get("artists", [])
-    if not isinstance(artists, list):
-        artists = []
-    selected = (
-        next(
-            (
-                item
-                for item in artists
-                if isinstance(item, dict) and item.get("id") == mbid
-            ),
-            None,
+    selected_mbid = str(mbid or "").strip()
+    if selected_mbid:
+        payload = _get_json(
+            f"https://musicbrainz.org/ws/2/artist/{quote(selected_mbid)}",
+            params={"fmt": "json", "inc": "url-rels+artist-rels"},
         )
-        or next(
+        if not payload:
+            return []
+    else:
+        candidates = _get_json(
+            "https://musicbrainz.org/ws/2/artist/",
+            params={"query": f'artist:"{name}"', "fmt": "json", "limit": 5},
+        )
+        artists = (candidates or {}).get("artists", [])
+        if not isinstance(artists, list):
+            artists = []
+        selected = next(
             (
                 item
                 for item in artists
@@ -211,20 +397,17 @@ def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]
             ),
             None,
         )
-        or (artists[0] if artists and isinstance(artists[0], dict) else None)
-    )
-    if not selected:
-        return []
-    selected_mbid = str(selected.get("id") or "")
-    detail = (
-        _get_json(
+        if not selected:
+            return []
+        selected_mbid = str(selected.get("id") or "")
+        if not selected_mbid:
+            return []
+        payload = _get_json(
             f"https://musicbrainz.org/ws/2/artist/{quote(selected_mbid)}",
-            params={"fmt": "json", "inc": "url-rels"},
+            params={"fmt": "json", "inc": "url-rels+artist-rels"},
         )
-        if selected_mbid
-        else None
-    )
-    payload = detail or selected
+        if not payload:
+            payload = selected
     excerpt_parts = [
         f"Name: {payload.get('name', name)}",
         f"Type: {payload.get('type', '')}",
@@ -233,6 +416,43 @@ def _collect_musicbrainz(name: str, mbid: str | None) -> list[dict[str, object]]
         f"Life-span: {payload.get('life-span', '')}",
         f"Disambiguation: {payload.get('disambiguation', '')}",
     ]
+    relations = payload.get("relations", payload.get("artist-relation-list", []))
+    if str(payload.get("type") or "").casefold() in {
+        "group",
+        "orchestra",
+        "choir",
+    } and isinstance(relations, list):
+        for relation in relations[:60]:
+            if not isinstance(relation, dict):
+                continue
+            relation_type = str(relation.get("type") or "")
+            if (
+                relation_type != "member of band"
+                or str(relation.get("direction") or "") != "backward"
+                or str(relation.get("target-type") or "") != "artist"
+            ):
+                continue
+            member = relation.get("artist")
+            if (
+                not isinstance(member, dict)
+                or str(member.get("type") or "") != "Person"
+                or not member.get("name")
+            ):
+                continue
+            attributes = (
+                relation.get("attributes") or relation.get("attribute-list") or []
+            )
+            if isinstance(attributes, list):
+                roles = ", ".join(str(attribute)[:80] for attribute in attributes[:6])
+            else:
+                roles = str(attributes)[:240]
+            begin = str(relation.get("begin") or "")[:32]
+            end = str(relation.get("end") or "")[:32]
+            excerpt_parts.append(
+                "Member: "
+                f"{str(member['name'])[:160]} | Roles: {roles} | "
+                f"From: {begin} | To: {end or 'present'}"
+            )
     return [
         _source(
             "musicbrainz",
@@ -454,22 +674,71 @@ def research_artist_bio(
     from crate.llm import get_config
     from crate.llm.prompts.artist_bio_research import consolidate_artist_bio
 
+    current_bio = normalize_artist_bio(str(artist.get("bio") or ""))
     sources = collect_artist_research_sources(artist, progress=progress)
     if progress:
         progress("Consolidating evidence with AI")
     response = consolidate_artist_bio(
         artist_name=str(artist["name"]),
-        current_bio=normalize_artist_bio(str(artist.get("bio") or "")),
+        current_bio=current_bio,
         artist_context=dict(artist),
         sources=sources,
         language=language,
     )
+    draft = "\n\n".join(response.paragraphs)
+    preserve_current_bio = bool(current_bio) and response.bio_action == "preserve"
+    warnings = list(response.warnings)
+    shorter_draft = (
+        bool(current_bio)
+        and response.bio_action == "update"
+        and _draft_loses_substantial_detail(current_bio, draft)
+    )
+    omitted_content = (
+        bool(current_bio)
+        and response.bio_action == "update"
+        and _draft_omits_existing_content(current_bio, draft, response.bio_changes)
+    )
+    draft_loses_detail = shorter_draft or omitted_content
+    if draft_loses_detail:
+        preserve_current_bio = True
+        warnings.append(
+            (
+                "The generated draft was substantially shorter than the existing biography, so the current text was preserved for review."
+                if shorter_draft
+                else "The generated draft omitted supported detail from the existing biography, so the current text was preserved for review."
+            )
+        )
+    paragraphs = (
+        _bio_paragraphs(current_bio) if preserve_current_bio else response.paragraphs
+    )
+    bio_changes = [change.model_dump() for change in response.bio_changes]
+    if not bio_changes and preserve_current_bio:
+        bio_changes = _unchanged_bio_changes(current_bio)
+    if not bio_changes and not preserve_current_bio:
+        bio_changes = [
+            {
+                "status": "updated",
+                "text": draft,
+                "previous_text": current_bio or None,
+                "source_ids": [],
+            }
+        ]
+    proposal = "\n\n".join(paragraphs)
     return {
+        "schema_version": 1,
         "artist": str(artist["name"]),
-        "proposal": response.bio,
+        "proposal": proposal,
+        "bio": {"paragraphs": paragraphs},
+        "bio_action": "preserve" if preserve_current_bio else response.bio_action,
+        "review_items": [item.model_dump() for item in response.review_items],
+        "bio_changes": bio_changes,
+        "members": {
+            "current": [member.model_dump() for member in response.current_members],
+            "former": [member.model_dump() for member in response.former_members],
+        },
         "claims": [claim.model_dump() for claim in response.claims],
         "conflicts": response.conflicts,
-        "warnings": response.warnings,
+        "warnings": warnings[:8],
         "sources": sources,
         "model": get_config().get("model"),
         "generated_at": datetime.now(timezone.utc).isoformat(),

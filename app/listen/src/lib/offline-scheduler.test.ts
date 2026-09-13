@@ -67,10 +67,9 @@ describe("offline scheduler", () => {
   it("coalesces progress writes and flushes the latest value", () => {
     vi.useFakeTimers();
     const writes: string[] = [];
-    const writer = createCoalescedOfflineWriter<string>(
-      (value) => writes.push(value),
-      100,
-    );
+    const writer = createCoalescedOfflineWriter<string>((value) => {
+      writes.push(value);
+    }, 100);
 
     writer.schedule("one");
     writer.schedule("two");

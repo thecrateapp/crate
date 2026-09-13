@@ -1142,7 +1142,7 @@ class TestRepairJobs:
                 {"artist_name": "Birds in Row", "genre_id": genre_id},
             )
 
-        rename_artist("Birds in Row", "Birds In Row", "birds-in-row")
+        merged = rename_artist("Birds in Row", "Birds In Row", "birds-in-row")
 
         with transaction_scope() as session:
             artists = (
@@ -1173,6 +1173,17 @@ class TestRepairJobs:
         assert {row["artist"] for row in albums} == {"Birds In Row"}
         assert {row["artist"] for row in tracks} == {"Birds In Row"}
         assert {row["artist_name"] for row in artist_genres} == {"Birds In Row"}
+        assert merged is False
+
+    def test_rename_artist_reports_merge_into_existing_artist(self, pg_db):
+        from crate.db.jobs.repair import rename_artist
+
+        pg_db.upsert_artist({"name": "Source Artist"})
+        pg_db.upsert_artist({"name": "Canonical Artist"})
+
+        merged = rename_artist("Source Artist", "Canonical Artist", "canonical-artist")
+
+        assert merged is True
 
 
 class TestGenreTaxonomyCleanup:

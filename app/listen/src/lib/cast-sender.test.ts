@@ -1,20 +1,45 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, runtimeMock, nativeCapabilitiesMock } = vi.hoisted(() => ({
+const {
+  apiMock,
+  ensureMediaAccessUrlMock,
+  runtimeMock,
+  nativeCapabilitiesMock,
+  nativeControlMock,
+  nativeRequestSessionMock,
+  nativeListenerMock,
+  sessionChangedListeners,
+} = vi.hoisted(() => ({
   apiMock: vi.fn(),
+  ensureMediaAccessUrlMock: vi.fn(),
   runtimeMock: { isNative: false },
   nativeCapabilitiesMock: vi.fn(),
+  nativeControlMock: vi.fn(),
+  nativeRequestSessionMock: vi.fn(),
+  nativeListenerMock: vi.fn(),
+  sessionChangedListeners: [] as Array<(event: { active: boolean }) => void>,
 }));
 
 vi.mock("@capacitor/core", () => ({
   registerPlugin: () => ({
     getCapabilities: nativeCapabilitiesMock,
+    play: nativeControlMock,
+    pause: nativeControlMock,
+    stop: nativeControlMock,
+    requestSession: nativeRequestSessionMock,
+    addListener: nativeListenerMock.mockImplementation(
+      (_event: string, listener: (event: { active: boolean }) => void) => {
+        sessionChangedListeners.push(listener);
+        return Promise.resolve({ remove: vi.fn() });
+      },
+    ),
   }),
 }));
 
 vi.mock("@/lib/api", () => ({
   api: apiMock,
   apiUrl: (path: string) => `https://crate.test${path}`,
+  ensureMediaAccessUrl: ensureMediaAccessUrlMock,
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -26,8 +51,10 @@ vi.mock("@/lib/capacitor-runtime", () => ({
 import {
   buildCastTicketRequest,
   castPause,
+  castPlay,
   castSeek,
   castSetVolume,
+  castStop,
   getCastSenderCapabilities,
   isCastSessionActive,
   startCastSession,
@@ -37,6 +64,10 @@ describe("cast sender", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeMock.isNative = false;
+    ensureMediaAccessUrlMock.mockImplementation(
+      async (url: string) =>
+        `${url}${url.includes("?") ? "&" : "?"}media_ticket=artwork-ticket`,
+    );
   });
 
   it("builds auto delivery cast tickets from stable track references", () => {
@@ -208,5 +239,171 @@ describe("cast sender", () => {
     await expect(castSeek(42)).resolves.toEqual({ ok: true });
     await expect(castSetVolume(0.7)).resolves.toEqual({ ok: true });
     expect(calls).toEqual(["pause", "seek:42", "volume:0.7"]);
+  });
+
+  it("reflects a native session ending for reasons the app never asked for", async () => {
+    runtimeMock.isNative = true;
+    nativeControlMock.mockResolvedValue({ ok: true });
+
+    // Establish a session the way the app normally would.
+    await castPlay();
+    expect(isCastSessionActive()).toBe(true);
+
+    // The native side ends the session on its own (receiver closed
+    // remotely, TV turned off, route dropped) and notifies listeners —
+    // before this fix, isCastSessionActive() had no way to hear about it.
+    expect(sessionChangedListeners.length).toBeGreaterThan(0);
+    sessionChangedListeners.forEach((listener) => listener({ active: false }));
+
+    expect(isCastSessionActive()).toBe(false);
+  });
+
+  it("does not treat a successful stop as the Cast session ending", async () => {
+    runtimeMock.isNative = true;
+    nativeControlMock.mockResolvedValue({ ok: true });
+
+    await castPlay();
+    expect(isCastSessionActive()).toBe(true);
+
+    // stop() only stops the receiver's current media — it does not end
+    // the Cast session, so the app should still be able to play again
+    // without re-picking a device.
+    await expect(castStop()).resolves.toEqual({ ok: true });
+    expect(isCastSessionActive()).toBe(true);
+  });
+
+  it("does not treat a rejected command as the Cast session ending", async () => {
+    runtimeMock.isNative = true;
+    nativeControlMock.mockResolvedValue({ ok: true });
+
+    await castPlay();
+    expect(isCastSessionActive()).toBe(true);
+
+    // A transient pause rejection (e.g. the receiver briefly refused the
+    // command) is not proof the device disconnected — only the
+    // sessionChanged listener or a fresh capabilities read gets to say
+    // that.
+    nativeControlMock.mockResolvedValueOnce({
+      ok: false,
+      message: "Cast command was rejected by the receiver.",
+    });
+    await expect(castPause()).resolves.toEqual({
+      ok: false,
+      message: "Cast command was rejected by the receiver.",
+    });
+    expect(isCastSessionActive()).toBe(true);
+  });
+
+  it("does not let a late command success resurrect a disconnected session", async () => {
+    runtimeMock.isNative = true;
+    let resolveCommand: ((result: { ok: boolean }) => void) | undefined;
+    nativeControlMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCommand = resolve;
+      }),
+    );
+
+    const command = castPlay();
+    await vi.waitFor(() => expect(nativeControlMock).toHaveBeenCalled());
+    sessionChangedListeners.forEach((listener) => listener({ active: false }));
+    resolveCommand!({ ok: true });
+
+    await expect(command).resolves.toEqual({ ok: true });
+    expect(isCastSessionActive()).toBe(false);
+  });
+
+  it("does not let a late session request resurrect a disconnected session", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+    });
+    apiMock.mockResolvedValue({
+      stream_url: "https://stream.example/track",
+      metadata_url: "https://stream.example/metadata",
+      expires_at: "2030-01-01T00:00:00Z",
+      delivery_policy: "direct",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          stream_url: "https://stream.example/track",
+          title: "Track",
+          artist: "Artist",
+        }),
+        { status: 200 },
+      ),
+    );
+    let resolveSession: ((result: { ok: boolean }) => void) | undefined;
+    nativeRequestSessionMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+
+    const request = startCastSession({
+      track: {
+        id: "track-1",
+        libraryTrackId: 1,
+        title: "Track",
+        artist: "Artist",
+      },
+    });
+    await vi.waitFor(() => expect(nativeRequestSessionMock).toHaveBeenCalled());
+    sessionChangedListeners.forEach((listener) => listener({ active: false }));
+    resolveSession!({ ok: true });
+
+    await expect(request).resolves.toEqual({ ok: true });
+    expect(isCastSessionActive()).toBe(false);
+  });
+
+  it("authorizes restored queue artwork before native Cast", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    apiMock.mockResolvedValue({
+      stream_url: "https://stream.example/track",
+      metadata_url: "https://stream.example/metadata",
+      expires_at: "2030-01-01T00:00:00Z",
+      delivery_policy: "direct",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          stream_url: "https://stream.example/track",
+          title: "Track",
+          artist: "Artist",
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await startCastSession({
+      track: {
+        id: "track-1",
+        libraryTrackId: 1,
+        title: "Track",
+        artist: "Artist",
+        albumCover: "/api/catalog/albums/album-1/cover?size=512",
+      },
+    });
+
+    expect(ensureMediaAccessUrlMock).toHaveBeenCalledWith(
+      "https://crate.test/api/catalog/albums/album-1/cover?size=512",
+      "artwork",
+    );
+    expect(nativeRequestSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artworkUrl:
+          "https://crate.test/api/catalog/albums/album-1/cover?size=512&media_ticket=artwork-ticket",
+      }),
+    );
   });
 });

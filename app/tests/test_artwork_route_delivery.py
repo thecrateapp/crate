@@ -134,6 +134,9 @@ def test_artist_hero_routes_select_composition_and_fallback(monkeypatch, tmp_pat
             "revision": current_revision,
         },
     )
+    monkeypatch.setattr(
+        browse_artist, "get_artist_hero_render_revision", lambda **_kwargs: None
+    )
     monkeypatch.setattr(browse_artist, "library_path", lambda: tmp_path)
     monkeypatch.setattr(
         browse_artist,
@@ -163,7 +166,11 @@ def test_artist_hero_routes_select_composition_and_fallback(monkeypatch, tmp_pat
     )
 
     browse_artist.api_artist_hero_by_id(
-        SimpleNamespace(), 5, composition="mobile", size=1024
+        SimpleNamespace(),
+        5,
+        composition="mobile",
+        size=1024,
+        version=current_revision,
     )
     missing_response = browse_artist.api_artist_hero_by_id(
         SimpleNamespace(), 5, composition="desktop", size=1024
@@ -254,6 +261,226 @@ def test_artist_hero_canonical_size_serves_generated_original(monkeypatch, tmp_p
         response.headers["X-Crate-Artwork"] == "hero"
         for _path, _kwargs, response in originals
     )
+
+
+def test_artist_hero_uses_revision_scoped_artifact_when_manifest_is_active(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    from crate.api import browse_artist
+    from crate.artist_hero_artwork import ARTIST_HERO_RENDER_VERSION
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        publish_artist_hero_artifact,
+    )
+
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path))
+    artist = {"id": 5, "entity_uid": "artist-entity", "name": "Artist"}
+    identity = ArtistHeroArtifactIdentity(
+        "artist-entity", "desktop", "renderer:revision-a"
+    )
+    publication = publish_artist_hero_artifact(
+        identity,
+        Image.new("RGB", (2960, 1200), color="red"),
+        source_fingerprint="sha256:source-a",
+        recipe_hash="recipe-a",
+        renderer_version=ARTIST_HERO_RENDER_VERSION,
+        source_content=b"source-a",
+    )
+    delivered = []
+    monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(browse_artist, "artist_name_from_id", lambda _id: "Artist")
+    monkeypatch.setattr(browse_artist, "get_library_artist", lambda _name: artist)
+    monkeypatch.setattr(
+        browse_artist,
+        "get_artist_hero_artwork",
+        lambda _artist_id: {
+            "review_status": "approved",
+            "revision": "editorial-revision-a",
+            "render_manifest": {
+                "manifest_version": 1,
+                "editorial_revision": "editorial-revision-a",
+                "artifacts": {
+                    "desktop": publication.manifest,
+                },
+            },
+        },
+    )
+    monkeypatch.setattr(browse_artist, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        browse_artist, "resolve_artist_dir", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        browse_artist,
+        "deliver_artwork",
+        lambda asset, **kwargs: (
+            delivered.append((asset, kwargs))
+            or SimpleNamespace(status_code=200, headers={})
+        ),
+    )
+
+    response = browse_artist.api_artist_hero_by_id(
+        SimpleNamespace(),
+        5,
+        composition="desktop",
+        size=1024,
+        version="renderer:revision-a",
+    )
+
+    assert response.status_code == 200
+    assert delivered[0][0].entity_key == identity.asset_key
+    assert delivered[0][1]["local_original"] == publication.artifact_path
+
+
+def test_artist_hero_does_not_serve_current_artifact_for_unknown_version(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    from crate.api import browse_artist
+    from crate.artist_hero_artwork import ARTIST_HERO_RENDER_VERSION
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        publish_artist_hero_artifact,
+    )
+
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path))
+    artist = {"id": 5, "entity_uid": "artist-entity", "name": "Artist"}
+    identity = ArtistHeroArtifactIdentity("artist-entity", "mobile", "revision-a")
+    publication = publish_artist_hero_artifact(
+        identity,
+        Image.new("RGB", (2160, 2700), color="red"),
+        source_fingerprint="sha256:source-a",
+        recipe_hash="recipe-a",
+        renderer_version=ARTIST_HERO_RENDER_VERSION,
+        source_content=b"source-a",
+    )
+    delivered = []
+    monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(browse_artist, "artist_name_from_id", lambda _id: "Artist")
+    monkeypatch.setattr(browse_artist, "get_library_artist", lambda _name: artist)
+    monkeypatch.setattr(
+        browse_artist,
+        "get_artist_hero_artwork",
+        lambda _artist_id: {
+            "review_status": "approved",
+            "revision": "editorial-revision-a",
+            "render_manifest": {
+                "manifest_version": 1,
+                "editorial_revision": "editorial-revision-a",
+                "artifacts": {"mobile": publication.manifest},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        browse_artist, "get_artist_hero_render_revision", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(browse_artist, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        browse_artist, "resolve_artist_dir", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        browse_artist,
+        "deliver_artwork",
+        lambda asset, **kwargs: delivered.append((asset, kwargs)),
+    )
+
+    response = browse_artist.api_artist_hero_by_id(
+        SimpleNamespace(),
+        5,
+        composition="mobile",
+        size=1024,
+        version="revision-old",
+    )
+
+    assert response.status_code == 404
+    assert response.headers["X-Crate-Artwork"] == "hero-revision-unavailable"
+    assert delivered == []
+
+
+def test_artist_hero_serves_a_retained_revision_referenced_by_a_cached_snapshot(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    from crate.api import browse_artist
+    from crate.artist_hero_artwork import ARTIST_HERO_RENDER_VERSION
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        publish_artist_hero_artifact,
+    )
+
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path))
+    artist = {"id": 5, "entity_uid": "artist-entity", "name": "Artist"}
+    retained_identity = ArtistHeroArtifactIdentity(
+        "artist-entity", "desktop", "revision-a"
+    )
+    active_identity = ArtistHeroArtifactIdentity(
+        "artist-entity", "desktop", "revision-b"
+    )
+    retained = publish_artist_hero_artifact(
+        retained_identity,
+        Image.new("RGB", (2960, 1200), color="red"),
+        source_fingerprint="sha256:source-a",
+        recipe_hash="recipe-a",
+        renderer_version=ARTIST_HERO_RENDER_VERSION,
+        source_content=b"source-a",
+    )
+    active = publish_artist_hero_artifact(
+        active_identity,
+        Image.new("RGB", (2960, 1200), color="blue"),
+        source_fingerprint="sha256:source-b",
+        recipe_hash="recipe-b",
+        renderer_version=ARTIST_HERO_RENDER_VERSION,
+        source_content=b"source-b",
+    )
+    delivered = []
+    monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(browse_artist, "artist_name_from_id", lambda _id: "Artist")
+    monkeypatch.setattr(browse_artist, "get_library_artist", lambda _name: artist)
+    monkeypatch.setattr(
+        browse_artist,
+        "get_artist_hero_artwork",
+        lambda _artist_id: {
+            "review_status": "approved",
+            "revision": "editorial-revision-b",
+            "render_manifest": {
+                "manifest_version": 1,
+                "editorial_revision": "editorial-revision-b",
+                "artifacts": {"desktop": active.manifest},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        browse_artist,
+        "get_artist_hero_render_revision",
+        lambda **_kwargs: {"relative_path": retained.manifest["relative_path"]},
+    )
+    monkeypatch.setattr(browse_artist, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        browse_artist, "resolve_artist_dir", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        browse_artist,
+        "deliver_artwork",
+        lambda asset, **kwargs: (
+            delivered.append((asset, kwargs))
+            or SimpleNamespace(status_code=200, headers={})
+        ),
+    )
+
+    response = browse_artist.api_artist_hero_by_id(
+        SimpleNamespace(),
+        5,
+        composition="desktop",
+        size=1024,
+        version="revision-a",
+    )
+
+    assert response.status_code == 200
+    assert delivered[0][0].entity_key == retained_identity.asset_key
+    assert delivered[0][1]["local_original"] == retained.artifact_path
 
 
 def test_artist_hero_route_recomposes_legacy_renderer_output(monkeypatch, tmp_path):

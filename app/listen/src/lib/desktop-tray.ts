@@ -1,3 +1,7 @@
+// Mirrors the transport variants of PlaybackCommand in
+// app/listen-desktop/src-tauri/src/lib.rs — update both together. A Rust
+// test (transport_commands_match_the_frontend_contract) pins the exact
+// wire strings on that side.
 export type DesktopTrayCommand =
   | "play"
   | "pause"

@@ -34,7 +34,9 @@ describe("AppModal", () => {
         <ModalBody>Content</ModalBody>
       </AppModal>,
     );
-    const overlay = screen.getByRole("dialog");
+    const overlay = screen.getByRole("button", {
+      name: "Close dialog backdrop",
+    });
     fireEvent.click(overlay);
     expect(onClose).toHaveBeenCalledTimes(1);
   });

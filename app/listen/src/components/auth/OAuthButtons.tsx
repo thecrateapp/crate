@@ -12,19 +12,6 @@ interface OAuthButtonsProps {
   inviteToken?: string;
 }
 
-type TauriOpenerGlobal = Window &
-  typeof globalThis & {
-    __TAURI__?: {
-      opener?: {
-        openUrl?: (url: string) => Promise<void> | void;
-        open?: (url: string) => Promise<void> | void;
-      };
-      shell?: {
-        open?: (url: string) => Promise<void> | void;
-      };
-    };
-  };
-
 const fetchProviders = () =>
   api<
     Record<
@@ -37,28 +24,6 @@ function oauthProvider(loginUrl: string): "google" | "apple" {
   return /(?:^|[/?])apple(?:[/?]|$)/i.test(loginUrl) ? "apple" : "google";
 }
 
-function tauriOAuthCallbackUrl(returnTo: string | null): URL {
-  const callbackUrl = new URL("http://127.0.0.1:17654/oauth/callback");
-  if (returnTo && returnTo !== "/")
-    callbackUrl.searchParams.set("next", returnTo);
-  return callbackUrl;
-}
-
-export async function openExternalOAuthUrl(url: string): Promise<void> {
-  const tauri = (window as TauriOpenerGlobal).__TAURI__;
-  const opener =
-    tauri?.opener?.openUrl ?? tauri?.opener?.open ?? tauri?.shell?.open;
-  if (opener) {
-    await opener(url);
-    return;
-  }
-
-  const opened = window.open(url, "_blank", "noopener,noreferrer");
-  if (!opened) {
-    window.location.href = url;
-  }
-}
-
 export function OAuthButtons({
   returnTo = "/",
   inviteToken,
@@ -69,16 +34,14 @@ export function OAuthButtons({
       const base = getApiBase() || window.location.origin;
       const target = new URL(loginUrl, base);
       if (invite) target.searchParams.set("invite", invite);
-      if (isTauriRuntime) {
-        const callbackUrl = tauriOAuthCallbackUrl(rt);
-        target.searchParams.set("return_to", callbackUrl.toString());
-        target.searchParams.set("app_id", "listen-tauri");
-        void openExternalOAuthUrl(target.toString()).catch(() => {
-          window.location.href = target.toString();
-        });
-        return;
-      }
-      if (isNative) {
+      if (isTauriRuntime || isNative) {
+        // Desktop (Tauri) and mobile (Capacitor) both do the PKCE +
+        // one-time-code exchange dance through the cratemusic:// deep
+        // link — Tauri registers that same custom scheme as an OS-level
+        // deep link, so it reaches the app the exact same way. The
+        // @capacitor/browser import resolves to a stub on desktop that
+        // opens the system browser via Tauri's opener plugin instead of
+        // a Capacitor bridge that doesn't exist there.
         void beginNativeOAuth(
           oauthProvider(target.toString()),
           rt || "/",

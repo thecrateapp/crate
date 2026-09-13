@@ -1,5 +1,6 @@
 import base64
 import io
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -52,6 +53,9 @@ class TestHandlerRegistration:
     def test_artwork_task_handlers_registers_all_handlers(self):
         expected = {
             "backfill_artist_heroes",
+            "migrate_artist_heroes",
+            "migrate_artist_hero",
+            "rollback_artist_hero",
             "backfill_artwork_variants",
             "cleanup_artwork_variants",
             "compose_artist_hero",
@@ -98,6 +102,58 @@ class TestHandlerRegistration:
 
 
 class TestHandleMaterializeArtworkVariants:
+    def test_artist_hero_materialization_rechecks_artist_inside_lock(self, monkeypatch):
+        lookups = iter(
+            [
+                {"id": 42, "entity_uid": "artist-entity"},
+                None,
+            ]
+        )
+        events: list[str] = []
+
+        @contextmanager
+        def publication_lock(_root, artist_id):
+            assert artist_id == 42
+            events.append("lock-enter")
+            yield
+            events.append("lock-exit")
+
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: next(lookups),
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.artist_hero_publication_lock",
+            publication_lock,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("deleted artists must not resolve hero sources")
+            ),
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.emit_progress",
+            lambda *_args, **_kwargs: None,
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-1",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop:renderer:revision-a",
+            },
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-hero",
+            "entity_key": "artist-entity:desktop:renderer:revision-a",
+        }
+        assert events == ["lock-enter", "lock-exit"]
+
     def test_materializes_resolved_source(self, monkeypatch):
         from crate.artwork_sources import ArtworkSource
 

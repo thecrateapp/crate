@@ -622,7 +622,11 @@ class TestOAuthStart:
                 oauth_start(
                     request,
                     "google",
-                    OAuthStartRequest(return_to="cratemusic://oauth/callback"),
+                    OAuthStartRequest(
+                        return_to="cratemusic://oauth/callback",
+                        native_code_challenge="a" * 43,
+                        native_state="b" * 32,
+                    ),
                 )
             )
 
@@ -638,35 +642,71 @@ class TestOAuthStart:
         )
 
     @patch.dict("os.environ", {"DOMAIN": "lespedants.org"}, clear=False)
-    def test_tauri_loopback_oauth_callback_uses_listen_origin(self):
+    def test_tauri_native_oauth_callback_uses_listen_origin(self):
         from crate.api.auth import _oauth_callback_url
 
         assert (
             _oauth_callback_url(
                 "google",
-                "http://127.0.0.1:17654/oauth/callback",
+                "cratemusic://oauth/callback",
                 app_id="listen-tauri",
             )
             == "https://listen.lespedants.org/api/auth/oauth/google/callback"
         )
 
-    def test_tauri_loopback_return_to_requires_tauri_app_id(self):
-        from crate.api.auth import _validate_return_to
+    def test_validate_native_oauth_start_accepts_tauri_app_id(self):
+        from crate.api.auth import _validate_native_oauth_start
 
-        return_to = "http://127.0.0.1:17654/oauth/callback?next=%2F"
-
-        assert _validate_return_to(return_to, app_id="listen-tauri") == return_to
-        assert _validate_return_to(return_to, app_id="listen-web") == "/"
-
-    def test_post_auth_redirect_url_adds_token_for_tauri_loopback(self):
-        from crate.api.auth import _post_auth_redirect_url
-
-        assert (
-            _post_auth_redirect_url(
-                "http://127.0.0.1:17654/oauth/callback?next=%2F", "abc123"
+        with patch("crate.api.auth._native_oauth_exchange_enabled", return_value=True):
+            assert (
+                _validate_native_oauth_start(
+                    app_id="listen-tauri",
+                    mode="login",
+                    return_to="cratemusic://oauth/callback",
+                    challenge="a" * 43,
+                    state="b" * 32,
+                )
+                is True
             )
-            == "http://127.0.0.1:17654/oauth/callback?next=%2F&token=abc123"
-        )
+
+    def test_validate_native_oauth_start_rejects_tauri_without_pkce(self):
+        from crate.api.auth import _validate_native_oauth_start
+
+        with (
+            patch("crate.api.auth._native_oauth_exchange_enabled", return_value=True),
+            pytest.raises(Exception) as exc_info,
+        ):
+            _validate_native_oauth_start(
+                app_id="listen-tauri",
+                mode="login",
+                return_to="cratemusic://oauth/callback",
+                challenge=None,
+                state=None,
+            )
+
+        assert getattr(exc_info.value, "status_code", None) == 426
+
+    def test_validate_native_oauth_start_rejects_custom_callback_without_pkce_for_web_app(
+        self,
+    ):
+        from crate.api.auth import _validate_native_oauth_start
+
+        with pytest.raises(Exception) as exc_info:
+            _validate_native_oauth_start(
+                app_id="listen-web",
+                mode="login",
+                return_to="cratemusic://oauth/callback",
+                challenge=None,
+                state=None,
+            )
+
+        assert getattr(exc_info.value, "status_code", None) == 426
+
+    def test_native_oauth_secure_flow_is_enabled_by_default(self):
+        from crate.api.auth import _native_oauth_exchange_enabled
+
+        with patch.dict("os.environ", {}, clear=True):
+            assert _native_oauth_exchange_enabled() is True
 
     def test_oauth_start_preserves_tauri_app_id_from_query(self):
         from crate.api.auth import oauth_start
@@ -695,7 +735,11 @@ class TestOAuthStart:
                 oauth_start(
                     request,
                     "google",
-                    OAuthStartRequest(return_to="cratemusic://oauth/callback"),
+                    OAuthStartRequest(
+                        return_to="cratemusic://oauth/callback",
+                        native_code_challenge="a" * 43,
+                        native_state="b" * 32,
+                    ),
                 )
             )
 
@@ -796,10 +840,10 @@ class TestOAuthCallback:
                 "crate.api.auth._parse_oauth_state",
                 return_value={
                     "provider": "google",
-                    "return_to": "cratemusic://oauth/callback",
+                    "return_to": "/",
                     "mode": "login",
                     "verifier": "verifier",
-                    "app_id": "listen-android",
+                    "app_id": "listen-web",
                 },
             ),
             patch(
@@ -823,12 +867,56 @@ class TestOAuthCallback:
                 oauth_callback(self._request(), "google", code="code", state="state")
             )
 
-        assert (
-            response.headers["location"]
-            == "cratemusic://oauth/callback?token=jwt-token&refresh_token=refresh-token"
-        )
+        assert response.headers["location"] == "/"
         mock_upsert.assert_called_once()
         mock_last_login.assert_called_once_with(legacy_user["id"])
+
+    def test_native_callback_without_pkce_never_issues_tokens_for_spoofed_web_app(
+        self,
+    ):
+        from fastapi import HTTPException
+
+        from crate.api.auth import oauth_callback
+
+        user = {
+            "id": 42,
+            "email": "native@test.com",
+            "role": "user",
+            "username": "native",
+            "name": "Native User",
+            "status": "active",
+        }
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "login",
+                    "verifier": "provider-verifier",
+                    "app_id": "listen-web",
+                },
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-native",
+                    "email": "native@test.com",
+                    "name": "Native User",
+                },
+            ),
+            patch(
+                "crate.api.auth.get_user_by_external_identity",
+                return_value=user,
+            ),
+            patch("crate.api.auth.update_user_last_login"),
+            patch("crate.api.auth._create_login_session") as create_session,
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            _run(oauth_callback(self._request(), "google", code="code", state="state"))
+
+        assert exc_info.value.status_code == 426
+        create_session.assert_not_called()
 
     def test_native_callback_redirects_with_code_only(self):
         from crate.api.auth import oauth_callback
@@ -1068,11 +1156,11 @@ class TestOAuthCallback:
                 "crate.api.auth._parse_oauth_state",
                 return_value={
                     "provider": "google",
-                    "return_to": "cratemusic://oauth/callback",
+                    "return_to": "/",
                     "mode": "login",
                     "verifier": "verifier",
                     "invite_key": "invite-key",
-                    "app_id": "listen-android",
+                    "app_id": "listen-web",
                 },
             ),
             patch(
@@ -1109,10 +1197,7 @@ class TestOAuthCallback:
                 oauth_callback(self._request(), "google", code="code", state="state")
             )
 
-        assert (
-            response.headers["location"]
-            == "cratemusic://oauth/callback?token=jwt-token&refresh_token=refresh-token"
-        )
+        assert response.headers["location"] == "/"
         mock_retrieve.assert_called_once_with("invite-key")
         mock_consume.assert_called_once_with(
             "invite-token", email="invited-google@test.com"
@@ -1914,6 +1999,50 @@ class TestAuthIntegration:
         assert second["id"] == "listen-a"
         assert [session["id"] for session in sessions].count("listen-a") == 1
         assert "listen-b" not in {session["id"] for session in sessions}
+
+    def test_create_session_reuses_the_same_id_without_a_fingerprint(self, pg_db):
+        user = pg_db.create_user("session-idempotency@test.com")
+        now = datetime.now(timezone.utc)
+
+        first = pg_db.create_session(
+            "native-session",
+            user["id"],
+            (now + timedelta(days=30)).isoformat(),
+            app_id="listen-tauri",
+            device_label="Desktop A",
+        )
+        second = pg_db.create_session(
+            "native-session",
+            user["id"],
+            (now + timedelta(days=30)).isoformat(),
+            app_id="listen-tauri",
+            device_label="Desktop B",
+        )
+
+        sessions = pg_db.list_sessions(user["id"], include_revoked=True)
+        assert first["id"] == "native-session"
+        assert second["id"] == "native-session"
+        assert [session["id"] for session in sessions].count("native-session") == 1
+        assert second["device_label"] == "Desktop B"
+
+    def test_create_session_does_not_reassign_an_existing_id(self, pg_db):
+        first_user = pg_db.create_user("session-owner@test.com")
+        second_user = pg_db.create_user("session-attacker@test.com")
+        expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        pg_db.create_session(
+            "owned-session",
+            first_user["id"],
+            expires_at,
+            app_id="listen-tauri",
+        )
+
+        with pytest.raises(ValueError, match="already in use"):
+            pg_db.create_session(
+                "owned-session",
+                second_user["id"],
+                expires_at,
+                app_id="listen-tauri",
+            )
 
     def test_create_user_reuses_shared_session_for_username_lookup(self, pg_db):
         from crate.db.auth import create_user, get_user_by_id

@@ -1,8 +1,55 @@
 from crate.worker_handlers.management import (
+    _handle_delete_artist,
     _handle_move_artist,
     _handle_repair,
     _handle_repair_duplicate_tracks,
 )
+
+
+def test_delete_artist_uses_shared_artist_deletion_lifecycle(monkeypatch, tmp_path):
+    events: list[str] = []
+
+    def run_deletion(name, operation):
+        events.append(f"lifecycle:{name}")
+        return operation()
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist",
+        lambda _name: {
+            "id": 42,
+            "entity_uid": "artist-entity",
+            "folder_name": "Artist",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion", run_deletion
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.db_delete_artist",
+        lambda name: events.append(f"db-delete:{name}"),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.delete_cache", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.emit_task_event",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.log_audit", lambda *_args, **_kwargs: None
+    )
+
+    result = _handle_delete_artist(
+        "delete-artist-1",
+        {"name": "Artist", "mode": "db_only"},
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {"deleted": "Artist", "mode": "db_only"}
+    assert events == [
+        "lifecycle:Artist",
+        "db-delete:Artist",
+    ]
 
 
 def test_handle_index_genres_broadcasts_library_cache_invalidation(monkeypatch):

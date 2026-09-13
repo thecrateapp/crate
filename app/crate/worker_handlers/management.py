@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from crate.artist_lifecycle import run_artist_deletion
 from crate.db.audit import log_audit, wipe_library_tables
 from crate.db.cache_runtime import get_redis
 from crate.db.cache_store import delete_cache, set_cache
@@ -678,11 +679,13 @@ def _handle_delete_artist(task_id: str, params: dict, config: dict) -> dict:
     folder = (artist.get("folder_name") if artist else None) or name
     artist_dir = lib / folder
 
-    if mode == "full" and artist_dir.is_dir():
-        shutil.rmtree(str(artist_dir))
-        log.info("Deleted artist directory: %s", artist_dir)
+    def delete_artist_data() -> None:
+        if mode == "full" and artist_dir.is_dir():
+            shutil.rmtree(str(artist_dir))
+            log.info("Deleted artist directory: %s", artist_dir)
+        db_delete_artist(name)
 
-    db_delete_artist(name)
+    run_artist_deletion(name, delete_artist_data)
 
     for prefix in ENRICHMENT_CACHE_PREFIXES:
         delete_cache(f"{prefix}{name.lower()}")
@@ -1721,11 +1724,14 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
     source_track_count = sum(
         int(album.get("track_count") or 0) for album in source_albums
     )
-    merge_artist_into_artist(
+    run_artist_deletion(
         source_artist_name,
-        target_artist_name,
-        str(source_dir),
-        str(target_dir),
+        lambda: merge_artist_into_artist(
+            source_artist_name,
+            target_artist_name,
+            str(source_dir),
+            str(target_dir),
+        ),
     )
 
     emit_task_event(
@@ -2025,12 +2031,18 @@ def _handle_update_artist_metadata(task_id: str, params: dict, config: dict) -> 
     )
 
     try:
-        from crate.api.cache_events import broadcast_invalidation
+        from crate.api.cache_events import (
+            broadcast_invalidation,
+            wait_for_cache_invalidation,
+        )
 
         scopes = ["library", "home"]
+        if "bio" in changed_fields:
+            scopes.append("artist_bio")
         if result.get("artist_id"):
             scopes.append(f"artist:{result['artist_id']}")
         broadcast_invalidation(*scopes)
+        wait_for_cache_invalidation()
     except Exception:
         log.debug("Failed to broadcast artist metadata invalidation", exc_info=True)
 

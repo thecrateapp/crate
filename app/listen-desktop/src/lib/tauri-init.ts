@@ -1,4 +1,7 @@
-import { consumeOAuthCallbackUrl } from "@/lib/capacitor-oauth";
+import {
+  consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthCallback,
+} from "@/lib/capacitor-oauth";
 import { recordDevLog } from "@/lib/dev-logs";
 import {
   dispatchDesktopTrayCommand,
@@ -26,8 +29,10 @@ export function initTauriRuntime(): void {
   installNativeHttpFetch();
   void initTrayBridge();
   void initBandcampCookieBridge();
-  installDeepLinkBridge();
   void initDeepLinks();
+  window.addEventListener("online", () => {
+    void retryDeferredOAuth();
+  });
 }
 
 function ensureDesktopWindowSize(): void {
@@ -55,11 +60,33 @@ function installNativeHttpFetch(): void {
   const browserFetch = window.fetch.bind(window);
   window.__crateTauriFetchInstalled = true;
   window.fetch = async (input, init) => {
-    if (!isHttpRequest(input)) return browserFetch(input, init);
+    if (!shouldUseTauriHttpPlugin(input)) return browserFetch(input, init);
 
     const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
     return tauriFetch(input, init);
   };
+}
+
+export function shouldUseTauriHttpPlugin(input: RequestInfo | URL): boolean {
+  if (!isHttpRequest(input)) return false;
+  try {
+    const value =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const url = new URL(value);
+    if (url.protocol === "https:") return true;
+    return (
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" ||
+        url.hostname === "127.0.0.1" ||
+        url.hostname === "[::1]")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isHttpRequest(
@@ -74,9 +101,7 @@ function isHttpRequest(
 
 async function initDeepLinks(): Promise<void> {
   try {
-    const { getCurrent, onOpenUrl } = await import(
-      "@tauri-apps/plugin-deep-link"
-    );
+    const { getCurrent } = await import("@tauri-apps/plugin-deep-link");
     const { listen } = await import("@tauri-apps/api/event");
 
     await listen<string[]>("crate:deep-link", (event) => {
@@ -87,21 +112,22 @@ async function initDeepLinks(): Promise<void> {
       void handleDeepLinkUrls(event.payload);
     });
 
-    await onOpenUrl((urls) => {
-      recordTauriAuthDiagnostic("Deep link opened", `${urls.length} URL(s)`);
-      void handleDeepLinkUrls(urls);
-    });
-
+    const bufferedUrls =
+      (await window.__crateTauriInvoke?.<string[]>(
+        "register_deep_link_listener",
+      )) ?? [];
     const launchUrls = await getCurrent();
-    if (launchUrls?.length) {
+    const initialUrls = mergeInitialDeepLinkUrls(bufferedUrls, launchUrls);
+    if (initialUrls.length) {
       recordTauriAuthDiagnostic(
         "Launch deep link found",
-        `${launchUrls.length} URL(s)`,
+        `${initialUrls.length} URL(s)`,
       );
-      await handleDeepLinkUrls(launchUrls);
+      await handleDeepLinkUrls(initialUrls);
     } else {
       recordTauriAuthDiagnostic("OAuth bridge ready");
     }
+    await retryDeferredOAuth();
   } catch (err) {
     recordTauriAuthDiagnostic(
       "OAuth bridge failed",
@@ -109,6 +135,20 @@ async function initDeepLinks(): Promise<void> {
     );
     console.warn("[tauri] deep-link init failed", err);
   }
+}
+
+export function mergeInitialDeepLinkUrls(
+  bufferedUrls: string[],
+  launchUrls: string[] | null,
+): string[] {
+  return [...new Set([...bufferedUrls, ...(launchUrls ?? [])])];
+}
+
+async function retryDeferredOAuth(): Promise<void> {
+  const result = await retryPendingNativeOAuthCallback();
+  if (!result.handled) return;
+  recordTauriAuthDiagnostic("OAuth token stored", result.next);
+  window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
 }
 
 async function initTrayBridge(): Promise<void> {
@@ -146,23 +186,12 @@ async function initBandcampCookieBridge(): Promise<void> {
   }
 }
 
-function installDeepLinkBridge(): void {
-  if (typeof window === "undefined") return;
-  window.__crateHandleTauriDeepLinks = (urls) => {
-    recordTauriAuthDiagnostic(
-      "Deep link bridge invoked",
-      `${urls.length} URL(s)`,
-    );
-    void handleDeepLinkUrls(urls);
-  };
-}
-
 async function handleDeepLinkUrls(urls: string[]): Promise<void> {
   for (const url of urls) {
     const result = await consumeOAuthCallbackUrl(url);
     if (!result.handled) {
       recordTauriAuthDiagnostic(
-        "Deep link ignored",
+        result.retryable ? "OAuth exchange deferred" : "Deep link ignored",
         protocolForDiagnostic(url),
       );
       continue;
@@ -184,7 +213,6 @@ function protocolForDiagnostic(url: string): string {
 declare global {
   interface Window {
     __crateTauriFetchInstalled?: boolean;
-    __crateHandleTauriDeepLinks?: (urls: string[]) => void;
     __crateTauriInvoke?: <T = unknown>(
       command: string,
       args?: Record<string, unknown>,

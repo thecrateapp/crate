@@ -108,6 +108,15 @@
     "order": 40
   },
   {
+    "sourcePath": "docs/technical/listen-design-system-visual-qa.md",
+    "route": "/developer/listen-design-system-visual-qa",
+    "section": "developer",
+    "title": "Listen design system visual QA",
+    "summary": "Repeatable visual and computed-style checks for appearance, density, logo and artist hero contracts.",
+    "keywords": ["listen", "design system", "visual regression", "playwright"],
+    "order": 98
+  },
+  {
     "sourcePath": "docs/technical/10-development-deployment-and-operations.md",
     "route": "/operations/runtime-model",
     "section": "operations",
@@ -151,6 +160,15 @@
     "summary": "Operate worker-owned persistent artwork variants and their non-blocking read path.",
     "keywords": ["artwork", "variants", "backfill", "workers"],
     "order": 140
+  },
+  {
+    "sourcePath": "docs/technical/artist-hero-theming-rollout.md",
+    "route": "/operations/artist-hero-theming-rollout",
+    "section": "operations",
+    "title": "Artist hero theming rollout",
+    "summary": "Operate the shared hero presentation, versioned artifacts, canary migration and guarded rollback.",
+    "keywords": ["artist hero", "theming", "artwork", "rollback"],
+    "order": 141
   },
   {
     "sourcePath": "docs/technical/local-media-delivery-slos.md",

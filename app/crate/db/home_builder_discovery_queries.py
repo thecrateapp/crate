@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from urllib.parse import quote
 
 from crate.artist_hero_artwork import (
     ARTIST_HERO_RENDER_VERSION,
@@ -8,7 +9,10 @@ from crate.artist_hero_artwork import (
     MOBILE_HERO_SIZE,
     get_artist_hero_artwork_bounds,
 )
-from crate.artist_hero_contract import artist_hero_recipe_hash
+from crate.artist_hero_contract import (
+    artist_hero_recipe_hash,
+    artist_hero_render_version_is_supported,
+)
 from crate.db.home_builder_shared import _trim_bio
 from crate.db.home_hero_scoring import (
     HOME_HERO_SCORE_VERSION,
@@ -18,7 +22,7 @@ from crate.db.home_hero_scoring import (
 )
 from crate.db.home_debug import record_home_hero_debug
 from crate.db.queries.home import (
-    get_artist_genres_map,
+    get_artist_genre_profiles_map,
     get_discovery_track_rows,
     get_home_hero_rows,
     get_recent_interest_track_rows,
@@ -60,6 +64,17 @@ def _hero_source_dimensions(
     return item.get("_hero_source_width"), item.get("_hero_source_height")
 
 
+def _hero_render_artifact(
+    item: Mapping[str, object], composition: str
+) -> Mapping[str, object] | None:
+    manifest = item.get("_hero_render_manifest")
+    if not isinstance(manifest, Mapping):
+        return None
+    artifacts = manifest.get("artifacts")
+    artifact = artifacts.get(composition) if isinstance(artifacts, Mapping) else None
+    return artifact if isinstance(artifact, Mapping) else None
+
+
 def _add_hero_artwork_bounds(item: dict) -> None:
     generic_width = item.pop("_hero_source_width", None)
     generic_height = item.pop("_hero_source_height", None)
@@ -87,18 +102,27 @@ def _add_hero_artwork_bounds(item: dict) -> None:
             (coerce_int(width), coerce_int(height)), recipe, output_size
         )
         item[f"{composition}_artwork_bounds"] = bounds
-        if item.get("artwork_revision"):
+        artifact = _hero_render_artifact(item, composition)
+        render_revision = str(
+            (artifact or {}).get("render_revision")
+            or item.get("artwork_revision")
+            or ""
+        )
+        if render_revision:
             compositions[composition] = {
                 "schema_version": 1,
                 "composition": composition,
-                "render_revision": str(item["artwork_revision"]),
-                "recipe_hash": artist_hero_recipe_hash(recipe),
+                "render_revision": render_revision,
+                "recipe_hash": str(
+                    (artifact or {}).get("recipe_hash")
+                    or artist_hero_recipe_hash(recipe)
+                ),
                 "width": output_size[0],
                 "height": output_size[1],
                 "bounds": bounds,
                 "asset_path": (
                     f"/api/artists/{int(item['id'])}/hero?composition={composition}"
-                    f"&size={output_size[0]}&v={item['artwork_revision']}"
+                    f"&size={output_size[0]}&v={quote(render_revision, safe='')}"
                 ),
             }
     if compositions:
@@ -116,7 +140,13 @@ def _canonical_surface_ready(item: Mapping[str, object], composition: str) -> bo
         return False
     if item.get(f"_hero_{composition}_enabled", True) is False:
         return False
-    if not str(item.get("artwork_revision") or "").startswith(
+    artifact = _hero_render_artifact(item, composition)
+    if artifact is not None:
+        if not str(artifact.get("render_revision") or "") or not (
+            artist_hero_render_version_is_supported(artifact.get("renderer_version"))
+        ):
+            return False
+    elif not str(item.get("artwork_revision") or "").startswith(
         f"{ARTIST_HERO_RENDER_VERSION}:"
     ):
         return False
@@ -204,20 +234,23 @@ def _rank_home_hero_rows(
     source_rows = _dedupe_home_hero_rows(source_rows)
 
     artist_names = [row["name"] for row in source_rows]
-    genre_map = get_artist_genres_map(artist_names)
+    genre_profile_map = get_artist_genre_profiles_map(artist_names, limit=4)
 
     public_by_name: dict[str, dict] = {}
     for source_item in source_rows:
         item = dict(source_item)
         _add_hero_artwork_bounds(item)
         item["bio"] = _trim_bio(item.get("bio") or "")
-        item["genres"] = genre_map.get(item["name"], [])[:4]
+        genre_profile = genre_profile_map.get(item["name"], [])
+        item["genres"] = [genre["name"] for genre in genre_profile]
+        item["genre_profile"] = genre_profile
         item.setdefault("artwork_provenance", "fallback")
         for key in (
             "_hero_provenance",
             "_hero_review_status",
             "_hero_desktop_enabled",
             "_hero_mobile_enabled",
+            "_hero_render_manifest",
         ):
             item.pop(key, None)
         public_by_name[str(source_item["name"])] = strip_home_hero_score(item)

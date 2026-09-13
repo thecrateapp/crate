@@ -1,10 +1,5 @@
 #[cfg(desktop)]
-use std::{
-    io::{Read, Write},
-    net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::sync::{Arc, Mutex};
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, SubmenuBuilder};
 #[cfg(desktop)]
@@ -30,9 +25,13 @@ mod linux_desktop_theme;
 #[cfg(target_os = "linux")]
 mod linux_media_controls;
 #[cfg(target_os = "macos")]
+mod macos_delegate;
+#[cfg(target_os = "macos")]
 mod macos_dock_menu;
 #[cfg(target_os = "macos")]
 mod macos_media_controls;
+#[cfg(target_os = "windows")]
+mod windows_media_controls;
 
 #[cfg(desktop)]
 const DESKTOP_DEFAULT_WIDTH: f64 = 1280.0;
@@ -85,6 +84,84 @@ struct DesktopMenuState {
 }
 
 #[cfg(desktop)]
+#[derive(Default)]
+struct DeepLinkBuffer {
+    frontend_ready: bool,
+    pending_urls: Vec<String>,
+}
+
+#[cfg(desktop)]
+impl DeepLinkBuffer {
+    fn dispatch(&mut self, urls: Vec<String>) -> Option<Vec<String>> {
+        if self.frontend_ready {
+            return Some(urls);
+        }
+        self.pending_urls.extend(urls);
+        None
+    }
+
+    fn mark_ready(&mut self) -> Vec<String> {
+        self.frontend_ready = true;
+        std::mem::take(&mut self.pending_urls)
+    }
+}
+
+#[cfg(desktop)]
+#[derive(Default)]
+struct DeepLinkState(Mutex<DeepLinkBuffer>);
+
+/// Every command a tray/dock menu item, a media key, or a CLI activation
+/// arg can trigger. `Play`/`Pause`/`PlayPause`/`Previous`/`Next` are also
+/// the only ones forwarded to the frontend, as the string payload of a
+/// "crate:tray-command" event — that set must stay in sync with
+/// `DesktopTrayCommand` in `app/listen/src/lib/desktop-tray.ts`.
+/// `as_str`/`parse` are the single place mapping this enum to the wire
+/// string, so menu builders, native media keys (macOS/Linux) and menu
+/// event handling can't drift from each other by typo.
+#[cfg(desktop)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum PlaybackCommand {
+    Play,
+    Pause,
+    PlayPause,
+    Previous,
+    Next,
+    Show,
+    Hide,
+    Quit,
+}
+
+#[cfg(desktop)]
+impl PlaybackCommand {
+    fn as_str(self) -> &'static str {
+        match self {
+            PlaybackCommand::Play => "play",
+            PlaybackCommand::Pause => "pause",
+            PlaybackCommand::PlayPause => "play_pause",
+            PlaybackCommand::Previous => "previous",
+            PlaybackCommand::Next => "next",
+            PlaybackCommand::Show => "show",
+            PlaybackCommand::Hide => "hide",
+            PlaybackCommand::Quit => "quit",
+        }
+    }
+
+    fn parse(value: &str) -> Option<PlaybackCommand> {
+        Some(match value {
+            "play" => PlaybackCommand::Play,
+            "pause" => PlaybackCommand::Pause,
+            "play_pause" => PlaybackCommand::PlayPause,
+            "previous" => PlaybackCommand::Previous,
+            "next" => PlaybackCommand::Next,
+            "show" => PlaybackCommand::Show,
+            "hide" => PlaybackCommand::Hide,
+            "quit" => PlaybackCommand::Quit,
+            _ => return None,
+        })
+    }
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 fn update_now_playing(
     payload: NowPlayingPayload,
@@ -130,6 +207,8 @@ fn update_desktop_media_session(payload: DesktopMediaSessionPayload) -> Result<(
     macos_media_controls::update_now_playing(&payload);
     #[cfg(target_os = "linux")]
     linux_media_controls::update_now_playing(&payload);
+    #[cfg(target_os = "windows")]
+    windows_media_controls::update_now_playing(&payload);
 
     Ok(())
 }
@@ -175,34 +254,31 @@ fn open_bandcamp_cookie_interceptor(app: tauri::AppHandle) -> Result<(), String>
     let login_url = "https://bandcamp.com/login"
         .parse()
         .map_err(|err| format!("invalid Bandcamp login URL: {err}"))?;
-    let window = WebviewWindowBuilder::new(
-        &app,
-        "bandcamp-connect",
-        WebviewUrl::External(login_url),
-    )
-    .title("Connect Bandcamp")
-    .inner_size(980.0, 760.0)
-    .min_inner_size(720.0, 560.0)
-    .on_page_load(move |window, payload| {
-        if !matches!(payload.event(), PageLoadEvent::Finished) {
-            return;
-        }
-        if !is_bandcamp_capture_url(payload.url().as_str()) {
-            return;
-        }
-        let Some(cookie) = bandcamp_cookie_header_from_window(&window) else {
-            return;
-        };
+    let window =
+        WebviewWindowBuilder::new(&app, "bandcamp-connect", WebviewUrl::External(login_url))
+            .title("Connect Bandcamp")
+            .inner_size(980.0, 760.0)
+            .min_inner_size(720.0, 560.0)
+            .on_page_load(move |window, payload| {
+                if !matches!(payload.event(), PageLoadEvent::Finished) {
+                    return;
+                }
+                if !is_bandcamp_capture_url(payload.url().as_str()) {
+                    return;
+                }
+                let Some(cookie) = bandcamp_cookie_header_from_window(&window) else {
+                    return;
+                };
 
-        if let Some(main) = app_for_load.get_webview_window("main") {
-            let _ = main.emit("crate:bandcamp-cookie", BandcampCookiePayload { cookie });
-            let _ = main.show();
-            let _ = main.set_focus();
-        }
-        let _ = window.close();
-    })
-    .build()
-    .map_err(|err| err.to_string())?;
+                if let Some(main) = app_for_load.get_webview_window("main") {
+                    let _ = main.emit("crate:bandcamp-cookie", BandcampCookiePayload { cookie });
+                    let _ = main.show();
+                    let _ = main.set_focus();
+                }
+                let _ = window.close();
+            })
+            .build()
+            .map_err(|err| err.to_string())?;
 
     set_desktop_window_icon(&window);
     Ok(())
@@ -222,6 +298,18 @@ fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, String> {
     {
         Ok(None)
     }
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn register_deep_link_listener(
+    state: tauri::State<'_, DeepLinkState>,
+) -> Result<Vec<String>, String> {
+    state
+        .0
+        .lock()
+        .map(|mut buffer| buffer.mark_ready())
+        .map_err(|_| "deep-link buffer is unavailable".to_string())
 }
 
 #[cfg(desktop)]
@@ -274,96 +362,18 @@ fn truncate_menu_text(value: &str, max_chars: usize) -> String {
 
 #[cfg(desktop)]
 fn dispatch_deep_link_urls<R: tauri::Runtime>(window: &WebviewWindow<R>, urls: Vec<String>) {
-    let _ = window.emit("crate:deep-link", urls.clone());
-
-    if let Ok(payload) = serde_json::to_string(&urls) {
-        let script = format!(
-            "window.__crateHandleTauriDeepLinks && window.__crateHandleTauriDeepLinks({payload});"
-        );
-        let _ = window.eval(script);
-    }
-}
-
-#[cfg(desktop)]
-fn dispatch_oauth_callback<R: tauri::Runtime>(app: &tauri::AppHandle<R>, callback_url: String) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        dispatch_deep_link_urls(&window, vec![callback_url]);
-    }
-}
-
-#[cfg(desktop)]
-fn start_oauth_loopback<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
-    thread::spawn(move || {
-        let listener = match TcpListener::bind(("127.0.0.1", 17654)) {
-            Ok(listener) => listener,
-            Err(err) => {
-                eprintln!("failed to bind Crate OAuth loopback listener: {err}");
-                return;
-            }
-        };
-
-        for stream in listener.incoming() {
-            match stream {
-                Ok(mut stream) => handle_oauth_loopback_request(&app, &mut stream),
-                Err(err) => eprintln!("Crate OAuth loopback request failed: {err}"),
+    let state = window.state::<DeepLinkState>();
+    match state.0.lock() {
+        Ok(mut buffer) => {
+            if let Some(urls) = buffer.dispatch(urls) {
+                let _ = window.emit("crate:deep-link", urls);
             }
         }
-    });
+        Err(_) => {
+            let _ = window.emit("crate:deep-link", urls);
+        }
+    };
 }
-
-#[cfg(desktop)]
-fn handle_oauth_loopback_request<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-    stream: &mut TcpStream,
-) {
-    let mut buffer = [0_u8; 4096];
-    let read = stream.read(&mut buffer).unwrap_or(0);
-    let request = String::from_utf8_lossy(&buffer[..read]);
-    let request_target = request
-        .lines()
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .unwrap_or("/");
-
-    if let Some(query) = request_target.strip_prefix("/oauth/callback?") {
-        let callback_url = format!("cratemusic://oauth/callback?{query}");
-        dispatch_oauth_callback(app, callback_url);
-        let _ = stream.write_all(OAUTH_LOOPBACK_OK_RESPONSE.as_bytes());
-        return;
-    }
-
-    if request_target == "/oauth/callback" {
-        dispatch_oauth_callback(app, "cratemusic://oauth/callback".to_string());
-        let _ = stream.write_all(OAUTH_LOOPBACK_OK_RESPONSE.as_bytes());
-        return;
-    }
-
-    let _ = stream.write_all(OAUTH_LOOPBACK_NOT_FOUND_RESPONSE.as_bytes());
-}
-
-#[cfg(desktop)]
-const OAUTH_LOOPBACK_OK_RESPONSE: &str = concat!(
-    "HTTP/1.1 200 OK\r\n",
-    "Content-Type: text/html; charset=utf-8\r\n",
-    "Cache-Control: no-store\r\n",
-    "Connection: close\r\n",
-    "\r\n",
-    "<!doctype html><title>Crate Login</title>",
-    "<body style=\"font-family:system-ui;background:#07080d;color:#fff;display:grid;place-items:center;height:100vh;margin:0\">",
-    "<main><h1>Crate</h1><p>Login complete. You can close this window.</p></main>",
-    "</body>",
-);
-
-#[cfg(desktop)]
-const OAUTH_LOOPBACK_NOT_FOUND_RESPONSE: &str = concat!(
-    "HTTP/1.1 404 Not Found\r\n",
-    "Content-Type: text/plain; charset=utf-8\r\n",
-    "Connection: close\r\n",
-    "\r\n",
-    "Not found",
-);
 
 #[cfg(desktop)]
 fn show_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
@@ -441,59 +451,63 @@ fn should_restore_desktop_window_size<R: tauri::Runtime>(window: &Window<R>) -> 
 #[cfg(desktop)]
 fn emit_playback_command<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    command: &str,
+    command: PlaybackCommand,
     focus_window: bool,
 ) {
     if focus_window {
         show_main_window(app);
     }
-    let _ = app.emit("crate:tray-command", command);
+    let _ = app.emit("crate:tray-command", command.as_str());
 }
 
 #[cfg(desktop)]
-fn emit_tray_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>, command: &str) {
+fn emit_tray_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>, command: PlaybackCommand) {
     emit_playback_command(app, command, false);
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-pub(crate) fn emit_system_media_command(app: &tauri::AppHandle, command: &str) {
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+pub(crate) fn emit_system_media_command(app: &tauri::AppHandle, command: PlaybackCommand) {
     emit_playback_command(app, command, false);
 }
 
 #[cfg(desktop)]
-fn current_play_pause_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> &'static str {
+fn current_play_pause_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> PlaybackCommand {
     let Some(state) = app.try_state::<DesktopMenuState>() else {
-        return "play_pause";
+        return PlaybackCommand::PlayPause;
     };
 
     let command = match state.is_playing.lock() {
         Ok(is_playing) => play_pause_command_for_state(*is_playing),
-        Err(_) => "play_pause",
+        Err(_) => PlaybackCommand::PlayPause,
     };
     command
 }
 
 #[cfg(desktop)]
-fn play_pause_command_for_state(is_playing: bool) -> &'static str {
+fn play_pause_command_for_state(is_playing: bool) -> PlaybackCommand {
     if is_playing {
-        "pause"
+        PlaybackCommand::Pause
     } else {
-        "play"
+        PlaybackCommand::Play
     }
 }
 
 #[cfg(desktop)]
 fn handle_playback_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: &str) {
-    match id {
-        "play" => emit_tray_command(app, "play"),
-        "pause" => emit_tray_command(app, "pause"),
-        "play_pause" => emit_tray_command(app, current_play_pause_command(app)),
-        "previous" => emit_tray_command(app, "previous"),
-        "next" => emit_tray_command(app, "next"),
-        "show" => show_main_window(app),
-        "hide" => hide_main_window(app),
-        "quit" => app.exit(0),
-        _ => {}
+    let Some(command) = PlaybackCommand::parse(id) else {
+        return;
+    };
+    // No wildcard arm: adding a PlaybackCommand variant without handling
+    // it here is a compile error, not a silent no-op.
+    match command {
+        PlaybackCommand::Play => emit_tray_command(app, PlaybackCommand::Play),
+        PlaybackCommand::Pause => emit_tray_command(app, PlaybackCommand::Pause),
+        PlaybackCommand::PlayPause => emit_tray_command(app, current_play_pause_command(app)),
+        PlaybackCommand::Previous => emit_tray_command(app, PlaybackCommand::Previous),
+        PlaybackCommand::Next => emit_tray_command(app, PlaybackCommand::Next),
+        PlaybackCommand::Show => show_main_window(app),
+        PlaybackCommand::Hide => hide_main_window(app),
+        PlaybackCommand::Quit => app.exit(0),
     }
 }
 
@@ -584,17 +598,30 @@ fn set_desktop_window_icon<R: tauri::Runtime>(window: &WebviewWindow<R>) {
 
 #[cfg(desktop)]
 fn is_supported_activation_command(command: &str) -> bool {
+    // Deliberately narrower than every PlaybackCommand: Quit is a valid
+    // menu/dock/media-key command but must not be reachable from a CLI
+    // `--crate-command=` activation arg.
     matches!(
-        command,
-        "play" | "pause" | "play_pause" | "previous" | "next" | "show" | "hide"
+        PlaybackCommand::parse(command),
+        Some(
+            PlaybackCommand::Play
+                | PlaybackCommand::Pause
+                | PlaybackCommand::PlayPause
+                | PlaybackCommand::Previous
+                | PlaybackCommand::Next
+                | PlaybackCommand::Show
+                | PlaybackCommand::Hide
+        )
     )
 }
 
 #[cfg(target_os = "macos")]
 fn build_app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let play_pause = MenuItemBuilder::with_id("play_pause", "Play / Pause").build(app)?;
-    let previous = MenuItemBuilder::with_id("previous", "Previous").build(app)?;
-    let next = MenuItemBuilder::with_id("next", "Next").build(app)?;
+    let play_pause =
+        MenuItemBuilder::with_id(PlaybackCommand::PlayPause.as_str(), "Play / Pause").build(app)?;
+    let previous =
+        MenuItemBuilder::with_id(PlaybackCommand::Previous.as_str(), "Previous").build(app)?;
+    let next = MenuItemBuilder::with_id(PlaybackCommand::Next.as_str(), "Next").build(app)?;
     let playback = SubmenuBuilder::with_id(app, "playback", "Playback")
         .items(&[&play_pause, &previous, &next])
         .build()?;
@@ -643,12 +670,14 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<DesktopMenuState> {
     let now_artist = MenuItemBuilder::with_id("now_artist", "Crate")
         .enabled(false)
         .build(app)?;
-    let play_pause = MenuItemBuilder::with_id("play_pause", "Play / Pause").build(app)?;
-    let previous = MenuItemBuilder::with_id("previous", "Previous").build(app)?;
-    let next = MenuItemBuilder::with_id("next", "Next").build(app)?;
-    let show = MenuItemBuilder::with_id("show", "Show Crate").build(app)?;
-    let hide = MenuItemBuilder::with_id("hide", "Hide Crate").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Quit Crate").build(app)?;
+    let play_pause =
+        MenuItemBuilder::with_id(PlaybackCommand::PlayPause.as_str(), "Play / Pause").build(app)?;
+    let previous =
+        MenuItemBuilder::with_id(PlaybackCommand::Previous.as_str(), "Previous").build(app)?;
+    let next = MenuItemBuilder::with_id(PlaybackCommand::Next.as_str(), "Next").build(app)?;
+    let show = MenuItemBuilder::with_id(PlaybackCommand::Show.as_str(), "Show Crate").build(app)?;
+    let hide = MenuItemBuilder::with_id(PlaybackCommand::Hide.as_str(), "Hide Crate").build(app)?;
+    let quit = MenuItemBuilder::with_id(PlaybackCommand::Quit.as_str(), "Quit Crate").build(app)?;
     let separator = PredefinedMenuItem::separator(app)?;
 
     let menu = MenuBuilder::new(app)
@@ -695,9 +724,12 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            handle_activation_args(app, argv);
-        }));
+        builder =
+            builder
+                .manage(DeepLinkState::default())
+                .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+                    handle_activation_args(app, argv);
+                }));
     }
 
     #[cfg(target_os = "macos")]
@@ -729,6 +761,8 @@ pub fn run() {
                 macos_media_controls::install(app);
                 #[cfg(target_os = "linux")]
                 linux_media_controls::install(app);
+                #[cfg(target_os = "windows")]
+                windows_media_controls::install(app);
 
                 let handle = app.handle().clone();
                 if let Some(window) = handle.get_webview_window("main") {
@@ -736,7 +770,6 @@ pub fn run() {
                     enforce_desktop_webview_window_size(&window);
                 }
                 handle_activation_args(&handle, std::env::args());
-                start_oauth_loopback(handle.clone());
                 app.deep_link().on_open_url(move |event| {
                     let urls = event
                         .urls()
@@ -761,7 +794,8 @@ pub fn run() {
             cache_desktop_media_artwork,
             ensure_desktop_window_size,
             open_bandcamp_cookie_interceptor,
-            linux_desktop_theme_snapshot
+            linux_desktop_theme_snapshot,
+            register_deep_link_listener
         ])
         .build(tauri::generate_context!())
         .expect("error while building Crate desktop")
@@ -772,7 +806,33 @@ pub fn run() {
 mod tests {
     use super::{
         is_bandcamp_capture_url, is_supported_activation_command, play_pause_command_for_state,
+        DeepLinkBuffer, PlaybackCommand,
     };
+
+    #[test]
+    fn deep_links_are_buffered_until_the_frontend_listener_is_ready() {
+        let mut buffer = DeepLinkBuffer::default();
+
+        assert_eq!(
+            buffer.dispatch(vec!["cratemusic://oauth/callback?code=one".into()]),
+            None
+        );
+        assert_eq!(
+            buffer.mark_ready(),
+            vec!["cratemusic://oauth/callback?code=one"]
+        );
+    }
+
+    #[test]
+    fn deep_links_dispatch_immediately_after_the_frontend_handshake() {
+        let mut buffer = DeepLinkBuffer::default();
+        assert!(buffer.mark_ready().is_empty());
+
+        assert_eq!(
+            buffer.dispatch(vec!["cratemusic://oauth/callback?code=two".into()]),
+            Some(vec!["cratemusic://oauth/callback?code=two".into()])
+        );
+    }
 
     #[test]
     fn activation_commands_include_system_media_controls() {
@@ -792,15 +852,39 @@ mod tests {
     }
 
     #[test]
+    fn quit_is_a_valid_menu_command_but_not_an_activation_arg() {
+        assert!(PlaybackCommand::parse("quit").is_some());
+        assert!(!is_supported_activation_command("quit"));
+    }
+
+    #[test]
     fn play_pause_menu_resolves_to_explicit_transport_commands() {
-        assert_eq!(play_pause_command_for_state(true), "pause");
-        assert_eq!(play_pause_command_for_state(false), "play");
+        assert_eq!(play_pause_command_for_state(true), PlaybackCommand::Pause);
+        assert_eq!(play_pause_command_for_state(false), PlaybackCommand::Play);
+    }
+
+    #[test]
+    fn transport_commands_match_the_frontend_contract() {
+        // Mirrors DesktopTrayCommand in app/listen/src/lib/desktop-tray.ts —
+        // update both together.
+        for (command, wire) in [
+            (PlaybackCommand::Play, "play"),
+            (PlaybackCommand::Pause, "pause"),
+            (PlaybackCommand::PlayPause, "play_pause"),
+            (PlaybackCommand::Previous, "previous"),
+            (PlaybackCommand::Next, "next"),
+        ] {
+            assert_eq!(command.as_str(), wire);
+            assert_eq!(PlaybackCommand::parse(wire), Some(command));
+        }
     }
 
     #[test]
     fn bandcamp_capture_url_is_restricted_to_bandcamp_hosts() {
         assert!(is_bandcamp_capture_url("https://bandcamp.com/login"));
         assert!(is_bandcamp_capture_url("https://foo.bandcamp.com/"));
-        assert!(!is_bandcamp_capture_url("https://evil.example.com/bandcamp.com"));
+        assert!(!is_bandcamp_capture_url(
+            "https://evil.example.com/bandcamp.com"
+        ));
     }
 }

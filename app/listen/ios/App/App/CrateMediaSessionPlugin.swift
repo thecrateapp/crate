@@ -17,14 +17,18 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "presentRoutePicker", returnType: CAPPluginReturnPromise)
     ]
 
-    private var remoteCommandTokens: [Any] = []
-    private var artworkRequestId = 0
+    private var remoteCommandTokens: [(MPRemoteCommand, Any)] = []
+    private var artworkState = CrateMediaSessionArtworkState()
+    private var cachedArtworkUrl: String?
+    private var cachedArtwork: MPMediaItemArtwork?
     private var routePickerOverlay: UIView?
     private var routePickerDismissWorkItem: DispatchWorkItem?
+    private var lastKnownIsPlaying = false
+    private var interruptionState = CrateMediaSessionInterruptionState()
+    private var activationState = CrateMediaSessionActivationState()
 
     override func load() {
         super.load()
-        configureAudioSession()
         configureRemoteCommands()
         NotificationCenter.default.addObserver(
             self,
@@ -32,17 +36,18 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             name: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance()
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioSessionInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-        let commandCenter = MPRemoteCommandCenter.shared()
-        for token in remoteCommandTokens {
-            commandCenter.playCommand.removeTarget(token)
-            commandCenter.pauseCommand.removeTarget(token)
-            commandCenter.nextTrackCommand.removeTarget(token)
-            commandCenter.previousTrackCommand.removeTarget(token)
-            commandCenter.changePlaybackPositionCommand.removeTarget(token)
+        for (command, token) in remoteCommandTokens {
+            command.removeTarget(token)
         }
     }
 
@@ -58,6 +63,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         let album = call.getString("album", "")
         let artwork = call.getString("artwork", "")
         let isPlaying = call.getBool("isPlaying", false)
+        lastKnownIsPlaying = isPlaying
         let duration = max(0, call.getDouble("duration", 0))
         let position = max(0, min(call.getDouble("position", 0), duration > 0 ? duration : call.getDouble("position", 0)))
 
@@ -73,8 +79,17 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             info[MPMediaItemPropertyPlaybackDuration] = duration
         }
 
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        loadArtwork(from: artwork, into: info)
+        if artwork == cachedArtworkUrl, let cachedArtwork {
+            // update() is called roughly once per second while playing —
+            // without this, we were re-downloading and re-decoding the same
+            // album art over and over for the whole length of a track.
+            artworkState.cancelPendingRequest()
+            info[MPMediaItemPropertyArtwork] = cachedArtwork
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        } else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            loadArtwork(from: artwork)
+        }
         call.resolve()
     }
 
@@ -160,18 +175,36 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stop(_ call: CAPPluginCall) {
-        artworkRequestId += 1
+        artworkState.stop()
+        lastKnownIsPlaying = false
+        interruptionState.stop()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        deactivateAudioSession()
         call.resolve()
     }
 
     private func configureAudioSession() {
+        guard activationState.activate() else { return }
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetoothA2DP])
             try session.setActive(true)
         } catch {
+            _ = activationState.deactivate()
             NSLog("CrateMediaSessionPlugin failed to configure AVAudioSession: \(error.localizedDescription)")
+        }
+    }
+
+    private func deactivateAudioSession() {
+        guard activationState.deactivate() else { return }
+        do {
+            try AVAudioSession.sharedInstance().setActive(
+                false,
+                options: .notifyOthersOnDeactivation
+            )
+        } catch {
+            _ = activationState.activate()
+            NSLog("CrateMediaSessionPlugin failed to deactivate AVAudioSession: \(error.localizedDescription)")
         }
     }
 
@@ -183,27 +216,29 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         commandCenter.previousTrackCommand.isEnabled = true
         commandCenter.changePlaybackPositionCommand.isEnabled = true
 
-        remoteCommandTokens.append(commandCenter.playCommand.addTarget { [weak self] _ in
+        remoteCommandTokens.append((commandCenter.playCommand, commandCenter.playCommand.addTarget { [weak self] _ in
             self?.sendControl("play")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.pauseCommand.addTarget { [weak self] _ in
+        }))
+        remoteCommandTokens.append((commandCenter.pauseCommand, commandCenter.pauseCommand.addTarget { [weak self] _ in
+            self?.interruptionState.pause()
+            self?.lastKnownIsPlaying = false
             self?.sendControl("pause")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+        }))
+        remoteCommandTokens.append((commandCenter.nextTrackCommand, commandCenter.nextTrackCommand.addTarget { [weak self] _ in
             self?.sendControl("next")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+        }))
+        remoteCommandTokens.append((commandCenter.previousTrackCommand, commandCenter.previousTrackCommand.addTarget { [weak self] _ in
             self?.sendControl("previous")
             return .success
-        })
-        remoteCommandTokens.append(commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
+        }))
+        remoteCommandTokens.append((commandCenter.changePlaybackPositionCommand, commandCenter.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
             self?.sendControl("seekTo", position: event.positionTime)
             return .success
-        })
+        }))
     }
 
     private func sendControl(_ control: String, position: Double? = nil) {
@@ -221,6 +256,40 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             data: ["route": currentRoutePayload()],
             retainUntilConsumed: true
         )
+    }
+
+    @objc private func handleAudioSessionInterruption(_ notification: Notification) {
+        // A phone call, Siri, or another app grabbing the audio session
+        // stops our output without any route change and without ever
+        // calling back into JS — without this, the lock screen (and JS's
+        // own isPlaying state, which drives it) is left showing "playing"
+        // indefinitely after the interruption ends.
+        guard
+            let info = notification.userInfo,
+            let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+            let type = AVAudioSession.InterruptionType(rawValue: typeValue)
+        else { return }
+
+        switch type {
+        case .began:
+            // Capture our own state before we force a pause, since a
+            // subsequent .ended callback can't tell the difference between
+            // "we were playing and got interrupted" and "the user had
+            // already paused before the interruption" — resuming in the
+            // latter case would silently undo the user's own pause.
+            interruptionState.begin(wasPlaying: lastKnownIsPlaying)
+            activationState.interrupted()
+            sendControl("pause")
+        case .ended:
+            let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            let shouldResume = AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume)
+            if interruptionState.end(systemAllowsResume: shouldResume) {
+                configureAudioSession()
+                sendControl("play")
+            }
+        @unknown default:
+            break
+        }
     }
 
     @objc private func dismissRoutePickerOverlay() {
@@ -262,24 +331,30 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    private func loadArtwork(from artworkUrl: String, into baseInfo: [String: Any]) {
-        guard let url = URL(string: artworkUrl), !artworkUrl.isEmpty else { return }
-        artworkRequestId += 1
-        let currentRequestId = artworkRequestId
+    private func loadArtwork(from artworkUrl: String) {
+        guard let request = artworkState.beginRequest(for: artworkUrl) else { return }
 
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            guard
-                let self,
-                currentRequestId == self.artworkRequestId,
-                let data,
-                let decodedArtwork = CrateArtworkDownsampler.decode(data: data)
-            else { return }
-
-            let image = UIImage(cgImage: decodedArtwork)
-            let mediaArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+        URLSession.shared.dataTask(with: request.url) { [weak self] data, _, _ in
+            guard let self else { return }
+            let decodedArtwork = data.flatMap {
+                CrateArtworkDownsampler.decode(data: $0)
+            }
             DispatchQueue.main.async {
-                guard currentRequestId == self.artworkRequestId else { return }
-                var nextInfo = baseInfo
+                guard self.artworkState.complete(request), let decodedArtwork else { return }
+                let image = UIImage(cgImage: decodedArtwork)
+                let mediaArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                self.cachedArtworkUrl = artworkUrl
+                self.cachedArtwork = mediaArtwork
+                // Merge into whatever is *currently* published, not the
+                // info snapshot captured when this download started —
+                // update() fires roughly once per second, so a slow
+                // download completing later would otherwise overwrite a
+                // since-advanced position/playbackRate with stale values.
+                // If nowPlayingInfo is nil, stop() cleared it in the
+                // meantime; don't resurrect stale info over that.
+                guard var nextInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo else {
+                    return
+                }
                 nextInfo[MPMediaItemPropertyArtwork] = mediaArtwork
                 MPNowPlayingInfoCenter.default().nowPlayingInfo = nextInfo
             }

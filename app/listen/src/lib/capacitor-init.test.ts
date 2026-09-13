@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { appAddListener, networkAddListener } = vi.hoisted(() => ({
+const {
+  appAddListener,
+  networkAddListener,
+  retryPendingNativeOAuthCallback,
+  statusBarSetStyle,
+} = vi.hoisted(() => ({
   appAddListener: vi.fn(),
   networkAddListener: vi.fn(),
+  retryPendingNativeOAuthCallback: vi.fn(),
+  statusBarSetStyle: vi.fn(),
 }));
 
 vi.mock("@capacitor/app", () => ({
@@ -33,15 +40,16 @@ vi.mock("@capacitor/network", () => ({
 
 vi.mock("@capacitor/status-bar", () => ({
   StatusBar: {
-    setStyle: vi.fn(),
+    setStyle: statusBarSetStyle,
     setOverlaysWebView: vi.fn(),
     setBackgroundColor: vi.fn(),
   },
-  Style: { Dark: "dark" },
+  Style: { Dark: "dark", Light: "light" },
 }));
 
 vi.mock("@/lib/capacitor-oauth", () => ({
   consumeOAuthCallbackUrl: vi.fn(),
+  retryPendingNativeOAuthCallback,
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -55,6 +63,10 @@ describe("Capacitor initialization", () => {
     vi.resetModules();
     appAddListener.mockReset();
     networkAddListener.mockReset();
+    statusBarSetStyle.mockReset();
+    retryPendingNativeOAuthCallback
+      .mockReset()
+      .mockResolvedValue({ handled: false, next: "/" });
     appAddListener.mockResolvedValue({ remove: vi.fn() });
     networkAddListener.mockResolvedValue({ remove: vi.fn() });
   });
@@ -66,5 +78,13 @@ describe("Capacitor initialization", () => {
 
     expect(appAddListener).toHaveBeenCalledTimes(4);
     expect(networkAddListener).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps the resolved appearance mode to the native status bar", async () => {
+    const { applyNativeColorMode } = await import("./capacitor-init");
+
+    await applyNativeColorMode("light");
+
+    expect(statusBarSetStyle).toHaveBeenCalledWith({ style: "light" });
   });
 });

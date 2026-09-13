@@ -15,6 +15,10 @@ import type {
   EngineTrack,
   PlaybackEngine,
 } from "@/lib/playback-engine";
+import {
+  beginNativePlaybackIntent,
+  cancelNativePlaybackRecoveryIntent,
+} from "@/lib/native-playback-intent";
 
 const NATIVE_PLAYER_DISABLED_KEY = "crate-native-player-disabled";
 const NATIVE_PLAYER_CROSSFADE_KEY = "crate-native-player-crossfade-enabled";
@@ -199,17 +203,20 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async play(): Promise<EngineState> {
+    beginNativePlaybackIntent();
     await this.ensureReady();
     await this.ensureNotificationPermission();
     return nativePlayback.play();
   }
 
   async pause(): Promise<EngineState> {
+    cancelNativePlaybackRecoveryIntent("pause");
     await this.ensureReady();
     return nativePlayback.pause();
   }
 
   async stop(): Promise<EngineState> {
+    cancelNativePlaybackRecoveryIntent("stop");
     await this.ensureReady();
     return nativePlayback.stop();
   }
@@ -300,6 +307,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
 
   async getState(): Promise<EngineState | null> {
     try {
+      await this.ensureReady();
       const state = await nativePlayback.getState();
       if (state.revision) this.queueRevision = state.revision;
       return state;
@@ -311,6 +319,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
   async drainEvents(): Promise<
     Array<{ event: EngineEventName; payload: EngineEventMap[EngineEventName] }>
   > {
+    await this.ensureReady();
     const response = await nativePlayback.drainEvents();
     return (response.events ?? []).flatMap((event) => {
       if (!event.event || !event.payload) return [];
@@ -329,6 +338,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async destroy(): Promise<void> {
+    cancelNativePlaybackRecoveryIntent("stop");
     await this.ensureReady();
     await nativePlayback.stop();
   }

@@ -3,8 +3,15 @@ import { Keyboard, KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 import { Network } from "@capacitor/network";
 import { StatusBar, Style } from "@capacitor/status-bar";
 
-import { consumeOAuthCallbackUrl } from "@/lib/capacitor-oauth";
+import {
+  consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthCallback,
+} from "@/lib/capacitor-oauth";
 import { isIosRuntime, isNative, platform } from "@/lib/capacitor-runtime";
+import {
+  getAppliedThemeSkin,
+  type ResolvedColorMode,
+} from "@crate/ui/lib/theme-skin";
 
 let viewportFallbackInitialized = false;
 let keyboardInitialized = false;
@@ -91,7 +98,7 @@ async function initializeCapacitor(): Promise<string | null> {
   await initKeyboardHandling();
 
   try {
-    await StatusBar.setStyle({ style: Style.Dark });
+    await applyNativeColorMode(getAppliedThemeSkin().resolvedMode);
     await StatusBar.setOverlaysWebView({ overlay: true });
     if (platform === "android") {
       await StatusBar.setBackgroundColor({ color: "#00000000" });
@@ -127,6 +134,7 @@ async function initializeCapacitor(): Promise<string | null> {
 
   App.addListener("resume", () => {
     window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+    void retryPendingOAuthExchange();
   });
 
   try {
@@ -138,6 +146,8 @@ async function initializeCapacitor(): Promise<string | null> {
     // Ignore launch URL failures
   }
 
+  await retryPendingOAuthExchange();
+
   Network.addListener("networkStatusChange", (status) => {
     console.log(
       "[capacitor] network:",
@@ -145,10 +155,32 @@ async function initializeCapacitor(): Promise<string | null> {
     );
     if (status.connected) {
       window.dispatchEvent(new CustomEvent("crate:network-restored"));
+      void retryPendingOAuthExchange();
     }
   });
 
   return null;
+}
+
+async function retryPendingOAuthExchange(): Promise<void> {
+  const result = await retryPendingNativeOAuthCallback();
+  if (result.handled) {
+    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
+  }
+}
+
+export async function applyNativeColorMode(
+  mode: ResolvedColorMode,
+): Promise<void> {
+  if (!isNative) return;
+
+  try {
+    await StatusBar.setStyle({
+      style: mode === "dark" ? Style.Dark : Style.Light,
+    });
+  } catch {
+    // Native status-bar support is best-effort across Capacitor shells.
+  }
 }
 
 export function initCapacitor(): Promise<string | null> {

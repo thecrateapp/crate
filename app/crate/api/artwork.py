@@ -39,6 +39,8 @@ from crate.api.schemas.artwork import (
     ArtistHeroCandidateAnalysisRequest,
     ArtistHeroRecipe,
     ArtistHeroReviewRequest,
+    ArtistHeroMigrationRequest,
+    ArtistHeroRollbackRequest,
 )
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
@@ -52,12 +54,14 @@ from crate.artist_hero_contract import (
     artist_hero_profile_contract,
     artist_hero_profile_ready_compositions,
 )
+from crate.artist_hero_publication import resolve_artist_hero_publication_path
 from crate.db.repositories.library import get_albums_missing_covers, get_library_artist
 from crate.db.repositories.artist_artwork_assets import (
     get_artist_artwork_asset,
     list_artist_artwork_assets,
 )
 from crate.db.repositories.artist_hero_artwork import (
+    artist_hero_manifest_id,
     get_artist_hero_artwork,
     update_artist_hero_review_status,
 )
@@ -83,6 +87,17 @@ _ARTWORK_RESPONSES = merge_responses(
 
 def _require_artwork_editor(request: Request) -> dict:
     return require_permission(request, "library.metadata.write")
+
+
+def _artist_hero_expected_state(artist_id: int) -> dict[str, str | None]:
+    profile = get_artist_hero_artwork(artist_id)
+    manifest = profile.get("render_manifest") if profile else None
+    return {
+        "expected_revision": str(profile.get("revision") or "") if profile else None,
+        "expected_active_manifest_id": (
+            artist_hero_manifest_id(manifest) if isinstance(manifest, dict) else None
+        ),
+    }
 
 
 @router.get(
@@ -401,6 +416,7 @@ async def api_upload_background_by_entity_uid(
 async def api_upload_artist_hero(
     request: Request,
     name: str,
+    artist_id: int,
     file: UploadFile,
     desktop_recipe: str,
     mobile_recipe: str,
@@ -436,6 +452,7 @@ async def api_upload_artist_hero(
             "desktop_recipe": desktop.model_dump(),
             "mobile_recipe": mobile.model_dump(),
             "composition": composition,
+            **_artist_hero_expected_state(artist_id),
         },
     )
     return {"status": "queued", "task_id": task_id}
@@ -460,7 +477,13 @@ async def api_upload_artist_hero_by_id(
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
     return await api_upload_artist_hero(
-        request, artist_name, file, desktop_recipe, mobile_recipe, composition
+        request,
+        artist_name,
+        artist_id,
+        file,
+        desktop_recipe,
+        mobile_recipe,
+        composition,
     )
 
 
@@ -482,8 +505,17 @@ async def api_upload_artist_hero_by_entity_uid(
     artist_name = artist_name_from_entity_uid(artist_entity_uid)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
+    artist_row = get_library_artist(artist_name)
+    if not artist_row:
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
     return await api_upload_artist_hero(
-        request, artist_name, file, desktop_recipe, mobile_recipe, composition
+        request,
+        artist_name,
+        int(artist_row["id"]),
+        file,
+        desktop_recipe,
+        mobile_recipe,
+        composition,
     )
 
 
@@ -501,12 +533,14 @@ def api_artist_hero_profile(request: Request, artist_id: int):
     if not profile:
         return JSONResponse({"error": "Artist hero not found"}, status_code=404)
     featured_state = get_artist_featured_state(artist_id) or {}
-    payload = {
-        **profile,
-        "is_featured": bool(featured_state.get("is_featured")),
-        "featured_devices": list(artist_hero_profile_ready_compositions(profile)),
-        **artist_hero_profile_contract(artist_id=artist_id, profile=profile),
-    }
+    payload = {key: value for key, value in profile.items() if key != "render_manifest"}
+    payload.update(
+        {
+            "is_featured": bool(featured_state.get("is_featured")),
+            "featured_devices": list(artist_hero_profile_ready_compositions(profile)),
+        }
+    )
+    payload.update(artist_hero_profile_contract(artist_id=artist_id, profile=profile))
     return JSONResponse(
         jsonable_encoder(payload), headers={"Cache-Control": "no-store"}
     )
@@ -537,21 +571,37 @@ def api_artist_hero_source(
 
     if composition not in {None, "desktop", "mobile"}:
         return JSONResponse({"error": "Invalid composition"}, status_code=400)
+    profile = get_artist_hero_artwork(int(artist_id)) or {}
     if composition:
-        profile = get_artist_hero_artwork(int(artist_id))
         if profile and profile.get(f"{composition}_enabled", True) is False:
             return JSONResponse(
                 {"error": "Artist hero composition not found"}, status_code=404
             )
-    composition_path = (
-        artist_dir / f"artist-hero-source-{composition}.jpg"
-        if composition
-        else artist_dir / "artist-hero-source.jpg"
-    )
-    source_path = composition_path.resolve()
-    if composition and not source_path.is_file():
-        source_path = (artist_dir / "artist-hero-source.jpg").resolve()
-    if not source_path.is_relative_to(root) or not source_path.is_file():
+
+    manifest = profile.get("render_manifest")
+    artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
+    source_path = None
+    if composition:
+        artifact = artifacts.get(composition) if isinstance(artifacts, dict) else None
+        if isinstance(artifact, dict):
+            candidate = resolve_artist_hero_publication_path(
+                artifact.get("source_relative_path"), root=cache_root()
+            )
+            if candidate is not None and candidate.is_file():
+                source_path = candidate
+
+    if source_path is None:
+        composition_path = (
+            artist_dir / f"artist-hero-source-{composition}.jpg"
+            if composition
+            else artist_dir / "artist-hero-source.jpg"
+        )
+        source_path = composition_path.resolve()
+        if composition and not source_path.is_file():
+            source_path = (artist_dir / "artist-hero-source.jpg").resolve()
+        if not source_path.is_relative_to(root):
+            source_path = None
+    if source_path is None or not source_path.is_file():
         return JSONResponse({"error": "Artist hero source not found"}, status_code=404)
     return deliver_original_artwork(
         source_path,
@@ -917,6 +967,7 @@ def api_compose_artist_hero(
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
+    expected_state = _artist_hero_expected_state(artist_id)
     task_id = create_task(
         "compose_artist_hero",
         {
@@ -924,6 +975,7 @@ def api_compose_artist_hero(
             "desktop_recipe": body.desktop_recipe.model_dump(),
             "mobile_recipe": body.mobile_recipe.model_dump(),
             "composition": body.composition,
+            **expected_state,
         },
     )
     return {"status": "queued", "task_id": task_id}
@@ -975,13 +1027,16 @@ def api_delete_artist_hero_composition(
         return JSONResponse(
             {"error": "Artist hero composition not found"}, status_code=404
         )
+    params = {
+        "artist": artist_name,
+        "artist_id": artist_id,
+        "composition": composition,
+    }
+    if profile.get("revision"):
+        params["expected_revision"] = str(profile["revision"])
     task_id = create_task(
         "delete_artist_hero_composition",
-        {
-            "artist": artist_name,
-            "artist_id": artist_id,
-            "composition": composition,
-        },
+        params,
     )
     return {"status": "queued", "task_id": task_id}
 
@@ -1013,5 +1068,61 @@ def api_backfill_artist_heroes(request: Request):
     _require_artwork_editor(request)
     task_id = create_task(
         "backfill_artist_heroes", {"after_artist_id": 0, "batch_size": 25}
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.post(
+    "/api/artwork/artist-heroes/migration-canary",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Run a dry-run artist-hero publication migration canary",
+)
+def api_migrate_artist_heroes(
+    request: Request, body: ArtistHeroMigrationRequest | None = None
+):
+    _require_artwork_editor(request)
+    payload = body or ArtistHeroMigrationRequest()
+    task_id = create_task(
+        "migrate_artist_heroes",
+        {
+            "after_artist_id": payload.after_artist_id,
+            "batch_size": payload.batch_size,
+            "dry_run": payload.dry_run,
+        },
+    )
+    return {"status": "queued", "task_id": task_id}
+
+
+@router.post(
+    "/api/artwork/artists/{artist_id}/hero-profile/rollback",
+    response_model=ArtworkQueuedResponse,
+    response_model_exclude_none=True,
+    responses=_ARTWORK_RESPONSES,
+    summary="Queue rollback to a retained artist-hero manifest",
+)
+def api_rollback_artist_hero(
+    request: Request, artist_id: int, body: ArtistHeroRollbackRequest
+):
+    _require_artwork_editor(request)
+    if not artist_name_from_id(artist_id):
+        return JSONResponse({"error": "Artist not found"}, status_code=404)
+    profile = get_artist_hero_artwork(artist_id)
+    if not profile:
+        return JSONResponse({"error": "Artist hero not found"}, status_code=404)
+    active_manifest = profile.get("render_manifest")
+    if not isinstance(active_manifest, dict):
+        return JSONResponse(
+            {"error": "Artist hero has no versioned manifest"}, status_code=409
+        )
+    task_id = create_task(
+        "rollback_artist_hero",
+        {
+            "artist_id": artist_id,
+            "expected_revision": str(profile.get("revision") or ""),
+            "expected_active_manifest_id": artist_hero_manifest_id(active_manifest),
+            "target_manifest_id": body.target_manifest_id,
+        },
     )
     return {"status": "queued", "task_id": task_id}

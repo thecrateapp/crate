@@ -25,6 +25,7 @@ vi.mock("react-router", async () => {
 import { api, ApiError } from "@/lib/api";
 import { TopBarSearch } from "@/components/layout/topbar/TopBarSearch";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
+import { TOP_BAR_SEARCH_RECENTS_STORAGE_KEY } from "./topbar-search-model";
 
 function mockHoverPointer(matches: boolean) {
   vi.stubGlobal(
@@ -238,6 +239,7 @@ describe("TopBarSearch", () => {
       expect(screen.getByText("High Vis")).toBeTruthy();
     });
 
+    expect(screen.getByText("High Vis")).toHaveClass("text-text-primary/80");
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
       "listen-glass-panel",
       "rounded-[12px]",
@@ -415,7 +417,7 @@ describe("TopBarSearch", () => {
   it("navigates directly when a recent entry has a destination", async () => {
     const user = userEvent.setup();
     localStorage.setItem(
-      "listen-search-recents",
+      TOP_BAR_SEARCH_RECENTS_STORAGE_KEY,
       JSON.stringify([
         { label: "High Vis", type: "artist", navigateTo: "/artists/high-vis" },
       ]),
@@ -432,7 +434,10 @@ describe("TopBarSearch", () => {
 
   it("keeps query search behaviour for legacy plain recent entries", async () => {
     const user = userEvent.setup();
-    localStorage.setItem("listen-search-recents", JSON.stringify(["Converge"]));
+    localStorage.setItem(
+      TOP_BAR_SEARCH_RECENTS_STORAGE_KEY,
+      JSON.stringify(["Converge"]),
+    );
     renderWithListenProviders(<TopBarSearch />);
 
     const searchButton = screen.getByRole("button", { name: "Search" });
@@ -445,5 +450,22 @@ describe("TopBarSearch", () => {
     );
     expect(input).toHaveValue("Converge");
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("migrates recents from the legacy storage key", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      "listen-search-recents",
+      JSON.stringify(["Legacy artist"]),
+    );
+    renderWithListenProviders(<TopBarSearch />);
+
+    await user.click(screen.getByRole("button", { name: "Search" }));
+
+    expect(await screen.findByText("Legacy artist")).toBeInTheDocument();
+    expect(localStorage.getItem("listen-search-recents")).toBeNull();
+    expect(
+      localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY),
+    ).not.toBeNull();
   });
 });

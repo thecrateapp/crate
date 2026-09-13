@@ -4,17 +4,43 @@ from __future__ import annotations
 
 import shutil
 import time
+import logging
 from typing import Iterator, cast
 
+from crate.artist_hero_publication import (
+    ARTIST_HERO_PUBLICATION_PREFIX,
+    ArtistHeroArtifactIdentity,
+    artist_hero_artifact_asset,
+    artist_hero_artifact_root,
+    artist_hero_publication_lock,
+    delete_artist_hero_storage,
+)
+from crate.artist_hero_retention import (
+    retained_artist_hero_revisions,
+    retained_artist_hero_revisions_from_manifests,
+)
 from crate.artwork_variants import (
     ARTWORK_KINDS,
     ArtworkAsset,
     ArtworkKind,
+    artwork_asset_root,
     artwork_variant_root,
     load_current_manifest,
 )
+from crate.db.repositories.artist_hero_artwork import (
+    artist_hero_manifest_id,
+    get_artist_hero_artwork,
+    list_artist_hero_manifest_history,
+    list_artist_hero_render_revision_artists,
+    list_artist_hero_render_revisions,
+)
+from crate.db.repositories.library_artist_reads import (
+    get_library_artist_by_entity_uid,
+)
+from crate.streaming.paths import cache_root
 
 _TEMP_MAX_AGE_SECONDS = 24 * 3600
+log = logging.getLogger(__name__)
 
 
 def _iter_assets(max_assets: int) -> Iterator[ArtworkAsset]:
@@ -201,10 +227,197 @@ def cleanup_artwork_variants(*, max_assets: int = 1000) -> dict[str, int]:
                 continue
             shutil.rmtree(revision, ignore_errors=True)
             result["revisions_removed"] += 1
+    try:
+        hero_result = cleanup_artist_hero_publications(max_artists=max_assets)
+    except Exception:
+        log.warning("Artist hero publication cleanup failed", exc_info=True)
+        hero_result = {
+            "artists_checked": 0,
+            "revisions_removed": 0,
+            "temporary_removed": 0,
+            "orphan_revisions_removed": 0,
+        }
+    result.update(
+        {
+            "artist_hero_artists_checked": hero_result["artists_checked"],
+            "artist_hero_revisions_removed": hero_result["revisions_removed"],
+            "artist_hero_temporary_removed": hero_result["temporary_removed"],
+            "artist_hero_orphan_revisions_removed": hero_result[
+                "orphan_revisions_removed"
+            ],
+        }
+    )
+    return result
+
+
+def cleanup_artist_hero_publications(
+    *, max_artists: int = 1000, keep_per_composition: int = 2
+) -> dict[str, int]:
+    """Remove stale publications and expired artifacts left by crashed workers."""
+
+    now = time.time()
+    result = {
+        "artists_checked": 0,
+        "revisions_removed": 0,
+        "temporary_removed": 0,
+        "orphan_revisions_removed": 0,
+    }
+    capped_limit = max(1, int(max_artists))
+    artists = list_artist_hero_render_revision_artists(limit=capped_limit)
+    publication_root = cache_root()
+    namespace_root = publication_root / ARTIST_HERO_PUBLICATION_PREFIX
+
+    def _expired(path) -> bool:
+        try:
+            return now - path.stat().st_mtime > _TEMP_MAX_AGE_SECONDS
+        except OSError:
+            return False
+
+    def _remove_tree(path) -> bool:
+        try:
+            if path.is_symlink():
+                path.unlink()
+            elif path.is_dir():
+                shutil.rmtree(path)
+        except OSError:
+            return False
+        return not path.exists()
+
+    known_entity_uids = {str(artist.get("entity_uid") or "") for artist in artists}
+    discovered_count = len(artists)
+    if namespace_root.is_dir() and len(artists) < capped_limit:
+        for entity_root in sorted(namespace_root.iterdir()):
+            entity_uid = entity_root.name
+            if (
+                discovered_count >= capped_limit
+                or not entity_root.is_dir()
+                or entity_root.is_symlink()
+                or entity_uid in known_entity_uids
+            ):
+                continue
+            artist = get_library_artist_by_entity_uid(entity_uid)
+            if not artist:
+                if not _expired(entity_root):
+                    continue
+                revision_count = sum(
+                    1
+                    for composition_root in entity_root.iterdir()
+                    if composition_root.is_dir() and not composition_root.is_symlink()
+                    for revision_root in composition_root.iterdir()
+                    if revision_root.is_dir()
+                    and not revision_root.is_symlink()
+                    and not revision_root.name.startswith(".")
+                )
+                removed = delete_artist_hero_storage(entity_uid)
+                if removed["publication_roots_removed"]:
+                    result["orphan_revisions_removed"] += revision_count
+                    result["revisions_removed"] += revision_count
+                result["artists_checked"] += 1
+                discovered_count += 1
+                continue
+            artists.append({"artist_id": int(artist["id"]), "entity_uid": entity_uid})
+            known_entity_uids.add(entity_uid)
+            discovered_count += 1
+
+    for artist in artists:
+        result["artists_checked"] += 1
+        artist_id = int(artist["artist_id"])
+        with artist_hero_publication_lock(publication_root, artist_id):
+            profile = get_artist_hero_artwork(artist_id) or {}
+            enabled_compositions = {
+                composition
+                for composition in ("desktop", "mobile")
+                if profile.get(f"{composition}_enabled", True) is not False
+            }
+            manifest = profile.get("render_manifest")
+            artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
+            active_revisions = {
+                composition: str(artifact.get("render_revision") or "")
+                for composition, artifact in (artifacts or {}).items()
+                if composition in enabled_compositions and isinstance(artifact, dict)
+            }
+            history = list_artist_hero_render_revisions(artist_id)
+            known_revisions = {
+                (
+                    str(row.get("composition") or ""),
+                    str(row.get("render_revision") or ""),
+                )
+                for row in history
+            }
+            manifest_history = list_artist_hero_manifest_history(artist_id)
+            if isinstance(manifest, dict) and manifest_history:
+                retained = retained_artist_hero_revisions_from_manifests(
+                    manifest_history,
+                    artist_hero_manifest_id(manifest),
+                    keep_manifest_count=max(2, keep_per_composition),
+                )
+                retained.update(active_revisions.items())
+            else:
+                retained = retained_artist_hero_revisions(
+                    history,
+                    active_revisions,
+                    keep_per_composition=keep_per_composition,
+                )
+            retained = {item for item in retained if item[0] in enabled_compositions}
+            for row in history:
+                composition = str(row.get("composition") or "")
+                revision = str(row.get("render_revision") or "")
+                if (composition, revision) in retained:
+                    continue
+                try:
+                    identity = ArtistHeroArtifactIdentity(
+                        artist_entity_uid=str(artist.get("entity_uid") or ""),
+                        composition=composition,
+                        render_revision=revision,
+                    )
+                except ValueError:
+                    continue
+                removed = False
+                path = artist_hero_artifact_root(identity, root=publication_root)
+                if path.is_dir() and _remove_tree(path):
+                    removed = True
+                variant_path = artwork_asset_root(artist_hero_artifact_asset(identity))
+                if variant_path.is_dir() and _remove_tree(variant_path):
+                    removed = True
+                if removed:
+                    result["revisions_removed"] += 1
+
+            entity_root = namespace_root / str(artist.get("entity_uid") or "")
+            if not entity_root.is_dir() or entity_root.is_symlink():
+                continue
+            for composition in ("desktop", "mobile"):
+                composition_root = entity_root / composition
+                if not composition_root.is_dir() or composition_root.is_symlink():
+                    continue
+                for child in list(composition_root.iterdir()):
+                    if child.name.startswith("."):
+                        if _expired(child) and _remove_tree(child):
+                            result["temporary_removed"] += 1
+                        continue
+                    identity_key = (composition, child.name)
+                    if (
+                        not child.is_dir()
+                        or identity_key in known_revisions
+                        or active_revisions.get(composition) == child.name
+                        or not _expired(child)
+                    ):
+                        continue
+                    if _remove_tree(child):
+                        result["orphan_revisions_removed"] += 1
+                        result["revisions_removed"] += 1
+                try:
+                    composition_root.rmdir()
+                except OSError:
+                    pass
+            try:
+                entity_root.rmdir()
+            except OSError:
+                pass
     return result
 
 
 __all__ = [
+    "cleanup_artist_hero_publications",
     "cleanup_artwork_variants",
     "find_corrupt_artwork_assets",
     "inspect_artwork_variants",
