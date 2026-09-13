@@ -192,25 +192,28 @@ def _artist_hero_task_matches_profile(
     return True
 
 
+def _artist_hero_manifest_artifact_available(artifact: object) -> bool:
+    if not isinstance(artifact, Mapping):
+        return False
+    root = cache_root().resolve()
+    for path_key in ("relative_path", "source_relative_path"):
+        relative_path = str(artifact.get(path_key) or "")
+        if not relative_path:
+            return False
+        candidate = (root / relative_path).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            return False
+    return True
+
+
 def _artist_hero_manifest_artifacts_available(
     manifest: Mapping[str, object], *, enabled: tuple[str, ...]
 ) -> bool:
     artifacts = manifest.get("artifacts")
-    if not isinstance(artifacts, Mapping):
-        return False
-    root = cache_root().resolve()
-    for composition in enabled:
-        artifact = artifacts.get(composition)
-        if not isinstance(artifact, Mapping):
-            return False
-        for path_key in ("relative_path", "source_relative_path"):
-            relative_path = str(artifact.get(path_key) or "")
-            if not relative_path:
-                return False
-            candidate = (root / relative_path).resolve()
-            if not candidate.is_relative_to(root) or not candidate.is_file():
-                return False
-    return True
+    return isinstance(artifacts, Mapping) and all(
+        _artist_hero_manifest_artifact_available(artifacts.get(composition))
+        for composition in enabled
+    )
 
 
 def _publish_artist_hero_manifest(
@@ -260,7 +263,8 @@ def _publish_artist_hero_manifest(
         and recipes.get(composition) is not None
     }
     if any(
-        composition not in artifacts and composition not in publishable
+        composition not in publishable
+        and not _artist_hero_manifest_artifact_available(artifacts.get(composition))
         for composition in enabled
     ):
         return None
@@ -295,13 +299,16 @@ def _publish_artist_hero_manifest(
             )
         }
 
-    if any(composition not in artifacts for composition in enabled):
-        return None
-    return {
+    candidate_manifest = {
         "manifest_version": ARTIST_HERO_PUBLICATION_VERSION,
         "editorial_revision": editorial_revision,
         "artifacts": artifacts,
     }
+    if not _artist_hero_manifest_artifacts_available(
+        candidate_manifest, enabled=enabled
+    ):
+        return None
+    return candidate_manifest
 
 
 def _artist_hero_materialization_assets(

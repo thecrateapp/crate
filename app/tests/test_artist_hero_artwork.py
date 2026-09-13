@@ -1113,8 +1113,13 @@ def test_upload_handler_normalizes_exif_orientation_before_persisting_hero_sourc
 
 
 def test_upload_handler_replaces_only_mobile_source_and_variant(monkeypatch, tmp_path):
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        publish_artist_hero_artifact,
+    )
     from crate.worker_handlers.artwork import _handle_upload_image
 
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
     desktop_recipe = _crop_recipe(1400, 600)
     requested_desktop_recipe = {**desktop_recipe, "brightness": 0.6}
     artist_dir = tmp_path / "Converge"
@@ -1126,6 +1131,14 @@ def test_upload_handler_replaces_only_mobile_source_and_variant(monkeypatch, tmp
         artist_dir / "artist-hero-desktop.webp", "WEBP"
     )
     original_desktop = (artist_dir / "artist-hero-desktop.webp").read_bytes()
+    desktop_publication = publish_artist_hero_artifact(
+        ArtistHeroArtifactIdentity("artist-entity", "desktop", "desktop-legacy"),
+        Image.new("RGB", (1480, 600), color=(180, 40, 20)),
+        source_fingerprint="sha256:desktop",
+        recipe_hash="desktop-hash",
+        renderer_version="cover-fit-v4",
+        source_content=b"desktop-source",
+    )
     profiles: list[dict] = []
     monkeypatch.setattr(
         "crate.worker_handlers.artwork.get_library_artist",
@@ -1154,13 +1167,7 @@ def test_upload_handler_replaces_only_mobile_source_and_variant(monkeypatch, tmp
                 "manifest_version": 1,
                 "editorial_revision": "legacy-profile",
                 "artifacts": {
-                    "desktop": {
-                        "renderer_version": "cover-fit-v4",
-                        "render_revision": "desktop-legacy",
-                        "source_fingerprint": "sha256:desktop",
-                        "recipe_hash": "desktop-hash",
-                        "relative_path": "artist-hero-publications/v1/artist-entity/desktop/desktop-legacy/artifact.webp",
-                    },
+                    "desktop": desktop_publication.manifest,
                     "mobile": {
                         "renderer_version": "cover-fit-v4",
                         "render_revision": "mobile-legacy",

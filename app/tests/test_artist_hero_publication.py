@@ -204,6 +204,44 @@ def test_publish_manifest_does_not_write_when_enabled_composition_is_missing(
     assert manifest is None
 
 
+def test_publish_manifest_does_not_write_when_existing_composition_files_are_missing(
+    monkeypatch,
+):
+    from crate.worker_handlers import artwork
+
+    monkeypatch.setattr(
+        artwork,
+        "get_library_artist_by_id",
+        lambda _artist_id: {"id": 42, "entity_uid": "artist-1"},
+    )
+
+    def fail_publish(*_args, **_kwargs):
+        raise AssertionError("incomplete manifest siblings must block publication")
+
+    monkeypatch.setattr(artwork, "publish_artist_hero_artifact", fail_publish)
+
+    manifest = artwork._publish_artist_hero_manifest(
+        artist_row={"id": 42, "entity_uid": "artist-1"},
+        revision="revision-a",
+        rendered={"desktop": _image()},
+        raw_sources={"desktop": b"source"},
+        recipes={"desktop": {"mode": "cover"}},
+        existing={
+            "render_manifest": {
+                "artifacts": {
+                    "mobile": {
+                        "relative_path": "missing/mobile/artifact.webp",
+                        "source_relative_path": "missing/mobile/source.jpg",
+                    }
+                }
+            }
+        },
+        enabled=("desktop", "mobile"),
+    )
+
+    assert manifest is None
+
+
 def test_publish_artist_hero_artifact_accepts_concurrent_identical_winner(
     monkeypatch, tmp_path
 ):
