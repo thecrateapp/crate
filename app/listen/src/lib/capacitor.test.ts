@@ -247,7 +247,7 @@ describe("capacitor OAuth callback helpers", () => {
     expect(removeSecureSessionValue).not.toHaveBeenCalled();
   });
 
-  it("rejects the callback when the exchanged session cannot be persisted", async () => {
+  it("keeps the callback retryable when the exchanged session cannot be persisted", async () => {
     getSecureSessionValue.mockResolvedValue(
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -271,13 +271,14 @@ describe("capacitor OAuth callback helpers", () => {
       )}`,
     );
 
-    expect(result).toEqual({ handled: false, next: "/" });
+    expect(result).toEqual({ handled: false, next: "/", retryable: true });
     expect(setAuthTokensForServer).toHaveBeenLastCalledWith(
       "server-a",
       null,
       null,
       null,
     );
+    expect(removeSecureSessionValue).not.toHaveBeenCalled();
   });
 
   it("parses token and next from plain search params too", () => {

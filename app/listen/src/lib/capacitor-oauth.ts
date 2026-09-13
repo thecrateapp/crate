@@ -395,7 +395,6 @@ async function exchangeNativeOAuthCallback(
         state,
       },
     );
-    exchangeCompleted = true;
     if (!response.token) return { handled: false, next: "/" };
     const stored = setAuthTokensForServer(
       record.serverId,
@@ -410,6 +409,7 @@ async function exchangeNativeOAuthCallback(
       setAuthTokensForServer(record.serverId, null, null, null);
       throw error;
     }
+    exchangeCompleted = true;
     if (!getServers().some((server) => server.id === record.serverId)) {
       return { handled: false, next: "/" };
     }

@@ -167,6 +167,37 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     expect(mocks.apiForServerMock).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the callback retryable when secure session persistence fails", async () => {
+    const state = "s".repeat(32);
+    const recordKey = `crate.oauth.${state}`;
+    localStorage.setItem(
+      recordKey,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    mocks.apiForServerMock.mockResolvedValue({ token: "access-token" });
+    mocks.waitForPendingSecureSessionWrites
+      .mockRejectedValueOnce(new Error("keychain unavailable"))
+      .mockResolvedValue(undefined);
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
+      ),
+    ).resolves.toEqual({ handled: false, next: "/", retryable: true });
+    expect(localStorage.getItem(recordKey)).not.toBeNull();
+
+    await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
+      handled: true,
+      next: "/library",
+    });
+    expect(mocks.apiForServerMock).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps a retryable callback when an unrelated stale deep link arrives", async () => {
     const retryableState = "a".repeat(32);
     localStorage.setItem(
