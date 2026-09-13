@@ -102,6 +102,36 @@ def test_run_artist_deletion_keeps_database_result_when_cleanup_fails(monkeypatc
     )
 
 
+def test_run_artist_merge_cleans_storage_only_when_source_is_removed(monkeypatch):
+    from crate import artist_lifecycle
+
+    cleanup_calls: list[str] = []
+
+    @contextmanager
+    def publication_lock(_root, _artist_id):
+        yield
+
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "get_library_artist",
+        lambda _name: {"id": 42, "entity_uid": "artist-entity"},
+    )
+    monkeypatch.setattr(
+        artist_lifecycle, "artist_hero_publication_lock", publication_lock
+    )
+    monkeypatch.setattr(
+        artist_lifecycle,
+        "delete_artist_hero_storage",
+        lambda entity_uid: cleanup_calls.append(entity_uid),
+    )
+
+    assert artist_lifecycle.run_artist_merge("Artist", lambda: False) is False
+    assert cleanup_calls == []
+
+    assert artist_lifecycle.run_artist_merge("Artist", lambda: True) is True
+    assert cleanup_calls == ["artist-entity"]
+
+
 def test_delete_artist_uses_shared_deletion_lifecycle(monkeypatch):
     from crate import artist_lifecycle
 
