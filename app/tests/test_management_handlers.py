@@ -1,5 +1,3 @@
-from contextlib import contextmanager
-
 from crate.worker_handlers.management import (
     _handle_delete_artist,
     _handle_move_artist,
@@ -8,17 +6,12 @@ from crate.worker_handlers.management import (
 )
 
 
-def test_delete_artist_cleans_hero_storage_inside_publication_lock(
-    monkeypatch, tmp_path
-):
+def test_delete_artist_uses_shared_artist_deletion_lifecycle(monkeypatch, tmp_path):
     events: list[str] = []
 
-    @contextmanager
-    def publication_lock(_root, artist_id):
-        assert artist_id == 42
-        events.append("lock-enter")
-        yield
-        events.append("lock-exit")
+    def run_deletion(name, operation):
+        events.append(f"lifecycle:{name}")
+        return operation()
 
     monkeypatch.setattr(
         "crate.worker_handlers.management.get_library_artist",
@@ -29,12 +22,7 @@ def test_delete_artist_cleans_hero_storage_inside_publication_lock(
         },
     )
     monkeypatch.setattr(
-        "crate.worker_handlers.management.artist_hero_publication_lock",
-        publication_lock,
-    )
-    monkeypatch.setattr(
-        "crate.worker_handlers.management.delete_artist_hero_storage",
-        lambda entity_uid: events.append(f"cleanup:{entity_uid}"),
+        "crate.worker_handlers.management.run_artist_deletion", run_deletion
     )
     monkeypatch.setattr(
         "crate.worker_handlers.management.db_delete_artist",
@@ -59,10 +47,8 @@ def test_delete_artist_cleans_hero_storage_inside_publication_lock(
 
     assert result == {"deleted": "Artist", "mode": "db_only"}
     assert events == [
-        "lock-enter",
-        "cleanup:artist-entity",
+        "lifecycle:Artist",
         "db-delete:Artist",
-        "lock-exit",
     ]
 
 

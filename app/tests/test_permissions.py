@@ -1715,6 +1715,10 @@ def test_merge_artist_moves_albums_reassigns_db_and_rescans(tmp_path, monkeypatc
             (source_artist, target_artist, old_path, new_path)
         ),
     )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion",
+        lambda _name, operation: operation(),
+    )
     monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
     monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
     monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
@@ -1808,6 +1812,10 @@ def test_merge_artist_preserves_duplicate_artist_photo_sidecar(tmp_path, monkeyp
     monkeypatch.setattr(
         "crate.worker_handlers.management.merge_artist_into_artist",
         MagicMock(),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion",
+        lambda _name, operation: operation(),
     )
     monkeypatch.setattr("crate.worker_handlers.management.log_audit", MagicMock())
     monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())

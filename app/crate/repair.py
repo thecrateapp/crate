@@ -5,6 +5,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from crate.artist_lifecycle import delete_artist
 from crate.audio import read_tags
 from crate.db.audit import log_audit
 from crate.db.jobs.repair import (
@@ -22,7 +23,6 @@ from crate.db.jobs.repair import (
 )
 from crate.db.repositories.library import (
     delete_album,
-    delete_artist,
     delete_track,
     get_library_artist,
 )
