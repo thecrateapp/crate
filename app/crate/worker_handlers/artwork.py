@@ -253,6 +253,18 @@ def _publish_artist_hero_manifest(
             }
         )
 
+    publishable = {
+        composition
+        for composition in rendered
+        if raw_sources.get(composition) is not None
+        and recipes.get(composition) is not None
+    }
+    if any(
+        composition not in artifacts and composition not in publishable
+        for composition in enabled
+    ):
+        return None
+
     for composition, image in rendered.items():
         raw_source = raw_sources.get(composition)
         recipe = recipes.get(composition)
