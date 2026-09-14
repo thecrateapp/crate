@@ -678,6 +678,14 @@ describe("playback targets", () => {
     const result = await googleCastTargetProvider.selectTarget(target!, {
       currentTrack,
       currentTime: 12.4,
+      currentIndex: 1,
+      queue: [
+        { id: "track-0", libraryTrackId: 6, title: "Before", artist: "Artist" },
+        currentTrack,
+      ],
+      repeatMode: "all",
+      shuffle: true,
+      playbackAuthority: "local",
       pause,
       pauseLocal,
     });
@@ -685,10 +693,45 @@ describe("playback targets", () => {
     expect(result).toEqual({ ok: true, message: "Casting." });
     expect(startCastSessionMock).toHaveBeenCalledWith({
       track: currentTrack,
+      queue: [
+        { id: "track-0", libraryTrackId: 6, title: "Before", artist: "Artist" },
+        currentTrack,
+      ],
+      currentIndex: 1,
       currentTime: 12.4,
+      repeatMode: "all",
+      shuffle: true,
+      appearance: expect.objectContaining({
+        contractVersion: 1,
+        skinId: "default",
+      }),
       targetDeviceId: "google-cast:default",
     });
     expect(pauseLocal).toHaveBeenCalledTimes(1);
     expect(pause).not.toHaveBeenCalled();
+  });
+
+  it("keeps Cast unavailable while a Jam owns playback", async () => {
+    getCastSenderCapabilitiesMock.mockResolvedValue({
+      platform: "web",
+      visible: true,
+      available: true,
+      activeSession: false,
+    });
+
+    const [target] = await googleCastTargetProvider.getTargets({
+      currentTrack: {
+        id: "track-1",
+        libraryTrackId: 7,
+        title: "Track",
+        artist: "Artist",
+      },
+      playbackAuthority: "jam",
+    });
+
+    expect(target).toMatchObject({
+      available: false,
+      unavailableReason: "Google Cast is unavailable during a Jam session.",
+    });
   });
 });

@@ -16,7 +16,11 @@ import {
   CONNECT_ENABLED_EVENT,
   CONNECT_SESSION_EVENT,
 } from "@/lib/crate-connect";
-import { onCastSessionChanged } from "@/lib/cast-sender";
+import {
+  disconnectCastSession,
+  onCastSessionChanged,
+  stopCastSession,
+} from "@/lib/cast-sender";
 import { onNativeOutputRouteChanged } from "@/lib/native-output-router";
 
 import { PlaybackTargetButton } from "./PlaybackTargetButton";
@@ -36,6 +40,9 @@ export function PlaybackTargetMenu({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [castAction, setCastAction] = useState<"disconnect" | "stop" | null>(
+    null,
+  );
   const [groups, setGroups] = useState<PlaybackTargetGroup[]>([]);
   const [popoverPosition, setPopoverPosition] = useState<{
     right: number;
@@ -184,6 +191,24 @@ export function PlaybackTargetMenu({
     [close, runRefreshTargets, t],
   );
 
+  const handleCastAction = useCallback(
+    async (action: "disconnect" | "stop") => {
+      setCastAction(action);
+      const result =
+        action === "disconnect"
+          ? await disconnectCastSession()
+          : await stopCastSession();
+      setCastAction(null);
+      if (!result.ok) {
+        toast.info(result.message || t("player.output.cast.actionFailed"));
+        return;
+      }
+      runRefreshTargets();
+      close();
+    },
+    [close, runRefreshTargets, t],
+  );
+
   const toggle = useCallback(() => {
     const nextOpen = !open;
     if (nextOpen) updatePopoverPosition();
@@ -206,8 +231,11 @@ export function PlaybackTargetMenu({
               popoverRef={popoverRef}
               position={popoverPosition}
               loading={loading}
+              castAction={castAction}
               groups={groups}
               onTarget={(target) => void handleTarget(target)}
+              onDisconnectCast={() => void handleCastAction("disconnect")}
+              onStopCast={() => void handleCastAction("stop")}
             />,
             document.body,
           )

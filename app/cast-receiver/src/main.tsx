@@ -5,7 +5,7 @@ import { App } from "./App";
 import { createCafAdapter } from "./caf-adapter";
 import type { CafRuntime } from "./caf-types";
 import { seedReceiverPreview } from "./dev-preview";
-import { loadReceiverSession } from "./receiver-client";
+import { createReceiverSessionRuntime } from "./receiver-session-runtime";
 import { createReceiverStore } from "./receiver-store";
 import "./styles.css";
 
@@ -18,46 +18,38 @@ if (!runtime && !preview) {
   throw new Error("Google Cast Application Framework is unavailable");
 }
 
+let sessionRuntime: ReturnType<typeof createReceiverSessionRuntime> | null =
+  null;
 const adapter =
   runtime && !preview
     ? createCafAdapter({
         runtime,
         handlers: {
-          onLoad: (data) => {
-            store.dispatch({ type: "load-started", sessionId: data.sessionId });
-            void loadReceiverSession(data.bootstrapUrl, data.sessionId)
-              .then((session) => {
-                store.dispatch({
-                  type: "session-loaded",
-                  appearance: session.appearance,
-                  queue: session.queue,
-                });
-              })
-              .catch(() => {
-                store.dispatch({
-                  type: "terminal-error",
-                  message: "Playback unavailable",
-                });
-              });
-          },
-          onPlayerState: (state) => {
-            store.dispatch({ type: "player-state", state });
-          },
-          onProgress: (progress) => {
-            store.progress.set(progress);
-          },
+          onLoad: (data) => void sessionRuntime?.load(data),
+          onCurrentItem: (itemId) => sessionRuntime?.currentItem(itemId),
+          onPlayerState: (state) => sessionRuntime?.playerState(state),
+          onProgress: (progress) => sessionRuntime?.progress(progress),
+          onQueueChange: () => void sessionRuntime?.refreshQueue(),
           onError: () => {
-            store.dispatch({
-              type: "terminal-error",
-              message: "Unable to play this item",
-            });
+            sessionRuntime?.mediaError();
           },
         },
       })
     : null;
 
-if (adapter) adapter.start();
-else seedReceiverPreview(store);
+if (adapter) {
+  sessionRuntime = createReceiverSessionRuntime({
+    store,
+    retryCurrentItem: () => adapter.retryCurrentItem(),
+    sendProtocolMessage: (message) => adapter.sendProtocolMessage(message),
+    skipCurrentItem: () => adapter.skipCurrentItem(),
+  });
+}
+
+if (adapter) {
+  adapter.start();
+  sessionRuntime?.start();
+} else seedReceiverPreview(store);
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Cast receiver root is missing");

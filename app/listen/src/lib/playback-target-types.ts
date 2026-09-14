@@ -1,4 +1,4 @@
-import type { Track } from "@/contexts/player-types";
+import type { RepeatMode, Track } from "@/contexts/player-types";
 import type { ActiveConnectSession } from "@/lib/crate-connect";
 
 export type PlaybackTargetKind =
@@ -37,6 +37,9 @@ export interface PlaybackTargetContext {
   currentTime?: number;
   currentIndex?: number;
   queue?: Track[];
+  repeatMode?: RepeatMode;
+  shuffle?: boolean;
+  playbackAuthority?: "cast" | "connect" | "jam" | "local";
   volume?: number;
   activeConnectDeviceId?: string | null;
   activeConnectSession?: ActiveConnectSession | null;

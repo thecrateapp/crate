@@ -184,11 +184,14 @@ export function usePlayerBarController() {
     isLiked,
     isBuffering,
     isRemoteConnectActive,
+    jamQueueLocked,
     legacyConnectEnabled,
     pause,
     pauseLocal,
     publishConnectState,
+    repeat,
     resumeLocal,
+    shuffle,
   });
 
   const {

@@ -18,6 +18,7 @@ import type {
 
 export interface CafAdapterHandlers {
   onError?(event: CafEvent): void;
+  onCurrentItem?(itemId: string): void;
   onLoad?(data: CrateLoadData): void;
   onPlayerState?(state: CastPlayerState): void;
   onProgress?(progress: { currentTime: number; duration: number }): void;
@@ -26,6 +27,9 @@ export interface CafAdapterHandlers {
 }
 
 export interface CafAdapter {
+  retryCurrentItem(): boolean;
+  sendProtocolMessage(message: CastProtocolMessage, senderId?: string): void;
+  skipCurrentItem(): boolean;
   start(): void;
   stop(): void;
 }
@@ -92,7 +96,24 @@ export function createCafAdapter({
     playerManager?.addEventListener(type, listener);
   }
 
+  function publishCurrentItem() {
+    const customData = playerManager?.getMediaInformation?.()?.customData;
+    if (!customData || typeof customData !== "object") return;
+    const crateCast = (customData as Record<string, unknown>).crateCast;
+    if (!crateCast || typeof crateCast !== "object") return;
+    const itemId = (crateCast as Record<string, unknown>).itemId;
+    if (typeof itemId === "string" && itemId) handlers.onCurrentItem?.(itemId);
+  }
+
   return {
+    retryCurrentItem() {
+      const queueManager = playerManager?.getQueueManager?.();
+      if (!queueManager) return false;
+      const itemId = queueManager?.getCurrentItem()?.itemId;
+      if (typeof itemId !== "number") return false;
+      queueManager.jumpToItem(itemId);
+      return true;
+    },
     start() {
       if (started) return;
       context = runtime.framework.CastReceiverContext.getInstance();
@@ -109,7 +130,10 @@ export function createCafAdapter({
         [eventTypes.PLAYING, "PLAYING"],
         [eventTypes.PLAYER_LOADING, "BUFFERING"],
       ] as const) {
-        bindEvent(type, () => handlers.onPlayerState?.(state));
+        bindEvent(type, () => {
+          publishCurrentItem();
+          handlers.onPlayerState?.(state);
+        });
       }
       bindEvent(eventTypes.BUFFERING, (event) => {
         if (event.isBuffering !== false) {
@@ -124,6 +148,7 @@ export function createCafAdapter({
         });
       });
       bindEvent(eventTypes.MEDIA_STATUS, (event) => {
+        publishCurrentItem();
         if (
           event.currentMediaTime === undefined &&
           event.duration === undefined
@@ -150,6 +175,20 @@ export function createCafAdapter({
       );
       context.start();
       started = true;
+    },
+    sendProtocolMessage(message, senderId) {
+      if (!started || !context) return;
+      context.sendCustomMessage(CAST_PROTOCOL_NAMESPACE, senderId, message);
+    },
+    skipCurrentItem() {
+      const queueManager = playerManager?.getQueueManager?.();
+      const items = queueManager?.getItems() ?? [];
+      const currentId = queueManager?.getCurrentItem()?.itemId;
+      const currentIndex = items.findIndex((item) => item.itemId === currentId);
+      const nextId = items[currentIndex + 1]?.itemId;
+      if (typeof nextId !== "number") return false;
+      queueManager?.jumpToItem(nextId);
+      return true;
     },
     stop() {
       if (!started || !context || !playerManager) return;

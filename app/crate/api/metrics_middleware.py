@@ -14,6 +14,10 @@ log = logging.getLogger(__name__)
 # Patterns that normalize dynamic path segments to templates.
 _PATH_NORMALIZERS = [
     (
+        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/artwork"),
+        "/api/cast/sessions/{lease}/items/{item_id}/artwork",
+    ),
+    (
         re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/stream"),
         "/api/cast/sessions/{lease}/items/{item_id}/stream",
     ),

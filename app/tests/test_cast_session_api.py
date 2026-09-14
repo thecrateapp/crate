@@ -144,6 +144,10 @@ def test_create_cast_session_resolves_queue_and_returns_scoped_urls(
         "https://cast-api.example.test/api/cast/sessions/opaque-lease/"
         "items/item-1/stream"
     )
+    assert data["queue"]["items"][0]["artwork_url"] == (
+        "https://cast-api.example.test/api/cast/sessions/opaque-lease/"
+        "items/item-1/artwork"
+    )
     assert data["queue"]["items"][0]["content_type"] == "audio/mp4"
     assert calls["user_id"] == 1
     assert calls["queue"][0]["track_id"] == 7
@@ -257,6 +261,26 @@ def test_cast_session_item_metadata_and_range_stream_are_receiver_safe(
     assert stream.headers["access-control-allow-origin"] == "*"
     assert stream.headers["x-crate-delivery-policy"] == "balanced"
     assert used == ["opaque-lease", "opaque-lease"]
+
+
+def test_cast_session_artwork_is_scoped_to_the_lease(test_app, monkeypatch):
+    used: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "crate.api.cast.touch_cast_session", lambda _lease: _stored_session()
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.get_track_delivery_row_by_id", lambda _track_id: _track()
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.api_cover",
+        lambda artist, album, **_kwargs: used.append((artist, album)) or "cover",
+    )
+
+    response = test_app.get("/api/cast/sessions/opaque-lease/items/item-1/artwork")
+
+    assert response.status_code == 200
+    assert response.json() == "cover"
+    assert used == [("Artist", "Album")]
 
 
 def test_cast_session_stream_reports_preparing_with_retry_after(test_app, monkeypatch):

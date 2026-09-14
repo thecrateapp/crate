@@ -157,7 +157,7 @@ def test_cast_session_queue_update_is_cas_and_idempotent(pg_db, monkeypatch):
     )
     assert applied["mutation_status"] == "applied"
     assert applied["revision"] == 8
-    assert applied["current_index"] == 0
+    assert applied["current_index"] == 1
     assert applied["current_time"] == 0
     assert [item["item_id"] for item in applied["queue"]] == [
         "item-2",
@@ -174,6 +174,7 @@ def test_cast_session_queue_update_is_cas_and_idempotent(pg_db, monkeypatch):
     )
     assert second["mutation_status"] == "applied"
     assert second["revision"] == 9
+    assert second["current_index"] == 1
 
     duplicate = cast_sessions.update_cast_session_queue(
         owner["id"],

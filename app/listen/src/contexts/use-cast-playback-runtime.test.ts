@@ -26,6 +26,7 @@ describe("useCastPlaybackRuntime", () => {
       return unsubscribe;
     });
     const commitCurrentTime = vi.fn();
+    const commitCurrentIndex = vi.fn();
     const commitDuration = vi.fn();
     const commitIsBuffering = vi.fn();
     const commitIsPlaying = vi.fn();
@@ -34,6 +35,7 @@ describe("useCastPlaybackRuntime", () => {
     const { unmount } = renderHook(() =>
       useCastPlaybackRuntime({
         commitCurrentTime,
+        commitCurrentIndex,
         commitDuration,
         commitIsBuffering,
         commitIsPlaying,
@@ -44,6 +46,7 @@ describe("useCastPlaybackRuntime", () => {
     act(() => {
       listener?.({
         active: true,
+        currentIndex: 3,
         currentTime: 42.5,
         duration: 185,
         isBuffering: false,
@@ -53,6 +56,7 @@ describe("useCastPlaybackRuntime", () => {
     });
 
     expect(commitCurrentTime).toHaveBeenCalledWith(42.5);
+    expect(commitCurrentIndex).toHaveBeenCalledWith(3);
     expect(commitDuration).toHaveBeenCalledWith(185);
     expect(commitIsBuffering).toHaveBeenCalledWith(false);
     expect(commitIsPlaying).toHaveBeenCalledWith(true);
@@ -73,6 +77,7 @@ describe("useCastPlaybackRuntime", () => {
     renderHook(() =>
       useCastPlaybackRuntime({
         commitCurrentTime,
+        commitCurrentIndex: vi.fn(),
         commitDuration: vi.fn(),
         commitIsBuffering: vi.fn(),
         commitIsPlaying: vi.fn(),

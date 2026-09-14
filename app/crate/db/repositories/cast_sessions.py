@@ -355,12 +355,31 @@ def update_cast_session_queue(
         if current and current["revision"] != expected_revision:
             return {**current, "mutation_status": "conflict"}
 
+        current_queue = current["queue"] if current else []
+        current_index = current["current_index"] if current else 0
+        current_item_id = (
+            current_queue[current_index].get("item_id")
+            if current_queue and current_index < len(current_queue)
+            else None
+        )
+        next_index = next(
+            (
+                index
+                for index, item in enumerate(queue)
+                if item.get("item_id") == current_item_id
+            ),
+            min(current_index, max(len(queue) - 1, 0)),
+        )
+        _validate_cursor(queue, next_index)
+        values["current_index"] = next_index
+
         row = (
             session.execute(
                 text(
                     """
                     UPDATE cast_playback_sessions
                     SET queue_json = CAST(:queue_json AS jsonb),
+                        current_index = :current_index,
                         repeat_mode = COALESCE(:repeat_mode, repeat_mode),
                         shuffle = COALESCE(:shuffle, shuffle),
                         revision = revision + 1,

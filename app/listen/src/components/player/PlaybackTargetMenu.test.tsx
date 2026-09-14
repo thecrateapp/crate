@@ -2,14 +2,18 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  disconnectCastSessionMock,
   loadGroupsMock,
   onNativeOutputRouteChangedMock,
   selectTargetMock,
+  stopCastSessionMock,
   toastInfoMock,
 } = vi.hoisted(() => ({
+  disconnectCastSessionMock: vi.fn(),
   loadGroupsMock: vi.fn(),
   onNativeOutputRouteChangedMock: vi.fn(),
   selectTargetMock: vi.fn(),
+  stopCastSessionMock: vi.fn(),
   toastInfoMock: vi.fn(),
 }));
 
@@ -33,6 +37,18 @@ vi.mock("sonner", () => ({
 vi.mock("@/lib/native-output-router", () => ({
   onNativeOutputRouteChanged: onNativeOutputRouteChangedMock,
 }));
+
+vi.mock("@/lib/cast-sender", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/cast-sender")>(
+      "@/lib/cast-sender",
+    );
+  return {
+    ...actual,
+    disconnectCastSession: disconnectCastSessionMock,
+    stopCastSession: stopCastSessionMock,
+  };
+});
 
 import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -84,6 +100,8 @@ describe("PlaybackTargetMenu", () => {
       },
     ]);
     selectTargetMock.mockResolvedValue({ ok: true });
+    disconnectCastSessionMock.mockResolvedValue({ ok: true });
+    stopCastSessionMock.mockResolvedValue({ ok: true });
   });
 
   afterEach(() => {
@@ -232,5 +250,45 @@ describe("PlaybackTargetMenu", () => {
     expect(screen.getByText("Salida")).toBeVisible();
     expect(screen.getByText("Activo")).toBeVisible();
     expect(screen.getByText("No disponible")).toBeVisible();
+  });
+
+  it("offers separate disconnect and stop actions for active Cast", async () => {
+    loadGroupsMock.mockResolvedValue([
+      {
+        providerId: "google-cast",
+        label: "Cast",
+        targets: [
+          {
+            id: "google-cast:default",
+            providerId: "google-cast",
+            kind: "google-cast",
+            name: "Living room TV",
+            subtitle: "Playing on Google Cast",
+            active: true,
+            available: true,
+            capabilities: {
+              canPlay: true,
+              canSeek: true,
+              canSetVolume: true,
+            },
+          },
+        ],
+      },
+    ]);
+
+    renderWithListenProviders(<PlaybackTargetMenu />);
+    fireEvent.click(screen.getByRole("button", { name: "Output" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Disconnect/ }));
+    await waitFor(() =>
+      expect(disconnectCastSessionMock).toHaveBeenCalledOnce(),
+    );
+    expect(stopCastSessionMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Output" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Stop casting/ }),
+    );
+    await waitFor(() => expect(stopCastSessionMock).toHaveBeenCalledOnce());
   });
 });

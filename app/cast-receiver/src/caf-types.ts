@@ -21,12 +21,20 @@ export interface CafCustomMessageEvent {
 }
 
 export interface CafPlayerManager {
+  getMediaInformation?(): { customData?: unknown } | null;
+  getQueueManager?(): CafQueueManager;
   addEventListener(type: string, listener: (event: CafEvent) => void): void;
   removeEventListener(type: string, listener: (event: CafEvent) => void): void;
   setMessageInterceptor(
     type: string,
     interceptor: ((request: CafLoadRequest) => CafLoadRequest) | null,
   ): void;
+}
+
+export interface CafQueueManager {
+  getCurrentItem(): { itemId?: number } | null;
+  getItems(): Array<{ itemId?: number }>;
+  jumpToItem(itemId: number): void;
 }
 
 export interface CafReceiverContext {
@@ -38,6 +46,11 @@ export interface CafReceiverContext {
   removeCustomMessageListener(
     namespace: string,
     listener: (event: CafCustomMessageEvent) => void,
+  ): void;
+  sendCustomMessage(
+    namespace: string,
+    senderId: string | undefined,
+    data: unknown,
   ): void;
   start(options?: Record<string, unknown>): void;
   stop?(): void;

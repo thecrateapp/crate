@@ -2,6 +2,7 @@ import type { Track } from "@/contexts/player-types";
 import { apiUrl, ensureMediaAccessUrl } from "@/lib/api";
 import type {
   CastMediaResponse,
+  CastPlaybackSessionResponse,
   CastStartPayload,
   CastTicketRequest,
   CastTicketResponse,
@@ -11,6 +12,7 @@ import type {
   ChromeCastMusicMetadata,
   ChromeCastNamespace,
   NativeCastMediaPayload,
+  WebCastQueueLoad,
 } from "./cast-sender-types";
 
 export const DEFAULT_CAST_TARGET_ID = "google-cast:default";
@@ -172,6 +174,60 @@ export function buildWebLoadRequest(
   request.autoplay = true;
   request.currentTime = Math.max(0, Math.floor(payload.currentTime || 0));
   return request;
+}
+
+export function buildWebQueueLoad(
+  session: CastPlaybackSessionResponse,
+  chromeCast: ChromeCastNamespace,
+): WebCastQueueLoad {
+  const crateCast = {
+    protocolVersion: 1 as const,
+    sessionId: session.session_id,
+  };
+  const items = session.queue.items.map((item, index) => {
+    const mediaInfo = new chromeCast.media.MediaInfo(
+      item.stream_url,
+      item.content_type || "audio/mpeg",
+    );
+    const metadata = new chromeCast.media.MusicTrackMediaMetadata();
+    metadata.title = item.title;
+    metadata.artist = item.artist;
+    metadata.albumName = item.album || "";
+    if (item.artwork_url) {
+      const image = new chromeCast.Image(item.artwork_url);
+      image.width = 512;
+      image.height = 512;
+      metadata.images = [image];
+    }
+    mediaInfo.metadata = metadata;
+    mediaInfo.duration = item.duration;
+    mediaInfo.customData = {
+      crateCast: {
+        ...crateCast,
+        bootstrapUrl: session.bootstrap_url,
+        itemId: item.item_id,
+      },
+    };
+    const queueItem = new chromeCast.media.QueueItem(mediaInfo);
+    queueItem.autoplay = true;
+    if (index === session.queue.current_index) {
+      queueItem.startTime = Math.max(0, session.queue.current_time);
+    }
+    return queueItem;
+  });
+  const repeatMode =
+    session.queue.repeat_mode === "all"
+      ? chromeCast.media.RepeatMode.ALL
+      : session.queue.repeat_mode === "one"
+        ? chromeCast.media.RepeatMode.SINGLE
+        : chromeCast.media.RepeatMode.OFF;
+  return {
+    items,
+    repeatMode,
+    startIndex: session.queue.current_index,
+    startTime: Math.max(0, session.queue.current_time),
+    customData: { crateCast },
+  };
 }
 
 export function buildCastTicketRequest(

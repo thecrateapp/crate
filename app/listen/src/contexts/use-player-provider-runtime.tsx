@@ -83,6 +83,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
   } = runtimeState;
 
   useCastPlaybackRuntime({
+    commitCurrentIndex,
     commitCurrentTime,
     commitDuration,
     commitIsBuffering,

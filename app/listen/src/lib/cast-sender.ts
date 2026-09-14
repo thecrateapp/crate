@@ -1,17 +1,32 @@
 import { registerPlugin } from "@capacitor/core";
+import {
+  CAST_PROTOCOL_NAMESPACE,
+  parseCastProtocolMessage,
+} from "@crate/cast-protocol";
 
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
+import type { RepeatMode, Track } from "@/contexts/player-types";
 import { isNative } from "@/lib/capacitor-runtime";
 import {
   buildCastTicketRequest,
   buildNativePayload,
   buildWebLoadRequest,
+  buildWebQueueLoad,
   DEFAULT_CAST_TARGET_ID,
   resolveCastArtworkUrl,
   resolveCastMedia,
 } from "./cast-sender-media";
+import {
+  buildCastQueueUpdateRequest,
+  createCastPlaybackSession,
+  loadScopedCastPlaybackSession,
+  revokeCastPlaybackSession,
+  updateCastPlaybackSession,
+  type CastSessionQueueItemRequest,
+} from "./cast-session-client";
 import type {
   CastSenderCapabilities,
+  CastPlaybackSessionResponse,
   CastPlaybackState,
   CastSession,
   CastStartPayload,
@@ -21,6 +36,7 @@ import type {
   ChromeCastMedia,
   ChromeCastNamespace,
   NativeCastPlugin,
+  TimedCastReceiverStatus,
 } from "./cast-sender-types";
 
 export type {
@@ -37,11 +53,28 @@ const CAST_SENDER_SCRIPT =
 const CAST_SESSION_CHANGED_EVENT = "crate:cast-session-changed";
 
 let webCastReady: Promise<boolean> | null = null;
-let webCastInitialized = false;
+let webCastInitializedReceiverId: string | null = null;
 const observedWebCastContexts = new WeakSet<object>();
 let nativeCast: NativeCastPlugin | null = null;
 let nativeCastSessionActive = false;
 let nativeCastSessionGeneration = 0;
+let activeCrateCastSessionId: string | null = null;
+let activeCrateCastBootstrapUrl: string | null = null;
+let activeCrateCastQueue: CastPlaybackSessionResponse["queue"] | null = null;
+let castQueueWriteTail: Promise<void> = Promise.resolve();
+
+interface CustomCastQueueUpdate {
+  currentIndex: number;
+  queue: Track[];
+  repeatMode: RepeatMode;
+  shuffle: boolean;
+}
+
+function customReceiverApplicationId(): string | null {
+  if (import.meta.env.VITE_CAST_CUSTOM_RECEIVER_ENABLED !== "true") return null;
+  const appId = import.meta.env.VITE_CAST_RECEIVER_APP_ID?.trim();
+  return appId && /^[a-z0-9]{8}$/i.test(appId) ? appId : null;
+}
 
 function emitCastSessionChanged(): void {
   if (typeof window !== "undefined") {
@@ -63,19 +96,41 @@ function finiteNonNegative(value: unknown): number {
 
 function currentWebCastPlaybackState(
   media: ChromeCastMedia | null = currentWebCastMedia(),
+  receiverStatus?: TimedCastReceiverStatus | null,
 ): CastPlaybackState | null {
   if (!media || !currentWebCastSession()) return null;
   const playerState = String(media.playerState || "").toUpperCase();
   const estimatedTime = media.getEstimatedTime?.();
-  const currentTime = finiteNonNegative(estimatedTime ?? media.currentTime);
+  const status = receiverStatus?.message;
+  const receiverTime = status
+    ? status.currentTime +
+      (status.playerState === "PLAYING"
+        ? Math.max(0, Date.now() - receiverStatus.receivedAt) / 1_000
+        : 0)
+    : undefined;
+  const currentTime = finiteNonNegative(
+    receiverTime ?? estimatedTime ?? media.currentTime,
+  );
   const duration = finiteNonNegative(media.media?.duration ?? media.duration);
   const volume = media.volume?.level;
+  const cafCurrentIndex = media.items?.findIndex(
+    (item) => item.itemId === media.currentItemId,
+  );
+  const currentIndex = status?.currentIndex ?? cafCurrentIndex;
   return {
     active: true,
+    ...(currentIndex !== undefined && currentIndex >= 0
+      ? { currentIndex }
+      : {}),
     currentTime: duration > 0 ? Math.min(currentTime, duration) : currentTime,
     duration,
-    isBuffering: playerState === "BUFFERING",
-    isPlaying: playerState === "PLAYING",
+    isBuffering: status
+      ? status.playerState === "BUFFERING" ||
+        status.playerState === "RECOVERING"
+      : playerState === "BUFFERING",
+    isPlaying: status
+      ? status.playerState === "PLAYING"
+      : playerState === "PLAYING",
     volume:
       typeof volume === "number" && Number.isFinite(volume)
         ? Math.max(0, Math.min(1, volume))
@@ -91,6 +146,9 @@ export function subscribeCastPlaybackState(
   let disposed = false;
   let timer: number | null = null;
   let observedMedia: ChromeCastMedia | null = null;
+  let observedSession: CastSession | null = null;
+  let receiverStatus: TimedCastReceiverStatus | null = null;
+  let wasActive = false;
 
   const clearTimer = () => {
     if (timer === null) return;
@@ -103,13 +161,62 @@ export function subscribeCastPlaybackState(
     observedMedia = media;
     observedMedia?.addUpdateListener?.(handleMediaUpdate);
   };
+  const handleProtocolMessage = (_namespace: string, payload: string) => {
+    let value: unknown;
+    try {
+      value = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    const parsed = parseCastProtocolMessage(value);
+    if (!parsed.ok || parsed.value.type !== "receiver.status") return;
+    if (
+      parsed.value.sessionId !== activeCrateCastSessionId ||
+      (receiverStatus &&
+        (parsed.value.stateSeq <= receiverStatus.message.stateSeq ||
+          parsed.value.queueRevision < receiverStatus.message.queueRevision))
+    ) {
+      return;
+    }
+    receiverStatus = { message: parsed.value, receivedAt: Date.now() };
+    publish();
+  };
+  const bindSession = (session: CastSession | null) => {
+    if (session === observedSession) return;
+    observedSession?.removeMessageListener?.(
+      CAST_PROTOCOL_NAMESPACE,
+      handleProtocolMessage,
+    );
+    observedSession = session;
+    receiverStatus = null;
+    observedSession?.addMessageListener?.(
+      CAST_PROTOCOL_NAMESPACE,
+      handleProtocolMessage,
+    );
+  };
   const publish = () => {
     if (disposed) return;
     clearTimer();
-    const media = currentWebCastMedia();
+    const session = currentWebCastSession();
+    bindSession(session);
+    const media = session?.getMediaSession?.() ?? null;
     bindMedia(media);
-    const state = currentWebCastPlaybackState(media);
-    if (!state) return;
+    if (media) isCustomCastSessionActive();
+    const state = currentWebCastPlaybackState(media, receiverStatus);
+    if (!state) {
+      if (wasActive) {
+        wasActive = false;
+        listener({
+          active: false,
+          currentTime: 0,
+          duration: 0,
+          isBuffering: false,
+          isPlaying: false,
+        });
+      }
+      return;
+    }
+    wasActive = true;
     listener(state);
     if (state.isPlaying) {
       timer = window.setTimeout(publish, 500);
@@ -127,6 +234,7 @@ export function subscribeCastPlaybackState(
     disposed = true;
     clearTimer();
     bindMedia(null);
+    bindSession(null);
     unsubscribeSession();
   };
 }
@@ -198,13 +306,16 @@ function initializeWebCastContext(): boolean {
       emitCastSessionChanged,
     );
   }
-  if (webCastInitialized) return true;
-
-  context.setOptions({
-    receiverApplicationId: chromeCast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-    autoJoinPolicy: chromeCast.AutoJoinPolicy.ORIGIN_SCOPED,
-  });
-  webCastInitialized = true;
+  const receiverApplicationId =
+    customReceiverApplicationId() ??
+    chromeCast.media.DEFAULT_MEDIA_RECEIVER_APP_ID;
+  if (webCastInitializedReceiverId !== receiverApplicationId) {
+    context.setOptions({
+      receiverApplicationId,
+      autoJoinPolicy: chromeCast.AutoJoinPolicy.ORIGIN_SCOPED,
+    });
+    webCastInitializedReceiverId = receiverApplicationId;
+  }
   return true;
 }
 
@@ -380,6 +491,302 @@ export function isCastSessionActive(): boolean {
   return Boolean(currentWebCastSession());
 }
 
+export function isCustomCastSessionActive(): boolean {
+  if (!isCastSessionActive()) return false;
+  if (activeCrateCastSessionId) return true;
+  const customData = currentWebCastMedia()?.media?.customData;
+  if (!customData || typeof customData !== "object") return false;
+  const crateCast = (customData as Record<string, unknown>).crateCast;
+  if (!crateCast || typeof crateCast !== "object") return false;
+  const sessionId = (crateCast as Record<string, unknown>).sessionId;
+  if (typeof sessionId !== "string" || !sessionId.trim()) return false;
+  activeCrateCastSessionId = sessionId;
+  const bootstrapUrl = (crateCast as Record<string, unknown>).bootstrapUrl;
+  if (typeof bootstrapUrl === "string" && bootstrapUrl) {
+    activeCrateCastBootstrapUrl = bootstrapUrl;
+  }
+  return true;
+}
+
+function queueItemRequest(
+  item: CastPlaybackSessionResponse["queue"]["items"][number],
+): CastSessionQueueItemRequest {
+  return {
+    item_id: item.item_id,
+    ...(item.track_id === undefined ? {} : { track_id: item.track_id }),
+    ...(item.track_entity_uid
+      ? { track_entity_uid: item.track_entity_uid }
+      : {}),
+    ...(item.track_path ? { track_path: item.track_path } : {}),
+  };
+}
+
+function rebaseQueueRequest(
+  base: CastPlaybackSessionResponse["queue"]["items"],
+  desired: CastSessionQueueItemRequest[],
+  latest: CastPlaybackSessionResponse["queue"]["items"],
+): CastSessionQueueItemRequest[] {
+  const baseIds = new Set(base.map((item) => item.item_id));
+  const desiredIds = new Set(desired.map((item) => item.item_id));
+  const removedIds = new Set(
+    [...baseIds].filter((itemId) => !desiredIds.has(itemId)),
+  );
+  const latestById = new Map(
+    latest.map((item) => [item.item_id, queueItemRequest(item)]),
+  );
+  const desiredById = new Map(desired.map((item) => [item.item_id, item]));
+  const replayed = desired
+    .map((item) => latestById.get(item.item_id) ?? item)
+    .filter((item) => !removedIds.has(item.item_id));
+  const replayedIds = new Set(replayed.map((item) => item.item_id));
+  for (const item of latest) {
+    if (!replayedIds.has(item.item_id) && !removedIds.has(item.item_id)) {
+      replayed.push(desiredById.get(item.item_id) ?? queueItemRequest(item));
+    }
+  }
+  return replayed;
+}
+
+function customQueueItemId(item: {
+  media?: { customData?: unknown };
+}): string | null {
+  const customData = item.media?.customData;
+  if (!customData || typeof customData !== "object") return null;
+  const crateCast = (customData as Record<string, unknown>).crateCast;
+  if (!crateCast || typeof crateCast !== "object") return null;
+  const itemId = (crateCast as Record<string, unknown>).itemId;
+  return typeof itemId === "string" ? itemId : null;
+}
+
+function castCommand(
+  run: (resolve: () => void, reject: (error: unknown) => void) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => run(resolve, reject));
+}
+
+async function applyCustomQueueDelta(
+  previous: CastPlaybackSessionResponse["queue"],
+  next: CastPlaybackSessionResponse["queue"],
+): Promise<void> {
+  const media = currentWebCastMedia();
+  const chromeCast = castWindow()?.chrome?.cast;
+  if (!media || !chromeCast)
+    throw new Error("Custom Cast queue is unavailable.");
+
+  const numericByStableId = new Map(
+    (media.items ?? [])
+      .map((item) => [customQueueItemId(item), item.itemId] as const)
+      .filter(
+        (entry): entry is readonly [string, number] =>
+          Boolean(entry[0]) && typeof entry[1] === "number",
+      ),
+  );
+  const previousIds = previous.items.map((item) => item.item_id);
+  const nextIds = next.items.map((item) => item.item_id);
+  const previousIdSet = new Set(previousIds);
+  const nextIdSet = new Set(nextIds);
+  const removed = previousIds.filter((itemId) => !nextIdSet.has(itemId));
+  const inserted = nextIds.filter((itemId) => !previousIdSet.has(itemId));
+
+  if (removed.length) {
+    const numericIds = removed
+      .map((itemId) => numericByStableId.get(itemId))
+      .filter((itemId): itemId is number => itemId !== undefined);
+    if (numericIds.length) {
+      const request = new chromeCast.media.QueueRemoveItemsRequest(numericIds);
+      await castCommand((resolve, reject) =>
+        media.queueRemoveItems(request, resolve, reject),
+      );
+    }
+  }
+
+  if (inserted.length) {
+    const syntheticSession: CastPlaybackSessionResponse = {
+      session_id: activeCrateCastSessionId ?? "",
+      lease: "",
+      bootstrap_url: activeCrateCastBootstrapUrl ?? "",
+      receiver_application_id: customReceiverApplicationId() ?? "",
+      queue: next,
+    };
+    const built = buildWebQueueLoad(syntheticSession, chromeCast);
+    const insertItem = async (position: number): Promise<void> => {
+      const itemId = inserted[position];
+      if (!itemId) return;
+      const index = nextIds.indexOf(itemId);
+      const item = built.items[index];
+      if (item) {
+        const request = new chromeCast.media.QueueInsertItemsRequest([item]);
+        const nextExistingId = nextIds
+          .slice(index + 1)
+          .map((candidate) => numericByStableId.get(candidate))
+          .find((candidate) => candidate !== undefined);
+        if (nextExistingId !== undefined) request.insertBefore = nextExistingId;
+        await castCommand((resolve, reject) =>
+          media.queueInsertItems(request, resolve, reject),
+        );
+      }
+      await insertItem(position + 1);
+    };
+    await insertItem(0);
+  }
+
+  const survivingDesiredOrder = nextIds
+    .map((itemId) => numericByStableId.get(itemId))
+    .filter((itemId): itemId is number => itemId !== undefined);
+  const survivingPreviousOrder = previousIds
+    .map((itemId) => numericByStableId.get(itemId))
+    .filter((itemId): itemId is number => itemId !== undefined);
+  if (
+    !inserted.length &&
+    survivingDesiredOrder.join(",") !== survivingPreviousOrder.join(",")
+  ) {
+    const request = new chromeCast.media.QueueReorderItemsRequest(
+      survivingDesiredOrder,
+    );
+    await castCommand((resolve, reject) =>
+      media.queueReorderItems(request, resolve, reject),
+    );
+  }
+
+  if (next.repeat_mode !== previous.repeat_mode) {
+    const repeatMode =
+      next.repeat_mode === "all"
+        ? chromeCast.media.RepeatMode.ALL
+        : next.repeat_mode === "one"
+          ? chromeCast.media.RepeatMode.SINGLE
+          : chromeCast.media.RepeatMode.OFF;
+    await castCommand((resolve, reject) =>
+      media.queueSetRepeatMode(repeatMode, resolve, reject),
+    );
+  }
+}
+
+async function requireActiveCustomQueue() {
+  if (!isCustomCastSessionActive() || !activeCrateCastSessionId) {
+    throw new Error("No active Crate Cast queue.");
+  }
+  if (!activeCrateCastBootstrapUrl) {
+    isCustomCastSessionActive();
+  }
+  if (!activeCrateCastBootstrapUrl) {
+    throw new Error("Cast session cannot be rejoined from this sender.");
+  }
+  if (!activeCrateCastQueue) {
+    const scoped = await loadScopedCastPlaybackSession(
+      activeCrateCastBootstrapUrl,
+    );
+    activeCrateCastQueue = scoped.queue;
+  }
+  return {
+    bootstrapUrl: activeCrateCastBootstrapUrl,
+    queue: activeCrateCastQueue,
+    sessionId: activeCrateCastSessionId,
+  };
+}
+
+async function syncCustomCastQueueNow(
+  update: CustomCastQueueUpdate,
+): Promise<CastStartResult> {
+  const { queue, repeatMode, shuffle } = update;
+  try {
+    const active = await requireActiveCustomQueue();
+    const mutationId = crypto.randomUUID();
+    let request = buildCastQueueUpdateRequest(
+      queue,
+      active.queue.items,
+      active.queue.revision,
+      mutationId,
+      repeatMode,
+      shuffle,
+    );
+    try {
+      await updateCastPlaybackSession(active.sessionId, request);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 409) throw error;
+      const latest = await loadScopedCastPlaybackSession(active.bootstrapUrl);
+      request = {
+        ...request,
+        expected_revision: latest.queue.revision,
+        items: rebaseQueueRequest(
+          active.queue.items,
+          request.items,
+          latest.queue.items,
+        ),
+      };
+      await updateCastPlaybackSession(active.sessionId, request);
+    }
+    const scoped = await loadScopedCastPlaybackSession(active.bootstrapUrl);
+    await applyCustomQueueDelta(active.queue, scoped.queue);
+    activeCrateCastQueue = scoped.queue;
+    emitCastSessionChanged();
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Could not update Cast queue.",
+    };
+  }
+}
+
+export function syncCustomCastQueue(
+  update: CustomCastQueueUpdate,
+): Promise<CastStartResult> {
+  const result = castQueueWriteTail.then(() => syncCustomCastQueueNow(update));
+  castQueueWriteTail = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+function castQueueCommand(
+  command: "next" | "previous" | { index: number },
+): Promise<CastStartResult> {
+  const media = currentWebCastMedia();
+  if (!media || !isCustomCastSessionActive()) {
+    return Promise.resolve({
+      ok: false,
+      message: "No active Crate Cast queue.",
+    });
+  }
+  return new Promise((resolve) => {
+    const success = () => resolve({ ok: true });
+    const failure = (error: unknown) =>
+      resolve({
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Cast queue command failed.",
+      });
+    if (command === "next") {
+      media.queueNext(success, failure);
+      return;
+    }
+    if (command === "previous") {
+      media.queuePrev(success, failure);
+      return;
+    }
+    const itemId = media.items?.[command.index]?.itemId;
+    if (typeof itemId !== "number") {
+      resolve({ ok: false, message: "Cast queue item is unavailable." });
+      return;
+    }
+    media.queueJumpToItem(itemId, success, failure);
+  });
+}
+
+export function castQueueNext(): Promise<CastStartResult> {
+  return castQueueCommand("next");
+}
+
+export function castQueuePrevious(): Promise<CastStartResult> {
+  return castQueueCommand("previous");
+}
+
+export function castQueueJumpTo(index: number): Promise<CastStartResult> {
+  return castQueueCommand({ index });
+}
+
 async function castControl(
   command: "pause" | "play" | "seek" | "setVolume" | "stop",
   payload: { currentTime?: number; volume?: number } = {},
@@ -480,12 +887,17 @@ export function castStop(): Promise<CastStartResult> {
   return castControl("stop");
 }
 
-export async function endCastSession(): Promise<CastStartResult> {
+export async function disconnectCastSession(): Promise<CastStartResult> {
   if (isNative) {
     try {
-      const result = await getNativeCast().endSession();
+      const result = await getNativeCast().endSession({ stopCasting: false });
       if (result.ok) setAuthoritativeNativeCastSession(false);
-      if (result.ok) emitCastSessionChanged();
+      if (result.ok) {
+        activeCrateCastSessionId = null;
+        activeCrateCastBootstrapUrl = null;
+        activeCrateCastQueue = null;
+        emitCastSessionChanged();
+      }
       return result;
     } catch (error) {
       return {
@@ -501,7 +913,10 @@ export async function endCastSession(): Promise<CastStartResult> {
   try {
     const context = castWindow()?.cast?.framework.CastContext.getInstance();
     if (!context?.getCurrentSession()) return { ok: true };
-    context.endCurrentSession(true);
+    context.endCurrentSession(false);
+    activeCrateCastSessionId = null;
+    activeCrateCastBootstrapUrl = null;
+    activeCrateCastQueue = null;
     emitCastSessionChanged();
     return { ok: true };
   } catch (error) {
@@ -511,6 +926,91 @@ export async function endCastSession(): Promise<CastStartResult> {
         error instanceof Error ? error.message : "Could not end Cast session.",
     };
   }
+}
+
+export async function stopCastSession(): Promise<CastStartResult> {
+  const sessionId = activeCrateCastSessionId;
+  const hasPlayableSession = isNative
+    ? isCastSessionActive()
+    : Boolean(currentWebCastMedia());
+  const stopResult = hasPlayableSession
+    ? await castStop()
+    : ({ ok: true } satisfies CastStartResult);
+  let revokeError: unknown;
+  if (sessionId) {
+    try {
+      await revokeCastPlaybackSession(sessionId);
+    } catch (error) {
+      revokeError = error;
+    }
+  }
+  if (isNative) {
+    try {
+      const result = await getNativeCast().endSession({ stopCasting: true });
+      if (result.ok) setAuthoritativeNativeCastSession(false);
+      activeCrateCastSessionId = null;
+      activeCrateCastBootstrapUrl = null;
+      activeCrateCastQueue = null;
+      emitCastSessionChanged();
+      if (!result.ok) return result;
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Could not stop Cast.",
+      };
+    }
+  } else {
+    try {
+      const context = castWindow()?.cast?.framework.CastContext.getInstance();
+      context?.endCurrentSession(true);
+      activeCrateCastSessionId = null;
+      activeCrateCastBootstrapUrl = null;
+      activeCrateCastQueue = null;
+      emitCastSessionChanged();
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Could not stop Cast.",
+      };
+    }
+  }
+  if (!stopResult.ok) return stopResult;
+  if (revokeError) {
+    return {
+      ok: false,
+      message: "Cast stopped, but its lease was not revoked.",
+    };
+  }
+  return { ok: true };
+}
+
+export function endCastSession(): Promise<CastStartResult> {
+  return stopCastSession();
+}
+
+function loadWebCastQueue(
+  session: CastSession,
+  response: CastPlaybackSessionResponse,
+  chromeCast: ChromeCastNamespace,
+): Promise<void> {
+  const sessionObject = session.getSessionObj?.();
+  if (!sessionObject) {
+    return Promise.reject(new Error("Custom Cast queue API is unavailable."));
+  }
+  const load = buildWebQueueLoad(response, chromeCast);
+  return new Promise((resolve, reject) => {
+    sessionObject.queueLoad(
+      load.items,
+      load.repeatMode,
+      load.startIndex,
+      load.startTime,
+      load.customData,
+      resolve,
+      reject,
+    );
+  });
 }
 
 export async function startCastSession(
@@ -539,6 +1039,46 @@ export async function startCastSession(
     const webSession = isNative ? null : await requestWebCastSession();
     if (!isNative && !webSession) {
       return { ok: false, message: "Could not open the Cast device picker." };
+    }
+
+    const customReceiverId = customReceiverApplicationId();
+    if (!isNative && customReceiverId && webSession) {
+      const castSession = await createCastPlaybackSession(payload);
+      if (castSession.receiver_application_id !== customReceiverId) {
+        await revokeCastPlaybackSession(castSession.session_id).catch(
+          () => undefined,
+        );
+        return {
+          ok: false,
+          message: "The Cast receiver configuration does not match the server.",
+        };
+      }
+      const chromeCast = castWindow()?.chrome?.cast;
+      if (!chromeCast) {
+        await revokeCastPlaybackSession(castSession.session_id).catch(
+          () => undefined,
+        );
+        return { ok: false, message: "Google Cast sender is unavailable." };
+      }
+      try {
+        await loadWebCastQueue(webSession, castSession, chromeCast);
+      } catch (error) {
+        await revokeCastPlaybackSession(castSession.session_id).catch(
+          () => undefined,
+        );
+        throw error;
+      }
+      activeCrateCastSessionId = castSession.session_id;
+      activeCrateCastBootstrapUrl = castSession.bootstrap_url;
+      activeCrateCastQueue = castSession.queue;
+      nativeCastSessionActive = false;
+      emitCastSessionChanged();
+      const targetName = castSessionName(webSession);
+      return {
+        ok: true,
+        targetName,
+        message: targetName ? `Casting to ${targetName}.` : "Casting started.",
+      };
     }
 
     const ticket = await api<CastTicketResponse>(

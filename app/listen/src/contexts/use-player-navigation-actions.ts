@@ -14,7 +14,11 @@ import {
   seekTo as gpSeekTo,
 } from "@/lib/gapless-player";
 import {
+  castQueueJumpTo,
+  castQueueNext,
+  castQueuePrevious,
   castSeek,
+  isCustomCastSessionActive,
   isCastSessionActive,
   startCastSession,
 } from "@/lib/cast-sender";
@@ -103,6 +107,14 @@ export function usePlayerNavigationActions({
     const nextIndex = currentIndexRef.current + 1;
     if (nextIndex < queueRef.current.length) {
       if (isCastSessionActive()) {
+        if (isCustomCastSessionActive()) {
+          void castQueueNext().then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to advance queue:", result.message);
+            }
+          });
+          return;
+        }
         const nextTrack = queueRef.current[nextIndex];
         if (nextTrack) {
           void startCastSession({ track: nextTrack, currentTime: 0 })
@@ -137,6 +149,14 @@ export function usePlayerNavigationActions({
 
     if (repeatRef.current === "all" && queueRef.current.length > 0) {
       if (isCastSessionActive()) {
+        if (isCustomCastSessionActive()) {
+          void castQueueNext().then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to wrap queue:", result.message);
+            }
+          });
+          return;
+        }
         const nextTrack = queueRef.current[0];
         if (nextTrack) {
           void startCastSession({ track: nextTrack, currentTime: 0 })
@@ -243,6 +263,14 @@ export function usePlayerNavigationActions({
     if (currentIndexRef.current > 0) {
       const targetIndex = currentIndexRef.current - 1;
       if (isCastSessionActive()) {
+        if (isCustomCastSessionActive()) {
+          void castQueuePrevious().then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to rewind queue:", result.message);
+            }
+          });
+          return;
+        }
         const previousTrack = queueRef.current[targetIndex];
         if (previousTrack) {
           void startCastSession({ track: previousTrack, currentTime: 0 })
@@ -280,6 +308,14 @@ export function usePlayerNavigationActions({
     if (repeatRef.current === "all" && queueRef.current.length > 0) {
       const wrappedIndex = queueRef.current.length - 1;
       if (isCastSessionActive()) {
+        if (isCustomCastSessionActive()) {
+          void castQueuePrevious().then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to wrap previous:", result.message);
+            }
+          });
+          return;
+        }
         const previousTrack = queueRef.current[wrappedIndex];
         if (previousTrack) {
           void startCastSession({ track: previousTrack, currentTime: 0 })
@@ -335,6 +371,14 @@ export function usePlayerNavigationActions({
       if (index < 0 || index >= queueRef.current.length) return;
       pendingRestoreTimeRef.current = 0;
       if (isCastSessionActive()) {
+        if (isCustomCastSessionActive()) {
+          void castQueueJumpTo(index).then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to jump queue:", result.message);
+            }
+          });
+          return;
+        }
         const nextTrack = queueRef.current[index];
         if (nextTrack) {
           void startCastSession({ track: nextTrack, currentTime: 0 })

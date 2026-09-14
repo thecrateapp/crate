@@ -75,10 +75,32 @@ describe("receiver store", () => {
     });
 
     expect(store.getSnapshot()).toMatchObject({ appearance, queueRevision: 2 });
+    expect(store.getSnapshot()).toMatchObject({
+      stateSeq: 3,
+      repeatMode: "off",
+      shuffle: false,
+    });
     expect(store.progress.getSnapshot()).toEqual({
       currentTime: 16,
       duration: 0,
     });
+  });
+
+  it("adopts the current CAF item without replacing the queue", () => {
+    const store = createReceiverStore();
+    store.dispatch({
+      type: "queue-loaded",
+      queueRevision: 2,
+      currentIndex: 0,
+      items: [
+        { itemId: "one", track: { trackId: 1 }, title: "One", artist: "A" },
+        { itemId: "two", track: { trackId: 2 }, title: "Two", artist: "A" },
+      ],
+    });
+
+    store.dispatch({ type: "current-item", itemId: "two" });
+
+    expect(store.getSnapshot().currentIndex).toBe(1);
   });
 
   it("keeps high-frequency progress outside structural subscriptions", () => {

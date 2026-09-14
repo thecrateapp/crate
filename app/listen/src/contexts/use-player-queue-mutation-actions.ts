@@ -1,6 +1,6 @@
 import { useCallback, type MutableRefObject } from "react";
 
-import type { Track } from "@/contexts/player-types";
+import type { RepeatMode, Track } from "@/contexts/player-types";
 import { toFreshEngineTrack } from "@/contexts/player-engine-adapter";
 import {
   addTrack as gpAddTrack,
@@ -12,6 +12,10 @@ import {
   androidNativeEngine as nativeEngine,
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
+import {
+  isCustomCastSessionActive,
+  syncCustomCastQueue,
+} from "@/lib/cast-sender";
 
 type QueueCommitter = (queue: Track[]) => void;
 type IndexCommitter = (index: number) => void;
@@ -32,6 +36,8 @@ export interface UsePlayerQueueMutationActionsParams {
   currentIndexRef: MutableRefObject<number>;
   currentTimeRef: MutableRefObject<number>;
   isPlayingRef: MutableRefObject<boolean>;
+  repeatRef: MutableRefObject<RepeatMode>;
+  shuffleRef: MutableRefObject<boolean>;
   unshuffledQueueRef: MutableRefObject<Track[] | null>;
   registerEngineTrack: (track: Track) => string;
   unregisterEngineTrack: (track: Track) => void;
@@ -54,6 +60,8 @@ export function usePlayerQueueMutationActions({
   currentIndexRef,
   currentTimeRef,
   isPlayingRef,
+  repeatRef,
+  shuffleRef,
   unshuffledQueueRef,
   registerEngineTrack,
   unregisterEngineTrack,
@@ -68,6 +76,23 @@ export function usePlayerQueueMutationActions({
       const insertAt = currentIndexRef.current + 1;
       const nextQueue = [...queueRef.current];
       nextQueue.splice(insertAt, 0, track);
+
+      if (isCustomCastSessionActive()) {
+        void syncCustomCastQueue({
+          queue: nextQueue,
+          currentIndex: currentIndexRef.current,
+          repeatMode: repeatRef.current,
+          shuffle: shuffleRef.current,
+        }).then((result) => {
+          if (result.ok) commitQueue(nextQueue);
+          else
+            console.error(
+              "[cast] failed to insert next track:",
+              result.message,
+            );
+        });
+        return;
+      }
 
       if (shouldUseAndroidNativePlayer()) {
         void (async () => {
@@ -93,6 +118,8 @@ export function usePlayerQueueMutationActions({
       jamQueueLockedRef,
       queueRef,
       registerEngineTrack,
+      repeatRef,
+      shuffleRef,
       unshuffledQueueRef,
     ],
   );
@@ -101,6 +128,18 @@ export function usePlayerQueueMutationActions({
     (track: Track) => {
       if (jamQueueLockedRef.current) return;
       const nextQueue = [...queueRef.current, track];
+      if (isCustomCastSessionActive()) {
+        void syncCustomCastQueue({
+          queue: nextQueue,
+          currentIndex: currentIndexRef.current,
+          repeatMode: repeatRef.current,
+          shuffle: shuffleRef.current,
+        }).then((result) => {
+          if (result.ok) commitQueue(nextQueue);
+          else console.error("[cast] failed to append track:", result.message);
+        });
+        return;
+      }
       if (shouldUseAndroidNativePlayer()) {
         void (async () => {
           const engineTrack = await toFreshEngineTrack(track, undefined, {
@@ -121,9 +160,12 @@ export function usePlayerQueueMutationActions({
     },
     [
       commitQueue,
+      currentIndexRef,
       jamQueueLockedRef,
       queueRef,
       registerEngineTrack,
+      repeatRef,
+      shuffleRef,
       unshuffledQueueRef,
     ],
   );
@@ -139,6 +181,30 @@ export function usePlayerQueueMutationActions({
       const nextQueue = previousQueue.filter(
         (_, queueIndex) => queueIndex !== index,
       );
+      const nextIndex = removingCurrent
+        ? Math.max(0, Math.min(currentIndexRef.current, nextQueue.length - 1))
+        : index < currentIndexRef.current
+          ? currentIndexRef.current - 1
+          : currentIndexRef.current;
+
+      if (isCustomCastSessionActive()) {
+        void syncCustomCastQueue({
+          queue: nextQueue,
+          currentIndex: nextIndex,
+          repeatMode: repeatRef.current,
+          shuffle: shuffleRef.current,
+        }).then((result) => {
+          if (!result.ok) {
+            console.error("[cast] failed to remove track:", result.message);
+            return;
+          }
+          commitQueue(nextQueue);
+          if (nextIndex !== currentIndexRef.current) {
+            commitCurrentIndex(nextIndex);
+          }
+        });
+        return;
+      }
 
       if (unshuffledQueueRef.current && removedTrack) {
         const removedKey = getTrackCacheKey(removedTrack);
@@ -168,10 +234,6 @@ export function usePlayerQueueMutationActions({
         gpRemoveTrack(index);
         if (removedTrack) unregisterEngineTrack(removedTrack);
       }
-      const nextIndex =
-        index < currentIndexRef.current
-          ? currentIndexRef.current - 1
-          : currentIndexRef.current;
       commitQueue(nextQueue);
       if (nextIndex !== currentIndexRef.current) {
         commitCurrentIndex(nextIndex);
@@ -186,6 +248,8 @@ export function usePlayerQueueMutationActions({
       jamQueueLockedRef,
       pushToEngine,
       queueRef,
+      repeatRef,
+      shuffleRef,
       unregisterEngineTrack,
       unshuffledQueueRef,
     ],
@@ -216,6 +280,31 @@ export function usePlayerQueueMutationActions({
 
       const activeIndex = currentIndexRef.current;
       const movingCurrent = fromIndex === activeIndex;
+      let nextIndex = activeIndex;
+      if (movingCurrent) {
+        nextIndex = toIndex;
+      } else if (fromIndex < activeIndex && toIndex >= activeIndex) {
+        nextIndex = activeIndex - 1;
+      } else if (fromIndex > activeIndex && toIndex <= activeIndex) {
+        nextIndex = activeIndex + 1;
+      }
+
+      if (isCustomCastSessionActive()) {
+        void syncCustomCastQueue({
+          queue: nextQueue,
+          currentIndex: nextIndex,
+          repeatMode: repeatRef.current,
+          shuffle: shuffleRef.current,
+        }).then((result) => {
+          if (!result.ok) {
+            console.error("[cast] failed to reorder queue:", result.message);
+            return;
+          }
+          commitQueue(nextQueue);
+          if (nextIndex !== activeIndex) commitCurrentIndex(nextIndex);
+        });
+        return;
+      }
       if (movingCurrent) {
         pushToEngine(nextQueue, toIndex, {
           autoplay: isPlayingRef.current,
@@ -234,13 +323,6 @@ export function usePlayerQueueMutationActions({
         gpInsertTrack(toIndex, registerEngineTrack(moved));
       }
 
-      let nextIndex = activeIndex;
-      if (fromIndex < activeIndex && toIndex >= activeIndex) {
-        nextIndex = activeIndex - 1;
-      } else if (fromIndex > activeIndex && toIndex <= activeIndex) {
-        nextIndex = activeIndex + 1;
-      }
-
       commitQueue(nextQueue);
       if (nextIndex !== activeIndex) {
         commitCurrentIndex(nextIndex);
@@ -256,6 +338,8 @@ export function usePlayerQueueMutationActions({
       pushToEngine,
       queueRef,
       registerEngineTrack,
+      repeatRef,
+      shuffleRef,
       unregisterEngineTrack,
       unshuffledQueueRef,
     ],

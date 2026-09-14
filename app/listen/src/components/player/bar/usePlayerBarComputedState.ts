@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { CrossfadeTransition } from "@/contexts/player-context";
-import type { Track } from "@/contexts/player-types";
+import type { RepeatMode, Track } from "@/contexts/player-types";
+import { isCastSessionActive } from "@/lib/cast-sender";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
 
 type IsLiked = (
@@ -22,6 +23,9 @@ type UsePlayerBarComputedStateOptions = {
   displayTrack: Track | undefined;
   displayQueue: Track[];
   displayCurrentIndex: number;
+  jamQueueLocked: boolean;
+  repeat: RepeatMode;
+  shuffle: boolean;
   legacyConnectEnabled: boolean;
   activeConnectDeviceId: string | null;
   activeConnectSession: PlaybackTargetContext["activeConnectSession"];
@@ -45,6 +49,9 @@ export function usePlayerBarComputedState({
   displayTrack,
   displayQueue,
   displayCurrentIndex,
+  jamQueueLocked,
+  repeat,
+  shuffle,
   legacyConnectEnabled,
   activeConnectDeviceId,
   activeConnectSession,
@@ -61,6 +68,15 @@ export function usePlayerBarComputedState({
       currentTime: effectiveDisplayedTime,
       currentIndex: displayCurrentIndex,
       queue: displayQueue,
+      repeatMode: repeat,
+      shuffle,
+      playbackAuthority: jamQueueLocked
+        ? "jam"
+        : isRemoteConnectActive
+          ? "connect"
+          : isCastSessionActive()
+            ? "cast"
+            : "local",
       volume: effectiveVolume,
       activeConnectDeviceId: legacyConnectEnabled
         ? activeConnectDeviceId
@@ -82,10 +98,14 @@ export function usePlayerBarComputedState({
       effectiveDisplayedTime,
       effectiveVolume,
       legacyConnectEnabled,
+      isRemoteConnectActive,
+      jamQueueLocked,
       pause,
       pauseLocal,
       publishConnectState,
+      repeat,
       resumeLocal,
+      shuffle,
     ],
   );
 

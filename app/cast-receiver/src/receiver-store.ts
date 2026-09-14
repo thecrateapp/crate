@@ -23,7 +23,10 @@ export interface ReceiverSnapshot {
   message: string | null;
   phase: ReceiverPhase;
   queueRevision: number;
+  repeatMode: CastQueueSnapshot["repeatMode"];
   sessionId: string | null;
+  shuffle: boolean;
+  stateSeq: number;
 }
 
 export interface ReceiverProgress {
@@ -33,6 +36,8 @@ export interface ReceiverProgress {
 
 export type ReceiverAction =
   | { type: "load-started"; sessionId: string }
+  | { type: "current-item"; itemId: string }
+  | { type: "state-seq"; stateSeq: number }
   | { type: "player-state"; state: CastPlayerState }
   | {
       type: "queue-loaded";
@@ -70,6 +75,19 @@ function reduce(
       sessionId: action.sessionId,
     };
   }
+  if (action.type === "current-item") {
+    const currentIndex = snapshot.items.findIndex(
+      (item) => item.itemId === action.itemId,
+    );
+    return currentIndex < 0 || currentIndex === snapshot.currentIndex
+      ? snapshot
+      : { ...snapshot, currentIndex };
+  }
+  if (action.type === "state-seq") {
+    return action.stateSeq <= snapshot.stateSeq
+      ? snapshot
+      : { ...snapshot, stateSeq: action.stateSeq };
+  }
   if (action.type === "player-state") {
     const phase = phaseForPlayerState(action.state);
     return phase === snapshot.phase
@@ -91,6 +109,9 @@ function reduce(
       currentIndex: action.queue.currentIndex,
       items: action.queue.items,
       queueRevision: action.queue.queueRevision,
+      repeatMode: action.queue.repeatMode,
+      shuffle: action.queue.shuffle,
+      stateSeq: action.queue.stateSeq,
     };
   }
   if (action.type === "recovering") {
@@ -131,7 +152,10 @@ export function createReceiverStore() {
     message: null,
     phase: "idle",
     queueRevision: 0,
+    repeatMode: "off",
     sessionId: null,
+    shuffle: false,
+    stateSeq: 0,
   };
   const listeners = new Set<() => void>();
   const progress = createProgressChannel();

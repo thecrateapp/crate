@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from crate.api.auth import _request_base_origin, _require_auth
 from crate.api.browse_media import _playback_headers, _stream_resolved_file
+from crate.api.browse_album import api_cover
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -264,6 +265,12 @@ def _serialise_session_item(
         item_id = str(item["item_id"])
         result.update(
             {
+                "artwork_url": _absolute_cast_route_url(
+                    request,
+                    "get_cast_session_item_artwork",
+                    lease=lease,
+                    item_id=item_id,
+                ),
                 "content_type": _content_type_hint(item, session),
                 "metadata_url": _absolute_cast_route_url(
                     request,
@@ -490,6 +497,17 @@ def get_cast_session_item(request: Request, lease: str, item_id: str):
         "source": resolution.source,
         "expires_at": session.get("expires_at"),
     }
+
+
+@router.api_route(
+    "/api/cast/sessions/{lease}/items/{item_id}/artwork",
+    methods=["GET", "HEAD"],
+    responses=_CAST_PUBLIC_RESPONSES,
+    summary="Get scoped artwork for one Cast session item",
+)
+def get_cast_session_item_artwork(lease: str, item_id: str):
+    _session, _item, track = _session_item_and_track_or_404(lease, item_id)
+    return api_cover(str(track.get("artist") or ""), str(track.get("album") or ""))
 
 
 @router.api_route(

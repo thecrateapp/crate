@@ -1,5 +1,32 @@
+import type { CastAppearance } from "@crate/cast-protocol";
+import { getAppliedThemeSkin } from "@crate/ui/lib/theme-skin";
+
 import { getCastSenderCapabilities, startCastSession } from "@/lib/cast-sender";
+import { isMotionBlocked } from "@/lib/motion-availability";
 import type { PlaybackTargetProvider } from "./playback-target-types";
+
+function castAppearance(): CastAppearance {
+  const appearance = getAppliedThemeSkin();
+  return {
+    contractVersion: 1,
+    skinId: appearance.skin,
+    preferredMode: appearance.mode,
+    resolvedMode: appearance.resolvedMode,
+    reducedMotion: isMotionBlocked(),
+  };
+}
+
+function authorityUnavailableReason(
+  authority: "cast" | "connect" | "jam" | "local" | undefined,
+): string | undefined {
+  if (authority === "jam") {
+    return "Google Cast is unavailable during a Jam session.";
+  }
+  if (authority === "connect") {
+    return "Switch playback to this device before starting Google Cast.";
+  }
+  return undefined;
+}
 
 export const googleCastTargetProvider: PlaybackTargetProvider = {
   id: "google-cast",
@@ -9,7 +36,10 @@ export const googleCastTargetProvider: PlaybackTargetProvider = {
     if (!capabilities.visible) return [];
 
     const hasTrack = Boolean(context?.currentTrack);
-    const available = capabilities.available && hasTrack;
+    const authorityReason = authorityUnavailableReason(
+      context?.playbackAuthority,
+    );
+    const available = capabilities.available && hasTrack && !authorityReason;
     return [
       {
         id: "google-cast:default",
@@ -27,9 +57,10 @@ export const googleCastTargetProvider: PlaybackTargetProvider = {
         available,
         unavailableReason: available
           ? undefined
-          : hasTrack
-            ? capabilities.reason || "Google Cast is unavailable."
-            : "Start a track before casting.",
+          : authorityReason ??
+            (hasTrack
+              ? capabilities.reason || "Google Cast is unavailable."
+              : "Start a track before casting."),
         capabilities: {
           canPlay: true,
           canSeek: true,
@@ -45,7 +76,12 @@ export const googleCastTargetProvider: PlaybackTargetProvider = {
     }
     const result = await startCastSession({
       track: currentTrack,
+      queue: context?.queue,
+      currentIndex: context?.currentIndex,
       currentTime: context?.currentTime,
+      repeatMode: context?.repeatMode,
+      shuffle: context?.shuffle,
+      appearance: castAppearance(),
       targetDeviceId: target.id,
     });
     if (result.ok) await (context?.pauseLocal ?? context?.pause)?.();

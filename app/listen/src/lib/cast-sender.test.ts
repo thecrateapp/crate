@@ -55,21 +55,28 @@ import {
   buildCastTicketRequest,
   castPause,
   castPlay,
+  castQueueJumpTo,
+  castQueueNext,
+  castQueuePrevious,
   castSeek,
   castSetVolume,
   castStop,
+  disconnectCastSession,
   endCastSession,
   getCastSenderCapabilities,
   isCastSessionActive,
   onCastSessionChanged,
   startCastSession,
+  stopCastSession,
   subscribeCastPlaybackState,
+  syncCustomCastQueue,
 } from "@/lib/cast-sender";
 
 describe("cast sender", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runtimeMock.isNative = false;
+    vi.unstubAllEnvs();
     ensureMediaAccessUrlMock.mockImplementation(
       async (url: string) =>
         `${url}${url.includes("?") ? "&" : "?"}media_ticket=artwork-ticket`,
@@ -310,6 +317,401 @@ describe("cast sender", () => {
     expect(session.loadMedia).toHaveBeenCalledOnce();
   });
 
+  it("loads the full queue into the configured custom receiver", async () => {
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    const queueLoad = vi.fn(
+      (
+        _items: unknown[],
+        _repeat: string,
+        _index: number,
+        _time: number,
+        _customData: unknown,
+        success: () => void,
+      ) => success(),
+    );
+    const context = {
+      setOptions: vi.fn(),
+      getCurrentSession: vi.fn(() => null),
+      requestSession: vi.fn(async () => ({
+        getCastDevice: () => ({ friendlyName: "Living Room" }),
+        getSessionObj: () => ({ queueLoad }),
+      })),
+      endCurrentSession: vi.fn(),
+    };
+    class MediaInfo {
+      customData?: unknown;
+      metadata?: unknown;
+      duration?: number;
+      constructor(
+        public contentId: string,
+        public contentType: string,
+      ) {}
+    }
+    class QueueItem {
+      autoplay?: boolean;
+      startTime?: number;
+      constructor(public media: MediaInfo) {}
+    }
+    Object.assign(window, {
+      cast: { framework: { CastContext: { getInstance: () => context } } },
+      chrome: {
+        cast: {
+          AutoJoinPolicy: { ORIGIN_SCOPED: "origin_scoped" },
+          Image: class {
+            constructor(public url: string) {}
+          },
+          media: {
+            DEFAULT_MEDIA_RECEIVER_APP_ID: "CC1AD845",
+            MediaInfo,
+            MusicTrackMediaMetadata: class {},
+            QueueItem,
+            RepeatMode: { OFF: "OFF", ALL: "ALL", SINGLE: "SINGLE" },
+          },
+        },
+      },
+    });
+    apiMock.mockResolvedValue({
+      session_id: "session-1",
+      lease: "private-lease",
+      bootstrap_url: "https://api.example/api/cast/sessions/private-lease",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 1,
+        current_time: 17,
+        repeat_mode: "all",
+        shuffle: false,
+        items: [
+          {
+            item_id: "one",
+            title: "One",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/one",
+            metadata_url: "https://api.example/one/meta",
+          },
+          {
+            item_id: "two",
+            title: "Two",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/two",
+            metadata_url: "https://api.example/two/meta",
+          },
+        ],
+      },
+    });
+
+    await expect(
+      startCastSession({
+        track: {
+          id: "two",
+          libraryTrackId: 2,
+          title: "Two",
+          artist: "Artist",
+        },
+        queue: [
+          { id: "one", libraryTrackId: 1, title: "One", artist: "Artist" },
+          { id: "two", libraryTrackId: 2, title: "Two", artist: "Artist" },
+        ],
+        currentIndex: 1,
+        currentTime: 17,
+        repeatMode: "all",
+      }),
+    ).resolves.toMatchObject({ ok: true, targetName: "Living Room" });
+
+    expect(context.setOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ receiverApplicationId: "ABCD1234" }),
+    );
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/me/cast/sessions",
+      "POST",
+      expect.objectContaining({ current_index: 1, items: expect.any(Array) }),
+    );
+    expect(queueLoad).toHaveBeenCalledWith(
+      expect.any(Array),
+      "ALL",
+      1,
+      17,
+      { crateCast: { protocolVersion: 1, sessionId: "session-1" } },
+      expect.any(Function),
+      expect.any(Function),
+    );
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("edits a custom receiver queue without reloading active media", async () => {
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    const queueLoad = vi.fn(
+      (
+        _items: unknown[],
+        _repeat: string,
+        _index: number,
+        _time: number,
+        _customData: unknown,
+        success: () => void,
+      ) => success(),
+    );
+    const queueInsertItems = vi.fn((_request: unknown, success: () => void) =>
+      success(),
+    );
+    const media = {
+      items: [
+        {
+          itemId: 41,
+          media: {
+            customData: { crateCast: { itemId: "track-1-1" } },
+          },
+        },
+      ],
+      media: {
+        customData: {
+          crateCast: {
+            protocolVersion: 1,
+            sessionId: "session-edit",
+            bootstrapUrl: "https://api.example/api/cast/sessions/lease",
+          },
+        },
+      },
+      queueInsertItems,
+      queueRemoveItems: vi.fn(),
+      queueReorderItems: vi.fn(),
+      queueSetRepeatMode: vi.fn(),
+    };
+    const session = {
+      getMediaSession: () => media,
+      getSessionObj: () => ({ queueLoad }),
+    };
+    const context = {
+      setOptions: vi.fn(),
+      getCurrentSession: vi.fn(() => session),
+      requestSession: vi.fn(async () => session),
+      endCurrentSession: vi.fn(),
+    };
+    class MediaInfo {
+      customData?: unknown;
+      metadata?: unknown;
+      constructor(
+        public contentId: string,
+        public contentType: string,
+      ) {}
+    }
+    class QueueItem {
+      autoplay?: boolean;
+      constructor(public media: MediaInfo) {}
+    }
+    class QueueInsertItemsRequest {
+      insertBefore?: number;
+      constructor(public items: QueueItem[]) {}
+    }
+    Object.assign(window, {
+      cast: { framework: { CastContext: { getInstance: () => context } } },
+      chrome: {
+        cast: {
+          AutoJoinPolicy: { ORIGIN_SCOPED: "origin_scoped" },
+          Image: class {},
+          media: {
+            DEFAULT_MEDIA_RECEIVER_APP_ID: "CC1AD845",
+            MediaInfo,
+            MusicTrackMediaMetadata: class {},
+            QueueItem,
+            QueueInsertItemsRequest,
+            QueueRemoveItemsRequest: class {},
+            QueueReorderItemsRequest: class {},
+            RepeatMode: { OFF: "OFF", ALL: "ALL", SINGLE: "SINGLE" },
+          },
+        },
+      },
+    });
+    const initial = {
+      session_id: "session-edit",
+      lease: "lease",
+      bootstrap_url: "https://api.example/api/cast/sessions/lease",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off" as const,
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "One",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/one",
+            metadata_url: "https://api.example/one/meta",
+          },
+        ],
+      },
+    };
+    const scoped = {
+      ...initial,
+      protocol_version: 1,
+      queue: {
+        ...initial.queue,
+        revision: 1,
+        items: [
+          initial.queue.items[0],
+          {
+            item_id: "track-2-1",
+            track_id: 2,
+            title: "Two",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/two",
+            metadata_url: "https://api.example/two/meta",
+          },
+        ],
+      },
+    };
+    apiMock.mockResolvedValueOnce(initial).mockResolvedValueOnce({
+      mutation_status: "applied",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(scoped), { status: 200 }),
+    );
+    const one = {
+      id: "one",
+      libraryTrackId: 1,
+      title: "One",
+      artist: "Artist",
+    };
+    const two = {
+      id: "two",
+      libraryTrackId: 2,
+      title: "Two",
+      artist: "Artist",
+    };
+
+    await startCastSession({ track: one, queue: [one] });
+    await expect(
+      syncCustomCastQueue({
+        queue: [one, two],
+        currentIndex: 0,
+        repeatMode: "off",
+        shuffle: false,
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(queueLoad).toHaveBeenCalledOnce();
+    expect(queueInsertItems).toHaveBeenCalledOnce();
+    expect(apiMock).toHaveBeenLastCalledWith(
+      "/api/me/cast/sessions/session-edit",
+      "PATCH",
+      expect.objectContaining({
+        expected_revision: 0,
+        items: [
+          { item_id: "track-1-1", track_id: 1 },
+          { item_id: "track-2-1", track_id: 2 },
+        ],
+      }),
+    );
+  });
+
+  it("separates disconnect from stopping and revoking custom Cast", async () => {
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    const stop = vi.fn((_request: unknown, success: () => void) => success());
+    const endCurrentSession = vi.fn();
+    const session = {
+      getMediaSession: () => ({ stop }),
+      getSessionObj: () => ({
+        queueLoad: (
+          _items: unknown[],
+          _repeat: string,
+          _index: number,
+          _time: number,
+          _customData: unknown,
+          success: () => void,
+        ) => success(),
+      }),
+    };
+    const context = {
+      setOptions: vi.fn(),
+      getCurrentSession: vi.fn(() => session),
+      requestSession: vi.fn(async () => session),
+      endCurrentSession,
+    };
+    class MediaInfo {
+      customData?: unknown;
+      metadata?: unknown;
+      constructor(
+        public contentId: string,
+        public contentType: string,
+      ) {}
+    }
+    Object.assign(window, {
+      cast: { framework: { CastContext: { getInstance: () => context } } },
+      chrome: {
+        cast: {
+          AutoJoinPolicy: { ORIGIN_SCOPED: "origin_scoped" },
+          Image: class {},
+          media: {
+            DEFAULT_MEDIA_RECEIVER_APP_ID: "CC1AD845",
+            MediaInfo,
+            MusicTrackMediaMetadata: class {},
+            QueueItem: class {
+              constructor(public media: MediaInfo) {}
+            },
+            RepeatMode: { OFF: "OFF", ALL: "ALL", SINGLE: "SINGLE" },
+            StopRequest: class {},
+          },
+        },
+      },
+    });
+    apiMock.mockResolvedValue({
+      session_id: "session-2",
+      lease: "lease",
+      bootstrap_url: "https://api.example/api/cast/sessions/lease",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off",
+        shuffle: false,
+        items: [
+          {
+            item_id: "one",
+            title: "One",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/one",
+            metadata_url: "https://api.example/one/meta",
+          },
+        ],
+      },
+    });
+    const payload = {
+      track: { id: "one", libraryTrackId: 1, title: "One", artist: "Artist" },
+    };
+
+    await startCastSession(payload);
+    apiMock.mockClear();
+    await disconnectCastSession();
+    expect(endCurrentSession).toHaveBeenLastCalledWith(false);
+    expect(stop).not.toHaveBeenCalled();
+    expect(apiMock).not.toHaveBeenCalled();
+
+    await startCastSession(payload);
+    apiMock.mockClear();
+    await stopCastSession();
+    expect(stop).toHaveBeenCalledOnce();
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/me/cast/sessions/session-2",
+      "DELETE",
+    );
+    expect(endCurrentSession).toHaveBeenLastCalledWith(true);
+  });
+
   it("sends media controls to the active web Cast session", async () => {
     const calls: string[] = [];
     const media = {
@@ -456,6 +858,145 @@ describe("cast sender", () => {
 
     unsubscribe();
     expect(media.removeUpdateListener).toHaveBeenCalledOnce();
+  });
+
+  it("prefers monotonic receiver status for a custom Cast session", () => {
+    const messageListeners = new Map<
+      string,
+      (namespace: string, message: string) => void
+    >();
+    const media = {
+      currentItemId: 41,
+      items: [{ itemId: 41 }, { itemId: 42 }],
+      currentTime: 4,
+      playerState: "PLAYING",
+      media: {
+        duration: 180,
+        customData: {
+          crateCast: { protocolVersion: 1, sessionId: "session-status" },
+        },
+      },
+      addUpdateListener: vi.fn(),
+      removeUpdateListener: vi.fn(),
+    };
+    const session = {
+      getMediaSession: () => media,
+      addMessageListener: vi.fn(
+        (
+          namespace: string,
+          listener: (namespace: string, message: string) => void,
+        ) => {
+          messageListeners.set(namespace, listener);
+        },
+      ),
+      removeMessageListener: vi.fn(),
+    };
+    const context = {
+      setOptions: vi.fn(),
+      getCurrentSession: vi.fn(() => session),
+      requestSession: vi.fn(),
+    };
+    Object.assign(window, {
+      cast: { framework: { CastContext: { getInstance: () => context } } },
+      chrome: {
+        cast: {
+          AutoJoinPolicy: { ORIGIN_SCOPED: "origin_scoped" },
+          media: { DEFAULT_MEDIA_RECEIVER_APP_ID: "CC1AD845" },
+        },
+      },
+    });
+    const listener = vi.fn();
+    const unsubscribe = subscribeCastPlaybackState(listener);
+    const onMessage = messageListeners.get(
+      "urn:x-cast:app.cratemusic.crate.v1",
+    );
+
+    onMessage?.(
+      "urn:x-cast:app.cratemusic.crate.v1",
+      JSON.stringify({
+        version: 1,
+        messageId: "status-9",
+        type: "receiver.status",
+        sessionId: "session-status",
+        queueRevision: 4,
+        stateSeq: 9,
+        currentIndex: 1,
+        currentTime: 46,
+        playerState: "PAUSED",
+        consecutiveFailures: 0,
+      }),
+    );
+    onMessage?.(
+      "urn:x-cast:app.cratemusic.crate.v1",
+      JSON.stringify({
+        version: 1,
+        messageId: "status-8",
+        type: "receiver.status",
+        sessionId: "session-status",
+        queueRevision: 4,
+        stateSeq: 8,
+        currentIndex: 0,
+        currentTime: 8,
+        playerState: "PLAYING",
+        consecutiveFailures: 0,
+      }),
+    );
+
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        currentIndex: 1,
+        currentTime: 46,
+        isPlaying: false,
+      }),
+    );
+    unsubscribe();
+    expect(session.removeMessageListener).toHaveBeenCalledOnce();
+  });
+
+  it("uses CAF queue navigation for a custom receiver session", async () => {
+    const calls: string[] = [];
+    const items = [{ itemId: 41 }, { itemId: 42 }];
+    const media = {
+      currentItemId: 41,
+      items,
+      media: {
+        customData: {
+          crateCast: { protocolVersion: 1, sessionId: "session-queue" },
+        },
+      },
+      queueNext: (success: () => void) => {
+        calls.push("next");
+        success();
+      },
+      queuePrev: (success: () => void) => {
+        calls.push("previous");
+        success();
+      },
+      queueJumpToItem: (itemId: number, success: () => void) => {
+        calls.push(`jump:${itemId}`);
+        success();
+      },
+    };
+    const context = {
+      setOptions: vi.fn(),
+      getCurrentSession: vi.fn(() => ({ getMediaSession: () => media })),
+      requestSession: vi.fn(),
+    };
+    Object.assign(window, {
+      cast: { framework: { CastContext: { getInstance: () => context } } },
+      chrome: {
+        cast: {
+          AutoJoinPolicy: { ORIGIN_SCOPED: "origin_scoped" },
+          media: { DEFAULT_MEDIA_RECEIVER_APP_ID: "CC1AD845" },
+        },
+      },
+    });
+
+    await expect(castQueueNext()).resolves.toEqual({ ok: true });
+    await expect(castQueuePrevious()).resolves.toEqual({ ok: true });
+    await expect(castQueueJumpTo(1)).resolves.toEqual({ ok: true });
+    await expect(castQueueJumpTo(4)).resolves.toMatchObject({ ok: false });
+    expect(calls).toEqual(["next", "previous", "jump:42"]);
   });
 
   it("ends the active web Cast session", async () => {

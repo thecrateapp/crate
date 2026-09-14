@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { useCrateConnectWs } from "@/hooks/use-crate-connect-ws";
 import { connectPlayerStateToRemotePlaybackState } from "@/lib/crate-connect-state";
+import { isCastSessionActive } from "@/lib/cast-sender";
 import {
   type PlaybackStatePayload,
   type RemotePlaybackState,
@@ -226,7 +227,14 @@ export function usePlayerConnectV2Sync({
   );
   const publishConnectV2State = useCallback(
     async (options?: ConnectPublishOptions) => {
-      if (!authUserId || !connectV2Enabled || !queueRef.current.length) return;
+      if (
+        !authUserId ||
+        !connectV2Enabled ||
+        !queueRef.current.length ||
+        isCastSessionActive()
+      ) {
+        return;
+      }
       const payload = buildConnectSnapshotPayload(
         options?.claimActive ? "structural" : "light",
         options,
@@ -267,6 +275,7 @@ export function usePlayerConnectV2Sync({
   const claimedPlaybackRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authUserId || !connectV2Enabled || !isPlaying || !queue.length) return;
+    if (isCastSessionActive()) return;
     if (activeInstanceId && activeInstanceId !== playbackInstanceId) return;
     const payload = buildConnectSnapshotPayload("structural", {
       claimActive: true,
@@ -303,6 +312,7 @@ export function usePlayerConnectV2Sync({
 
   useEffect(() => {
     if (!connectV2Enabled || !isActive || !queue.length) return;
+    if (isCastSessionActive()) return;
     const payload = buildConnectSnapshotPayload("structural");
     if (payload.queue_revision === structuralRevisionRef.current) return;
     structuralRevisionRef.current = payload.queue_revision;
@@ -321,6 +331,7 @@ export function usePlayerConnectV2Sync({
 
   useEffect(() => {
     if (!connectV2Enabled || !isActive || !queueRef.current.length) return;
+    if (isCastSessionActive()) return;
     sendSnapshot(buildConnectSnapshotPayload("light"));
   }, [
     buildConnectSnapshotPayload,
@@ -333,11 +344,13 @@ export function usePlayerConnectV2Sync({
 
   useEffect(() => {
     if (!connectV2Enabled || !isActive) return;
+    if (isCastSessionActive()) return;
     sendVolume(volume);
   }, [connectV2Enabled, isActive, sendVolume, volume]);
 
   useEffect(() => {
     if (!connectV2Enabled || !isActive) return;
+    if (isCastSessionActive()) return;
     const intervalId = window.setInterval(() => {
       if (!queueRef.current.length) return;
       sendSnapshot(buildConnectSnapshotPayload("light"));

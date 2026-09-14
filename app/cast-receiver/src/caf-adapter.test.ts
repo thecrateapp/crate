@@ -15,8 +15,19 @@ function createFakeRuntime() {
     | ((request: CafLoadRequest) => CafLoadRequest)
     | undefined;
   let customListener: ((event: CafCustomMessageEvent) => void) | undefined;
+  const jumpToItem = vi.fn();
+  const queueItems = [{ itemId: 7 }, { itemId: 8 }];
+  const queueManager = {
+    getCurrentItem: () => queueItems[0] ?? null,
+    getItems: () => queueItems,
+    jumpToItem,
+  };
 
   const playerManager = {
+    getQueueManager: () => queueManager,
+    getMediaInformation: vi.fn(() => ({
+      customData: { crateCast: { itemId: "item-2" } },
+    })),
     addEventListener(type: string, listener: (event: CafEvent) => void) {
       calls.push(`player:add:${type}`);
       listeners.set(type, listener);
@@ -58,6 +69,17 @@ function createFakeRuntime() {
     stop() {
       calls.push("context:stop");
     },
+    sendCustomMessage(
+      namespace: string,
+      senderId: string | undefined,
+      data: unknown,
+    ) {
+      calls.push(
+        `context:send:${namespace}:${senderId ?? "all"}:${String(
+          (data as { type?: string }).type,
+        )}`,
+      );
+    },
   };
   const runtime: CafRuntime = {
     framework: {
@@ -93,6 +115,7 @@ function createFakeRuntime() {
     custom: (data: unknown) => customListener?.({ data }),
     event: (type: string, event: CafEvent = {}) => listeners.get(type)?.(event),
     intercept: (request: CafLoadRequest) => loadInterceptor?.(request),
+    jumpToItem,
     runtime,
   };
 }
@@ -140,6 +163,7 @@ describe("CAF adapter", () => {
       onProgress: vi.fn(),
       onQueueChange: vi.fn(),
       onProtocolMessage: vi.fn(),
+      onCurrentItem: vi.fn(),
       onError: vi.fn(),
     };
     createCafAdapter({ runtime: fake.runtime, handlers }).start();
@@ -172,6 +196,35 @@ describe("CAF adapter", () => {
     expect(handlers.onQueueChange).toHaveBeenCalledTimes(1);
     expect(handlers.onError).toHaveBeenCalledTimes(1);
     expect(handlers.onProtocolMessage).toHaveBeenCalledTimes(1);
+    expect(handlers.onCurrentItem).toHaveBeenCalledWith("item-2");
+  });
+
+  it("broadcasts protocol messages through the Crate namespace", () => {
+    const fake = createFakeRuntime();
+    const adapter = createCafAdapter({ runtime: fake.runtime, handlers: {} });
+    adapter.start();
+
+    adapter.sendProtocolMessage({
+      version: 1,
+      messageId: "ready-1",
+      type: "receiver.ready",
+      capabilities: ["queue"],
+    });
+
+    expect(fake.calls).toContain(
+      "context:send:urn:x-cast:app.cratemusic.crate.v1:all:receiver.ready",
+    );
+  });
+
+  it("retries or skips the current CAF queue item in place", () => {
+    const fake = createFakeRuntime();
+    const adapter = createCafAdapter({ runtime: fake.runtime, handlers: {} });
+    adapter.start();
+
+    expect(adapter.retryCurrentItem()).toBe(true);
+    expect(adapter.skipCurrentItem()).toBe(true);
+    expect(fake.jumpToItem).toHaveBeenNthCalledWith(1, 7);
+    expect(fake.jumpToItem).toHaveBeenNthCalledWith(2, 8);
   });
 
   it("removes every listener and interceptor on teardown", () => {

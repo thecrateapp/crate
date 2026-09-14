@@ -4,7 +4,7 @@ import type {
   CastQueueSnapshot,
 } from "@crate/cast-protocol";
 
-interface ReceiverSession {
+export interface ReceiverSession {
   appearance: CastAppearance;
   queue: CastQueueSnapshot;
   sessionId: string;
@@ -70,16 +70,19 @@ function mapItem(value: unknown): CastQueueItem | null {
 
 function mapAppearance(value: unknown): CastAppearance {
   const appearance = record(value);
+  const skinId = appearance?.skinId ?? appearance?.skin_id;
+  const preferredMode = appearance?.preferredMode ?? appearance?.preferred_mode;
+  const resolvedMode = appearance?.resolvedMode ?? appearance?.resolved_mode;
+  const reducedMotion = appearance?.reducedMotion ?? appearance?.reduced_motion;
   return {
     contractVersion: 1,
-    skinId: stringValue(appearance?.skinId, "default"),
+    skinId: stringValue(skinId, "default"),
     preferredMode:
-      appearance?.preferredMode === "dark" ||
-      appearance?.preferredMode === "light"
-        ? appearance.preferredMode
+      preferredMode === "dark" || preferredMode === "light"
+        ? preferredMode
         : "system",
-    resolvedMode: appearance?.resolvedMode === "light" ? "light" : "dark",
-    reducedMotion: appearance?.reducedMotion === true,
+    resolvedMode: resolvedMode === "light" ? "light" : "dark",
+    reducedMotion: reducedMotion === true,
   };
 }
 
@@ -141,4 +144,76 @@ export async function loadReceiverSession(
   const session = mapSession(await response.json(), expectedSessionId);
   if (!session) throw new Error("CAST_SESSION_INVALID");
   return session;
+}
+
+export interface ReceiverStateUpdate {
+  stateSeq: number;
+  currentIndex: number;
+  currentTime: number;
+}
+
+export interface PlayCheckpoint {
+  clientEventId: string;
+  itemId: string;
+  startedAt: string;
+  endedAt: string;
+  playedSeconds: number;
+  trackDurationSeconds?: number;
+  completionRatio?: number;
+  wasSkipped: boolean;
+  wasCompleted: boolean;
+}
+
+async function postReceiverPayload(
+  url: string,
+  payload: unknown,
+  fetcher: Fetcher,
+): Promise<void> {
+  const response = await fetcher(url, {
+    method: "POST",
+    cache: "no-store",
+    credentials: "omit",
+    mode: "cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error("CAST_SESSION_UPDATE_FAILED");
+}
+
+export function publishReceiverState(
+  bootstrapUrl: string,
+  update: ReceiverStateUpdate,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  return postReceiverPayload(
+    `${bootstrapUrl}/state`,
+    {
+      state_seq: update.stateSeq,
+      current_index: update.currentIndex,
+      current_time: update.currentTime,
+    },
+    fetcher,
+  );
+}
+
+export function publishPlayCheckpoint(
+  bootstrapUrl: string,
+  checkpoint: PlayCheckpoint,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  return postReceiverPayload(
+    `${bootstrapUrl}/checkpoints`,
+    {
+      client_event_id: checkpoint.clientEventId,
+      item_id: checkpoint.itemId,
+      started_at: checkpoint.startedAt,
+      ended_at: checkpoint.endedAt,
+      played_seconds: checkpoint.playedSeconds,
+      track_duration_seconds: checkpoint.trackDurationSeconds,
+      completion_ratio: checkpoint.completionRatio,
+      was_skipped: checkpoint.wasSkipped,
+      was_completed: checkpoint.wasCompleted,
+    },
+    fetcher,
+  );
 }

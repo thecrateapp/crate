@@ -1,6 +1,10 @@
 import type { PluginListenerHandle } from "@capacitor/core";
+import type {
+  CastAppearance,
+  CastReceiverStatusMessage,
+} from "@crate/cast-protocol";
 
-import type { Track } from "@/contexts/player-types";
+import type { RepeatMode, Track } from "@/contexts/player-types";
 
 export interface CastTicketRequest {
   track_id?: number;
@@ -40,8 +44,45 @@ export interface CastSenderCapabilities {
 
 export interface CastStartPayload {
   track: Track;
+  queue?: Track[];
+  currentIndex?: number;
   currentTime?: number;
+  repeatMode?: RepeatMode;
+  shuffle?: boolean;
+  appearance?: CastAppearance;
   targetDeviceId?: string;
+}
+
+export interface CastSessionQueueItemResponse {
+  item_id: string;
+  track_id?: number;
+  track_entity_uid?: string;
+  track_path?: string;
+  title: string;
+  artist: string;
+  album?: string;
+  duration?: number;
+  quality?: string;
+  artwork_url?: string;
+  content_type: string;
+  stream_url: string;
+  metadata_url: string;
+}
+
+export interface CastPlaybackSessionResponse {
+  session_id: string;
+  lease: string;
+  bootstrap_url: string;
+  receiver_application_id: string;
+  queue: {
+    revision: number;
+    state_seq: number;
+    current_index: number;
+    current_time: number;
+    repeat_mode: RepeatMode;
+    shuffle: boolean;
+    items: CastSessionQueueItemResponse[];
+  };
 }
 
 export interface CastStartResult {
@@ -52,6 +93,7 @@ export interface CastStartResult {
 
 export interface CastPlaybackState {
   active: boolean;
+  currentIndex?: number;
   currentTime: number;
   duration: number;
   isBuffering: boolean;
@@ -71,7 +113,7 @@ export interface NativeCastPlugin {
   seek(payload: { currentTime: number }): Promise<CastStartResult>;
   setVolume(payload: { volume: number }): Promise<CastStartResult>;
   stop(): Promise<CastStartResult>;
-  endSession(): Promise<CastStartResult>;
+  endSession(payload?: { stopCasting?: boolean }): Promise<CastStartResult>;
   addListener(
     eventName: "sessionChanged",
     listener: (event: NativeCastSessionChangedEvent) => void,
@@ -130,7 +172,33 @@ export interface CastSession {
   getCastDevice?(): { friendlyName?: string } | null;
   getMediaSession?(): ChromeCastMedia | null;
   loadMedia(request: ChromeCastLoadRequest): Promise<unknown>;
+  getSessionObj?(): ChromeCastSessionObject | null;
   setVolume?(volume: number): Promise<unknown>;
+  addMessageListener?(
+    namespace: string,
+    listener: (namespace: string, message: string) => void,
+  ): void;
+  removeMessageListener?(
+    namespace: string,
+    listener: (namespace: string, message: string) => void,
+  ): void;
+}
+
+export interface TimedCastReceiverStatus {
+  message: CastReceiverStatusMessage;
+  receivedAt: number;
+}
+
+export interface ChromeCastSessionObject {
+  queueLoad(
+    items: ChromeCastQueueItem[],
+    repeatMode: string,
+    startIndex: number,
+    startTime: number,
+    customData: unknown,
+    success: () => void,
+    error: (error: unknown) => void,
+  ): void;
 }
 
 export interface ChromeCastWindow {
@@ -151,6 +219,21 @@ export interface ChromeCastNamespace {
       contentType: string,
     ) => ChromeCastMediaInfo;
     MusicTrackMediaMetadata: new () => ChromeCastMusicMetadata;
+    QueueItem: new (mediaInfo: ChromeCastMediaInfo) => ChromeCastQueueItem;
+    QueueInsertItemsRequest: new (
+      items: ChromeCastQueueItem[],
+    ) => ChromeCastQueueInsertItemsRequest;
+    QueueRemoveItemsRequest: new (
+      itemIds: number[],
+    ) => ChromeCastQueueRemoveItemsRequest;
+    QueueReorderItemsRequest: new (
+      itemIds: number[],
+    ) => ChromeCastQueueReorderItemsRequest;
+    RepeatMode: {
+      OFF: string;
+      ALL: string;
+      SINGLE: string;
+    };
     PauseRequest: new () => Record<string, never>;
     PlayRequest: new () => Record<string, never>;
     SeekRequest: new () => ChromeCastSeekRequest;
@@ -159,12 +242,44 @@ export interface ChromeCastNamespace {
   };
 }
 
+export interface ChromeCastQueueItem {
+  autoplay?: boolean;
+  itemId?: number;
+  media: ChromeCastMediaInfo;
+  startTime?: number;
+}
+
+export interface ChromeCastQueueInsertItemsRequest {
+  insertBefore?: number;
+  items: ChromeCastQueueItem[];
+}
+
+export interface ChromeCastQueueRemoveItemsRequest {
+  itemIds: number[];
+}
+
+export interface ChromeCastQueueReorderItemsRequest {
+  insertBefore?: number;
+  itemIds: number[];
+}
+
+export interface WebCastQueueLoad {
+  items: ChromeCastQueueItem[];
+  repeatMode: string;
+  startIndex: number;
+  startTime: number;
+  customData: { crateCast: { protocolVersion: 1; sessionId: string } };
+}
+
 export interface ChromeCastMedia {
+  currentItemId?: number;
   currentTime?: number;
   duration?: number;
   media?: {
+    customData?: unknown;
     duration?: number;
   };
+  items?: ChromeCastQueueItem[];
   playerState?: string;
   volume?: ChromeCastVolume;
   getEstimatedTime?(): number;
@@ -177,6 +292,33 @@ export interface ChromeCastMedia {
   ): void;
   play(
     request: Record<string, never>,
+    success: () => void,
+    error: (error: unknown) => void,
+  ): void;
+  queueJumpToItem(
+    itemId: number,
+    success: () => void,
+    error: (error: unknown) => void,
+  ): void;
+  queueNext(success: () => void, error: (error: unknown) => void): void;
+  queuePrev(success: () => void, error: (error: unknown) => void): void;
+  queueInsertItems(
+    request: ChromeCastQueueInsertItemsRequest,
+    success: () => void,
+    error: (error: unknown) => void,
+  ): void;
+  queueRemoveItems(
+    request: ChromeCastQueueRemoveItemsRequest,
+    success: () => void,
+    error: (error: unknown) => void,
+  ): void;
+  queueReorderItems(
+    request: ChromeCastQueueReorderItemsRequest,
+    success: () => void,
+    error: (error: unknown) => void,
+  ): void;
+  queueSetRepeatMode(
+    repeatMode: string,
     success: () => void,
     error: (error: unknown) => void,
   ): void;

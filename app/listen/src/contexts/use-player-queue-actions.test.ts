@@ -8,12 +8,15 @@ const {
   shouldUseAndroidNativePlayerMock,
   castPauseMock,
   castPlayMock,
+  castQueueNextMock,
   castSeekMock,
   castSetVolumeMock,
   cancelNativeMediaSessionResumeMock,
   markNativeMediaSessionPlayingIntentMock,
   isCastSessionActiveMock,
+  isCustomCastSessionActiveMock,
   startCastSessionMock,
+  syncCustomCastQueueMock,
 } = vi.hoisted(() => ({
   androidLoadQueueMock: vi.fn(),
   androidInsertTrackMock: vi.fn(),
@@ -21,12 +24,15 @@ const {
   shouldUseAndroidNativePlayerMock: vi.fn(() => false),
   castPauseMock: vi.fn(),
   castPlayMock: vi.fn(),
+  castQueueNextMock: vi.fn(),
   castSeekMock: vi.fn(),
   castSetVolumeMock: vi.fn(),
   cancelNativeMediaSessionResumeMock: vi.fn(async () => {}),
   markNativeMediaSessionPlayingIntentMock: vi.fn(),
   isCastSessionActiveMock: vi.fn(),
+  isCustomCastSessionActiveMock: vi.fn(),
   startCastSessionMock: vi.fn(),
+  syncCustomCastQueueMock: vi.fn(),
 }));
 
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
@@ -77,11 +83,16 @@ vi.mock("@/lib/gapless-player", () => ({
 vi.mock("@/lib/cast-sender", () => ({
   castPause: castPauseMock,
   castPlay: castPlayMock,
+  castQueueJumpTo: vi.fn(),
+  castQueueNext: castQueueNextMock,
+  castQueuePrevious: vi.fn(),
   castSeek: castSeekMock,
   castSetVolume: castSetVolumeMock,
   castStop: vi.fn(),
   isCastSessionActive: isCastSessionActiveMock,
+  isCustomCastSessionActive: isCustomCastSessionActiveMock,
   startCastSession: startCastSessionMock,
+  syncCustomCastQueue: syncCustomCastQueueMock,
 }));
 
 vi.mock("@/lib/native-media-session", () => ({
@@ -156,8 +167,11 @@ describe("usePlayerQueueActions", () => {
     castPlayMock.mockResolvedValue({ ok: true });
     castSeekMock.mockResolvedValue({ ok: true });
     castSetVolumeMock.mockResolvedValue({ ok: true });
+    castQueueNextMock.mockResolvedValue({ ok: true });
     isCastSessionActiveMock.mockReturnValue(false);
+    isCustomCastSessionActiveMock.mockReturnValue(false);
     startCastSessionMock.mockResolvedValue({ ok: true });
+    syncCustomCastQueueMock.mockResolvedValue({ ok: true });
     shouldUseAndroidNativePlayerMock.mockReturnValue(false);
     androidLoadQueueMock.mockResolvedValue(undefined);
     androidInsertTrackMock.mockResolvedValue(undefined);
@@ -546,6 +560,30 @@ describe("usePlayerQueueActions", () => {
     expect(gaplessPlayer.play).not.toHaveBeenCalled();
   });
 
+  it("mutates a custom Cast queue without touching the local engine", async () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    params.currentIndexRef.current = 0;
+    isCastSessionActiveMock.mockReturnValue(true);
+    isCustomCastSessionActiveMock.mockReturnValue(true);
+    const queuedTrack = { ...TRACK, id: "track-queued", libraryTrackId: 22 };
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.addToQueue(queuedTrack);
+
+    await waitFor(() =>
+      expect(syncCustomCastQueueMock).toHaveBeenCalledWith({
+        queue: [TRACK, queuedTrack],
+        currentIndex: 0,
+        repeatMode: "off",
+        shuffle: false,
+      }),
+    );
+    expect(params.commitQueue).toHaveBeenCalledWith([TRACK, queuedTrack]);
+    expect(gaplessPlayer.addTrack).not.toHaveBeenCalled();
+    expect(params.registerEngineTrack).not.toHaveBeenCalled();
+  });
+
   it("pauses immediately when the app is hidden", () => {
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
@@ -632,6 +670,8 @@ describe("usePlayerQueueActions", () => {
 
   it("routes transport and volume actions to an active Cast receiver", async () => {
     isCastSessionActiveMock.mockReturnValue(true);
+    isCustomCastSessionActiveMock.mockReturnValue(true);
+    castQueueNextMock.mockResolvedValue({ ok: true });
     const params = createParams();
     params.queueRef.current = [
       TRACK,
@@ -649,27 +689,31 @@ describe("usePlayerQueueActions", () => {
     expect(castPlayMock).toHaveBeenCalledTimes(1);
     expect(castSeekMock).toHaveBeenCalledWith(42);
     expect(castSetVolumeMock).toHaveBeenCalledWith(0.6);
-    expect(startCastSessionMock).toHaveBeenCalledWith({
-      track: expect.objectContaining({ id: "track-2" }),
-      currentTime: 0,
-    });
+    expect(castQueueNextMock).toHaveBeenCalledTimes(1);
+    expect(startCastSessionMock).not.toHaveBeenCalled();
     expect(gaplessPlayer.play).not.toHaveBeenCalled();
     expect(gaplessPlayer.pause).not.toHaveBeenCalled();
     expect(gaplessPlayer.seekTo).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(params.commitIsPlaying).toHaveBeenCalledWith(false);
       expect(params.commitIsPlaying).toHaveBeenCalledWith(true);
+      expect(params.advanceCursorTo).not.toHaveBeenCalled();
     });
   });
 
   it("keeps local player state unchanged when Cast rejects commands", async () => {
     isCastSessionActiveMock.mockReturnValue(true);
+    isCustomCastSessionActiveMock.mockReturnValue(true);
     castPauseMock.mockResolvedValue({ ok: false, message: "pause rejected" });
     castPlayMock.mockResolvedValue({ ok: false, message: "play rejected" });
     castSeekMock.mockResolvedValue({ ok: false, message: "seek rejected" });
     castSetVolumeMock.mockResolvedValue({
       ok: false,
       message: "volume rejected",
+    });
+    castQueueNextMock.mockResolvedValue({
+      ok: false,
+      message: "queue rejected",
     });
     startCastSessionMock.mockResolvedValue({
       ok: false,
@@ -689,7 +733,7 @@ describe("usePlayerQueueActions", () => {
     result.current.next();
 
     await waitFor(() => {
-      expect(startCastSessionMock).toHaveBeenCalledTimes(1);
+      expect(castQueueNextMock).toHaveBeenCalledTimes(1);
       expect(castSetVolumeMock).toHaveBeenCalledTimes(1);
     });
     expect(params.commitIsPlaying).not.toHaveBeenCalled();

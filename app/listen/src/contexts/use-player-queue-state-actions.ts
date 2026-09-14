@@ -13,7 +13,13 @@ import {
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
 import { getPosition as gpGetPosition } from "@/lib/gapless-player";
-import { castStop, isCastSessionActive } from "@/lib/cast-sender";
+import {
+  castStop,
+  isCastSessionActive,
+  isCustomCastSessionActive,
+  stopCastSession,
+  syncCustomCastQueue,
+} from "@/lib/cast-sender";
 import type { EngineRepeatMode } from "@/lib/playback-engine";
 
 type QueueCommitter = (queue: Track[]) => void;
@@ -40,6 +46,7 @@ export interface UsePlayerQueueStateActionsParams {
   currentTimeRef: MutableRefObject<number>;
   isPlayingRef: MutableRefObject<boolean>;
   jamQueueLockedRef: MutableRefObject<boolean>;
+  repeatRef: MutableRefObject<RepeatMode>;
   shuffleRef: MutableRefObject<boolean>;
   unshuffledQueueRef: MutableRefObject<Track[] | null>;
   bufferingIntentRef: MutableRefObject<boolean>;
@@ -82,6 +89,7 @@ export function usePlayerQueueStateActions({
   currentTimeRef,
   isPlayingRef,
   jamQueueLockedRef,
+  repeatRef,
   shuffleRef,
   unshuffledQueueRef,
   bufferingIntentRef,
@@ -110,7 +118,10 @@ export function usePlayerQueueStateActions({
     (options: { force?: boolean } = {}) => {
       if (jamQueueLockedRef.current && !options.force) return;
       if (isCastSessionActive()) {
-        void castStop().catch((error) => {
+        const stop = isCustomCastSessionActive()
+          ? stopCastSession()
+          : castStop();
+        void stop.catch((error) => {
           console.error("[cast] failed to stop:", error);
         });
       }
@@ -178,6 +189,23 @@ export function usePlayerQueueStateActions({
         previousQueue,
         currentIndexRef.current,
       );
+      if (isCustomCastSessionActive()) {
+        void syncCustomCastQueue({
+          queue: nextQueue,
+          currentIndex: 0,
+          repeatMode: repeatRef.current,
+          shuffle: true,
+        }).then((result) => {
+          if (!result.ok) {
+            console.error("[cast] failed to enable shuffle:", result.message);
+            return;
+          }
+          setShuffleState(true);
+          commitQueue(nextQueue);
+          commitCurrentIndex(0);
+        });
+        return;
+      }
       setShuffleState(true);
       pushToEngine(nextQueue, 0, {
         autoplay: isPlayingRef.current,
@@ -198,6 +226,24 @@ export function usePlayerQueueStateActions({
         )
       : 0;
 
+    if (isCustomCastSessionActive()) {
+      void syncCustomCastQueue({
+        queue: original,
+        currentIndex: nextIndex,
+        repeatMode: repeatRef.current,
+        shuffle: false,
+      }).then((result) => {
+        if (!result.ok) {
+          console.error("[cast] failed to disable shuffle:", result.message);
+          return;
+        }
+        setShuffleState(false);
+        commitQueue(original);
+        commitCurrentIndex(nextIndex);
+      });
+      return;
+    }
+
     setShuffleState(false);
     pushToEngine(original, nextIndex, {
       autoplay: isPlayingRef.current,
@@ -210,6 +256,9 @@ export function usePlayerQueueStateActions({
     jamQueueLockedRef,
     pushToEngine,
     queueRef,
+    repeatRef,
+    commitCurrentIndex,
+    commitQueue,
     setShuffleState,
     shuffleRef,
     unshuffledQueueRef,
@@ -220,7 +269,18 @@ export function usePlayerQueueStateActions({
     setRepeatState((previousMode) => {
       const nextMode =
         previousMode === "off" ? "all" : previousMode === "all" ? "one" : "off";
-      if (shouldUseAndroidNativePlayer()) {
+      if (isCustomCastSessionActive()) {
+        void syncCustomCastQueue({
+          queue: queueRef.current,
+          currentIndex: currentIndexRef.current,
+          repeatMode: nextMode,
+          shuffle: shuffleRef.current,
+        }).then((result) => {
+          if (!result.ok) {
+            console.error("[cast] failed to set repeat:", result.message);
+          }
+        });
+      } else if (shouldUseAndroidNativePlayer()) {
         void nativeEngine
           .setRepeat(toEngineRepeatMode(nextMode))
           .catch((error) => {
@@ -229,7 +289,13 @@ export function usePlayerQueueStateActions({
       }
       return nextMode;
     });
-  }, [jamQueueLockedRef, setRepeatState]);
+  }, [
+    currentIndexRef,
+    jamQueueLockedRef,
+    queueRef,
+    setRepeatState,
+    shuffleRef,
+  ]);
 
   return { clearQueue, toggleShuffle, cycleRepeat };
 }
