@@ -119,6 +119,7 @@ services:
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=api
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
+      - CRATE_CAST_PUBLIC_BASE_URL=${CRATE_CAST_PUBLIC_BASE_URL:-}
       - SENTRY_DSN=${SENTRY_API_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}

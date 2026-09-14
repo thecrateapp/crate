@@ -48,7 +48,7 @@ export const googleCastTargetProvider: PlaybackTargetProvider = {
       currentTime: context?.currentTime,
       targetDeviceId: target.id,
     });
-    if (result.ok) await context?.pause?.();
+    if (result.ok) await (context?.pauseLocal ?? context?.pause)?.();
     return result;
   },
 };

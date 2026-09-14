@@ -5,6 +5,8 @@ const {
   getNativeCurrentOutputRouteMock,
   getNativeOutputCapabilitiesMock,
   getCastSenderCapabilitiesMock,
+  endCastSessionMock,
+  isCastSessionActiveMock,
   isCrateConnectEnabledMock,
   isNativeOutputRoutingAvailableMock,
   startCastSessionMock,
@@ -14,6 +16,8 @@ const {
   getNativeCurrentOutputRouteMock: vi.fn(),
   getNativeOutputCapabilitiesMock: vi.fn(),
   getCastSenderCapabilitiesMock: vi.fn(),
+  endCastSessionMock: vi.fn(),
+  isCastSessionActiveMock: vi.fn(),
   isCrateConnectEnabledMock: vi.fn(() => true),
   isNativeOutputRoutingAvailableMock: vi.fn(),
   startCastSessionMock: vi.fn(),
@@ -61,7 +65,9 @@ vi.mock("@/lib/native-output-router", () => ({
 }));
 
 vi.mock("@/lib/cast-sender", () => ({
+  endCastSession: endCastSessionMock,
   getCastSenderCapabilities: getCastSenderCapabilitiesMock,
+  isCastSessionActive: isCastSessionActiveMock,
   startCastSession: startCastSessionMock,
 }));
 
@@ -106,6 +112,8 @@ describe("playback targets", () => {
       available: false,
       activeSession: false,
     });
+    endCastSessionMock.mockResolvedValue({ ok: true });
+    isCastSessionActiveMock.mockReturnValue(false);
     startCastSessionMock.mockResolvedValue({ ok: true, message: "Casting." });
     getNativeOutputCapabilitiesMock.mockResolvedValue({
       platform: "android",
@@ -450,6 +458,40 @@ describe("playback targets", () => {
     expect(requestTransfer).toHaveBeenCalledWith("phone-tab");
   });
 
+  it("marks this device inactive while Cast owns playback", async () => {
+    isCastSessionActiveMock.mockReturnValue(true);
+
+    const targets = await localTargetProvider.getTargets();
+
+    expect(targets[0]).toMatchObject({ id: "local:current", active: false });
+  });
+
+  it("ends Cast and resumes local playback when this device is selected", async () => {
+    isCastSessionActiveMock.mockReturnValue(true);
+    const resumeLocal = vi.fn();
+
+    const result = await localTargetProvider.selectTarget(
+      {
+        id: "local:current",
+        providerId: "local",
+        kind: "local",
+        name: "Crate on Chrome",
+        active: false,
+        available: true,
+        capabilities: {
+          canPlay: true,
+          canSeek: true,
+          canSetVolume: true,
+        },
+      },
+      { resumeLocal },
+    );
+
+    expect(result).toEqual({ ok: true, message: "Playing here." });
+    expect(endCastSessionMock).toHaveBeenCalledTimes(1);
+    expect(resumeLocal).toHaveBeenCalledTimes(1);
+  });
+
   it("does not expose or claim Crate Connect targets when the feature is disabled", async () => {
     isCrateConnectEnabledMock.mockReturnValue(false);
 
@@ -607,6 +649,7 @@ describe("playback targets", () => {
       activeSession: false,
     });
     const pause = vi.fn();
+    const pauseLocal = vi.fn();
     const currentTrack = {
       id: "track-1",
       libraryTrackId: 7,
@@ -618,6 +661,7 @@ describe("playback targets", () => {
       currentTrack,
       currentTime: 12.4,
       pause,
+      pauseLocal,
     });
 
     expect(targets).toEqual([
@@ -635,6 +679,7 @@ describe("playback targets", () => {
       currentTrack,
       currentTime: 12.4,
       pause,
+      pauseLocal,
     });
 
     expect(result).toEqual({ ok: true, message: "Casting." });
@@ -643,6 +688,7 @@ describe("playback targets", () => {
       currentTime: 12.4,
       targetDeviceId: "google-cast:default",
     });
-    expect(pause).toHaveBeenCalledTimes(1);
+    expect(pauseLocal).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled();
   });
 });

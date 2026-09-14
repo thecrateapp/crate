@@ -11,6 +11,9 @@ import {
 
 const DEFAULT_FADE_MS = 220;
 const RESUMED_AUDIO_CONTEXT_RAMP_MS = 24;
+const PLAYBACK_RECOVERY_OPTIONS = {
+  rebuildIfTauriOutputMayBeStale: true,
+} as const;
 
 export interface GaplessPlayerControlHost {
   audioRecovery: AudioRecoveryController;
@@ -51,23 +54,39 @@ export interface GaplessPlayerControls {
 export function createGaplessPlayerControls(
   host: GaplessPlayerControlHost,
 ): GaplessPlayerControls {
+  const startPlaybackWithRecovery = async (
+    reason: string,
+    startPlayback: () => void,
+  ): Promise<void> => {
+    const shouldWaitForRecovery = host.audioRecovery.needsRecovery(
+      PLAYBACK_RECOVERY_OPTIONS,
+    );
+    const recovery = host.audioRecovery.prepare(
+      reason,
+      PLAYBACK_RECOVERY_OPTIONS,
+    );
+    if (!shouldWaitForRecovery) startPlayback();
+    await recovery;
+    if (shouldWaitForRecovery) startPlayback();
+  };
+
   const play = async (): Promise<void> => {
     stopFade();
     const shouldRampAfterResume =
       !host.isTauriDesktopRuntime() &&
       host.getAudioContext()?.state === "suspended";
-    await host.audioRecovery.prepare("play", {
-      rebuildIfTauriOutputMayBeStale: true,
-    });
-    host.setPlaybackActive(true);
-    const player = host.getPlayer();
-    if (shouldRampAfterResume && player) {
-      applyVolume(0);
-      player.play();
-      animateVolume(0, getLastVolume(), RESUMED_AUDIO_CONTEXT_RAMP_MS);
-      return;
-    }
-    player?.play();
+    const startPlayback = (): void => {
+      host.setPlaybackActive(true);
+      const player = host.getPlayer();
+      if (shouldRampAfterResume && player) {
+        applyVolume(0);
+        player.play();
+        animateVolume(0, getLastVolume(), RESUMED_AUDIO_CONTEXT_RAMP_MS);
+        return;
+      }
+      player?.play();
+    };
+    await startPlaybackWithRecovery("play", startPlayback);
   };
 
   const pause = (): void => {
@@ -181,12 +200,12 @@ export function createGaplessPlayerControls(
   const fadeInAndPlay = async (durationMs = DEFAULT_FADE_MS): Promise<void> => {
     if (!host.getPlayer()) return Promise.resolve();
     stopFade();
-    await host.audioRecovery.prepare("fadeInAndPlay", {
-      rebuildIfTauriOutputMayBeStale: true,
-    });
-    applyVolume(0);
-    host.setPlaybackActive(true);
-    host.getPlayer()?.play();
+    const startPlayback = (): void => {
+      applyVolume(0);
+      host.setPlaybackActive(true);
+      host.getPlayer()?.play();
+    };
+    await startPlaybackWithRecovery("fadeInAndPlay", startPlayback);
     return new Promise((resolve) => {
       animateVolume(0, getLastVolume(), durationMs, resolve);
     });

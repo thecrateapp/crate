@@ -561,6 +561,26 @@ describe("usePlayerQueueActions", () => {
     expect(gaplessPlayer.fadeOutAndPause).not.toHaveBeenCalled();
   });
 
+  it("uses immediate engine pause only when explicitly requested", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+    const pause = result.current.pause as (options?: {
+      immediate?: boolean;
+    }) => void;
+
+    pause();
+
+    expect(gaplessPlayer.fadeOutAndPause).toHaveBeenCalledWith(220);
+    expect(gaplessPlayer.pause).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    pause({ immediate: true });
+
+    expect(gaplessPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(gaplessPlayer.fadeOutAndPause).not.toHaveBeenCalled();
+  });
+
   it("cancels a pending native resume even when playback is already paused", () => {
     const params = createParams();
     params.isPlayingRef.current = false;
@@ -610,7 +630,7 @@ describe("usePlayerQueueActions", () => {
     expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
   });
 
-  it("routes transport and volume actions to an active Cast receiver", () => {
+  it("routes transport and volume actions to an active Cast receiver", async () => {
     isCastSessionActiveMock.mockReturnValue(true);
     const params = createParams();
     params.queueRef.current = [
@@ -636,7 +656,46 @@ describe("usePlayerQueueActions", () => {
     expect(gaplessPlayer.play).not.toHaveBeenCalled();
     expect(gaplessPlayer.pause).not.toHaveBeenCalled();
     expect(gaplessPlayer.seekTo).not.toHaveBeenCalled();
-    expect(params.commitIsPlaying).toHaveBeenCalledWith(false);
-    expect(params.commitIsPlaying).toHaveBeenCalledWith(true);
+    await waitFor(() => {
+      expect(params.commitIsPlaying).toHaveBeenCalledWith(false);
+      expect(params.commitIsPlaying).toHaveBeenCalledWith(true);
+    });
+  });
+
+  it("keeps local player state unchanged when Cast rejects commands", async () => {
+    isCastSessionActiveMock.mockReturnValue(true);
+    castPauseMock.mockResolvedValue({ ok: false, message: "pause rejected" });
+    castPlayMock.mockResolvedValue({ ok: false, message: "play rejected" });
+    castSeekMock.mockResolvedValue({ ok: false, message: "seek rejected" });
+    castSetVolumeMock.mockResolvedValue({
+      ok: false,
+      message: "volume rejected",
+    });
+    startCastSessionMock.mockResolvedValue({
+      ok: false,
+      message: "load rejected",
+    });
+    const params = createParams();
+    params.queueRef.current = [
+      TRACK,
+      { ...TRACK, id: "track-2", title: "Track Two" },
+    ];
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.pause();
+    result.current.resume();
+    result.current.seek(42);
+    result.current.setVolume(0.6);
+    result.current.next();
+
+    await waitFor(() => {
+      expect(startCastSessionMock).toHaveBeenCalledTimes(1);
+      expect(castSetVolumeMock).toHaveBeenCalledTimes(1);
+    });
+    expect(params.commitIsPlaying).not.toHaveBeenCalled();
+    expect(params.commitCurrentTime).not.toHaveBeenCalled();
+    expect(params.markSeekPosition).not.toHaveBeenCalled();
+    expect(params.setVolumeState).not.toHaveBeenCalled();
+    expect(params.advanceCursorTo).not.toHaveBeenCalled();
   });
 });

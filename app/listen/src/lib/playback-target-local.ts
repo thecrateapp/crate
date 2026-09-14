@@ -2,6 +2,7 @@ import {
   fetchActiveConnectSession,
   transferPlaybackToDevice,
 } from "@/lib/crate-connect";
+import { endCastSession, isCastSessionActive } from "@/lib/cast-sender";
 import {
   getListenDeviceCapabilities,
   getListenDeviceId,
@@ -19,10 +20,14 @@ export const localTargetProvider: PlaybackTargetProvider = {
   getTargets: (context) => {
     const capabilities = getListenDeviceCapabilities();
     const activeConnectDeviceId = context?.activeConnectDeviceId;
-    const localActive = isWsCrateConnectContext(context)
-      ? !context.connect.activeInstanceId ||
-        context.connect.activeInstanceId === context.connect.playbackInstanceId
-      : !activeConnectDeviceId || activeConnectDeviceId === getListenDeviceId();
+    const localActive =
+      !isCastSessionActive() &&
+      (isWsCrateConnectContext(context)
+        ? !context.connect.activeInstanceId ||
+          context.connect.activeInstanceId ===
+            context.connect.playbackInstanceId
+        : !activeConnectDeviceId ||
+          activeConnectDeviceId === getListenDeviceId());
     return [
       {
         id: "local:current",
@@ -44,6 +49,12 @@ export const localTargetProvider: PlaybackTargetProvider = {
     ];
   },
   selectTarget: async (_target, context) => {
+    if (isCastSessionActive()) {
+      const result = await endCastSession();
+      if (!result.ok) return result;
+      await context?.resumeLocal?.();
+      return { ok: true, message: "Playing here." };
+    }
     if (isWsCrateConnectContext(context)) {
       const { activeInstanceId, playbackInstanceId, requestTransfer } =
         context.connect;

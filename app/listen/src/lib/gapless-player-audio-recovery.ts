@@ -22,6 +22,7 @@ export interface AudioRecoveryDependencies {
 
 export interface AudioRecoveryController {
   install(): void;
+  needsRecovery(options?: AudioRecoveryOptions): boolean;
   prepare(reason: string, options?: AudioRecoveryOptions): Promise<void>;
   clearSharedGaplessAudioContext(previousContext: AudioContext | null): void;
 }
@@ -115,7 +116,12 @@ export function createAudioRecoveryController(
       ctx = dependencies.getAudioContext();
     }
 
-    if (ctx?.state === "suspended") {
+    // WebKit exposes the non-standard `interrupted` state while an audio
+    // route is unavailable (for example, while Bluetooth headphones are
+    // being removed). Treat every live, non-running context as resumable so
+    // reinserting the route does not leave desktop playback permanently
+    // silent.
+    if (ctx && ctx.state !== "running" && ctx.state !== "closed") {
       try {
         await ctx.resume();
       } catch (error) {
@@ -138,6 +144,20 @@ export function createAudioRecoveryController(
     if (ctx?.state === "running") {
       kickAudioOutput(ctx, reason);
     }
+  };
+
+  const needsRecovery = (options: AudioRecoveryOptions = {}): boolean => {
+    const ctx = dependencies.getAudioContext();
+    const staleTauriOutput =
+      options.rebuildIfTauriOutputMayBeStale === true &&
+      dependencies.isTauriDesktopRuntime() &&
+      dependencies.isOutputStale();
+
+    return (
+      contextWakeInFlight !== null ||
+      staleTauriOutput ||
+      (ctx !== null && ctx.state !== "running")
+    );
   };
 
   const prepare = (
@@ -217,6 +237,7 @@ export function createAudioRecoveryController(
 
   return {
     install,
+    needsRecovery,
     prepare,
     clearSharedGaplessAudioContext,
   };

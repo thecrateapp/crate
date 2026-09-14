@@ -12,6 +12,7 @@ import {
 } from "./cast-sender-media";
 import type {
   CastSenderCapabilities,
+  CastPlaybackState,
   CastSession,
   CastStartPayload,
   CastStartResult,
@@ -23,6 +24,7 @@ import type {
 } from "./cast-sender-types";
 
 export type {
+  CastPlaybackState,
   CastSenderCapabilities,
   CastStartPayload,
   CastStartResult,
@@ -32,12 +34,102 @@ export { buildCastTicketRequest } from "./cast-sender-media";
 
 const CAST_SENDER_SCRIPT =
   "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
+const CAST_SESSION_CHANGED_EVENT = "crate:cast-session-changed";
 
 let webCastReady: Promise<boolean> | null = null;
 let webCastInitialized = false;
+const observedWebCastContexts = new WeakSet<object>();
 let nativeCast: NativeCastPlugin | null = null;
 let nativeCastSessionActive = false;
 let nativeCastSessionGeneration = 0;
+
+function emitCastSessionChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(CAST_SESSION_CHANGED_EVENT));
+  }
+}
+
+export function onCastSessionChanged(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(CAST_SESSION_CHANGED_EVENT, listener);
+  return () => window.removeEventListener(CAST_SESSION_CHANGED_EVENT, listener);
+}
+
+function finiteNonNegative(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, value)
+    : 0;
+}
+
+function currentWebCastPlaybackState(
+  media: ChromeCastMedia | null = currentWebCastMedia(),
+): CastPlaybackState | null {
+  if (!media || !currentWebCastSession()) return null;
+  const playerState = String(media.playerState || "").toUpperCase();
+  const estimatedTime = media.getEstimatedTime?.();
+  const currentTime = finiteNonNegative(estimatedTime ?? media.currentTime);
+  const duration = finiteNonNegative(media.media?.duration ?? media.duration);
+  const volume = media.volume?.level;
+  return {
+    active: true,
+    currentTime: duration > 0 ? Math.min(currentTime, duration) : currentTime,
+    duration,
+    isBuffering: playerState === "BUFFERING",
+    isPlaying: playerState === "PLAYING",
+    volume:
+      typeof volume === "number" && Number.isFinite(volume)
+        ? Math.max(0, Math.min(1, volume))
+        : undefined,
+  };
+}
+
+export function subscribeCastPlaybackState(
+  listener: (state: CastPlaybackState) => void,
+): () => void {
+  if (typeof window === "undefined" || isNative) return () => undefined;
+
+  let disposed = false;
+  let timer: number | null = null;
+  let observedMedia: ChromeCastMedia | null = null;
+
+  const clearTimer = () => {
+    if (timer === null) return;
+    window.clearTimeout(timer);
+    timer = null;
+  };
+  const bindMedia = (media: ChromeCastMedia | null) => {
+    if (media === observedMedia) return;
+    observedMedia?.removeUpdateListener?.(handleMediaUpdate);
+    observedMedia = media;
+    observedMedia?.addUpdateListener?.(handleMediaUpdate);
+  };
+  const publish = () => {
+    if (disposed) return;
+    clearTimer();
+    const media = currentWebCastMedia();
+    bindMedia(media);
+    const state = currentWebCastPlaybackState(media);
+    if (!state) return;
+    listener(state);
+    if (state.isPlaying) {
+      timer = window.setTimeout(publish, 500);
+    }
+  };
+  function handleMediaUpdate(isAlive: boolean) {
+    if (!isAlive) bindMedia(null);
+    publish();
+  }
+
+  const unsubscribeSession = onCastSessionChanged(publish);
+  publish();
+
+  return () => {
+    disposed = true;
+    clearTimer();
+    bindMedia(null);
+    unsubscribeSession();
+  };
+}
 
 function setAuthoritativeNativeCastSession(active: boolean): void {
   nativeCastSessionGeneration += 1;
@@ -64,6 +156,7 @@ function getNativeCast(): NativeCastPlugin {
     // disconnect silently no-op'd against a session that no longer exists.
     void nativeCast.addListener("sessionChanged", (event) => {
       setAuthoritativeNativeCastSession(event.active);
+      emitCastSessionChanged();
     });
   }
   return nativeCast;
@@ -89,9 +182,25 @@ function initializeWebCastContext(): boolean {
   const castFramework = currentWindow?.cast?.framework;
   const chromeCast = currentWindow?.chrome?.cast;
   if (!castFramework || !chromeCast) return false;
+  const context = castFramework.CastContext.getInstance();
+  if (
+    context.addEventListener &&
+    castFramework.CastContextEventType &&
+    !observedWebCastContexts.has(context)
+  ) {
+    observedWebCastContexts.add(context);
+    context.addEventListener(
+      castFramework.CastContextEventType.CAST_STATE_CHANGED,
+      emitCastSessionChanged,
+    );
+    context.addEventListener(
+      castFramework.CastContextEventType.SESSION_STATE_CHANGED,
+      emitCastSessionChanged,
+    );
+  }
   if (webCastInitialized) return true;
 
-  castFramework.CastContext.getInstance().setOptions({
+  context.setOptions({
     receiverApplicationId: chromeCast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
     autoJoinPolicy: chromeCast.AutoJoinPolicy.ORIGIN_SCOPED,
   });
@@ -109,14 +218,16 @@ function ensureWebCastFramework(): Promise<boolean> {
   if (!isLikelyWebCastBrowser()) return Promise.resolve(false);
   if (webCastReady) return webCastReady;
 
-  webCastReady = new Promise((resolve) => {
+  const ready = new Promise<boolean>((resolve) => {
     let settled = false;
+    let script: HTMLScriptElement | null = null;
     const timeout = webWindow.setTimeout(() => finish(false), 6000);
 
     function finish(available: boolean) {
       if (settled) return;
       settled = true;
       webWindow.clearTimeout(timeout);
+      if (!available) script?.remove();
       resolve(available && initializeWebCastContext());
     }
 
@@ -129,13 +240,29 @@ function ensureWebCastFramework(): Promise<boolean> {
     const existingScript = document.querySelector<HTMLScriptElement>(
       `script[src="${CAST_SENDER_SCRIPT}"]`,
     );
-    if (existingScript) return;
+    if (existingScript) {
+      existingScript.addEventListener(
+        "load",
+        () => finish(initializeWebCastContext()),
+        { once: true },
+      );
+      existingScript.addEventListener("error", () => finish(false), {
+        once: true,
+      });
+      script = existingScript;
+      return;
+    }
 
-    const script = document.createElement("script");
+    script = document.createElement("script");
     script.async = true;
     script.src = CAST_SENDER_SCRIPT;
     script.onerror = () => finish(false);
     document.head.appendChild(script);
+  });
+
+  webCastReady = ready.then((available) => {
+    if (!available) webCastReady = null;
+    return available;
   });
 
   return webCastReady;
@@ -228,13 +355,23 @@ export async function getCastSenderCapabilities(): Promise<CastSenderCapabilitie
     };
   }
 
-  const session = currentWebCastSession();
+  const currentWindow = castWindow();
+  const castFramework = currentWindow?.cast?.framework;
+  const context = castFramework?.CastContext.getInstance();
+  const session = context?.getCurrentSession() ?? null;
+  const castState = context?.getCastState?.();
+  const noDevicesState = castFramework?.CastState?.NO_DEVICES_AVAILABLE;
+  const receiverAvailable =
+    Boolean(session) || !noDevicesState || castState !== noDevicesState;
   return {
     platform: "web",
     visible: true,
-    available: true,
+    available: receiverAvailable,
     activeSession: Boolean(session),
     targetName: castSessionName(session),
+    reason: receiverAvailable
+      ? undefined
+      : "No Cast receivers found on this network.",
   };
 }
 
@@ -343,6 +480,39 @@ export function castStop(): Promise<CastStartResult> {
   return castControl("stop");
 }
 
+export async function endCastSession(): Promise<CastStartResult> {
+  if (isNative) {
+    try {
+      const result = await getNativeCast().endSession();
+      if (result.ok) setAuthoritativeNativeCastSession(false);
+      if (result.ok) emitCastSessionChanged();
+      return result;
+    } catch (error) {
+      return {
+        ok: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not end Cast session.",
+      };
+    }
+  }
+
+  try {
+    const context = castWindow()?.cast?.framework.CastContext.getInstance();
+    if (!context?.getCurrentSession()) return { ok: true };
+    context.endCurrentSession(true);
+    emitCastSessionChanged();
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Could not end Cast session.",
+    };
+  }
+}
+
 export async function startCastSession(
   payload: CastStartPayload,
 ): Promise<CastStartResult> {
@@ -366,13 +536,21 @@ export async function startCastSession(
   }
 
   try {
+    const webSession = isNative ? null : await requestWebCastSession();
+    if (!isNative && !webSession) {
+      return { ok: false, message: "Could not open the Cast device picker." };
+    }
+
     const ticket = await api<CastTicketResponse>(
       "/api/me/cast/tickets",
       "POST",
       request,
     );
     const media = await resolveCastMedia(ticket);
-    const artworkUrl = await resolveCastArtworkUrl(payload.track.albumCover);
+    const artworkUrl = await resolveCastArtworkUrl(
+      payload.track.albumCover,
+      media.stream_url || ticket.stream_url,
+    );
 
     if (isNative) {
       const startedAtGeneration = nativeCastSessionGeneration;
@@ -383,7 +561,7 @@ export async function startCastSession(
       return result;
     }
 
-    const session = await requestWebCastSession();
+    const session = webSession;
     const chromeCast = castWindow()?.chrome?.cast;
     const loadRequest = chromeCast
       ? buildWebLoadRequest(ticket, media, payload, chromeCast, artworkUrl)
@@ -393,6 +571,7 @@ export async function startCastSession(
     }
     await session.loadMedia(loadRequest);
     nativeCastSessionActive = false;
+    emitCastSessionChanged();
     const targetName = castSessionName(session);
     return {
       ok: true,

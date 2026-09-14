@@ -9,6 +9,7 @@ import {
 import type { JamTransportControls } from "@/contexts/player-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlayerConnectTransport } from "@/contexts/use-player-connect-transport";
+import { useCastPlaybackRuntime } from "@/contexts/use-cast-playback-runtime";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
 import { useJamQueueSession } from "@/contexts/use-jam-queue-session";
@@ -81,6 +82,14 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     commitIsBuffering,
   } = runtimeState;
 
+  useCastPlaybackRuntime({
+    commitCurrentTime,
+    commitDuration,
+    commitIsBuffering,
+    commitIsPlaying,
+    setVolumeState,
+  });
+
   const { user: authUser } = useAuth();
   const {
     connectEnabled,
@@ -143,7 +152,9 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     play,
     playAll,
     pause,
+    pauseLocal,
     resume,
+    resumeLocal,
     next,
     prev,
     seek,
@@ -318,7 +329,9 @@ export function usePlayerProviderRuntime(children: ReactNode) {
       play,
       playAll,
       pause,
+      pauseLocal,
       resume,
+      resumeLocal,
       next,
       prev,
       seek,

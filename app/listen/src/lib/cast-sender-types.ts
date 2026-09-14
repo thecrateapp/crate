@@ -50,6 +50,15 @@ export interface CastStartResult {
   targetName?: string;
 }
 
+export interface CastPlaybackState {
+  active: boolean;
+  currentTime: number;
+  duration: number;
+  isBuffering: boolean;
+  isPlaying: boolean;
+  volume?: number;
+}
+
 export interface NativeCastSessionChangedEvent {
   active: boolean;
 }
@@ -62,6 +71,7 @@ export interface NativeCastPlugin {
   seek(payload: { currentTime: number }): Promise<CastStartResult>;
   setVolume(payload: { volume: number }): Promise<CastStartResult>;
   stop(): Promise<CastStartResult>;
+  endSession(): Promise<CastStartResult>;
   addListener(
     eventName: "sessionChanged",
     listener: (event: NativeCastSessionChangedEvent) => void,
@@ -91,6 +101,13 @@ export interface CastNamespace {
     CastContext: {
       getInstance(): CastContext;
     };
+    CastState?: {
+      NO_DEVICES_AVAILABLE: string;
+    };
+    CastContextEventType?: {
+      CAST_STATE_CHANGED: string;
+      SESSION_STATE_CHANGED: string;
+    };
   };
 }
 
@@ -100,7 +117,13 @@ export interface CastContext {
     autoJoinPolicy: string;
   }): void;
   getCurrentSession(): CastSession | null;
+  getCastState?(): string;
+  addEventListener?(
+    eventType: string,
+    listener: (event: unknown) => void,
+  ): void;
   requestSession(): Promise<CastSession>;
+  endCurrentSession(stopCasting: boolean): void;
 }
 
 export interface CastSession {
@@ -137,6 +160,16 @@ export interface ChromeCastNamespace {
 }
 
 export interface ChromeCastMedia {
+  currentTime?: number;
+  duration?: number;
+  media?: {
+    duration?: number;
+  };
+  playerState?: string;
+  volume?: ChromeCastVolume;
+  getEstimatedTime?(): number;
+  addUpdateListener?(listener: (isAlive: boolean) => void): void;
+  removeUpdateListener?(listener: (isAlive: boolean) => void): void;
   pause(
     request: Record<string, never>,
     success: () => void,
@@ -165,7 +198,9 @@ export interface ChromeCastMedia {
 }
 
 export interface ChromeCastImage {
+  height?: number;
   url: string;
+  width?: number;
 }
 
 export interface ChromeCastMediaInfo {

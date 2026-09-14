@@ -42,6 +42,8 @@ export interface PlaybackTargetContext {
   activeConnectSession?: ActiveConnectSession | null;
   connect?: PlaybackTargetConnectContext | null;
   pause?: () => void | Promise<void>;
+  pauseLocal?: () => void | Promise<void>;
+  resumeLocal?: () => void | Promise<void>;
   publishConnectState?: (options?: { claimActive?: boolean }) => Promise<void>;
 }
 

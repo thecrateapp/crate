@@ -16,6 +16,7 @@ import {
   CONNECT_ENABLED_EVENT,
   CONNECT_SESSION_EVENT,
 } from "@/lib/crate-connect";
+import { onCastSessionChanged } from "@/lib/cast-sender";
 import { onNativeOutputRouteChanged } from "@/lib/native-output-router";
 
 import { PlaybackTargetButton } from "./PlaybackTargetButton";
@@ -136,6 +137,12 @@ export function PlaybackTargetMenu({
     };
   }, [runRefreshTargets]);
 
+  useEffect(() => onCastSessionChanged(runRefreshTargets), [runRefreshTargets]);
+
+  useEffect(() => {
+    if (open) runRefreshTargets();
+  }, [open, runRefreshTargets]);
+
   useEffect(() => {
     if (!open) return;
     let disposed = false;
@@ -171,9 +178,10 @@ export function PlaybackTargetMenu({
         toast.info(result.message);
         return;
       }
+      runRefreshTargets();
       close();
     },
-    [close, t],
+    [close, runRefreshTargets, t],
   );
 
   const toggle = useCallback(() => {

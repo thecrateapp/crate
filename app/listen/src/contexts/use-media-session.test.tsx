@@ -115,6 +115,16 @@ function renderSession(
   );
 }
 
+function getMediaSessionActionHandler(
+  action: MediaSessionAction,
+): MediaSessionActionHandler {
+  const registration = mediaSession.setActionHandler.mock.calls.find(
+    ([registeredAction]) => registeredAction === action,
+  );
+  expect(registration).toBeDefined();
+  return registration?.[1] as MediaSessionActionHandler;
+}
+
 beforeEach(() => {
   runtime.isNative = false;
   nativeMediaSession.controlListener = null;
@@ -160,6 +170,23 @@ afterEach(() => {
 });
 
 describe("useMediaSession", () => {
+  it("requests an immediate pause from the Web MediaSession handler", () => {
+    renderSession();
+
+    getMediaSessionActionHandler("pause")({ action: "pause" });
+
+    expect(controls.pause).toHaveBeenCalledWith({ immediate: true });
+  });
+
+  it("synchronizes the Web MediaSession state inside the pause callback", () => {
+    renderSession();
+    expect(mediaSession.playbackState).toBe("playing");
+
+    getMediaSessionActionHandler("pause")({ action: "pause" });
+
+    expect(mediaSession.playbackState).toBe("paused");
+  });
+
   it("reasserts playing when the active track changes", () => {
     const { rerender } = renderSession();
     expect(mediaSession.playbackState).toBe("playing");

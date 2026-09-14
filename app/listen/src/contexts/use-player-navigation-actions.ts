@@ -105,16 +105,23 @@ export function usePlayerNavigationActions({
       if (isCastSessionActive()) {
         const nextTrack = queueRef.current[nextIndex];
         if (nextTrack) {
-          void startCastSession({
-            track: nextTrack,
-            currentTime: 0,
-          }).catch((error) => {
-            console.error("[cast] failed to load next track:", error);
-          });
+          void startCastSession({ track: nextTrack, currentTime: 0 })
+            .then((result) => {
+              if (!result.ok) {
+                console.error(
+                  "[cast] failed to load next track:",
+                  result.message,
+                );
+                return;
+              }
+              advanceToTrack(nextIndex);
+              commitCurrentTime(0);
+              commitIsPlaying(true);
+            })
+            .catch((error) => {
+              console.error("[cast] failed to load next track:", error);
+            });
         }
-        advanceToTrack(nextIndex);
-        commitCurrentTime(0);
-        commitIsPlaying(true);
         return;
       }
       if (shouldUseAndroidNativePlayer()) {
@@ -132,16 +139,20 @@ export function usePlayerNavigationActions({
       if (isCastSessionActive()) {
         const nextTrack = queueRef.current[0];
         if (nextTrack) {
-          void startCastSession({
-            track: nextTrack,
-            currentTime: 0,
-          }).catch((error) => {
-            console.error("[cast] failed to wrap queue:", error);
-          });
+          void startCastSession({ track: nextTrack, currentTime: 0 })
+            .then((result) => {
+              if (!result.ok) {
+                console.error("[cast] failed to wrap queue:", result.message);
+                return;
+              }
+              advanceToTrack(0);
+              commitCurrentTime(0);
+              commitIsPlaying(true);
+            })
+            .catch((error) => {
+              console.error("[cast] failed to wrap queue:", error);
+            });
         }
-        advanceToTrack(0);
-        commitCurrentTime(0);
-        commitIsPlaying(true);
         return;
       }
       if (shouldUseAndroidNativePlayer()) {
@@ -195,15 +206,22 @@ export function usePlayerNavigationActions({
       })
     ) {
       if (isCastSessionActive()) {
-        void castSeek(0).catch((error) => {
-          console.error("[cast] failed to restart track:", error);
-        });
-        commitCurrentTime(0);
-        markSeekPosition(0);
-        prevRestartTrackKeyRef.current = activeTrackKey;
-        prevRestartedAtRef.current = now;
-        bufferingIntentRef.current = false;
-        commitIsBuffering(false);
+        void castSeek(0)
+          .then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to restart track:", result.message);
+              return;
+            }
+            commitCurrentTime(0);
+            markSeekPosition(0);
+            prevRestartTrackKeyRef.current = activeTrackKey;
+            prevRestartedAtRef.current = now;
+            bufferingIntentRef.current = false;
+            commitIsBuffering(false);
+          })
+          .catch((error) => {
+            console.error("[cast] failed to restart track:", error);
+          });
         return;
       }
       if (shouldUseAndroidNativePlayer()) {
@@ -224,22 +242,30 @@ export function usePlayerNavigationActions({
 
     if (currentIndexRef.current > 0) {
       const targetIndex = currentIndexRef.current - 1;
-      clearPrevRestartLatch();
       if (isCastSessionActive()) {
         const previousTrack = queueRef.current[targetIndex];
         if (previousTrack) {
-          void startCastSession({
-            track: previousTrack,
-            currentTime: 0,
-          }).catch((error) => {
-            console.error("[cast] failed to load previous track:", error);
-          });
+          void startCastSession({ track: previousTrack, currentTime: 0 })
+            .then((result) => {
+              if (!result.ok) {
+                console.error(
+                  "[cast] failed to load previous track:",
+                  result.message,
+                );
+                return;
+              }
+              clearPrevRestartLatch();
+              advanceToTrack(targetIndex);
+              commitCurrentTime(0);
+              commitIsPlaying(true);
+            })
+            .catch((error) => {
+              console.error("[cast] failed to load previous track:", error);
+            });
         }
-        advanceToTrack(targetIndex);
-        commitCurrentTime(0);
-        commitIsPlaying(true);
         return;
       }
+      clearPrevRestartLatch();
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.previous().catch((error) => {
           console.error("[native-player] failed to skip previous:", error);
@@ -253,22 +279,30 @@ export function usePlayerNavigationActions({
 
     if (repeatRef.current === "all" && queueRef.current.length > 0) {
       const wrappedIndex = queueRef.current.length - 1;
-      clearPrevRestartLatch();
       if (isCastSessionActive()) {
         const previousTrack = queueRef.current[wrappedIndex];
         if (previousTrack) {
-          void startCastSession({
-            track: previousTrack,
-            currentTime: 0,
-          }).catch((error) => {
-            console.error("[cast] failed to wrap previous:", error);
-          });
+          void startCastSession({ track: previousTrack, currentTime: 0 })
+            .then((result) => {
+              if (!result.ok) {
+                console.error(
+                  "[cast] failed to wrap previous:",
+                  result.message,
+                );
+                return;
+              }
+              clearPrevRestartLatch();
+              advanceToTrack(wrappedIndex);
+              commitCurrentTime(0);
+              commitIsPlaying(true);
+            })
+            .catch((error) => {
+              console.error("[cast] failed to wrap previous:", error);
+            });
         }
-        advanceToTrack(wrappedIndex);
-        commitCurrentTime(0);
-        commitIsPlaying(true);
         return;
       }
+      clearPrevRestartLatch();
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.jumpTo(wrappedIndex, true).catch((error) => {
           console.error("[native-player] failed to wrap previous:", error);
@@ -303,16 +337,20 @@ export function usePlayerNavigationActions({
       if (isCastSessionActive()) {
         const nextTrack = queueRef.current[index];
         if (nextTrack) {
-          void startCastSession({
-            track: nextTrack,
-            currentTime: 0,
-          }).catch((error) => {
-            console.error("[cast] failed to jump:", error);
-          });
+          void startCastSession({ track: nextTrack, currentTime: 0 })
+            .then((result) => {
+              if (!result.ok) {
+                console.error("[cast] failed to jump:", result.message);
+                return;
+              }
+              advanceToTrack(index);
+              commitCurrentTime(0);
+              commitIsPlaying(true);
+            })
+            .catch((error) => {
+              console.error("[cast] failed to jump:", error);
+            });
         }
-        advanceToTrack(index);
-        commitCurrentTime(0);
-        commitIsPlaying(true);
         return;
       }
       if (shouldUseAndroidNativePlayer()) {

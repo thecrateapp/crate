@@ -229,20 +229,27 @@ export function usePlayerQueueActions({
     },
   );
 
-  const { pause, resume, seek, setVolume, setPlaybackRate } =
-    usePlayerTransportControls({
-      queueRef,
-      isPlayingRef,
-      bufferingIntentRef,
-      lastNonZeroVolumeRef,
-      commitIsPlaying,
-      commitIsBuffering,
-      commitCurrentTime,
-      setVolumeState,
-      markSeekPosition,
-      cancelSoftInterruption,
-      silenceGaplessEngine,
-    });
+  const {
+    pause,
+    pauseLocal,
+    resume,
+    resumeLocal,
+    seek,
+    setVolume,
+    setPlaybackRate,
+  } = usePlayerTransportControls({
+    queueRef,
+    isPlayingRef,
+    bufferingIntentRef,
+    lastNonZeroVolumeRef,
+    commitIsPlaying,
+    commitIsBuffering,
+    commitCurrentTime,
+    setVolumeState,
+    markSeekPosition,
+    cancelSoftInterruption,
+    silenceGaplessEngine,
+  });
 
   const { addToQueue, playNext, removeFromQueue, reorderQueue } =
     usePlayerQueueMutationActions({
@@ -283,7 +290,9 @@ export function usePlayerQueueActions({
     play,
     playAll,
     pause,
+    pauseLocal,
     resume,
+    resumeLocal,
     next,
     prev,
     seek,

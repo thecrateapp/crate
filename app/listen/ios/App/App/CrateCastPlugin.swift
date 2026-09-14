@@ -12,6 +12,13 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
     private static let castContextLock = NSLock()
     private static var castContextConfigured = false
     private var pendingRequestCall: CAPPluginCall?
+    private struct PendingCastOperation {
+        let call: CAPPluginCall
+        let failureMessage: String
+        let successMessage: String?
+        let activatesSession: Bool
+    }
+    private var pendingOperations: [GCKRequestID: PendingCastOperation] = [:]
     #endif
 
     let identifier = "CrateCastPlugin"
@@ -23,7 +30,8 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "pause", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "seek", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setVolume", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endSession", returnType: CAPPluginReturnPromise)
     ]
 
     #if canImport(GoogleCast)
@@ -80,8 +88,7 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func play(_ call: CAPPluginCall) {
         #if canImport(GoogleCast)
         guard let client = remoteMediaClient(call) else { return }
-        client.play()
-        call.resolve(result(true, nil))
+        track(client.play(), call: call, failureMessage: "Could not resume Cast playback.")
         #else
         call.resolve(result(false, "Google Cast SDK is not linked in this iOS build."))
         #endif
@@ -90,8 +97,7 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func pause(_ call: CAPPluginCall) {
         #if canImport(GoogleCast)
         guard let client = remoteMediaClient(call) else { return }
-        client.pause()
-        call.resolve(result(true, nil))
+        track(client.pause(), call: call, failureMessage: "Could not pause Cast playback.")
         #else
         call.resolve(result(false, "Google Cast SDK is not linked in this iOS build."))
         #endif
@@ -101,8 +107,13 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
         #if canImport(GoogleCast)
         guard let client = remoteMediaClient(call) else { return }
         let position = max(0, call.getDouble("currentTime", 0))
-        client.seek(toTimeInterval: position)
-        call.resolve(result(true, nil))
+        let options = GCKMediaSeekOptions()
+        options.interval = position
+        track(
+            client.seek(with: options),
+            call: call,
+            failureMessage: "Could not seek Cast playback."
+        )
         #else
         call.resolve(result(false, "Google Cast SDK is not linked in this iOS build."))
         #endif
@@ -116,8 +127,11 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let volume = max(0, min(1, call.getDouble("volume", 1)))
-        session.setDeviceVolume(Float(volume))
-        call.resolve(result(true, nil))
+        track(
+            session.setDeviceVolume(Float(volume)),
+            call: call,
+            failureMessage: "Could not set Cast volume."
+        )
         #else
         call.resolve(result(false, "Google Cast SDK is not linked in this iOS build."))
         #endif
@@ -126,7 +140,25 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func stop(_ call: CAPPluginCall) {
         #if canImport(GoogleCast)
         guard let client = remoteMediaClient(call) else { return }
-        client.stop()
+        track(client.stop(), call: call, failureMessage: "Could not stop Cast playback.")
+        #else
+        call.resolve(result(false, "Google Cast SDK is not linked in this iOS build."))
+        #endif
+    }
+
+    @objc func endSession(_ call: CAPPluginCall) {
+        #if canImport(GoogleCast)
+        configureCastContext()
+        let sessionManager = GCKCastContext.sharedInstance().sessionManager
+        guard sessionManager.currentCastSession != nil else {
+            call.resolve(result(true, nil))
+            return
+        }
+        guard sessionManager.endSessionAndStopCasting(true) else {
+            call.resolve(result(false, "Could not end Cast session."))
+            return
+        }
+        notifyListeners("sessionChanged", data: ["active": false], retainUntilConsumed: true)
         call.resolve(result(true, nil))
         #else
         call.resolve(result(false, "Google Cast SDK is not linked in this iOS build."))
@@ -179,6 +211,22 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
             return nil
         }
         return client
+    }
+
+    private func track(
+        _ request: GCKRequest,
+        call: CAPPluginCall,
+        failureMessage: String,
+        successMessage: String? = nil,
+        activatesSession: Bool = false
+    ) {
+        pendingOperations[request.requestID] = PendingCastOperation(
+            call: call,
+            failureMessage: failureMessage,
+            successMessage: successMessage,
+            activatesSession: activatesSession
+        )
+        request.delegate = self
     }
 
     private func presentCastPicker(_ call: CAPPluginCall) {
@@ -259,9 +307,13 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
         request.mediaInformation = mediaInfoBuilder.build()
         request.autoplay = true
         request.startTime = max(0, call.getDouble("currentTime", 0))
-        client.loadMedia(with: request.build())
-        call.resolve(result(true, "Casting started."))
-        notifyListeners("sessionChanged", data: ["active": true], retainUntilConsumed: true)
+        track(
+            client.loadMedia(with: request.build()),
+            call: call,
+            failureMessage: "Could not load Cast media.",
+            successMessage: "Casting started.",
+            activatesSession: true
+        )
     }
     #endif
 }
@@ -289,6 +341,32 @@ extension CrateCastPlugin: GCKSessionManagerListener {
 
     func sessionManager(_ sessionManager: GCKSessionManager, didFailToResumeSession sessionID: String, withError error: Error?) {
         resolvePending(false, "Could not resume Cast session.")
+    }
+}
+
+extension CrateCastPlugin: GCKRequestDelegate {
+    func requestDidComplete(_ request: GCKRequest) {
+        guard let operation = pendingOperations.removeValue(forKey: request.requestID) else {
+            return
+        }
+        operation.call.resolve(result(true, operation.successMessage))
+        if operation.activatesSession {
+            notifyListeners("sessionChanged", data: ["active": true], retainUntilConsumed: true)
+        }
+    }
+
+    func request(_ request: GCKRequest, didFailWithError error: GCKError) {
+        guard let operation = pendingOperations.removeValue(forKey: request.requestID) else {
+            return
+        }
+        operation.call.resolve(result(false, operation.failureMessage))
+    }
+
+    func request(_ request: GCKRequest, didAbortWith reason: GCKRequestAbortReason) {
+        guard let operation = pendingOperations.removeValue(forKey: request.requestID) else {
+            return
+        }
+        operation.call.resolve(result(false, operation.failureMessage))
     }
 }
 #endif

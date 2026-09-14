@@ -171,6 +171,17 @@ describe("PlaybackTargetMenu", () => {
     expect(screen.getByText("Active")).toBeVisible();
   });
 
+  it("refreshes output state when the Cast session changes", async () => {
+    renderWithListenProviders(<PlaybackTargetMenu />);
+
+    await waitFor(() => expect(loadGroupsMock).toHaveBeenCalled());
+    loadGroupsMock.mockClear();
+
+    window.dispatchEvent(new Event("crate:cast-session-changed"));
+
+    await waitFor(() => expect(loadGroupsMock).toHaveBeenCalledTimes(1));
+  });
+
   it("delegates available targets and explains unavailable targets", async () => {
     const targetContext = {
       currentTrack: {

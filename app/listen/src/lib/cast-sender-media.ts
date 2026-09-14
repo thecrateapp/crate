@@ -43,11 +43,26 @@ function receiverArtworkUrl(
 
 export async function resolveCastArtworkUrl(
   url: string | null | undefined,
+  streamUrl?: string,
 ): Promise<string | undefined> {
   const receiverUrl = receiverArtworkUrl(url);
   if (!receiverUrl) return undefined;
   try {
-    return await ensureMediaAccessUrl(receiverUrl, "artwork");
+    const authorizedUrl = await ensureMediaAccessUrl(receiverUrl, "artwork");
+    if (!streamUrl) return authorizedUrl;
+
+    const browserOrigin =
+      typeof window === "undefined" ? undefined : window.location.origin;
+    const artwork = new URL(authorizedUrl, browserOrigin);
+    const apiOrigin = new URL(apiUrl("/"), browserOrigin).origin;
+    if (artwork.origin !== apiOrigin) return authorizedUrl;
+
+    const streamOrigin = new URL(streamUrl).origin;
+    const receiverArtwork = new URL(
+      artwork.pathname + artwork.search,
+      streamOrigin,
+    );
+    return receiverArtwork.href;
   } catch {
     return undefined;
   }
@@ -69,18 +84,35 @@ function mediaDurationSeconds(
 export async function resolveCastMedia(
   ticket: CastTicketResponse,
 ): Promise<CastMediaResponse> {
-  const response = await fetch(ticket.metadata_url, {
-    credentials: "omit",
-  });
-  if (response.status === 425) {
-    throw new Error(
-      "Receiver-safe audio is still preparing. Try again shortly.",
-    );
+  const maxAttempts = 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetch(ticket.metadata_url, {
+        credentials: "omit",
+      });
+    } catch {
+      throw new Error(
+        "Could not reach the Cast media endpoint. Check that this Crate server is reachable over HTTPS.",
+      );
+    }
+    if (response.status === 425) {
+      if (attempt === maxAttempts - 1) {
+        throw new Error(
+          "Receiver-safe audio is still preparing. Try again shortly.",
+        );
+      }
+      const retryAfter = Number(response.headers.get("Retry-After") || 1);
+      const delayMs = Math.max(0, Math.min(5, retryAfter)) * 1000;
+      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error("Could not prepare this track for Cast.");
+    }
+    return (await response.json()) as CastMediaResponse;
   }
-  if (!response.ok) {
-    throw new Error("Could not prepare this track for Cast.");
-  }
-  return (await response.json()) as CastMediaResponse;
+  throw new Error("Could not prepare this track for Cast.");
 }
 
 export function buildNativePayload(
@@ -121,9 +153,12 @@ export function buildWebLoadRequest(
   metadata.albumName = nativePayload.album;
 
   if (nativePayload.artworkUrl) {
-    metadata.images = [
-      new chromeCast.Image(nativePayload.artworkUrl) as ChromeCastImage,
-    ];
+    const image = new chromeCast.Image(
+      nativePayload.artworkUrl,
+    ) as ChromeCastImage;
+    image.width = 512;
+    image.height = 512;
+    metadata.images = [image];
   }
 
   mediaInfo.metadata = metadata as ChromeCastMusicMetadata;

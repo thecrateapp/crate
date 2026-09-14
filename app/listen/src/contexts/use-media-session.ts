@@ -250,7 +250,13 @@ export function useMediaSession({
 
     const actions: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
       ["play", () => actionsRef.current.resume()],
-      ["pause", () => actionsRef.current.pause()],
+      [
+        "pause",
+        () => {
+          navigator.mediaSession.playbackState = "paused";
+          actionsRef.current.pause({ immediate: true });
+        },
+      ],
       ["previoustrack", () => actionsRef.current.prev()],
       ["nexttrack", () => actionsRef.current.next()],
       [

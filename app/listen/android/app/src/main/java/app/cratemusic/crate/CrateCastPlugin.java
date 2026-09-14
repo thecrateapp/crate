@@ -135,14 +135,20 @@ public class CrateCastPlugin extends Plugin {
                 CastContext context = castContext();
                 CastSession session = currentSession(context);
                 boolean active = session != null && session.isConnected();
+                boolean permissionRequired = !hasCastDiscoveryPermission();
                 int state = context.getCastState();
                 JSObject payload = new JSObject();
                 payload.put("platform", "native");
                 payload.put("visible", true);
-                payload.put("available", active || state != CastState.NO_DEVICES_AVAILABLE);
+                payload.put(
+                    "available",
+                    permissionRequired || active || state != CastState.NO_DEVICES_AVAILABLE
+                );
                 payload.put("activeSession", active);
                 payload.put("targetName", active ? session.getCastDevice().getFriendlyName() : null);
-                if (!active && state == CastState.NO_DEVICES_AVAILABLE) {
+                if (permissionRequired) {
+                    payload.put("reason", "Nearby-device permission is required for Cast discovery.");
+                } else if (!active && state == CastState.NO_DEVICES_AVAILABLE) {
                     payload.put("reason", "No Cast receivers found on this network.");
                 }
                 call.resolve(payload);
@@ -226,6 +232,20 @@ public class CrateCastPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         runWithRemoteClient(call, remoteClient -> remoteClient.stop());
+    }
+
+    @PluginMethod
+    public void endSession(PluginCall call) {
+        mainHandler.post(() -> {
+            try {
+                castContext().getSessionManager().endCurrentSession(true);
+                notifyListeners("sessionChanged", castStatePayload(false), true);
+                call.resolve(result(true, null));
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Could not end Cast session.", error);
+                call.resolve(result(false, "Could not end Cast session."));
+            }
+        });
     }
 
     private CastContext castContext() {

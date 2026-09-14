@@ -50,7 +50,9 @@ export function usePlayerBarController() {
     queue,
     currentIndex,
     pause,
+    pauseLocal,
     resume,
+    resumeLocal,
     next,
     prev,
     seek,
@@ -184,7 +186,9 @@ export function usePlayerBarController() {
     isRemoteConnectActive,
     legacyConnectEnabled,
     pause,
+    pauseLocal,
     publishConnectState,
+    resumeLocal,
   });
 
   const {

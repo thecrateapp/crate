@@ -69,16 +69,77 @@ export function usePlayerTransportControls({
   cancelSoftInterruption,
   silenceGaplessEngine,
 }: UsePlayerTransportControlsParams) {
+  const pauseLocal = useCallback(() => {
+    void cancelNativeMediaSessionResume();
+    cancelSoftInterruption();
+    bufferingIntentRef.current = false;
+    commitIsBuffering(false);
+    if (shouldUseAndroidNativePlayer()) {
+      silenceGaplessEngine();
+      void nativeEngine.pause().catch((error) => {
+        console.error("[native-player] failed to pause local playback:", error);
+      });
+      return;
+    }
+    gpPause();
+  }, [
+    bufferingIntentRef,
+    cancelSoftInterruption,
+    commitIsBuffering,
+    silenceGaplessEngine,
+  ]);
+
+  const resumeLocal = useCallback(() => {
+    if (!queueRef.current.length) return;
+    markNativeMediaSessionPlayingIntent();
+    cancelSoftInterruption();
+    bufferingIntentRef.current = true;
+    commitIsBuffering(true);
+    if (shouldUseAndroidNativePlayer()) {
+      silenceGaplessEngine();
+      void nativeEngine.play().catch((error) => {
+        console.error(
+          "[native-player] failed to resume local playback:",
+          error,
+        );
+        commitIsBuffering(false);
+      });
+      return;
+    }
+    if (shouldUseImmediateTransportAction()) {
+      gpRestoreVolume();
+      gpPlay();
+      return;
+    }
+    void gpFadeInAndPlay(SOFT_PAUSE_FADE_MS).catch(() => {
+      gpRestoreVolume();
+      gpPlay();
+    });
+  }, [
+    bufferingIntentRef,
+    cancelSoftInterruption,
+    commitIsBuffering,
+    queueRef,
+    silenceGaplessEngine,
+  ]);
+
   const pause = useCallback(
     (options?: PlayerPauseOptions) => {
       if (!options?.preserveNativeResume) {
         void cancelNativeMediaSessionResume();
       }
       if (isCastSessionActive()) {
-        void castPause().catch((error) => {
-          console.error("[cast] failed to pause:", error);
-        });
-        commitIsPlaying(false);
+        void castPause()
+          .then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to pause:", result.message);
+              return;
+            }
+            commitIsPlaying(false);
+          })
+          .catch((error) => {
+            console.error("[cast] failed to pause:", error);
+          });
         return;
       }
       cancelSoftInterruption();
@@ -92,7 +153,7 @@ export function usePlayerTransportControls({
         commitIsPlaying(false);
         return;
       }
-      if (shouldUseImmediateTransportAction()) {
+      if (options?.immediate || shouldUseImmediateTransportAction()) {
         gpPause();
         return;
       }
@@ -113,10 +174,17 @@ export function usePlayerTransportControls({
     if (!queueRef.current.length) return;
     markNativeMediaSessionPlayingIntent();
     if (isCastSessionActive()) {
-      void castPlay().catch((error) => {
-        console.error("[cast] failed to resume:", error);
-      });
-      commitIsPlaying(true);
+      void castPlay()
+        .then((result) => {
+          if (!result.ok) {
+            console.error("[cast] failed to resume:", result.message);
+            return;
+          }
+          commitIsPlaying(true);
+        })
+        .catch((error) => {
+          console.error("[cast] failed to resume:", error);
+        });
       return;
     }
     cancelSoftInterruption();
@@ -151,11 +219,18 @@ export function usePlayerTransportControls({
   const seek = useCallback(
     (time: number) => {
       if (isCastSessionActive()) {
-        void castSeek(time).catch((error) => {
-          console.error("[cast] failed to seek:", error);
-        });
-        commitCurrentTime(time);
-        markSeekPosition(time);
+        void castSeek(time)
+          .then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to seek:", result.message);
+              return;
+            }
+            commitCurrentTime(time);
+            markSeekPosition(time);
+          })
+          .catch((error) => {
+            console.error("[cast] failed to seek:", error);
+          });
         return;
       }
       const shouldResumeBufferingFlow = isPlayingRef.current;
@@ -183,18 +258,25 @@ export function usePlayerTransportControls({
   const setVolume = useCallback(
     (volume: number) => {
       if (isCastSessionActive()) {
-        void castSetVolume(volume).catch((error) => {
-          console.error("[cast] failed to set volume:", error);
-        });
-        setVolumeState(volume);
-        if (volume > 0) {
-          lastNonZeroVolumeRef.current = volume;
-        }
-        try {
-          localStorage.setItem("listen-player-volume", String(volume));
-        } catch {
-          // ignore persistence failures
-        }
+        void castSetVolume(volume)
+          .then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to set volume:", result.message);
+              return;
+            }
+            setVolumeState(volume);
+            if (volume > 0) {
+              lastNonZeroVolumeRef.current = volume;
+            }
+            try {
+              localStorage.setItem("listen-player-volume", String(volume));
+            } catch {
+              // ignore persistence failures
+            }
+          })
+          .catch((error) => {
+            console.error("[cast] failed to set volume:", error);
+          });
         return;
       }
       const effectiveVolume = isNative ? 1 : volume;
@@ -229,5 +311,13 @@ export function usePlayerTransportControls({
     }
   }, []);
 
-  return { pause, resume, seek, setVolume, setPlaybackRate };
+  return {
+    pause,
+    pauseLocal,
+    resume,
+    resumeLocal,
+    seek,
+    setVolume,
+    setPlaybackRate,
+  };
 }

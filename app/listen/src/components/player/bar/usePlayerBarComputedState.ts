@@ -27,6 +27,8 @@ type UsePlayerBarComputedStateOptions = {
   activeConnectSession: PlaybackTargetContext["activeConnectSession"];
   connect: PlaybackTargetContext["connect"];
   pause: PlaybackTargetContext["pause"];
+  pauseLocal: PlaybackTargetContext["pauseLocal"];
+  resumeLocal: PlaybackTargetContext["resumeLocal"];
   publishConnectState: PlaybackTargetContext["publishConnectState"];
   isLiked: IsLiked;
 };
@@ -48,6 +50,8 @@ export function usePlayerBarComputedState({
   activeConnectSession,
   connect,
   pause,
+  pauseLocal,
+  resumeLocal,
   publishConnectState,
   isLiked,
 }: UsePlayerBarComputedStateOptions) {
@@ -64,6 +68,8 @@ export function usePlayerBarComputedState({
       activeConnectSession: legacyConnectEnabled ? activeConnectSession : null,
       connect,
       pause,
+      pauseLocal,
+      resumeLocal,
       publishConnectState,
     }),
     [
@@ -77,7 +83,9 @@ export function usePlayerBarComputedState({
       effectiveVolume,
       legacyConnectEnabled,
       pause,
+      pauseLocal,
       publishConnectState,
+      resumeLocal,
     ],
   );
 

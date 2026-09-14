@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from crate.api.auth import _require_auth
+from crate.api.auth import _request_base_origin, _require_auth
 from crate.api.browse_media import _playback_headers, _stream_resolved_file
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
@@ -70,8 +71,41 @@ def _require_persisted_user_id(request: Request) -> int:
     return user_id
 
 
+def _absolute_url(
+    request: Request,
+    route_name: str,
+    ticket: str,
+    *,
+    public_origin: str,
+) -> str:
+    route_url = request.url_for(route_name, ticket=ticket)
+    return f"{public_origin.rstrip('/')}{route_url.path}"
+
+
+def _absolute_api_url(request: Request, route_name: str, ticket: str) -> str:
+    public_origin = os.environ.get("CRATE_PUBLIC_API_BASE_URL") or _request_base_origin(
+        request
+    )
+    return _absolute_url(
+        request,
+        route_name,
+        ticket,
+        public_origin=public_origin,
+    )
+
+
 def _absolute_cast_url(request: Request, route_name: str, ticket: str) -> str:
-    return str(request.url_for(route_name, ticket=ticket))
+    public_origin = (
+        os.environ.get("CRATE_CAST_PUBLIC_BASE_URL")
+        or os.environ.get("CRATE_PUBLIC_API_BASE_URL")
+        or _request_base_origin(request)
+    )
+    return _absolute_url(
+        request,
+        route_name,
+        ticket,
+        public_origin=public_origin,
+    )
 
 
 def _track_for_ticket(ticket_payload: dict) -> dict | None:
@@ -207,7 +241,7 @@ def post_cast_ticket(request: Request, body: CastTicketRequest):
     ticket = ticket_payload["ticket"]
     return {
         "stream_url": _absolute_cast_url(request, "get_cast_stream", ticket),
-        "metadata_url": _absolute_cast_url(request, "get_cast_media", ticket),
+        "metadata_url": _absolute_api_url(request, "get_cast_media", ticket),
         "expires_at": ticket_payload["expires_at"],
         "delivery_policy": ticket_payload["delivery_policy"],
     }
