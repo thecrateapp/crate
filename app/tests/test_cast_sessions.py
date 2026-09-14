@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import text
 
 from crate.db.tx import read_scope, transaction_scope
@@ -151,18 +152,28 @@ def test_cast_session_queue_update_is_cas_and_idempotent(pg_db, monkeypatch):
         expected_revision=7,
         mutation_id="mutation-1",
         queue=_queue("item-2", "item-1", "item-3"),
-        current_index=1,
-        current_time=4.0,
         repeat_mode="one",
         shuffle=False,
     )
     assert applied["mutation_status"] == "applied"
     assert applied["revision"] == 8
+    assert applied["current_index"] == 0
+    assert applied["current_time"] == 0
     assert [item["item_id"] for item in applied["queue"]] == [
         "item-2",
         "item-1",
         "item-3",
     ]
+
+    second = cast_sessions.update_cast_session_queue(
+        owner["id"],
+        created["session_id"],
+        expected_revision=8,
+        mutation_id="mutation-2",
+        queue=_queue("item-3", "item-2"),
+    )
+    assert second["mutation_status"] == "applied"
+    assert second["revision"] == 9
 
     duplicate = cast_sessions.update_cast_session_queue(
         owner["id"],
@@ -170,32 +181,29 @@ def test_cast_session_queue_update_is_cas_and_idempotent(pg_db, monkeypatch):
         expected_revision=7,
         mutation_id="mutation-1",
         queue=_queue("ignored"),
-        current_index=0,
     )
     assert duplicate["mutation_status"] == "duplicate"
-    assert duplicate["revision"] == 8
-    assert duplicate["queue"] == applied["queue"]
+    assert duplicate["revision"] == 9
+    assert duplicate["queue"] == second["queue"]
 
     conflict = cast_sessions.update_cast_session_queue(
         owner["id"],
         created["session_id"],
         expected_revision=7,
-        mutation_id="mutation-2",
+        mutation_id="mutation-3",
         queue=_queue("stale"),
-        current_index=0,
     )
     assert conflict["mutation_status"] == "conflict"
-    assert conflict["revision"] == 8
-    assert conflict["queue"] == applied["queue"]
+    assert conflict["revision"] == 9
+    assert conflict["queue"] == second["queue"]
 
     assert (
         cast_sessions.update_cast_session_queue(
             owner["id"] + 1,
             created["session_id"],
             expected_revision=8,
-            mutation_id="mutation-3",
+            mutation_id="mutation-4",
             queue=_queue("forbidden"),
-            current_index=0,
         )
         is None
     )
@@ -216,6 +224,7 @@ def test_cast_session_revocation_is_owner_scoped(pg_db, monkeypatch):
         cast_sessions.revoke_cast_session(other["id"], created["session_id"]) is False
     )
     assert cast_sessions.revoke_cast_session(owner["id"], created["session_id"])
+    assert cast_sessions.revoke_cast_session(owner["id"], created["session_id"])
     assert cast_sessions.get_cast_session_by_lease(created["lease"]) is None
 
     with transaction_scope() as session:
@@ -227,3 +236,83 @@ def test_cast_session_revocation_is_owner_scoped(pg_db, monkeypatch):
             {"session_id": created["session_id"]},
         ).scalar_one()
     assert revoked_at == NOW
+
+
+def test_cast_session_validates_bounded_queue_and_payloads(pg_db, monkeypatch):
+    from crate.db.repositories import cast_sessions
+
+    monkeypatch.setattr(cast_sessions, "_now", lambda: NOW)
+    owner = pg_db.create_user("cast-session-validation@test.com")
+
+    with pytest.raises(ValueError, match="unique item_id"):
+        cast_sessions.create_cast_session(
+            owner["id"], queue=_queue("duplicate", "duplicate")
+        )
+    with pytest.raises(ValueError, match="at most"):
+        cast_sessions.create_cast_session(
+            owner["id"],
+            queue=_queue(*(f"item-{index}" for index in range(1_001))),
+        )
+    with pytest.raises(ValueError, match="capabilities"):
+        cast_sessions.create_cast_session(
+            owner["id"],
+            queue=_queue("item-1"),
+            receiver_capabilities={"value": "x" * 20_000},
+        )
+    oversized_item = _queue("item-1")[0]
+    oversized_item["title"] = "x" * 20_000
+    with pytest.raises(ValueError, match="queue item"):
+        cast_sessions.create_cast_session(owner["id"], queue=[oversized_item])
+
+
+def test_receiver_state_uses_its_own_monotonic_sequence(pg_db, monkeypatch):
+    from crate.db.repositories import cast_sessions
+
+    monkeypatch.setattr(cast_sessions, "_now", lambda: NOW)
+    owner = pg_db.create_user("cast-session-state@test.com")
+    created = cast_sessions.create_cast_session(
+        owner["id"], queue=_queue("item-1", "item-2"), current_index=0
+    )
+
+    updated = cast_sessions.update_cast_session_state(
+        created["lease"],
+        state_seq=2,
+        current_index=1,
+        current_time=42.5,
+    )
+    stale = cast_sessions.update_cast_session_state(
+        created["lease"],
+        state_seq=1,
+        current_index=0,
+        current_time=0,
+    )
+
+    assert updated["state_seq"] == 2
+    assert updated["current_index"] == 1
+    assert updated["current_time"] == 42.5
+    assert stale["state_seq"] == 2
+    assert stale["current_index"] == 1
+
+
+def test_cast_session_cleanup_removes_only_old_terminal_rows(pg_db, monkeypatch):
+    from crate.db.repositories import cast_sessions
+
+    monkeypatch.setattr(cast_sessions, "_now", lambda: NOW)
+    owner = pg_db.create_user("cast-session-cleanup@test.com")
+    expired = cast_sessions.create_cast_session(owner["id"], queue=_queue("expired"))
+    active = cast_sessions.create_cast_session(owner["id"], queue=_queue("active"))
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE cast_playback_sessions "
+                "SET expires_at = :expired_at "
+                "WHERE session_id = :session_id"
+            ),
+            {
+                "expired_at": NOW - timedelta(days=2),
+                "session_id": expired["session_id"],
+            },
+        )
+
+    assert cast_sessions.cleanup_cast_sessions(retention=timedelta(days=1)) == 1
+    assert cast_sessions.get_cast_session_by_lease(active["lease"]) is not None

@@ -1,6 +1,12 @@
 export const CAST_PROTOCOL_VERSION = 1 as const;
 export const CAST_PROTOCOL_NAMESPACE =
   "urn:x-cast:app.cratemusic.crate.v1" as const;
+export const MAX_CAST_QUEUE_ITEMS = 1_000;
+
+const MAX_ID_LENGTH = 160;
+const MAX_TEXT_LENGTH = 512;
+const MAX_URL_LENGTH = 4_096;
+const MAX_CAPABILITIES = 32;
 
 export type CastPreferredMode = "dark" | "light" | "system";
 export type CastResolvedMode = "dark" | "light";
@@ -21,22 +27,34 @@ export interface CastAppearance {
   artworkPalette?: string[];
 }
 
-export interface CastQueueItem {
-  itemId: string;
-  title: string;
-  artist: string;
-  album?: string;
-  artworkUrl?: string;
+export interface CastTrackReference {
+  trackId?: number;
+  trackEntityUid?: string;
+  trackPath?: string;
+}
+
+export interface CastQueueItemResources {
   contentType: string;
   streamUrl: string;
   metadataUrl: string;
+  artworkUrl?: string;
   spectrumUrl?: string;
+}
+
+export interface CastQueueItem {
+  itemId: string;
+  track: CastTrackReference;
+  title: string;
+  artist: string;
+  album?: string;
   duration?: number;
   quality?: string;
+  resources?: CastQueueItemResources;
 }
 
 export interface CastQueueSnapshot {
-  revision: number;
+  queueRevision: number;
+  stateSeq: number;
   currentIndex: number;
   currentTime: number;
   repeatMode: CastRepeatMode;
@@ -54,6 +72,8 @@ export type CastQueueOperation =
 
 interface CastMessageBase {
   version: typeof CAST_PROTOCOL_VERSION;
+  messageId: string;
+  replyTo?: string;
   type: string;
 }
 
@@ -69,15 +89,29 @@ export interface CastReceiverReadyMessage extends CastMessageBase {
 export interface CastQueueReplaceMessage extends CastSessionMessageBase {
   type: "queue.replace";
   mutationId: string;
-  expectedRevision: number;
+  expectedQueueRevision: number;
   queue: CastQueueSnapshot;
 }
 
 export interface CastQueueMutationMessage extends CastSessionMessageBase {
   type: "queue.mutate";
   mutationId: string;
-  expectedRevision: number;
+  expectedQueueRevision: number;
   operation: CastQueueOperation;
+}
+
+export interface CastQueueAcknowledgementMessage
+  extends CastSessionMessageBase {
+  type: "queue.ack";
+  mutationId: string;
+  queueRevision: number;
+  stateSeq: number;
+}
+
+export interface CastQueueSnapshotMessage extends CastSessionMessageBase {
+  type: "queue.snapshot";
+  reason: "conflict" | "reconnect" | "requested" | "updated";
+  queue: CastQueueSnapshot;
 }
 
 export interface CastAppearanceUpdateMessage extends CastSessionMessageBase {
@@ -102,7 +136,8 @@ export interface CastReceiverError {
 
 export interface CastReceiverStatusMessage extends CastSessionMessageBase {
   type: "receiver.status";
-  revision: number;
+  queueRevision: number;
+  stateSeq: number;
   currentIndex: number;
   currentTime: number;
   playerState: CastPlayerState;
@@ -117,8 +152,10 @@ export interface CastSessionStopMessage extends CastSessionMessageBase {
 
 export type CastProtocolMessage =
   | CastAppearanceUpdateMessage
+  | CastQueueAcknowledgementMessage
   | CastQueueMutationMessage
   | CastQueueReplaceMessage
+  | CastQueueSnapshotMessage
   | CastReceiverReadyMessage
   | CastReceiverStatusMessage
   | CastSessionStopMessage;
@@ -136,66 +173,125 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
+function isBoundedString(value: unknown, maxLength: number): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value.length <= maxLength
+  );
+}
+
+function isOptionalBoundedString(
+  value: unknown,
+  maxLength: number,
+): value is string | undefined {
+  return value === undefined || isBoundedString(value, maxLength);
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
-function isNonNegativeNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
-function isOptionalString(value: unknown): value is string | undefined {
-  return value === undefined || typeof value === "string";
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 function isRepeatMode(value: unknown): value is CastRepeatMode {
   return value === "all" || value === "off" || value === "one";
 }
 
-function parseQueueItem(value: unknown): CastQueueItem | null {
+function parseTrackReference(value: unknown): CastTrackReference | null {
+  if (!isRecord(value)) return null;
+  const trackId = value.trackId;
+  const trackEntityUid = value.trackEntityUid;
+  const trackPath = value.trackPath;
+  if (
+    (trackId !== undefined && !isPositiveInteger(trackId)) ||
+    !isOptionalBoundedString(trackEntityUid, MAX_ID_LENGTH) ||
+    !isOptionalBoundedString(trackPath, 2_048) ||
+    (trackId === undefined &&
+      trackEntityUid === undefined &&
+      trackPath === undefined)
+  ) {
+    return null;
+  }
+  return {
+    ...(trackId === undefined ? {} : { trackId }),
+    ...(trackEntityUid === undefined ? {} : { trackEntityUid }),
+    ...(trackPath === undefined ? {} : { trackPath }),
+  };
+}
+
+function parseResources(value: unknown): CastQueueItemResources | null {
   if (!isRecord(value)) return null;
   if (
-    !isNonEmptyString(value.itemId) ||
-    !isNonEmptyString(value.title) ||
-    !isNonEmptyString(value.artist) ||
-    !isNonEmptyString(value.contentType) ||
-    !isNonEmptyString(value.streamUrl) ||
-    !isNonEmptyString(value.metadataUrl) ||
-    !isOptionalString(value.album) ||
-    !isOptionalString(value.artworkUrl) ||
-    !isOptionalString(value.spectrumUrl) ||
-    !isOptionalString(value.quality) ||
+    !isBoundedString(value.contentType, MAX_TEXT_LENGTH) ||
+    !isBoundedString(value.streamUrl, MAX_URL_LENGTH) ||
+    !isBoundedString(value.metadataUrl, MAX_URL_LENGTH) ||
+    !isOptionalBoundedString(value.artworkUrl, MAX_URL_LENGTH) ||
+    !isOptionalBoundedString(value.spectrumUrl, MAX_URL_LENGTH)
+  ) {
+    return null;
+  }
+  return {
+    contentType: value.contentType,
+    streamUrl: value.streamUrl,
+    metadataUrl: value.metadataUrl,
+    ...(value.artworkUrl === undefined ? {} : { artworkUrl: value.artworkUrl }),
+    ...(value.spectrumUrl === undefined
+      ? {}
+      : { spectrumUrl: value.spectrumUrl }),
+  };
+}
+
+function parseQueueItem(value: unknown): CastQueueItem | null {
+  if (!isRecord(value)) return null;
+  const track = parseTrackReference(value.track);
+  const resources =
+    value.resources === undefined ? undefined : parseResources(value.resources);
+  if (
+    !track ||
+    resources === null ||
+    !isBoundedString(value.itemId, MAX_ID_LENGTH) ||
+    !isBoundedString(value.title, MAX_TEXT_LENGTH) ||
+    !isBoundedString(value.artist, MAX_TEXT_LENGTH) ||
+    !isOptionalBoundedString(value.album, MAX_TEXT_LENGTH) ||
+    !isOptionalBoundedString(value.quality, MAX_TEXT_LENGTH) ||
     (value.duration !== undefined && !isNonNegativeNumber(value.duration))
   ) {
     return null;
   }
   return {
     itemId: value.itemId,
+    track,
     title: value.title,
     artist: value.artist,
-    contentType: value.contentType,
-    streamUrl: value.streamUrl,
-    metadataUrl: value.metadataUrl,
     ...(value.album === undefined ? {} : { album: value.album }),
-    ...(value.artworkUrl === undefined ? {} : { artworkUrl: value.artworkUrl }),
-    ...(value.spectrumUrl === undefined
-      ? {}
-      : { spectrumUrl: value.spectrumUrl }),
     ...(value.duration === undefined ? {} : { duration: value.duration }),
     ...(value.quality === undefined ? {} : { quality: value.quality }),
+    ...(resources === undefined ? {} : { resources }),
   };
 }
 
 function parseQueueSnapshot(value: unknown): CastQueueSnapshot | null {
-  if (!isRecord(value) || !Array.isArray(value.items)) return null;
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.items) ||
+    value.items.length > MAX_CAST_QUEUE_ITEMS
+  ) {
+    return null;
+  }
   const items = value.items.map(parseQueueItem);
+  const itemIds = items.map((item) => item?.itemId);
   if (
     items.some((item) => item === null) ||
-    !isNonNegativeInteger(value.revision) ||
+    new Set(itemIds).size !== itemIds.length ||
+    !isNonNegativeInteger(value.queueRevision) ||
+    !isNonNegativeInteger(value.stateSeq) ||
     !isNonNegativeInteger(value.currentIndex) ||
     !isNonNegativeNumber(value.currentTime) ||
     !isRepeatMode(value.repeatMode) ||
@@ -206,7 +302,8 @@ function parseQueueSnapshot(value: unknown): CastQueueSnapshot | null {
     return null;
   }
   return {
-    revision: value.revision,
+    queueRevision: value.queueRevision,
+    stateSeq: value.stateSeq,
     currentIndex: value.currentIndex,
     currentTime: value.currentTime,
     repeatMode: value.repeatMode,
@@ -220,7 +317,7 @@ function parseAppearance(value: unknown): CastAppearance | null {
   const palette = value.artworkPalette;
   if (
     value.contractVersion !== 1 ||
-    !isNonEmptyString(value.skinId) ||
+    !isBoundedString(value.skinId, MAX_ID_LENGTH) ||
     !["dark", "light", "system"].includes(String(value.preferredMode)) ||
     !["dark", "light"].includes(String(value.resolvedMode)) ||
     typeof value.reducedMotion !== "boolean" ||
@@ -245,7 +342,9 @@ function parseAppearance(value: unknown): CastAppearance | null {
 }
 
 function parseQueueOperation(value: unknown): CastQueueOperation | null {
-  if (!isRecord(value) || !isNonEmptyString(value.type)) return null;
+  if (!isRecord(value) || !isBoundedString(value.type, MAX_ID_LENGTH)) {
+    return null;
+  }
   switch (value.type) {
     case "queue.clear":
       return { type: value.type };
@@ -256,12 +355,12 @@ function parseQueueOperation(value: unknown): CastQueueOperation | null {
         : null;
     }
     case "queue.move":
-      return isNonEmptyString(value.itemId) &&
+      return isBoundedString(value.itemId, MAX_ID_LENGTH) &&
         isNonNegativeInteger(value.toIndex)
         ? { type: value.type, itemId: value.itemId, toIndex: value.toIndex }
         : null;
     case "queue.remove":
-      return isNonEmptyString(value.itemId)
+      return isBoundedString(value.itemId, MAX_ID_LENGTH)
         ? { type: value.type, itemId: value.itemId }
         : null;
     case "queue.set-repeat":
@@ -302,7 +401,7 @@ function parseReceiverError(
     !isRecord(value) ||
     !ERROR_CODES.has(value.code as CastReceiverErrorCode) ||
     typeof value.recoverable !== "boolean" ||
-    !isOptionalString(value.itemId) ||
+    !isOptionalBoundedString(value.itemId, MAX_ID_LENGTH) ||
     (value.attempt !== undefined && !isNonNegativeInteger(value.attempt))
   ) {
     return null;
@@ -315,35 +414,56 @@ function parseReceiverError(
   };
 }
 
-function hasSessionEnvelope(
-  value: Record<string, unknown>,
-): value is Record<string, unknown> & { sessionId: string } {
-  return isNonEmptyString(value.sessionId);
+function parseEnvelope(value: Record<string, unknown>) {
+  if (
+    !isBoundedString(value.messageId, MAX_ID_LENGTH) ||
+    !isOptionalBoundedString(value.replyTo, MAX_ID_LENGTH)
+  ) {
+    return null;
+  }
+  return {
+    version: CAST_PROTOCOL_VERSION,
+    messageId: value.messageId,
+    ...(value.replyTo === undefined ? {} : { replyTo: value.replyTo }),
+  };
+}
+
+function parseSessionEnvelope(value: Record<string, unknown>) {
+  const envelope = parseEnvelope(value);
+  if (!envelope || !isBoundedString(value.sessionId, MAX_ID_LENGTH)) {
+    return null;
+  }
+  return { ...envelope, sessionId: value.sessionId };
 }
 
 export function parseCastProtocolMessage(
   value: unknown,
 ): CastProtocolParseResult {
-  if (!isRecord(value) || !isNonEmptyString(value.type)) {
+  if (!isRecord(value) || !isBoundedString(value.type, MAX_ID_LENGTH)) {
     return { ok: false, error: "INVALID_MESSAGE" };
   }
   if (value.version !== CAST_PROTOCOL_VERSION) {
     return { ok: false, error: "UNSUPPORTED_VERSION" };
   }
+  const envelope = parseEnvelope(value);
+  if (!envelope) return { ok: false, error: "INVALID_MESSAGE" };
 
   if (value.type === "receiver.ready") {
     const capabilities = value.capabilities;
     if (
       capabilities !== undefined &&
       (!Array.isArray(capabilities) ||
-        capabilities.some((capability) => !isNonEmptyString(capability)))
+        capabilities.length > MAX_CAPABILITIES ||
+        capabilities.some(
+          (capability) => !isBoundedString(capability, MAX_ID_LENGTH),
+        ))
     ) {
       return { ok: false, error: "INVALID_MESSAGE" };
     }
     return {
       ok: true,
       value: {
-        version: 1,
+        ...envelope,
         type: value.type,
         ...(capabilities === undefined
           ? {}
@@ -354,29 +474,23 @@ export function parseCastProtocolMessage(
 
   const knownSessionType = [
     "appearance.update",
+    "queue.ack",
     "queue.mutate",
     "queue.replace",
+    "queue.snapshot",
     "receiver.status",
     "session.stop",
   ].includes(value.type);
   if (!knownSessionType) {
     return { ok: false, error: "UNKNOWN_MESSAGE_TYPE" };
   }
-  if (!hasSessionEnvelope(value)) {
-    return { ok: false, error: "INVALID_MESSAGE" };
-  }
-  const base = {
-    version: CAST_PROTOCOL_VERSION,
-    sessionId: value.sessionId,
-  };
+  const base = parseSessionEnvelope(value);
+  if (!base) return { ok: false, error: "INVALID_MESSAGE" };
 
   if (value.type === "appearance.update") {
     const appearance = parseAppearance(value.appearance);
     return appearance
-      ? {
-          ok: true,
-          value: { ...base, type: value.type, appearance },
-        }
+      ? { ok: true, value: { ...base, type: value.type, appearance } }
       : { ok: false, error: "INVALID_MESSAGE" };
   }
 
@@ -384,8 +498,8 @@ export function parseCastProtocolMessage(
     const queue = parseQueueSnapshot(value.queue);
     if (
       !queue ||
-      !isNonEmptyString(value.mutationId) ||
-      !isNonNegativeInteger(value.expectedRevision)
+      !isBoundedString(value.mutationId, MAX_ID_LENGTH) ||
+      !isNonNegativeInteger(value.expectedQueueRevision)
     ) {
       return { ok: false, error: "INVALID_MESSAGE" };
     }
@@ -395,7 +509,7 @@ export function parseCastProtocolMessage(
         ...base,
         type: value.type,
         mutationId: value.mutationId,
-        expectedRevision: value.expectedRevision,
+        expectedQueueRevision: value.expectedQueueRevision,
         queue,
       },
     };
@@ -405,8 +519,8 @@ export function parseCastProtocolMessage(
     const operation = parseQueueOperation(value.operation);
     if (
       !operation ||
-      !isNonEmptyString(value.mutationId) ||
-      !isNonNegativeInteger(value.expectedRevision)
+      !isBoundedString(value.mutationId, MAX_ID_LENGTH) ||
+      !isNonNegativeInteger(value.expectedQueueRevision)
     ) {
       return { ok: false, error: "INVALID_MESSAGE" };
     }
@@ -416,8 +530,49 @@ export function parseCastProtocolMessage(
         ...base,
         type: value.type,
         mutationId: value.mutationId,
-        expectedRevision: value.expectedRevision,
+        expectedQueueRevision: value.expectedQueueRevision,
         operation,
+      },
+    };
+  }
+
+  if (value.type === "queue.ack") {
+    if (
+      !isBoundedString(value.mutationId, MAX_ID_LENGTH) ||
+      !isNonNegativeInteger(value.queueRevision) ||
+      !isNonNegativeInteger(value.stateSeq)
+    ) {
+      return { ok: false, error: "INVALID_MESSAGE" };
+    }
+    return {
+      ok: true,
+      value: {
+        ...base,
+        type: value.type,
+        mutationId: value.mutationId,
+        queueRevision: value.queueRevision,
+        stateSeq: value.stateSeq,
+      },
+    };
+  }
+
+  if (value.type === "queue.snapshot") {
+    const queue = parseQueueSnapshot(value.queue);
+    if (
+      !queue ||
+      !["conflict", "reconnect", "requested", "updated"].includes(
+        String(value.reason),
+      )
+    ) {
+      return { ok: false, error: "INVALID_MESSAGE" };
+    }
+    return {
+      ok: true,
+      value: {
+        ...base,
+        type: value.type,
+        reason: value.reason as CastQueueSnapshotMessage["reason"],
+        queue,
       },
     };
   }
@@ -426,7 +581,8 @@ export function parseCastProtocolMessage(
     const error = parseReceiverError(value.error);
     if (
       error === null ||
-      !isNonNegativeInteger(value.revision) ||
+      !isNonNegativeInteger(value.queueRevision) ||
+      !isNonNegativeInteger(value.stateSeq) ||
       !isNonNegativeInteger(value.currentIndex) ||
       !isNonNegativeNumber(value.currentTime) ||
       !PLAYER_STATES.has(value.playerState as CastPlayerState) ||
@@ -439,7 +595,8 @@ export function parseCastProtocolMessage(
       value: {
         ...base,
         type: value.type,
-        revision: value.revision,
+        queueRevision: value.queueRevision,
+        stateSeq: value.stateSeq,
         currentIndex: value.currentIndex,
         currentTime: value.currentTime,
         playerState: value.playerState as CastPlayerState,
@@ -469,6 +626,11 @@ export function parseCastProtocolMessage(
 
 const SECRET_KEY = /(authorization|lease|secret|ticket|token)/i;
 const URL_KEY = /url$/i;
+const SESSION_LEASE_PATH = /(\/api\/cast\/sessions\/)[^/?#]+/gi;
+
+function redactUrl(value: string): string {
+  return value.split(/[?#]/, 1)[0].replace(SESSION_LEASE_PATH, "$1[REDACTED]");
+}
 
 export function redactCastProtocolValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactCastProtocolValue);
@@ -477,7 +639,7 @@ export function redactCastProtocolValue(value: unknown): unknown {
     Object.entries(value).map(([key, entry]) => {
       if (SECRET_KEY.test(key)) return [key, "[REDACTED]"];
       if (URL_KEY.test(key) && typeof entry === "string") {
-        return [key, entry.split(/[?#]/, 1)[0]];
+        return [key, redactUrl(entry)];
       }
       return [key, redactCastProtocolValue(entry)];
     }),

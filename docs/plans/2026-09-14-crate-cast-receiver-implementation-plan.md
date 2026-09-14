@@ -125,6 +125,7 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
 **Files:**
 
 - Create: `app/crate/db/migrations/versions/094_cast_playback_sessions.py`
+- Create: `app/crate/db/migrations/versions/095_harden_cast_playback_sessions.py`
 - Create: `app/crate/db/repositories/cast_sessions.py`
 - Create: `app/tests/test_cast_sessions.py`
 - Modify: `app/crate/api/schemas/cast.py`
@@ -137,7 +138,10 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
    - thirty-minute idle expiry;
    - owner lookup, receiver lookup and revocation;
    - queue JSON persistence with revision compare-and-swap;
+   - persistent mutation idempotency across later queue edits;
    - rejection of duplicate/out-of-order revisions;
+   - a separate monotonic receiver `stateSeq` that alone updates cursor/time;
+   - idempotent revocation and bounded cleanup;
    - `last_used_at` refresh without extending absolute expiry.
 2. Verify RED against the missing repository/table.
 3. Add migration `094` after `093` with:
@@ -147,9 +151,12 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
    - queue JSON, current index/position, repeat/shuffle, revision;
    - created/last-used/expires/revoked timestamps;
    - expiry and user indexes.
-4. Implement repository functions through concrete `crate.db.tx` scopes.
-5. Run migration upgrade/downgrade smoke, repository tests and Ruff.
-6. Commit:
+4. Add migration `095` for persistent mutation ids, payload constraints and
+   the receiver-only `stateSeq`.
+5. Implement repository functions through concrete `crate.db.tx` scopes. A
+   sender queue mutation must never overwrite receiver cursor/time.
+6. Run migration upgrade/downgrade smoke, repository tests and Ruff.
+7. Commit:
 
    ```bash
    git commit -m "feat: persist scoped cast sessions"
@@ -196,7 +203,9 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
 2. Add `PATCH /api/me/cast/sessions/{session_id}` with expected revision.
 3. Add `DELETE /api/me/cast/sessions/{session_id}` to revoke the lease.
 4. Return `409` with the current receiver snapshot on revision conflict.
-5. Run full Cast API tests, Ruff and backend type/lint checks.
+5. Add lease-scoped heartbeat/state and idempotent play-checkpoint endpoints;
+   the receiver is the sole history/scrobble producer while Cast owns playback.
+6. Run full Cast API tests, Ruff and backend type/lint checks.
 6. Commit:
 
    ```bash
@@ -324,6 +333,8 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
 3. Disable Listen's local ended/next transition while receiver authority is
    active.
 4. Map receiver queue state back to the existing player context atomically.
+5. Model one explicit playback authority (`local | cast | connect | jam`) and
+   prevent local restore/tracking from starting while Cast remains active.
 
 ### Task 6.3: Separate Disconnect from Stop Cast
 
@@ -393,6 +404,8 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
 - Modify: `.github/workflows/test-frontend.yml`
 - Modify: `.env.example`
 - Modify: `Makefile`
+- Modify: `scripts/release_manifest.py`
+- Modify: `scripts/deploy-remote.sh`
 - Create: `docs/operators/cast-receiver.md`
 
 ### Task 8.1: Produce and serve an independent receiver image
@@ -425,7 +438,7 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
 
 **Files:**
 
-- Create: `app/crate/db/migrations/versions/095_cast_spectrum_artifacts.py`
+- Create: `app/crate/db/migrations/versions/096_cast_spectrum_artifacts.py`
 - Create: `app/crate/db/repositories/cast_spectrum.py`
 - Create: `app/crate/cast_spectrum.py`
 - Create: `app/crate/worker_handlers/cast_spectrum.py`

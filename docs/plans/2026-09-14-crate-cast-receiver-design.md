@@ -86,10 +86,17 @@ Proposed custom namespace:
 urn:x-cast:app.cratemusic.crate.v1
 ```
 
-The protocol package must contain serialisable types and runtime validation,
-without React or browser dependencies. Every message includes a protocol
-version and message type. Unknown additive fields are ignored; unsupported
-major versions degrade to standard CAF playback.
+The protocol package must contain serialisable types, runtime validation, and
+language-neutral JSON fixtures without React or browser dependencies. Every
+message includes a protocol version, message id, and message type. Replies use
+`replyTo`. Unknown additive fields are ignored; unsupported major versions
+degrade to standard CAF playback.
+
+Queue structure uses a monotonic `queueRevision`. Dynamic receiver state uses
+a separate monotonic `stateSeq`, so progress updates never look like structural
+queue edits. Queue edits receive either `queue.ack` or an authoritative
+`queue.snapshot`; conflict recovery adopts that snapshot before replaying one
+still-valid user intent.
 
 ## Receiver application
 
@@ -204,13 +211,28 @@ expected next revision and returns its effective queue state. On a revision
 conflict, the sender first adopts receiver state, reapplies a still-valid user
 intent once, and does not retry indefinitely.
 
-On reconnect, the sender adopts receiver state before enabling controls. It
+Mutation idempotency is persisted per session rather than remembering only the
+latest mutation. On reconnect, the sender adopts receiver state before enabling controls. It
 must not reload the current item or reset progress. Browser suspension or
 sender closure does not stop playback.
 
 The first two slices support multiple reconnecting instances for the same user
 but not simultaneous collaborative editing. Jam and multi-user conflict
 resolution remain outside scope.
+
+## Playback authority and history
+
+Exactly one runtime may own playback at a time: `local`, `cast`, `connect`, or
+`jam`. Starting Cast performs an explicit handoff and is rejected while a
+locked Jam session cannot yield authority. Restore-on-mount must discover and
+adopt an active Cast session before it considers resuming local audio. Losing a
+receiver never starts local playback automatically.
+
+While the receiver can continue without a sender, it is the sole producer of
+play checkpoints. The backend derives user and track from the scoped lease and
+deduplicates events with an id composed from session id, queue occurrence, and
+play attempt. Sender-side play tracking is disabled while Cast owns authority,
+preventing both missing autonomous plays and duplicate scrobbles.
 
 ## Sender integration
 
