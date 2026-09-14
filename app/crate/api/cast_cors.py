@@ -3,18 +3,30 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
 _CAST_PATH_PREFIX = "/api/cast/"
-_CAST_CORS_HEADERS = {
+_CAST_READ_CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
     "Access-Control-Allow-Headers": "Accept, Range",
     "Access-Control-Expose-Headers": (
-        "Accept-Ranges, Content-Length, Content-Range, Content-Type"
+        "Accept-Ranges, Content-Length, Content-Range, Content-Type, Retry-After, "
+        "X-Crate-Delivery-Policy, X-Crate-Delivery-Effective-Policy, "
+        "X-Crate-Delivery-Format, X-Crate-Delivery-Bitrate, "
+        "X-Crate-Source-Format, X-Crate-Transcoded, X-Crate-Variant-Status"
     ),
     "Access-Control-Max-Age": "600",
 }
+_CAST_WRITE_SUFFIXES = ("/checkpoints", "/state")
 _CAST_CORS_HEADER_NAMES = {
-    name.lower().encode("latin-1") for name in _CAST_CORS_HEADERS
+    name.lower().encode("latin-1") for name in _CAST_READ_CORS_HEADERS
 } | {b"access-control-allow-credentials"}
+
+
+def _cast_cors_headers(path: str) -> dict[str, str]:
+    headers = dict(_CAST_READ_CORS_HEADERS)
+    if path.endswith(_CAST_WRITE_SUFFIXES):
+        headers["Access-Control-Allow-Methods"] = "GET, HEAD, POST, OPTIONS"
+        headers["Access-Control-Allow-Headers"] = "Accept, Content-Type, Range"
+    return headers
 
 
 class CastReceiverCorsMiddleware:
@@ -35,10 +47,9 @@ class CastReceiverCorsMiddleware:
             await self.app(scope, receive, send)
             return
 
+        cors_headers = _cast_cors_headers(scope.get("path", ""))
         if scope.get("method") == "OPTIONS":
-            await Response(status_code=204, headers=_CAST_CORS_HEADERS)(
-                scope, receive, send
-            )
+            await Response(status_code=204, headers=cors_headers)(scope, receive, send)
             return
 
         async def send_with_cast_cors(message: Message) -> None:
@@ -50,7 +61,7 @@ class CastReceiverCorsMiddleware:
                 ]
                 headers.extend(
                     (name.lower().encode("latin-1"), value.encode("latin-1"))
-                    for name, value in _CAST_CORS_HEADERS.items()
+                    for name, value in cors_headers.items()
                 )
                 message["headers"] = headers
             await send(message)

@@ -29,6 +29,11 @@ def trace_app():
         response.headers["X-Trace-ID"] = "downstream"
         return response
 
+    @app.get("/api/cast/sessions/{lease}")
+    def cast_session_route(lease: str):
+        del lease
+        return PlainTextResponse("ok")
+
     return TestClient(app)
 
 
@@ -61,6 +66,19 @@ def test_trace_id_replaces_downstream_header(trace_app):
 
     assert response.status_code == 200
     assert response.headers.get_list("X-Trace-ID") == ["upstream"]
+
+
+def test_trace_logs_redact_cast_session_lease(trace_app, caplog):
+    with caplog.at_level(logging.INFO, logger="crate.api.trace_middleware"):
+        response = trace_app.get("/api/cast/sessions/opaque-lease")
+
+    assert response.status_code == 200
+    assert "opaque-lease" not in caplog.text
+    assert any(
+        record.path == "/api/cast/sessions/[Filtered]"
+        for record in caplog.records
+        if hasattr(record, "path")
+    )
 
 
 def test_generate_trace_id_format():

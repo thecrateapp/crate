@@ -11,6 +11,8 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import sentry_sdk
 
+from crate.observability.redaction import redact_cast_session_lease
+
 _FILTERED = "[Filtered]"
 _DEFAULT_TRACE_SAMPLE_RATE = 0.1
 _SENSITIVE_QUERY_KEYS = {
@@ -157,8 +159,10 @@ def _scrub_value(value: Any, key: str | None = None) -> Any:
     if isinstance(value, tuple):
         return tuple(_scrub_value(item) for item in value)
     if isinstance(value, str):
-        if key in {"url", "query_string"}:
+        if key in {"path", "url", "query_string"}:
             return _scrub_url_or_query(value, is_url=key == "url")
+        if "/api/cast/sessions/" in value:
+            return redact_cast_session_lease(value)
         return value
     return value
 
@@ -173,17 +177,17 @@ def _is_sensitive_key(key: str) -> bool:
 def _scrub_url_or_query(value: str, *, is_url: bool) -> str:
     if is_url:
         parsed = urlsplit(value)
-        if not parsed.query:
-            return value
         return urlunsplit(
             (
                 parsed.scheme,
                 parsed.netloc,
-                parsed.path,
+                redact_cast_session_lease(parsed.path),
                 _scrub_query(parsed.query),
                 parsed.fragment,
             )
         )
+    if "/api/cast/sessions/" in value:
+        return redact_cast_session_lease(value)
     return _scrub_query(value)
 
 

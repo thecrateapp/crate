@@ -7,6 +7,8 @@ import secrets
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from crate.observability.redaction import redact_cast_session_lease
+
 log = logging.getLogger(__name__)
 _TRACE_ID_HEADER = "X-Trace-ID"
 _TRACE_ID_HEADER_BYTES = _TRACE_ID_HEADER.lower().encode("latin-1")
@@ -84,7 +86,10 @@ class TraceMiddleware:
         token = _trace_id_var.set(trace_id)
         log.info(
             "request started",
-            extra={"method": scope.get("method"), "path": scope.get("path")},
+            extra={
+                "method": scope.get("method"),
+                "path": redact_cast_session_lease(str(scope.get("path") or "")),
+            },
         )
 
         async def send_wrapper(message: Message) -> None:

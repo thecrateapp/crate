@@ -52,9 +52,11 @@ def test_sentry_scrubber_redacts_credentials_and_sensitive_query_values():
     event = {
         "request": {
             "url": (
-                "https://api.example.test/api/stream?media_ticket=secret"
+                "https://api.example.test/api/cast/sessions/opaque-lease/"
+                "items/item-1/stream?media_ticket=secret"
                 "&artist=birds-in-row"
             ),
+            "path": "/api/cast/sessions/opaque-lease/items/item-1/stream",
             "headers": {
                 "Authorization": "Bearer secret",
                 "Content-Type": "application/json",
@@ -68,8 +70,12 @@ def test_sentry_scrubber_redacts_credentials_and_sensitive_query_values():
     scrubbed = scrub_sentry_event(event)
 
     assert scrubbed["request"]["url"] == (
-        "https://api.example.test/api/stream?media_ticket=[Filtered]"
+        "https://api.example.test/api/cast/sessions/[Filtered]/items/item-1/stream"
+        "?media_ticket=[Filtered]"
         "&artist=birds-in-row"
+    )
+    assert scrubbed["request"]["path"] == (
+        "/api/cast/sessions/[Filtered]/items/item-1/stream"
     )
     assert scrubbed["request"]["headers"]["Authorization"] == "[Filtered]"
     assert scrubbed["request"]["headers"]["Content-Type"] == "application/json"

@@ -421,9 +421,9 @@ def create_app() -> FastAPI:
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)
+    app.add_middleware(CastReceiverCorsMiddleware)
     install_trace_id_log_record_factory()
     app.add_middleware(TraceMiddleware)
-    app.add_middleware(CastReceiverCorsMiddleware)
 
     from crate.api.setup import router as setup_router
     from crate.api.auth import router as auth_router, admin_router as admin_auth_router
