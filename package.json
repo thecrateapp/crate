@@ -10,6 +10,7 @@
     "test:listen-visual": "playwright test --config=playwright.listen-visual.config.ts"
   },
   "workspaces": [
+    "app/shared/cast",
     "app/shared/ui",
     "app/ui",
     "app/listen",
