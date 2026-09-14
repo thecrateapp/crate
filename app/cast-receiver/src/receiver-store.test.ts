@@ -50,6 +50,37 @@ describe("receiver store", () => {
     });
   });
 
+  it("loads queue and appearance as one session snapshot", () => {
+    const store = createReceiverStore();
+    const appearance = {
+      contractVersion: 1 as const,
+      skinId: "crate-red",
+      preferredMode: "dark" as const,
+      resolvedMode: "dark" as const,
+      reducedMotion: false,
+    };
+
+    store.dispatch({
+      type: "session-loaded",
+      appearance,
+      queue: {
+        queueRevision: 2,
+        stateSeq: 3,
+        currentIndex: 0,
+        currentTime: 16,
+        repeatMode: "off",
+        shuffle: false,
+        items: [],
+      },
+    });
+
+    expect(store.getSnapshot()).toMatchObject({ appearance, queueRevision: 2 });
+    expect(store.progress.getSnapshot()).toEqual({
+      currentTime: 16,
+      duration: 0,
+    });
+  });
+
   it("keeps high-frequency progress outside structural subscriptions", () => {
     const store = createReceiverStore();
     const subscriber = vi.fn();

@@ -1,4 +1,11 @@
-import type { CastPlayerState, CastQueueItem } from "@crate/cast-protocol";
+import type {
+  CastAppearance,
+  CastPlayerState,
+  CastQueueItem,
+  CastQueueSnapshot,
+} from "@crate/cast-protocol";
+
+import { DEFAULT_RECEIVER_APPEARANCE } from "./appearance";
 
 export type ReceiverPhase =
   | "buffering"
@@ -10,6 +17,7 @@ export type ReceiverPhase =
   | "recovering";
 
 export interface ReceiverSnapshot {
+  appearance: CastAppearance;
   currentIndex: number;
   items: CastQueueItem[];
   message: string | null;
@@ -31,6 +39,11 @@ export type ReceiverAction =
       queueRevision: number;
       currentIndex: number;
       items: CastQueueItem[];
+    }
+  | {
+      type: "session-loaded";
+      appearance: CastAppearance;
+      queue: CastQueueSnapshot;
     }
   | { type: "recovering"; message: string }
   | { type: "terminal-error"; message: string };
@@ -71,6 +84,15 @@ function reduce(
       queueRevision: action.queueRevision,
     };
   }
+  if (action.type === "session-loaded") {
+    return {
+      ...snapshot,
+      appearance: action.appearance,
+      currentIndex: action.queue.currentIndex,
+      items: action.queue.items,
+      queueRevision: action.queue.queueRevision,
+    };
+  }
   if (action.type === "recovering") {
     return { ...snapshot, message: action.message, phase: "recovering" };
   }
@@ -94,13 +116,16 @@ function createProgressChannel() {
     },
     subscribe(listener: () => void) {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }
 
 export function createReceiverStore() {
   let snapshot: ReceiverSnapshot = {
+    appearance: DEFAULT_RECEIVER_APPEARANCE,
     currentIndex: 0,
     items: [],
     message: null,
@@ -109,10 +134,18 @@ export function createReceiverStore() {
     sessionId: null,
   };
   const listeners = new Set<() => void>();
+  const progress = createProgressChannel();
   return {
-    progress: createProgressChannel(),
+    progress,
     getSnapshot: () => snapshot,
     dispatch(action: ReceiverAction) {
+      if (action.type === "session-loaded") {
+        const item = action.queue.items[action.queue.currentIndex];
+        progress.set({
+          currentTime: action.queue.currentTime,
+          duration: item?.duration ?? 0,
+        });
+      }
       const next = reduce(snapshot, action);
       if (next === snapshot) return;
       snapshot = next;
@@ -120,7 +153,9 @@ export function createReceiverStore() {
     },
     subscribe(listener: () => void) {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }
