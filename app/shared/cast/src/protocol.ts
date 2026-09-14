@@ -629,7 +629,8 @@ const URL_KEY = /url$/i;
 const SESSION_LEASE_PATH = /(\/api\/cast\/sessions\/)[^/?#]+/gi;
 
 function redactUrl(value: string): string {
-  return value.split(/[?#]/, 1)[0].replace(SESSION_LEASE_PATH, "$1[REDACTED]");
+  const [path = ""] = value.split(/[?#]/, 1);
+  return path.replace(SESSION_LEASE_PATH, "$1[REDACTED]");
 }
 
 export function redactCastProtocolValue(value: unknown): unknown {
