@@ -15,7 +15,7 @@ fn main() {
     let sentry = observability::init_sentry("media-worker");
     if let Err(err) = run() {
         if sentry.is_some() {
-            sentry::capture_message("media worker command failed", sentry::Level::Error);
+            observability::capture_operation_error(err.as_ref(), "command.run", &[]);
         }
         eprintln!("crate-media-worker: {err}");
         drop(sentry);
