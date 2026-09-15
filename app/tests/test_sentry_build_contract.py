@@ -92,3 +92,55 @@ def test_capacitor_builds_embed_runtime_sentry_configuration(
     assert bundle_step["env"]["SENTRY_ORG"] == "ninja-development"
     assert bundle_step["env"]["SENTRY_PROJECT"] == "crate-listen"
     assert bundle_step["env"]["SENTRY_RELEASE"] == "crate-${{ github.sha }}"
+
+
+def test_android_release_uploads_r8_mapping_to_sentry() -> None:
+    root_gradle = (ROOT / "app/listen/android/build.gradle").read_text()
+    app_gradle = (ROOT / "app/listen/android/app/build.gradle").read_text()
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/build-android.yml").read_text()
+    )
+    job = workflow["jobs"]["build-apk"]
+
+    assert "io.sentry:sentry-android-gradle-plugin:6.22.0" in root_gradle
+    assert "apply plugin: 'io.sentry.android.gradle'" in app_gradle
+    assert "includeProguardMapping = true" in app_gradle
+    assert "autoUploadProguardMapping = sentryUploadEnabled" in app_gradle
+    assert "authToken = sentryAuthToken" in app_gradle
+    assert 'org = "ninja-development"' in app_gradle
+    assert 'projectName = "crate-listen"' in app_gradle
+    assert "autoInstallation" in app_gradle
+    assert "enabled = false" in app_gradle
+
+    release_step = next(
+        step
+        for step in job["steps"]
+        if step.get("name") == "Build signed release APK and AAB"
+    )
+    assert (
+        release_step["env"]["SENTRY_AUTH_TOKEN"] == "${{ secrets.SENTRY_AUTH_TOKEN }}"
+    )
+
+
+def test_desktop_release_uploads_native_debug_symbols() -> None:
+    cargo = (ROOT / "app/listen-desktop/src-tauri/Cargo.toml").read_text()
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/build-desktop.yml").read_text()
+    )
+    job = workflow["jobs"]["build-desktop"]
+
+    assert "[profile.release]" in cargo
+    assert 'debug = "line-tables-only"' in cargo
+
+    symbol_step = next(
+        step
+        for step in job["steps"]
+        if step.get("name") == "Upload desktop native debug symbols"
+    )
+    assert symbol_step["if"] == "github.event_name == 'push'"
+    assert symbol_step["env"]["SENTRY_AUTH_TOKEN"] == "${{ secrets.SENTRY_AUTH_TOKEN }}"
+    assert symbol_step["env"]["SENTRY_ORG"] == "ninja-development"
+    assert symbol_step["env"]["SENTRY_PROJECT"] == "crate-listen"
+    assert "sentry-cli debug-files upload" in symbol_step["run"]
+    assert "app/listen-desktop/src-tauri/target" in symbol_step["run"]
+    assert "--wait-for 120" in symbol_step["run"]

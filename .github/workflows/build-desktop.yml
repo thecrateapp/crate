@@ -272,6 +272,19 @@ jobs:
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
         run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
 
+      - name: Upload desktop native debug symbols
+        if: github.event_name == 'push'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-listen
+        run: >-
+          npx --no-install sentry-cli debug-files upload
+          --org "$SENTRY_ORG"
+          --project "$SENTRY_PROJECT"
+          --wait-for 120
+          app/listen-desktop/src-tauri/target
+
       - name: Collect artifacts
         if: runner.os != 'macOS'
         run: app/listen-desktop/scripts/collect-artifacts.sh ${{ matrix.artifact_suffix }}

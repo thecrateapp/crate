@@ -48,3 +48,6 @@ windows = { version = "0.61", features = [
 
 [dev-dependencies]
 sentry = { version = "0.44.0", default-features = false, features = ["test"] }
+
+[profile.release]
+debug = "line-tables-only"

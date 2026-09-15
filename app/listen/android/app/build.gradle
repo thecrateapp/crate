@@ -1,8 +1,15 @@
 apply plugin: 'com.android.application'
+apply plugin: 'io.sentry.android.gradle'
 
 def releaseTaskRequested = gradle.startParameter.taskNames.any {
     it.toLowerCase().contains("release")
 }
+def sentryAuthToken = System.getenv("SENTRY_AUTH_TOKEN")
+def sentryUploadEnabled = (
+    releaseTaskRequested
+        && sentryAuthToken != null
+        && !sentryAuthToken.trim().isEmpty()
+)
 def releaseKeystorePath = System.getenv("CRATE_ANDROID_KEYSTORE_FILE")
 def releaseStorePassword = System.getenv("CRATE_ANDROID_KEYSTORE_PASSWORD")
 def releaseKeyAlias = System.getenv("CRATE_ANDROID_KEY_ALIAS")
@@ -39,6 +46,23 @@ if (releaseTaskRequested) {
         throw new GradleException(
             "Release keystore does not exist: ${releaseKeystorePath}"
         )
+    }
+}
+
+sentry {
+    includeProguardMapping = true
+    autoUploadProguardMapping = sentryUploadEnabled
+    uploadNativeSymbols = false
+    authToken = sentryAuthToken
+    org = "ninja-development"
+    projectName = "crate-listen"
+    telemetry = false
+
+    autoInstallation {
+        enabled = false
+    }
+    tracingInstrumentation {
+        enabled = false
     }
 }
 

@@ -139,6 +139,7 @@ jobs:
       - name: Build signed release APK and AAB
         if: startsWith(github.ref, 'refs/tags/v')
         env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           CRATE_ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/crate-release.jks
           CRATE_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEYSTORE_PASSWORD }}
           CRATE_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
