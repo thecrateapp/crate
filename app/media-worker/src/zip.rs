@@ -271,7 +271,7 @@ fn check_cancelled(cancel_check: Option<&dyn Fn() -> bool>) -> io::Result<()> {
 }
 
 fn validate_name(name: &str) -> io::Result<()> {
-    if name.is_empty() || name.as_bytes().len() > u16::MAX as usize {
+    if name.is_empty() || name.len() > u16::MAX as usize {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "invalid zip entry name",
