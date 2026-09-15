@@ -8,7 +8,8 @@ _CAST_READ_CORS_HEADERS = {
     "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
     "Access-Control-Allow-Headers": "Accept, Range",
     "Access-Control-Expose-Headers": (
-        "Accept-Ranges, Content-Length, Content-Range, Content-Type, Retry-After, "
+        "Accept-Ranges, Cache-Control, Content-Encoding, Content-Length, "
+        "Content-Range, Content-Type, ETag, Retry-After, Vary, "
         "X-Crate-Delivery-Policy, X-Crate-Delivery-Effective-Policy, "
         "X-Crate-Delivery-Format, X-Crate-Delivery-Bitrate, "
         "X-Crate-Source-Format, X-Crate-Transcoded, X-Crate-Variant-Status"

@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from crate.api.auth import _request_base_origin, _require_auth
 from crate.api.browse_media import _playback_headers, _stream_resolved_file
@@ -30,6 +31,10 @@ from crate.db.repositories.cast_sessions import (
     update_cast_session_queue,
     update_cast_session_state,
 )
+from crate.db.repositories.cast_spectrum import (
+    ensure_cast_spectrum_request,
+    mark_cast_spectrum_missing,
+)
 from crate.db.repositories.cast_tickets import (
     CAST_AUTO_POLICY,
     create_cast_ticket,
@@ -42,6 +47,7 @@ from crate.db.repositories.streaming import (
     get_track_delivery_row_by_id,
     get_track_delivery_row_by_path,
 )
+from crate.db.repositories.tasks import create_task_dedup
 from crate.db.repositories.user_library_playback_writes import record_play_event
 from crate.streaming.policy import (
     BALANCED_POLICY,
@@ -50,6 +56,10 @@ from crate.streaming.policy import (
     infer_format,
 )
 from crate.streaming.service import media_type_for_path, resolve_playback
+from crate.cast_spectrum import MEDIA_TYPE as CAST_SPECTRUM_MEDIA_TYPE
+from crate.cast_spectrum import source_fingerprint
+from crate.streaming.paths import resolve_data_file
+from crate.streaming.service import resolve_source_path
 
 router = APIRouter(tags=["cast"])
 
@@ -275,6 +285,12 @@ def _serialise_session_item(
                 "metadata_url": _absolute_cast_route_url(
                     request,
                     "get_cast_session_item",
+                    lease=lease,
+                    item_id=item_id,
+                ),
+                "spectrum_url": _absolute_cast_route_url(
+                    request,
+                    "get_cast_session_item_spectrum",
                     lease=lease,
                     item_id=item_id,
                 ),
@@ -526,6 +542,83 @@ def get_cast_session_item_stream(lease: str, item_id: str):
         extra_headers=_playback_headers(resolution),
         require_auth=False,
     )
+
+
+def _etag_matches(request: Request, etag: str) -> bool:
+    candidates = request.headers.get("if-none-match", "")
+    expected = f'"{etag}"'
+    for candidate in candidates.split(","):
+        normalized = candidate.strip()
+        if normalized == "*":
+            return True
+        if normalized.startswith("W/"):
+            normalized = normalized[2:].strip()
+        if normalized == expected:
+            return True
+    return False
+
+
+def _spectrum_pending_response(*, queued: bool) -> JSONResponse:
+    retry_after = 2
+    status = "pending" if queued else "generating"
+    return JSONResponse(
+        status_code=202 if queued else 425,
+        content={"status": status, "retry_after": retry_after},
+        headers={"Retry-After": str(retry_after), "Cache-Control": "no-store"},
+    )
+
+
+@router.api_route(
+    "/api/cast/sessions/{lease}/items/{item_id}/spectrum",
+    methods=["GET", "HEAD"],
+    responses=_CAST_PUBLIC_RESPONSES,
+    summary="Get or lazily prepare a scoped Cast spectrum artefact",
+    name="get_cast_session_item_spectrum",
+)
+def get_cast_session_item_spectrum(request: Request, lease: str, item_id: str):
+    _session, _item, track = _session_item_and_track_or_404(lease, item_id)
+    track_id = track.get("id")
+    source_path = resolve_source_path(track)
+    if (
+        not isinstance(track_id, int)
+        or source_path is None
+        or not source_path.is_file()
+    ):
+        raise HTTPException(status_code=404, detail="Spectrum source not found")
+
+    fingerprint = source_fingerprint(track, source_path)
+    artifact = ensure_cast_spectrum_request(track_id, fingerprint)
+    if artifact["status"] == "ready":
+        artifact_path = resolve_data_file(artifact.get("artifact_path"))
+        if artifact_path is not None and artifact_path.is_file():
+            etag = str(artifact["artifact_etag"])
+            headers = {
+                "Cache-Control": "private, max-age=31536000, immutable",
+                "Content-Encoding": "gzip",
+                "ETag": f'"{etag}"',
+                "Vary": "Accept-Encoding",
+            }
+            if _etag_matches(request, etag):
+                return Response(status_code=304, headers=headers)
+            return FileResponse(
+                artifact_path,
+                media_type=CAST_SPECTRUM_MEDIA_TYPE,
+                headers=headers,
+            )
+        mark_cast_spectrum_missing(track_id, fingerprint)
+        artifact = {"status": "pending", "should_enqueue": True}
+
+    if artifact["status"] == "failed":
+        raise HTTPException(status_code=404, detail="Spectrum artefact unavailable")
+
+    if artifact.get("should_enqueue"):
+        task_id = create_task_dedup(
+            "generate_cast_spectrum",
+            {"track_id": track_id, "source_fingerprint": fingerprint},
+            f"{track_id}:{fingerprint}",
+        )
+        return _spectrum_pending_response(queued=task_id is not None)
+    return _spectrum_pending_response(queued=False)
 
 
 @router.patch(

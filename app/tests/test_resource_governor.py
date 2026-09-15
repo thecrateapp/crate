@@ -95,6 +95,30 @@ def test_resource_governor_allows_non_governed_tasks_without_sampling(monkeypatc
     assert decision.allowed is True
 
 
+def test_cast_spectrum_is_governed_without_deferring_for_its_active_listener(
+    monkeypatch,
+):
+    from crate import resource_governor as governor
+
+    calls: list[tuple[str, bool]] = []
+    monkeypatch.setattr(
+        governor,
+        "evaluate_resources",
+        lambda *, label, listener_sensitive: (
+            calls.append((label, listener_sensitive))
+            or governor.ResourceDecision(allowed=True)
+        ),
+    )
+
+    decision = governor.should_defer_task("generate_cast_spectrum")
+
+    assert decision.allowed is True
+    assert "generate_cast_spectrum" in governor.RESOURCE_GOVERNED_TASK_TYPES
+    assert "generate_cast_spectrum" in governor.AUDIO_HEAVY_TASK_TYPES
+    assert "generate_cast_spectrum" not in governor.MAINTENANCE_WINDOW_TASK_TYPES
+    assert calls == [("generate_cast_spectrum", False)]
+
+
 def test_resource_governor_can_be_bypassed_per_task(monkeypatch):
     from crate import resource_governor as governor
 

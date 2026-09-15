@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import gzip
 from types import SimpleNamespace
 
 
@@ -73,6 +74,10 @@ def test_cast_session_metrics_never_use_lease_or_item_cardinality():
     assert (
         _normalize_path("/api/cast/sessions/opaque-lease/items/private-item/stream")
         == "/api/cast/sessions/{lease}/items/{item_id}/stream"
+    )
+    assert (
+        _normalize_path("/api/cast/sessions/opaque-lease/items/private-item/spectrum")
+        == "/api/cast/sessions/{lease}/items/{item_id}/spectrum"
     )
     assert _normalize_path("/api/cast/sessions/opaque-lease/state") == (
         "/api/cast/sessions/{lease}/state"
@@ -147,6 +152,10 @@ def test_create_cast_session_resolves_queue_and_returns_scoped_urls(
     assert data["queue"]["items"][0]["artwork_url"] == (
         "https://cast-api.example.test/api/cast/sessions/opaque-lease/"
         "items/item-1/artwork"
+    )
+    assert data["queue"]["items"][0]["spectrum_url"] == (
+        "https://cast-api.example.test/api/cast/sessions/opaque-lease/"
+        "items/item-1/spectrum"
     )
     assert data["queue"]["items"][0]["content_type"] == "audio/mp4"
     assert calls["user_id"] == 1
@@ -480,3 +489,135 @@ def test_cast_session_public_routes_allow_receiver_cors_preflight(test_app):
     assert (
         "content-type" in write_response.headers["access-control-allow-headers"].lower()
     )
+
+
+def _prepare_spectrum_request(tmp_path, monkeypatch, artifact: dict) -> None:
+    source = tmp_path / "track.flac"
+    source.write_bytes(b"audio-source")
+    monkeypatch.setattr(
+        "crate.api.cast.touch_cast_session", lambda _lease: _stored_session()
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.get_track_delivery_row_by_id", lambda _track_id: _track()
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.resolve_source_path", lambda _track: source, raising=False
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.source_fingerprint",
+        lambda _track, _source: "a" * 64,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.ensure_cast_spectrum_request",
+        lambda _track_id, _fingerprint: dict(artifact),
+        raising=False,
+    )
+
+
+def test_cast_session_spectrum_serves_ready_immutable_artifact_with_etag(
+    tmp_path, test_app, monkeypatch
+):
+    artifact_file = tmp_path / "spectrum.crsp.gz"
+    artifact_file.write_bytes(gzip.compress(b"CRSP-payload", mtime=0))
+    _prepare_spectrum_request(
+        tmp_path,
+        monkeypatch,
+        {
+            "status": "ready",
+            "artifact_path": "cast-spectrum/aa/spectrum.crsp.gz",
+            "artifact_etag": "etag-1",
+            "should_enqueue": False,
+        },
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.resolve_data_file", lambda _path: artifact_file, raising=False
+    )
+
+    response = test_app.get(
+        "/api/cast/sessions/opaque-lease/items/item-1/spectrum",
+        headers={"Origin": "https://receiver.example.test"},
+    )
+    not_modified = test_app.get(
+        "/api/cast/sessions/opaque-lease/items/item-1/spectrum",
+        headers={"If-None-Match": 'W/"etag-1"'},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "application/vnd.crate.cast-spectrum"
+    )
+    assert response.headers["content-encoding"] == "gzip"
+    assert response.headers["etag"] == '"etag-1"'
+    assert response.headers["cache-control"] == "private, max-age=31536000, immutable"
+    exposed = response.headers["access-control-expose-headers"].lower()
+    assert "etag" in exposed
+    assert "content-encoding" in exposed
+    assert not_modified.status_code == 304
+    assert not_modified.content == b""
+
+
+def test_cast_session_spectrum_lazily_queues_once_and_reports_generation_state(
+    tmp_path, test_app, monkeypatch
+):
+    queued: list[tuple[str, dict, str]] = []
+    _prepare_spectrum_request(
+        tmp_path,
+        monkeypatch,
+        {"status": "pending", "should_enqueue": True},
+    )
+
+    def create_task(task_type: str, params: dict, dedup_key: str):
+        queued.append((task_type, params, dedup_key))
+        return "task-1"
+
+    monkeypatch.setattr("crate.api.cast.create_task_dedup", create_task, raising=False)
+
+    response = test_app.get("/api/cast/sessions/opaque-lease/items/item-1/spectrum")
+
+    assert response.status_code == 202
+    assert response.headers["retry-after"] == "2"
+    assert response.json() == {"status": "pending", "retry_after": 2}
+    assert queued == [
+        (
+            "generate_cast_spectrum",
+            {"track_id": 7, "source_fingerprint": "a" * 64},
+            f"7:{'a' * 64}",
+        )
+    ]
+
+
+def test_cast_session_spectrum_reports_existing_generation_without_requeue(
+    tmp_path, test_app, monkeypatch
+):
+    _prepare_spectrum_request(
+        tmp_path,
+        monkeypatch,
+        {"status": "generating", "should_enqueue": False},
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.create_task_dedup",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("generating artefact must not be requeued")
+        ),
+        raising=False,
+    )
+
+    response = test_app.get("/api/cast/sessions/opaque-lease/items/item-1/spectrum")
+
+    assert response.status_code == 425
+    assert response.headers["retry-after"] == "2"
+
+
+def test_cast_session_spectrum_rejects_items_outside_scoped_queue(
+    test_app, monkeypatch
+):
+    monkeypatch.setattr(
+        "crate.api.cast.touch_cast_session", lambda _lease: _stored_session()
+    )
+
+    response = test_app.get(
+        "/api/cast/sessions/opaque-lease/items/not-in-queue/spectrum"
+    )
+
+    assert response.status_code == 404

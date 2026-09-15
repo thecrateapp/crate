@@ -22,6 +22,10 @@ _PATH_NORMALIZERS = [
         "/api/cast/sessions/{lease}/items/{item_id}/stream",
     ),
     (
+        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/spectrum"),
+        "/api/cast/sessions/{lease}/items/{item_id}/spectrum",
+    ),
+    (
         re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+"),
         "/api/cast/sessions/{lease}/items/{item_id}",
     ),

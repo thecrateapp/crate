@@ -731,6 +731,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "cleanup_stream_variants",
         ),
     ),
+    (
+        "crate.worker_handlers.cast_spectrum",
+        "CAST_SPECTRUM_TASK_HANDLERS",
+        ("generate_cast_spectrum",),
+    ),
 )
 
 
