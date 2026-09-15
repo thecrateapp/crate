@@ -120,6 +120,7 @@ services:
       - CRATE_RUNTIME=api
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - CRATE_CAST_PUBLIC_BASE_URL=${CRATE_CAST_PUBLIC_BASE_URL:-}
+      - CRATE_CAST_RECEIVER_APP_ID=${CRATE_CAST_RECEIVER_APP_ID:-CC1AD845}
       - SENTRY_DSN=${SENTRY_API_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -644,6 +645,27 @@ services:
     mem_reservation: 64m
     cpus: "0.25"
 
+  cast-receiver:
+    build:
+      context: ./app
+      dockerfile: cast-receiver/Dockerfile
+      args:
+        VITE_SENTRY_DSN: ${SENTRY_CAST_RECEIVER_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
+        VITE_SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE:-0.05}
+    container_name: crate-dev-cast-receiver
+    ports:
+      - "${CRATE_CAST_RECEIVER_PORT:-8591}:80"
+    networks:
+      - crate-dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   caddy:
     image: caddy:2-alpine
     container_name: crate-dev-caddy
@@ -668,6 +690,7 @@ services:
       - crate-dev
     depends_on:
       - api
+      - cast-receiver
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

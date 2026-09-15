@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       images:
-        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,docs,site or all)"
+        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,cast-receiver,docs,site or all)"
         default: "all"
 
 env:
@@ -32,6 +32,7 @@ jobs:
       media_worker: ${{ steps.filter.outputs.media_worker }}
       ui: ${{ steps.filter.outputs.ui }}
       listen: ${{ steps.filter.outputs.listen }}
+      cast_receiver: ${{ steps.filter.outputs.cast_receiver }}
       site: ${{ steps.filter.outputs.site }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
@@ -421,6 +422,51 @@ jobs:
             VITE_SENTRY_DSN=${{ vars.SENTRY_LISTEN_DSN }}
             VITE_SENTRY_ENVIRONMENT=production
             VITE_SENTRY_RELEASE=crate-${{ github.sha }}
+            VITE_CAST_CUSTOM_RECEIVER_ENABLED=${{ vars.CAST_CUSTOM_RECEIVER_ENABLED || 'false' }}
+            VITE_CAST_RECEIVER_APP_ID=${{ vars.CAST_RECEIVER_APP_ID || 'CC1AD845' }}
+
+  build-cast-receiver:
+    needs: changes
+    if: needs.changes.outputs.cast_receiver == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-cast-receiver
+          tags: |
+            type=sha,prefix=,format=long
+
+      - uses: docker/build-push-action@v7
+        id: build
+        with:
+          context: ./app
+          file: ./app/cast-receiver/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=cast-receiver
+          cache-to: type=gha,scope=cast-receiver,mode=max
+          build-args: |
+            VITE_SENTRY_DSN=${{ vars.SENTRY_CAST_RECEIVER_DSN }}
+            VITE_SENTRY_ENVIRONMENT=production
+            VITE_SENTRY_RELEASE=cast-receiver-${{ github.sha }}
+            VITE_SENTRY_TRACES_SAMPLE_RATE=${{ vars.SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE || '0.05' }}
 
   build-docs:
     needs: changes
@@ -514,6 +560,7 @@ jobs:
       - build-media-worker
       - build-ui
       - build-listen
+      - build-cast-receiver
       - build-site
       - build-docs
     if: always() && needs.changes.result == 'success'
@@ -533,6 +580,7 @@ jobs:
       CHANGED_MEDIA_WORKER: ${{ needs.changes.outputs.media_worker }}
       CHANGED_UI: ${{ needs.changes.outputs.ui }}
       CHANGED_LISTEN: ${{ needs.changes.outputs.listen }}
+      CHANGED_CAST_RECEIVER: ${{ needs.changes.outputs.cast_receiver }}
       CHANGED_SITE: ${{ needs.changes.outputs.site }}
       CHANGED_DOCS: ${{ needs.changes.outputs.docs }}
       RESULT_API: ${{ needs['build-api'].result }}
@@ -543,6 +591,7 @@ jobs:
       RESULT_MEDIA_WORKER: ${{ needs['build-media-worker'].result }}
       RESULT_UI: ${{ needs['build-ui'].result }}
       RESULT_LISTEN: ${{ needs['build-listen'].result }}
+      RESULT_CAST_RECEIVER: ${{ needs['build-cast-receiver'].result }}
       RESULT_SITE: ${{ needs['build-site'].result }}
       RESULT_DOCS: ${{ needs['build-docs'].result }}
       DIGEST_API: ${{ needs['build-api'].outputs.digest }}
@@ -553,6 +602,7 @@ jobs:
       DIGEST_MEDIA_WORKER: ${{ needs['build-media-worker'].outputs.digest }}
       DIGEST_UI: ${{ needs['build-ui'].outputs.digest }}
       DIGEST_LISTEN: ${{ needs['build-listen'].outputs.digest }}
+      DIGEST_CAST_RECEIVER: ${{ needs['build-cast-receiver'].outputs.digest }}
       DIGEST_SITE: ${{ needs['build-site'].outputs.digest }}
       DIGEST_DOCS: ${{ needs['build-docs'].outputs.digest }}
     steps:
@@ -586,6 +636,7 @@ jobs:
           check_result media-worker "$CHANGED_MEDIA_WORKER" "$RESULT_MEDIA_WORKER"
           check_result ui "$CHANGED_UI" "$RESULT_UI"
           check_result listen "$CHANGED_LISTEN" "$RESULT_LISTEN"
+          check_result cast-receiver "$CHANGED_CAST_RECEIVER" "$RESULT_CAST_RECEIVER"
           check_result site "$CHANGED_SITE" "$RESULT_SITE"
           check_result docs "$CHANGED_DOCS" "$RESULT_DOCS"
 
@@ -615,6 +666,7 @@ jobs:
           [[ "$CHANGED_MEDIA_WORKER" == "true" ]] && digest_args+=(--digest "media-worker=$DIGEST_MEDIA_WORKER")
           [[ "$CHANGED_UI" == "true" ]] && digest_args+=(--digest "ui=$DIGEST_UI")
           [[ "$CHANGED_LISTEN" == "true" ]] && digest_args+=(--digest "listen=$DIGEST_LISTEN")
+          [[ "$CHANGED_CAST_RECEIVER" == "true" ]] && digest_args+=(--digest "cast-receiver=$DIGEST_CAST_RECEIVER")
           [[ "$CHANGED_SITE" == "true" ]] && digest_args+=(--digest "site=$DIGEST_SITE")
           [[ "$CHANGED_DOCS" == "true" ]] && digest_args+=(--digest "docs=$DIGEST_DOCS")
 
@@ -681,6 +733,7 @@ jobs:
           promote_latest "$CHANGED_MEDIA_WORKER" crate-media-worker "$DIGEST_MEDIA_WORKER"
           promote_latest "$CHANGED_UI" crate-ui "$DIGEST_UI"
           promote_latest "$CHANGED_LISTEN" crate-listen "$DIGEST_LISTEN"
+          promote_latest "$CHANGED_CAST_RECEIVER" crate-cast-receiver "$DIGEST_CAST_RECEIVER"
           promote_latest "$CHANGED_SITE" crate-site "$DIGEST_SITE"
           promote_latest "$CHANGED_DOCS" crate-docs "$DIGEST_DOCS"
 

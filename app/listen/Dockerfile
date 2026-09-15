@@ -26,9 +26,18 @@ RUN rm -rf /app-shared/shared/ui/node_modules && ln -s /app/node_modules /app-sh
 ARG VITE_SENTRY_DSN=
 ARG VITE_SENTRY_ENVIRONMENT=production
 ARG VITE_SENTRY_RELEASE=
+ARG VITE_CAST_CUSTOM_RECEIVER_ENABLED=false
+ARG VITE_CAST_RECEIVER_APP_ID=CC1AD845
+RUN if [ "$VITE_CAST_CUSTOM_RECEIVER_ENABLED" = "true" ]; then \
+      printf '%s' "$VITE_CAST_RECEIVER_APP_ID" | grep -Eq '^[A-Za-z0-9]{8}$' \
+        && [ "$VITE_CAST_RECEIVER_APP_ID" != "CC1AD845" ] \
+        || { echo 'A registered VITE_CAST_RECEIVER_APP_ID is required when custom Cast is enabled' >&2; exit 1; }; \
+    fi
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
     VITE_SENTRY_ENVIRONMENT=$VITE_SENTRY_ENVIRONMENT \
-    VITE_SENTRY_RELEASE=$VITE_SENTRY_RELEASE
+    VITE_SENTRY_RELEASE=$VITE_SENTRY_RELEASE \
+    VITE_CAST_CUSTOM_RECEIVER_ENABLED=$VITE_CAST_CUSTOM_RECEIVER_ENABLED \
+    VITE_CAST_RECEIVER_APP_ID=$VITE_CAST_RECEIVER_APP_ID
 # Skip tsc typecheck in Docker (CI handles it separately).
 RUN npx vite build
 

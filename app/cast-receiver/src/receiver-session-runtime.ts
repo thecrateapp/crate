@@ -17,6 +17,7 @@ import {
   type ReceiverStateUpdate,
 } from "./receiver-client";
 import type { ReceiverPhase, ReceiverStore } from "./receiver-store";
+import type { ReceiverTelemetry } from "./sentry";
 
 interface ReceiverSessionRuntimeOptions {
   store: ReceiverStore;
@@ -34,6 +35,7 @@ interface ReceiverSessionRuntimeOptions {
   makeMessageId?: () => string;
   retryCurrentItem?: () => boolean;
   skipCurrentItem?: () => boolean;
+  telemetry?: ReceiverTelemetry;
 }
 
 interface ActiveSession {
@@ -69,6 +71,7 @@ export function createReceiverSessionRuntime({
   makeMessageId = () => crypto.randomUUID(),
   retryCurrentItem = () => false,
   skipCurrentItem = () => false,
+  telemetry = { captureError: () => undefined, metric: () => undefined },
 }: ReceiverSessionRuntimeOptions) {
   let active: ActiveSession | null = null;
   let checkpoint: ActiveCheckpoint | null = null;
@@ -193,12 +196,18 @@ export function createReceiverSessionRuntime({
       if (current) beginCheckpoint(current.itemId, session.queue.currentTime);
       sendQueueSnapshot(session);
       sendStatus();
-    } catch {
+      telemetry.metric("receiver.session_load", { outcome: "success" });
+    } catch (error) {
       if (generation !== loadGeneration) return;
       store.dispatch({
         type: "terminal-error",
         message: "Playback unavailable",
       });
+      telemetry.metric("receiver.session_load", { outcome: "error" });
+      telemetry.captureError(
+        error instanceof Error ? error : new Error("CAST_SESSION_UNAVAILABLE"),
+        "session_load",
+      );
       sendStatus();
     }
   }
@@ -213,7 +222,13 @@ export function createReceiverSessionRuntime({
         activeAtStart.sessionId,
       );
       if (generation !== loadGeneration || active !== activeAtStart) return;
-      if (session.queue.queueRevision <= store.getSnapshot().queueRevision) {
+      if (session.queue.queueRevision < store.getSnapshot().queueRevision) {
+        telemetry.metric("receiver.queue_conflict", {
+          outcome: "stale_snapshot",
+        });
+        return;
+      }
+      if (session.queue.queueRevision === store.getSnapshot().queueRevision) {
         return;
       }
       const previousProgress = store.progress.getSnapshot();
@@ -238,11 +253,17 @@ export function createReceiverSessionRuntime({
       }
       sendQueueSnapshot(session, "updated");
       sendStatus();
-    } catch {
+      telemetry.metric("receiver.queue_refresh", { outcome: "success" });
+    } catch (error) {
       store.dispatch({
         type: "recovering",
         message: "Refreshing the Cast queue",
       });
+      telemetry.metric("receiver.queue_refresh", { outcome: "error" });
+      telemetry.captureError(
+        error instanceof Error ? error : new Error("CAST_QUEUE_REFRESH_FAILED"),
+        "queue_refresh",
+      );
       sendStatus();
     }
   }
@@ -280,6 +301,10 @@ export function createReceiverSessionRuntime({
     const itemId =
       store.getSnapshot().items[store.getSnapshot().currentIndex]?.itemId;
     if (mediaAttempts <= 2 && retryCurrentItem()) {
+      telemetry.metric("receiver.media_retry", {
+        attempt: mediaAttempts,
+        outcome: "retry",
+      });
       store.dispatch({ type: "recovering", message: "Retrying media" });
       sendStatus({
         code: "MEDIA_RETRYING",
@@ -296,6 +321,7 @@ export function createReceiverSessionRuntime({
     finishCheckpoint(false);
     const canSkip = consecutiveFailedItems < 3 && skipCurrentItem();
     if (canSkip) {
+      telemetry.metric("receiver.media_skip", { outcome: "skip" });
       store.dispatch({
         type: "recovering",
         message: "Skipping unavailable media",
@@ -312,6 +338,7 @@ export function createReceiverSessionRuntime({
       type: "terminal-error",
       message: "Unable to play this item",
     });
+    telemetry.metric("receiver.media_terminal", { outcome: "error" });
     sendStatus({
       code: "MEDIA_FAILED",
       recoverable: false,

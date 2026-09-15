@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "app/shared/**"
+      - "app/cast-receiver/**"
       - "app/ui/**"
       - "app/listen/**"
       - "app/listen-desktop/**"
@@ -20,6 +21,7 @@ on:
     types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "app/shared/**"
+      - "app/cast-receiver/**"
       - "app/ui/**"
       - "app/listen/**"
       - "app/listen-desktop/**"
@@ -34,7 +36,6 @@ on:
 
 jobs:
   test:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -54,6 +55,32 @@ jobs:
 
       - name: Test shared UI (@crate/ui)
         run: npm run --workspace=@crate/ui test
+
+      - name: Type check Cast protocol
+        run: npm run --workspace=app/shared/cast typecheck
+
+      - name: Test Cast protocol
+        run: npm run --workspace=app/shared/cast test
+
+      - name: Type check Cast receiver
+        run: npm run --workspace=app/cast-receiver typecheck
+
+      - name: Test Cast receiver
+        run: npm run --workspace=app/cast-receiver test
+
+      - name: Build Cast receiver and upload Sentry source maps
+        env:
+          SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-cast-receiver
+          SENTRY_RELEASE: cast-receiver-${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_CAST_RECEIVER_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_SENTRY_RELEASE: cast-receiver-${{ github.sha }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE || '0.05' }}
+        run: |
+          npm run --workspace=app/cast-receiver build
+          npm run --workspace=app/cast-receiver check:bundle
 
       - name: Type check admin UI
         run: npm run --workspace=app/ui typecheck
@@ -108,7 +135,6 @@ jobs:
         run: npm run --workspace=app/listen-desktop test
 
   appearance-chromium:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

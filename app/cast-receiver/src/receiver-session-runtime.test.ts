@@ -53,6 +53,10 @@ function setup() {
   const loadSession = vi.fn(async () => session);
   const retryCurrentItem = vi.fn(() => true);
   const skipCurrentItem = vi.fn(() => true);
+  const telemetry = {
+    captureError: vi.fn(),
+    metric: vi.fn(),
+  };
   let nowMs = Date.parse("2026-09-14T12:00:00.000Z");
   const runtime = createReceiverSessionRuntime({
     store,
@@ -64,6 +68,7 @@ function setup() {
     makeMessageId: () => "message-1",
     retryCurrentItem,
     skipCurrentItem,
+    telemetry,
   });
   return {
     advance(ms: number) {
@@ -77,12 +82,13 @@ function setup() {
     sendProtocolMessage,
     skipCurrentItem,
     store,
+    telemetry,
   };
 }
 
 describe("receiver session runtime", () => {
   it("loads the scoped queue and announces a receiver-owned snapshot", async () => {
-    const { runtime, sendProtocolMessage, store } = setup();
+    const { runtime, sendProtocolMessage, store, telemetry } = setup();
 
     await runtime.load(loadData);
 
@@ -100,6 +106,9 @@ describe("receiver session runtime", () => {
         queue: session.queue,
       }),
     );
+    expect(telemetry.metric).toHaveBeenCalledWith("receiver.session_load", {
+      outcome: "success",
+    });
     expect(sendProtocolMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "receiver.status",
@@ -180,7 +189,8 @@ describe("receiver session runtime", () => {
   });
 
   it("ignores an out-of-order queue refresh", async () => {
-    const { loadSession, runtime, sendProtocolMessage, store } = setup();
+    const { loadSession, runtime, sendProtocolMessage, store, telemetry } =
+      setup();
     await runtime.load(loadData);
     sendProtocolMessage.mockClear();
     loadSession.mockResolvedValueOnce({
@@ -204,6 +214,9 @@ describe("receiver session runtime", () => {
       ],
     });
     expect(sendProtocolMessage).not.toHaveBeenCalled();
+    expect(telemetry.metric).toHaveBeenCalledWith("receiver.queue_conflict", {
+      outcome: "stale_snapshot",
+    });
   });
 
   it("records one idempotent checkpoint when CAF advances the queue", async () => {
@@ -266,6 +279,7 @@ describe("receiver session runtime", () => {
       sendProtocolMessage,
       skipCurrentItem,
       store,
+      telemetry,
     } = setup();
     await runtime.load(loadData);
 
@@ -296,5 +310,31 @@ describe("receiver session runtime", () => {
       phase: "error",
       message: "Unable to play this item",
     });
+    expect(telemetry.metric).toHaveBeenCalledWith("receiver.media_retry", {
+      attempt: 1,
+      outcome: "retry",
+    });
+    expect(telemetry.metric).toHaveBeenCalledWith("receiver.media_skip", {
+      outcome: "skip",
+    });
+    expect(telemetry.metric).toHaveBeenCalledWith("receiver.media_terminal", {
+      outcome: "error",
+    });
+  });
+
+  it("reports a failed scoped session load without exposing its URL", async () => {
+    const { loadSession, runtime, telemetry } = setup();
+    const error = new Error("CAST_SESSION_UNAVAILABLE");
+    loadSession.mockRejectedValueOnce(error);
+
+    await runtime.load(loadData);
+
+    expect(telemetry.metric).toHaveBeenCalledWith("receiver.session_load", {
+      outcome: "error",
+    });
+    expect(telemetry.captureError).toHaveBeenCalledWith(error, "session_load");
+    expect(JSON.stringify(telemetry.captureError.mock.calls)).not.toContain(
+      "private-lease",
+    );
   });
 });
