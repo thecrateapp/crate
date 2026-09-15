@@ -29,7 +29,6 @@ export function SpectrumCanvas({
   const rendererRef = useRef<SpectrumRenderer | null>(null);
   const playing = phase === "playing";
   const playbackStateRef = useRef({ playing, reducedMotion });
-  playbackStateRef.current = { playing, reducedMotion };
   const spectrumUrl = item.resources?.spectrumUrl;
 
   useEffect(() => {
@@ -70,7 +69,9 @@ export function SpectrumCanvas({
   }, [client, item.itemId, progress, rendererFactory, spectrumUrl]);
 
   useEffect(() => {
-    rendererRef.current?.setPlaybackState({ playing, reducedMotion });
+    const playbackState = { playing, reducedMotion };
+    playbackStateRef.current = playbackState;
+    rendererRef.current?.setPlaybackState(playbackState);
   }, [playing, reducedMotion]);
 
   return (
