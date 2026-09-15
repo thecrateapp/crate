@@ -121,3 +121,25 @@ def test_production_app_registers_trace_middleware_outermost():
     middleware = [entry.cls for entry in app.user_middleware]
 
     assert middleware[0] is TraceMiddleware
+
+
+def test_trace_middleware_reports_returned_5xx_responses(monkeypatch):
+    captured: list[dict] = []
+    monkeypatch.setattr(
+        "crate.observability.sentry.capture_handled_http_error",
+        lambda **kwargs: captured.append(kwargs),
+        raising=False,
+    )
+
+    app = FastAPI()
+    app.add_middleware(TraceMiddleware)
+
+    @app.get("/handled")
+    def handled_error():
+        return PlainTextResponse("failed", status_code=500)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/handled?secret=ignored")
+
+    assert response.status_code == 500
+    assert captured == [{"method": "GET", "route": "/handled", "status_code": 500}]

@@ -759,6 +759,16 @@ def _execute_task(task_type: str, task_id: str):
             error = str(result.get("error") or "Task failed")[:500]
             update_task(task_id, status="failed", result=result, error=error)
             log.warning("Task %s (%s) failed: %s", task_id, task_type, error)
+            from crate.observability.sentry import capture_task_failure
+
+            capture_task_failure(
+                task_type=task_type,
+                task_id=task_id,
+                queue=get_queue_for_task(task_type),
+                error=error,
+                retry_count=int(task.get("retry_count") or 0),
+                max_retries=int(task.get("max_retries") or 0),
+            )
             _try_fan_in_parent(task, task_type, task_id)
             try:
                 from crate.metrics import record as _record
@@ -831,7 +841,17 @@ def _execute_task(task_type: str, task_id: str):
             _try_fan_in_parent(task, task_type, task_id)
 
     except Exception as e:
-        log.exception("Task %s (%s) failed", task_id, task_type)
+        from crate.observability.sentry import capture_task_exception
+
+        capture_task_exception(
+            e,
+            task_type=task_type,
+            task_id=task_id,
+            queue=get_queue_for_task(task_type),
+            retry_count=int(task.get("retry_count") or 0),
+            max_retries=int(task.get("max_retries") or 0),
+        )
+        log.warning("Task %s (%s) failed", task_id, task_type, exc_info=True)
         try:
             from crate.metrics import record as _record
 
@@ -875,7 +895,19 @@ def _execute_task(task_type: str, task_id: str):
     except BaseException as e:
         if e.__class__.__name__ != "TimeLimitExceeded":
             raise
-        log.exception("Task %s (%s) exceeded time limit", task_id, task_type)
+        from crate.observability.sentry import capture_task_exception
+
+        capture_task_exception(
+            e,
+            task_type=task_type,
+            task_id=task_id,
+            queue=get_queue_for_task(task_type),
+            retry_count=int(task.get("retry_count") or 0),
+            max_retries=int(task.get("max_retries") or 0),
+        )
+        log.warning(
+            "Task %s (%s) exceeded time limit", task_id, task_type, exc_info=True
+        )
         try:
             from crate.metrics import record as _record
 

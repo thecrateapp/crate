@@ -94,6 +94,22 @@ class TraceMiddleware:
 
         async def send_wrapper(message: Message) -> None:
             if message["type"] == "http.response.start":
+                status_code = int(message.get("status", 0))
+                if status_code >= 500:
+                    route = scope.get("route")
+                    route_path = getattr(route, "path", None) or "<unmatched>"
+                    try:
+                        from crate.observability.sentry import (
+                            capture_handled_http_error,
+                        )
+
+                        capture_handled_http_error(
+                            method=str(scope.get("method") or "UNKNOWN"),
+                            route=str(route_path),
+                            status_code=status_code,
+                        )
+                    except Exception:
+                        log.debug("Failed to report handled HTTP error", exc_info=True)
                 response_headers = [
                     (key, value)
                     for key, value in message.get("headers", [])

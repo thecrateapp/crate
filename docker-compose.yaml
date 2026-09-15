@@ -487,6 +487,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-default
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -605,6 +606,8 @@ services:
     extends:
       service: crate-worker
     container_name: crate-fast-worker
+    environment:
+      - SENTRY_SERVICE=worker-fast
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "0.35"
@@ -633,6 +636,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=projector
+      - SENTRY_SERVICE=projector
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -685,6 +689,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-maintenance
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -810,6 +815,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-analysis
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -895,6 +901,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-playback
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}

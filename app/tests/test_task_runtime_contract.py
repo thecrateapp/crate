@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_every_registered_handler_has_an_actor_config():
     from crate.actors import TASK_POOL_CONFIG
     from crate.worker import TASK_HANDLERS
@@ -44,6 +47,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
     }
     updates: list[dict] = []
     fan_in: list[tuple[str, str, str]] = []
+    captured: list[dict] = []
 
     monkeypatch.setattr("crate.db.queries.tasks.get_task", lambda task_id: task)
     monkeypatch.setattr(
@@ -77,6 +81,11 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         "crate.db.events._publish_to_redis", lambda *args, **kwargs: None
     )
     monkeypatch.setattr(actors, "_check_memory", lambda: None)
+    monkeypatch.setattr(
+        "crate.observability.sentry.capture_task_failure",
+        lambda **kwargs: captured.append(kwargs),
+        raising=False,
+    )
     monkeypatch.setitem(
         TASK_HANDLERS, "scan", lambda task_id, params, config: {"error": "boom"}
     )
@@ -88,6 +97,16 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         for update in updates
     )
     assert fan_in == [("parent-task", "scan", "child-task")]
+    assert captured == [
+        {
+            "task_type": "scan",
+            "task_id": "child-task",
+            "queue": "maintenance",
+            "error": "boom",
+            "retry_count": 0,
+            "max_retries": 0,
+        }
+    ]
 
 
 def test_actor_task_done_event_includes_handler_result(monkeypatch):
@@ -146,3 +165,148 @@ def test_actor_task_done_event_includes_handler_result(monkeypatch):
 
     task_done = next(event for event in published if event[1] == "task_done")
     assert task_done[2]["result"] == result
+
+
+def test_actor_reports_handler_exception_before_dramatiq_retry(monkeypatch):
+    from crate import actors
+    from crate.worker import TASK_HANDLERS
+
+    class Allowed:
+        allowed = True
+
+    task = {
+        "id": "failed-task",
+        "type": "scan",
+        "status": "pending",
+        "params": {},
+        "created_at": None,
+        "parent_task_id": None,
+        "retry_count": 1,
+        "max_retries": 2,
+    }
+    captured: list[dict] = []
+    error = RuntimeError("database unavailable")
+
+    monkeypatch.setattr("crate.db.queries.tasks.get_task", lambda _task_id: task)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.start_task",
+        lambda task_id, worker_id=None: {"id": task_id},
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.fail_or_retry_task",
+        lambda _task_id, _error: "failed",
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.should_defer_task",
+        lambda _task_type, params=None: Allowed(),
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.record_decision", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr("crate.config.load_config", lambda: {"library_path": "/tmp"})
+    monkeypatch.setattr("crate.worker._is_cancelled", lambda _task_id: False)
+    monkeypatch.setattr("crate.metrics.record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.telegram.notify_task_failed", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.db.events._publish_to_redis", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(actors, "_try_fan_in_parent", lambda *args, **kwargs: None)
+    monkeypatch.setattr(actors, "_check_memory", lambda: None)
+    monkeypatch.setattr(
+        "crate.observability.sentry.capture_task_exception",
+        lambda exception, **kwargs: captured.append({"exception": exception, **kwargs}),
+        raising=False,
+    )
+    monkeypatch.setitem(
+        TASK_HANDLERS,
+        "scan",
+        lambda _task_id, _params, _config: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        actors._execute_task("scan", "failed-task")
+
+    assert captured == [
+        {
+            "exception": error,
+            "task_type": "scan",
+            "task_id": "failed-task",
+            "queue": "maintenance",
+            "retry_count": 1,
+            "max_retries": 2,
+        }
+    ]
+
+
+def test_actor_reports_timeout_before_dramatiq_retry(monkeypatch):
+    from crate import actors
+    from crate.worker import TASK_HANDLERS
+
+    class Allowed:
+        allowed = True
+
+    class TimeLimitExceeded(BaseException):
+        pass
+
+    task = {
+        "id": "timed-out-task",
+        "type": "scan",
+        "status": "pending",
+        "params": {},
+        "created_at": None,
+        "parent_task_id": None,
+        "retry_count": 0,
+        "max_retries": 2,
+    }
+    captured: list[dict] = []
+    error = TimeLimitExceeded("time limit exceeded")
+
+    monkeypatch.setattr("crate.db.queries.tasks.get_task", lambda _task_id: task)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.start_task",
+        lambda task_id, worker_id=None: {"id": task_id},
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.fail_or_retry_task",
+        lambda _task_id, _error: "failed",
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.should_defer_task",
+        lambda _task_type, params=None: Allowed(),
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.record_decision", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr("crate.config.load_config", lambda: {"library_path": "/tmp"})
+    monkeypatch.setattr("crate.worker._is_cancelled", lambda _task_id: False)
+    monkeypatch.setattr("crate.metrics.record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.db.events._publish_to_redis", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(actors, "_try_fan_in_parent", lambda *args, **kwargs: None)
+    monkeypatch.setattr(actors, "_check_memory", lambda: None)
+    monkeypatch.setattr(
+        "crate.observability.sentry.capture_task_exception",
+        lambda exception, **kwargs: captured.append({"exception": exception, **kwargs}),
+    )
+    monkeypatch.setitem(
+        TASK_HANDLERS,
+        "scan",
+        lambda _task_id, _params, _config: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(TimeLimitExceeded, match="time limit exceeded"):
+        actors._execute_task("scan", "timed-out-task")
+
+    assert captured == [
+        {
+            "exception": error,
+            "task_type": "scan",
+            "task_id": "timed-out-task",
+            "queue": "maintenance",
+            "retry_count": 0,
+            "max_retries": 2,
+        }
+    ]
