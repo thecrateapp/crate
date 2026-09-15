@@ -132,6 +132,13 @@ def test_desktop_release_uploads_native_debug_symbols() -> None:
     assert "[profile.release]" in cargo
     assert 'debug = "line-tables-only"' in cargo
 
+    dsym_step = next(
+        step for step in job["steps"] if step.get("name") == "Generate macOS dSYMs"
+    )
+    assert dsym_step["if"] == "runner.os == 'macOS' && github.event_name == 'push'"
+    assert "dsymutil" in dsym_step["run"]
+    assert "*/release/crate-desktop" in dsym_step["run"]
+
     symbol_step = next(
         step
         for step in job["steps"]
@@ -144,3 +151,8 @@ def test_desktop_release_uploads_native_debug_symbols() -> None:
     assert "sentry-cli debug-files upload" in symbol_step["run"]
     assert "app/listen-desktop/src-tauri/target" in symbol_step["run"]
     assert "--wait-for 120" in symbol_step["run"]
+
+    step_names = [step.get("name") for step in job["steps"]]
+    assert step_names.index("Generate macOS dSYMs") < step_names.index(
+        "Upload desktop native debug symbols"
+    )

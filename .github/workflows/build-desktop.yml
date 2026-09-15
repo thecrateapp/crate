@@ -272,6 +272,20 @@ jobs:
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
         run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
 
+      - name: Generate macOS dSYMs
+        if: runner.os == 'macOS' && github.event_name == 'push'
+        run: |
+          found=0
+          while IFS= read -r -d '' binary; do
+            dsymutil "$binary" -o "$binary.dSYM"
+            test -d "$binary.dSYM"
+            found=$((found + 1))
+          done < <(
+            find app/listen-desktop/src-tauri/target \
+              -type f -path '*/release/crate-desktop' -print0
+          )
+          test "$found" -gt 0
+
       - name: Upload desktop native debug symbols
         if: github.event_name == 'push'
         env:
