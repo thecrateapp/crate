@@ -40,6 +40,8 @@ describe("receiver session client", () => {
                 content_type: "audio/flac",
                 metadata_url:
                   "https://api.example.test/api/cast/sessions/lease/items/item-1",
+                spectrum_url:
+                  "https://api.example.test/api/cast/sessions/lease/items/item-1/spectrum",
                 stream_url:
                   "https://api.example.test/api/cast/sessions/lease/items/item-1/stream",
               },
@@ -74,6 +76,8 @@ describe("receiver session client", () => {
           resources: {
             contentType: "audio/flac",
             artworkUrl: "https://images.example.test/cover.jpg",
+            spectrumUrl:
+              "https://api.example.test/api/cast/sessions/lease/items/item-1/spectrum",
           },
         },
       ],

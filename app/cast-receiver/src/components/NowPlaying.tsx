@@ -2,11 +2,13 @@ import type { CastQueueItem } from "@crate/cast-protocol";
 
 import type { ReceiverPhase, ReceiverStore } from "../receiver-store";
 import { ProgressBar } from "./ProgressBar";
+import { SpectrumCanvas } from "./SpectrumCanvas";
 
 interface NowPlayingProps {
   item: CastQueueItem;
   phase: ReceiverPhase;
   progress: ReceiverStore["progress"];
+  reducedMotion: boolean;
 }
 
 function phaseLabel(phase: ReceiverPhase): string {
@@ -16,7 +18,12 @@ function phaseLabel(phase: ReceiverPhase): string {
   return "Playing on Crate";
 }
 
-export function NowPlaying({ item, phase, progress }: NowPlayingProps) {
+export function NowPlaying({
+  item,
+  phase,
+  progress,
+  reducedMotion,
+}: NowPlayingProps) {
   return (
     <section className="now-playing" aria-label="Now playing">
       <div className="eyebrow">
@@ -27,6 +34,12 @@ export function NowPlaying({ item, phase, progress }: NowPlayingProps) {
       <p className="artist">{item.artist}</p>
       {item.album ? <p className="album">{item.album}</p> : null}
       {item.quality ? <span className="quality">{item.quality}</span> : null}
+      <SpectrumCanvas
+        item={item}
+        phase={phase}
+        progress={progress}
+        reducedMotion={reducedMotion}
+      />
       <ProgressBar progress={progress} />
     </section>
   );

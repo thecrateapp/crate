@@ -88,6 +88,10 @@ describe("Cast receiver app", () => {
     expect(screen.getByText("Third track")).toBeVisible();
     expect(screen.getByText("Fourth track")).toBeVisible();
     expect(screen.getByText("FLAC 24/96")).toBeVisible();
+    expect(screen.getByTestId("cast-spectrum")).toHaveAttribute(
+      "data-spectrum-state",
+      "fallback",
+    );
   });
 
   it("uses an artwork fallback and handles an empty queue", () => {

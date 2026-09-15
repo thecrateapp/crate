@@ -79,6 +79,7 @@ export function App({ store }: AppProps) {
               item={item}
               phase={snapshot.phase}
               progress={store.progress}
+              reducedMotion={appearance.reducedMotion}
             />
             <QueuePreview
               currentIndex={snapshot.currentIndex}

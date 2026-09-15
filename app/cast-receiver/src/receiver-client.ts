@@ -49,9 +49,10 @@ function mapItem(value: unknown): CastQueueItem | null {
   const streamUrl = optionalString(item.stream_url);
   const metadataUrl = optionalString(item.metadata_url);
   const artworkUrl = optionalString(item.artwork_url);
+  const spectrumUrl = optionalString(item.spectrum_url);
   const resources =
     contentType && streamUrl && metadataUrl
-      ? { contentType, streamUrl, metadataUrl, artworkUrl }
+      ? { contentType, streamUrl, metadataUrl, artworkUrl, spectrumUrl }
       : undefined;
   return {
     itemId,

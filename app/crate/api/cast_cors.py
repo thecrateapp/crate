@@ -6,7 +6,7 @@ _CAST_PATH_PREFIX = "/api/cast/"
 _CAST_READ_CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-    "Access-Control-Allow-Headers": "Accept, Range",
+    "Access-Control-Allow-Headers": "Accept, If-None-Match, Range",
     "Access-Control-Expose-Headers": (
         "Accept-Ranges, Cache-Control, Content-Encoding, Content-Length, "
         "Content-Range, Content-Type, ETag, Retry-After, Vary, "

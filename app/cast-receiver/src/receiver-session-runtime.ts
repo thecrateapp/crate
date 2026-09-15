@@ -376,7 +376,7 @@ export function createReceiverSessionRuntime({
     sendProtocolMessage({
       ...messageBase(),
       type: "receiver.ready",
-      capabilities: ["queue", "checkpoint", "receiver-state"],
+      capabilities: ["queue", "checkpoint", "receiver-state", "spectrum"],
     });
     interval = setInterval(() => {
       void flushState().catch(() => undefined);

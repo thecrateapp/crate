@@ -87,6 +87,20 @@ function setup() {
 }
 
 describe("receiver session runtime", () => {
+  it("announces support for spectrum artefacts", () => {
+    const { runtime, sendProtocolMessage } = setup();
+
+    runtime.start();
+
+    expect(sendProtocolMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "receiver.ready",
+        capabilities: expect.arrayContaining(["spectrum"]),
+      }),
+    );
+    runtime.stop();
+  });
+
   it("loads the scoped queue and announces a receiver-owned snapshot", async () => {
     const { runtime, sendProtocolMessage, store, telemetry } = setup();
 

@@ -469,13 +469,14 @@ def test_cast_session_public_routes_allow_receiver_cors_preflight(test_app):
         headers={
             "Origin": "https://receiver.example.test",
             "Access-Control-Request-Method": "GET",
-            "Access-Control-Request-Headers": "Range",
+            "Access-Control-Request-Headers": "If-None-Match, Range",
         },
     )
 
     assert response.status_code in {200, 204}
     assert response.headers["access-control-allow-origin"] == "*"
     assert "range" in response.headers["access-control-allow-headers"].lower()
+    assert "if-none-match" in response.headers["access-control-allow-headers"].lower()
 
     write_response = test_app.options(
         "/api/cast/sessions/opaque-lease/state",
