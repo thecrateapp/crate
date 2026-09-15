@@ -91,12 +91,12 @@ export function waitForOfflineTransferPermission(
 
 export interface CoalescedOfflineWriter<T> {
   schedule(value: T): void;
-  flush(): void;
+  flush(): void | Promise<void>;
   dispose(): void;
 }
 
 export function createCoalescedOfflineWriter<T>(
-  write: (value: T) => void,
+  write: (value: T) => void | Promise<void>,
   delayMs = 100,
 ): CoalescedOfflineWriter<T> {
   let pending: T | undefined;
@@ -108,11 +108,14 @@ export function createCoalescedOfflineWriter<T>(
       clearTimeout(timer);
       timer = null;
     }
-    if (!hasPending) return;
+    if (!hasPending) return undefined;
     const value = pending as T;
     pending = undefined;
     hasPending = false;
-    write(value);
+    // Callers that need this specific write to be durable (e.g. before
+    // tearing down the profile) can await the returned promise; routine
+    // coalesced writes are free to ignore it, same as before.
+    return write(value);
   };
 
   return {

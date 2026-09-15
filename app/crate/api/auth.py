@@ -62,10 +62,15 @@ from crate.api.schemas.auth import (
     UpdateUserStatusRequest,
 )
 from crate.api.native_oauth import (
+    complete_exchange as complete_native_oauth_exchange,
+    exchange_session_id as native_oauth_exchange_session_id,
+    get_completed_exchange as get_completed_native_oauth_exchange,
     InvalidNativeOAuthHandoff,
+    NativeOAuthCompletionUnknown,
     NativeOAuthUnavailable,
     consume_handoff as consume_native_oauth_handoff,
     issue_handoff as issue_native_oauth_handoff,
+    restore_handoff as restore_native_oauth_handoff,
 )
 from crate.api.schemas.common import OkResponse
 from crate.auth import (
@@ -88,6 +93,7 @@ from crate.db.repositories.auth import (
     create_auth_invite,
     create_session,
     create_user,
+    delete_session,
     get_session,
     get_user_by_email,
     get_user_by_external_identity,
@@ -348,11 +354,7 @@ def _env_enabled(name: str, default: bool = False) -> bool:
 
 
 def _native_oauth_exchange_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", False)
-
-
-def _native_oauth_legacy_redirect_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED", True)
+    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", True)
 
 
 _NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
@@ -369,12 +371,12 @@ def _validate_native_oauth_start(
     challenge: str | None,
     state: str | None,
 ) -> bool:
+    native_callback = (return_to or "").startswith("cratemusic://")
+    if native_callback and return_to != _NATIVE_CALLBACK_URL:
+        raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
     requested = challenge is not None or state is not None
     if not requested:
-        if (
-            _is_mobile_native_listen_app_id(app_id)
-            and not _native_oauth_legacy_redirect_enabled()
-        ):
+        if native_callback or _is_native_listen_app_id(app_id):
             raise HTTPException(
                 status_code=426,
                 detail="Native app upgrade required",
@@ -385,7 +387,7 @@ def _validate_native_oauth_start(
             status_code=503,
             detail="Native OAuth exchange is not enabled",
         )
-    if mode != "login" or not _is_mobile_native_listen_app_id(app_id):
+    if mode != "login" or not _is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
     if return_to != _NATIVE_CALLBACK_URL:
         raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
@@ -412,21 +414,6 @@ def _is_listen_return_to(return_to: str | None) -> bool:
     except Exception:
         return False
     return host == "listen" or host.startswith("listen.")
-
-
-def _is_tauri_loopback_return_to(return_to: str | None) -> bool:
-    if not return_to:
-        return False
-    try:
-        parsed = urlparse(return_to)
-    except Exception:
-        return False
-    return (
-        parsed.scheme == "http"
-        and parsed.hostname in {"127.0.0.1", "localhost"}
-        and parsed.port == 17654
-        and parsed.path == "/oauth/callback"
-    )
 
 
 def _request_host(request: Request) -> str:
@@ -914,9 +901,7 @@ def _allowed_redirect_origins() -> set[str]:
 def _callback_origin(return_to: str | None = None, *, app_id: str | None = None) -> str:
     allowed = _allowed_redirect_origins()
     if return_to and (
-        return_to.startswith("cratemusic://")
-        or _is_tauri_loopback_return_to(return_to)
-        or _is_native_listen_app_id(app_id)
+        return_to.startswith("cratemusic://") or _is_native_listen_app_id(app_id)
     ):
         # Native/Tauri OAuth still needs an HTTPS callback registered with
         # Google/Apple. Keep it on Listen, not Admin, so desktop/mobile auth
@@ -943,8 +928,6 @@ def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> 
     if not return_to:
         return "/"
     if return_to.startswith("cratemusic://"):
-        return return_to
-    if app_id == "listen-tauri" and _is_tauri_loopback_return_to(return_to):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
         return return_to
@@ -1182,7 +1165,11 @@ def _build_apple_client_secret() -> str:
 
 
 def _create_login_session(
-    user: dict, request: Request, *, app_id: str | None = None
+    user: dict,
+    request: Request,
+    *,
+    app_id: str | None = None,
+    session_id: str | None = None,
 ) -> tuple[str, dict, str | None]:
     user = _ensure_user_active(user)
     app = app_id or request.headers.get("x-crate-app")
@@ -1190,7 +1177,7 @@ def _create_login_session(
     access_expiry_hours = _access_expiry_hours(request, app_id=app)
     expires_at_dt = datetime.now(timezone.utc) + timedelta(hours=session_expiry_hours)
     expires_at = expires_at_dt.isoformat()
-    session_id = secrets.token_urlsafe(24)
+    session_id = session_id or secrets.token_urlsafe(24)
     session = create_session(
         session_id,
         user["id"],
@@ -2383,14 +2370,14 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     native_challenge = parsed_state.get("native_code_challenge")
     native_state = parsed_state.get("native_state")
-    if native_challenge is not None or native_state is not None:
-        _validate_native_oauth_start(
-            app_id=app_id,
-            mode=str(parsed_state.get("mode") or ""),
-            return_to=parsed_state.get("return_to"),
-            challenge=native_challenge,
-            state=native_state,
-        )
+    native_exchange = _validate_native_oauth_start(
+        app_id=app_id,
+        mode=str(parsed_state.get("mode") or ""),
+        return_to=parsed_state.get("return_to"),
+        challenge=native_challenge,
+        state=native_state,
+    )
+    if native_exchange:
         try:
             handoff_code = issue_native_oauth_handoff(
                 user_id=int(user["id"]),
@@ -2422,19 +2409,6 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     return_to = parsed_state.get("return_to") or "/"
     safe_return = _validate_return_to(return_to, app_id=app_id)
-
-    if safe_return.startswith("cratemusic://"):
-        redirect_url = _append_query_param(safe_return, "token", token)
-        access_expires_at = _access_expires_at_from_token(token)
-        if access_expires_at:
-            redirect_url = _append_query_param(
-                redirect_url, "access_expires_at", _iso_datetime(access_expires_at)
-            )
-        if refresh_token:
-            redirect_url = _append_query_param(
-                redirect_url, "refresh_token", refresh_token
-            )
-        return RedirectResponse(url=redirect_url)
 
     if safe_return.startswith("http"):
         redirect_url = _post_auth_redirect_url(safe_return, token)
@@ -2484,7 +2458,7 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             detail="Native OAuth exchange is not enabled",
         )
     app_id = (request.headers.get("x-crate-app") or "").strip().lower()
-    if not _is_mobile_native_listen_app_id(app_id):
+    if not _is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
     if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
         raise HTTPException(
@@ -2494,6 +2468,14 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
     if not _NATIVE_STATE_RE.fullmatch(body.state):
         raise HTTPException(status_code=400, detail="Invalid native OAuth state")
     try:
+        completed = get_completed_native_oauth_exchange(
+            code=body.code,
+            state=body.state,
+            verifier=body.code_verifier,
+            app_id=app_id,
+        )
+        if completed is not None:
+            return completed
         handoff = consume_native_oauth_handoff(
             code=body.code,
             state=body.state,
@@ -2511,15 +2493,55 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
         ) from exc
     if not secrets.compare_digest(handoff.app_id, app_id):
         raise HTTPException(status_code=401, detail="Native OAuth client mismatch")
-    user = get_user_by_id(handoff.user_id)
-    user = _ensure_user_active(user)
-    update_user_last_login(user["id"])
-    token, session, refresh_token = _create_login_session(
-        user,
-        request,
-        app_id=app_id,
-    )
-    return _auth_login_payload(user, token, session, refresh_token)
+    try:
+        user = get_user_by_id(handoff.user_id)
+        user = _ensure_user_active(user)
+        update_user_last_login(user["id"])
+        requested_session_id = native_oauth_exchange_session_id(body.code)
+        session_already_existed = get_session(requested_session_id) is not None
+        token, session, refresh_token = _create_login_session(
+            user,
+            request,
+            app_id=app_id,
+            session_id=requested_session_id,
+        )
+        session_was_created = (
+            not session_already_existed and session["id"] == requested_session_id
+        )
+        payload = _auth_login_payload(user, token, session, refresh_token)
+    except Exception:
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.warning("Failed to restore native OAuth handoff", exc_info=True)
+        raise
+    try:
+        complete_native_oauth_exchange(
+            code=body.code,
+            handoff=handoff,
+            payload=payload,
+        )
+    except NativeOAuthUnavailable as exc:
+        if session_was_created and not isinstance(exc, NativeOAuthCompletionUnknown):
+            try:
+                delete_session(str(session["id"]))
+            except Exception:
+                log.error(
+                    "Failed to delete incomplete native OAuth session",
+                    exc_info=True,
+                )
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.error(
+                "Failed to restore native OAuth handoff after cache failure",
+                exc_info=True,
+            )
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is temporarily unavailable",
+        ) from exc
+    return payload
 
 
 @router.post(

@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from crate.artist_lifecycle import ArtistIdentityChangedError, run_artist_deletion
 from crate.db.audit import log_audit, wipe_library_tables
 from crate.db.cache_runtime import get_redis
 from crate.db.cache_store import delete_cache, set_cache
@@ -678,11 +679,16 @@ def _handle_delete_artist(task_id: str, params: dict, config: dict) -> dict:
     folder = (artist.get("folder_name") if artist else None) or name
     artist_dir = lib / folder
 
-    if mode == "full" and artist_dir.is_dir():
-        shutil.rmtree(str(artist_dir))
-        log.info("Deleted artist directory: %s", artist_dir)
+    def delete_artist_data() -> None:
+        if mode == "full" and artist_dir.is_dir():
+            shutil.rmtree(str(artist_dir))
+            log.info("Deleted artist directory: %s", artist_dir)
+        db_delete_artist(name)
 
-    db_delete_artist(name)
+    try:
+        run_artist_deletion(name, delete_artist_data)
+    except ArtistIdentityChangedError:
+        return {"error": f"Artist changed before deletion; retry the task: {name}"}
 
     for prefix in ENRICHMENT_CACHE_PREFIXES:
         delete_cache(f"{prefix}{name.lower()}")
@@ -1690,20 +1696,11 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
         return {"error": f"Source artist directory not found: {source_relative}"}
     if source_dir == target_dir or _path_inside(target_dir, source_dir):
         return {"error": "Invalid artist merge target"}
-    moved_sidecars_to_trash: list[str] = []
     for child in sorted(source_dir.iterdir(), key=lambda item: item.name.lower()):
         target_child = target_dir / child.name
         if not target_child.exists():
             continue
         if child.is_file() and child.name.lower() in PHOTO_NAMES:
-            destination = _unique_artist_sidecar_trash_path(
-                _crate_trash_root(lib),
-                child.relative_to(lib),
-                task_id,
-            )
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(child), str(destination))
-            moved_sidecars_to_trash.append(str(destination))
             continue
         if child.is_file() and target_child.is_file():
             return {"error": f"Target artist directory already has file {child.name}"}
@@ -1711,22 +1708,65 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
             "error": f"Target artist directory already has {child.name}; merge duplicate albums first"
         }
 
-    target_dir.mkdir(parents=True, exist_ok=True)
     moved_items = 0
-    for child in sorted(source_dir.iterdir(), key=lambda item: item.name.lower()):
-        shutil.move(str(child), str(target_dir / child.name))
-        moved_items += 1
-    source_dir.rmdir()
+    moved_sidecars_to_trash: list[tuple[Path, Path]] = []
+    moved_paths: list[tuple[Path, Path]] = []
+    target_dir_existed = target_dir.exists()
+
+    def merge_artist_data() -> None:
+        nonlocal moved_items
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            for child in sorted(
+                source_dir.iterdir(), key=lambda item: item.name.lower()
+            ):
+                target_child = target_dir / child.name
+                if (
+                    target_child.exists()
+                    and child.is_file()
+                    and child.name.lower() in PHOTO_NAMES
+                ):
+                    destination = _unique_artist_sidecar_trash_path(
+                        _crate_trash_root(lib),
+                        child.relative_to(lib),
+                        task_id,
+                    )
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(child), str(destination))
+                    moved_sidecars_to_trash.append((child, destination))
+                    continue
+                shutil.move(str(child), str(target_child))
+                moved_paths.append((child, target_child))
+                moved_items += 1
+            source_dir.rmdir()
+            merge_artist_into_artist(
+                source_artist_name,
+                target_artist_name,
+                str(source_dir),
+                str(target_dir),
+            )
+        except Exception:
+            source_dir.mkdir(parents=True, exist_ok=True)
+            for source_path, destination in reversed(moved_paths):
+                if destination.exists() and not source_path.exists():
+                    shutil.move(str(destination), str(source_path))
+            for source_path, destination in reversed(moved_sidecars_to_trash):
+                if destination.exists() and not source_path.exists():
+                    shutil.move(str(destination), str(source_path))
+            if not target_dir_existed and target_dir.is_dir():
+                try:
+                    target_dir.rmdir()
+                except OSError:
+                    pass
+            raise
 
     source_track_count = sum(
         int(album.get("track_count") or 0) for album in source_albums
     )
-    merge_artist_into_artist(
-        source_artist_name,
-        target_artist_name,
-        str(source_dir),
-        str(target_dir),
-    )
+    try:
+        run_artist_deletion(source_artist_name, merge_artist_data)
+    except ArtistIdentityChangedError:
+        return {"error": "Source artist changed before merge; retry the task"}
 
     emit_task_event(
         task_id,
@@ -2025,12 +2065,18 @@ def _handle_update_artist_metadata(task_id: str, params: dict, config: dict) -> 
     )
 
     try:
-        from crate.api.cache_events import broadcast_invalidation
+        from crate.api.cache_events import (
+            broadcast_invalidation,
+            wait_for_cache_invalidation,
+        )
 
         scopes = ["library", "home"]
+        if "bio" in changed_fields:
+            scopes.append("artist_bio")
         if result.get("artist_id"):
             scopes.append(f"artist:{result['artist_id']}")
         broadcast_invalidation(*scopes)
+        wait_for_cache_invalidation()
     except Exception:
         log.debug("Failed to broadcast artist metadata invalidation", exc_info=True)
 

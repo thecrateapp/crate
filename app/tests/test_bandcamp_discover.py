@@ -301,7 +301,9 @@ def test_discover_worker_refreshes_only_an_active_connection(monkeypatch):
     class FakeDiscoverClient:
         def __init__(self, session_material: Any, **kwargs: Any):
             assert session_material.cookies == {"identity": "session-cookie"}
-            assert kwargs["cache_key"] == "bandcamp:discover:user:1"
+            assert kwargs["cache_key"] == (
+                "bandcamp:discover:user:1:session:fingerprint-discover"
+            )
 
         def fetch_followed(self) -> BandcampDiscoverResult:
             return BandcampDiscoverResult(
@@ -327,6 +329,7 @@ def test_discover_worker_refreshes_only_an_active_connection(monkeypatch):
             "user_id": user_id,
             "status": "connected",
             "session_secret_ref": "bandcamp-secret",
+            "session_fingerprint": "fingerprint-discover",
         },
     )
     monkeypatch.setattr(

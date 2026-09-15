@@ -180,4 +180,75 @@ describe("android native engine flags", () => {
     expect(nativePlaybackMock.addListener).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
+
+  it("waits for the native service before draining cold-start events", async () => {
+    vi.useFakeTimers();
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    nativePlaybackMock.getState.mockRejectedValue(new Error("service binding"));
+    nativePlaybackMock.drainEvents.mockResolvedValue({ events: [] });
+    let signalReady!: () => void;
+    nativePlaybackMock.addListener.mockImplementation(
+      (event: string, listener: () => void) => {
+        if (event === "ready") signalReady = listener;
+        return Promise.resolve({ remove: vi.fn() });
+      },
+    );
+    const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = new AndroidNativeEngine();
+
+    const eventsPromise = engine.drainEvents();
+    await vi.advanceTimersByTimeAsync(350);
+
+    expect(nativePlaybackMock.drainEvents).not.toHaveBeenCalled();
+    expect(nativePlaybackMock.addListener).toHaveBeenCalledWith(
+      "ready",
+      expect.any(Function),
+    );
+
+    signalReady();
+
+    await expect(eventsPromise).resolves.toEqual([]);
+    expect(nativePlaybackMock.drainEvents).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("waits for the native service before reading cold-start state", async () => {
+    vi.useFakeTimers();
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 1,
+      crossfadeMs: 0,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState
+      .mockRejectedValueOnce(new Error("service binding"))
+      .mockRejectedValueOnce(new Error("service binding"))
+      .mockRejectedValueOnce(new Error("service binding"))
+      .mockResolvedValue(state);
+    let signalReady!: () => void;
+    nativePlaybackMock.addListener.mockImplementation(
+      (event: string, listener: () => void) => {
+        if (event === "ready") signalReady = listener;
+        return Promise.resolve({ remove: vi.fn() });
+      },
+    );
+    const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = new AndroidNativeEngine();
+
+    const statePromise = engine.getState();
+    await vi.advanceTimersByTimeAsync(350);
+
+    expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(3);
+    signalReady();
+
+    await expect(statePromise).resolves.toEqual(state);
+    expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
 });

@@ -34,6 +34,11 @@ export interface JamTransportControls {
   seek: (time: number) => void;
 }
 
+export interface PlayerPauseOptions {
+  immediate?: boolean;
+  preserveNativeResume?: boolean;
+}
+
 export interface PlayerActionsValue {
   queue: Track[];
   currentIndex: number;
@@ -41,13 +46,16 @@ export interface PlayerActionsValue {
   jamTransport: JamTransportControls | null;
   shuffle: boolean;
   repeat: RepeatMode;
+  smartCrossfadeEnabled: boolean;
   playSource: PlaySource | null;
   recentlyPlayed: Track[];
   currentTrack: Track | undefined;
   play: (track: Track, source?: PlaySource) => void;
   playAll: (tracks: Track[], startIndex?: number, source?: PlaySource) => void;
-  pause: () => void;
+  pause: (options?: PlayerPauseOptions) => void;
+  pauseLocal: () => void;
   resume: () => void;
+  resumeLocal: () => void;
   next: () => void;
   prev: () => void;
   seek: (time: number) => void;

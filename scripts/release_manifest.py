@@ -97,6 +97,17 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         services=("crate-listen",),
         patterns=("app/listen/**", "app/shared/**"),
     ),
+    "cast-receiver": ImageSpec(
+        repository="crate-cast-receiver",
+        environment="CRATE_CAST_RECEIVER_IMAGE",
+        services=("crate-cast-receiver",),
+        patterns=(
+            "app/cast-receiver/**",
+            "app/shared/cast/**",
+            "app/shared/fonts/**",
+            "app/.dockerignore",
+        ),
+    ),
     "site": ImageSpec(
         repository="crate-site",
         environment="CRATE_SITE_IMAGE",

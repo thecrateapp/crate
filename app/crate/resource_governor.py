@@ -31,6 +31,7 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "fetch_artwork_all",
         "fix_artist",
         "fix_issues",
+        "generate_cast_spectrum",
         "health_check",
         "library_pipeline",
         "library_sync",
@@ -54,8 +55,11 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
 AUDIO_HEAVY_TASK_TYPES = frozenset(
     {
         "backfill_track_audio_fingerprints",
+        "generate_cast_spectrum",
     }
 )
+
+LISTENER_INSENSITIVE_GOVERNED_TASK_TYPES = frozenset({"generate_cast_spectrum"})
 
 MAINTENANCE_WINDOW_TASK_TYPES = frozenset(
     {
@@ -165,7 +169,10 @@ def should_defer_task(task_type: str, params: dict | None = None) -> ResourceDec
             return window_decision
     if _bypasses_resource_pressure(task_type, params):
         return ResourceDecision(allowed=True)
-    return evaluate_resources(label=task_type, listener_sensitive=True)
+    return evaluate_resources(
+        label=task_type,
+        listener_sensitive=task_type not in LISTENER_INSENSITIVE_GOVERNED_TASK_TYPES,
+    )
 
 
 def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDecision:

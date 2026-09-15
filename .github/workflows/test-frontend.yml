@@ -5,20 +5,37 @@ on:
     branches: [main]
     paths:
       - "app/shared/**"
+      - "app/cast-receiver/**"
       - "app/ui/**"
       - "app/listen/**"
       - "app/listen-desktop/**"
+      - "app/docs/**"
+      - "app/site/**"
       - "package.json"
       - "package-lock.json"
+      - "scripts/design-system/**"
+      - "playwright.appearance.config.ts"
+      - "playwright.listen-visual.config.ts"
+      - "tests/appearance/**"
+      - "tests/listen-visual/**"
       - ".github/workflows/test-frontend.yml"
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "app/shared/**"
+      - "app/cast-receiver/**"
       - "app/ui/**"
       - "app/listen/**"
       - "app/listen-desktop/**"
+      - "app/docs/**"
+      - "app/site/**"
       - "package.json"
       - "package-lock.json"
+      - "scripts/design-system/**"
+      - "playwright.appearance.config.ts"
+      - "playwright.listen-visual.config.ts"
+      - "tests/appearance/**"
+      - "tests/listen-visual/**"
       - ".github/workflows/test-frontend.yml"
 
 jobs:
@@ -37,11 +54,67 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install auxiliary frontend dependencies
+        run: |
+          npm ci --prefix app/site
+          npm ci --prefix app/docs
+
+      - name: Test and build marketing site
+        env:
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-site
+          SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_SITE_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
+        run: |
+          npm test --prefix app/site
+          npm run build --prefix app/site
+
+      - name: Test and build docs site
+        env:
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-docs
+          SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_DOCS_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
+        run: |
+          npm test --prefix app/docs
+          npm run build --prefix app/docs
+
       - name: Type check shared UI
         run: npm run --workspace=@crate/ui typecheck
 
       - name: Test shared UI (@crate/ui)
         run: npm run --workspace=@crate/ui test
+
+      - name: Type check Cast protocol
+        run: npm run --workspace=app/shared/cast typecheck
+
+      - name: Test Cast protocol
+        run: npm run --workspace=app/shared/cast test
+
+      - name: Type check Cast receiver
+        run: npm run --workspace=app/cast-receiver typecheck
+
+      - name: Test Cast receiver
+        run: npm run --workspace=app/cast-receiver test
+
+      - name: Build Cast receiver
+        env:
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-cast-receiver
+          SENTRY_RELEASE: cast-receiver-${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_CAST_RECEIVER_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_SENTRY_RELEASE: cast-receiver-${{ github.sha }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE || '0.05' }}
+        run: |
+          npm run --workspace=app/cast-receiver build
+          npm run --workspace=app/cast-receiver check:bundle
 
       - name: Type check admin UI
         run: npm run --workspace=app/ui typecheck
@@ -49,9 +122,8 @@ jobs:
       - name: Test admin UI (crate-ui)
         run: npm run --workspace=app/ui test
 
-      - name: Build admin UI and upload Sentry source maps
+      - name: Build admin UI
         env:
-          SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-admin
           SENTRY_RELEASE: crate-${{ github.sha }}
@@ -69,9 +141,17 @@ jobs:
       - name: Test listen app
         run: npm run --workspace=app/listen test
 
-      - name: Build Listen and upload Sentry source maps
+      - name: Test design-system tooling
+        run: node --test scripts/design-system/*.test.mjs
+
+      - name: Check generated appearance tokens
+        run: npm run design-system:tokens:check
+
+      - name: Check shared UI layer boundaries
+        run: npm run design-system:layers
+
+      - name: Build Listen
         env:
-          SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-listen
           SENTRY_RELEASE: crate-${{ github.sha }}
@@ -79,3 +159,44 @@ jobs:
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
         run: npm run --workspace=app/listen build
+
+      - name: Type check desktop app
+        run: npm run --workspace=app/listen-desktop typecheck
+
+      - name: Test desktop app
+        run: npm run --workspace=app/listen-desktop test
+
+  appearance-chromium:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run appearance contracts
+        run: npm run test:appearance -- --project=chromium
+
+      - name: Run real Listen visual regression
+        run: npm run test:listen-visual
+
+      - name: Upload appearance report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appearance-chromium-report
+          path: |
+            playwright-report/appearance/
+            playwright-report/listen-visual/
+            test-results/appearance/
+            test-results/listen-visual/

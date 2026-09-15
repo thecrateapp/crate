@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,6 +29,11 @@ func TestSingleJoiningSlash(t *testing.T) {
 }
 
 func TestFallbackProxyBoundsInteractiveRequests(t *testing.T) {
+	transport := &sentry.MockTransport{}
+	assert.NoError(t, sentry.Init(sentry.ClientOptions{
+		Dsn:       "https://public@example.ingest.sentry.io/1",
+		Transport: transport,
+	}))
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(40 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
@@ -49,6 +55,12 @@ func TestFallbackProxyBoundsInteractiveRequests(t *testing.T) {
 	assert.True(t, proxy.ServeHTTP(recorder, request))
 	assert.Equal(t, http.StatusBadGateway, recorder.Code)
 	assert.Equal(t, uint64(1), proxy.Stats().Timeouts)
+	events := transport.Events()
+	if len(events) != 1 {
+		t.Fatalf("captured %d Sentry events, want 1", len(events))
+	}
+	assert.Equal(t, "fallback.proxy", events[0].Tags["operation"])
+	assert.Equal(t, "interactive", events[0].Tags["route_class"])
 }
 
 func TestFallbackProxyCircuitOpensAndRecoversHalfOpen(t *testing.T) {

@@ -2,14 +2,18 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  disconnectCastSessionMock,
   loadGroupsMock,
   onNativeOutputRouteChangedMock,
   selectTargetMock,
+  stopCastSessionMock,
   toastInfoMock,
 } = vi.hoisted(() => ({
+  disconnectCastSessionMock: vi.fn(),
   loadGroupsMock: vi.fn(),
   onNativeOutputRouteChangedMock: vi.fn(),
   selectTargetMock: vi.fn(),
+  stopCastSessionMock: vi.fn(),
   toastInfoMock: vi.fn(),
 }));
 
@@ -33,6 +37,18 @@ vi.mock("sonner", () => ({
 vi.mock("@/lib/native-output-router", () => ({
   onNativeOutputRouteChanged: onNativeOutputRouteChangedMock,
 }));
+
+vi.mock("@/lib/cast-sender", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/cast-sender")>(
+      "@/lib/cast-sender",
+    );
+  return {
+    ...actual,
+    disconnectCastSession: disconnectCastSessionMock,
+    stopCastSession: stopCastSessionMock,
+  };
+});
 
 import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -84,6 +100,8 @@ describe("PlaybackTargetMenu", () => {
       },
     ]);
     selectTargetMock.mockResolvedValue({ ok: true });
+    disconnectCastSessionMock.mockResolvedValue({ ok: true });
+    stopCastSessionMock.mockResolvedValue({ ok: true });
   });
 
   afterEach(() => {
@@ -95,8 +113,10 @@ describe("PlaybackTargetMenu", () => {
 
     const outputButton = screen.getByRole("button", { name: "Output" });
     expect(outputButton.className).not.toContain("hover:bg");
-    expect(outputButton.className).toContain("hover:text-primary");
-    expect(outputButton.className).toContain("hover:drop-shadow");
+    expect(outputButton.className).toContain("hover:text-accent-action");
+    expect(outputButton.className).toContain("hover:drop-shadow-accent-action");
+    expect(outputButton.className).not.toContain("text-white/30");
+    expect(outputButton.className).not.toContain("rgba(");
 
     fireEvent.click(outputButton);
 
@@ -104,6 +124,16 @@ describe("PlaybackTargetMenu", () => {
     expect(screen.getByText("System-selected output")).toBeVisible();
     expect(screen.getByText("Desktop")).toBeVisible();
     expect(screen.getByText("Unavailable")).toBeVisible();
+
+    const menu = screen.getByRole("menu", { name: "Output targets" });
+    const localRow = menu.querySelector('[role="menuitemradio"]');
+
+    expect(localRow).toHaveClass(
+      "text-text-primary",
+      "hover:bg-surface-control",
+    );
+    expect(menu.innerHTML).not.toContain("rgba(");
+    expect(menu.innerHTML).not.toContain("bg-white");
   });
 
   it("surfaces the active remote Connect device", async () => {
@@ -159,6 +189,17 @@ describe("PlaybackTargetMenu", () => {
     expect(screen.getByText("Active")).toBeVisible();
   });
 
+  it("refreshes output state when the Cast session changes", async () => {
+    renderWithListenProviders(<PlaybackTargetMenu />);
+
+    await waitFor(() => expect(loadGroupsMock).toHaveBeenCalled());
+    loadGroupsMock.mockClear();
+
+    window.dispatchEvent(new Event("crate:cast-session-changed"));
+
+    await waitFor(() => expect(loadGroupsMock).toHaveBeenCalledTimes(1));
+  });
+
   it("delegates available targets and explains unavailable targets", async () => {
     const targetContext = {
       currentTrack: {
@@ -209,5 +250,45 @@ describe("PlaybackTargetMenu", () => {
     expect(screen.getByText("Salida")).toBeVisible();
     expect(screen.getByText("Activo")).toBeVisible();
     expect(screen.getByText("No disponible")).toBeVisible();
+  });
+
+  it("offers separate disconnect and stop actions for active Cast", async () => {
+    loadGroupsMock.mockResolvedValue([
+      {
+        providerId: "google-cast",
+        label: "Cast",
+        targets: [
+          {
+            id: "google-cast:default",
+            providerId: "google-cast",
+            kind: "google-cast",
+            name: "Living room TV",
+            subtitle: "Playing on Google Cast",
+            active: true,
+            available: true,
+            capabilities: {
+              canPlay: true,
+              canSeek: true,
+              canSetVolume: true,
+            },
+          },
+        ],
+      },
+    ]);
+
+    renderWithListenProviders(<PlaybackTargetMenu />);
+    fireEvent.click(screen.getByRole("button", { name: "Output" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /^Disconnect/ }));
+    await waitFor(() =>
+      expect(disconnectCastSessionMock).toHaveBeenCalledOnce(),
+    );
+    expect(stopCastSessionMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Output" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Stop casting/ }),
+    );
+    await waitFor(() => expect(stopCastSessionMock).toHaveBeenCalledOnce());
   });
 });

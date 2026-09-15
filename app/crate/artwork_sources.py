@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import mutagen
 import requests
 
+from crate.artist_hero_publication import (
+    ArtistHeroArtifactIdentity,
+    ArtistHeroComposition,
+    resolve_artist_hero_artifact_source_path,
+)
 from crate.artwork_variants import ArtworkAsset
 from crate.audio import get_audio_files
 from crate.config import load_config
@@ -202,8 +208,31 @@ def _artist_source(
 
 
 def _artist_hero_source(asset: ArtworkAsset) -> ArtworkSource | None:
-    entity_uid, separator, composition = asset.entity_key.rpartition(":")
-    if not separator or composition not in {"desktop", "mobile"}:
+    identity_parts = asset.entity_key.split(":", 2)
+    if len(identity_parts) == 3:
+        entity_uid, composition, render_revision = identity_parts
+        if composition not in {"desktop", "mobile"}:
+            return None
+        try:
+            identity = ArtistHeroArtifactIdentity(
+                artist_entity_uid=entity_uid,
+                composition=cast(ArtistHeroComposition, composition),
+                render_revision=render_revision,
+            )
+        except ValueError:
+            return None
+        source_path = resolve_artist_hero_artifact_source_path(identity)
+        if source_path is None:
+            return None
+        source = _file_source(source_path)
+        if source is None:
+            return None
+        return ArtworkSource(source.content, source.media_type, "revision-artifact")
+
+    if len(identity_parts) != 2:
+        return None
+    entity_uid, composition = identity_parts
+    if composition not in {"desktop", "mobile"}:
         return None
     artist = get_library_artist_by_entity_uid(entity_uid)
     if not artist:

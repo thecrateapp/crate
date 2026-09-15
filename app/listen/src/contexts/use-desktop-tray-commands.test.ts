@@ -47,6 +47,7 @@ describe("useDesktopTrayCommands", () => {
     dispatchDesktopTrayCommand("play_pause");
 
     expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(controls.pause).toHaveBeenCalledWith({ immediate: true });
     expect(controls.resume).not.toHaveBeenCalled();
   });
 
@@ -58,6 +59,7 @@ describe("useDesktopTrayCommands", () => {
 
     expect(controls.resume).toHaveBeenCalledTimes(1);
     expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(controls.pause).toHaveBeenCalledWith({ immediate: true });
   });
 
   it("routes previous and next tray commands", () => {

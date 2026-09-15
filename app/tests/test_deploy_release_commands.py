@@ -94,6 +94,11 @@ def test_deploy_builds_candidate_from_the_remote_production_environment() -> Non
         ("docker-compose.yaml", "crate-media-worker", "CRATE_MEDIA_WORKER_IMAGE"),
         ("docker-compose.yaml", "crate-ui", "CRATE_UI_IMAGE"),
         ("docker-compose.yaml", "crate-listen", "CRATE_LISTEN_IMAGE"),
+        (
+            "docker-compose.yaml",
+            "crate-cast-receiver",
+            "CRATE_CAST_RECEIVER_IMAGE",
+        ),
         ("docker-compose.project.yaml", "crate-site", "CRATE_SITE_IMAGE"),
         ("docker-compose.project.yaml", "crate-docs", "CRATE_DOCS_IMAGE"),
         (
@@ -164,6 +169,16 @@ def test_preflight_requires_a_persistent_jwt_secret() -> None:
     assert "assert_required_env JWT_SECRET 32" in remote_script
 
 
+def test_preflight_validates_enabled_custom_cast_receiver_configuration() -> None:
+    remote_script = (ROOT / "scripts/deploy-remote.sh").read_text()
+
+    assert "assert_cast_receiver_config" in remote_script
+    assert "env_value CRATE_CAST_CUSTOM_RECEIVER_ENABLED" in remote_script
+    assert "env_value CRATE_CAST_RECEIVER_APP_ID" in remote_script
+    assert "env_value CRATE_CAST_RECEIVER_HOST" in remote_script
+    assert "CC1AD845" in remote_script
+
+
 def test_deploy_cannot_bypass_remote_release_preflight() -> None:
     script = (ROOT / "scripts/deploy.sh").read_text()
     deploy_body = script[
@@ -220,6 +235,33 @@ def test_worker_release_manages_every_production_worker_role() -> None:
         '[CRATE_WORKER_IMAGE]="crate-worker crate-fast-worker '
         'crate-projector crate-maintenance-worker"'
     ) in script
+
+
+def test_cast_receiver_is_part_of_release_health_and_rollback_contracts() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+
+    for array_name in ("PROJECT_SERVICES", "HEALTHY_SERVICES", "RUNNING_SERVICES"):
+        assignment = next(
+            line for line in script.splitlines() if line.startswith(f"{array_name}=(")
+        )
+        assert "crate-cast-receiver" in assignment
+
+    assert '[crate-cast-receiver]="${IMAGE_PREFIX}/crate-cast-receiver"' in script
+    assert '[CRATE_CAST_RECEIVER_IMAGE]="crate-cast-receiver"' in script
+
+
+def test_cast_receiver_build_and_frontend_gates_are_wired_in_ci() -> None:
+    images = (ROOT / ".github/workflows/build-images.yml").read_text()
+    frontend = (ROOT / ".github/workflows/test-frontend.yml").read_text()
+    react_doctor = (ROOT / ".github/workflows/react-doctor.yml").read_text()
+
+    assert "build-cast-receiver:" in images
+    assert "crate-cast-receiver" in images
+    assert "CHANGED_CAST_RECEIVER" in images
+    assert "npm run --workspace=app/cast-receiver test" in frontend
+    assert "npm run --workspace=app/cast-receiver build" in frontend
+    assert react_doctor.count('"app/cast-receiver/**"') == 2
+    assert "app/cast-receiver" in react_doctor
 
 
 def test_image_rollback_restores_only_the_services_changed_by_the_release() -> None:

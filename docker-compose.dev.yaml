@@ -119,6 +119,8 @@ services:
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=api
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
+      - CRATE_CAST_PUBLIC_BASE_URL=${CRATE_CAST_PUBLIC_BASE_URL:-}
+      - CRATE_CAST_RECEIVER_APP_ID=${CRATE_CAST_RECEIVER_APP_ID:-CC1AD845}
       - SENTRY_DSN=${SENTRY_API_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -211,6 +213,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-default
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
@@ -254,6 +257,12 @@ services:
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
       - SLSKD_API_KEY=${SLSKD_API_KEY:-}
       - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
+      - OLLAMA_URL=${OLLAMA_URL:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
       # SCRAPE_PROXY_URL not set in dev — VPN image is x86_64 only, scrapes go direct
     volumes:
       - ./app/crate:/app/crate:ro
@@ -325,6 +334,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=projector
+      - SENTRY_SERVICE=projector
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_PROJECTOR_POSTGRES_STATEMENT_TIMEOUT_MS:-30000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
@@ -378,6 +388,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-maintenance
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
@@ -424,6 +435,12 @@ services:
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
       - SLSKD_API_KEY=${SLSKD_API_KEY:-}
       - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
+      - OLLAMA_URL=${OLLAMA_URL:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
     volumes:
       - ./app/crate:/app/crate:ro
       - ./app/tests:/app/tests:ro
@@ -476,6 +493,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-analysis
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
@@ -547,6 +565,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-playback
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
@@ -631,6 +650,27 @@ services:
     mem_reservation: 64m
     cpus: "0.25"
 
+  cast-receiver:
+    build:
+      context: ./app
+      dockerfile: cast-receiver/Dockerfile
+      args:
+        VITE_SENTRY_DSN: ${SENTRY_CAST_RECEIVER_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
+        VITE_SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE:-0.05}
+    container_name: crate-dev-cast-receiver
+    ports:
+      - "${CRATE_CAST_RECEIVER_PORT:-8591}:80"
+    networks:
+      - crate-dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   caddy:
     image: caddy:2-alpine
     container_name: crate-dev-caddy
@@ -655,6 +695,7 @@ services:
       - crate-dev
     depends_on:
       - api
+      - cast-receiver
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

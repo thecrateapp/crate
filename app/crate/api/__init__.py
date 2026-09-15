@@ -416,10 +416,12 @@ def create_app() -> FastAPI:
         TraceMiddleware,
         install_trace_id_log_record_factory,
     )
+    from crate.api.cast_cors import CastReceiverCorsMiddleware
 
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)
+    app.add_middleware(CastReceiverCorsMiddleware)
     install_trace_id_log_record_factory()
     app.add_middleware(TraceMiddleware)
 

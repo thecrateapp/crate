@@ -149,6 +149,8 @@ describe("AuthProvider", () => {
     localStorage.setItem("listen-auth-user-id", "41");
     localStorage.setItem("listen-player-state", '{"queue":[]}');
     localStorage.setItem("listen-recently-played", "[]");
+    localStorage.setItem("listen-player-state:v1", '{"queue":[{"id":"a"}]}');
+    localStorage.setItem("listen-recently-played:v1", '[{"id":"a"}]');
     apiMock.mockResolvedValueOnce({
       id: 42,
       email: "new@example.test",
@@ -167,6 +169,8 @@ describe("AuthProvider", () => {
     expect(await screen.findByText("user:42")).toBeTruthy();
     expect(localStorage.getItem("listen-player-state")).toBeNull();
     expect(localStorage.getItem("listen-recently-played")).toBeNull();
+    expect(localStorage.getItem("listen-player-state:v1")).toBeNull();
+    expect(localStorage.getItem("listen-recently-played:v1")).toBeNull();
     expect(clearQueueMock).toHaveBeenCalledTimes(1);
     expect(authReset).toHaveBeenCalledTimes(1);
     expect((authReset.mock.calls[0]?.[0] as CustomEvent).detail.reason).toBe(
@@ -195,6 +199,8 @@ describe("AuthProvider", () => {
 
     localStorage.setItem("listen-player-state", '{"queue":[]}');
     localStorage.setItem("listen-recently-played", "[]");
+    localStorage.setItem("listen-player-state:v1", '{"queue":[{"id":"a"}]}');
+    localStorage.setItem("listen-recently-played:v1", '[{"id":"a"}]');
 
     render(
       <MemoryRouter>
@@ -213,6 +219,8 @@ describe("AuthProvider", () => {
     });
     expect(localStorage.getItem("listen-player-state")).toBeNull();
     expect(localStorage.getItem("listen-recently-played")).toBeNull();
+    expect(localStorage.getItem("listen-player-state:v1")).toBeNull();
+    expect(localStorage.getItem("listen-recently-played:v1")).toBeNull();
     expect(localStorage.getItem("listen-auth-user-id")).toBeNull();
     expect(clearQueueMock).toHaveBeenCalled();
     expect(authReset).toHaveBeenCalledTimes(1);

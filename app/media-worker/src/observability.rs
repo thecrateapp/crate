@@ -1,4 +1,5 @@
 use std::env;
+use std::error::Error;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -118,6 +119,59 @@ pub fn init_sentry(service: &str) -> Option<sentry::ClientInitGuard> {
     Some(guard)
 }
 
+pub fn capture_operation_error<E>(error: &E, operation: &str, tags: &[(&str, &str)])
+where
+    E: Error + ?Sized,
+{
+    let operation = normalized_operation(operation);
+    sentry::with_scope(
+        |scope| {
+            scope.set_level(Some(sentry::Level::Error));
+            scope.set_fingerprint(Some(&["media-worker-operation-failure", operation]));
+            scope.set_tag("operation", operation);
+            for (key, value) in tags {
+                scope.set_tag(key, value);
+            }
+        },
+        || {
+            sentry::capture_error(error);
+        },
+    );
+}
+
+pub fn capture_job_failure(operation: &str, job_id: Option<&str>, errors: &[String]) {
+    let operation = normalized_operation(operation);
+    sentry::with_scope(
+        |scope| {
+            scope.set_level(Some(sentry::Level::Error));
+            scope.set_fingerprint(Some(&["media-worker-job-failure", operation]));
+            scope.set_tag("operation", operation);
+            if let Some(job_id) = job_id {
+                scope.set_extra("job_id", Value::String(job_id.to_string()));
+            }
+            scope.set_extra(
+                "errors",
+                Value::Array(errors.iter().take(10).cloned().map(Value::String).collect()),
+            );
+        },
+        || {
+            sentry::capture_message(
+                &format!("Media job failed: {operation}"),
+                sentry::Level::Error,
+            );
+        },
+    );
+}
+
+fn normalized_operation(operation: &str) -> &str {
+    let operation = operation.trim();
+    if operation.is_empty() {
+        "unknown"
+    } else {
+        operation
+    }
+}
+
 fn scrub_event(event: &mut sentry::protocol::Event) {
     if let Some(user) = event.user.as_mut() {
         user.email = None;
@@ -180,9 +234,11 @@ fn first_non_empty(first: Option<String>, second: Option<String>) -> Option<Stri
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use serde_json::json;
 
-    use super::{scrub_payload, SentrySettings};
+    use super::{capture_job_failure, capture_operation_error, scrub_payload, SentrySettings};
 
     #[test]
     fn settings_disable_without_a_dsn() {
@@ -232,6 +288,62 @@ mod tests {
                 },
                 "items": [{"password": "[Filtered]"}]
             })
+        );
+    }
+
+    #[test]
+    fn capture_operation_error_keeps_the_original_error_and_stable_grouping() {
+        let events = sentry::test::with_captured_events(|| {
+            let error = io::Error::new(io::ErrorKind::ConnectionRefused, "redis unavailable");
+            capture_operation_error(&error, "server.accept", &[("error_source", "listener")]);
+        });
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].fingerprint,
+            vec!["media-worker-operation-failure", "server.accept"]
+        );
+        assert_eq!(
+            events[0].tags.get("operation").map(String::as_str),
+            Some("server.accept")
+        );
+        assert_eq!(
+            events[0].tags.get("error_source").map(String::as_str),
+            Some("listener")
+        );
+        assert_eq!(
+            events[0].exception[0].value.as_deref(),
+            Some("redis unavailable")
+        );
+    }
+
+    #[test]
+    fn capture_job_failure_groups_by_job_kind_and_keeps_id_in_context() {
+        let events = sentry::test::with_captured_events(|| {
+            capture_job_failure(
+                "package.track",
+                Some("job-123"),
+                &["source file missing".to_string()],
+            );
+        });
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].fingerprint,
+            vec!["media-worker-job-failure", "package.track"]
+        );
+        assert_eq!(
+            events[0].message.as_deref(),
+            Some("Media job failed: package.track")
+        );
+        assert_eq!(
+            events[0].tags.get("operation").map(String::as_str),
+            Some("package.track")
+        );
+        assert_eq!(events[0].extra.get("job_id"), Some(&json!("job-123")));
+        assert_eq!(
+            events[0].extra.get("errors"),
+            Some(&json!(["source file missing"]))
         );
     }
 }

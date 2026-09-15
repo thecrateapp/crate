@@ -74,16 +74,19 @@ def deliver_original_artwork(
     path: Path,
     *,
     cache_control: str = "public, max-age=300, stale-while-revalidate=86400",
-) -> FileResponse:
-    return FileResponse(
-        path,
-        media_type=_MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream"),
-        headers={
-            "Cache-Control": cache_control,
-            "ETag": _file_etag(path),
-            "X-Crate-Artwork": "original",
-        },
-    )
+    buffer_file: bool = False,
+) -> Response:
+    media_type = _MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    headers = {
+        "Cache-Control": cache_control,
+        "ETag": _file_etag(path),
+        "X-Crate-Artwork": "original",
+    }
+    if buffer_file:
+        return Response(
+            content=path.read_bytes(), media_type=media_type, headers=headers
+        )
+    return FileResponse(path, media_type=media_type, headers=headers)
 
 
 def deliver_artwork(
@@ -95,6 +98,7 @@ def deliver_artwork(
     queue_on_miss: bool = True,
     cache_visibility: Literal["public", "private"] = "public",
     validate_source_revision: bool = False,
+    buffer_file: bool = False,
 ) -> Response:
     variant = resolve_materialized_variant(asset, requested_size)
     if validate_source_revision and variant is not None and local_original is not None:
@@ -106,17 +110,22 @@ def deliver_artwork(
             variant = None
     if variant is not None:
         _record_request(asset, "variant")
+        headers = {
+            "Cache-Control": (
+                f"{cache_visibility}, max-age=86400, stale-while-revalidate=604800"
+            ),
+            "ETag": _file_etag(variant.path, variant.source_revision),
+            "X-Crate-Artwork": "variant",
+            "X-Crate-Artwork-Revision": variant.source_revision,
+        }
+        if buffer_file:
+            return Response(
+                content=variant.path.read_bytes(),
+                media_type=variant.media_type,
+                headers=headers,
+            )
         return FileResponse(
-            variant.path,
-            media_type=variant.media_type,
-            headers={
-                "Cache-Control": (
-                    f"{cache_visibility}, max-age=86400, stale-while-revalidate=604800"
-                ),
-                "ETag": _file_etag(variant.path, variant.source_revision),
-                "X-Crate-Artwork": "variant",
-                "X-Crate-Artwork-Revision": variant.source_revision,
-            },
+            variant.path, media_type=variant.media_type, headers=headers
         )
 
     if local_original is not None and local_original.is_file():
@@ -126,6 +135,7 @@ def deliver_artwork(
             cache_control=(
                 f"{cache_visibility}, max-age=300, stale-while-revalidate=86400"
             ),
+            buffer_file=buffer_file,
         )
         return (
             _queue_after_response(response, asset, reason="variant-miss")

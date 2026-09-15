@@ -17,6 +17,7 @@ import {
   type GaplessPlayerCallbacks,
 } from "@/lib/gapless-player";
 import { isOnline as isRuntimeOnline } from "@/lib/capacitor";
+import { isCastSessionActive } from "@/lib/cast-sender";
 
 interface UsePlayerEngineCallbacksParams {
   callbacksRef: MutableRefObject<GaplessPlayerCallbacks>;
@@ -116,6 +117,7 @@ export function usePlayerEngineCallbacks({
   const playbackRequestStartedAtRef = useRef<number | null>(null);
   callbacksRef.current = {
     onTimeUpdate: (positionMs, trackIndex) => {
+      if (isCastSessionActive()) return;
       const positionSeconds = positionMs / 1000;
       clearStallTimer();
       if (bufferingIntentRef.current) {
@@ -130,9 +132,11 @@ export function usePlayerEngineCallbacks({
       }
     },
     onDurationChange: (durationMs) => {
+      if (isCastSessionActive()) return;
       commitDuration(Math.max(durationMs / 1000, 0));
     },
     onLoad: (_path, _fullyLoaded, durationMs) => {
+      if (isCastSessionActive()) return;
       const durationSeconds = Math.max(durationMs / 1000, 0);
       if (durationSeconds > 0) {
         commitDuration(durationSeconds);
@@ -152,6 +156,7 @@ export function usePlayerEngineCallbacks({
       tryRestoreAutoplay();
     },
     onPlayRequest: () => {
+      if (isCastSessionActive()) return;
       playbackRequestStartedAtRef.current ??= Date.now();
       bufferingIntentRef.current = true;
       if (!isPlayingRef.current) {
@@ -159,6 +164,7 @@ export function usePlayerEngineCallbacks({
       }
     },
     onPlay: () => {
+      if (isCastSessionActive()) return;
       if (playbackRequestStartedAtRef.current !== null) {
         recordPlaybackStarted(
           Math.max(0, Date.now() - playbackRequestStartedAtRef.current),
@@ -175,6 +181,7 @@ export function usePlayerEngineCallbacks({
       onActivePlaybackStarted();
     },
     onPause: () => {
+      if (isCastSessionActive()) return;
       if (bufferingIntentRef.current && isPlayingRef.current) {
         commitIsBuffering(true);
         return;
@@ -190,6 +197,7 @@ export function usePlayerEngineCallbacks({
       bufferingIntentRef.current = false;
     },
     onPrev: () => {
+      if (isCastSessionActive()) return;
       clearPrevRestartLatch();
       commitCurrentTime(0);
       commitDuration(Math.max(gpGetCurrentTrackDuration() / 1000, 0));
@@ -199,6 +207,7 @@ export function usePlayerEngineCallbacks({
       clearStallTimer();
     },
     onNext: (fromPath, toPath) => {
+      if (isCastSessionActive()) return;
       clearPrevRestartLatch();
       const outgoingDurationSeconds = durationRef.current;
 
@@ -229,6 +238,7 @@ export function usePlayerEngineCallbacks({
       }
     },
     onTrackFinished: (path) => {
+      if (isCastSessionActive()) return;
       const bucket = engineTrackMapRef.current.get(path);
       const endedTrack =
         bucket?.[0] ??
@@ -251,6 +261,7 @@ export function usePlayerEngineCallbacks({
       );
     },
     onAllFinished: () => {
+      if (isCastSessionActive()) return;
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       cancelSoftInterruption();
@@ -259,6 +270,7 @@ export function usePlayerEngineCallbacks({
       bufferingIntentRef.current = false;
     },
     onError: (path, err) => {
+      if (isCastSessionActive()) return;
       const currentTrack = currentTrackRef.current;
       const currentPath = currentTrack ? getStreamUrl(currentTrack) : null;
       if (currentPath && path && path !== currentPath) {
@@ -290,6 +302,7 @@ export function usePlayerEngineCallbacks({
       });
     },
     onBuffering: (path) => {
+      if (isCastSessionActive()) return;
       const currentTrack = currentTrackRef.current;
       const currentPath = currentTrack ? getStreamUrl(currentTrack) : null;
       if (path && currentPath && path !== currentPath) return;

@@ -45,12 +45,13 @@ def _queue_research(
 ):
     require_permission(request, "library.metadata.write")
     identity = str(artist.get("entity_uid") or artist.get("id") or artist.get("name"))
-    dedup_key = f"artist-bio-research:{identity}"
+    language = " ".join(body.language.split()) or "English"
+    dedup_key = f"artist-bio-research:{identity}:{language.casefold()}"
     params = {
         "artist_id": artist.get("id"),
         "artist_entity_uid": artist.get("entity_uid"),
         "artist_name": artist.get("name"),
-        "language": body.language.strip() or "English",
+        "language": language,
     }
     task_id = create_task_dedup("research_artist_bio", params, dedup_key=dedup_key)
     if task_id is None:

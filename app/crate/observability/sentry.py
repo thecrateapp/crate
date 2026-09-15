@@ -11,6 +11,8 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import sentry_sdk
 
+from crate.observability.redaction import redact_cast_session_lease
+
 _FILTERED = "[Filtered]"
 _DEFAULT_TRACE_SAMPLE_RATE = 0.1
 _SENSITIVE_QUERY_KEYS = {
@@ -48,6 +50,11 @@ class SentrySettings:
     @property
     def enabled(self) -> bool:
         return bool(self.dsn)
+
+
+def resolve_service_name(default: str) -> str:
+    """Resolve the low-cardinality runtime name used to segment shared projects."""
+    return os.getenv("SENTRY_SERVICE", "").strip() or default
 
 
 def load_settings(service: str) -> SentrySettings:
@@ -114,10 +121,146 @@ def task_scope(task_type: str, task_id: str, queue: str):
         scope.set_tag("task_type", task_type)
         scope.set_tag("queue", queue)
         scope.set_context("task", {"id": str(task_id), "type": task_type})
-        with sentry_sdk.start_span(op="queue.process", name=task_type) as span:
+        with sentry_sdk.start_transaction(op="queue.process", name=task_type) as span:
             span.set_data("task_id", str(task_id))
             span.set_data("queue", queue)
-            yield span
+            try:
+                yield span
+            except BaseException:
+                _set_span_status(span, "internal_error")
+                raise
+            else:
+                _set_span_status(span, "ok")
+
+
+def capture_task_failure(
+    task_type: str,
+    task_id: str,
+    queue: str,
+    error: str,
+    *,
+    retry_count: int = 0,
+    max_retries: int = 0,
+) -> None:
+    """Report a terminal task result without creating one issue per task id."""
+    if not sentry_sdk.is_initialized():
+        return
+
+    with sentry_sdk.push_scope() as scope:
+        scope.fingerprint = ["worker-task-failure", task_type]
+        scope.set_tag("task_type", task_type)
+        scope.set_tag("queue", queue)
+        scope.set_context(
+            "task",
+            {
+                "id": str(task_id),
+                "type": task_type,
+                "queue": queue,
+                "reason": str(error)[:500],
+                "retry_count": int(retry_count),
+                "max_retries": int(max_retries),
+            },
+        )
+        _mark_current_span_failed()
+        sentry_sdk.capture_message(f"Worker task failed: {task_type}", "error")
+
+
+def capture_task_exception(
+    error: BaseException,
+    *,
+    task_type: str,
+    task_id: str,
+    queue: str,
+    retry_count: int = 0,
+    max_retries: int = 0,
+) -> None:
+    """Capture a raised worker exception with stable task-type grouping."""
+    if not sentry_sdk.is_initialized():
+        return
+
+    error_type = type(error).__name__
+    with sentry_sdk.push_scope() as scope:
+        scope.fingerprint = ["worker-task-exception", task_type, error_type]
+        scope.set_tag("task_type", task_type)
+        scope.set_tag("queue", queue)
+        scope.set_tag("error_type", error_type)
+        scope.set_context(
+            "task",
+            {
+                "id": str(task_id),
+                "type": task_type,
+                "queue": queue,
+                "retry_count": int(retry_count),
+                "max_retries": int(max_retries),
+            },
+        )
+        _mark_current_span_failed()
+        sentry_sdk.capture_exception(error)
+
+
+def capture_handled_http_error(*, method: str, route: str, status_code: int) -> None:
+    """Report a returned 5xx response that did not raise an exception."""
+    if not sentry_sdk.is_initialized():
+        return
+
+    normalized_method = str(method or "UNKNOWN").upper()
+    normalized_route = str(route or "<unmatched>")
+    normalized_status = int(status_code)
+    with sentry_sdk.push_scope() as scope:
+        scope.fingerprint = [
+            "handled-http-error",
+            normalized_method,
+            normalized_route,
+            str(normalized_status),
+        ]
+        scope.set_tag("error.source", "handled-http-response")
+        scope.set_tag("http.method", normalized_method)
+        scope.set_tag("http.route", normalized_route)
+        scope.set_tag("http.status_code", str(normalized_status))
+        scope.set_context(
+            "http_response",
+            {
+                "method": normalized_method,
+                "route": normalized_route,
+                "status_code": normalized_status,
+            },
+        )
+        _mark_current_span_failed()
+        sentry_sdk.capture_message(
+            f"Handled HTTP {normalized_status}: {normalized_method} {normalized_route}",
+            "error",
+        )
+
+
+def capture_background_exception(error: BaseException, operation: str) -> None:
+    """Capture a handled daemon failure with stable, low-cardinality grouping."""
+    if not sentry_sdk.is_initialized():
+        return
+
+    error_type = type(error).__name__
+    with sentry_sdk.push_scope() as scope:
+        scope.fingerprint = [
+            "background-operation-failure",
+            operation,
+            error_type,
+        ]
+        scope.set_tag("operation", operation)
+        scope.set_tag("error_type", error_type)
+        _mark_current_span_failed()
+        sentry_sdk.capture_exception(error)
+
+
+def _mark_current_span_failed() -> None:
+    get_current_span = getattr(sentry_sdk, "get_current_span", None)
+    span = get_current_span() if callable(get_current_span) else None
+    if span is not None:
+        _set_span_status(span, "internal_error")
+
+
+def _set_span_status(span: Any, status: str) -> None:
+    set_status = getattr(span, "set_status", None)
+    if callable(set_status):
+        set_status(status)
 
 
 def scrub_sentry_event(event: dict[str, Any]) -> dict[str, Any]:
@@ -157,8 +300,10 @@ def _scrub_value(value: Any, key: str | None = None) -> Any:
     if isinstance(value, tuple):
         return tuple(_scrub_value(item) for item in value)
     if isinstance(value, str):
-        if key in {"url", "query_string"}:
+        if key in {"path", "url", "query_string"}:
             return _scrub_url_or_query(value, is_url=key == "url")
+        if "/api/cast/sessions/" in value:
+            return redact_cast_session_lease(value)
         return value
     return value
 
@@ -173,17 +318,17 @@ def _is_sensitive_key(key: str) -> bool:
 def _scrub_url_or_query(value: str, *, is_url: bool) -> str:
     if is_url:
         parsed = urlsplit(value)
-        if not parsed.query:
-            return value
         return urlunsplit(
             (
                 parsed.scheme,
                 parsed.netloc,
-                parsed.path,
+                redact_cast_session_lease(parsed.path),
                 _scrub_query(parsed.query),
                 parsed.fragment,
             )
         )
+    if "/api/cast/sessions/" in value:
+        return redact_cast_session_lease(value)
     return _scrub_query(value)
 
 

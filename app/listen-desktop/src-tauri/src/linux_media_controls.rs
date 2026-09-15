@@ -160,7 +160,7 @@ struct MprisPlayer {
 }
 
 impl MprisPlayer {
-    fn emit_command(&self, command: &str) {
+    fn emit_command(&self, command: crate::PlaybackCommand) {
         crate::emit_system_media_command(&self.app, command);
     }
 
@@ -175,31 +175,31 @@ impl MprisPlayer {
 #[interface(interface = "org.mpris.MediaPlayer2.Player")]
 impl MprisPlayer {
     fn next(&self) {
-        self.emit_command("next");
+        self.emit_command(crate::PlaybackCommand::Next);
     }
 
     fn previous(&self) {
-        self.emit_command("previous");
+        self.emit_command(crate::PlaybackCommand::Previous);
     }
 
     fn pause(&self) {
-        self.emit_command("pause");
+        self.emit_command(crate::PlaybackCommand::Pause);
     }
 
     fn play_pause(&self) {
         if self.state().is_playing {
-            self.emit_command("pause");
+            self.emit_command(crate::PlaybackCommand::Pause);
         } else {
-            self.emit_command("play");
+            self.emit_command(crate::PlaybackCommand::Play);
         }
     }
 
     fn stop(&self) {
-        self.emit_command("pause");
+        self.emit_command(crate::PlaybackCommand::Pause);
     }
 
     fn play(&self) {
-        self.emit_command("play");
+        self.emit_command(crate::PlaybackCommand::Play);
     }
 
     fn seek(&self, _offset: i64) {}

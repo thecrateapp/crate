@@ -281,6 +281,8 @@ services:
       - DOMAIN=${DOMAIN}
       - CRATE_INSTANCE_NAME=${CRATE_INSTANCE_NAME:?CRATE_INSTANCE_NAME must be set}
       - CRATE_PUBLIC_API_BASE_URL=${CRATE_PUBLIC_API_BASE_URL:?CRATE_PUBLIC_API_BASE_URL must be set}
+      - CRATE_CAST_PUBLIC_BASE_URL=${CRATE_CAST_PUBLIC_BASE_URL:-}
+      - CRATE_CAST_RECEIVER_APP_ID=${CRATE_CAST_RECEIVER_APP_ID:-CC1AD845}
       - SPOTIFY_ID=${SPOTIFY_ID}
       - SPOTIFY_SECRET=${SPOTIFY_SECRET}
       - SETLISTFM_API_KEY=${SETLISTFM_API_KEY}
@@ -303,8 +305,7 @@ services:
       - CRATE_FEDERATION_CATALOG_PAGE_MAX_BYTES=${CRATE_FEDERATION_CATALOG_PAGE_MAX_BYTES:-2097152}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - NATIVE_OAUTH_EXCHANGE_ENABLED=${NATIVE_OAUTH_EXCHANGE_ENABLED:-false}
-      - NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED=${NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED:-true}
+      - NATIVE_OAUTH_EXCHANGE_ENABLED=${NATIVE_OAUTH_EXCHANGE_ENABLED:-true}
       - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
       - APPLE_TEAM_ID=${APPLE_TEAM_ID:-}
       - APPLE_KEY_ID=${APPLE_KEY_ID:-}
@@ -486,6 +487,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-default
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -604,6 +606,8 @@ services:
     extends:
       service: crate-worker
     container_name: crate-fast-worker
+    environment:
+      - SENTRY_SERVICE=worker-fast
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "0.35"
@@ -632,6 +636,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=projector
+      - SENTRY_SERVICE=projector
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -684,6 +689,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-maintenance
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -809,6 +815,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-analysis
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -894,6 +901,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - SENTRY_SERVICE=worker-playback
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -1041,6 +1049,36 @@ services:
       traefik.http.middlewares.crate-auth-soft.forwardAuth.address: http://crate-api:8585/api/auth/verify-soft
       traefik.http.middlewares.crate-auth-soft.forwardAuth.trustForwardHeader: true
       traefik.http.middlewares.crate-auth-soft.forwardAuth.authResponseHeaders: Remote-User,Remote-Name,Remote-Role
+
+  crate-cast-receiver:
+    logging: *default-logging
+    image: ${CRATE_CAST_RECEIVER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-cast-receiver:${CRATE_IMAGE_TAG:-latest}}
+    build:
+      context: ./app
+      dockerfile: cast-receiver/Dockerfile
+      args:
+        VITE_SENTRY_DSN: ${SENTRY_CAST_RECEIVER_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+        VITE_SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE:-0.05}
+    container_name: crate-cast-receiver
+    restart: unless-stopped
+    networks:
+      - crate
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.cast-receiver.rule: Host(`${CRATE_CAST_RECEIVER_HOST:-cast.example.com}`)
+      traefik.http.routers.cast-receiver.entryPoints: websecure
+      traefik.http.services.cast-receiver.loadbalancer.server.port: 80
+      traefik.http.routers.cast-receiver.tls: true
+      traefik.http.routers.cast-receiver.tls.certresolver: letsencrypt
 
 volumes:
   crate_redis:
