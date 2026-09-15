@@ -28,6 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CRATE_MOBILE_RELEASE: "true"
+      CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: ${{ startsWith(github.ref, 'refs/tags/v') && 'true' || 'false' }}
+      CRATE_CAST_RECEIVER_APP_ID: ${{ vars.CAST_RECEIVER_APP_ID || 'CC1AD845' }}
+      VITE_CAST_CUSTOM_RECEIVER_ENABLED: ${{ vars.CAST_CUSTOM_RECEIVER_ENABLED || 'false' }}
+      VITE_CAST_RECEIVER_APP_ID: ${{ vars.CAST_RECEIVER_APP_ID || 'CC1AD845' }}
     permissions:
       contents: write # create/update releases
     steps:

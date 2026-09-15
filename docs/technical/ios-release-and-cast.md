@@ -41,6 +41,11 @@ registered 8-character Crate receiver ID. It must match the
 `VITE_CAST_RECEIVER_APP_ID` compiled into the Listen web bundle and the API
 receiver configuration.
 
+GitHub Actions reads the public `CAST_RECEIVER_APP_ID` and
+`CAST_CUSTOM_RECEIVER_ENABLED` repository variables, injects them into both
+the Capacitor bundle and Xcode, and fails tagged builds when custom Cast is not
+enabled or still uses the Default Media Receiver ID.
+
 The Capacitor bridge loads the complete receiver-owned queue, preserves Crate
 stable item IDs in media `customData`, and exposes queue mutation, navigation,
 playback-state and versioned protocol events. Disconnect leaves the receiver

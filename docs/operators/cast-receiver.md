@@ -21,6 +21,11 @@ SENTRY_CAST_RECEIVER_DSN=
 SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE=0.05
 ```
 
+`CAST_RECEIVER_APP_ID` is public configuration, not a secret. The Android and
+iOS workflows inject these same variables into the web bundle and native SDKs.
+Tag builds fail closed when the custom receiver is disabled, the IDs differ,
+or the ID is missing, malformed, or still `CC1AD845`.
+
 GitHub Actions repository variables used by static sender builds:
 
 ```text
@@ -81,6 +86,34 @@ The receiver image is part of the immutable release manifest and deployment
 rollback. `Disconnect` leaves the receiver and lease active; `Stop Cast` stops
 CAF playback and revokes the scoped lease.
 
+## Spectrum pipeline
+
+The receiver requests one lease-scoped spectrum resource per queue item. A
+cache miss creates the deduplicated `generate_cast_spectrum` task on the heavy
+analysis queue. The analysis worker uses ffmpeg to stream mono PCM, encodes 24
+frequency bands every 100 ms and atomically stores a gzip-compressed CRSP v1
+artefact under `${DATA_DIR}/cast-spectrum/`. PostgreSQL stores only its state,
+source fingerprint, relative path and integrity metadata.
+
+The endpoint returns `202` while queued and `425` while generating, both with
+`Retry-After`. A ready artefact returns an immutable `ETag`; the receiver
+revalidates it with `If-None-Match`. Missing, failed or stale artefacts never
+block audio and render the bounded ambient fallback instead.
+
+Useful diagnostics:
+
+```bash
+docker compose logs --since=15m crate-analysis-worker | grep generate_cast_spectrum
+docker compose exec crate-postgres psql -U "${POSTGRES_SUPERUSER_USER:-crate}" \
+  -d "${CRATE_POSTGRES_DB:-crate}" \
+  -c "select status, count(*) from cast_spectrum_artifacts group by status;"
+find "${DATA_DIR:-./data}/cast-spectrum" -type f -name '*.crsp.gz' | head
+```
+
+Do not delete a ready database row independently from its file. If a file is
+missing, the next scoped request marks it pending and regenerates it. Source
+fingerprints also invalidate artefacts automatically when the track changes.
+
 ## Rollback
 
 Set `CAST_CUSTOM_RECEIVER_ENABLED=false` for the next sender build and
@@ -110,3 +143,14 @@ Receiver Sentry loads only when a DSN is present and uses its own release name
 strings, scoped leases, signed URLs, queue data and listening metadata. Metrics
 accept only bounded operational attributes such as outcome, attempt, source,
 device category and CAF version.
+
+## Troubleshooting
+
+| Symptom                           | Check                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| Receiver does not launch          | App ID, published/dev device registration, HTTPS URL and receiver `/healthz`        |
+| Audio returns `Failed to fetch`   | `CRATE_CAST_PUBLIC_BASE_URL`, receiver CORS, public API TLS and Range preflight     |
+| Default Google screen appears     | Sender flag is false, app ID is `CC1AD845`, or native/web IDs do not match          |
+| Queue restarts after reconnect    | Receiver status messages, session lease expiry and queue revision conflicts         |
+| Spectrum stays ambient            | Analysis-worker health, task status, writable `${DATA_DIR}` and ffmpeg availability |
+| Playback works but controls drift | CAF media status/custom namespace events and receiver heartbeat writes              |

@@ -30,3 +30,52 @@ test("rejects release server URLs that use HTTP", () => {
     /HTTPS/i,
   );
 });
+
+test("requires one matching registered Cast receiver for tagged releases", () => {
+  assert.throws(
+    () =>
+      validateReleaseMobileConfig({
+        CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+      }),
+    /registered Cast receiver/i,
+  );
+  assert.throws(
+    () =>
+      validateReleaseMobileConfig({
+        CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+        CRATE_CAST_RECEIVER_APP_ID: "CC1AD845",
+        VITE_CAST_RECEIVER_APP_ID: "CC1AD845",
+        VITE_CAST_CUSTOM_RECEIVER_ENABLED: "true",
+      }),
+    /registered Cast receiver/i,
+  );
+  assert.throws(
+    () =>
+      validateReleaseMobileConfig({
+        CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+        CRATE_CAST_RECEIVER_APP_ID: "ABCD1234",
+        VITE_CAST_RECEIVER_APP_ID: "WXYZ5678",
+        VITE_CAST_CUSTOM_RECEIVER_ENABLED: "true",
+      }),
+    /must match/i,
+  );
+  assert.throws(
+    () =>
+      validateReleaseMobileConfig({
+        CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+        CRATE_CAST_RECEIVER_APP_ID: "ABCD1234",
+        VITE_CAST_RECEIVER_APP_ID: "ABCD1234",
+        VITE_CAST_CUSTOM_RECEIVER_ENABLED: "false",
+      }),
+    /must be enabled/i,
+  );
+
+  assert.doesNotThrow(() =>
+    validateReleaseMobileConfig({
+      CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+      CRATE_CAST_RECEIVER_APP_ID: "ABCD1234",
+      VITE_CAST_RECEIVER_APP_ID: "ABCD1234",
+      VITE_CAST_CUSTOM_RECEIVER_ENABLED: "true",
+    }),
+  );
+});

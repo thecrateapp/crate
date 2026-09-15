@@ -38,6 +38,7 @@ compose if the change involves readplane-routed endpoints or SSE.
 | Listen    |       5174 | `https://listen.dev.lespedants.org` |
 | Docs      |       5175 | `https://docs.dev.cratemusic.app`   |
 | Site      |       5176 | `https://www.dev.cratemusic.app`    |
+| Cast UI   |       8591 | `https://cast.dev.lespedants.org`   |
 | API       |       8585 | `https://api.dev.lespedants.org`    |
 | Readplane |       8686 | `http://localhost:8686`             |
 
@@ -75,6 +76,19 @@ your change.
 
 The seeded development account is `admin@cratemusic.app` / `admin`.
 
+The Cast receiver can be previewed without a physical device or CAF runtime:
+
+```bash
+npm run --workspace=app/cast-receiver dev -- --host --port 5179
+# Open http://localhost:5179/?preview=1
+```
+
+Physical Cast devices require a publicly reachable HTTPS receiver URL and a
+registered development application ID; they do not trust the local mkcert CA.
+See [Cast receiver operations](../operators/cast-receiver.md) and complete the
+[Cast release checklist](../testing/cast-release-checklist.md) before enabling
+the custom receiver.
+
 ## Focused workflows
 
 ```bash
@@ -87,9 +101,9 @@ make dev-logs s=worker
 make dev-down
 ```
 
-The npm workspace includes four web packages: `app/shared/ui`, `app/ui`,
-`app/listen` and `app/listen-desktop`. Docs and Site are standalone Vite apps;
-their dependencies are installed by `make dev`.
+The npm workspace includes `app/shared/ui`, the shared Cast protocol,
+`app/cast-receiver`, `app/ui`, `app/listen` and `app/listen-desktop`. Docs and
+Site are standalone Vite apps; their dependencies are installed by `make dev`.
 
 ## Federation harness
 
