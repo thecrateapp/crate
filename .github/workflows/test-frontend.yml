@@ -68,9 +68,8 @@ jobs:
       - name: Test Cast receiver
         run: npm run --workspace=app/cast-receiver test
 
-      - name: Build Cast receiver and upload Sentry source maps
+      - name: Build Cast receiver
         env:
-          SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-cast-receiver
           SENTRY_RELEASE: cast-receiver-${{ github.sha }}
@@ -88,9 +87,8 @@ jobs:
       - name: Test admin UI (crate-ui)
         run: npm run --workspace=app/ui test
 
-      - name: Build admin UI and upload Sentry source maps
+      - name: Build admin UI
         env:
-          SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-admin
           SENTRY_RELEASE: crate-${{ github.sha }}
@@ -117,9 +115,8 @@ jobs:
       - name: Check shared UI layer boundaries
         run: npm run design-system:layers
 
-      - name: Build Listen and upload Sentry source maps
+      - name: Build Listen
         env:
-          SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-listen
           SENTRY_RELEASE: crate-${{ github.sha }}

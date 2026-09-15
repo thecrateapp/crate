@@ -8,11 +8,8 @@ import { startMediaAccessTicketRefresh } from "./lib/api";
 import { initCapacitor } from "./lib/capacitor";
 import { applyNativeColorMode } from "./lib/capacitor-init";
 import { primeOfflineRuntimeProfile } from "./lib/offline";
-import {
-  isCapacitorRuntime,
-  shouldRegisterServiceWorker,
-  usesMobileShell,
-} from "./lib/platform";
+import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
+import { initRuntimeSentry, reportRuntimeError } from "./lib/runtime-sentry";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
 import { renderSecureSessionError } from "./lib/secure-session-error";
 import { syncThemeColor } from "./lib/theme-color";
@@ -21,7 +18,6 @@ import {
   initializeThemeSkin,
   subscribeThemeSkin,
 } from "@crate/ui/lib/theme-skin";
-import { initSentry } from "./lib/sentry";
 import "./index.css";
 
 async function disableDevServiceWorker() {
@@ -78,14 +74,6 @@ function ThemeAwareToaster() {
   );
 }
 
-if (isCapacitorRuntime) {
-  void import("./lib/sentry-capacitor").then(({ initNativeSentry }) => {
-    initNativeSentry();
-  });
-} else {
-  initSentry();
-}
-
 // Load Poppins only on web — iOS/Android use system fonts (San
 // Francisco / Roboto) for a native feel. The mode guard is build-time
 // constant, so Vite drops the font chunk from Capacitor bundles.
@@ -107,7 +95,10 @@ function renderApp(): void {
 async function bootstrap(): Promise<void> {
   try {
     await bootstrapNativeSessionStore();
-  } catch {
+  } catch (error) {
+    await reportRuntimeError(error, "bootstrap.secure_session").catch(
+      () => undefined,
+    );
     const root = document.getElementById("root");
     if (root) renderSecureSessionError(root);
     return;
@@ -117,7 +108,11 @@ async function bootstrap(): Promise<void> {
   const appliedTheme = initializeThemeSkin();
   syncThemeColor(document.documentElement, appliedTheme.resolvedMode);
   await initCapacitor();
-  void primeOfflineRuntimeProfile();
+  void primeOfflineRuntimeProfile().catch((error) => {
+    void reportRuntimeError(error, "offline.profile.prime").catch(
+      () => undefined,
+    );
+  });
 
   if (
     shouldRegisterServiceWorker &&
@@ -127,12 +122,26 @@ async function bootstrap(): Promise<void> {
     if (import.meta.env.DEV) {
       void disableDevServiceWorker();
     } else {
-      void navigator.serviceWorker.register("/sw.js").catch(() => {
-        // Ignore registration failures; the app still works without offline mirror.
+      void navigator.serviceWorker.register("/sw.js").catch((error) => {
+        void reportRuntimeError(error, "service_worker.register").catch(
+          () => undefined,
+        );
       });
     }
   }
   renderApp();
 }
 
-void bootstrap();
+async function start(): Promise<void> {
+  await initRuntimeSentry().catch(() => undefined);
+
+  try {
+    await bootstrap();
+  } catch (error) {
+    await reportRuntimeError(error, "bootstrap.unhandled").catch(
+      () => undefined,
+    );
+  }
+}
+
+void start();

@@ -376,6 +376,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=ui
           cache-to: type=gha,scope=ui,mode=max
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           build-args: |
             VITE_SENTRY_DSN=${{ vars.SENTRY_ADMIN_DSN }}
             VITE_SENTRY_ENVIRONMENT=production
@@ -418,6 +420,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=listen
           cache-to: type=gha,scope=listen,mode=max
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           build-args: |
             VITE_SENTRY_DSN=${{ vars.SENTRY_LISTEN_DSN }}
             VITE_SENTRY_ENVIRONMENT=production
@@ -462,6 +466,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=cast-receiver
           cache-to: type=gha,scope=cast-receiver,mode=max
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           build-args: |
             VITE_SENTRY_DSN=${{ vars.SENTRY_CAST_RECEIVER_DSN }}
             VITE_SENTRY_ENVIRONMENT=production

@@ -32,6 +32,10 @@ jobs:
       CRATE_CAST_RECEIVER_APP_ID: ${{ vars.CAST_RECEIVER_APP_ID || 'CC1AD845' }}
       VITE_CAST_CUSTOM_RECEIVER_ENABLED: ${{ vars.CAST_CUSTOM_RECEIVER_ENABLED || 'false' }}
       VITE_CAST_RECEIVER_APP_ID: ${{ vars.CAST_RECEIVER_APP_ID || 'CC1AD845' }}
+      VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
+      VITE_SENTRY_ENVIRONMENT: production
+      VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+      VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_LISTEN_TRACES_SAMPLE_RATE || '0.1' }}
     permissions:
       contents: write # create/update releases
     steps:
@@ -87,6 +91,11 @@ jobs:
         working-directory: app/listen
 
       - name: Build web bundle (capacitor mode)
+        env:
+          SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-listen
+          SENTRY_RELEASE: crate-${{ github.sha }}
         run: npm run build:cap
         working-directory: app/listen
 
