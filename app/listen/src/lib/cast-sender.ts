@@ -1,4 +1,4 @@
-import { registerPlugin } from "@capacitor/core";
+import { registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 import {
   CAST_PROTOCOL_NAMESPACE,
   parseCastProtocolMessage,
@@ -281,7 +281,7 @@ function subscribeNativeCastPlaybackState(
   let timer: number | null = null;
   let nativeState: CastPlaybackState | null = null;
   let receiverStatus: TimedCastReceiverStatus | null = null;
-  const handles: Array<Promise<{ remove: () => Promise<void> }>> = [];
+  const handles: Array<Promise<PluginListenerHandle>> = [];
 
   const clearTimer = () => {
     if (timer === null) return;
