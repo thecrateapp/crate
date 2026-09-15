@@ -39,6 +39,7 @@ mod macos_delegate;
 mod macos_dock_menu;
 #[cfg(target_os = "macos")]
 mod macos_media_controls;
+mod observability;
 #[cfg(target_os = "windows")]
 mod windows_media_controls;
 
@@ -803,6 +804,7 @@ fn handle_activation_args<R: tauri::Runtime>(
 fn register_deep_links(app: &tauri::App) {
     #[cfg(target_os = "linux")]
     if let Err(err) = app.deep_link().register_all() {
+        observability::capture_operation_error(&err, "deep_link.register");
         eprintln!("failed to register Crate deep links: {err}");
     }
     #[cfg(not(target_os = "linux"))]
@@ -816,8 +818,15 @@ fn app_icon_image() -> tauri::Result<Image<'static>> {
 
 #[cfg(desktop)]
 fn set_desktop_window_icon<R: tauri::Runtime>(window: &WebviewWindow<R>) {
-    if let Ok(icon) = app_icon_image() {
-        let _ = window.set_icon(icon);
+    let icon = match app_icon_image() {
+        Ok(icon) => icon,
+        Err(err) => {
+            observability::capture_operation_error(&err, "window.icon.decode");
+            return;
+        }
+    };
+    if let Err(err) = window.set_icon(icon) {
+        observability::capture_operation_error(&err, "window.icon.apply");
     }
 }
 
@@ -940,8 +949,11 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<DesktopMenuState> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _sentry_guard = observability::init_sentry("listen-tauri-native");
+
     #[cfg(target_os = "linux")]
     if let Err(err) = linux_desktop_integration::ensure_registered() {
+        observability::capture_operation_error(&err, "linux.desktop.register");
         eprintln!("failed to register Crate desktop integration: {err}");
     }
 
