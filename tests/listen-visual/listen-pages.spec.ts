@@ -147,6 +147,15 @@ test("renders Crate Red as a complete skin", async ({
     "data-crate-skin",
     "crateRed",
   );
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--font-brand")
+          .trim(),
+      ),
+    )
+    .toBe("system-ui, sans-serif");
   await expectStablePage(page, "settings-crate-red-dark");
 });
 
