@@ -514,6 +514,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=docs
           cache-to: type=gha,scope=docs,mode=max
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+          build-args: |
+            VITE_SENTRY_DSN=${{ vars.SENTRY_DOCS_DSN }}
+            VITE_SENTRY_ENVIRONMENT=production
+            VITE_SENTRY_RELEASE=crate-${{ github.sha }}
+            VITE_SENTRY_TRACES_SAMPLE_RATE=${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
 
   build-site:
     needs: changes
@@ -554,6 +561,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=site
           cache-to: type=gha,scope=site,mode=max
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+          build-args: |
+            VITE_SENTRY_DSN=${{ vars.SENTRY_SITE_DSN }}
+            VITE_SENTRY_ENVIRONMENT=production
+            VITE_SENTRY_RELEASE=crate-${{ github.sha }}
+            VITE_SENTRY_TRACES_SAMPLE_RATE=${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
 
   promote-release:
     needs:

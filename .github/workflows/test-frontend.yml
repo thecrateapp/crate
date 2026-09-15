@@ -9,6 +9,8 @@ on:
       - "app/ui/**"
       - "app/listen/**"
       - "app/listen-desktop/**"
+      - "app/docs/**"
+      - "app/site/**"
       - "package.json"
       - "package-lock.json"
       - "scripts/design-system/**"
@@ -25,6 +27,8 @@ on:
       - "app/ui/**"
       - "app/listen/**"
       - "app/listen-desktop/**"
+      - "app/docs/**"
+      - "app/site/**"
       - "package.json"
       - "package-lock.json"
       - "scripts/design-system/**"
@@ -49,6 +53,37 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install auxiliary frontend dependencies
+        run: |
+          npm ci --prefix app/site
+          npm ci --prefix app/docs
+
+      - name: Test and build marketing site
+        env:
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-site
+          SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_SITE_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
+        run: |
+          npm test --prefix app/site
+          npm run build --prefix app/site
+
+      - name: Test and build docs site
+        env:
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-docs
+          SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_DSN: ${{ vars.SENTRY_DOCS_DSN }}
+          VITE_SENTRY_ENVIRONMENT: production
+          VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
+        run: |
+          npm test --prefix app/docs
+          npm run build --prefix app/docs
 
       - name: Type check shared UI
         run: npm run --workspace=@crate/ui typecheck
