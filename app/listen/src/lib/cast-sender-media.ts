@@ -12,6 +12,7 @@ import type {
   ChromeCastMusicMetadata,
   ChromeCastNamespace,
   NativeCastMediaPayload,
+  NativeCastQueuePayload,
   WebCastQueueLoad,
 } from "./cast-sender-types";
 
@@ -227,6 +228,37 @@ export function buildWebQueueLoad(
     startIndex: session.queue.current_index,
     startTime: Math.max(0, session.queue.current_time),
     customData: { crateCast },
+  };
+}
+
+export function buildNativeQueuePayload(
+  session: CastPlaybackSessionResponse,
+): NativeCastQueuePayload {
+  return {
+    protocolVersion: 1,
+    sessionId: session.session_id,
+    bootstrapUrl: session.bootstrap_url,
+    currentIndex: session.queue.current_index,
+    currentTime: Math.max(0, session.queue.current_time),
+    repeatMode: session.queue.repeat_mode,
+    items: session.queue.items.map((item) => ({
+      stableId: item.item_id,
+      streamUrl: item.stream_url,
+      contentType: item.content_type || "audio/mpeg",
+      title: item.title,
+      artist: item.artist,
+      album: item.album || "",
+      ...(item.artwork_url ? { artworkUrl: item.artwork_url } : {}),
+      ...(item.duration ? { duration: item.duration } : {}),
+      customData: {
+        crateCast: {
+          protocolVersion: 1,
+          sessionId: session.session_id,
+          bootstrapUrl: session.bootstrap_url,
+          itemId: item.item_id,
+        },
+      },
+    })),
   };
 }
 

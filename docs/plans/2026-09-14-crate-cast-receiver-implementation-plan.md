@@ -364,7 +364,9 @@ Sentry, Capacitor Google Cast SDKs, Docker, GitHub Actions.
 - Modify: `app/listen/src/lib/cast-sender-types.ts`
 - Modify: `app/listen/src/lib/cast-sender.ts`
 - Create: `app/listen/src/lib/native-cast-contract.test.ts`
-- Modify: `docs/development.md`
+- Modify: `docs/technical/android-release-signing.md`
+- Modify: `docs/technical/ios-release-and-cast.md`
+- Modify: `docs/technical/listen-mobile-release-gates.md`
 
 ### Task 7.1: Share the receiver app id and queue payload
 

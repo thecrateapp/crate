@@ -9,6 +9,16 @@ def releaseKeyAlias = System.getenv("CRATE_ANDROID_KEY_ALIAS")
 def releaseKeyPassword = System.getenv("CRATE_ANDROID_KEY_PASSWORD")
 def releaseVersionName = System.getenv("CRATE_ANDROID_VERSION_NAME")
 def releaseVersionCode = System.getenv("CRATE_ANDROID_VERSION_CODE")
+def configuredCastReceiverAppId = (
+    System.getenv("CRATE_CAST_RECEIVER_APP_ID")
+        ?: System.getenv("VITE_CAST_RECEIVER_APP_ID")
+)
+def castReceiverAppId = (configuredCastReceiverAppId ?: "CC1AD845").trim()
+if (!(castReceiverAppId ==~ /[A-Za-z0-9]{8}/)) {
+    throw new GradleException(
+        "Cast receiver application ID must contain exactly 8 alphanumeric characters"
+    )
+}
 def requiredReleaseValues = [
     "CRATE_ANDROID_KEYSTORE_FILE": releaseKeystorePath,
     "CRATE_ANDROID_KEYSTORE_PASSWORD": releaseStorePassword,
@@ -16,6 +26,7 @@ def requiredReleaseValues = [
     "CRATE_ANDROID_KEY_PASSWORD": releaseKeyPassword,
     "CRATE_ANDROID_VERSION_NAME": releaseVersionName,
     "CRATE_ANDROID_VERSION_CODE": releaseVersionCode,
+    "CRATE_CAST_RECEIVER_APP_ID": configuredCastReceiverAppId,
 ]
 if (releaseTaskRequested) {
     def missing = requiredReleaseValues.findAll { !it.value }.keySet()
@@ -40,6 +51,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode releaseVersionCode ? Integer.parseInt(releaseVersionCode) : 1
         versionName releaseVersionName ?: "0.0.0-dev"
+        resValue "string", "crate_cast_receiver_app_id", castReceiverAppId
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

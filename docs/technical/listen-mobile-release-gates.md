@@ -52,6 +52,9 @@ ios_simulator_build: pass
 ios_artwork_downsample_contract: pass
 ios_secure_session_keychain_contract: pass
 ios_signed_archive: pass
+android_cast_custom_receiver_id: pass
+ios_cast_custom_receiver_id: pass
+native_cast_queue_contract: pass
 direct_runtime_vulnerabilities_with_compatible_fix: 0
 ```
 
@@ -65,12 +68,12 @@ Complete
 [`listen-mobile-device-matrix.md`](./listen-mobile-device-matrix.md) and attach
 its evidence to the GitHub release:
 
-| Platform          | Required scenarios                                                                                                                                                                  |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Android app       | Fresh login, upgrade with an existing session, Home, followed artists, liked tracks, saved albums, artwork, two-track playback, pause/resume, lock screen, Bluetooth, offline track |
-| Chrome Android    | Home/Collection parity, two-track playback, MediaSession metadata/actions, screen lock, Bluetooth                                                                                   |
-| iOS app           | Fresh login, upgrade session, Home/Collection, artwork, playback, lock screen, AirPlay/Bluetooth, offline track                                                                     |
-| Desktop web/Tauri | Playback and MediaSession regression smoke                                                                                                                                          |
+| Platform          | Required scenarios                                                                                                                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Android app       | Fresh login, upgrade with an existing session, Home, followed artists, liked tracks, saved albums, artwork, two-track playback, pause/resume, lock screen, Bluetooth, offline track, Cast discovery/full queue/reconnect/disconnect/stop |
+| Chrome Android    | Home/Collection parity, two-track playback, MediaSession metadata/actions, screen lock, Bluetooth                                                                                                                                        |
+| iOS app           | Fresh login, upgrade session, Home/Collection, artwork, playback, lock screen, AirPlay/Bluetooth, offline track, Cast discovery/full queue/reconnect/disconnect/stop                                                                     |
+| Desktop web/Tauri | Playback and MediaSession regression smoke                                                                                                                                                                                               |
 
 For each scenario record device, OS version, application version, server
 version and pass/fail. A failed P0 scenario blocks release.

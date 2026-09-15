@@ -7,8 +7,18 @@ const {
   nativeCapabilitiesMock,
   nativeControlMock,
   nativeEndSessionMock,
+  nativeGetQueueSnapshotMock,
   nativeRequestSessionMock,
+  nativeQueueInsertMock,
+  nativeQueueJumpToMock,
+  nativeQueueNextMock,
+  nativeQueuePreviousMock,
+  nativeQueueRemoveMock,
+  nativeQueueReorderMock,
+  nativeQueueSetRepeatModeMock,
   nativeListenerMock,
+  nativePlaybackStateListeners,
+  nativeProtocolMessageListeners,
   sessionChangedListeners,
 } = vi.hoisted(() => ({
   apiMock: vi.fn(),
@@ -17,9 +27,19 @@ const {
   nativeCapabilitiesMock: vi.fn(),
   nativeControlMock: vi.fn(),
   nativeEndSessionMock: vi.fn(),
+  nativeGetQueueSnapshotMock: vi.fn(),
   nativeRequestSessionMock: vi.fn(),
+  nativeQueueInsertMock: vi.fn(),
+  nativeQueueJumpToMock: vi.fn(),
+  nativeQueueNextMock: vi.fn(),
+  nativeQueuePreviousMock: vi.fn(),
+  nativeQueueRemoveMock: vi.fn(),
+  nativeQueueReorderMock: vi.fn(),
+  nativeQueueSetRepeatModeMock: vi.fn(),
   nativeListenerMock: vi.fn(),
-  sessionChangedListeners: [] as Array<(event: { active: boolean }) => void>,
+  nativePlaybackStateListeners: [] as Array<(event: unknown) => void>,
+  nativeProtocolMessageListeners: [] as Array<(event: unknown) => void>,
+  sessionChangedListeners: [] as Array<(event: unknown) => void>,
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -29,10 +49,24 @@ vi.mock("@capacitor/core", () => ({
     pause: nativeControlMock,
     stop: nativeControlMock,
     endSession: nativeEndSessionMock,
+    getQueueSnapshot: nativeGetQueueSnapshotMock,
+    queueInsert: nativeQueueInsertMock,
+    queueJumpTo: nativeQueueJumpToMock,
+    queueNext: nativeQueueNextMock,
+    queuePrevious: nativeQueuePreviousMock,
+    queueRemove: nativeQueueRemoveMock,
+    queueReorder: nativeQueueReorderMock,
+    queueSetRepeatMode: nativeQueueSetRepeatModeMock,
     requestSession: nativeRequestSessionMock,
     addListener: nativeListenerMock.mockImplementation(
-      (_event: string, listener: (event: { active: boolean }) => void) => {
-        sessionChangedListeners.push(listener);
+      (event: string, listener: (event: unknown) => void) => {
+        if (event === "sessionChanged") sessionChangedListeners.push(listener);
+        if (event === "playbackState") {
+          nativePlaybackStateListeners.push(listener);
+        }
+        if (event === "protocolMessage") {
+          nativeProtocolMessageListeners.push(listener);
+        }
         return Promise.resolve({ remove: vi.fn() });
       },
     ),
@@ -65,6 +99,7 @@ import {
   endCastSession,
   getCastSenderCapabilities,
   isCastSessionActive,
+  isCustomCastSessionActive,
   onCastSessionChanged,
   startCastSession,
   stopCastSession,
@@ -157,6 +192,190 @@ describe("cast sender", () => {
       available: false,
       activeSession: false,
     });
+  });
+
+  it("loads the full receiver-owned queue through the native bridge", async () => {
+    runtimeMock.isNative = true;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    apiMock.mockResolvedValue({
+      session_id: "native-session",
+      lease: "receiver-lease",
+      bootstrap_url: "https://api.example/cast/receiver-lease",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 1,
+        current_time: 24,
+        repeat_mode: "all",
+        shuffle: false,
+        items: [
+          {
+            item_id: "item-1",
+            title: "One",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/one",
+            metadata_url: "https://api.example/one/meta",
+          },
+          {
+            item_id: "item-2",
+            title: "Two",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/two",
+            metadata_url: "https://api.example/two/meta",
+          },
+        ],
+      },
+    });
+
+    const result = await startCastSession({
+      track: {
+        id: "two",
+        libraryTrackId: 2,
+        title: "Two",
+        artist: "Artist",
+      },
+      queue: [
+        {
+          id: "one",
+          libraryTrackId: 1,
+          title: "One",
+          artist: "Artist",
+        },
+        {
+          id: "two",
+          libraryTrackId: 2,
+          title: "Two",
+          artist: "Artist",
+        },
+      ],
+      currentIndex: 1,
+      currentTime: 24,
+      repeatMode: "all",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/me/cast/sessions",
+      "POST",
+      expect.objectContaining({ current_index: 1, repeat_mode: "all" }),
+    );
+    expect(nativeRequestSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        protocolVersion: 1,
+        sessionId: "native-session",
+        currentIndex: 1,
+        currentTime: 24,
+        items: [
+          expect.objectContaining({ stableId: "item-1" }),
+          expect.objectContaining({ stableId: "item-2" }),
+        ],
+      }),
+    );
+  });
+
+  it("uses the native receiver id as the custom receiver source of truth", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    apiMock.mockResolvedValue({
+      session_id: "native-configured",
+      lease: "lease",
+      bootstrap_url: "https://api.example/cast/native-configured",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off",
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "Track",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/track",
+            metadata_url: "https://api.example/track/meta",
+          },
+        ],
+      },
+    });
+
+    await expect(
+      startCastSession({
+        track: {
+          id: "track-1",
+          libraryTrackId: 1,
+          title: "Track",
+          artist: "Artist",
+        },
+      }),
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(nativeRequestSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        protocolVersion: 1,
+        sessionId: "native-configured",
+      }),
+    );
+  });
+
+  it("rehydrates scoped native Cast metadata from capabilities", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: true,
+      receiverApplicationId: "ABCD1234",
+      sessionId: "native-resumed",
+      bootstrapUrl: "https://api.example/cast/native-resumed",
+    });
+
+    await getCastSenderCapabilities();
+
+    expect(isCustomCastSessionActive()).toBe(true);
+  });
+
+  it("clears stale Crate metadata when native resumes a default receiver", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: true,
+      receiverApplicationId: "ABCD1234",
+      sessionId: "native-custom",
+      bootstrapUrl: "https://api.example/cast/native-custom",
+    });
+    await getCastSenderCapabilities();
+    expect(isCustomCastSessionActive()).toBe(true);
+
+    sessionChangedListeners.forEach((listener) =>
+      listener({ active: true, targetName: "Default receiver" }),
+    );
+
+    expect(isCustomCastSessionActive()).toBe(false);
   });
 
   it("reports web Cast unavailable when the SDK finds no receivers", async () => {
@@ -615,6 +834,346 @@ describe("cast sender", () => {
     );
   });
 
+  it("applies receiver-owned queue edits through the native bridge", async () => {
+    runtimeMock.isNative = true;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    nativeGetQueueSnapshotMock.mockResolvedValueOnce({
+      available: true,
+      items: [
+        { stableId: "track-1-1", itemId: 41 },
+        { stableId: "track-2-1", itemId: 42 },
+        { stableId: "track-3-1", itemId: 43 },
+      ],
+    });
+    for (const mock of [
+      nativeQueueInsertMock,
+      nativeQueueRemoveMock,
+      nativeQueueReorderMock,
+      nativeQueueSetRepeatModeMock,
+    ]) {
+      mock.mockResolvedValue({ ok: true });
+    }
+    const initial = {
+      session_id: "native-edit",
+      lease: "lease",
+      bootstrap_url: "https://api.example/api/cast/sessions/native-lease",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off" as const,
+        shuffle: false,
+        items: [1, 2, 3].map((id) => ({
+          item_id: `track-${id}-1`,
+          track_id: id,
+          title: `Track ${id}`,
+          artist: "Artist",
+          content_type: "audio/mpeg",
+          stream_url: `https://api.example/${id}`,
+          metadata_url: `https://api.example/${id}/meta`,
+        })),
+      },
+    };
+    const scoped = {
+      ...initial,
+      protocol_version: 1,
+      queue: {
+        ...initial.queue,
+        revision: 1,
+        repeat_mode: "all" as const,
+        items: [
+          initial.queue.items[2],
+          {
+            item_id: "track-4-1",
+            track_id: 4,
+            title: "Track 4",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/4",
+            metadata_url: "https://api.example/4/meta",
+          },
+          initial.queue.items[1],
+        ],
+      },
+    };
+    apiMock.mockResolvedValueOnce(initial).mockResolvedValueOnce({
+      mutation_status: "applied",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(scoped), { status: 200 }),
+    );
+    const track = (id: number) => ({
+      id: `track-${id}`,
+      libraryTrackId: id,
+      title: `Track ${id}`,
+      artist: "Artist",
+    });
+
+    await startCastSession({ track: track(1), queue: [1, 2, 3].map(track) });
+    await expect(
+      syncCustomCastQueue({
+        queue: [3, 4, 2].map(track),
+        currentIndex: 0,
+        repeatMode: "all",
+        shuffle: false,
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(nativeQueueRemoveMock).toHaveBeenCalledWith({ itemIds: [41] });
+    expect(nativeQueueInsertMock).toHaveBeenCalledWith({
+      items: [expect.objectContaining({ stableId: "track-4-1" })],
+      insertBefore: 42,
+    });
+    expect(nativeQueueReorderMock).toHaveBeenCalledWith({
+      itemIds: [43, 42],
+    });
+    expect(nativeQueueSetRepeatModeMock).toHaveBeenCalledWith({
+      repeatMode: "all",
+    });
+  });
+
+  it("does not duplicate a native queue while its snapshot is unavailable", async () => {
+    runtimeMock.isNative = true;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    nativeGetQueueSnapshotMock.mockResolvedValue({
+      available: false,
+      items: [],
+    });
+    const initial = {
+      session_id: "native-pending-snapshot",
+      lease: "lease",
+      bootstrap_url: "https://api.example/cast/native-pending-snapshot",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off" as const,
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "Track 1",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/1",
+            metadata_url: "https://api.example/1/meta",
+          },
+        ],
+      },
+    };
+    const scoped = {
+      ...initial,
+      protocol_version: 1,
+      queue: {
+        ...initial.queue,
+        revision: 1,
+        items: [
+          ...initial.queue.items,
+          {
+            item_id: "track-2-1",
+            track_id: 2,
+            title: "Track 2",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/2",
+            metadata_url: "https://api.example/2/meta",
+          },
+        ],
+      },
+    };
+    apiMock.mockResolvedValueOnce(initial).mockResolvedValueOnce({
+      mutation_status: "applied",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(scoped), { status: 200 }),
+    );
+    const track = (id: number) => ({
+      id: `track-${id}`,
+      libraryTrackId: id,
+      title: `Track ${id}`,
+      artist: "Artist",
+    });
+
+    await startCastSession({ track: track(1) });
+    const result = await syncCustomCastQueue({
+      queue: [track(1), track(2)],
+      currentIndex: 0,
+      repeatMode: "off",
+      shuffle: false,
+    });
+
+    expect(result).toMatchObject({ ok: false });
+    expect(nativeGetQueueSnapshotMock).toHaveBeenCalledTimes(3);
+    expect(nativeQueueInsertMock).not.toHaveBeenCalled();
+  });
+
+  it("uses native queue navigation for a custom receiver session", async () => {
+    runtimeMock.isNative = true;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    for (const mock of [
+      nativeQueueNextMock,
+      nativeQueuePreviousMock,
+      nativeQueueJumpToMock,
+    ]) {
+      mock.mockResolvedValue({ ok: true });
+    }
+    apiMock.mockResolvedValue({
+      session_id: "native-navigation",
+      lease: "lease",
+      bootstrap_url: "https://api.example/api/cast/sessions/navigation",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off",
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "Track 1",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/1",
+            metadata_url: "https://api.example/1/meta",
+          },
+        ],
+      },
+    });
+    await startCastSession({
+      track: {
+        id: "track-1",
+        libraryTrackId: 1,
+        title: "Track 1",
+        artist: "Artist",
+      },
+    });
+
+    await expect(castQueueNext()).resolves.toEqual({ ok: true });
+    await expect(castQueuePrevious()).resolves.toEqual({ ok: true });
+    await expect(castQueueJumpTo(2)).resolves.toEqual({ ok: true });
+
+    expect(nativeQueueNextMock).toHaveBeenCalledOnce();
+    expect(nativeQueuePreviousMock).toHaveBeenCalledOnce();
+    expect(nativeQueueJumpToMock).toHaveBeenCalledWith({ index: 2 });
+  });
+
+  it("serializes native queue navigation behind an in-flight mutation", async () => {
+    runtimeMock.isNative = true;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    nativeQueueNextMock.mockResolvedValue({ ok: true });
+    nativeGetQueueSnapshotMock.mockResolvedValue({
+      available: true,
+      items: [{ stableId: "track-1-1", itemId: 41 }],
+    });
+    const initial = {
+      session_id: "native-serialized",
+      lease: "lease",
+      bootstrap_url: "https://api.example/cast/native-serialized",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off" as const,
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "Track",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/track",
+            metadata_url: "https://api.example/track/meta",
+          },
+        ],
+      },
+    };
+    let resolveMutation: ((value: unknown) => void) | undefined;
+    apiMock.mockResolvedValueOnce(initial).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveMutation = resolve;
+      }),
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...initial,
+          protocol_version: 1,
+          queue: { ...initial.queue, revision: 1 },
+        }),
+        { status: 200 },
+      ),
+    );
+    const track = {
+      id: "track-1",
+      libraryTrackId: 1,
+      title: "Track",
+      artist: "Artist",
+    };
+    await startCastSession({ track });
+
+    const mutation = syncCustomCastQueue({
+      queue: [track],
+      currentIndex: 0,
+      repeatMode: "off",
+      shuffle: false,
+    });
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    const navigation = castQueueNext();
+
+    expect(nativeQueueNextMock).not.toHaveBeenCalled();
+    resolveMutation!({ mutation_status: "applied" });
+    await expect(mutation).resolves.toEqual({ ok: true });
+    await expect(navigation).resolves.toEqual({ ok: true });
+    expect(nativeQueueNextMock).toHaveBeenCalledOnce();
+  });
+
   it("separates disconnect from stopping and revoking custom Cast", async () => {
     vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
     vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
@@ -953,6 +1512,178 @@ describe("cast sender", () => {
     expect(session.removeMessageListener).toHaveBeenCalledOnce();
   });
 
+  it("publishes native media state and prefers monotonic receiver status", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: true,
+    });
+    await getCastSenderCapabilities();
+    sessionChangedListeners.forEach((listener) =>
+      listener({
+        active: true,
+        sessionId: "native-status",
+        bootstrapUrl: "https://api.example/cast/native-status",
+      }),
+    );
+    const listener = vi.fn();
+
+    const unsubscribe = subscribeCastPlaybackState(listener);
+    nativePlaybackStateListeners[nativePlaybackStateListeners.length - 1]?.({
+      active: true,
+      currentIndex: 0,
+      currentTime: 12,
+      duration: 180,
+      isBuffering: false,
+      isPlaying: true,
+      volume: 0.6,
+    });
+    nativeProtocolMessageListeners[nativeProtocolMessageListeners.length - 1]?.(
+      {
+        namespace: "urn:x-cast:app.cratemusic.crate.v1",
+        message: JSON.stringify({
+          version: 1,
+          messageId: "native-status-5",
+          type: "receiver.status",
+          sessionId: "native-status",
+          queueRevision: 2,
+          stateSeq: 5,
+          currentIndex: 1,
+          currentTime: 44,
+          playerState: "PAUSED",
+          consecutiveFailures: 0,
+        }),
+      },
+    );
+    nativeProtocolMessageListeners[nativeProtocolMessageListeners.length - 1]?.(
+      {
+        namespace: "urn:x-cast:app.cratemusic.crate.v1",
+        message: JSON.stringify({
+          version: 1,
+          messageId: "native-status-4",
+          type: "receiver.status",
+          sessionId: "native-status",
+          queueRevision: 2,
+          stateSeq: 4,
+          currentIndex: 0,
+          currentTime: 2,
+          playerState: "PLAYING",
+          consecutiveFailures: 0,
+        }),
+      },
+    );
+    nativeProtocolMessageListeners[nativeProtocolMessageListeners.length - 1]?.(
+      {
+        namespace: "urn:x-cast:app.cratemusic.crate.v1",
+        message: JSON.stringify({
+          version: 1,
+          messageId: "native-status-next-revision",
+          type: "receiver.status",
+          sessionId: "native-status",
+          queueRevision: 3,
+          stateSeq: 1,
+          currentIndex: 2,
+          currentTime: 3,
+          playerState: "PLAYING",
+          consecutiveFailures: 0,
+        }),
+      },
+    );
+
+    expect(listener).toHaveBeenLastCalledWith({
+      active: true,
+      currentIndex: 2,
+      currentTime: 3,
+      duration: 180,
+      isBuffering: false,
+      isPlaying: true,
+      volume: 0.6,
+    });
+    unsubscribe();
+  });
+
+  it("resets native receiver ordering when the active session changes", async () => {
+    runtimeMock.isNative = true;
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: true,
+    });
+    await getCastSenderCapabilities();
+    sessionChangedListeners.forEach((listener) =>
+      listener({
+        active: true,
+        sessionId: "native-old",
+        bootstrapUrl: "https://api.example/cast/native-old",
+      }),
+    );
+    const listener = vi.fn();
+    const unsubscribe = subscribeCastPlaybackState(listener);
+    const playbackListener =
+      nativePlaybackStateListeners[nativePlaybackStateListeners.length - 1];
+    const protocolListener =
+      nativeProtocolMessageListeners[nativeProtocolMessageListeners.length - 1];
+
+    playbackListener?.({
+      active: true,
+      currentIndex: 0,
+      currentTime: 10,
+      duration: 180,
+      isBuffering: false,
+      isPlaying: true,
+    });
+    protocolListener?.({
+      namespace: "urn:x-cast:app.cratemusic.crate.v1",
+      message: JSON.stringify({
+        version: 1,
+        messageId: "native-old-99",
+        type: "receiver.status",
+        sessionId: "native-old",
+        queueRevision: 9,
+        stateSeq: 99,
+        currentIndex: 0,
+        currentTime: 90,
+        playerState: "PLAYING",
+        consecutiveFailures: 0,
+      }),
+    });
+
+    sessionChangedListeners.forEach((sessionListener) =>
+      sessionListener({
+        active: true,
+        sessionId: "native-new",
+        bootstrapUrl: "https://api.example/cast/native-new",
+      }),
+    );
+    protocolListener?.({
+      namespace: "urn:x-cast:app.cratemusic.crate.v1",
+      message: JSON.stringify({
+        version: 1,
+        messageId: "native-new-1",
+        type: "receiver.status",
+        sessionId: "native-new",
+        queueRevision: 0,
+        stateSeq: 1,
+        currentIndex: 1,
+        currentTime: 2,
+        playerState: "PAUSED",
+        consecutiveFailures: 0,
+      }),
+    });
+
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        currentIndex: 1,
+        currentTime: 2,
+        isPlaying: false,
+      }),
+    );
+    unsubscribe();
+  });
+
   it("uses CAF queue navigation for a custom receiver session", async () => {
     const calls: string[] = [];
     const items = [{ itemId: 41 }, { itemId: 42 }];
@@ -1147,6 +1878,74 @@ describe("cast sender", () => {
 
     await expect(request).resolves.toEqual({ ok: true });
     expect(isCastSessionActive()).toBe(false);
+  });
+
+  it("cancels and revokes a custom native start overtaken by disconnect", async () => {
+    runtimeMock.isNative = true;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeEndSessionMock.mockResolvedValue({ ok: true });
+    apiMock.mockResolvedValueOnce({
+      session_id: "native-overtaken",
+      lease: "lease",
+      bootstrap_url: "https://api.example/cast/native-overtaken",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off",
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "Track",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/track",
+            metadata_url: "https://api.example/track/meta",
+          },
+        ],
+      },
+    });
+    let resolveSession: ((result: { ok: boolean }) => void) | undefined;
+    nativeRequestSessionMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+
+    const starting = startCastSession({
+      track: {
+        id: "track-1",
+        libraryTrackId: 1,
+        title: "Track",
+        artist: "Artist",
+      },
+    });
+    await vi.waitFor(() => expect(nativeRequestSessionMock).toHaveBeenCalled());
+    await disconnectCastSession();
+    resolveSession!({ ok: true });
+
+    await expect(starting).resolves.toMatchObject({
+      ok: false,
+      message: "Cast start was cancelled.",
+    });
+    expect(isCastSessionActive()).toBe(false);
+    expect(isCustomCastSessionActive()).toBe(false);
+    expect(apiMock).toHaveBeenLastCalledWith(
+      "/api/me/cast/sessions/native-overtaken",
+      "DELETE",
+    );
   });
 
   it("serves protected Crate artwork from the receiver-reachable origin", async () => {

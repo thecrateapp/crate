@@ -20,6 +20,7 @@ keystore upgrade in place without losing application data.
 | `ANDROID_SIGNING_KEYSTORE_PASSWORD` | Keystore password                  |
 | `ANDROID_SIGNING_KEY_ALIAS`         | Release key alias                  |
 | `ANDROID_SIGNING_KEY_PASSWORD`      | Private-key password               |
+| `CRATE_CAST_RECEIVER_APP_ID`        | Registered 8-character Cast app ID |
 
 The workflow decodes the keystore into `$RUNNER_TEMP` and never places it in
 the repository or an uploaded artifact. A tag build fails before Gradle when a
@@ -62,8 +63,16 @@ export CRATE_ANDROID_KEYSTORE_FILE=/absolute/path/to/release.jks
 export CRATE_ANDROID_KEYSTORE_PASSWORD='...'
 export CRATE_ANDROID_KEY_ALIAS='...'
 export CRATE_ANDROID_KEY_PASSWORD='...'
+export CRATE_CAST_RECEIVER_APP_ID='ABCD1234'
 make cap-android-release CAP_ANDROID_RELEASE_TAG=v2.4.0-beta
 ```
+
+The Gradle build writes the Cast application ID into
+`crate_cast_receiver_app_id`, which is consumed by the native discovery
+provider. `CC1AD845` is accepted only as the local Default Media Receiver
+fallback; release automation must supply the registered Crate receiver ID and
+the Listen web bundle must be built with the matching
+`VITE_CAST_RECEIVER_APP_ID`.
 
 Artifacts are copied to `artifacts/capacitor/android/`. Never commit the
 keystore, passwords, generated APK/AAB, R8 mapping or native symbols.

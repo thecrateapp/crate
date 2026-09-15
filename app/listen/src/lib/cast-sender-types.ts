@@ -40,6 +40,9 @@ export interface CastSenderCapabilities {
   activeSession: boolean;
   targetName?: string;
   reason?: string;
+  receiverApplicationId?: string;
+  sessionId?: string;
+  bootstrapUrl?: string;
 }
 
 export interface CastStartPayload {
@@ -103,21 +106,91 @@ export interface CastPlaybackState {
 
 export interface NativeCastSessionChangedEvent {
   active: boolean;
+  sessionId?: string;
+  bootstrapUrl?: string;
+  targetName?: string;
+}
+
+export interface NativeCastQueueSnapshot {
+  available: boolean;
+  items: Array<{
+    stableId: string;
+    itemId: number;
+  }>;
+}
+
+export type NativeCastPlaybackStateEvent = CastPlaybackState;
+
+export interface NativeCastProtocolMessageEvent {
+  namespace: string;
+  message: string;
 }
 
 export interface NativeCastPlugin {
   getCapabilities(): Promise<CastSenderCapabilities>;
-  requestSession(payload: NativeCastMediaPayload): Promise<CastStartResult>;
+  requestSession(
+    payload: NativeCastMediaPayload | NativeCastQueuePayload,
+  ): Promise<CastStartResult>;
   play(): Promise<CastStartResult>;
   pause(): Promise<CastStartResult>;
   seek(payload: { currentTime: number }): Promise<CastStartResult>;
   setVolume(payload: { volume: number }): Promise<CastStartResult>;
   stop(): Promise<CastStartResult>;
   endSession(payload?: { stopCasting?: boolean }): Promise<CastStartResult>;
+  getQueueSnapshot(): Promise<NativeCastQueueSnapshot>;
+  queueInsert(payload: {
+    items: NativeCastQueueItemPayload[];
+    insertBefore?: number;
+  }): Promise<CastStartResult>;
+  queueRemove(payload: { itemIds: number[] }): Promise<CastStartResult>;
+  queueReorder(payload: { itemIds: number[] }): Promise<CastStartResult>;
+  queueSetRepeatMode(payload: {
+    repeatMode: RepeatMode;
+  }): Promise<CastStartResult>;
+  queueNext(): Promise<CastStartResult>;
+  queuePrevious(): Promise<CastStartResult>;
+  queueJumpTo(payload: { index: number }): Promise<CastStartResult>;
   addListener(
     eventName: "sessionChanged",
     listener: (event: NativeCastSessionChangedEvent) => void,
   ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "playbackState",
+    listener: (event: NativeCastPlaybackStateEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "protocolMessage",
+    listener: (event: NativeCastProtocolMessageEvent) => void,
+  ): Promise<PluginListenerHandle>;
+}
+
+export interface NativeCastQueueItemPayload {
+  stableId: string;
+  streamUrl: string;
+  contentType: string;
+  title: string;
+  artist: string;
+  album: string;
+  artworkUrl?: string;
+  duration?: number;
+  customData: {
+    crateCast: {
+      protocolVersion: 1;
+      sessionId: string;
+      bootstrapUrl: string;
+      itemId: string;
+    };
+  };
+}
+
+export interface NativeCastQueuePayload {
+  protocolVersion: 1;
+  sessionId: string;
+  bootstrapUrl: string;
+  currentIndex: number;
+  currentTime: number;
+  repeatMode: RepeatMode;
+  items: NativeCastQueueItemPayload[];
 }
 
 export interface NativeCastMediaPayload {

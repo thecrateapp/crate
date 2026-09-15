@@ -32,6 +32,32 @@ Cast discovery and receiver playback still require validation on a physical
 iPhone and receiver; the simulator build is a compile/link regression gate,
 not a substitute.
 
+## Receiver application ID and native contract
+
+The native sender reads `CrateCastReceiverApplicationID` from `Info.plist`.
+Xcode expands it from `CRATE_CAST_RECEIVER_APP_ID`; local debug builds default
+to Google's Default Media Receiver, while release automation must inject the
+registered 8-character Crate receiver ID. It must match the
+`VITE_CAST_RECEIVER_APP_ID` compiled into the Listen web bundle and the API
+receiver configuration.
+
+The Capacitor bridge loads the complete receiver-owned queue, preserves Crate
+stable item IDs in media `customData`, and exposes queue mutation, navigation,
+playback-state and versioned protocol events. Disconnect leaves the receiver
+running; Stop Cast stops playback and ends the receiver session. Reconnection
+restores the scoped session metadata from the current queue item without
+putting bearer credentials in Cast payloads.
+
+To prove build-setting expansion locally:
+
+```bash
+xcodebuild -workspace App.xcworkspace -scheme App \
+  -configuration Debug -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  CRATE_CAST_RECEIVER_APP_ID=ABCD1234 build
+```
+
 ## CI and versioning
 
 `.github/workflows/build-ios.yml`:

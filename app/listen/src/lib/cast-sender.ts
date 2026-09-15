@@ -10,6 +10,7 @@ import { isNative } from "@/lib/capacitor-runtime";
 import {
   buildCastTicketRequest,
   buildNativePayload,
+  buildNativeQueuePayload,
   buildWebLoadRequest,
   buildWebQueueLoad,
   DEFAULT_CAST_TARGET_ID,
@@ -51,6 +52,7 @@ export { buildCastTicketRequest } from "./cast-sender-media";
 const CAST_SENDER_SCRIPT =
   "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
 const CAST_SESSION_CHANGED_EVENT = "crate:cast-session-changed";
+const DEFAULT_CAST_RECEIVER_APPLICATION_ID = "CC1AD845";
 
 let webCastReady: Promise<boolean> | null = null;
 let webCastInitializedReceiverId: string | null = null;
@@ -58,10 +60,13 @@ const observedWebCastContexts = new WeakSet<object>();
 let nativeCast: NativeCastPlugin | null = null;
 let nativeCastSessionActive = false;
 let nativeCastSessionGeneration = 0;
+let nativeCastReceiverApplicationId: string | null = null;
 let activeCrateCastSessionId: string | null = null;
 let activeCrateCastBootstrapUrl: string | null = null;
 let activeCrateCastQueue: CastPlaybackSessionResponse["queue"] | null = null;
-let castQueueWriteTail: Promise<void> = Promise.resolve();
+let castQueueOperationTail: Promise<void> = Promise.resolve();
+let castLifecycleGeneration = 0;
+let castLifecycleIntent: "disconnect" | "start" | "stop" = "stop";
 
 interface CustomCastQueueUpdate {
   currentIndex: number;
@@ -70,10 +75,40 @@ interface CustomCastQueueUpdate {
   shuffle: boolean;
 }
 
+function beginCastLifecycle(intent: "disconnect" | "start" | "stop"): number {
+  castLifecycleIntent = intent;
+  castLifecycleGeneration += 1;
+  return castLifecycleGeneration;
+}
+
+function isCurrentCastLifecycle(generation: number): boolean {
+  return castLifecycleGeneration === generation;
+}
+
+function cancelledCastStart(): CastStartResult {
+  return { ok: false, message: "Cast start was cancelled." };
+}
+
 function customReceiverApplicationId(): string | null {
+  if (isNative) {
+    return nativeCastReceiverApplicationId &&
+      nativeCastReceiverApplicationId !== DEFAULT_CAST_RECEIVER_APPLICATION_ID
+      ? nativeCastReceiverApplicationId
+      : null;
+  }
   if (import.meta.env.VITE_CAST_CUSTOM_RECEIVER_ENABLED !== "true") return null;
   const appId = import.meta.env.VITE_CAST_RECEIVER_APP_ID?.trim();
   return appId && /^[a-z0-9]{8}$/i.test(appId) ? appId : null;
+}
+
+function isNewerReceiverStatus(
+  next: TimedCastReceiverStatus["message"],
+  previous: TimedCastReceiverStatus["message"],
+): boolean {
+  if (next.queueRevision !== previous.queueRevision) {
+    return next.queueRevision > previous.queueRevision;
+  }
+  return next.stateSeq > previous.stateSeq;
 }
 
 function emitCastSessionChanged(): void {
@@ -141,7 +176,8 @@ function currentWebCastPlaybackState(
 export function subscribeCastPlaybackState(
   listener: (state: CastPlaybackState) => void,
 ): () => void {
-  if (typeof window === "undefined" || isNative) return () => undefined;
+  if (typeof window === "undefined") return () => undefined;
+  if (isNative) return subscribeNativeCastPlaybackState(listener);
 
   let disposed = false;
   let timer: number | null = null;
@@ -173,8 +209,7 @@ export function subscribeCastPlaybackState(
     if (
       parsed.value.sessionId !== activeCrateCastSessionId ||
       (receiverStatus &&
-        (parsed.value.stateSeq <= receiverStatus.message.stateSeq ||
-          parsed.value.queueRevision < receiverStatus.message.queueRevision))
+        !isNewerReceiverStatus(parsed.value, receiverStatus.message))
     ) {
       return;
     }
@@ -239,9 +274,130 @@ export function subscribeCastPlaybackState(
   };
 }
 
+function subscribeNativeCastPlaybackState(
+  listener: (state: CastPlaybackState) => void,
+): () => void {
+  let disposed = false;
+  let timer: number | null = null;
+  let nativeState: CastPlaybackState | null = null;
+  let receiverStatus: TimedCastReceiverStatus | null = null;
+  const handles: Array<Promise<{ remove: () => Promise<void> }>> = [];
+
+  const clearTimer = () => {
+    if (timer === null) return;
+    window.clearTimeout(timer);
+    timer = null;
+  };
+  const publish = () => {
+    if (disposed || (!nativeState && !receiverStatus)) return;
+    clearTimer();
+    const status = receiverStatus?.message;
+    const receiverTime = status
+      ? status.currentTime +
+        (status.playerState === "PLAYING"
+          ? Math.max(0, Date.now() - receiverStatus!.receivedAt) / 1_000
+          : 0)
+      : undefined;
+    const duration = finiteNonNegative(nativeState?.duration);
+    const currentTime = finiteNonNegative(
+      receiverTime ?? nativeState?.currentTime,
+    );
+    const state: CastPlaybackState = {
+      active: nativeState?.active ?? true,
+      ...(status?.currentIndex !== undefined
+        ? { currentIndex: status.currentIndex }
+        : nativeState?.currentIndex !== undefined
+          ? { currentIndex: nativeState.currentIndex }
+          : {}),
+      currentTime: duration > 0 ? Math.min(currentTime, duration) : currentTime,
+      duration,
+      isBuffering: status
+        ? status.playerState === "BUFFERING" ||
+          status.playerState === "RECOVERING"
+        : Boolean(nativeState?.isBuffering),
+      isPlaying: status
+        ? status.playerState === "PLAYING"
+        : Boolean(nativeState?.isPlaying),
+      ...(nativeState?.volume === undefined
+        ? {}
+        : { volume: nativeState.volume }),
+    };
+    listener(state);
+    if (state.isPlaying) timer = window.setTimeout(publish, 500);
+  };
+
+  const plugin = getNativeCast();
+  handles.push(
+    plugin.addListener("sessionChanged", (event) => {
+      receiverStatus = null;
+      nativeState = event.active
+        ? null
+        : {
+            active: false,
+            currentTime: 0,
+            duration: 0,
+            isBuffering: false,
+            isPlaying: false,
+          };
+      publish();
+    }),
+  );
+  handles.push(
+    plugin.addListener("playbackState", (state) => {
+      nativeState = state;
+      publish();
+    }),
+  );
+  handles.push(
+    plugin.addListener("protocolMessage", (event) => {
+      if (event.namespace !== CAST_PROTOCOL_NAMESPACE) return;
+      let value: unknown;
+      try {
+        value = JSON.parse(event.message);
+      } catch {
+        return;
+      }
+      const parsed = parseCastProtocolMessage(value);
+      if (!parsed.ok || parsed.value.type !== "receiver.status") return;
+      if (
+        parsed.value.sessionId !== activeCrateCastSessionId ||
+        (receiverStatus &&
+          !isNewerReceiverStatus(parsed.value, receiverStatus.message))
+      ) {
+        return;
+      }
+      receiverStatus = { message: parsed.value, receivedAt: Date.now() };
+      publish();
+    }),
+  );
+
+  return () => {
+    disposed = true;
+    clearTimer();
+    for (const handle of handles) {
+      void handle.then((resolved) => resolved.remove());
+    }
+  };
+}
+
 function setAuthoritativeNativeCastSession(active: boolean): void {
   nativeCastSessionGeneration += 1;
   nativeCastSessionActive = active;
+}
+
+function adoptNativeCastSession(event: {
+  active: boolean;
+  sessionId?: string;
+  bootstrapUrl?: string;
+}): void {
+  setAuthoritativeNativeCastSession(event.active);
+  activeCrateCastSessionId = null;
+  activeCrateCastBootstrapUrl = null;
+  activeCrateCastQueue = null;
+  if (event.active && event.sessionId?.trim() && event.bootstrapUrl?.trim()) {
+    activeCrateCastSessionId = event.sessionId;
+    activeCrateCastBootstrapUrl = event.bootstrapUrl;
+  }
 }
 
 function applyNativeCastSuccess(
@@ -263,7 +419,7 @@ function getNativeCast(): NativeCastPlugin {
     // a command *we* issued, so the first play/pause after an external
     // disconnect silently no-op'd against a session that no longer exists.
     void nativeCast.addListener("sessionChanged", (event) => {
-      setAuthoritativeNativeCastSession(event.active);
+      adoptNativeCastSession(event);
       emitCastSessionChanged();
     });
   }
@@ -426,12 +582,21 @@ async function getNativeCastCapabilities(): Promise<CastSenderCapabilities> {
   const startedAtGeneration = nativeCastSessionGeneration;
   try {
     const capabilities = await getNativeCast().getCapabilities();
+    const receiverApplicationId = capabilities.receiverApplicationId?.trim();
+    nativeCastReceiverApplicationId =
+      receiverApplicationId && /^[a-z0-9]{8}$/i.test(receiverApplicationId)
+        ? receiverApplicationId
+        : null;
     // This is the freshest read of the native session state we ever get —
     // sync our local flag from it, since a session can end natively
     // (receiver disconnect before the plugin is registered/listening,
     // app restart, etc.) without a `sessionChanged` event ever reaching us.
     if (nativeCastSessionGeneration === startedAtGeneration) {
-      setAuthoritativeNativeCastSession(Boolean(capabilities.activeSession));
+      adoptNativeCastSession({
+        active: Boolean(capabilities.activeSession),
+        sessionId: capabilities.sessionId,
+        bootstrapUrl: capabilities.bootstrapUrl,
+      });
     }
     return {
       platform: "native",
@@ -440,6 +605,9 @@ async function getNativeCastCapabilities(): Promise<CastSenderCapabilities> {
       activeSession: nativeCastSessionActive,
       targetName: capabilities.targetName,
       reason: capabilities.reason,
+      receiverApplicationId: nativeCastReceiverApplicationId ?? undefined,
+      sessionId: capabilities.sessionId,
+      bootstrapUrl: capabilities.bootstrapUrl,
     };
   } catch {
     return {
@@ -568,6 +736,11 @@ async function applyCustomQueueDelta(
   previous: CastPlaybackSessionResponse["queue"],
   next: CastPlaybackSessionResponse["queue"],
 ): Promise<void> {
+  if (isNative) {
+    await applyNativeCustomQueueDelta(previous, next);
+    return;
+  }
+
   const media = currentWebCastMedia();
   const chromeCast = castWindow()?.chrome?.cast;
   if (!media || !chromeCast)
@@ -661,6 +834,111 @@ async function applyCustomQueueDelta(
   }
 }
 
+function assertNativeCastResult(result: CastStartResult): void {
+  if (!result.ok) {
+    throw new Error(result.message || "Native Cast queue command failed.");
+  }
+}
+
+async function getReadyNativeQueueSnapshot(
+  plugin: NativeCastPlugin,
+  remainingAttempts = 3,
+): Promise<Awaited<ReturnType<NativeCastPlugin["getQueueSnapshot"]>>> {
+  const snapshot = await plugin.getQueueSnapshot();
+  if (snapshot.available) return snapshot;
+  if (remainingAttempts <= 1) {
+    throw new Error("Native Cast queue is not ready.");
+  }
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+  return getReadyNativeQueueSnapshot(plugin, remainingAttempts - 1);
+}
+
+async function applyNativeCustomQueueDelta(
+  previous: CastPlaybackSessionResponse["queue"],
+  next: CastPlaybackSessionResponse["queue"],
+): Promise<void> {
+  const plugin = getNativeCast();
+  const snapshot = await getReadyNativeQueueSnapshot(plugin);
+  const numericByStableId = new Map(
+    snapshot.items.map((item) => [item.stableId, item.itemId]),
+  );
+  const previousIds = previous.items.map((item) => item.item_id);
+  const nextIds = next.items.map((item) => item.item_id);
+  const previousIdSet = new Set(previousIds);
+  const nextIdSet = new Set(nextIds);
+  const removed = previousIds.filter((itemId) => !nextIdSet.has(itemId));
+  const inserted = nextIds.filter((itemId) => !previousIdSet.has(itemId));
+
+  const removedNumericIds = removed
+    .map((itemId) => numericByStableId.get(itemId))
+    .filter((itemId): itemId is number => itemId !== undefined);
+  if (removedNumericIds.length) {
+    assertNativeCastResult(
+      await plugin.queueRemove({ itemIds: removedNumericIds }),
+    );
+  }
+
+  const survivingDesiredOrder = nextIds
+    .filter((itemId) => previousIdSet.has(itemId))
+    .map((itemId) => numericByStableId.get(itemId))
+    .filter((itemId): itemId is number => itemId !== undefined);
+  const survivingCurrentOrder = snapshot.items
+    .filter((item) => nextIdSet.has(item.stableId))
+    .map((item) => item.itemId);
+  if (
+    survivingDesiredOrder.length > 0 &&
+    survivingDesiredOrder.join(",") !== survivingCurrentOrder.join(",")
+  ) {
+    assertNativeCastResult(
+      await plugin.queueReorder({ itemIds: survivingDesiredOrder }),
+    );
+  }
+
+  if (inserted.length) {
+    const syntheticSession: CastPlaybackSessionResponse = {
+      session_id: activeCrateCastSessionId ?? "",
+      lease: "",
+      bootstrap_url: activeCrateCastBootstrapUrl ?? "",
+      receiver_application_id: customReceiverApplicationId() ?? "",
+      queue: next,
+    };
+    const itemsById = new Map(
+      buildNativeQueuePayload(syntheticSession).items.map((item) => [
+        item.stableId,
+        item,
+      ]),
+    );
+    const insertItem = async (position: number): Promise<void> => {
+      const itemId = inserted[position];
+      if (!itemId) return;
+      const item = itemsById.get(itemId);
+      if (!item) {
+        await insertItem(position + 1);
+        return;
+      }
+      const index = nextIds.indexOf(itemId);
+      const insertBefore = nextIds
+        .slice(index + 1)
+        .map((candidate) => numericByStableId.get(candidate))
+        .find((candidate) => candidate !== undefined);
+      assertNativeCastResult(
+        await plugin.queueInsert({
+          items: [item],
+          ...(insertBefore === undefined ? {} : { insertBefore }),
+        }),
+      );
+      await insertItem(position + 1);
+    };
+    await insertItem(0);
+  }
+
+  if (next.repeat_mode !== previous.repeat_mode) {
+    assertNativeCastResult(
+      await plugin.queueSetRepeatMode({ repeatMode: next.repeat_mode }),
+    );
+  }
+}
+
 async function requireActiveCustomQueue() {
   if (!isCustomCastSessionActive() || !activeCrateCastSessionId) {
     throw new Error("No active Crate Cast queue.");
@@ -732,17 +1010,36 @@ async function syncCustomCastQueueNow(
 export function syncCustomCastQueue(
   update: CustomCastQueueUpdate,
 ): Promise<CastStartResult> {
-  const result = castQueueWriteTail.then(() => syncCustomCastQueueNow(update));
-  castQueueWriteTail = result.then(
+  return enqueueCastQueueOperation(() => syncCustomCastQueueNow(update));
+}
+
+function enqueueCastQueueOperation(
+  operation: () => Promise<CastStartResult>,
+): Promise<CastStartResult> {
+  const result = castQueueOperationTail.then(operation);
+  castQueueOperationTail = result.then(
     () => undefined,
     () => undefined,
   );
   return result;
 }
 
-function castQueueCommand(
+function castQueueCommandNow(
   command: "next" | "previous" | { index: number },
 ): Promise<CastStartResult> {
+  if (isNative) {
+    if (!isCustomCastSessionActive()) {
+      return Promise.resolve({
+        ok: false,
+        message: "No active Crate Cast queue.",
+      });
+    }
+    const plugin = getNativeCast();
+    if (command === "next") return plugin.queueNext();
+    if (command === "previous") return plugin.queuePrevious();
+    return plugin.queueJumpTo({ index: Math.max(0, command.index) });
+  }
+
   const media = currentWebCastMedia();
   if (!media || !isCustomCastSessionActive()) {
     return Promise.resolve({
@@ -773,6 +1070,12 @@ function castQueueCommand(
     }
     media.queueJumpToItem(itemId, success, failure);
   });
+}
+
+function castQueueCommand(
+  command: "next" | "previous" | { index: number },
+): Promise<CastStartResult> {
+  return enqueueCastQueueOperation(() => castQueueCommandNow(command));
 }
 
 export function castQueueNext(): Promise<CastStartResult> {
@@ -888,6 +1191,7 @@ export function castStop(): Promise<CastStartResult> {
 }
 
 export async function disconnectCastSession(): Promise<CastStartResult> {
+  beginCastLifecycle("disconnect");
   if (isNative) {
     try {
       const result = await getNativeCast().endSession({ stopCasting: false });
@@ -929,6 +1233,7 @@ export async function disconnectCastSession(): Promise<CastStartResult> {
 }
 
 export async function stopCastSession(): Promise<CastStartResult> {
+  beginCastLifecycle("stop");
   const sessionId = activeCrateCastSessionId;
   const hasPlayableSession = isNative
     ? isCastSessionActive()
@@ -1027,7 +1332,11 @@ export async function startCastSession(
     };
   }
 
+  const lifecycleGeneration = beginCastLifecycle("start");
   const capabilities = await getCastSenderCapabilities();
+  if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+    return cancelledCastStart();
+  }
   if (!capabilities.available) {
     return {
       ok: false,
@@ -1037,13 +1346,27 @@ export async function startCastSession(
 
   try {
     const webSession = isNative ? null : await requestWebCastSession();
+    if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+      if (webSession && castLifecycleIntent !== "start") {
+        castWindow()
+          ?.cast?.framework.CastContext.getInstance()
+          .endCurrentSession(true);
+      }
+      return cancelledCastStart();
+    }
     if (!isNative && !webSession) {
       return { ok: false, message: "Could not open the Cast device picker." };
     }
 
     const customReceiverId = customReceiverApplicationId();
-    if (!isNative && customReceiverId && webSession) {
+    if (customReceiverId) {
       const castSession = await createCastPlaybackSession(payload);
+      if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+        await revokeCastPlaybackSession(castSession.session_id).catch(
+          () => undefined,
+        );
+        return cancelledCastStart();
+      }
       if (castSession.receiver_application_id !== customReceiverId) {
         await revokeCastPlaybackSession(castSession.session_id).catch(
           () => undefined,
@@ -1053,15 +1376,53 @@ export async function startCastSession(
           message: "The Cast receiver configuration does not match the server.",
         };
       }
-      const chromeCast = castWindow()?.chrome?.cast;
-      if (!chromeCast) {
-        await revokeCastPlaybackSession(castSession.session_id).catch(
-          () => undefined,
-        );
-        return { ok: false, message: "Google Cast sender is unavailable." };
-      }
       try {
+        if (isNative) {
+          const startedAtGeneration = nativeCastSessionGeneration;
+          const result = await getNativeCast().requestSession(
+            buildNativeQueuePayload(castSession),
+          );
+          if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+            await revokeCastPlaybackSession(castSession.session_id).catch(
+              () => undefined,
+            );
+            if (castLifecycleIntent !== "start") {
+              await getNativeCast()
+                .endSession({ stopCasting: true })
+                .catch(() => undefined);
+            }
+            return cancelledCastStart();
+          }
+          if (!result.ok) {
+            await revokeCastPlaybackSession(castSession.session_id).catch(
+              () => undefined,
+            );
+            return result;
+          }
+          applyNativeCastSuccess(result, startedAtGeneration);
+          activeCrateCastSessionId = castSession.session_id;
+          activeCrateCastBootstrapUrl = castSession.bootstrap_url;
+          activeCrateCastQueue = castSession.queue;
+          emitCastSessionChanged();
+          return result;
+        }
+
+        const chromeCast = castWindow()?.chrome?.cast;
+        if (!webSession || !chromeCast) {
+          throw new Error("Google Cast sender is unavailable.");
+        }
         await loadWebCastQueue(webSession, castSession, chromeCast);
+        if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+          await revokeCastPlaybackSession(castSession.session_id).catch(
+            () => undefined,
+          );
+          if (castLifecycleIntent !== "start") {
+            castWindow()
+              ?.cast?.framework.CastContext.getInstance()
+              .endCurrentSession(true);
+          }
+          return cancelledCastStart();
+        }
       } catch (error) {
         await revokeCastPlaybackSession(castSession.session_id).catch(
           () => undefined,
@@ -1086,17 +1447,34 @@ export async function startCastSession(
       "POST",
       request,
     );
+    if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+      return cancelledCastStart();
+    }
     const media = await resolveCastMedia(ticket);
+    if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+      return cancelledCastStart();
+    }
     const artworkUrl = await resolveCastArtworkUrl(
       payload.track.albumCover,
       media.stream_url || ticket.stream_url,
     );
+    if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+      return cancelledCastStart();
+    }
 
     if (isNative) {
       const startedAtGeneration = nativeCastSessionGeneration;
       const result = await getNativeCast().requestSession(
         buildNativePayload(ticket, media, payload, artworkUrl),
       );
+      if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+        if (castLifecycleIntent !== "start") {
+          await getNativeCast()
+            .endSession({ stopCasting: true })
+            .catch(() => undefined);
+        }
+        return cancelledCastStart();
+      }
       applyNativeCastSuccess(result, startedAtGeneration);
       return result;
     }
@@ -1110,6 +1488,14 @@ export async function startCastSession(
       return { ok: false, message: "Could not open the Cast device picker." };
     }
     await session.loadMedia(loadRequest);
+    if (!isCurrentCastLifecycle(lifecycleGeneration)) {
+      if (castLifecycleIntent !== "start") {
+        castWindow()
+          ?.cast?.framework.CastContext.getInstance()
+          .endCurrentSession(true);
+      }
+      return cancelledCastStart();
+    }
     nativeCastSessionActive = false;
     emitCastSessionChanged();
     const targetName = castSessionName(session);
