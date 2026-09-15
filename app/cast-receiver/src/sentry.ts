@@ -36,7 +36,7 @@ interface ReceiverSentryEvent {
   user?: Record<string, unknown>;
 }
 
-type SentryModule = typeof import("@sentry/react");
+type SentryModule = typeof import("./sentry-sdk");
 
 const FILTERED = "[Filtered]";
 const RECEIVER_SESSION_PATH = /\/api\/cast\/sessions\/[^/?#\s]+/gi;
@@ -181,7 +181,7 @@ export const receiverTelemetry: ReceiverTelemetry = {
 };
 
 function loadSentry(): Promise<SentryModule | null> {
-  return (sentryModulePromise ??= import("@sentry/react").catch(() => null));
+  return (sentryModulePromise ??= import("./sentry-sdk").catch(() => null));
 }
 
 function withSentry(callback: (sentry: SentryModule) => void): Promise<void> {

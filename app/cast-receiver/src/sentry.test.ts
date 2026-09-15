@@ -6,7 +6,7 @@ const { captureException, init, metricsCount } = vi.hoisted(() => ({
   metricsCount: vi.fn(),
 }));
 
-vi.mock("@sentry/react", () => ({
+vi.mock("./sentry-sdk", () => ({
   captureException,
   init,
   metrics: { count: metricsCount },
