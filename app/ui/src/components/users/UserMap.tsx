@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useApi } from "@/hooks/use-api";
+import { cartoBasemapTileUrl } from "@/lib/carto-basemap";
 import {
   groupMapUsers,
   type MapUser,
@@ -267,8 +268,8 @@ export function UserMap({
           attributionControl
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+            url={cartoBasemapTileUrl()}
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
           <FitBounds groups={groups} />
           {groups.map((group) => (

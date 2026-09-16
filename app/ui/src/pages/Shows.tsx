@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@crate/ui/shadcn/button";
+import { cartoBasemapTileUrl } from "@/lib/carto-basemap";
 import { ShowCard, type ShowEvent } from "@/components/shows/ShowCard";
 import { getGenreColor } from "@crate/ui/domain/shows/show-types";
 import {
@@ -338,8 +339,8 @@ export function Shows() {
                 zoomControl={false}
               >
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                  url={cartoBasemapTileUrl()}
                 />
                 <InvalidateSize />
                 <LiveMarkers events={mappableEvents} />

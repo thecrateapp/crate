@@ -14,6 +14,7 @@ const sentryRelease =
   (process.env.GITHUB_SHA ? `crate-${process.env.GITHUB_SHA}` : undefined);
 
 export default defineConfig({
+  envDir: path.resolve(__dirname, "../.."),
   plugins: [
     react(),
     tailwindcss(),

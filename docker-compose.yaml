@@ -1006,6 +1006,8 @@ services:
     build:
       context: ./app
       dockerfile: ui/Dockerfile
+      args:
+        VITE_CARTO_API_KEY: ${VITE_CARTO_API_KEY:-}
     container_name: crate-ui
     restart: unless-stopped
     depends_on:

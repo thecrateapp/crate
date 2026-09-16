@@ -382,6 +382,7 @@ jobs:
             VITE_SENTRY_DSN=${{ vars.SENTRY_ADMIN_DSN }}
             VITE_SENTRY_ENVIRONMENT=production
             VITE_SENTRY_RELEASE=crate-${{ github.sha }}
+            VITE_CARTO_API_KEY=${{ vars.VITE_CARTO_API_KEY }}
 
   build-listen:
     needs: changes
