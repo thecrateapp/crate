@@ -966,6 +966,9 @@ def test_openapi_types_events_cache_lyrics_tags_and_enrichment_routes(test_app):
     setlist_playlist_operation = data["paths"][
         "/api/artists/{artist_id}/setlist-playlist"
     ]["post"]
+    setlist_refresh_operation = data["paths"][
+        "/api/artists/{artist_id}/probable-setlist/refresh"
+    ]["post"]
 
     assert events_operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
     assert "text/event-stream" in events_operation["responses"]["200"]["content"]
@@ -1026,6 +1029,14 @@ def test_openapi_types_events_cache_lyrics_tags_and_enrichment_routes(test_app):
     assert setlist_playlist_operation["responses"]["200"]["content"][
         "application/json"
     ]["schema"]["$ref"].endswith("/SetlistPlaylistResponse")
+
+    assert setlist_refresh_operation["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+    assert setlist_refresh_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/TaskEnqueueResponse")
 
 
 def test_openapi_types_artwork_routes_and_marks_them_authenticated(test_app):

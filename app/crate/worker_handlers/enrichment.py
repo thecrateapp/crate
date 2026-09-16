@@ -1902,7 +1902,10 @@ def _handle_refresh_probable_setlist(task_id: str, params: dict, config: dict) -
     artist_name = str(params.get("artist_name") or "").strip()
     if not artist_name:
         raise ValueError("artist_name is required")
-    result = refresh_probable_setlist(artist_name)
+    result = refresh_probable_setlist(
+        artist_name,
+        force=bool(params.get("force", False)),
+    )
     broadcast_invalidation("upcoming", f"artist:{build_artist_slug(artist_name)}")
     return result
 
