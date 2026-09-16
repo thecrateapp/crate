@@ -73,6 +73,12 @@ class SubsonicArtists(_SubsonicModel):
     index: list[SubsonicArtistIndex]
 
 
+class SubsonicIndexes(_SubsonicModel):
+    ignored_articles: str = Field(alias="ignoredArticles")
+    last_modified: int = Field(alias="lastModified")
+    index: list[SubsonicArtistIndex] = Field(default_factory=list)
+
+
 class SubsonicAlbum(_SubsonicModel):
     id: str
     name: str
@@ -142,6 +148,25 @@ class SubsonicStarred2(_SubsonicModel):
 
 class SubsonicRandomSongs(_SubsonicModel):
     song: list[SubsonicSong]
+
+
+class SubsonicDirectory(_SubsonicModel):
+    id: str
+    name: str
+    parent: str | None = None
+    child: list[dict[str, object]] = Field(default_factory=list)
+
+
+class SubsonicGenres(_SubsonicModel):
+    genre: list[dict[str, object]]
+
+
+class SubsonicSongs(_SubsonicModel):
+    song: list[SubsonicSong]
+
+
+class SubsonicAlbumList(_SubsonicModel):
+    album: list[dict[str, object]]
 
 
 class SubsonicOkBody(SubsonicResponseBase):
@@ -254,3 +279,43 @@ class SubsonicRandomSongsBody(SubsonicResponseBase):
 
 class SubsonicRandomSongsResponse(SubsonicEnvelopeBase):
     subsonic_response: SubsonicRandomSongsBody = Field(alias="subsonic-response")
+
+
+class SubsonicIndexesBody(SubsonicResponseBase):
+    indexes: SubsonicIndexes | None = None
+
+
+class SubsonicIndexesResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicIndexesBody = Field(alias="subsonic-response")
+
+
+class SubsonicDirectoryBody(SubsonicResponseBase):
+    directory: SubsonicDirectory | None = None
+
+
+class SubsonicDirectoryResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicDirectoryBody = Field(alias="subsonic-response")
+
+
+class SubsonicGenresBody(SubsonicResponseBase):
+    genres: SubsonicGenres | None = None
+
+
+class SubsonicGenresResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicGenresBody = Field(alias="subsonic-response")
+
+
+class SubsonicSongsBody(SubsonicResponseBase):
+    songs: SubsonicSongs | None = None
+
+
+class SubsonicSongsResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicSongsBody = Field(alias="subsonic-response")
+
+
+class SubsonicAlbumListBody(SubsonicResponseBase):
+    album_list: SubsonicAlbumList | None = Field(default=None, alias="albumList")
+
+
+class SubsonicAlbumListResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicAlbumListBody = Field(alias="subsonic-response")

@@ -277,31 +277,201 @@ def _get_global_entity_by_local_id(entity_type: str, local_id: int) -> dict | No
 
 _ALBUM_ORDERS = {
     "alphabeticalByName": "entity.canonical_name ASC, entity.global_album_uid",
-    "alphabeticalByArtist": "entity.artist_name ASC, entity.canonical_name ASC",
-    "newest": "COALESCE(entity.year, '0') DESC, entity.canonical_name ASC",
-    "recent": "entity.updated_at DESC, entity.global_album_uid",
-    "frequent": "entity.source_count DESC, entity.canonical_name ASC",
+    "alphabeticalByArtist": "entity.artist_name ASC, entity.canonical_name ASC, entity.global_album_uid",
+    "newest": "COALESCE(entity.year, '0') DESC, entity.canonical_name ASC, entity.global_album_uid",
+    "recent": """(
+        SELECT MAX(play.ended_at)
+        FROM global_catalog_tracks played_track
+        JOIN user_play_events play
+          ON play.global_track_uid = played_track.global_track_uid
+          OR (play.global_track_uid IS NULL
+              AND play.track_id = played_track.local_track_id)
+        WHERE played_track.global_album_uid = entity.global_album_uid
+          AND play.user_id = :user_id
+    ) DESC NULLS LAST, entity.artist_name, entity.canonical_name ASC, entity.global_album_uid""",
+    "frequent": """(
+        SELECT COUNT(*)
+        FROM global_catalog_tracks played_track
+        JOIN user_play_events play
+          ON play.global_track_uid = played_track.global_track_uid
+          OR (play.global_track_uid IS NULL
+              AND play.track_id = played_track.local_track_id)
+        WHERE played_track.global_album_uid = entity.global_album_uid
+          AND play.user_id = :user_id
+    ) DESC, entity.artist_name, entity.canonical_name ASC, entity.global_album_uid""",
+    "highest": """(
+        SELECT AVG(NULLIF(rated_track.rating, 0))
+        FROM global_catalog_tracks rated_entity
+        JOIN library_tracks rated_track ON rated_track.id = rated_entity.local_track_id
+        WHERE rated_entity.global_album_uid = entity.global_album_uid
+    ) DESC NULLS LAST, entity.artist_name, entity.canonical_name ASC, entity.global_album_uid""",
+    "starred": "entity.canonical_name ASC, entity.global_album_uid",
     "random": "RANDOM()",
+    "byYear": "entity.year DESC, entity.canonical_name ASC, entity.global_album_uid",
+    "byGenre": "entity.canonical_name ASC, entity.global_album_uid",
 }
 
+_GENRE_TREE_CTE = """
+WITH RECURSIVE genre_tree AS (
+    SELECT node.id, node.global_genre_uid
+    FROM genre_taxonomy_nodes node
+    WHERE node.taxonomy_id = 'crate-core'
+      AND LOWER(node.name) = LOWER(:genre)
+    UNION
+    SELECT child.id, child.global_genre_uid
+    FROM genre_tree parent
+    JOIN genre_taxonomy_edges edge
+      ON edge.target_genre_id = parent.id
+     AND edge.relation_type = 'parent'
+     AND edge.locked
+    JOIN genre_taxonomy_nodes child
+      ON child.id = edge.source_genre_id
+)
+"""
 
-def list_global_albums(list_type: str, *, size: int, offset: int) -> list[dict]:
-    order = _ALBUM_ORDERS.get(list_type, _ALBUM_ORDERS["alphabeticalByName"])
+
+def list_global_albums(
+    list_type: str,
+    *,
+    size: int,
+    offset: int,
+    from_year: int | None = None,
+    to_year: int | None = None,
+    genre: str | None = None,
+    user_id: int | None = None,
+    music_folder_id: str | None = None,
+) -> list[dict]:
+    if list_type not in _ALBUM_ORDERS:
+        raise ValueError(f"Unsupported OpenSubsonic album list type: {list_type}")
+    if list_type == "byYear" and (from_year is None or to_year is None):
+        raise ValueError("byYear requires from_year and to_year")
+    if list_type == "byGenre" and not (genre or "").strip():
+        raise ValueError("byGenre requires a genre")
+
+    filters = [f"({_AVAILABLE_SOURCE.format(uid_column='global_album_uid')})"]
+    params: dict[str, object] = {
+        "entity_type": "album",
+        "size": min(max(int(size), 1), 500),
+        "offset": max(int(offset), 0),
+        "user_id": user_id,
+    }
+    if music_folder_id is not None:
+        filters.append(":music_folder_id = '1'")
+        params["music_folder_id"] = music_folder_id
+    if list_type == "byYear":
+        filters.append(
+            "entity.year ~ '^[0-9]{4}$' AND entity.year::integer BETWEEN "
+            "LEAST(CAST(:from_year AS INTEGER), CAST(:to_year AS INTEGER)) AND "
+            "GREATEST(CAST(:from_year AS INTEGER), CAST(:to_year AS INTEGER))"
+        )
+        params.update(from_year=from_year, to_year=to_year)
+    if list_type == "byGenre":
+        filters.append(
+            "EXISTS (SELECT 1 FROM global_catalog_entity_genres membership "
+            "WHERE membership.entity_type = 'album' "
+            "AND membership.global_entity_uid = entity.global_album_uid "
+            "AND membership.aggregate_score >= 0.700 "
+            "AND membership.global_genre_uid IN "
+            "(SELECT global_genre_uid FROM genre_tree))"
+        )
+        params["genre"] = genre.strip()
+    if list_type == "starred":
+        filters.append(
+            "EXISTS (SELECT 1 FROM global_catalog_tracks liked_track "
+            "JOIN user_global_track_likes liked "
+            "ON liked.global_track_uid = liked_track.global_track_uid "
+            "WHERE liked_track.global_album_uid = entity.global_album_uid "
+            "AND liked.user_id = :user_id)"
+        )
+    order = _ALBUM_ORDERS[list_type]
+    if list_type == "byYear":
+        direction = "DESC" if from_year > to_year else "ASC"
+        order = f"entity.year {direction}, entity.canonical_name ASC, entity.global_album_uid"
     with read_scope() as session:
         rows = session.execute(
             text(
                 f"""
+                {_GENRE_TREE_CTE if list_type == "byGenre" else ""}
                 SELECT {_album_select()}
                 FROM global_catalog_albums entity
-                WHERE {_AVAILABLE_SOURCE.format(uid_column="global_album_uid")}
+                WHERE {" AND ".join(filters)}
                 ORDER BY {order}
                 LIMIT :size OFFSET :offset
                 """
             ),
+            params,
+        ).mappings()
+        return [dict(row) for row in rows]
+
+
+def get_global_catalog_last_modified() -> int:
+    with read_scope() as session:
+        value = session.execute(
+            text(
+                """
+                SELECT FLOOR(EXTRACT(EPOCH FROM GREATEST(
+                    COALESCE((SELECT MAX(updated_at) FROM global_catalog_artists), TIMESTAMPTZ 'epoch'),
+                    COALESCE((SELECT MAX(updated_at) FROM global_catalog_albums), TIMESTAMPTZ 'epoch'),
+                    COALESCE((SELECT MAX(updated_at) FROM global_catalog_tracks), TIMESTAMPTZ 'epoch')
+                )) * 1000)::BIGINT AS last_modified
+                """
+            )
+        ).scalar_one()
+    return int(value or 0)
+
+
+def get_global_tracks_by_genre(
+    genre: str, *, size: int, offset: int, music_folder_id: str | None = None
+) -> list[dict]:
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                f"""
+                WITH RECURSIVE genre_tree AS (
+                    SELECT node.id, node.global_genre_uid
+                    FROM genre_taxonomy_nodes node
+                    WHERE node.taxonomy_id = 'crate-core'
+                      AND LOWER(node.name) = LOWER(:genre)
+                    UNION
+                    SELECT child.id, child.global_genre_uid
+                    FROM genre_tree parent
+                    JOIN genre_taxonomy_edges edge
+                      ON edge.target_genre_id = parent.id
+                     AND edge.relation_type = 'parent'
+                     AND edge.locked
+                    JOIN genre_taxonomy_nodes child
+                      ON child.id = edge.source_genre_id
+                )
+                SELECT {_track_select()}
+                FROM global_catalog_tracks entity
+                LEFT JOIN library_tracks local_track
+                  ON local_track.id = entity.local_track_id
+                LEFT JOIN global_catalog_albums album
+                  ON album.global_album_uid = entity.global_album_uid
+                WHERE ({_AVAILABLE_SOURCE.format(uid_column="global_track_uid")})
+                  AND EXISTS (
+                      SELECT 1 FROM global_catalog_entity_genres membership
+                      WHERE membership.entity_type = 'track'
+                        AND membership.global_entity_uid = entity.global_track_uid
+                        AND membership.aggregate_score >= 0.700
+                        AND membership.global_genre_uid IN (
+                            SELECT global_genre_uid FROM genre_tree
+                        )
+                  )
+                  AND (:music_folder_id IS NULL OR :music_folder_id = '1')
+                ORDER BY entity.artist_name, entity.album_name,
+                         entity.disc_number NULLS FIRST,
+                         entity.track_number NULLS FIRST,
+                         entity.canonical_title
+                LIMIT :size OFFSET :offset
+                """
+            ),
             {
-                "entity_type": "album",
-                "size": min(max(int(size), 1), 500),
+                "genre": genre,
+                "entity_type": "track",
+                "size": min(max(int(size), 0), 500),
                 "offset": max(int(offset), 0),
+                "music_folder_id": music_folder_id,
             },
         ).mappings()
         return [dict(row) for row in rows]
@@ -391,23 +561,63 @@ def search_global_catalog(
     }
 
 
-def get_random_global_tracks(size: int) -> list[dict]:
+def get_random_global_tracks(
+    size: int,
+    *,
+    genre: str | None = None,
+    from_year: int | None = None,
+    to_year: int | None = None,
+    music_folder_id: str | None = None,
+) -> list[dict]:
+    filters = [f"({_AVAILABLE_SOURCE.format(uid_column='global_track_uid')})"]
+    params: dict[str, object] = {
+        "entity_type": "track",
+        "limit": min(max(size, 0), 500),
+    }
+    use_genre_tree = bool(genre and genre.strip())
+    if use_genre_tree:
+        filters.append(
+            "EXISTS (SELECT 1 FROM global_catalog_entity_genres membership "
+            "WHERE membership.entity_type = 'track' "
+            "AND membership.global_entity_uid = entity.global_track_uid "
+            "AND membership.aggregate_score >= 0.700 "
+            "AND membership.global_genre_uid IN "
+            "(SELECT global_genre_uid FROM genre_tree))"
+        )
+        params["genre"] = genre.strip()
+    if from_year is not None:
+        filters.append(
+            "album.year ~ '^[0-9]{4}$' "
+            "AND album.year::integer >= CAST(:from_year AS INTEGER)"
+        )
+        params["from_year"] = from_year
+    if to_year is not None:
+        filters.append(
+            "album.year ~ '^[0-9]{4}$' "
+            "AND album.year::integer <= CAST(:to_year AS INTEGER)"
+        )
+        params["to_year"] = to_year
+    if music_folder_id is not None:
+        filters.append(":music_folder_id = '1'")
+        params["music_folder_id"] = music_folder_id
+
     with read_scope() as session:
         rows = session.execute(
             text(
                 f"""
+                {_GENRE_TREE_CTE if use_genre_tree else ""}
                 SELECT {_track_select()}
                 FROM global_catalog_tracks entity
                 LEFT JOIN library_tracks local_track
                   ON local_track.id = entity.local_track_id
                 LEFT JOIN global_catalog_albums album
                   ON album.global_album_uid = entity.global_album_uid
-                WHERE {_AVAILABLE_SOURCE.format(uid_column="global_track_uid")}
+                WHERE {" AND ".join(filters)}
                 ORDER BY RANDOM()
                 LIMIT :limit
                 """
             ),
-            {"entity_type": "track", "limit": min(max(size, 1), 500)},
+            params,
         ).mappings()
         return [dict(row) for row in rows]
 
@@ -447,7 +657,9 @@ __all__ = [
     "get_global_artist_by_local_id",
     "get_global_track",
     "get_global_track_by_local_id",
+    "get_global_catalog_last_modified",
     "get_random_global_tracks",
+    "get_global_tracks_by_genre",
     "get_starred_global_tracks",
     "list_global_album_tracks",
     "list_global_albums",

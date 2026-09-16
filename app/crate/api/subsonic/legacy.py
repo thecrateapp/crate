@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from crate.db.queries.subsonic_global import (
     get_global_track,
+    get_global_tracks_by_genre,
     get_random_global_tracks,
     get_starred_global_tracks,
     list_global_albums,
@@ -39,15 +40,20 @@ from crate.subsonic.services.artwork import serve_playlist_cover
 from crate.subsonic.serializers import serialize_album, serialize_song
 from crate.api._deps import library_path
 from crate.api.schemas.subsonic import (
+    SubsonicAlbumListResponse,
     SubsonicAlbumList2Response,
     SubsonicAlbumResponse,
     SubsonicArtistResponse,
     SubsonicArtistsResponse,
     SubsonicLicenseResponse,
+    SubsonicDirectoryResponse,
+    SubsonicGenresResponse,
+    SubsonicIndexesResponse,
     SubsonicMusicFoldersResponse,
     SubsonicOkResponse,
     SubsonicPlaylistsResponse,
     SubsonicRandomSongsResponse,
+    SubsonicSongsResponse,
     SubsonicSearchResult3Response,
     SubsonicSongResponse,
     SubsonicStarred2Response,
@@ -230,6 +236,101 @@ def get_user(request: Request, username: str = Query("")):
 
 
 @router.get(
+    "/getIndexes",
+    response_model=SubsonicIndexesResponse,
+    summary="Browse artists grouped by index letter",
+)
+@router.get("/getIndexes.view", include_in_schema=False)
+def get_indexes(
+    request: Request,
+    musicFolderId: str | None = Query(None),
+    ifModifiedSince: int | None = Query(None, ge=0),
+):
+    try:
+        _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+
+    if not _valid_music_folder(musicFolderId):
+        return _subsonic_error(0, "Invalid musicFolderId")
+    last_modified = catalog.index_last_modified()
+    indexes = {
+        "ignoredArticles": "The El La Los Las",
+        "lastModified": last_modified,
+    }
+    if ifModifiedSince is None or ifModifiedSince < last_modified:
+        indexes.update(catalog.artist_indexes())
+    return _subsonic_response({"indexes": indexes})
+
+
+@router.get(
+    "/getMusicDirectory",
+    response_model=SubsonicDirectoryResponse,
+    summary="Browse the contents of a music directory",
+)
+@router.get("/getMusicDirectory.view", include_in_schema=False)
+def get_music_directory(request: Request, id: str = Query("")):
+    try:
+        _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+
+    if not id:
+        return _subsonic_error(70, "Music directory not found")
+    try:
+        directory = catalog.music_directory(id)
+    except SubsonicIdError:
+        directory = None
+    if directory is None:
+        return _subsonic_error(70, "Music directory not found")
+    return _subsonic_response({"directory": directory})
+
+
+@router.get(
+    "/getGenres",
+    response_model=SubsonicGenresResponse,
+    summary="List genres with album and song counts",
+)
+@router.get("/getGenres.view", include_in_schema=False)
+def get_genres(request: Request):
+    try:
+        _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    return _subsonic_response({"genres": {"genre": catalog.genres()}})
+
+
+@router.get(
+    "/getSongsByGenre",
+    response_model=SubsonicSongsResponse,
+    summary="List songs matching a genre",
+)
+@router.get("/getSongsByGenre.view", include_in_schema=False)
+def get_songs_by_genre(
+    request: Request,
+    genre: str = Query(""),
+    count: int = Query(10, ge=0, le=500),
+    offset: int = Query(0, ge=0),
+    musicFolderId: str | None = Query(None),
+):
+    try:
+        _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+
+    if not genre.strip():
+        return _subsonic_error(0, "genre is required")
+    if not _valid_music_folder(musicFolderId):
+        return _subsonic_error(0, "Invalid musicFolderId")
+    tracks = get_global_tracks_by_genre(
+        genre.strip(), size=count, offset=offset, music_folder_id=musicFolderId
+    )
+    return _subsonic_response(
+        {"songs": {"song": [_global_song_payload(track) for track in tracks]}}
+    )
+
+
+@router.get(
     "/getArtists",
     response_model=SubsonicArtistsResponse,
     response_model_exclude_unset=True,
@@ -312,6 +413,110 @@ def get_song(request: Request, id: str = Query("")):
 # ── Album Lists ─────────────────────────────────────────────────
 
 
+_ALBUM_LIST_TYPES = {
+    "random",
+    "newest",
+    "highest",
+    "frequent",
+    "recent",
+    "alphabeticalByName",
+    "alphabeticalByArtist",
+    "starred",
+    "byYear",
+    "byGenre",
+}
+
+
+def _valid_music_folder(music_folder_id: str | None) -> bool:
+    return music_folder_id is None or music_folder_id == "1"
+
+
+def _album_list(
+    request: Request,
+    *,
+    list_type: str,
+    size: int,
+    offset: int,
+    from_year: int | None,
+    to_year: int | None,
+    genre: str | None,
+    music_folder_id: str | None,
+):
+    try:
+        user = _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+
+    if list_type not in _ALBUM_LIST_TYPES:
+        return _subsonic_error(0, "Unsupported album list type")
+    if not _valid_music_folder(music_folder_id):
+        return _subsonic_error(0, "Invalid musicFolderId")
+    if list_type == "byYear" and (from_year is None or to_year is None):
+        return _subsonic_error(0, "fromYear and toYear are required for byYear")
+    if list_type == "byGenre" and not (genre or "").strip():
+        return _subsonic_error(0, "genre is required for byGenre")
+
+    albums = list_global_albums(
+        list_type,
+        size=size,
+        offset=offset,
+        from_year=from_year,
+        to_year=to_year,
+        genre=genre.strip() if genre else None,
+        user_id=int(user["id"]),
+        music_folder_id=music_folder_id,
+    )
+    return albums
+
+
+def _legacy_album_payload(album: dict) -> dict:
+    serialized = _global_album_payload(album)
+    return {
+        "id": serialized["id"],
+        "parent": serialized.get("artistId"),
+        "isDir": True,
+        "title": str(album.get("name") or ""),
+        "artist": str(album.get("artist") or ""),
+        "artistId": serialized.get("artistId"),
+        "album": str(album.get("name") or ""),
+        "year": serialized.get("year"),
+        "coverArt": serialized.get("coverArt"),
+    }
+
+
+@router.get(
+    "/getAlbumList",
+    response_model=SubsonicAlbumListResponse,
+    summary="List albums using a Subsonic album-list strategy",
+)
+@router.get("/getAlbumList.view", include_in_schema=False)
+def get_album_list(
+    request: Request,
+    type: str = Query(...),
+    size: int = Query(10, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    fromYear: int | None = Query(None),
+    toYear: int | None = Query(None),
+    genre: str | None = Query(None),
+    musicFolderId: str | None = Query(None),
+):
+    albums = _album_list(
+        request,
+        list_type=type,
+        size=size,
+        offset=offset,
+        from_year=fromYear,
+        to_year=toYear,
+        genre=genre,
+        music_folder_id=musicFolderId,
+    )
+    if isinstance(albums, JSONResponse):
+        return albums
+    return _subsonic_response(
+        {"albumList": {"album": [_legacy_album_payload(album) for album in albums]}}
+    )
+
+
 @router.get(
     "/getAlbumList2",
     response_model=SubsonicAlbumList2Response,
@@ -320,16 +525,26 @@ def get_song(request: Request, id: str = Query("")):
 @router.get("/getAlbumList2.view", include_in_schema=False)
 def get_album_list2(
     request: Request,
-    type: str = Query("alphabeticalByName"),
+    type: str = Query(...),
     size: int = Query(10, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    fromYear: int | None = Query(None),
+    toYear: int | None = Query(None),
+    genre: str | None = Query(None),
+    musicFolderId: str | None = Query(None),
 ):
-    try:
-        _require_subsonic_auth(request)
-    except SubsonicAuthError as error:
-        return _subsonic_auth_error_response(error)
-
-    albums = list_global_albums(type, size=size, offset=offset)
+    albums = _album_list(
+        request,
+        list_type=type,
+        size=size,
+        offset=offset,
+        from_year=fromYear,
+        to_year=toYear,
+        genre=genre,
+        music_folder_id=musicFolderId,
+    )
+    if isinstance(albums, JSONResponse):
+        return albums
 
     return _subsonic_response(
         {
@@ -686,13 +901,28 @@ def get_starred2(request: Request):
     summary="Fetch random songs for Subsonic clients",
 )
 @router.get("/getRandomSongs.view", include_in_schema=False)
-def get_random_songs(request: Request, size: int = Query(10, ge=1, le=500)):
+def get_random_songs(
+    request: Request,
+    size: int = Query(10, ge=0, le=500),
+    genre: str | None = Query(None),
+    fromYear: int | None = Query(None),
+    toYear: int | None = Query(None),
+    musicFolderId: str | None = Query(None),
+):
     try:
         _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
 
-    tracks = get_random_global_tracks(size)
+    if not _valid_music_folder(musicFolderId):
+        return _subsonic_error(0, "Invalid musicFolderId")
+    tracks = get_random_global_tracks(
+        size,
+        genre=genre.strip() if genre else None,
+        from_year=fromYear,
+        to_year=toYear,
+        music_folder_id=musicFolderId,
+    )
 
     return _subsonic_response(
         {

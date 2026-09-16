@@ -507,7 +507,7 @@ class TestSubsonicBrowse:
 class TestSubsonicAlbumList2:
     """getAlbumList2 with sorting strategies."""
 
-    def test_album_list_default_order(self, test_app):
+    def test_album_list_default_pagination(self, test_app):
         with (
             _subsonic_auth_ok(),
             patch(
@@ -515,7 +515,10 @@ class TestSubsonicAlbumList2:
                 return_value=[_FAKE_GLOBAL_ALBUM],
             ),
         ):
-            resp = test_app.get(f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin")
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin"
+                "&type=alphabeticalByName"
+            )
             sr = _subsonic_ok_response(resp)
             al = sr["albumList2"]["album"]
             assert len(al) == 1
@@ -548,9 +551,97 @@ class TestSubsonicAlbumList2:
             sr = _subsonic_ok_response(resp)
             assert len(sr["albumList2"]["album"]) == 1
 
+    def test_album_list_by_year_forwards_filters_and_user(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.list_global_albums", return_value=[]
+            ) as list_albums,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin"
+                "&type=byYear&fromYear=2000&toYear=2005&size=3&offset=2"
+                "&musicFolderId=1"
+            )
+
+        assert _subsonic_ok_response(resp)["albumList2"]["album"] == []
+        list_albums.assert_called_once_with(
+            "byYear",
+            size=3,
+            offset=2,
+            from_year=2000,
+            to_year=2005,
+            genre=None,
+            user_id=1,
+            music_folder_id="1",
+        )
+
+    def test_album_list_by_genre_forwards_genre_filter(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.list_global_albums", return_value=[]
+            ) as list_albums,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin"
+                "&type=byGenre&genre=post-rock"
+            )
+
+        assert _subsonic_ok_response(resp)["albumList2"]["album"] == []
+        list_albums.assert_called_once_with(
+            "byGenre",
+            size=10,
+            offset=0,
+            from_year=None,
+            to_year=None,
+            genre="post-rock",
+            user_id=1,
+            music_folder_id=None,
+        )
+
+    def test_album_list_by_year_requires_both_boundaries(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch("crate.api.subsonic.legacy.list_global_albums") as list_albums,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin"
+                "&type=byYear&fromYear=2000"
+            )
+
+        _subsonic_error_response(resp, code=0)
+        list_albums.assert_not_called()
+
+    def test_album_list_by_genre_requires_genre(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch("crate.api.subsonic.legacy.list_global_albums") as list_albums,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin&type=byGenre"
+            )
+
+        _subsonic_error_response(resp, code=0)
+        list_albums.assert_not_called()
+
+    def test_album_list_rejects_unsupported_strategy_without_fallback(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch("crate.api.subsonic.legacy.list_global_albums") as list_albums,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin&type=not-a-strategy"
+            )
+
+        _subsonic_error_response(resp, code=0)
+        list_albums.assert_not_called()
+
     def test_album_list_unauthorized(self, test_app):
         with _subsonic_auth_fail():
-            resp = test_app.get(f"{_SUBSONIC_BASE}/getAlbumList2?u=bad&p=bad")
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList2?u=bad&p=bad&type=alphabeticalByName"
+            )
             _subsonic_error_response(resp, code=40)
 
 
@@ -655,6 +746,125 @@ class TestSubsonicStubs:
             assert len(songs) == 1
             assert songs[0]["title"] == "Concubine"
             assert songs[0]["type"] == "music"
+
+    def test_random_songs_forwards_genre_year_and_folder_filters(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.get_random_global_tracks",
+                return_value=[],
+            ) as random_tracks,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getRandomSongs?u=admin&p=admin&size=7"
+                "&genre=post-rock&fromYear=2001&toYear=2008&musicFolderId=1"
+            )
+
+        assert _subsonic_ok_response(response)["randomSongs"]["song"] == []
+        random_tracks.assert_called_once_with(
+            7,
+            genre="post-rock",
+            from_year=2001,
+            to_year=2008,
+            music_folder_id="1",
+        )
+
+    def test_random_songs_accepts_one_sided_year_filter_and_zero_size(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.get_random_global_tracks", return_value=[]
+            ) as random_tracks,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getRandomSongs?u=admin&p=admin&size=0&fromYear=2001"
+            )
+
+        assert _subsonic_ok_response(response)["randomSongs"]["song"] == []
+        random_tracks.assert_called_once_with(
+            0,
+            genre=None,
+            from_year=2001,
+            to_year=None,
+            music_folder_id=None,
+        )
+
+    def test_get_indexes_returns_index_contract(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.catalog.artist_indexes",
+                return_value={"ignoredArticles": "The El La Los Las", "index": []},
+            ),
+            patch(
+                "crate.api.subsonic.legacy.catalog.index_last_modified",
+                return_value=123456,
+            ),
+        ):
+            response = test_app.get(f"{_SUBSONIC_BASE}/getIndexes?u=admin&p=admin")
+
+        indexes = _subsonic_ok_response(response)["indexes"]
+        assert indexes == {
+            "ignoredArticles": "The El La Los Las",
+            "lastModified": 123456,
+            "index": [],
+        }
+
+    def test_get_music_directory_returns_not_found_for_unknown_id(self, test_app):
+        with _subsonic_auth_ok():
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getMusicDirectory?u=admin&p=admin&id=invalid"
+            )
+
+        _subsonic_error_response(response, code=70)
+
+    def test_get_genres_returns_counted_genres(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.catalog.genres",
+                return_value=[{"value": "Post-rock", "songCount": 8, "albumCount": 2}],
+            ),
+        ):
+            response = test_app.get(f"{_SUBSONIC_BASE}/getGenres?u=admin&p=admin")
+
+        genres = _subsonic_ok_response(response)["genres"]["genre"]
+        assert genres == [{"value": "Post-rock", "songCount": 8, "albumCount": 2}]
+
+    def test_get_songs_by_genre_forwards_pagination_and_folder(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.get_global_tracks_by_genre",
+                return_value=[_FAKE_GLOBAL_TRACK],
+            ) as tracks_by_genre,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getSongsByGenre?u=admin&p=admin"
+                "&genre=post-rock&count=4&offset=2&musicFolderId=1"
+            )
+
+        songs = _subsonic_ok_response(response)["songs"]["song"]
+        assert len(songs) == 1
+        tracks_by_genre.assert_called_once_with(
+            "post-rock", size=4, offset=2, music_folder_id="1"
+        )
+
+    def test_get_album_list_uses_legacy_album_list_key(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.list_global_albums",
+                return_value=[_FAKE_GLOBAL_ALBUM],
+            ),
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumList?u=admin&p=admin&type=alphabeticalByName"
+            )
+
+        album_list = _subsonic_ok_response(response)["albumList"]
+        assert album_list["album"][0]["title"] == "Jane Doe"
+        assert album_list["album"][0]["isDir"] is True
 
     def test_random_songs_unauthorized(self, test_app):
         with _subsonic_auth_fail():

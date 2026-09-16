@@ -1229,8 +1229,31 @@ def test_openapi_types_subsonic_routes_and_hides_view_aliases(test_app):
     data = test_app.get("/openapi.json").json()
 
     assert "/rest/ping" in data["paths"]
+    assert {
+        "/rest/getIndexes",
+        "/rest/getMusicDirectory",
+        "/rest/getGenres",
+        "/rest/getSongsByGenre",
+        "/rest/getAlbumList",
+    } <= data["paths"].keys()
     assert "/rest/ping.view" not in data["paths"]
     assert "/rest/getArtists.view" not in data["paths"]
+    for endpoint in (
+        "getIndexes",
+        "getMusicDirectory",
+        "getGenres",
+        "getSongsByGenre",
+        "getAlbumList",
+    ):
+        assert f"/rest/{endpoint}.view" not in data["paths"]
+
+    for endpoint in ("getAlbumList", "getAlbumList2"):
+        type_parameter = next(
+            parameter
+            for parameter in data["paths"][f"/rest/{endpoint}"]["get"]["parameters"]
+            if parameter["name"] == "type"
+        )
+        assert type_parameter["required"] is True
 
     ping_operation = data["paths"]["/rest/ping"]["get"]
     artist_operation = data["paths"]["/rest/getArtists"]["get"]
