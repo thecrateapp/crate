@@ -954,7 +954,13 @@ class TestSubsonicStubs:
     """getPlaylists, getStarred2, getRandomSongs."""
 
     def test_playlists_returns_empty_list(self, test_app):
-        with _subsonic_auth_ok():
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.playlist_service.list_playlists",
+                return_value=[],
+            ),
+        ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getPlaylists?u=admin&p=admin")
             sr = _subsonic_ok_response(resp)
             assert sr["playlists"]["playlist"] == []
@@ -963,6 +969,106 @@ class TestSubsonicStubs:
         with _subsonic_auth_fail():
             resp = test_app.get(f"{_SUBSONIC_BASE}/getPlaylists?u=bad&p=bad")
             _subsonic_error_response(resp, code=40)
+
+
+class TestSubsonicPlaylistEndpoints:
+    def test_get_playlist_alias_returns_the_playlist_detail(self, test_app):
+        payload = {
+            "id": "pl-12",
+            "name": "Heavy rotation",
+            "comment": "",
+            "public": False,
+            "songCount": 0,
+            "duration": 0,
+            "created": "2026-09-01T00:00:00+00:00",
+            "changed": "2026-09-02T00:00:00+00:00",
+            "readonly": False,
+            "entry": [],
+        }
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.playlist_service.get_playlist",
+                return_value=payload,
+            ) as get_playlist,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getPlaylist.view?u=admin&p=admin&id=pl-12"
+            )
+
+        assert _subsonic_ok_response(response)["playlist"] == payload
+        get_playlist.assert_called_once_with(_FAKE_USER, "pl-12")
+
+    def test_create_playlist_preserves_repeated_song_ids(self, test_app):
+        payload = {
+            "id": "pl-12",
+            "name": "Set",
+            "songCount": 2,
+            "duration": 10,
+            "created": "2026-09-01T00:00:00+00:00",
+            "changed": "2026-09-01T00:00:00+00:00",
+            "entry": [],
+        }
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.playlist_service.create_playlist",
+                return_value=payload,
+            ) as create_playlist,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/createPlaylist?u=admin&p=admin&name=Set"
+                "&songId=gt-33333333-3333-4333-8333-333333333333"
+                "&songId=gt-33333333-3333-4333-8333-333333333333"
+            )
+
+        assert _subsonic_ok_response(response)["playlist"] == payload
+        create_playlist.assert_called_once_with(
+            _FAKE_USER,
+            name="Set",
+            playlist_id=None,
+            song_ids=[
+                "gt-33333333-3333-4333-8333-333333333333",
+                "gt-33333333-3333-4333-8333-333333333333",
+            ],
+        )
+
+    def test_update_playlist_parses_repeated_zero_based_indices(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.playlist_service.update_playlist"
+            ) as update_playlist,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/updatePlaylist?u=admin&p=admin&playlistId=pl-12"
+                "&public=false&songIndexToRemove=0&songIndexToRemove=3"
+            )
+
+        _subsonic_ok_response(response)
+        update_playlist.assert_called_once_with(
+            _FAKE_USER,
+            "pl-12",
+            name=None,
+            comment=None,
+            public=False,
+            song_ids_to_add=None,
+            song_indexes_to_remove=[0, 3],
+        )
+
+    def test_delete_playlist_returns_empty_success_envelope(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.playlist_service.delete_playlist"
+            ) as delete_playlist,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/deletePlaylist.view?u=admin&p=admin&id=pl-12"
+            )
+
+        _subsonic_ok_response(response)
+        delete_playlist.assert_called_once_with(_FAKE_USER, "pl-12")
 
     def test_starred2_returns_empty_lists(self, test_app):
         with (

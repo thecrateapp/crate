@@ -33,7 +33,9 @@ from crate.subsonic.global_ids import (
     decode_subsonic_id,
     decode_subsonic_playlist_id,
 )
+from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.services import catalog
+from crate.subsonic.services import playlists as playlist_service
 from crate.subsonic.services.artwork import serve_playlist_cover
 from crate.subsonic.serializers import serialize_album, serialize_song
 from crate.api._deps import library_path
@@ -50,6 +52,7 @@ from crate.api.schemas.subsonic import (
     SubsonicMusicFoldersResponse,
     SubsonicOkResponse,
     SubsonicPlaylistsResponse,
+    SubsonicPlaylistResponse,
     SubsonicRandomSongsResponse,
     SubsonicSongsResponse,
     SubsonicSearchResponse,
@@ -1073,7 +1076,7 @@ def scrobble(
     return _subsonic_response({})
 
 
-# ── Stubs (required by clients but not critical) ────────────────
+# ── Playlists ───────────────────────────────────────────────────
 
 
 @router.get(
@@ -1082,12 +1085,150 @@ def scrobble(
     summary="List playlists for Subsonic clients",
 )
 @router.get("/getPlaylists.view", include_in_schema=False)
-def get_playlists(request: Request):
+def get_playlists(request: Request, username: str | None = Query(None)):
     try:
-        _require_subsonic_auth(request)
+        user = _require_subsonic_auth(request)
+        playlists = playlist_service.list_playlists(user, username=username)
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
-    return _subsonic_response({"playlists": {"playlist": []}})
+    return _subsonic_response({"playlists": {"playlist": playlists}})
+
+
+@router.get(
+    "/getPlaylist",
+    response_model=SubsonicPlaylistResponse,
+    summary="Return a saved playlist and its songs",
+)
+@router.get("/getPlaylist.view", include_in_schema=False)
+def get_playlist(request: Request, id: str = Query("")):
+    try:
+        user = _require_subsonic_auth(request)
+        if not id:
+            raise OpenSubsonicError(
+                ErrorCode.MISSING_PARAMETER, "Required parameter 'id' is missing"
+            )
+        playlist = playlist_service.get_playlist(user, id)
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    return _subsonic_response({"playlist": playlist})
+
+
+@router.get(
+    "/createPlaylist",
+    response_model=SubsonicPlaylistResponse,
+    summary="Create or replace a saved playlist",
+)
+@router.get("/createPlaylist.view", include_in_schema=False)
+def create_playlist(
+    request: Request,
+    name: str | None = Query(None),
+    playlist_id: str | None = Query(None, alias="playlistId"),
+    song_id: list[str] | None = Query(None, alias="songId"),
+):
+    try:
+        user = _require_subsonic_auth(request)
+        if playlist_id == "":
+            raise OpenSubsonicError(
+                ErrorCode.MISSING_PARAMETER, "Invalid parameter 'playlistId'"
+            )
+        playlist = playlist_service.create_playlist(
+            user, name=name, playlist_id=playlist_id, song_ids=song_id
+        )
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    return _subsonic_response({"playlist": playlist})
+
+
+@router.get(
+    "/updatePlaylist",
+    response_model=SubsonicOkResponse,
+    summary="Update a saved playlist",
+)
+@router.get("/updatePlaylist.view", include_in_schema=False)
+def update_playlist(
+    request: Request,
+    playlist_id: str = Query("", alias="playlistId"),
+    name: str | None = Query(None),
+    comment: str | None = Query(None),
+    public: str | None = Query(None),
+    song_id_to_add: list[str] | None = Query(None, alias="songIdToAdd"),
+    song_index_to_remove: list[str] | None = Query(None, alias="songIndexToRemove"),
+):
+    try:
+        user = _require_subsonic_auth(request)
+        if not playlist_id:
+            raise OpenSubsonicError(
+                ErrorCode.MISSING_PARAMETER,
+                "Required parameter 'playlistId' is missing",
+            )
+        parsed_public = _parse_playlist_public(public)
+        parsed_indexes = _parse_playlist_indexes(song_index_to_remove)
+        playlist_service.update_playlist(
+            user,
+            playlist_id,
+            name=name,
+            comment=comment,
+            public=parsed_public,
+            song_ids_to_add=song_id_to_add,
+            song_indexes_to_remove=parsed_indexes,
+        )
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    return _subsonic_response({})
+
+
+@router.get(
+    "/deletePlaylist",
+    response_model=SubsonicOkResponse,
+    summary="Delete a saved playlist",
+)
+@router.get("/deletePlaylist.view", include_in_schema=False)
+def delete_playlist(request: Request, id: str = Query("")):
+    try:
+        user = _require_subsonic_auth(request)
+        if not id:
+            raise OpenSubsonicError(
+                ErrorCode.MISSING_PARAMETER, "Required parameter 'id' is missing"
+            )
+        playlist_service.delete_playlist(user, id)
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    return _subsonic_response({})
+
+
+def _parse_playlist_public(value: str | None) -> bool | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized in {"true", "1"}:
+        return True
+    if normalized in {"false", "0"}:
+        return False
+    raise OpenSubsonicError(ErrorCode.MISSING_PARAMETER, "Invalid public value")
+
+
+def _parse_playlist_indexes(values: list[str] | None) -> list[int] | None:
+    if values is None:
+        return None
+    try:
+        return [int(value) for value in values]
+    except ValueError as error:
+        raise OpenSubsonicError(
+            ErrorCode.MISSING_PARAMETER, "Invalid songIndexToRemove value"
+        ) from error
+
+
+# ── Other stubs (required by clients but not critical) ──────────
 
 
 @router.get(

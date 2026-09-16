@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import urlencode, urlsplit
 
 from crate.db.queries.global_catalog import list_global_catalog_genres
+from crate.db.queries.subsonic_track_queries import get_track_full
 from crate.db.queries.subsonic_global import (
     get_global_album,
     get_global_album_metadata,
@@ -419,7 +420,10 @@ def song_detail(identifier: str) -> dict[str, Any] | None:
     if entity_id.scope == "global":
         song = get_global_track(str(entity_id.global_uid))
     else:
-        song = get_global_track_by_local_id(int(entity_id.local_id or 0))
+        local_track_id = int(entity_id.local_id or 0)
+        song = get_global_track_by_local_id(local_track_id)
+        if song is None:
+            song = get_track_full(local_track_id)
     return serialize_song(song) if song else None
 
 

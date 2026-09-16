@@ -169,8 +169,28 @@ class SubsonicAlbumInfo(_SubsonicModel):
     large_image_url: str | None = Field(default=None, alias="largeImageUrl")
 
 
+class SubsonicPlaylist(_SubsonicModel):
+    id: str
+    name: str
+    comment: str | None = None
+    owner: str | None = None
+    public: bool | None = None
+    song_count: int = Field(alias="songCount")
+    duration: int
+    created: str
+    changed: str
+    cover_art: str | None = Field(default=None, alias="coverArt")
+    allowed_user: list[str] | None = Field(default=None, alias="allowedUser")
+    readonly: bool | None = None
+    valid_until: str | None = Field(default=None, alias="validUntil")
+
+
+class SubsonicPlaylistWithSongs(SubsonicPlaylist):
+    entry: list[SubsonicSong] = Field(default_factory=list)
+
+
 class SubsonicPlaylists(_SubsonicModel):
-    playlist: list[dict[str, object]]
+    playlist: list[SubsonicPlaylist]
 
 
 class SubsonicStarred2(_SubsonicModel):
@@ -333,6 +353,14 @@ class SubsonicPlaylistsBody(SubsonicResponseBase):
 
 class SubsonicPlaylistsResponse(SubsonicEnvelopeBase):
     subsonic_response: SubsonicPlaylistsBody = Field(alias="subsonic-response")
+
+
+class SubsonicPlaylistBody(SubsonicResponseBase):
+    playlist: SubsonicPlaylistWithSongs | None = None
+
+
+class SubsonicPlaylistResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicPlaylistBody = Field(alias="subsonic-response")
 
 
 class SubsonicStarred2Body(SubsonicResponseBase):

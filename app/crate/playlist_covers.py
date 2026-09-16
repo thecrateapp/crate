@@ -9,17 +9,17 @@ _DATA_URL_RE = re.compile(r"^data:image/(?P<fmt>[a-zA-Z0-9.+-]+);base64,(?P<data
 
 
 def playlist_covers_root() -> Path:
-    root = Path(os.environ.get("DATA_DIR", "/data")) / "playlist-covers"
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+    return Path(os.environ.get("DATA_DIR", "/data")) / "playlist-covers"
 
 
 def playlist_cover_abspath(cover_path: str | None) -> Path | None:
     if not cover_path:
         return None
-    candidate = (playlist_covers_root() / cover_path).resolve()
     root = playlist_covers_root().resolve()
-    if not str(candidate).startswith(str(root)):
+    candidate = (root / cover_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
         return None
     return candidate
 
@@ -40,7 +40,9 @@ def persist_playlist_cover_data(playlist_id: int, cover_data_url: str) -> str:
         raise ValueError("Invalid playlist cover encoding") from exc
 
     filename = f"playlist-{playlist_id}.{ext}"
-    path = playlist_covers_root() / filename
+    root = playlist_covers_root()
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / filename
     path.write_bytes(payload)
     return filename
 

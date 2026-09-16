@@ -82,3 +82,32 @@ def test_legacy_local_album_and_track_ids_return_stable_global_ids(monkeypatch):
     assert album_result["song"][0]["id"] == f"gt-{_TRACK_UID}"
     assert song_result is not None
     assert song_result["id"] == f"gt-{_TRACK_UID}"
+
+
+def test_unreconciled_local_track_id_falls_back_to_library_projection(monkeypatch):
+    song = {
+        "id": 8,
+        "album_id": 4,
+        "artist_id": 7,
+        "title": "Concubine",
+        "artist": "Converge",
+        "album": "Jane Doe",
+        "track_number": 1,
+        "disc_number": 1,
+        "duration": 94,
+        "format": "flac",
+        "has_cover": True,
+        "path": "/music/Converge/Jane Doe/Concubine.flac",
+    }
+    monkeypatch.setattr(
+        catalog, "get_global_track_by_local_id", lambda _: None, raising=False
+    )
+    monkeypatch.setattr(catalog, "get_track_full", lambda _: song, raising=False)
+
+    result = catalog.song_detail("8")
+
+    assert result is not None
+    assert result["id"] == "8"
+    assert result["albumId"] == "al-4"
+    assert result["artistId"] == "ar-7"
+    assert result["coverArt"] == "al-4"

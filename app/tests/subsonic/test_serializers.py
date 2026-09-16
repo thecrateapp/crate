@@ -159,3 +159,24 @@ def test_song_serializer_does_not_emit_unrecognized_internal_fields(global_song)
             "type",
         }
     )
+
+
+def test_playlist_local_song_uses_local_track_and_parent_ids():
+    song = serialize_song(
+        {
+            "track_id": 41,
+            "artist_id": 12,
+            "album_id": 18,
+            "title": "Local track",
+            "artist": "Local artist",
+            "album": "Local album",
+            "duration": 123,
+            "format": "flac",
+            "has_cover": True,
+        }
+    )
+
+    assert song["id"] == "41"
+    assert song["artistId"] == "ar-12"
+    assert song["albumId"] == "al-18"
+    assert song["coverArt"] == "al-18"

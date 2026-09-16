@@ -1,6 +1,6 @@
 import base64
 
-from crate.playlist_covers import persist_playlist_cover_data
+from crate.playlist_covers import playlist_cover_abspath, persist_playlist_cover_data
 from crate.worker_handlers.management import _handle_persist_playlist_cover
 
 
@@ -18,6 +18,15 @@ def test_persist_playlist_cover_data_preserves_supported_extension(
 
     assert filename == "playlist-42.png"
     assert (tmp_path / "playlist-covers" / filename).read_bytes() == b"cover-bytes"
+
+
+def test_resolving_playlist_cover_path_does_not_create_storage(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+
+    path = playlist_cover_abspath("playlist-7.jpg")
+
+    assert path == tmp_path / "playlist-covers" / "playlist-7.jpg"
+    assert not (tmp_path / "playlist-covers").exists()
 
 
 def test_persist_playlist_cover_worker_uses_common_writer(tmp_path, monkeypatch):

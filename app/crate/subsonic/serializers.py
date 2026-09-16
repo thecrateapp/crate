@@ -7,7 +7,7 @@ from typing import Any, Literal, Mapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from crate.subsonic.global_ids import global_subsonic_id
+from crate.subsonic.global_ids import global_subsonic_id, local_subsonic_id
 
 
 class _Projection(BaseModel):
@@ -256,7 +256,13 @@ def _album_id(album: Mapping[str, Any]) -> str:
 
 
 def _track_id(song: Mapping[str, Any]) -> str:
-    return global_subsonic_id("track", str(song["global_track_uid"]))
+    uid = song.get("global_track_uid")
+    if uid:
+        return global_subsonic_id("track", str(uid))
+    local_id = song.get("track_id", song.get("id"))
+    if local_id is None:
+        raise ValueError("Track is missing its Subsonic ID")
+    return local_subsonic_id("track", _as_int(local_id, default=0))
 
 
 def _artist_id_from_album(album: Mapping[str, Any]) -> str | None:
@@ -266,12 +272,26 @@ def _artist_id_from_album(album: Mapping[str, Any]) -> str | None:
 
 def _album_id_from_song(song: Mapping[str, Any]) -> str | None:
     uid = song.get("global_album_uid")
-    return global_subsonic_id("album", str(uid)) if uid else None
+    if uid:
+        return global_subsonic_id("album", str(uid))
+    local_id = song.get("album_id")
+    return (
+        local_subsonic_id("album", _as_int(local_id, default=0))
+        if local_id is not None
+        else None
+    )
 
 
 def _artist_id_from_song(song: Mapping[str, Any]) -> str | None:
     uid = song.get("global_artist_uid")
-    return global_subsonic_id("artist", str(uid)) if uid else None
+    if uid:
+        return global_subsonic_id("artist", str(uid))
+    local_id = song.get("artist_id")
+    return (
+        local_subsonic_id("artist", _as_int(local_id, default=0))
+        if local_id is not None
+        else None
+    )
 
 
 def _year(value: Any) -> int | None:

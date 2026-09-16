@@ -41,6 +41,43 @@ def get_playlists(
         return _impl(s)
 
 
+def get_open_subsonic_playlists(
+    *,
+    user_id: int | None = None,
+    is_admin: bool = False,
+    session: Session | None = None,
+) -> list[dict]:
+    """Read playlists visible to a Subsonic user without per-row ACL queries."""
+
+    def _impl(s: Session) -> list[dict]:
+        stmt = select(Playlist)
+        if not is_admin:
+            member_playlist_ids = select(PlaylistMember.playlist_id).where(
+                PlaylistMember.user_id == user_id
+            )
+            stmt = stmt.where(
+                or_(
+                    Playlist.scope == "system",
+                    Playlist.visibility == "public",
+                    Playlist.user_id == user_id,
+                    Playlist.id.in_(member_playlist_ids),
+                )
+            )
+        rows = (
+            s.execute(stmt.order_by(Playlist.updated_at.desc(), Playlist.id.asc()))
+            .scalars()
+            .all()
+        )
+        return attach_artwork_tracks(
+            s, [playlist_to_dict(row) for row in rows if row is not None]
+        )
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as s:
+        return _impl(s)
+
+
 def get_playlist(playlist_id: int, *, session: Session | None = None) -> dict | None:
     def _impl(s: Session) -> dict | None:
         row = s.get(Playlist, playlist_id)
@@ -371,6 +408,7 @@ def get_smart_playlists_for_refresh() -> list[dict]:
 
 __all__ = [
     "get_followed_system_playlists",
+    "get_open_subsonic_playlists",
     "get_playlist",
     "get_playlist_cover_path",
     "get_playlist_followers_count",
