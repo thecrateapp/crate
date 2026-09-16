@@ -14,6 +14,7 @@ def get_bliss_candidates(
     session=None,
     bliss_vector: list[float] | None = None,
     exclude_path: str = "",
+    exclude_paths: list[str] | None = None,
     limit: int = 200,
 ) -> list[dict]:
     if not bliss_vector:
@@ -31,6 +32,7 @@ def get_bliss_candidates(
                 FROM library_tracks t
                 JOIN library_albums a ON t.album_id = a.id
                 WHERE t.bliss_embedding IS NOT NULL AND t.path != :exclude_path
+                  AND t.path <> ALL(:exclude_paths)
                   AND {playable_track_clause("t", "a")}
                 ORDER BY bliss_dist ASC
                 LIMIT :limit
@@ -39,6 +41,7 @@ def get_bliss_candidates(
                 {
                     "probe_vector": probe_vector,
                     "exclude_path": exclude_path,
+                    "exclude_paths": exclude_paths or [],
                     "limit": limit,
                     **playable_media_params(),
                 },

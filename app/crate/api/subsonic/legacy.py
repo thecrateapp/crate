@@ -30,7 +30,9 @@ from crate.subsonic.global_ids import (
 )
 from crate.subsonic.params import RequestParameters
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
+from crate.subsonic.protocol import render_response
 from crate.subsonic.services import catalog
+from crate.subsonic.services import discovery as discovery_service
 from crate.subsonic.services import preferences
 from crate.subsonic.services import playback as playback_service
 from crate.subsonic.services import queues as queue_service
@@ -138,6 +140,20 @@ def _subsonic_error(code: int, message: str) -> JSONResponse:
     return _subsonic_response(
         {"error": {"code": code, "message": message}}, status="failed"
     )
+
+
+def _discovery_response(
+    request: Request,
+    data: dict | None = None,
+    error: OpenSubsonicError | None = None,
+) -> Response:
+    response_format = (request.query_params.get("f") or "xml").strip().lower()
+    if response_format not in {"xml", "json"}:
+        error = error or OpenSubsonicError(
+            ErrorCode.GENERIC, "Unsupported response format"
+        )
+        response_format = "xml"
+    return render_response(data, error=error, response_format=response_format)
 
 
 def _require_subsonic_auth(request: Request) -> dict:
@@ -344,6 +360,105 @@ def get_songs_by_genre(
     return _subsonic_response(
         {"songs": {"song": [_global_song_payload(track) for track in tracks]}}
     )
+
+
+@router.get("/getLyrics", summary="Fetch cached lyrics by artist and title")
+@router.get("/getLyrics.view", include_in_schema=False)
+def get_lyrics(request: Request):
+    try:
+        _require_subsonic_auth(request)
+        lyrics = discovery_service.get_lyrics(
+            request.query_params.get("artist"), request.query_params.get("title")
+        )
+    except SubsonicAuthError as error:
+        return _discovery_response(
+            request, error=OpenSubsonicError(error.code, error.message)
+        )
+    except OpenSubsonicError as error:
+        return _discovery_response(request, error=error)
+    return _discovery_response(request, {"lyrics": lyrics})
+
+
+@router.get("/getLyricsBySongId", summary="Fetch structured cached lyrics by song ID")
+@router.get("/getLyricsBySongId.view", include_in_schema=False)
+def get_lyrics_by_song_id(request: Request):
+    try:
+        _require_subsonic_auth(request)
+        enhanced = (request.query_params.get("enhanced") or "false").strip().lower()
+        if enhanced not in {"", "false", "0"}:
+            if enhanced in {"true", "1"}:
+                raise OpenSubsonicError(
+                    ErrorCode.INCOMPATIBLE_SERVER,
+                    "Enhanced lyrics are not supported",
+                )
+            raise OpenSubsonicError(
+                ErrorCode.MISSING_PARAMETER, "Invalid parameter 'enhanced'"
+            )
+        lyrics = discovery_service.get_lyrics_by_song_id(
+            request.query_params.get("id") or ""
+        )
+    except SubsonicAuthError as error:
+        return _discovery_response(
+            request, error=OpenSubsonicError(error.code, error.message)
+        )
+    except OpenSubsonicError as error:
+        return _discovery_response(request, error=error)
+    return _discovery_response(request, {"lyricsList": lyrics})
+
+
+@router.get("/getTopSongs", summary="Return the best-ranked songs for an artist")
+@router.get("/getTopSongs.view", include_in_schema=False)
+def get_top_songs(request: Request):
+    try:
+        _require_subsonic_auth(request)
+        songs = discovery_service.get_top_songs(
+            artist=request.query_params.get("artist"),
+            artist_id=request.query_params.get("id"),
+            count=request.query_params.get("count"),
+        )
+    except SubsonicAuthError as error:
+        return _discovery_response(
+            request, error=OpenSubsonicError(error.code, error.message)
+        )
+    except OpenSubsonicError as error:
+        return _discovery_response(request, error=error)
+    return _discovery_response(request, {"topSongs": {"song": songs}})
+
+
+@router.get("/getSimilarSongs", summary="Return tracks similar to a library item")
+@router.get("/getSimilarSongs.view", include_in_schema=False)
+def get_similar_songs(request: Request):
+    try:
+        _require_subsonic_auth(request)
+        songs = discovery_service.get_similar_songs(
+            request.query_params.get("id") or "",
+            count=request.query_params.get("count"),
+        )
+    except SubsonicAuthError as error:
+        return _discovery_response(
+            request, error=OpenSubsonicError(error.code, error.message)
+        )
+    except OpenSubsonicError as error:
+        return _discovery_response(request, error=error)
+    return _discovery_response(request, {"similarSongs": {"song": songs}})
+
+
+@router.get("/getSimilarSongs2", summary="Return ID3-organized similar library tracks")
+@router.get("/getSimilarSongs2.view", include_in_schema=False)
+def get_similar_songs2(request: Request):
+    try:
+        _require_subsonic_auth(request)
+        songs = discovery_service.get_similar_songs(
+            request.query_params.get("id") or "",
+            count=request.query_params.get("count"),
+        )
+    except SubsonicAuthError as error:
+        return _discovery_response(
+            request, error=OpenSubsonicError(error.code, error.message)
+        )
+    except OpenSubsonicError as error:
+        return _discovery_response(request, error=error)
+    return _discovery_response(request, {"similarSongs2": {"song": songs}})
 
 
 @router.get(

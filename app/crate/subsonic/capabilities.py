@@ -8,6 +8,8 @@ OpenSubsonicEngine = Literal["legacy", "v1"]
 # Extensions are added only when their complete behavior is implemented.
 OPEN_SUBSONIC_EXTENSIONS: tuple[dict[str, object], ...] = (
     {"name": "indexBasedQueue", "versions": [1]},
+    {"name": "songLyrics", "versions": [1]},
+    {"name": "topSongsByArtistId", "versions": [1]},
 )
 
 

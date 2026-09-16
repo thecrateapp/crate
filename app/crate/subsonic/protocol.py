@@ -67,6 +67,10 @@ def _append_element(parent: ET.Element, name: str, value: Any) -> None:
     if value is None:
         return
     if isinstance(value, list):
+        if name == "structuredLyrics":
+            for item in value:
+                _append_element(parent, name, item)
+            return
         if name.endswith("s"):
             container = ET.SubElement(parent, _qualified(name))
             for item in value:
@@ -78,13 +82,18 @@ def _append_element(parent: ET.Element, name: str, value: Any) -> None:
 
     element = ET.SubElement(parent, _qualified(name))
     if isinstance(value, dict):
+        mixed_text = value.get("value") if name in {"lyrics", "line"} else None
         for key, item in value.items():
+            if key == "value" and name in {"lyrics", "line"}:
+                continue
             if item is None:
                 continue
             if isinstance(item, (str, int, float, bool)):
                 element.set(key, _xml_value(item))
             else:
                 _append_element(element, key, item)
+        if mixed_text is not None:
+            element.text = _xml_value(mixed_text)
         return
     element.text = _xml_value(value)
 

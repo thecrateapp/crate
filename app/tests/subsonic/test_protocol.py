@@ -108,6 +108,39 @@ def test_xml_error_envelope_uses_protocol_error_attributes() -> None:
     assert error.attrib == {"code": "40", "message": "Wrong username or password"}
 
 
+def test_xml_lyrics_and_structured_lines_use_mixed_text_content() -> None:
+    response = render_response(
+        {
+            "lyrics": {"artist": "Artist", "title": "Song", "value": "A lyric"},
+            "lyricsList": {
+                "structuredLyrics": [
+                    {
+                        "lang": "und",
+                        "synced": True,
+                        "line": [{"start": 1250, "value": "First line"}],
+                    }
+                ]
+            },
+        },
+        response_format="xml",
+    )
+    root = ET.fromstring(response.body)
+
+    lyrics = root.find(f"{{{XML_NAMESPACE}}}lyrics")
+    structured = root.find(
+        f"{{{XML_NAMESPACE}}}lyricsList/{{{XML_NAMESPACE}}}structuredLyrics"
+    )
+    line = (
+        structured.find(f"{{{XML_NAMESPACE}}}line") if structured is not None else None
+    )
+    assert lyrics is not None
+    assert lyrics.attrib == {"artist": "Artist", "title": "Song"}
+    assert lyrics.text == "A lyric"
+    assert line is not None
+    assert line.attrib == {"start": "1250"}
+    assert line.text == "First line"
+
+
 def test_v1_system_routes_support_view_aliases_and_public_extensions() -> None:
     app = FastAPI()
     router = create_subsonic_router("v1")
@@ -128,7 +161,9 @@ def test_v1_system_routes_support_view_aliases_and_public_extensions() -> None:
     assert ping.json() == ping_view.json()
     assert license_response.json()["subsonic-response"]["license"]["valid"] is True
     assert extensions.json()["subsonic-response"]["openSubsonicExtensions"] == [
-        {"name": "indexBasedQueue", "versions": [1]}
+        {"name": "indexBasedQueue", "versions": [1]},
+        {"name": "songLyrics", "versions": [1]},
+        {"name": "topSongsByArtistId", "versions": [1]},
     ]
     assert extensions.json()["subsonic-response"]["openSubsonic"] is True
     assert "/rest/getMusicFolders" in {route.path for route in router.routes}
