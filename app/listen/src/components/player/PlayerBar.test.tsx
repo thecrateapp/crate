@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -318,6 +318,37 @@ describe("PlayerBar mobile mini-player", () => {
         expect(button.className).not.toContain("rgba(");
       }
     }
+  });
+
+  it("uses compact counter typography for the desktop queue count", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const currentTrack = createMockTrack({
+      id: "queue-current",
+      title: "Current Track",
+      artist: "Crate",
+    });
+    const nextTrack = createMockTrack({
+      id: "queue-next",
+      title: "Next Track",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack,
+        currentIndex: 0,
+        queue: [currentTrack, nextTrack],
+      },
+    });
+
+    const queueCounter = screen
+      .getAllByRole("button", { name: "Queue" })
+      .map((button) => within(button).queryByText("1"))
+      .find((node): node is HTMLElement => node !== null);
+
+    expect(queueCounter).toHaveTextContent("1");
+    expect(queueCounter).toHaveClass("text-counter");
+    expect(queueCounter).not.toHaveClass("text-xs");
   });
 
   it("hides the desktop Equalizer access when the global toggle is disabled", async () => {

@@ -3,6 +3,8 @@
 @theme inline {
   --text-badge: 0.625rem; /* 10px */
   --text-badge--line-height: 1;
+  --text-counter: 0.5rem; /* 8px */
+  --text-counter--line-height: 1;
 }
 
 body {

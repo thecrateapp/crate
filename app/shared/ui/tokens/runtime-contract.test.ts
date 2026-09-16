@@ -58,4 +58,12 @@ describe("runtime token bridge", () => {
       ':root[data-crate-motion="reduced"]::view-transition-new(root)',
     );
   });
+
+  it("defines distinct compact typography for badges and counters", () => {
+    const typography = readTokenFile("typography.css");
+
+    expect(typography).toContain("--text-badge: 0.625rem");
+    expect(typography).toContain("--text-counter: 0.5rem");
+    expect(typography).toContain("--text-counter--line-height: 1");
+  });
 });

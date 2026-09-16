@@ -20,6 +20,12 @@ describe("cn", () => {
     );
   });
 
+  it("keeps counter typography when merged with a text color", () => {
+    expect(cn("text-counter", "text-[var(--active-text)]")).toBe(
+      "text-counter text-[var(--active-text)]",
+    );
+  });
+
   it("handles arrays and objects", () => {
     expect(cn(["a", "b"], { c: true, d: false })).toBe("a b c");
   });
