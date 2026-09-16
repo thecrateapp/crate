@@ -58,6 +58,20 @@ def get_playlist(playlist_id: int, *, session: Session | None = None) -> dict | 
         return _impl(s)
 
 
+def get_playlist_cover_path(
+    playlist_id: int, *, session: Session | None = None
+) -> str | None:
+    def _impl(s: Session) -> str | None:
+        return s.execute(
+            select(Playlist.cover_path).where(Playlist.id == playlist_id)
+        ).scalar_one_or_none()
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as s:
+        return _impl(s)
+
+
 def get_system_playlist_by_curation_key(
     curation_key: str, *, session: Session | None = None
 ) -> dict | None:
@@ -358,6 +372,7 @@ def get_smart_playlists_for_refresh() -> list[dict]:
 __all__ = [
     "get_followed_system_playlists",
     "get_playlist",
+    "get_playlist_cover_path",
     "get_playlist_followers_count",
     "get_playlists",
     "get_public_system_playlists_for_artist",

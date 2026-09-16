@@ -40,6 +40,7 @@ class ArtistProjection(_Projection):
     id: str
     name: str
     album_count: int = Field(alias="albumCount")
+    cover_art: str | None = Field(default=None, alias="coverArt")
 
 
 class ArtistIndexProjection(_Projection):
@@ -129,11 +130,7 @@ def serialize_artist_indexes(artists: Sequence[Mapping[str, Any]]) -> dict[str, 
         if not letter.isalpha():
             letter = "#"
         grouped.setdefault(letter, []).append(
-            ArtistProjection(
-                id=_artist_id(artist),
-                name=name,
-                albumCount=_as_int(artist.get("album_count"), default=0),
-            )
+            ArtistProjection(**_artist_fields(artist, name=name))
         )
 
     projection = ArtistsProjection(
@@ -156,9 +153,11 @@ def serialize_artist(
     ]
     return _dump(
         ArtistDetailProjection(
-            id=_artist_id(artist),
-            name=str(artist.get("name") or ""),
-            albumCount=len(album_projections),
+            **_artist_fields(
+                artist,
+                name=str(artist.get("name") or ""),
+                album_count=len(album_projections),
+            ),
             album=album_projections,
         )
     )
@@ -233,6 +232,23 @@ def serialize_song(song: Mapping[str, Any]) -> dict[str, Any]:
 
 def _artist_id(artist: Mapping[str, Any]) -> str:
     return global_subsonic_id("artist", str(artist["global_artist_uid"]))
+
+
+def _artist_fields(
+    artist: Mapping[str, Any], *, name: str, album_count: int | None = None
+) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "id": _artist_id(artist),
+        "name": name,
+        "albumCount": (
+            _as_int(artist.get("album_count"), default=0)
+            if album_count is None
+            else album_count
+        ),
+    }
+    if bool(artist.get("has_photo")):
+        values["coverArt"] = _artist_id(artist)
+    return values
 
 
 def _album_id(album: Mapping[str, Any]) -> str:

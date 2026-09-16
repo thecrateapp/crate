@@ -22,9 +22,11 @@ from crate.db.repositories.library import (
     get_library_artist,
     get_library_artist_by_entity_uid,
 )
+from crate.db.repositories.playlists_collection_reads import get_playlist_cover_path
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.external_artist_artwork import external_artist_artwork_path_from_key
 from crate.genre_covers import genre_cover_abspath
+from crate.playlist_covers import playlist_cover_abspath
 from crate.release_covers import release_cover_abspath
 from crate.storage_layout import resolve_album_dir, resolve_artist_dir
 from crate.utils import COVER_NAMES, PHOTO_NAMES
@@ -284,6 +286,15 @@ def _release_source(
     return ArtworkSource(response.content, content_type, "provider")
 
 
+def _playlist_source(asset: ArtworkAsset) -> ArtworkSource | None:
+    try:
+        playlist_id = int(asset.entity_key)
+    except ValueError:
+        return None
+    cover_path = playlist_cover_abspath(get_playlist_cover_path(playlist_id))
+    return _file_source(cover_path) if cover_path is not None else None
+
+
 def resolve_artwork_source(
     asset: ArtworkAsset, *, allow_provider: bool = True
 ) -> ArtworkSource | None:
@@ -300,6 +311,8 @@ def resolve_artwork_source(
         source = _file_source(absolute) if absolute is not None else None
     elif asset.kind == "release-cover":
         source = _release_source(asset, allow_provider=allow_provider)
+    elif asset.kind == "playlist-cover":
+        source = _playlist_source(asset)
     elif asset.kind == "external-artist":
         path = external_artist_artwork_path_from_key(asset.entity_key)
         source = _file_source(path) if path is not None else None

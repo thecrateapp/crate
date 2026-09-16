@@ -60,6 +60,7 @@ class SubsonicArtist(_SubsonicModel):
     id: str
     name: str
     album_count: int | None = Field(default=None, alias="albumCount")
+    cover_art: str | None = Field(default=None, alias="coverArt")
 
 
 class SubsonicArtistIndex(_SubsonicModel):
@@ -107,6 +108,7 @@ class SubsonicArtistDetail(_SubsonicModel):
     id: str
     name: str
     album_count: int = Field(alias="albumCount")
+    cover_art: str | None = Field(default=None, alias="coverArt")
     album: list[SubsonicAlbum]
 
 

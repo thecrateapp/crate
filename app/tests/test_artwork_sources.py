@@ -241,6 +241,33 @@ def test_genre_release_and_external_sources_use_durable_local_files(
     )
 
 
+def test_playlist_cover_source_uses_the_persisted_playlist_cover(monkeypatch, tmp_path):
+    from crate import artwork_sources
+    from crate.artwork_variants import ArtworkAsset
+
+    cover = tmp_path / "playlist-7.jpg"
+    cover.write_bytes(b"playlist-cover")
+    monkeypatch.setattr(
+        artwork_sources,
+        "get_playlist_cover_path",
+        lambda playlist_id: cover.name if playlist_id == 7 else None,
+    )
+    monkeypatch.setattr(
+        artwork_sources,
+        "playlist_cover_abspath",
+        lambda _cover_path: cover,
+        raising=False,
+    )
+
+    source = artwork_sources.resolve_artwork_source(
+        ArtworkAsset("playlist-cover", "7"), allow_provider=False
+    )
+
+    assert source is not None
+    assert source.content == b"playlist-cover"
+    assert source.media_type == "image/jpeg"
+
+
 def test_missing_artist_background_is_resolved_by_worker_provider(
     monkeypatch, tmp_path
 ):

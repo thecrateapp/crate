@@ -1276,6 +1276,11 @@ def test_openapi_types_subsonic_routes_and_hides_view_aliases(test_app):
     assert "application/json" in cover_content
     assert "image/jpeg" in cover_content
     assert cover_content["image/jpeg"]["schema"]["format"] == "binary"
+    assert "size" in {p["name"] for p in cover_operation["parameters"]}
+
+    schemas = data["components"]["schemas"]
+    assert "coverArt" in schemas["SubsonicArtist"]["properties"]
+    assert "coverArt" in schemas["SubsonicArtistDetail"]["properties"]
 
 
 def test_openapi_types_browse_media_routes_and_query_token_streams(test_app):

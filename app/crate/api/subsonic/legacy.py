@@ -31,9 +31,11 @@ from crate.subsonic.global_ids import (
     SubsonicEntityId,
     SubsonicIdError,
     decode_subsonic_id,
+    decode_subsonic_playlist_id,
     global_subsonic_id,
 )
 from crate.subsonic.services import catalog
+from crate.subsonic.services.artwork import serve_playlist_cover
 from crate.subsonic.serializers import serialize_album, serialize_song
 from crate.api._deps import library_path
 from crate.api.schemas.subsonic import (
@@ -230,6 +232,7 @@ def get_user(request: Request, username: str = Query("")):
 @router.get(
     "/getArtists",
     response_model=SubsonicArtistsResponse,
+    response_model_exclude_unset=True,
     summary="Browse artists grouped by index letter",
 )
 @router.get("/getArtists.view", include_in_schema=False)
@@ -245,6 +248,7 @@ def get_artists(request: Request):
 @router.get(
     "/getArtist",
     response_model=SubsonicArtistResponse,
+    response_model_exclude_unset=True,
     summary="Fetch a Subsonic artist with albums",
 )
 @router.get("/getArtist.view", include_in_schema=False)
@@ -456,7 +460,7 @@ def stream(request: Request, id: str = Query("")):
 
 @router.get(
     "/getCoverArt",
-    summary="Fetch album or artist artwork via the Subsonic API",
+    summary="Fetch artist, album or playlist artwork via the Subsonic API",
     responses={
         200: {
             "description": "Artwork image, or a Subsonic error envelope.",
@@ -473,11 +477,22 @@ def stream(request: Request, id: str = Query("")):
     },
 )
 @router.get("/getCoverArt.view", include_in_schema=False)
-def get_cover_art(request: Request, id: str = Query("")):
+def get_cover_art(
+    request: Request,
+    id: str = Query(""),
+    size: int | None = Query(None, gt=0, le=2048),
+):
     try:
         user = _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
+
+    if id.startswith("pl-"):
+        try:
+            playlist_id = decode_subsonic_playlist_id(id)
+        except SubsonicIdError:
+            return _subsonic_error(70, "Invalid Subsonic entity ID")
+        return serve_playlist_cover(playlist_id, user=user, size=size)
 
     entity_type: EntityKind
     if id.startswith(("al-", "gal-")):
@@ -497,18 +512,22 @@ def get_cover_art(request: Request, id: str = Query("")):
             str(entity_id.global_uid),
             entity_type=entity_type,
             user=user,
-            size=None,
+            size=size,
             image_format=None,
         )
 
     if entity_type == "album":
         from crate.api.browse_album import api_cover_by_id
 
-        return api_cover_by_id(int(entity_id.local_id or 0))
+        return api_cover_by_id(int(entity_id.local_id or 0), size=size)
 
     from crate.api.browse_artist import api_artist_photo_by_id
 
-    return api_artist_photo_by_id(request, int(entity_id.local_id or 0))
+    # The native photo endpoint reads the authenticated user from request.state.
+    # The Subsonic adapter has already authenticated this request using its own
+    # credential mechanism, so propagate that verified principal before reuse.
+    request.state.user = user
+    return api_artist_photo_by_id(request, int(entity_id.local_id or 0), size=size)
 
 
 # ── Scrobble ────────────────────────────────────────────────────

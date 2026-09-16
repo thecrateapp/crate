@@ -80,7 +80,7 @@ def test_global_cover_art_uses_canonical_resolver_with_subsonic_user(test_app):
         ) as serve,
     ):
         response = test_app.get(
-            f"/rest/getCoverArt?u=listener&p=secret&id=gal-{ALBUM_UID}"
+            f"/rest/getCoverArt?u=listener&p=secret&id=gal-{ALBUM_UID}&size=320"
         )
 
     assert response.status_code == 200
@@ -89,9 +89,70 @@ def test_global_cover_art_uses_canonical_resolver_with_subsonic_user(test_app):
         ALBUM_UID,
         entity_type="album",
         user=USER,
-        size=None,
+        size=320,
         image_format=None,
     )
+
+
+def test_artwork_references_from_all_media_serializers_resolve(test_app):
+    from crate.subsonic.serializers import (
+        serialize_album,
+        serialize_artist,
+        serialize_artist_indexes,
+        serialize_song,
+    )
+
+    artist = {
+        "global_artist_uid": ARTIST_UID,
+        "name": "High Vis",
+        "album_count": 1,
+        "has_photo": True,
+    }
+    album = {
+        "global_album_uid": ALBUM_UID,
+        "global_artist_uid": ARTIST_UID,
+        "name": "Blending",
+        "artist": "High Vis",
+        "year": 2022,
+        "track_count": 1,
+        "duration": 190,
+        "has_cover": True,
+    }
+    song = {
+        "global_track_uid": TRACK_UID,
+        "global_album_uid": ALBUM_UID,
+        "global_artist_uid": ARTIST_UID,
+        "title": "Talk For Hours",
+        "artist": "High Vis",
+        "album": "Blending",
+        "track_number": 1,
+        "disc_number": 1,
+        "duration": 190,
+        "format": "flac",
+        "has_cover": True,
+    }
+    references = [
+        serialize_artist_indexes([artist])["index"][0]["artist"][0]["coverArt"],
+        serialize_artist(artist, albums=[album])["coverArt"],
+        serialize_album(album, songs=[song])["coverArt"],
+        serialize_song(song)["coverArt"],
+    ]
+    image = Response(b"art", media_type="image/webp")
+
+    with (
+        _auth(),
+        patch(
+            "crate.federation.global_artwork.serve_global_artwork", return_value=image
+        ) as serve,
+    ):
+        responses = [
+            test_app.get(f"/rest/getCoverArt?u=listener&p=secret&id={reference}")
+            for reference in references
+        ]
+
+    assert all(response.status_code == 200 for response in responses)
+    assert all(response.content == b"art" for response in responses)
+    assert serve.call_count == len(references)
 
 
 def test_global_scrobble_records_global_identity_and_actual_source(test_app):
@@ -223,3 +284,73 @@ def test_remote_global_artwork_rejects_unsafe_content_types(content_type, monkey
         )
 
     assert error.value.status_code == 502
+
+
+def test_remote_global_artwork_preserves_cache_validators(monkeypatch):
+    import crate.federation.global_artwork as artwork
+
+    monkeypatch.setattr(
+        artwork,
+        "resolve_global_album_artwork",
+        lambda _uid: {
+            "kind": "remote",
+            "node_uid": "44444444-4444-4444-8444-444444444444",
+            "remote_entity_uid": "album-remote",
+        },
+    )
+    monkeypatch.setattr(
+        artwork.federation_repo,
+        "get_local_node",
+        lambda: {
+            "node_uid": "55555555-5555-4555-8555-555555555555",
+            "active_key_id": "key-1",
+            "private_key_ref": "federation/keys/key-1.pem",
+        },
+    )
+    monkeypatch.setattr(
+        artwork.federation_repo,
+        "get_peer",
+        lambda _uid: {
+            "trust_state": "approved",
+            "disabled_at": None,
+            "api_base_url": "https://peer.example",
+        },
+    )
+    monkeypatch.setattr(artwork, "build_outbound_user_assertion", lambda **_kw: "jwt")
+
+    class FakeResponse:
+        status_code = 200
+        headers = {
+            "content-type": "image/jpeg",
+            "etag": '"peer-revision"',
+            "last-modified": "Mon, 14 Sep 2026 09:00:00 GMT",
+        }
+        content = b"image"
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def request(self, method, path, *, user_assertion):
+            assert method == "GET"
+            assert path.endswith("?size=512")
+            assert user_assertion == "jwt"
+            return FakeResponse()
+
+    monkeypatch.setattr(artwork, "SignedFederationClient", FakeClient)
+
+    response = artwork.serve_global_artwork(
+        ALBUM_UID,
+        entity_type="album",
+        user=USER,
+        size=512,
+    )
+
+    assert response.headers["etag"] == '"peer-revision"'
+    assert response.headers["last-modified"] == "Mon, 14 Sep 2026 09:00:00 GMT"

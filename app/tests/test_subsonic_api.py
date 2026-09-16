@@ -342,11 +342,13 @@ class TestSubsonicBrowse:
     """getArtists, getArtist, getAlbum, getSong."""
 
     def test_get_artists_with_index_grouping(self, test_app):
+        artists = [dict(artist) for artist in _FAKE_GLOBAL_ARTISTS]
+        artists[1]["has_photo"] = True
         with (
             _subsonic_auth_ok(),
             patch(
                 "crate.subsonic.services.catalog.list_global_artists",
-                return_value=_FAKE_GLOBAL_ARTISTS,
+                return_value=artists,
             ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getArtists?u=admin&p=admin")
@@ -359,6 +361,8 @@ class TestSubsonicBrowse:
             assert artists[0]["name"] == "Birds In Row"
             assert artists[1]["name"] == "Converge"
             assert artists[2]["name"] == "Radiohead"
+            assert artists[0]["coverArt"] == ("ga-00000000-0000-4000-8000-000000000002")
+            assert "coverArt" not in artists[1]
             assert "ignoredArticles" in sr["artists"]
 
     def test_get_artists_unauthorized(self, test_app):
@@ -375,6 +379,7 @@ class TestSubsonicBrowse:
                     "id": f"ga-{_GLOBAL_ARTIST_UID}",
                     "name": "Converge",
                     "albumCount": 1,
+                    "coverArt": f"ga-{_GLOBAL_ARTIST_UID}",
                     "album": [{"name": "Jane Doe"}],
                 },
             ),
@@ -385,6 +390,7 @@ class TestSubsonicBrowse:
             assert a["name"] == "Converge"
             assert a["id"] == f"ga-{_GLOBAL_ARTIST_UID}"
             assert a["albumCount"] == 1
+            assert a["coverArt"] == f"ga-{_GLOBAL_ARTIST_UID}"
             assert len(a["album"]) == 1
             assert a["album"][0]["name"] == "Jane Doe"
 
@@ -747,25 +753,82 @@ class TestSubsonicCoverArt:
 
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.browse_album.api_cover_by_id", return_value=mock_response),
+            patch(
+                "crate.api.browse_album.api_cover_by_id", return_value=mock_response
+            ) as cover,
         ):
-            resp = test_app.get(f"{_SUBSONIC_BASE}/getCoverArt?u=admin&p=admin&id=al-1")
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getCoverArt?u=admin&p=admin&id=al-1&size=512"
+            )
             assert resp.status_code == 200
+            cover.assert_called_once_with(1, size=512)
 
     def test_cover_art_artist(self, test_app):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.headers = {"Content-Type": "image/jpeg"}
 
+        def serve_photo(request, _artist_id, *, size=None, **_kwargs):
+            assert request.state.user == _FAKE_USER
+            assert size == 512
+            return mock_response
+
         with (
             _subsonic_auth_ok(),
             patch(
                 "crate.api.browse_artist.api_artist_photo_by_id",
-                return_value=mock_response,
-            ),
+                side_effect=serve_photo,
+            ) as photo,
         ):
-            resp = test_app.get(f"{_SUBSONIC_BASE}/getCoverArt?u=admin&p=admin&id=ar-1")
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getCoverArt?u=admin&p=admin&id=ar-1&size=512"
+            )
             assert resp.status_code == 200
+            assert photo.call_args.kwargs["size"] == 512
+
+    def test_cover_art_rejects_oversized_image_requests(self, test_app):
+        with _subsonic_auth_ok():
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getCoverArt?u=admin&p=admin&id=al-1&size=2049"
+            )
+
+        assert response.status_code == 422
+
+    def test_playlist_cover_art_is_authorized_and_uses_variant_delivery(self, test_app):
+        from fastapi import Response
+
+        image = Response(b"playlist-cover", media_type="image/webp")
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.serve_playlist_cover",
+                return_value=image,
+            ) as serve,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getCoverArt?u=admin&p=admin&id=pl-7&size=384"
+            )
+
+        assert response.status_code == 200
+        assert response.content == b"playlist-cover"
+        serve.assert_called_once_with(7, user=_FAKE_USER, size=384)
+
+    def test_private_playlist_cover_is_not_visible_to_another_user(self, test_app):
+        from fastapi import Response
+
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.serve_playlist_cover",
+                return_value=Response(status_code=404),
+            ) as serve,
+        ):
+            response = test_app.get(
+                f"{_SUBSONIC_BASE}/getCoverArt?u=admin&p=admin&id=pl-7"
+            )
+
+        assert response.status_code == 404
+        serve.assert_called_once_with(7, user=_FAKE_USER, size=None)
 
     def test_cover_art_invalid_prefix(self, test_app):
         with _subsonic_auth_ok():

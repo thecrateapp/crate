@@ -240,10 +240,15 @@ def _remote_artwork(
         raise HTTPException(status_code=502, detail="Artwork response is invalid")
     if len(upstream.content) > MAX_ARTWORK_BYTES:
         raise HTTPException(status_code=502, detail="Artwork response is invalid")
+    headers = {"Cache-Control": f"private, max-age={ARTWORK_CACHE_SECONDS}"}
+    for name in ("etag", "last-modified"):
+        value = upstream.headers.get(name)
+        if value:
+            headers[name.title()] = value
     return Response(
         content=upstream.content,
         media_type=content_type,
-        headers={"Cache-Control": f"private, max-age={ARTWORK_CACHE_SECONDS}"},
+        headers=headers,
     )
 
 

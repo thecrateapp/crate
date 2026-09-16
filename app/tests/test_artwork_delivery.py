@@ -38,6 +38,7 @@ def test_deliver_artwork_prefers_materialized_variant(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.media_type == "image/webp"
     assert response.headers["etag"]
+    assert response.headers["last-modified"]
     assert response.headers["x-crate-artwork"] == "variant"
     assert str(getattr(response, "path")).endswith("384.webp")
     assert queued == []

@@ -109,6 +109,27 @@ def test_global_song_has_parent_directory_flag_and_album_creation_date(
     assert song["isDir"] is False
 
 
+def test_artist_photo_is_advertised_only_when_the_catalog_has_a_photo(global_artist):
+    artist = {**global_artist, "has_photo": True}
+
+    indexed = serialize_artist_indexes([artist])["index"][0]["artist"][0]
+    detailed = serialize_artist(artist, albums=[])
+
+    assert indexed["coverArt"] == f"ga-{_ARTIST_UID}"
+    assert detailed["coverArt"] == f"ga-{_ARTIST_UID}"
+
+    without_photo = serialize_artist_indexes([global_artist])["index"][0]["artist"][0]
+    assert without_photo.get("coverArt") is None
+
+
+def test_missing_album_artwork_is_not_advertised(global_album, global_song):
+    album = serialize_album({**global_album, "has_cover": False})
+    song = serialize_song({**global_song, "has_cover": False})
+
+    assert album.get("coverArt") is None
+    assert song.get("coverArt") is None
+
+
 def test_song_serializer_does_not_emit_unrecognized_internal_fields(global_song):
     song = serialize_song(global_song)
 

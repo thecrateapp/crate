@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from email.utils import formatdate
 from pathlib import Path
 from typing import Literal
 
@@ -28,6 +29,10 @@ def _file_etag(path: Path, source_revision: str | None = None) -> str:
     stat = path.stat()
     seed = source_revision or f"{stat.st_mtime_ns}:{stat.st_size}"
     return f'W/"{hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]}"'
+
+
+def _file_last_modified(path: Path) -> str:
+    return formatdate(path.stat().st_mtime, usegmt=True)
 
 
 def _file_source_revision(path: Path) -> str | None:
@@ -80,6 +85,7 @@ def deliver_original_artwork(
     headers = {
         "Cache-Control": cache_control,
         "ETag": _file_etag(path),
+        "Last-Modified": _file_last_modified(path),
         "X-Crate-Artwork": "original",
     }
     if buffer_file:
@@ -115,6 +121,7 @@ def deliver_artwork(
                 f"{cache_visibility}, max-age=86400, stale-while-revalidate=604800"
             ),
             "ETag": _file_etag(variant.path, variant.source_revision),
+            "Last-Modified": _file_last_modified(variant.path),
             "X-Crate-Artwork": "variant",
             "X-Crate-Artwork-Revision": variant.source_revision,
         }
