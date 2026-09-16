@@ -83,6 +83,7 @@ def _album_select() -> str:
         COALESCE(entity.track_count, 0)::INTEGER AS track_count,
         COALESCE(entity.total_duration_seconds, 0)::INTEGER AS duration,
         entity.has_cover,
+        entity.created_at AS created,
         entity.has_local,
         entity.has_remote
     """
@@ -141,6 +142,8 @@ def _track_select() -> str:
         COALESCE(local_track.path, entity.global_track_uid::text) AS path,
         album.year,
         COALESCE(album.has_cover, false) AS has_cover,
+        local_track.size,
+        entity.created_at AS created,
         entity.has_local,
         entity.has_remote
     """
@@ -191,6 +194,85 @@ def get_global_track(global_track_uid: str) -> dict | None:
             .first()
         )
         return dict(row) if row else None
+
+
+def get_global_artist_by_local_id(local_artist_id: int) -> dict | None:
+    return _get_global_entity_by_local_id("artist", local_artist_id)
+
+
+def get_global_album_by_local_id(local_album_id: int) -> dict | None:
+    return _get_global_entity_by_local_id("album", local_album_id)
+
+
+def get_global_track_by_local_id(local_track_id: int) -> dict | None:
+    return _get_global_entity_by_local_id("track", local_track_id)
+
+
+def _get_global_entity_by_local_id(entity_type: str, local_id: int) -> dict | None:
+    entity_configs = {
+        "artist": (
+            "global_catalog_artists",
+            "global_artist_uid",
+            "local_artist_id",
+            "entity.global_artist_uid::text AS global_artist_uid, "
+            "entity.canonical_name AS name, entity.has_photo",
+            "",
+        ),
+        "album": (
+            "global_catalog_albums",
+            "global_album_uid",
+            "local_album_id",
+            _album_select(),
+            "",
+        ),
+        "track": (
+            "global_catalog_tracks",
+            "global_track_uid",
+            "local_track_id",
+            _track_select(),
+            """
+            LEFT JOIN library_tracks local_track
+              ON local_track.id = entity.local_track_id
+            LEFT JOIN global_catalog_albums album
+              ON album.global_album_uid = entity.global_album_uid
+            """,
+        ),
+    }
+    if entity_type not in entity_configs:
+        raise ValueError(f"Unsupported OpenSubsonic entity type: {entity_type}")
+    table, uid_column, local_column, projection, joins = entity_configs[entity_type]
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    f"""
+                    SELECT {projection}
+                    FROM {table} entity
+                    {joins}
+                    WHERE {_AVAILABLE_SOURCE.format(uid_column=uid_column)}
+                      AND (
+                          entity.{local_column} = :local_id
+                          OR EXISTS (
+                              SELECT 1
+                              FROM global_catalog_sources source
+                              WHERE source.global_entity_uid = entity.{uid_column}
+                                AND source.entity_type = :entity_type
+                                AND source.source_kind = 'local'
+                                AND source.local_id = :local_id
+                                AND NOT source.source_stale
+                                AND source.source_deleted_at IS NULL
+                          )
+                      )
+                    ORDER BY entity.{uid_column}
+                    LIMIT 1
+                    """
+                ),
+                {"entity_type": entity_type, "local_id": local_id},
+            )
+            .mappings()
+            .first()
+        )
+    return dict(row) if row else None
 
 
 _ALBUM_ORDERS = {
@@ -360,8 +442,11 @@ def get_starred_global_tracks(user_id: int, limit: int = 500) -> list[dict]:
 
 __all__ = [
     "get_global_album",
+    "get_global_album_by_local_id",
     "get_global_artist",
+    "get_global_artist_by_local_id",
     "get_global_track",
+    "get_global_track_by_local_id",
     "get_random_global_tracks",
     "get_starred_global_tracks",
     "list_global_album_tracks",

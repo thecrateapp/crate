@@ -1,0 +1,119 @@
+{
+  "json": {
+    "musicFolders": { "musicFolder": [{ "id": 1, "name": "Music" }] },
+    "user": {
+      "username": "diego",
+      "email": "diego@example.test",
+      "adminRole": true,
+      "scrobblingEnabled": true,
+      "settingsRole": true,
+      "downloadRole": true,
+      "uploadRole": false,
+      "playlistRole": true,
+      "coverArtRole": true,
+      "commentRole": false,
+      "podcastRole": false,
+      "streamRole": true,
+      "jukeboxRole": false,
+      "shareRole": true
+    },
+    "artists": {
+      "ignoredArticles": "The El La Los Las",
+      "index": [
+        {
+          "name": "C",
+          "artist": [
+            {
+              "id": "ga-11111111-1111-4111-8111-111111111111",
+              "name": "Converge",
+              "albumCount": 1
+            }
+          ]
+        }
+      ]
+    },
+    "artist": {
+      "id": "ga-11111111-1111-4111-8111-111111111111",
+      "name": "Converge",
+      "albumCount": 1,
+      "album": [
+        {
+          "id": "gal-22222222-2222-4222-8222-222222222222",
+          "name": "Jane Doe",
+          "artist": "Converge",
+          "artistId": "ga-11111111-1111-4111-8111-111111111111",
+          "year": 2001,
+          "songCount": 1,
+          "duration": 94,
+          "coverArt": "gal-22222222-2222-4222-8222-222222222222",
+          "created": "2024-02-03T04:05:06Z"
+        }
+      ]
+    },
+    "album": {
+      "id": "gal-22222222-2222-4222-8222-222222222222",
+      "name": "Jane Doe",
+      "artist": "Converge",
+      "artistId": "ga-11111111-1111-4111-8111-111111111111",
+      "year": 2001,
+      "songCount": 1,
+      "duration": 94,
+      "coverArt": "gal-22222222-2222-4222-8222-222222222222",
+      "created": "2024-02-03T04:05:06Z",
+      "song": [
+        {
+          "id": "gt-33333333-3333-4333-8333-333333333333",
+          "parent": "gal-22222222-2222-4222-8222-222222222222",
+          "isDir": false,
+          "title": "Concubine",
+          "artist": "Converge",
+          "album": "Jane Doe",
+          "albumId": "gal-22222222-2222-4222-8222-222222222222",
+          "artistId": "ga-11111111-1111-4111-8111-111111111111",
+          "track": 1,
+          "discNumber": 1,
+          "year": 2001,
+          "duration": 94,
+          "bitRate": 320,
+          "suffix": "flac",
+          "contentType": "audio/flac",
+          "path": "Converge/Jane Doe/Concubine",
+          "coverArt": "gal-22222222-2222-4222-8222-222222222222",
+          "type": "music",
+          "size": 42000000,
+          "created": "2001-09-04T00:00:00Z"
+        }
+      ]
+    },
+    "song": {
+      "id": "gt-33333333-3333-4333-8333-333333333333",
+      "parent": "gal-22222222-2222-4222-8222-222222222222",
+      "isDir": false,
+      "title": "Concubine",
+      "artist": "Converge",
+      "album": "Jane Doe",
+      "albumId": "gal-22222222-2222-4222-8222-222222222222",
+      "artistId": "ga-11111111-1111-4111-8111-111111111111",
+      "track": 1,
+      "discNumber": 1,
+      "year": 2001,
+      "duration": 94,
+      "bitRate": 320,
+      "suffix": "flac",
+      "contentType": "audio/flac",
+      "path": "Converge/Jane Doe/Concubine",
+      "coverArt": "gal-22222222-2222-4222-8222-222222222222",
+      "type": "music",
+      "size": 42000000,
+      "created": "2001-09-04T00:00:00Z"
+    }
+  },
+  "xml": {
+    "musicFolders": "<?xml version='1.0' encoding='utf-8'?>\n<subsonic-response xmlns=\"http://subsonic.org/restapi\" status=\"ok\" version=\"1.16.1\" type=\"Crate\" serverVersion=\"0.1.0\" openSubsonic=\"true\"><musicFolders><musicFolder id=\"1\" name=\"Music\" /></musicFolders></subsonic-response>",
+    "user": "<?xml version='1.0' encoding='utf-8'?>\n<subsonic-response xmlns=\"http://subsonic.org/restapi\" status=\"ok\" version=\"1.16.1\" type=\"Crate\" serverVersion=\"0.1.0\" openSubsonic=\"true\"><user username=\"diego\" email=\"diego@example.test\" adminRole=\"true\" scrobblingEnabled=\"true\" settingsRole=\"true\" downloadRole=\"true\" uploadRole=\"false\" playlistRole=\"true\" coverArtRole=\"true\" commentRole=\"false\" podcastRole=\"false\" streamRole=\"true\" jukeboxRole=\"false\" shareRole=\"true\" /></subsonic-response>",
+    "artists": "<?xml version='1.0' encoding='utf-8'?>\n<subsonic-response xmlns=\"http://subsonic.org/restapi\" status=\"ok\" version=\"1.16.1\" type=\"Crate\" serverVersion=\"0.1.0\" openSubsonic=\"true\"><artists ignoredArticles=\"The El La Los Las\"><index name=\"C\"><artist id=\"ga-11111111-1111-4111-8111-111111111111\" name=\"Converge\" albumCount=\"1\" /></index></artists></subsonic-response>",
+    "artist": "<?xml version='1.0' encoding='utf-8'?>\n<subsonic-response xmlns=\"http://subsonic.org/restapi\" status=\"ok\" version=\"1.16.1\" type=\"Crate\" serverVersion=\"0.1.0\" openSubsonic=\"true\"><artist id=\"ga-11111111-1111-4111-8111-111111111111\" name=\"Converge\" albumCount=\"1\"><album id=\"gal-22222222-2222-4222-8222-222222222222\" name=\"Jane Doe\" artist=\"Converge\" artistId=\"ga-11111111-1111-4111-8111-111111111111\" year=\"2001\" songCount=\"1\" duration=\"94\" coverArt=\"gal-22222222-2222-4222-8222-222222222222\" created=\"2024-02-03T04:05:06Z\" /></artist></subsonic-response>",
+    "album": "<?xml version='1.0' encoding='utf-8'?>\n<subsonic-response xmlns=\"http://subsonic.org/restapi\" status=\"ok\" version=\"1.16.1\" type=\"Crate\" serverVersion=\"0.1.0\" openSubsonic=\"true\"><album id=\"gal-22222222-2222-4222-8222-222222222222\" name=\"Jane Doe\" artist=\"Converge\" artistId=\"ga-11111111-1111-4111-8111-111111111111\" year=\"2001\" songCount=\"1\" duration=\"94\" coverArt=\"gal-22222222-2222-4222-8222-222222222222\" created=\"2024-02-03T04:05:06Z\"><song id=\"gt-33333333-3333-4333-8333-333333333333\" parent=\"gal-22222222-2222-4222-8222-222222222222\" isDir=\"false\" title=\"Concubine\" artist=\"Converge\" album=\"Jane Doe\" albumId=\"gal-22222222-2222-4222-8222-222222222222\" artistId=\"ga-11111111-1111-4111-8111-111111111111\" track=\"1\" discNumber=\"1\" year=\"2001\" duration=\"94\" bitRate=\"320\" suffix=\"flac\" contentType=\"audio/flac\" path=\"Converge/Jane Doe/Concubine\" coverArt=\"gal-22222222-2222-4222-8222-222222222222\" type=\"music\" size=\"42000000\" created=\"2001-09-04T00:00:00Z\" /></album></subsonic-response>",
+    "song": "<?xml version='1.0' encoding='utf-8'?>\n<subsonic-response xmlns=\"http://subsonic.org/restapi\" status=\"ok\" version=\"1.16.1\" type=\"Crate\" serverVersion=\"0.1.0\" openSubsonic=\"true\"><song id=\"gt-33333333-3333-4333-8333-333333333333\" parent=\"gal-22222222-2222-4222-8222-222222222222\" isDir=\"false\" title=\"Concubine\" artist=\"Converge\" album=\"Jane Doe\" albumId=\"gal-22222222-2222-4222-8222-222222222222\" artistId=\"ga-11111111-1111-4111-8111-111111111111\" track=\"1\" discNumber=\"1\" year=\"2001\" duration=\"94\" bitRate=\"320\" suffix=\"flac\" contentType=\"audio/flac\" path=\"Converge/Jane Doe/Concubine\" coverArt=\"gal-22222222-2222-4222-8222-222222222222\" type=\"music\" size=\"42000000\" created=\"2001-09-04T00:00:00Z\" /></subsonic-response>"
+  }
+}

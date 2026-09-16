@@ -345,7 +345,7 @@ class TestSubsonicBrowse:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.list_global_artists",
+                "crate.subsonic.services.catalog.list_global_artists",
                 return_value=_FAKE_GLOBAL_ARTISTS,
             ),
         ):
@@ -370,19 +370,20 @@ class TestSubsonicBrowse:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.get_artist_by_id",
-                return_value=_FAKE_ARTISTS[0],
-            ),
-            patch(
-                "crate.api.subsonic.legacy.get_albums_by_artist_name",
-                return_value=[_FAKE_ALBUM],
+                "crate.subsonic.services.catalog.artist_detail",
+                return_value={
+                    "id": f"ga-{_GLOBAL_ARTIST_UID}",
+                    "name": "Converge",
+                    "albumCount": 1,
+                    "album": [{"name": "Jane Doe"}],
+                },
             ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getArtist?u=admin&p=admin&id=ar-1")
             sr = _subsonic_ok_response(resp)
             a = sr["artist"]
             assert a["name"] == "Converge"
-            assert a["id"] == "ar-1"
+            assert a["id"] == f"ga-{_GLOBAL_ARTIST_UID}"
             assert a["albumCount"] == 1
             assert len(a["album"]) == 1
             assert a["album"][0]["name"] == "Jane Doe"
@@ -396,7 +397,7 @@ class TestSubsonicBrowse:
     def test_get_artist_not_found(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_artist_by_id", return_value=None),
+            patch("crate.subsonic.services.catalog.artist_detail", return_value=None),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getArtist?u=admin&p=admin&id=999")
             _subsonic_error_response(resp, code=70)
@@ -405,12 +406,21 @@ class TestSubsonicBrowse:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.get_album_with_artist",
-                return_value=_FAKE_ALBUM,
-            ),
-            patch(
-                "crate.api.subsonic.legacy.get_tracks_by_album_id",
-                return_value=[_FAKE_TRACK],
+                "crate.subsonic.services.catalog.album_detail",
+                return_value={
+                    "id": f"gal-{_GLOBAL_ALBUM_UID}",
+                    "name": "Jane Doe",
+                    "artist": "Converge",
+                    "song": [
+                        {
+                            "id": f"gt-{_GLOBAL_TRACK_UID}",
+                            "title": "Concubine",
+                            "type": "music",
+                            "suffix": "flac",
+                            "contentType": "audio/flac",
+                        }
+                    ],
+                },
             ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getAlbum?u=admin&p=admin&id=al-1")
@@ -418,7 +428,7 @@ class TestSubsonicBrowse:
             album = sr["album"]
             assert album["name"] == "Jane Doe"
             assert album["artist"] == "Converge"
-            assert album["id"] == "al-1"
+            assert album["id"] == f"gal-{_GLOBAL_ALBUM_UID}"
             assert len(album["song"]) == 1
             song = album["song"][0]
             assert song["title"] == "Concubine"
@@ -429,7 +439,7 @@ class TestSubsonicBrowse:
     def test_get_album_not_found(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_album_with_artist", return_value=None),
+            patch("crate.subsonic.services.catalog.album_detail", return_value=None),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getAlbum?u=admin&p=admin&id=999")
             _subsonic_error_response(resp, code=70)
@@ -437,12 +447,22 @@ class TestSubsonicBrowse:
     def test_get_song(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_track_full", return_value=_FAKE_TRACK),
+            patch(
+                "crate.subsonic.services.catalog.song_detail",
+                return_value={
+                    "id": f"gt-{_GLOBAL_TRACK_UID}",
+                    "title": "Concubine",
+                    "artist": "Converge",
+                    "album": "Jane Doe",
+                    "suffix": "flac",
+                    "contentType": "audio/flac",
+                },
+            ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getSong?u=admin&p=admin&id=1")
             sr = _subsonic_ok_response(resp)
             song = sr["song"]
-            assert song["id"] == "1"
+            assert song["id"] == f"gt-{_GLOBAL_TRACK_UID}"
             assert song["title"] == "Concubine"
             assert song["artist"] == "Converge"
             assert song["album"] == "Jane Doe"
@@ -452,16 +472,22 @@ class TestSubsonicBrowse:
     def test_get_song_not_found(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_track_full", return_value=None),
+            patch("crate.subsonic.services.catalog.song_detail", return_value=None),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getSong?u=admin&p=admin&id=999")
             _subsonic_error_response(resp, code=70)
 
     def test_get_song_mp3_content_type(self, test_app):
-        mp3_track = {**_FAKE_TRACK, "format": "mp3"}
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_track_full", return_value=mp3_track),
+            patch(
+                "crate.subsonic.services.catalog.song_detail",
+                return_value={
+                    "id": f"gt-{_GLOBAL_TRACK_UID}",
+                    "contentType": "audio/mpeg",
+                    "suffix": "mp3",
+                },
+            ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getSong?u=admin&p=admin&id=1")
             sr = _subsonic_ok_response(resp)

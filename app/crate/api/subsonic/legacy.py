@@ -15,25 +15,16 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 
-from crate.db.queries.subsonic import (
-    get_artist_by_id,
-    get_albums_by_artist_name,
-    get_album_with_artist,
-    get_tracks_by_album_id,
-    get_track_full,
-    get_track_path_and_format,
-)
 from crate.db.queries.subsonic_global import (
-    get_global_album,
-    get_global_artist,
     get_global_track,
     get_random_global_tracks,
     get_starred_global_tracks,
-    list_global_album_tracks,
     list_global_albums,
-    list_global_artist_albums,
-    list_global_artists,
     search_global_catalog,
+)
+from crate.db.queries.subsonic_track_queries import (
+    get_track_full,
+    get_track_path_and_format,
 )
 from crate.subsonic.global_ids import (
     EntityKind,
@@ -42,6 +33,8 @@ from crate.subsonic.global_ids import (
     decode_subsonic_id,
     global_subsonic_id,
 )
+from crate.subsonic.services import catalog
+from crate.subsonic.serializers import serialize_album, serialize_song
 from crate.api._deps import library_path
 from crate.api.schemas.subsonic import (
     SubsonicAlbumList2Response,
@@ -161,49 +154,11 @@ def _decode_entity_id(value: str, kind: EntityKind) -> SubsonicEntityId | None:
 
 
 def _global_album_payload(album: dict) -> dict:
-    album_id = global_subsonic_id("album", album["global_album_uid"])
-    return {
-        "id": album_id,
-        "name": album["name"],
-        "artist": album["artist"],
-        "artistId": global_subsonic_id("artist", album["global_artist_uid"]),
-        "year": int(album["year"]) if str(album.get("year") or "").isdigit() else None,
-        "songCount": album.get("track_count") or 0,
-        "duration": album.get("duration") or 0,
-        "coverArt": album_id if album.get("has_cover") else None,
-    }
+    return serialize_album(album)
 
 
 def _global_song_payload(track: dict) -> dict:
-    album_uid = track.get("global_album_uid")
-    album_id = global_subsonic_id("album", album_uid) if album_uid else None
-    return {
-        "id": global_subsonic_id("track", track["global_track_uid"]),
-        "title": track["title"],
-        "artist": track["artist"],
-        "album": track.get("album") or "",
-        "albumId": album_id,
-        "artistId": global_subsonic_id("artist", track["global_artist_uid"]),
-        "track": track.get("track_number") or 0,
-        "discNumber": track.get("disc_number") or 1,
-        "year": int(track["year"]) if str(track.get("year") or "").isdigit() else None,
-        "duration": track.get("duration") or 0,
-        "bitRate": track.get("bitrate") or 0,
-        "suffix": (track.get("format") or "mp3").lower(),
-        "contentType": _content_type(track.get("format")),
-        "path": "/".join(
-            part.strip("/")
-            for part in (
-                str(track.get("artist") or ""),
-                str(track.get("album") or ""),
-                str(track.get("title") or ""),
-            )
-            if part
-        ),
-        "coverArt": album_id if album_id and track.get("has_cover") else None,
-        "type": "music",
-        **({"starred": str(track["starred"])} if track.get("starred") else {}),
-    }
+    return serialize_song(track)
 
 
 # ── System ──────────────────────────────────────────────────────
@@ -252,9 +207,7 @@ def get_music_folders(request: Request):
         _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
-    return _subsonic_response(
-        {"musicFolders": {"musicFolder": [{"id": 1, "name": "Music"}]}}
-    )
+    return _subsonic_response({"musicFolders": catalog.music_folders()})
 
 
 @router.get(
@@ -268,26 +221,7 @@ def get_user(request: Request, username: str = Query("")):
         user = _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
-    return _subsonic_response(
-        {
-            "user": {
-                "username": user.get("username") or user["email"],
-                "email": user["email"],
-                "adminRole": user["role"] == "admin",
-                "scrobblingEnabled": True,
-                "settingsRole": True,
-                "downloadRole": True,
-                "uploadRole": False,
-                "playlistRole": True,
-                "coverArtRole": True,
-                "commentRole": False,
-                "podcastRole": False,
-                "streamRole": True,
-                "jukeboxRole": False,
-                "shareRole": True,
-            }
-        }
-    )
+    return _subsonic_response({"user": catalog.user_profile(user)})
 
 
 # ── Browse ──────────────────────────────────────────────────────
@@ -305,30 +239,7 @@ def get_artists(request: Request):
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
 
-    rows = list_global_artists()
-
-    # Group by first letter
-    index_map: dict[str, list] = {}
-    for row in rows:
-        letter = (row["name"][0] or "?").upper()
-        if not letter.isalpha():
-            letter = "#"
-        index_map.setdefault(letter, []).append(
-            {
-                "id": global_subsonic_id("artist", row["global_artist_uid"]),
-                "name": row["name"],
-                "albumCount": row["album_count"] or 0,
-            }
-        )
-
-    indexes = [
-        {"name": letter, "artist": artists}
-        for letter, artists in sorted(index_map.items())
-    ]
-
-    return _subsonic_response(
-        {"artists": {"ignoredArticles": "The El La Los Las", "index": indexes}}
-    )
+    return _subsonic_response({"artists": catalog.artist_indexes()})
 
 
 @router.get(
@@ -343,55 +254,13 @@ def get_artist(request: Request, id: str = Query("")):
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
 
-    entity_id = _decode_entity_id(id, "artist")
-    if entity_id is None:
+    try:
+        artist = catalog.artist_detail(id)
+    except SubsonicIdError:
         return _subsonic_error(70, "Invalid Subsonic entity ID")
-    if entity_id.scope == "global":
-        artist = get_global_artist(str(entity_id.global_uid))
-        albums = list_global_artist_albums(str(entity_id.global_uid)) if artist else []
-        if not artist:
-            return _subsonic_error(70, "Artist not found")
-        artist_id = global_subsonic_id("artist", artist["global_artist_uid"])
-        return _subsonic_response(
-            {
-                "artist": {
-                    "id": artist_id,
-                    "name": artist["name"],
-                    "albumCount": len(albums),
-                    "album": [_global_album_payload(album) for album in albums],
-                }
-            }
-        )
-
-    artist_id = int(entity_id.local_id or 0)
-    artist = get_artist_by_id(artist_id)
     if not artist:
         return _subsonic_error(70, "Artist not found")
-
-    albums = get_albums_by_artist_name(artist["name"])
-
-    return _subsonic_response(
-        {
-            "artist": {
-                "id": f"ar-{artist['id']}",
-                "name": artist["name"],
-                "albumCount": len(albums),
-                "album": [
-                    {
-                        "id": f"al-{a['id']}",
-                        "name": a["name"],
-                        "artist": artist["name"],
-                        "artistId": f"ar-{artist['id']}",
-                        "year": int(a["year"]) if a["year"] else None,
-                        "songCount": a["track_count"] or 0,
-                        "duration": a["duration"],
-                        "coverArt": f"al-{a['id']}" if a["has_cover"] else None,
-                    }
-                    for a in albums
-                ],
-            }
-        }
-    )
+    return _subsonic_response({"artist": artist})
 
 
 @router.get(
@@ -406,68 +275,13 @@ def get_album(request: Request, id: str = Query("")):
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
 
-    entity_id = _decode_entity_id(id, "album")
-    if entity_id is None:
+    try:
+        album = catalog.album_detail(id)
+    except SubsonicIdError:
         return _subsonic_error(70, "Invalid Subsonic entity ID")
-    if entity_id.scope == "global":
-        album = get_global_album(str(entity_id.global_uid))
-        tracks = list_global_album_tracks(str(entity_id.global_uid)) if album else []
-        if not album:
-            return _subsonic_error(70, "Album not found")
-        return _subsonic_response(
-            {
-                "album": {
-                    **_global_album_payload(album),
-                    "songCount": len(tracks),
-                    "song": [_global_song_payload(track) for track in tracks],
-                }
-            }
-        )
-
-    album_id = int(entity_id.local_id or 0)
-    album = get_album_with_artist(album_id)
     if not album:
         return _subsonic_error(70, "Album not found")
-
-    tracks = get_tracks_by_album_id(album_id)
-
-    return _subsonic_response(
-        {
-            "album": {
-                "id": f"al-{album['id']}",
-                "name": album["name"],
-                "artist": album["artist"],
-                "artistId": f"ar-{album['artist_id']}" if album["artist_id"] else None,
-                "year": int(album["year"]) if album["year"] else None,
-                "songCount": len(tracks),
-                "duration": album["duration"],
-                "coverArt": f"al-{album['id']}" if album["has_cover"] else None,
-                "song": [
-                    {
-                        "id": str(t["id"]),
-                        "title": t["title"],
-                        "artist": t["artist"],
-                        "album": t["album"],
-                        "albumId": f"al-{album['id']}",
-                        "artistId": f"ar-{album['artist_id']}"
-                        if album["artist_id"]
-                        else None,
-                        "track": t["track"],
-                        "discNumber": t["disc"],
-                        "year": int(album["year"]) if album["year"] else None,
-                        "duration": t["duration"] or 0,
-                        "bitRate": t["bitrate"] or 0,
-                        "suffix": (t["format"] or "mp3").lower(),
-                        "contentType": _content_type(t["format"]),
-                        "path": t["path"],
-                        "coverArt": f"al-{album['id']}" if album["has_cover"] else None,
-                        "type": "music",
-                    }
-                    for t in tracks
-                ],
-            }
-        }
-    )
+    return _subsonic_response({"album": album})
 
 
 @router.get(
@@ -482,44 +296,13 @@ def get_song(request: Request, id: str = Query("")):
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
 
-    entity_id = _decode_entity_id(id, "track")
-    if entity_id is None:
+    try:
+        song = catalog.song_detail(id)
+    except SubsonicIdError:
         return _subsonic_error(70, "Invalid Subsonic entity ID")
-    if entity_id.scope == "global":
-        track = get_global_track(str(entity_id.global_uid))
-        if not track:
-            return _subsonic_error(70, "Song not found")
-        return _subsonic_response({"song": _global_song_payload(track)})
-
-    track_id = int(entity_id.local_id or 0)
-    t = get_track_full(track_id)
-    if not t:
+    if not song:
         return _subsonic_error(70, "Song not found")
-
-    return _subsonic_response(
-        {
-            "song": {
-                "id": str(t["id"]),
-                "title": t["title"],
-                "artist": t["artist"],
-                "album": t["album"],
-                "albumId": f"al-{t['album_id']}" if t["album_id"] else None,
-                "artistId": f"ar-{t['artist_id']}" if t["artist_id"] else None,
-                "track": t["track_number"] or 0,
-                "discNumber": t["disc_number"] or 1,
-                "year": int(t["year"]) if t["year"] else None,
-                "duration": t["duration"] or 0,
-                "bitRate": t["bitrate"] or 0,
-                "suffix": (t["format"] or "mp3").lower(),
-                "contentType": _content_type(t["format"]),
-                "path": t["path"],
-                "coverArt": f"al-{t['album_id']}"
-                if t["album_id"] and t["has_cover"]
-                else None,
-                "type": "music",
-            }
-        }
-    )
+    return _subsonic_response({"song": song})
 
 
 # ── Album Lists ─────────────────────────────────────────────────

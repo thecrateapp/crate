@@ -67,11 +67,13 @@ def _append_element(parent: ET.Element, name: str, value: Any) -> None:
     if value is None:
         return
     if isinstance(value, list):
-        container = ET.SubElement(parent, _qualified(name))
+        if name.endswith("s"):
+            container = ET.SubElement(parent, _qualified(name))
+            for item in value:
+                _append_element(container, name[:-1], item)
+            return
         for item in value:
-            _append_element(
-                container, name[:-1] if name.endswith("s") else "item", item
-            )
+            _append_element(parent, name, item)
         return
 
     element = ET.SubElement(parent, _qualified(name))

@@ -58,6 +58,39 @@ def test_xml_success_envelope_serializes_payload_attributes() -> None:
     assert license_node.attrib == {"valid": "true", "email": "crate@local"}
 
 
+def test_xml_serializes_repeated_media_elements_with_contract_names() -> None:
+    response = render_response(
+        {
+            "artists": {
+                "ignoredArticles": "The",
+                "index": [
+                    {
+                        "name": "C",
+                        "artist": [
+                            {"id": "ga-artist", "name": "Converge", "albumCount": 1}
+                        ],
+                    }
+                ],
+            }
+        },
+        response_format="xml",
+    )
+    root = ET.fromstring(response.body)
+    artists = root.find(f"{{{XML_NAMESPACE}}}artists")
+
+    assert artists is not None
+    indexes = artists.findall(f"{{{XML_NAMESPACE}}}index")
+    assert len(indexes) == 1
+    assert indexes[0].attrib == {"name": "C"}
+    artists_in_index = indexes[0].findall(f"{{{XML_NAMESPACE}}}artist")
+    assert len(artists_in_index) == 1
+    assert artists_in_index[0].attrib == {
+        "id": "ga-artist",
+        "name": "Converge",
+        "albumCount": "1",
+    }
+
+
 def test_xml_error_envelope_uses_protocol_error_attributes() -> None:
     response = render_response(
         error=OpenSubsonicError(

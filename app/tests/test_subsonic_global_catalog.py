@@ -45,7 +45,7 @@ def test_global_browse_uses_typed_canonical_ids(test_app):
     with (
         _auth(),
         patch(
-            "crate.api.subsonic.legacy.list_global_artists",
+            "crate.subsonic.services.catalog.list_global_artists",
             return_value=[
                 {
                     "global_artist_uid": ARTIST_UID,
@@ -79,9 +79,9 @@ def test_global_album_detail_contains_global_song_ids(test_app):
     }
     with (
         _auth(),
-        patch("crate.api.subsonic.legacy.get_global_album", return_value=album),
+        patch("crate.subsonic.services.catalog.get_global_album", return_value=album),
         patch(
-            "crate.api.subsonic.legacy.list_global_album_tracks",
+            "crate.subsonic.services.catalog.list_global_album_tracks",
             return_value=[_track()],
         ),
     ):
@@ -115,26 +115,17 @@ def test_global_search_applies_server_side_caps(test_app):
 
 
 def test_legacy_local_track_id_remains_accepted(test_app):
-    local = {
-        "id": 9,
-        "title": "Talk For Hours",
-        "artist": "High Vis",
-        "album": "Blending",
-        "album_id": 2,
-        "artist_id": 3,
-        "track_number": 2,
-        "disc_number": 1,
-        "year": "2022",
-        "duration": 190,
-        "bitrate": 320,
-        "format": "flac",
-        "path": "High Vis/Blending/02.flac",
-        "has_cover": True,
-    }
-    with _auth(), patch("crate.api.subsonic.legacy.get_track_full", return_value=local):
+    local = {**_track(), "title": "Talk For Hours", "track_number": 2}
+    with (
+        _auth(),
+        patch(
+            "crate.subsonic.services.catalog.get_global_track_by_local_id",
+            return_value=local,
+        ),
+    ):
         response = test_app.get("/rest/getSong?u=listener&p=secret&id=9")
 
-    assert response.json()["subsonic-response"]["song"]["id"] == "9"
+    assert response.json()["subsonic-response"]["song"]["id"] == f"gt-{TRACK_UID}"
 
 
 def test_wrong_global_id_type_returns_stable_subsonic_error(test_app):
@@ -193,11 +184,18 @@ def test_global_adapter_reads_singleton_catalog_without_duplicates(pg_db):
     )
 
     from crate.db.queries.subsonic_global import (
+        get_global_album_by_local_id,
+        get_global_artist_by_local_id,
+        get_global_track_by_local_id,
         list_global_album_tracks,
         list_global_artist_albums,
         list_global_artists,
     )
+    from crate.db.tx import read_scope
     from crate.federation.global_reconciliation import reconcile_local_catalog
+    from crate.subsonic.global_ids import global_subsonic_id
+    from crate.subsonic.services.catalog import album_detail, artist_detail, song_detail
+    from sqlalchemy import text
 
     reconcile_local_catalog()
 
@@ -208,3 +206,36 @@ def test_global_adapter_reads_singleton_catalog_without_duplicates(pg_db):
     assert [album["name"] for album in albums] == ["Blending"]
     tracks = list_global_album_tracks(albums[0]["global_album_uid"])
     assert [track["title"] for track in tracks] == ["Talk For Hours"]
+
+    with read_scope() as session:
+        local_artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = 'High Vis'")
+        ).scalar_one()
+        local_album_id = session.execute(
+            text("SELECT id FROM library_albums WHERE artist = 'High Vis'")
+        ).scalar_one()
+        local_track_id = session.execute(
+            text("SELECT id FROM library_tracks WHERE artist = 'High Vis'")
+        ).scalar_one()
+
+    assert (
+        get_global_artist_by_local_id(local_artist_id)["global_artist_uid"]
+        == high_vis[0]["global_artist_uid"]
+    )
+    assert (
+        get_global_album_by_local_id(local_album_id)["global_album_uid"]
+        == albums[0]["global_album_uid"]
+    )
+    assert (
+        get_global_track_by_local_id(local_track_id)["global_track_uid"]
+        == tracks[0]["global_track_uid"]
+    )
+    assert artist_detail(f"ar-{local_artist_id}")["id"] == global_subsonic_id(
+        "artist", high_vis[0]["global_artist_uid"]
+    )
+    assert album_detail(f"al-{local_album_id}")["id"] == global_subsonic_id(
+        "album", albums[0]["global_album_uid"]
+    )
+    assert song_detail(str(local_track_id))["id"] == global_subsonic_id(
+        "track", tracks[0]["global_track_uid"]
+    )
