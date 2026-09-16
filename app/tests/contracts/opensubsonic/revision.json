@@ -1,0 +1,13 @@
+{
+  "open_subsonic": {
+    "openapi_tree_sha256": "3ffb2814aa46f6c2832ee856da0de56c2f97e94734ce244341c578246a5d7a92",
+    "repository": "https://github.com/opensubsonic/open-subsonic-api",
+    "revision": "bed1688a7b0afe9f528a3dc1400a46ab7961b280"
+  },
+  "subsonic_xsd": {
+    "path": "subsonic-rest-api-1.16.1.xsd",
+    "sha256": "9baee72fa24087190ad22be4f7674d628acc7a3e0fb65160d74115b166df0387",
+    "source": "https://subsonic.org/pages/inc/api/schema/subsonic-rest-api-1.16.1.xsd",
+    "version": "1.16.1"
+  }
+}

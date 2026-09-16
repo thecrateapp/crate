@@ -6,3 +6,5 @@ pytest-cov>=7.0
 pytest-split==0.11.0
 testcontainers[postgres]>=4.0
 httpx>=0.27
+jsonschema>=4.23
+xmlschema>=4.2
