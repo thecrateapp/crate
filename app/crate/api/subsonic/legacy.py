@@ -21,7 +21,6 @@ from crate.db.queries.subsonic_global import (
     get_random_global_tracks,
     get_starred_global_tracks,
     list_global_albums,
-    search_global_catalog,
 )
 from crate.db.queries.subsonic_track_queries import (
     get_track_full,
@@ -33,7 +32,6 @@ from crate.subsonic.global_ids import (
     SubsonicIdError,
     decode_subsonic_id,
     decode_subsonic_playlist_id,
-    global_subsonic_id,
 )
 from crate.subsonic.services import catalog
 from crate.subsonic.services.artwork import serve_playlist_cover
@@ -54,7 +52,11 @@ from crate.api.schemas.subsonic import (
     SubsonicPlaylistsResponse,
     SubsonicRandomSongsResponse,
     SubsonicSongsResponse,
+    SubsonicSearchResponse,
+    SubsonicSearchResult2Response,
     SubsonicSearchResult3Response,
+    SubsonicArtistInfoResponse,
+    SubsonicAlbumInfoResponse,
     SubsonicSongResponse,
     SubsonicStarred2Response,
     SubsonicUserResponse,
@@ -555,46 +557,264 @@ def get_album_list2(
     )
 
 
-# ── Search ──────────────────────────────────────────────────────
+# ── Search & metadata ────────────────────────────────────────────
+
+
+def _validate_search_numbers(**values: int | None) -> JSONResponse | None:
+    for name, value in values.items():
+        if value is not None and value < 0:
+            return _subsonic_error(0, f"{name} must be non-negative")
+    return None
 
 
 @router.get(
-    "/search3",
-    response_model=SubsonicSearchResult3Response,
-    summary="Search artists, albums, and songs",
+    "/search",
+    response_model=SubsonicSearchResponse,
+    summary="Search the catalog using legacy parameters",
 )
-@router.get("/search3.view", include_in_schema=False)
-def search3(
+@router.get("/search.view", include_in_schema=False)
+def search(
     request: Request,
-    query: str = Query("", alias="query"),
-    artistCount: int = Query(5, ge=0, le=100),
-    albumCount: int = Query(5, ge=0, le=100),
-    songCount: int = Query(10, ge=0, le=200),
+    artist: str | None = Query(None),
+    album: str | None = Query(None),
+    title: str | None = Query(None),
+    any: str | None = Query(None),
+    count: int = Query(20),
+    offset: int = Query(0),
+    newerThan: int | None = Query(None),
 ):
     try:
         _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
+    invalid = _validate_search_numbers(count=count, offset=offset, newerThan=newerThan)
+    if invalid:
+        return invalid
+    try:
+        result = catalog.search_catalog(
+            None,
+            artist_count=0,
+            album_count=0,
+            song_count=min(count, 200),
+            song_offset=min(offset, 1_000_000),
+            artist_query=artist,
+            album_query=album,
+            song_query=title,
+            any_query=any,
+            newer_than_ms=newerThan,
+            version=1,
+        )
+    except ValueError as error:
+        return _subsonic_error(0, str(error))
+    return _subsonic_response({"searchResult": result})
 
-    matches = search_global_catalog(
-        query,
-        artist_limit=artistCount,
-        album_limit=albumCount,
-        track_limit=songCount,
+
+def _search_v2_or_v3(
+    request: Request,
+    *,
+    query: str | None,
+    artistCount: int,
+    artistOffset: int,
+    albumCount: int,
+    albumOffset: int,
+    songCount: int,
+    songOffset: int,
+    musicFolderId: str | None,
+    version: int,
+):
+    try:
+        _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    if query is None:
+        return _subsonic_error(10, "Required parameter 'query' is missing")
+    invalid = _validate_search_numbers(
+        artistCount=artistCount,
+        artistOffset=artistOffset,
+        albumCount=albumCount,
+        albumOffset=albumOffset,
+        songCount=songCount,
+        songOffset=songOffset,
     )
-    result: dict = {
-        "artist": [
-            {
-                "id": global_subsonic_id("artist", row["global_artist_uid"]),
-                "name": row["name"],
-            }
-            for row in matches["artists"]
-        ],
-        "album": [_global_album_payload(row) for row in matches["albums"]],
-        "song": [_global_song_payload(row) for row in matches["tracks"]],
-    }
+    if invalid:
+        return invalid
+    try:
+        result = catalog.search_catalog(
+            query,
+            artist_count=artistCount,
+            artist_offset=artistOffset,
+            album_count=albumCount,
+            album_offset=albumOffset,
+            song_count=songCount,
+            song_offset=songOffset,
+            music_folder_id=musicFolderId,
+            version=version,
+        )
+    except ValueError as error:
+        return _subsonic_error(0, str(error))
+    response_key = "searchResult2" if version == 2 else "searchResult3"
+    return _subsonic_response({response_key: result})
 
-    return _subsonic_response({"searchResult3": result})
+
+@router.get(
+    "/search2",
+    response_model=SubsonicSearchResult2Response,
+    summary="Search artists, albums, and songs",
+)
+@router.get("/search2.view", include_in_schema=False)
+def search2(
+    request: Request,
+    query: str | None = Query(None),
+    artistCount: int = Query(20),
+    artistOffset: int = Query(0),
+    albumCount: int = Query(20),
+    albumOffset: int = Query(0),
+    songCount: int = Query(20),
+    songOffset: int = Query(0),
+    musicFolderId: str | None = Query(None),
+):
+    return _search_v2_or_v3(
+        request,
+        query=query,
+        artistCount=artistCount,
+        artistOffset=artistOffset,
+        albumCount=albumCount,
+        albumOffset=albumOffset,
+        songCount=songCount,
+        songOffset=songOffset,
+        musicFolderId=musicFolderId,
+        version=2,
+    )
+
+
+@router.get(
+    "/search3",
+    response_model=SubsonicSearchResult3Response,
+    summary="Search artists, albums, and songs using ID3 tags",
+)
+@router.get("/search3.view", include_in_schema=False)
+def search3(
+    request: Request,
+    query: str | None = Query(None),
+    artistCount: int = Query(20),
+    artistOffset: int = Query(0),
+    albumCount: int = Query(20),
+    albumOffset: int = Query(0),
+    songCount: int = Query(20),
+    songOffset: int = Query(0),
+    musicFolderId: str | None = Query(None),
+):
+    return _search_v2_or_v3(
+        request,
+        query=query,
+        artistCount=artistCount,
+        artistOffset=artistOffset,
+        albumCount=albumCount,
+        albumOffset=albumOffset,
+        songCount=songCount,
+        songOffset=songOffset,
+        musicFolderId=musicFolderId,
+        version=3,
+    )
+
+
+@router.get(
+    "/getArtistInfo",
+    response_model=SubsonicArtistInfoResponse,
+    summary="Get artist biography, artwork, and similar artists",
+)
+@router.get("/getArtistInfo.view", include_in_schema=False)
+def get_artist_info(
+    request: Request,
+    id: str | None = Query(None),
+    count: int = Query(20),
+    includeNotPresent: bool = Query(False),
+):
+    return _get_artist_info(request, id, count, includeNotPresent, version=1)
+
+
+@router.get(
+    "/getArtistInfo2",
+    response_model=SubsonicArtistInfoResponse,
+    summary="Get artist metadata using ID3 tags",
+)
+@router.get("/getArtistInfo2.view", include_in_schema=False)
+def get_artist_info2(
+    request: Request,
+    id: str | None = Query(None),
+    count: int = Query(20),
+    includeNotPresent: bool = Query(False),
+):
+    return _get_artist_info(request, id, count, includeNotPresent, version=2)
+
+
+def _get_artist_info(
+    request: Request,
+    identifier: str | None,
+    count: int,
+    include_not_present: bool,
+    *,
+    version: int,
+):
+    try:
+        _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    if not identifier:
+        return _subsonic_error(10, "Required parameter 'id' is missing")
+    invalid = _validate_search_numbers(count=count)
+    if invalid:
+        return invalid
+    try:
+        metadata = catalog.artist_metadata(
+            identifier,
+            request=request,
+            count=min(count, 100),
+            include_not_present=include_not_present,
+        )
+    except ValueError as error:
+        return _subsonic_error(0, str(error))
+    if metadata is None:
+        return _subsonic_error(70, "Artist not found")
+    return _subsonic_response(
+        {"artistInfo" if version == 1 else "artistInfo2": metadata}
+    )
+
+
+@router.get(
+    "/getAlbumInfo",
+    response_model=SubsonicAlbumInfoResponse,
+    summary="Get album notes, artwork, and external metadata",
+)
+@router.get("/getAlbumInfo.view", include_in_schema=False)
+def get_album_info(request: Request, id: str | None = Query(None)):
+    return _get_album_info(request, id)
+
+
+@router.get(
+    "/getAlbumInfo2",
+    response_model=SubsonicAlbumInfoResponse,
+    summary="Get album metadata using ID3 tags",
+)
+@router.get("/getAlbumInfo2.view", include_in_schema=False)
+def get_album_info2(request: Request, id: str | None = Query(None)):
+    return _get_album_info(request, id)
+
+
+def _get_album_info(request: Request, identifier: str | None):
+    try:
+        _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    if not identifier:
+        return _subsonic_error(10, "Required parameter 'id' is missing")
+    try:
+        metadata = catalog.album_metadata(identifier, request=request)
+    except ValueError as error:
+        return _subsonic_error(0, str(error))
+    if metadata is None:
+        return _subsonic_error(70, "Album not found")
+    return _subsonic_response({"albumInfo": metadata})
 
 
 # ── Stream & Cover Art ──────────────────────────────────────────

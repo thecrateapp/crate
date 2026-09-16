@@ -136,6 +136,39 @@ class SubsonicSearchResult3(_SubsonicModel):
     song: list[SubsonicSong]
 
 
+class SubsonicSearchResult2(_SubsonicModel):
+    artist: list[dict[str, object]]
+    album: list[dict[str, object]]
+    song: list[dict[str, object]]
+
+
+class SubsonicSearchResult(_SubsonicModel):
+    match: list[SubsonicSong]
+    offset: int
+    total_hits: int = Field(alias="totalHits")
+
+
+class SubsonicArtistInfo(_SubsonicModel):
+    biography: str | None = None
+    music_brainz_id: str | None = Field(default=None, alias="musicBrainzId")
+    last_fm_url: str | None = Field(default=None, alias="lastFmUrl")
+    small_image_url: str | None = Field(default=None, alias="smallImageUrl")
+    medium_image_url: str | None = Field(default=None, alias="mediumImageUrl")
+    large_image_url: str | None = Field(default=None, alias="largeImageUrl")
+    similar_artist: list[dict[str, object]] | None = Field(
+        default=None, alias="similarArtist"
+    )
+
+
+class SubsonicAlbumInfo(_SubsonicModel):
+    notes: str | None = None
+    music_brainz_id: str | None = Field(default=None, alias="musicBrainzId")
+    last_fm_url: str | None = Field(default=None, alias="lastFmUrl")
+    small_image_url: str | None = Field(default=None, alias="smallImageUrl")
+    medium_image_url: str | None = Field(default=None, alias="mediumImageUrl")
+    large_image_url: str | None = Field(default=None, alias="largeImageUrl")
+
+
 class SubsonicPlaylists(_SubsonicModel):
     playlist: list[dict[str, object]]
 
@@ -255,6 +288,43 @@ class SubsonicSearchResult3Body(SubsonicResponseBase):
 
 class SubsonicSearchResult3Response(SubsonicEnvelopeBase):
     subsonic_response: SubsonicSearchResult3Body = Field(alias="subsonic-response")
+
+
+class SubsonicSearchResult2Body(SubsonicResponseBase):
+    search_result2: SubsonicSearchResult2 | None = Field(
+        default=None, alias="searchResult2"
+    )
+
+
+class SubsonicSearchResult2Response(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicSearchResult2Body = Field(alias="subsonic-response")
+
+
+class SubsonicSearchBody(SubsonicResponseBase):
+    search_result: SubsonicSearchResult | None = Field(
+        default=None, alias="searchResult"
+    )
+
+
+class SubsonicSearchResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicSearchBody = Field(alias="subsonic-response")
+
+
+class SubsonicArtistInfoBody(SubsonicResponseBase):
+    artist_info: SubsonicArtistInfo | None = Field(default=None, alias="artistInfo")
+    artist_info2: SubsonicArtistInfo | None = Field(default=None, alias="artistInfo2")
+
+
+class SubsonicArtistInfoResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicArtistInfoBody = Field(alias="subsonic-response")
+
+
+class SubsonicAlbumInfoBody(SubsonicResponseBase):
+    album_info: SubsonicAlbumInfo | None = Field(default=None, alias="albumInfo")
+
+
+class SubsonicAlbumInfoResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicAlbumInfoBody = Field(alias="subsonic-response")
 
 
 class SubsonicPlaylistsBody(SubsonicResponseBase):

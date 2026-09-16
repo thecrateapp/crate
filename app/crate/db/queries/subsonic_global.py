@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
@@ -477,10 +479,107 @@ def get_global_tracks_by_genre(
         return [dict(row) for row in rows]
 
 
+def _search_pattern(value: str | None) -> str | None:
+    term = str(value or "").strip()[:200]
+    if not term:
+        return None
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _search_predicates(
+    columns: tuple[str, ...], patterns: tuple[tuple[str, str | None], ...]
+) -> str:
+    clauses = [
+        "("
+        + " OR ".join(f"{column} ILIKE :{name} ESCAPE '\\'" for column in columns)
+        + ")"
+        for name, pattern in patterns
+        if pattern is not None
+    ]
+    return "(" + " OR ".join(clauses) + ")" if clauses else "TRUE"
+
+
 def search_global_catalog(
-    query: str, *, artist_limit: int, album_limit: int, track_limit: int
-) -> dict[str, list[dict]]:
-    pattern = f"%{str(query).strip()[:200]}%"
+    query: str | None = "",
+    *,
+    artist_limit: int = 20,
+    artist_offset: int = 0,
+    album_limit: int = 20,
+    album_offset: int = 0,
+    track_limit: int = 20,
+    track_offset: int = 0,
+    music_folder_id: str | None = None,
+    artist_query: str | None = None,
+    album_query: str | None = None,
+    song_query: str | None = None,
+    any_query: str | None = None,
+    newer_than_ms: int | None = None,
+    include_track_total: bool = False,
+) -> dict[str, Any]:
+    if music_folder_id not in {None, "1"}:
+        raise ValueError("Unsupported OpenSubsonic music folder")
+
+    query_pattern = _search_pattern(query)
+    any_pattern = _search_pattern(any_query)
+    artist_pattern = _search_pattern(artist_query)
+    album_pattern = _search_pattern(album_query)
+    song_pattern = _search_pattern(song_query)
+    artist_where = _search_predicates(
+        ("entity.canonical_name",),
+        (
+            ("pattern", query_pattern),
+            ("any_pattern", any_pattern),
+            ("artist_pattern", artist_pattern),
+        ),
+    )
+    album_where = _search_predicates(
+        ("entity.canonical_name", "entity.artist_name"),
+        (
+            ("pattern", query_pattern),
+            ("any_pattern", any_pattern),
+            ("album_pattern", album_pattern),
+        ),
+    )
+    track_conditions = [
+        "(entity.canonical_title ILIKE :{name} ESCAPE '\\' OR "
+        "entity.artist_name ILIKE :{name} ESCAPE '\\' OR "
+        "entity.album_name ILIKE :{name} ESCAPE '\\')".format(name=name)
+        for name, pattern in (("pattern", query_pattern), ("any_pattern", any_pattern))
+        if pattern is not None
+    ]
+    if artist_pattern is not None:
+        track_conditions.append("entity.artist_name ILIKE :artist_pattern ESCAPE '\\'")
+    if album_pattern is not None:
+        track_conditions.append("entity.album_name ILIKE :album_pattern ESCAPE '\\'")
+    if song_pattern is not None:
+        track_conditions.append(
+            "entity.canonical_title ILIKE :song_pattern ESCAPE '\\'"
+        )
+    track_where = (
+        "(" + " AND ".join(track_conditions) + ")" if track_conditions else "TRUE"
+    )
+
+    patterns = {
+        name: value
+        for name, value in (
+            ("pattern", query_pattern),
+            ("any_pattern", any_pattern),
+            ("artist_pattern", artist_pattern),
+            ("album_pattern", album_pattern),
+            ("song_pattern", song_pattern),
+        )
+        if value is not None
+    }
+
+    common_params: dict[str, object] = {
+        **patterns,
+        "music_folder_id": music_folder_id,
+        "newer_than_ms": newer_than_ms,
+    }
+    folder_filter = "(CAST(:music_folder_id AS TEXT) IS NULL OR entity.has_local)"
+    newer_filter = "(:newer_than_ms IS NULL OR entity.created_at >= to_timestamp(:newer_than_ms / 1000.0))"
+
     with read_scope() as session:
         artists = (
             session.execute(
@@ -488,18 +587,34 @@ def search_global_catalog(
                     f"""
                 SELECT entity.global_artist_uid::text AS global_artist_uid,
                        entity.canonical_name AS name,
-                       entity.has_photo
+                       entity.has_photo,
+                       (
+                           SELECT COUNT(*)::INTEGER
+                           FROM global_catalog_albums album
+                           WHERE album.global_artist_uid = entity.global_artist_uid
+                             AND (album.has_local OR EXISTS (
+                                 SELECT 1 FROM global_catalog_sources source
+                                 WHERE source.global_entity_uid = album.global_album_uid
+                                   AND source.entity_type = 'album'
+                                   AND NOT source.source_stale
+                                   AND source.source_deleted_at IS NULL
+                             ))
+                             AND (CAST(:music_folder_id AS TEXT) IS NULL OR album.has_local)
+                       ) AS album_count
                 FROM global_catalog_artists entity
-                WHERE entity.canonical_name ILIKE :pattern ESCAPE '\\'
+                WHERE {artist_where}
+                  AND {folder_filter}
+                  AND {newer_filter}
                   AND {_AVAILABLE_SOURCE.format(uid_column="global_artist_uid")}
-                ORDER BY entity.has_local DESC, entity.canonical_name
-                LIMIT :limit
+                ORDER BY entity.has_local DESC, entity.sort_name, entity.canonical_name
+                LIMIT :limit OFFSET :offset
                 """
                 ),
                 {
-                    "pattern": pattern,
+                    **common_params,
                     "entity_type": "artist",
-                    "limit": min(max(artist_limit, 0), 100),
+                    "limit": min(max(int(artist_limit), 0), 100),
+                    "offset": min(max(int(artist_offset), 0), 1_000_000),
                 },
             )
             .mappings()
@@ -511,17 +626,19 @@ def search_global_catalog(
                     f"""
                 SELECT {_album_select()}
                 FROM global_catalog_albums entity
-                WHERE (entity.canonical_name ILIKE :pattern ESCAPE '\\'
-                       OR entity.artist_name ILIKE :pattern ESCAPE '\\')
+                WHERE {album_where}
+                  AND {folder_filter}
+                  AND {newer_filter}
                   AND {_AVAILABLE_SOURCE.format(uid_column="global_album_uid")}
                 ORDER BY entity.has_local DESC, entity.artist_name, entity.canonical_name
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """
                 ),
                 {
-                    "pattern": pattern,
+                    **common_params,
                     "entity_type": "album",
-                    "limit": min(max(album_limit, 0), 100),
+                    "limit": min(max(int(album_limit), 0), 100),
+                    "offset": min(max(int(album_offset), 0), 1_000_000),
                 },
             )
             .mappings()
@@ -537,28 +654,137 @@ def search_global_catalog(
                   ON local_track.id = entity.local_track_id
                 LEFT JOIN global_catalog_albums album
                   ON album.global_album_uid = entity.global_album_uid
-                WHERE (entity.canonical_title ILIKE :pattern ESCAPE '\\'
-                       OR entity.artist_name ILIKE :pattern ESCAPE '\\'
-                       OR entity.album_name ILIKE :pattern ESCAPE '\\')
+                WHERE {track_where}
+                  AND {folder_filter}
+                  AND {newer_filter}
                   AND {_AVAILABLE_SOURCE.format(uid_column="global_track_uid")}
                 ORDER BY entity.has_local DESC, entity.artist_name, entity.canonical_title
-                LIMIT :limit
+                LIMIT :limit OFFSET :offset
                 """
                 ),
                 {
-                    "pattern": pattern,
+                    **common_params,
                     "entity_type": "track",
-                    "limit": min(max(track_limit, 0), 200),
+                    "limit": min(max(int(track_limit), 0), 200),
+                    "offset": min(max(int(track_offset), 0), 1_000_000),
                 },
             )
             .mappings()
             .all()
         )
-    return {
-        "artists": [dict(row) for row in artists],
-        "albums": [dict(row) for row in albums],
-        "tracks": [dict(row) for row in tracks],
-    }
+        result: dict[str, Any] = {
+            "artists": [dict(row) for row in artists],
+            "albums": [dict(row) for row in albums],
+            "tracks": [dict(row) for row in tracks],
+        }
+        if include_track_total:
+            total = session.execute(
+                text(
+                    f"""
+                SELECT COUNT(*)::INTEGER
+                FROM global_catalog_tracks entity
+                WHERE {track_where}
+                  AND {folder_filter}
+                  AND {newer_filter}
+                  AND {_AVAILABLE_SOURCE.format(uid_column="global_track_uid")}
+                """
+                ),
+                {**common_params, "entity_type": "track"},
+            ).scalar_one()
+            result["track_total"] = int(total)
+    return result
+
+
+def get_global_artist_metadata(global_artist_uid: str) -> dict | None:
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    f"""
+                SELECT entity.global_artist_uid::text AS global_artist_uid,
+                       entity.canonical_name AS name,
+                       COALESCE(NULLIF(local_artist.mbid, ''), entity.musicbrainz_artist_mbid) AS musicbrainz_id,
+                       local_artist.bio AS biography,
+                       local_artist.urls_json,
+                       local_artist.similar_json,
+                       entity.has_photo
+                FROM global_catalog_artists entity
+                LEFT JOIN library_artists local_artist
+                  ON local_artist.id = entity.local_artist_id
+                WHERE entity.global_artist_uid = CAST(:uid AS UUID)
+                  AND {_AVAILABLE_SOURCE.format(uid_column="global_artist_uid")}
+                """
+                ),
+                {"uid": global_artist_uid, "entity_type": "artist"},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+
+def get_global_album_metadata(global_album_uid: str) -> dict | None:
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    f"""
+                SELECT entity.global_album_uid::text AS global_album_uid,
+                       entity.global_artist_uid::text AS global_artist_uid,
+                       entity.canonical_name AS name,
+                       COALESCE(NULLIF(local_album.musicbrainz_albumid, ''),
+                                entity.musicbrainz_release_mbid,
+                                entity.musicbrainz_release_group_mbid) AS musicbrainz_id,
+                       (entity.has_cover OR COALESCE(local_album.has_cover, 0) > 0) AS has_cover
+                FROM global_catalog_albums entity
+                LEFT JOIN library_albums local_album
+                  ON local_album.id = entity.local_album_id
+                WHERE entity.global_album_uid = CAST(:uid AS UUID)
+                  AND {_AVAILABLE_SOURCE.format(uid_column="global_album_uid")}
+                """
+                ),
+                {"uid": global_album_uid, "entity_type": "album"},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+
+def get_global_artists_by_names(
+    names: list[str], *, include_not_present: bool, limit: int
+) -> list[dict]:
+    normalized_names = [name.strip().casefold() for name in names if name.strip()]
+    if not normalized_names or limit <= 0:
+        return []
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    f"""
+                SELECT entity.global_artist_uid::text AS global_artist_uid,
+                       entity.canonical_name AS name,
+                       entity.has_photo,
+                       entity.sort_name
+                FROM global_catalog_artists entity
+                WHERE LOWER(entity.canonical_name) = ANY(CAST(:names AS TEXT[]))
+                  AND (:include_not_present OR entity.has_local)
+                  AND {_AVAILABLE_SOURCE.format(uid_column="global_artist_uid")}
+                ORDER BY entity.has_local DESC, entity.sort_name, entity.canonical_name
+                LIMIT :limit
+                """
+                ),
+                {
+                    "names": normalized_names,
+                    "include_not_present": include_not_present,
+                    "entity_type": "artist",
+                    "limit": min(max(int(limit), 0), 100),
+                },
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(row) for row in rows]
 
 
 def get_random_global_tracks(
@@ -653,8 +879,11 @@ def get_starred_global_tracks(user_id: int, limit: int = 500) -> list[dict]:
 __all__ = [
     "get_global_album",
     "get_global_album_by_local_id",
+    "get_global_album_metadata",
     "get_global_artist",
     "get_global_artist_by_local_id",
+    "get_global_artist_metadata",
+    "get_global_artists_by_names",
     "get_global_track",
     "get_global_track_by_local_id",
     "get_global_catalog_last_modified",

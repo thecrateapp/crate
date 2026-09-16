@@ -649,22 +649,18 @@ class TestSubsonicAlbumList2:
 
 
 class TestSubsonicSearch:
-    """search3 endpoint."""
+    """OpenSubsonic search endpoints."""
 
     def test_search_returns_all_categories(self, test_app):
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.search_global_catalog",
+                "crate.api.subsonic.legacy.catalog.search_catalog",
+                create=True,
                 return_value={
-                    "artists": [
-                        {
-                            "global_artist_uid": _GLOBAL_ARTIST_UID,
-                            "name": "Converge",
-                        }
-                    ],
-                    "albums": [_FAKE_GLOBAL_ALBUM],
-                    "tracks": [_FAKE_GLOBAL_TRACK],
+                    "artist": [{"id": f"ga-{_GLOBAL_ARTIST_UID}", "name": "Converge"}],
+                    "album": [{"id": f"gal-{_GLOBAL_ALBUM_UID}", "name": "Jane Doe"}],
+                    "song": [{"id": f"gt-{_GLOBAL_TRACK_UID}", "title": "Concubine"}],
                 },
             ),
         ):
@@ -683,8 +679,9 @@ class TestSubsonicSearch:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.search_global_catalog",
-                return_value={"artists": [], "albums": [], "tracks": []},
+                "crate.api.subsonic.legacy.catalog.search_catalog",
+                create=True,
+                return_value={"artist": [], "album": [], "song": []},
             ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/search3?u=admin&p=admin&query=")
@@ -698,6 +695,256 @@ class TestSubsonicSearch:
         with _subsonic_auth_fail():
             resp = test_app.get(f"{_SUBSONIC_BASE}/search3?u=bad&p=bad&query=test")
             _subsonic_error_response(resp, code=40)
+
+    def test_search3_forwards_independent_offsets_and_folder(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.catalog.search_catalog",
+                create=True,
+                return_value={"artist": [], "album": [], "song": []},
+            ) as search,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/search3?u=admin&p=admin&query=Bj%C3%B6rk"
+                "&artistCount=2&artistOffset=3&albumCount=4&albumOffset=5"
+                "&songCount=6&songOffset=7&musicFolderId=1"
+            )
+
+        assert resp.status_code == 200
+        _subsonic_ok_response(resp)
+        search.assert_called_once_with(
+            "Björk",
+            artist_count=2,
+            artist_offset=3,
+            album_count=4,
+            album_offset=5,
+            song_count=6,
+            song_offset=7,
+            music_folder_id="1",
+            version=3,
+        )
+
+    def test_search2_view_returns_search_result2(self, test_app):
+        result = {
+            "artist": [{"id": "ga-artist", "name": "Björk"}],
+            "album": [{"id": "gal-album", "title": "Debut", "isDir": True}],
+            "song": [{"id": "gt-track", "title": "Human Behaviour"}],
+        }
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.catalog.search_catalog",
+                create=True,
+                return_value=result,
+            ) as search,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/search2.view?u=admin&p=admin&query=Bj%C3%B6rk"
+            )
+
+        assert resp.status_code == 200
+        sr = _subsonic_ok_response(resp)
+        assert sr["searchResult2"] == result
+        search.assert_called_once()
+        assert search.call_args.kwargs["version"] == 2
+
+    def test_legacy_search_returns_protocol_envelope(self, test_app):
+        result = {"match": [], "offset": 4, "totalHits": 0}
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.catalog.search_catalog",
+                create=True,
+                return_value=result,
+            ),
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/search?u=admin&p=admin&artist=Bj%C3%B6rk"
+                "&album=Debut&title=Human%20Behaviour&count=12&offset=4"
+            )
+
+        assert resp.status_code == 200
+        sr = _subsonic_ok_response(resp)
+        assert sr["searchResult"] == result
+
+
+class TestSubsonicMetadata:
+    def test_artist_info2_preserves_empty_biography_and_external_url(self, test_app):
+        result = {
+            "biography": "",
+            "musicBrainzId": "artist-mbid",
+            "lastFmUrl": "https://www.last.fm/music/Bj%C3%B6rk",
+        }
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.catalog.artist_metadata",
+                create=True,
+                return_value=result,
+            ) as metadata,
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getArtistInfo2?id=ga-"
+                f"{_GLOBAL_ARTIST_UID}&count=0&u=admin&p=admin"
+            )
+
+        assert resp.status_code == 200
+        sr = _subsonic_ok_response(resp)
+        assert sr["artistInfo2"] == result
+        assert "similarArtist" not in sr["artistInfo2"]
+        metadata.assert_called_once()
+
+    def test_album_info2_does_not_invent_optional_metadata(self, test_app):
+        with (
+            _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.catalog.album_metadata",
+                create=True,
+                return_value={"musicBrainzId": "album-mbid"},
+            ),
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getAlbumInfo2?id=gal-"
+                f"{_GLOBAL_ALBUM_UID}&u=admin&p=admin"
+            )
+
+        assert resp.status_code == 200
+        sr = _subsonic_ok_response(resp)
+        assert sr["albumInfo"] == {"musicBrainzId": "album-mbid"}
+
+
+class TestSubsonicCatalogService:
+    def test_search_catalog_projects_legacy_result_and_forwards_filters(self):
+        from crate.subsonic.services import catalog
+
+        matches = {"artists": [], "albums": [], "tracks": [], "track_total": 8}
+        with patch(
+            "crate.subsonic.services.catalog.search_global_catalog",
+            return_value=matches,
+        ) as search:
+            result = catalog.search_catalog(
+                None,
+                song_count=4,
+                song_offset=2,
+                artist_query="Björk",
+                album_query="Debut",
+                song_query="Human Behaviour",
+                any_query="live",
+                newer_than_ms=1234,
+                version=1,
+            )
+
+        assert result == {"match": [], "offset": 2, "totalHits": 8}
+        search.assert_called_once_with(
+            None,
+            artist_limit=20,
+            artist_offset=0,
+            album_limit=20,
+            album_offset=0,
+            track_limit=4,
+            track_offset=2,
+            music_folder_id=None,
+            artist_query="Björk",
+            album_query="Debut",
+            song_query="Human Behaviour",
+            any_query="live",
+            newer_than_ms=1234,
+            include_track_total=True,
+        )
+
+    def test_search_catalog_returns_three_categories_for_search3(self):
+        from crate.subsonic.services import catalog
+
+        with patch(
+            "crate.subsonic.services.catalog.search_global_catalog",
+            return_value={"artists": [], "albums": [], "tracks": []},
+        ):
+            assert catalog.search_catalog("Björk", version=3) == {
+                "artist": [],
+                "album": [],
+                "song": [],
+            }
+
+    def test_artist_metadata_preserves_empty_bio_and_known_fields(self):
+        from crate.subsonic.services import catalog
+
+        artist_uid = _GLOBAL_ARTIST_UID
+        similar_uid = "44444444-4444-4444-8444-444444444444"
+        request = MagicMock()
+        request.url_for.return_value = "https://crate.test/rest/getCoverArt"
+        with (
+            patch(
+                "crate.subsonic.services.catalog.get_global_artist",
+                return_value={"global_artist_uid": artist_uid},
+            ),
+            patch(
+                "crate.subsonic.services.catalog.get_global_artist_metadata",
+                return_value={
+                    "biography": "",
+                    "musicbrainz_id": "artist-mbid",
+                    "urls_json": {"lastfm": "https://last.fm/music/Artist"},
+                    "similar_json": [{"name": "Similar Artist"}],
+                    "has_photo": True,
+                },
+            ),
+            patch(
+                "crate.subsonic.services.catalog.get_global_artists_by_names",
+                return_value=[
+                    {
+                        "global_artist_uid": similar_uid,
+                        "name": "Similar Artist",
+                        "has_photo": True,
+                    }
+                ],
+            ) as similar_lookup,
+        ):
+            result = catalog.artist_metadata(
+                f"ga-{artist_uid}", request=request, count=3, include_not_present=True
+            )
+
+        assert result == {
+            "biography": "",
+            "musicBrainzId": "artist-mbid",
+            "lastFmUrl": "https://last.fm/music/Artist",
+            "smallImageUrl": (
+                f"https://crate.test/rest/getCoverArt?id=ga-{artist_uid}&size=34"
+            ),
+            "mediumImageUrl": (
+                f"https://crate.test/rest/getCoverArt?id=ga-{artist_uid}&size=64"
+            ),
+            "largeImageUrl": (
+                f"https://crate.test/rest/getCoverArt?id=ga-{artist_uid}&size=174"
+            ),
+            "similarArtist": [
+                {
+                    "id": f"ga-{similar_uid}",
+                    "name": "Similar Artist",
+                    "coverArt": f"ga-{similar_uid}",
+                }
+            ],
+        }
+        similar_lookup.assert_called_once_with(
+            ["Similar Artist"], include_not_present=True, limit=3
+        )
+
+    def test_album_metadata_omits_unavailable_fields(self):
+        from crate.subsonic.services import catalog
+
+        request = MagicMock()
+        with (
+            patch(
+                "crate.subsonic.services.catalog.get_global_album",
+                return_value={"global_album_uid": _GLOBAL_ALBUM_UID},
+            ),
+            patch(
+                "crate.subsonic.services.catalog.get_global_album_metadata",
+                return_value={"musicbrainz_id": None, "has_cover": False},
+            ),
+        ):
+            result = catalog.album_metadata(f"gal-{_GLOBAL_ALBUM_UID}", request=request)
+
+        assert result == {}
 
 
 # ── Stubs ────────────────────────────────────────────────────────────

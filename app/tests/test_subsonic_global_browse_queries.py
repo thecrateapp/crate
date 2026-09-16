@@ -130,6 +130,68 @@ def test_songs_by_genre_query_paginates_even_for_empty_result(session):
     assert params["music_folder_id"] == "1"
 
 
+def test_search_query_escapes_unicode_terms_and_paginates_each_kind(session):
+    subsonic_global.search_global_catalog(
+        "Björk %_",
+        artist_limit=3,
+        artist_offset=2,
+        album_limit=4,
+        album_offset=5,
+        track_limit=6,
+        track_offset=7,
+        music_folder_id="1",
+    )
+
+    assert len(session.calls) == 3
+    for statement, params in session.calls:
+        assert "ILIKE :pattern ESCAPE" in statement
+        assert "entity.has_local" in statement
+        assert params["pattern"] == "%Björk \\%\\_%"
+        assert params["music_folder_id"] == "1"
+
+    assert "LIMIT :limit OFFSET :offset" in session.calls[0][0]
+    assert session.calls[0][1]["limit"] == 3
+    assert session.calls[0][1]["offset"] == 2
+    assert "LIMIT :limit OFFSET :offset" in session.calls[1][0]
+    assert session.calls[1][1]["limit"] == 4
+    assert session.calls[1][1]["offset"] == 5
+    assert "LIMIT :limit OFFSET :offset" in session.calls[2][0]
+    assert session.calls[2][1]["limit"] == 6
+    assert session.calls[2][1]["offset"] == 7
+
+
+def test_legacy_search_combines_artist_album_and_title_filters(session):
+    subsonic_global.search_global_catalog(
+        None,
+        artist_limit=0,
+        album_limit=0,
+        track_limit=20,
+        artist_query="Björk",
+        album_query="Debut",
+        song_query="Human Behaviour",
+    )
+
+    statement, params = session.calls[2]
+    assert "entity.artist_name ILIKE :artist_pattern" in statement
+    assert "AND entity.album_name ILIKE :album_pattern" in statement
+    assert "AND entity.canonical_title ILIKE :song_pattern" in statement
+    assert params["artist_pattern"] == "%Björk%"
+    assert params["album_pattern"] == "%Debut%"
+    assert params["song_pattern"] == "%Human Behaviour%"
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_search_query_executes_with_folder_and_newer_than_filters(pg_db):
+    result = subsonic_global.search_global_catalog(
+        "Björk",
+        music_folder_id="1",
+        newer_than_ms=1,
+        include_track_total=True,
+    )
+
+    assert result == {"artists": [], "albums": [], "tracks": [], "track_total": 0}
+
+
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 def test_browse_queries_execute_and_filter_catalog_rows(pg_db):
     for list_type in (
