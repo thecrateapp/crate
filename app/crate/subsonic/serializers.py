@@ -87,6 +87,7 @@ class SongProjection(_Projection):
     size: int | None = None
     created: str | None = None
     starred: str | None = None
+    user_rating: int | None = Field(default=None, alias="userRating")
 
 
 class ArtistDetailProjection(ArtistProjection):
@@ -227,11 +228,19 @@ def serialize_song(song: Mapping[str, Any]) -> dict[str, Any]:
         values["created"] = _date_string(song["created"])
     if song.get("starred"):
         values["starred"] = _date_string(song["starred"])
+    if song.get("user_rating"):
+        values["userRating"] = _as_int(song["user_rating"], default=0)
     return _dump(SongProjection(**values))
 
 
 def _artist_id(artist: Mapping[str, Any]) -> str:
-    return global_subsonic_id("artist", str(artist["global_artist_uid"]))
+    uid = artist.get("global_artist_uid")
+    if uid:
+        return global_subsonic_id("artist", str(uid))
+    local_id = artist.get("artist_id", artist.get("id"))
+    if local_id is None:
+        raise ValueError("Artist is missing its Subsonic ID")
+    return local_subsonic_id("artist", _as_int(local_id, default=0))
 
 
 def _artist_fields(
@@ -252,7 +261,13 @@ def _artist_fields(
 
 
 def _album_id(album: Mapping[str, Any]) -> str:
-    return global_subsonic_id("album", str(album["global_album_uid"]))
+    uid = album.get("global_album_uid")
+    if uid:
+        return global_subsonic_id("album", str(uid))
+    local_id = album.get("album_id", album.get("id"))
+    if local_id is None:
+        raise ValueError("Album is missing its Subsonic ID")
+    return local_subsonic_id("album", _as_int(local_id, default=0))
 
 
 def _track_id(song: Mapping[str, Any]) -> str:
@@ -267,7 +282,14 @@ def _track_id(song: Mapping[str, Any]) -> str:
 
 def _artist_id_from_album(album: Mapping[str, Any]) -> str | None:
     uid = album.get("global_artist_uid")
-    return global_subsonic_id("artist", str(uid)) if uid else None
+    if uid:
+        return global_subsonic_id("artist", str(uid))
+    local_id = album.get("artist_id")
+    return (
+        local_subsonic_id("artist", _as_int(local_id, default=0))
+        if local_id is not None
+        else None
+    )
 
 
 def _album_id_from_song(song: Mapping[str, Any]) -> str | None:

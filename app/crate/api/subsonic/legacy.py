@@ -19,7 +19,6 @@ from crate.db.queries.subsonic_global import (
     get_global_track,
     get_global_tracks_by_genre,
     get_random_global_tracks,
-    get_starred_global_tracks,
     list_global_albums,
 )
 from crate.db.queries.subsonic_track_queries import (
@@ -35,6 +34,7 @@ from crate.subsonic.global_ids import (
 )
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.services import catalog
+from crate.subsonic.services import preferences
 from crate.subsonic.services import playlists as playlist_service
 from crate.subsonic.services.artwork import serve_playlist_cover
 from crate.subsonic.serializers import serialize_album, serialize_song
@@ -381,7 +381,7 @@ def get_artist(request: Request, id: str = Query("")):
 @router.get("/getAlbum.view", include_in_schema=False)
 def get_album(request: Request, id: str = Query("")):
     try:
-        _require_subsonic_auth(request)
+        user = _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
 
@@ -391,6 +391,13 @@ def get_album(request: Request, id: str = Query("")):
         return _subsonic_error(70, "Invalid Subsonic entity ID")
     if not album:
         return _subsonic_error(70, "Album not found")
+    album = {
+        **album,
+        "song": [
+            preferences.with_user_rating(int(user["id"]), song)
+            for song in album.get("song", [])
+        ],
+    }
     return _subsonic_response({"album": album})
 
 
@@ -402,7 +409,7 @@ def get_album(request: Request, id: str = Query("")):
 @router.get("/getSong.view", include_in_schema=False)
 def get_song(request: Request, id: str = Query("")):
     try:
-        _require_subsonic_auth(request)
+        user = _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
 
@@ -412,7 +419,9 @@ def get_song(request: Request, id: str = Query("")):
         return _subsonic_error(70, "Invalid Subsonic entity ID")
     if not song:
         return _subsonic_error(70, "Song not found")
-    return _subsonic_response({"song": song})
+    return _subsonic_response(
+        {"song": preferences.with_user_rating(int(user["id"]), song)}
+    )
 
 
 # ── Album Lists ─────────────────────────────────────────────────
@@ -1242,18 +1251,97 @@ def get_starred2(request: Request):
         user = _require_subsonic_auth(request)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
-    return _subsonic_response(
-        {
-            "starred2": {
-                "artist": [],
-                "album": [],
-                "song": [
-                    _global_song_payload(track)
-                    for track in get_starred_global_tracks(int(user["id"]))
-                ],
-            }
-        }
-    )
+    return _subsonic_response({"starred2": preferences.get_starred(int(user["id"]))})
+
+
+def _star_request_items(request: Request) -> list[tuple[str, str]]:
+    items: list[tuple[str, str]] = []
+    for value in request.query_params.getlist("artistId"):
+        items.append(("artist", value))
+    for value in request.query_params.getlist("albumId"):
+        items.append(("album", value))
+    for value in request.query_params.getlist("id"):
+        item_type = (
+            "artist"
+            if value.startswith(("ga-", "ar-"))
+            else "album"
+            if value.startswith(("gal-", "al-"))
+            else "song"
+        )
+        items.append((item_type, value))
+    return items
+
+
+@router.get("/star", response_model=SubsonicOkResponse, summary="Star media")
+@router.get("/star.view", include_in_schema=False)
+def star(request: Request):
+    try:
+        user = _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    items = _star_request_items(request)
+    if not items:
+        return _subsonic_error(
+            ErrorCode.MISSING_PARAMETER, "id, albumId or artistId is required"
+        )
+    try:
+        for item_type, item_id in items:
+            preferences.star(int(user["id"]), item_type, item_id)
+    except ValueError as error:
+        return _subsonic_error(ErrorCode.NOT_FOUND, str(error))
+    return _subsonic_response({})
+
+
+@router.get("/unstar", response_model=SubsonicOkResponse, summary="Unstar media")
+@router.get("/unstar.view", include_in_schema=False)
+def unstar(request: Request):
+    try:
+        user = _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    items = _star_request_items(request)
+    if not items:
+        return _subsonic_error(
+            ErrorCode.MISSING_PARAMETER, "id, albumId or artistId is required"
+        )
+    try:
+        for item_type, item_id in items:
+            preferences.unstar(int(user["id"]), item_type, item_id)
+    except ValueError as error:
+        return _subsonic_error(ErrorCode.NOT_FOUND, str(error))
+    return _subsonic_response({})
+
+
+@router.get(
+    "/setRating", response_model=SubsonicOkResponse, summary="Set a media rating"
+)
+@router.get("/setRating.view", include_in_schema=False)
+def set_rating(request: Request):
+    try:
+        user = _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    item_id = request.query_params.get("id")
+    raw_rating = request.query_params.get("rating")
+    if not item_id or raw_rating is None:
+        return _subsonic_error(
+            ErrorCode.MISSING_PARAMETER, "id and rating are required"
+        )
+    try:
+        rating = int(raw_rating)
+    except ValueError:
+        return _subsonic_error(ErrorCode.MISSING_PARAMETER, "Invalid rating")
+    if rating < 0 or rating > 5:
+        return _subsonic_error(
+            ErrorCode.MISSING_PARAMETER, "Rating must be between 0 and 5"
+        )
+    try:
+        updated = preferences.set_rating(int(user["id"]), item_id, rating)
+    except ValueError as error:
+        return _subsonic_error(ErrorCode.NOT_FOUND, str(error))
+    if not updated:
+        return _subsonic_error(ErrorCode.NOT_FOUND, "Track not found")
+    return _subsonic_response({})
 
 
 @router.get(

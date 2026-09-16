@@ -332,6 +332,8 @@ type Store struct {
 	globalSearchFn             func(context.Context, string, int) (map[string]any, error)
 	artistRowFn                func(context.Context, string, ...any) (map[string]any, error)
 	artistTopTracksFn          func(context.Context, string, int) ([]map[string]any, error)
+	favoritesFn                func(context.Context, int64) (map[string]any, error)
+	trackInfoFn                 func(context.Context, int64, string, any) (map[string]any, error)
 }
 
 type historyFallbackRef struct {
@@ -453,14 +455,18 @@ func escapeLocalSearchLike(query string) string {
 }
 
 // Favorites returns all favorited items ordered by creation time.
-func (s *Store) Favorites(ctx context.Context) (map[string]any, error) {
+func (s *Store) Favorites(ctx context.Context, userID int64) (map[string]any, error) {
+	if s.favoritesFn != nil {
+		return s.favoritesFn(ctx, userID)
+	}
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 	items, err := rowsToMaps(s.pool.Query(ctx, `
 		SELECT item_type, item_id, created_at
 		FROM favorites
+		WHERE user_id = $1
 		ORDER BY created_at DESC
-	`))
+	`, userID))
 	if err != nil {
 		return nil, err
 	}

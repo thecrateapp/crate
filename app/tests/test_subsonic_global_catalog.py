@@ -95,6 +95,54 @@ def test_global_album_detail_contains_global_song_ids(test_app):
     assert body["song"][0]["id"] == f"gt-{TRACK_UID}"
 
 
+def test_get_album_includes_ratings_for_the_authenticated_user(test_app):
+    album = {
+        "global_album_uid": ALBUM_UID,
+        "global_artist_uid": ARTIST_UID,
+        "name": "Blending",
+        "artist": "High Vis",
+        "year": "2022",
+        "track_count": 1,
+        "duration": 228,
+        "has_cover": True,
+    }
+    with (
+        _auth(),
+        patch("crate.subsonic.services.catalog.get_global_album", return_value=album),
+        patch(
+            "crate.subsonic.services.catalog.list_global_album_tracks",
+            return_value=[_track()],
+        ),
+        patch(
+            "crate.api.subsonic.legacy.preferences.get_rating", return_value=4
+        ) as get_rating,
+    ):
+        response = test_app.get(
+            f"/rest/getAlbum?u=listener&p=secret&id=gal-{ALBUM_UID}"
+        )
+
+    song = response.json()["subsonic-response"]["album"]["song"][0]
+    assert song["userRating"] == 4
+    get_rating.assert_called_once_with(USER["id"], f"gt-{TRACK_UID}")
+
+
+def test_get_song_includes_rating_for_the_authenticated_user(test_app):
+    with (
+        _auth(),
+        patch(
+            "crate.subsonic.services.catalog.get_global_track", return_value=_track()
+        ),
+        patch(
+            "crate.api.subsonic.legacy.preferences.get_rating", return_value=5
+        ) as get_rating,
+    ):
+        response = test_app.get(f"/rest/getSong?u=listener&p=secret&id=gt-{TRACK_UID}")
+
+    song = response.json()["subsonic-response"]["song"]
+    assert song["userRating"] == 5
+    get_rating.assert_called_once_with(USER["id"], f"gt-{TRACK_UID}")
+
+
 def test_global_search_applies_server_side_caps(test_app):
     with (
         _auth(),
@@ -141,12 +189,18 @@ def test_wrong_global_id_type_returns_stable_subsonic_error(test_app):
 
 
 def test_starred_tracks_are_read_from_global_likes(test_app):
-    starred = {**_track(), "starred": "2026-07-14T10:00:00+00:00"}
+    starred = {
+        "id": f"gt-{TRACK_UID}",
+        "title": "Marigold",
+        "artist": "High Vis",
+        "album": "Blending",
+        "starred": "2026-07-14T10:00:00+00:00",
+    }
     with (
         _auth(),
         patch(
-            "crate.api.subsonic.legacy.get_starred_global_tracks",
-            return_value=[starred],
+            "crate.api.subsonic.legacy.preferences.get_starred",
+            return_value={"artist": [], "album": [], "song": [starred]},
         ) as query,
     ):
         response = test_app.get("/rest/getStarred2?u=listener&p=secret")
@@ -155,6 +209,110 @@ def test_starred_tracks_are_read_from_global_likes(test_app):
     song = response.json()["subsonic-response"]["starred2"]["song"][0]
     assert song["id"] == f"gt-{TRACK_UID}"
     assert song["starred"] == starred["starred"]
+
+
+def test_legacy_favorite_alias_is_deduplicated_after_global_resolution():
+    from crate.subsonic.services import preferences
+
+    result = {
+        "artist": [{"id": f"ga-{ARTIST_UID}", "name": "High Vis"}],
+        "album": [],
+        "song": [],
+    }
+    with (
+        patch(
+            "crate.subsonic.services.preferences.list_favorites",
+            return_value=[
+                {
+                    "item_type": "artist",
+                    "item_id": "ar-17",
+                    "created_at": "2026-09-16T10:00:00Z",
+                }
+            ],
+        ),
+        patch(
+            "crate.subsonic.services.catalog.artist_detail",
+            return_value={"id": f"ga-{ARTIST_UID}", "name": "High Vis"},
+        ),
+    ):
+        preferences._include_legacy_favorites(USER["id"], result)
+
+    assert result["artist"] == [{"id": f"ga-{ARTIST_UID}", "name": "High Vis"}]
+
+
+def test_unstar_removes_local_and_global_favorite_aliases():
+    from crate.subsonic.services import preferences
+
+    with (
+        patch(
+            "crate.subsonic.services.preferences._favorite_ids_for_entity",
+            return_value={f"ga-{ARTIST_UID}", "ar-17"},
+            create=True,
+        ),
+        patch(
+            "crate.subsonic.services.preferences.unfollow_global_artist",
+            return_value=True,
+        ),
+        patch(
+            "crate.subsonic.services.preferences.remove_favorite", return_value=True
+        ) as remove_favorite,
+    ):
+        assert preferences.unstar(USER["id"], "artist", f"ga-{ARTIST_UID}") is True
+
+    assert {call.args[1:] for call in remove_favorite.call_args_list} == {
+        ("artist", f"ga-{ARTIST_UID}"),
+        ("artist", "ar-17"),
+    }
+
+
+def test_star_and_unstar_accept_repeated_ids_and_are_idempotent(test_app):
+    with (
+        _auth(),
+        patch("crate.api.subsonic.legacy.preferences.star", return_value=True) as star,
+        patch(
+            "crate.api.subsonic.legacy.preferences.unstar", return_value=True
+        ) as unstar,
+    ):
+        starred = test_app.get(
+            f"/rest/star?u=listener&p=secret&id=gt-{TRACK_UID}"
+            f"&albumId=gal-{ALBUM_UID}&artistId=ga-{ARTIST_UID}"
+        )
+        unstarred = test_app.get(
+            f"/rest/unstar?u=listener&p=secret&id=gt-{TRACK_UID}"
+            f"&albumId=gal-{ALBUM_UID}&artistId=ga-{ARTIST_UID}"
+        )
+
+    assert starred.json()["subsonic-response"]["status"] == "ok"
+    assert unstarred.json()["subsonic-response"]["status"] == "ok"
+    assert [call.args for call in star.call_args_list] == [
+        (USER["id"], "artist", f"ga-{ARTIST_UID}"),
+        (USER["id"], "album", f"gal-{ALBUM_UID}"),
+        (USER["id"], "song", f"gt-{TRACK_UID}"),
+    ]
+    assert [call.args for call in unstar.call_args_list] == [
+        (USER["id"], "artist", f"ga-{ARTIST_UID}"),
+        (USER["id"], "album", f"gal-{ALBUM_UID}"),
+        (USER["id"], "song", f"gt-{TRACK_UID}"),
+    ]
+
+
+def test_set_rating_uses_authenticated_user_and_rejects_out_of_range(test_app):
+    with (
+        _auth(),
+        patch(
+            "crate.api.subsonic.legacy.preferences.set_rating", return_value=True
+        ) as set_rating,
+    ):
+        response = test_app.get(
+            f"/rest/setRating?u=listener&p=secret&id=gt-{TRACK_UID}&rating=5"
+        )
+        invalid = test_app.get(
+            f"/rest/setRating?u=listener&p=secret&id=gt-{TRACK_UID}&rating=6"
+        )
+
+    assert response.json()["subsonic-response"]["status"] == "ok"
+    assert set_rating.call_args.args == (USER["id"], f"gt-{TRACK_UID}", 5)
+    assert invalid.json()["subsonic-response"]["status"] == "failed"
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")

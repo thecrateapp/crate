@@ -108,6 +108,7 @@ class SubsonicSong(_SubsonicModel):
     cover_art: str | None = Field(default=None, alias="coverArt")
     type: str | None = None
     starred: str | None = None
+    user_rating: int | None = Field(default=None, alias="userRating")
 
 
 class SubsonicArtistDetail(_SubsonicModel):
