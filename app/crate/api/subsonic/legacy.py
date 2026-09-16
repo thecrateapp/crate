@@ -6,23 +6,19 @@ to browse, search, and stream from the Crate library.
 Spec: http://www.subsonic.org/pages/api.jsp
 """
 
-import hashlib
 import logging
 from collections import defaultdict
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 
 from crate.db.queries.subsonic_global import (
-    get_global_track,
     get_global_tracks_by_genre,
     get_random_global_tracks,
     list_global_albums,
 )
 from crate.db.queries.subsonic_track_queries import (
-    get_track_full,
     get_track_path_and_format,
 )
 from crate.subsonic.global_ids import (
@@ -32,9 +28,11 @@ from crate.subsonic.global_ids import (
     decode_subsonic_id,
     decode_subsonic_playlist_id,
 )
+from crate.subsonic.params import RequestParameters
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.services import catalog
 from crate.subsonic.services import preferences
+from crate.subsonic.services import playback as playback_service
 from crate.subsonic.services import playlists as playlist_service
 from crate.subsonic.services.artwork import serve_playlist_cover
 from crate.subsonic.serializers import serialize_album, serialize_song
@@ -143,6 +141,18 @@ def _subsonic_error(code: int, message: str) -> JSONResponse:
 
 def _require_subsonic_auth(request: Request) -> dict:
     user = _subsonic_auth(request)
+    if not user:
+        raise SubsonicAuthError()
+    return user
+
+
+def _require_subsonic_auth_params(params: RequestParameters) -> dict:
+    from crate.subsonic.auth import authenticate
+
+    try:
+        user = authenticate(params)
+    except OpenSubsonicError as error:
+        raise SubsonicAuthError(error.code, error.message) from error
     if not user:
         raise SubsonicAuthError()
     return user
@@ -980,109 +990,39 @@ def get_cover_art(
 # ── Scrobble ────────────────────────────────────────────────────
 
 
-@router.get(
-    "/scrobble",
-    response_model=SubsonicOkResponse,
-    summary="Record a completed Subsonic scrobble",
-)
+@router.get("/scrobble", response_model=SubsonicOkResponse, summary="Record playback")
 @router.get("/scrobble.view", include_in_schema=False)
-@router.post(
-    "/scrobble",
-    response_model=SubsonicOkResponse,
-    summary="Record a completed Subsonic scrobble",
-)
+@router.post("/scrobble", response_model=SubsonicOkResponse, summary="Record playback")
 @router.post("/scrobble.view", include_in_schema=False)
-def scrobble(
-    request: Request,
-    id: str = Query(""),
-    submission: str = Query("true"),
-    time: int | None = Query(None),
-):
+async def scrobble(request: Request):
+    from crate.subsonic.params import collect_parameters
+
+    params = await collect_parameters(request)
     try:
-        user = _require_subsonic_auth(request)
+        user = _require_subsonic_auth_params(params)
+        playback_service.scrobble(params, user)
     except SubsonicAuthError as error:
         return _subsonic_auth_error_response(error)
-
-    if submission != "true":
-        return _subsonic_response({})
-
-    entity_id = _decode_entity_id(id, "track")
-    if entity_id is None:
-        return _subsonic_error(70, "Invalid Subsonic entity ID")
-    global_track_uid = None
-    track_id = None
-    content_origin = "local"
-    source_node_uid = None
-    if entity_id.scope == "global":
-        global_track_uid = str(entity_id.global_uid)
-        track = get_global_track(global_track_uid)
-        if track:
-            from crate.federation.playback_service import get_remembered_source
-
-            source = get_remembered_source(int(user["id"]), global_track_uid)
-            if source:
-                content_origin = str(source.get("content_origin") or "local")
-                source_node_uid = source.get("source_node_uid")
-            else:
-                from crate.federation.global_playback import (
-                    resolve_global_track_playback,
-                )
-
-                selected = resolve_global_track_playback(global_track_uid)
-                if selected["kind"] == "remote":
-                    content_origin = "remote"
-                    source_node_uid = str(selected["node_uid"])
-                else:
-                    from crate.playback_provenance import (
-                        resolve_local_content_provenance,
-                    )
-
-                    content_origin, source_node_uid = resolve_local_content_provenance(
-                        selected.get("local_track_id")
-                    )
-    else:
-        track_id = int(entity_id.local_id or 0)
-        track = get_track_full(track_id)
-        if track:
-            from crate.playback_provenance import resolve_local_content_provenance
-
-            content_origin, source_node_uid = resolve_local_content_provenance(track_id)
-
-    if track:
-        from crate.db.repositories.user_library import record_play_event
-
-        duration = float(track.get("duration") or 0)
-        ended_at = (
-            datetime.fromtimestamp(time / 1000, tz=timezone.utc)
-            if time is not None and time > 0
-            else datetime.now(timezone.utc)
-        )
-        started_at = ended_at - timedelta(seconds=duration)
-        event_identity = f"subsonic:{user['id']}:{id}:{int(ended_at.timestamp())}"
-        record_play_event(
-            int(user["id"]),
-            client_event_id=hashlib.sha256(event_identity.encode()).hexdigest(),
-            track_id=track_id,
-            global_track_uid=global_track_uid,
-            title=str(track.get("title") or ""),
-            artist=str(track.get("artist") or ""),
-            album=str(track.get("album") or ""),
-            started_at=started_at.isoformat(),
-            ended_at=ended_at.isoformat(),
-            played_seconds=duration,
-            track_duration_seconds=duration or None,
-            completion_ratio=1.0 if duration else None,
-            was_completed=True,
-            play_source_type="subsonic",
-            play_source_id=id,
-            play_source_name="Open Subsonic",
-            device_type="subsonic",
-            app_platform="subsonic",
-            content_origin=content_origin,
-            source_node_uid=source_node_uid,
-        )
-
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
     return _subsonic_response({})
+
+
+@router.get("/getNowPlaying", summary="Return tracks currently playing by users")
+@router.get("/getNowPlaying.view", include_in_schema=False)
+@router.post("/getNowPlaying", summary="Return tracks currently playing by users")
+@router.post("/getNowPlaying.view", include_in_schema=False)
+async def get_now_playing(request: Request):
+    from crate.subsonic.params import collect_parameters
+
+    params = await collect_parameters(request)
+    try:
+        _require_subsonic_auth_params(params)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    return _subsonic_response(
+        {"nowPlaying": {"entry": playback_service.get_now_playing_entries()}}
+    )
 
 
 # ── Playlists ───────────────────────────────────────────────────

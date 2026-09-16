@@ -1418,12 +1418,15 @@ class TestSubsonicScrobble:
     def test_scrobble_submission_get(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_track_full", return_value=_FAKE_TRACK),
+            patch(
+                "crate.subsonic.services.playback.get_track_full",
+                return_value=_FAKE_TRACK,
+            ),
             patch(
                 "crate.playback_provenance.resolve_local_content_provenance",
                 return_value=("local", None),
             ),
-            patch("crate.db.repositories.user_library.record_play_event"),
+            patch("crate.subsonic.services.playback.record_play_event"),
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=1&submission=true"
@@ -1434,10 +1437,11 @@ class TestSubsonicScrobble:
         """submission=false is a 'now playing' notification — no play recorded."""
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_track_full", return_value=_FAKE_TRACK),
             patch(
-                "crate.db.repositories.user_library.record_play_event"
-            ) as mock_record,
+                "crate.subsonic.services.playback.get_track_full",
+                return_value=_FAKE_TRACK,
+            ),
+            patch("crate.subsonic.services.playback.record_play_event") as mock_record,
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=1&submission=false"
@@ -1448,12 +1452,15 @@ class TestSubsonicScrobble:
     def test_scrobble_submission_post(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_track_full", return_value=_FAKE_TRACK),
+            patch(
+                "crate.subsonic.services.playback.get_track_full",
+                return_value=_FAKE_TRACK,
+            ),
             patch(
                 "crate.playback_provenance.resolve_local_content_provenance",
                 return_value=("local", None),
             ),
-            patch("crate.db.repositories.user_library.record_play_event"),
+            patch("crate.subsonic.services.playback.record_play_event"),
         ):
             resp = test_app.post(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=1&submission=true"
@@ -1469,10 +1476,8 @@ class TestSubsonicScrobble:
         """When track doesn't exist, scrobble still returns ok (no crash)."""
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.legacy.get_track_full", return_value=None),
-            patch(
-                "crate.db.repositories.user_library.record_play_event"
-            ) as mock_record,
+            patch("crate.subsonic.services.playback.get_track_full", return_value=None),
+            patch("crate.subsonic.services.playback.record_play_event") as mock_record,
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=999&submission=true"
