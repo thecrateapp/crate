@@ -21,7 +21,7 @@ TRACK_UID = "33333333-3333-4333-8333-333333333333"
 
 
 def _auth():
-    return patch("crate.api.subsonic._subsonic_auth", return_value=USER)
+    return patch("crate.api.subsonic.legacy._subsonic_auth", return_value=USER)
 
 
 def test_global_stream_is_proxied_without_exposing_ticket_or_redirect(test_app):
@@ -106,7 +106,7 @@ def test_global_scrobble_records_global_identity_and_actual_source(test_app):
     }
     with (
         _auth(),
-        patch("crate.api.subsonic.get_global_track", return_value=track),
+        patch("crate.api.subsonic.legacy.get_global_track", return_value=track),
         patch(
             "crate.federation.playback_service.get_remembered_source",
             return_value={

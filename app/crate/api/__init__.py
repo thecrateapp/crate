@@ -471,7 +471,7 @@ def create_app() -> FastAPI:
     from crate.api.cache_events import router as cache_events_router
     from crate.api.social import router as social_router
     from crate.api.jam import router as jam_router
-    from crate.api.subsonic import router as subsonic_router
+    from crate.api.subsonic import create_subsonic_router
     from crate.api.paths import router as paths_router
     from crate.api.admin_ops import router as admin_ops_router
     from crate.api.playback_admin import router as playback_admin_router
@@ -523,7 +523,7 @@ def create_app() -> FastAPI:
     app.include_router(scanner_router)
     app.include_router(matcher_router)
     app.include_router(duplicates_router)
-    app.include_router(subsonic_router)
+    app.include_router(create_subsonic_router())
     app.include_router(federation_router)
     app.include_router(internal_federation_router)
     app.include_router(federation_remote_router)

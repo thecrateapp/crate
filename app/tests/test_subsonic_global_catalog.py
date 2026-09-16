@@ -20,7 +20,7 @@ TRACK_UID = "33333333-3333-4333-8333-333333333333"
 
 
 def _auth():
-    return patch("crate.api.subsonic._subsonic_auth", return_value=USER)
+    return patch("crate.api.subsonic.legacy._subsonic_auth", return_value=USER)
 
 
 def _track() -> dict:
@@ -45,7 +45,7 @@ def test_global_browse_uses_typed_canonical_ids(test_app):
     with (
         _auth(),
         patch(
-            "crate.api.subsonic.list_global_artists",
+            "crate.api.subsonic.legacy.list_global_artists",
             return_value=[
                 {
                     "global_artist_uid": ARTIST_UID,
@@ -79,8 +79,11 @@ def test_global_album_detail_contains_global_song_ids(test_app):
     }
     with (
         _auth(),
-        patch("crate.api.subsonic.get_global_album", return_value=album),
-        patch("crate.api.subsonic.list_global_album_tracks", return_value=[_track()]),
+        patch("crate.api.subsonic.legacy.get_global_album", return_value=album),
+        patch(
+            "crate.api.subsonic.legacy.list_global_album_tracks",
+            return_value=[_track()],
+        ),
     ):
         response = test_app.get(
             f"/rest/getAlbum?u=listener&p=secret&id=gal-{ALBUM_UID}"
@@ -96,7 +99,7 @@ def test_global_search_applies_server_side_caps(test_app):
     with (
         _auth(),
         patch(
-            "crate.api.subsonic.search_global_catalog",
+            "crate.api.subsonic.legacy.search_global_catalog",
             return_value={"artists": [], "albums": [], "tracks": []},
         ) as search,
     ):
@@ -128,7 +131,7 @@ def test_legacy_local_track_id_remains_accepted(test_app):
         "path": "High Vis/Blending/02.flac",
         "has_cover": True,
     }
-    with _auth(), patch("crate.api.subsonic.get_track_full", return_value=local):
+    with _auth(), patch("crate.api.subsonic.legacy.get_track_full", return_value=local):
         response = test_app.get("/rest/getSong?u=listener&p=secret&id=9")
 
     assert response.json()["subsonic-response"]["song"]["id"] == "9"
@@ -151,7 +154,8 @@ def test_starred_tracks_are_read_from_global_likes(test_app):
     with (
         _auth(),
         patch(
-            "crate.api.subsonic.get_starred_global_tracks", return_value=[starred]
+            "crate.api.subsonic.legacy.get_starred_global_tracks",
+            return_value=[starred],
         ) as query,
     ):
         response = test_app.get("/rest/getStarred2?u=listener&p=secret")
