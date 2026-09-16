@@ -3,7 +3,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -238,8 +238,10 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    from crate.observability.access_log import install_open_subsonic_access_log_filter
     from crate.observability import init_sentry
 
+    install_open_subsonic_access_log_filter()
     init_sentry("api")
     app = FastAPI(
         title="Crate",
@@ -248,6 +250,19 @@ def create_app() -> FastAPI:
         default_response_class=DateAwareJSONResponse,
     )
     app.openapi = lambda: custom_openapi(app)
+
+    from crate.subsonic.errors import OpenSubsonicError
+    from crate.subsonic.protocol import render_response
+
+    @app.exception_handler(OpenSubsonicError)
+    async def subsonic_error_handler(request: Request, error: OpenSubsonicError):
+        from crate.subsonic.capabilities import selected_engine
+
+        default_format = "json" if selected_engine() == "legacy" else "xml"
+        response_format = request.query_params.get("f", default_format)
+        if response_format not in {"json", "xml"}:
+            response_format = "xml"
+        return render_response(error=error, response_format=response_format)
 
     @app.middleware("http")
     async def security_headers_middleware(request, call_next):

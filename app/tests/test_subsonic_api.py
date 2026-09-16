@@ -97,22 +97,18 @@ _SUBSONIC_BASE = "/rest"
 @contextmanager
 def _subsonic_auth_ok():
     """Mock subsonic auth functions to authenticate successfully."""
-    with (
-        patch("crate.api.subsonic.legacy.get_user_by_email", return_value=_FAKE_USER),
-        patch(
-            "crate.api.subsonic.legacy.get_user_by_username", return_value=_FAKE_USER
-        ),
-        patch("crate.api.subsonic.legacy.verify_password", return_value=True),
-    ):
+    with patch("crate.subsonic.auth.authenticate", return_value=_FAKE_USER):
         yield
 
 
 @contextmanager
 def _subsonic_auth_fail():
     """Mock subsonic auth functions so authentication fails."""
-    with (
-        patch("crate.api.subsonic.legacy.get_user_by_email", return_value=None),
-        patch("crate.api.subsonic.legacy.get_user_by_username", return_value=None),
+    from crate.subsonic.errors import ErrorCode, OpenSubsonicError
+
+    with patch(
+        "crate.subsonic.auth.authenticate",
+        side_effect=OpenSubsonicError(ErrorCode.INVALID_CREDENTIALS, "invalid"),
     ):
         yield
 
@@ -202,43 +198,51 @@ class TestSubsonicSystem:
 
 
 class TestSubsonicRealAuth:
-    """Auth compatibility without mocking password verification."""
+    """OpenSubsonic auth uses its dedicated credential, not Crate login."""
 
     @contextmanager
-    def _user(self, user):
+    def _credential(self, user):
         with (
-            patch("crate.api.subsonic.legacy.get_user_by_email", return_value=user),
-            patch("crate.api.subsonic.legacy.get_user_by_username", return_value=user),
+            patch(
+                "crate.subsonic.auth.get_user_subsonic_credential_by_identity",
+                return_value=user,
+            ),
+            patch(
+                "crate.subsonic.auth.load_secret",
+                return_value={"secret": "dedicated-secret"},
+            ),
         ):
             yield
 
-    def test_ping_view_accepts_plain_password_with_real_hash(self, test_app):
-        from crate.auth import hash_password
-
+    def test_ping_view_accepts_dedicated_plain_password(self, test_app):
         user = {
             **_FAKE_USER,
-            "password_hash": hash_password("crate-secret"),
+            "status": "active",
+            "deleted_at": None,
+            "suspended_at": None,
+            "secret_ref": "opensubsonic:opaque-ref",
             "subsonic_token": None,
         }
-        with self._user(user):
+        with self._credential(user):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/ping.view",
-                params={"u": "admin", "p": "crate-secret"},
+                params={"u": "admin", "p": "dedicated-secret"},
             )
 
         assert resp.status_code == 200
         _subsonic_ok_response(resp)
 
-    def test_ping_view_accepts_hex_encoded_password_with_real_hash(self, test_app):
-        from crate.auth import hash_password
-
+    def test_ping_view_accepts_hex_encoded_dedicated_password(self, test_app):
         user = {
             **_FAKE_USER,
-            "password_hash": hash_password("crate-secret"),
+            "status": "active",
+            "deleted_at": None,
+            "suspended_at": None,
+            "secret_ref": "opensubsonic:opaque-ref",
             "subsonic_token": None,
         }
-        encoded = "enc:" + "crate-secret".encode().hex()
-        with self._user(user):
+        encoded = "enc:" + "dedicated-secret".encode().hex()
+        with self._credential(user):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/ping.view",
                 params={"u": "admin", "p": encoded},
@@ -247,18 +251,19 @@ class TestSubsonicRealAuth:
         assert resp.status_code == 200
         _subsonic_ok_response(resp)
 
-    def test_ping_view_rejects_wrong_password_with_subsonic_error(self, test_app):
-        from crate.auth import hash_password
-
+    def test_ping_view_rejects_main_crate_password(self, test_app):
         user = {
             **_FAKE_USER,
-            "password_hash": hash_password("crate-secret"),
+            "status": "active",
+            "deleted_at": None,
+            "suspended_at": None,
+            "secret_ref": "opensubsonic:opaque-ref",
             "subsonic_token": None,
         }
-        with self._user(user):
+        with self._credential(user):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/ping.view",
-                params={"u": "admin", "p": "wrong"},
+                params={"u": "admin", "p": "crate-login-password"},
             )
 
         assert resp.status_code == 200
@@ -267,14 +272,17 @@ class TestSubsonicRealAuth:
     def test_ping_view_accepts_token_auth_for_sso_only_user(self, test_app):
         salt = "substreamer-salt"
         subsonic_token = "generated-subsonic-token"
-        token = hashlib.md5((subsonic_token + salt).encode()).hexdigest()
+        token = hashlib.md5(("dedicated-secret" + salt).encode()).hexdigest()
         user = {
             **_FAKE_USER,
-            "password_hash": None,
+            "status": "active",
+            "deleted_at": None,
+            "suspended_at": None,
+            "secret_ref": "opensubsonic:opaque-ref",
             "subsonic_token": subsonic_token,
         }
 
-        with self._user(user):
+        with self._credential(user):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/ping.view",
                 params={"u": "admin", "t": token, "s": salt},
@@ -283,26 +291,43 @@ class TestSubsonicRealAuth:
         assert resp.status_code == 200
         _subsonic_ok_response(resp)
 
-    def test_missing_credentials_returns_subsonic_auth_error(self, test_app):
+    def test_missing_credentials_returns_unsupported_mechanism_error(self, test_app):
         resp = test_app.get(f"{_SUBSONIC_BASE}/ping.view")
 
         assert resp.status_code == 200
-        _subsonic_error_response(resp, code=40)
+        _subsonic_error_response(resp, code=42)
+
+    def test_invalid_api_key_preserves_standard_error_code_on_catalog_routes(
+        self, test_app
+    ):
+        from crate.subsonic.errors import ErrorCode, OpenSubsonicError
+
+        with patch(
+            "crate.subsonic.auth.authenticate",
+            side_effect=OpenSubsonicError(ErrorCode.INVALID_API_KEY, "Invalid API key"),
+        ):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getArtists", params={"apiKey": "invalid"}
+            )
+
+        assert resp.status_code == 200
+        _subsonic_error_response(resp, code=44)
 
     def test_get_license_ignores_unsupported_format_without_breaking_auth(
         self, test_app
     ):
-        from crate.auth import hash_password
-
         user = {
             **_FAKE_USER,
-            "password_hash": hash_password("crate-secret"),
+            "status": "active",
+            "deleted_at": None,
+            "suspended_at": None,
+            "secret_ref": "opensubsonic:opaque-ref",
             "subsonic_token": None,
         }
-        with self._user(user):
+        with self._credential(user):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/getLicense.view",
-                params={"u": "admin", "p": "crate-secret", "f": "xml"},
+                params={"u": "admin", "p": "dedicated-secret", "f": "json"},
             )
 
         assert resp.status_code == 200

@@ -7,17 +7,15 @@ Spec: http://www.subsonic.org/pages/api.jsp
 """
 
 import hashlib
-import hmac
 import logging
+from collections import defaultdict
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 
-from crate.db.repositories.auth import get_user_by_email
 from crate.db.queries.subsonic import (
-    get_user_by_username,
     get_artist_by_id,
     get_albums_by_artist_name,
     get_album_with_artist,
@@ -44,7 +42,6 @@ from crate.subsonic.global_ids import (
     decode_subsonic_id,
     global_subsonic_id,
 )
-from crate.auth import verify_password
 from crate.api._deps import library_path
 from crate.api.schemas.subsonic import (
     SubsonicAlbumList2Response,
@@ -101,49 +98,20 @@ router = APIRouter(
 
 
 def _subsonic_auth(request: Request) -> dict | None:
-    """Authenticate via Subsonic token auth (md5(password + salt)) or plain password."""
-    params = request.query_params
-    username = params.get("u", "")
-    token = params.get("t", "")
-    salt = params.get("s", "")
-    password = params.get("p", "")
+    """Authenticate using the dedicated OpenSubsonic credential mechanisms."""
+    from crate.subsonic.auth import authenticate
+    from crate.subsonic.errors import OpenSubsonicError
+    from crate.subsonic.params import RequestParameters
 
-    if not username:
-        return None
-
-    user = get_user_by_email(username)
-    if not user:
-        # Try username field too
-        user = get_user_by_username(username)
-
-    if not user:
-        return None
-
-    if token and salt:
-        # Token auth: client sends md5(password + salt)
-        # We need to check against stored password — but we only have bcrypt hash.
-        # Subsonic token auth is incompatible with bcrypt. Fall back to checking
-        # if the user has a plain-text compatible token stored, or reject.
-        # For now: store a subsonic_token on the user for compatibility.
-        stored_token = user.get("subsonic_token")
-        if stored_token:
-            expected = hashlib.md5((stored_token + salt).encode()).hexdigest()
-            if hmac.compare_digest(token, expected):
-                return user
-        return None
-    elif password:
-        # Plain password (deprecated but simpler)
-        pw = password
-        if pw.startswith("enc:"):
-            try:
-                pw = bytes.fromhex(pw[4:]).decode("utf-8")
-            except (ValueError, UnicodeDecodeError):
-                return None
-        password_hash = user.get("password_hash")
-        if password_hash and verify_password(pw, password_hash):
-            return user
-
-    return None
+    grouped: defaultdict[str, list[str]] = defaultdict(list)
+    for name, value in request.query_params.multi_items():
+        grouped[name].append(value)
+    try:
+        return authenticate(
+            RequestParameters({name: tuple(values) for name, values in grouped.items()})
+        )
+    except OpenSubsonicError as error:
+        raise SubsonicAuthError(error.code, error.message) from error
 
 
 def _subsonic_response(data: dict, status: str = "ok") -> JSONResponse:
@@ -175,7 +143,14 @@ def _require_subsonic_auth(request: Request) -> dict:
 
 
 class SubsonicAuthError(Exception):
-    pass
+    def __init__(self, code: int = 40, message: str = "Wrong username or password"):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def _subsonic_auth_error_response(error: SubsonicAuthError) -> JSONResponse:
+    return _subsonic_error(error.code, error.message)
 
 
 def _decode_entity_id(value: str, kind: EntityKind) -> SubsonicEntityId | None:
@@ -239,8 +214,8 @@ def _global_song_payload(track: dict) -> dict:
 def ping(request: Request):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
     return _subsonic_response({})
 
 
@@ -253,8 +228,8 @@ def ping(request: Request):
 def get_license(request: Request):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
     return _subsonic_response(
         {
             "license": {
@@ -275,8 +250,8 @@ def get_license(request: Request):
 def get_music_folders(request: Request):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
     return _subsonic_response(
         {"musicFolders": {"musicFolder": [{"id": 1, "name": "Music"}]}}
     )
@@ -291,8 +266,8 @@ def get_music_folders(request: Request):
 def get_user(request: Request, username: str = Query("")):
     try:
         user = _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
     return _subsonic_response(
         {
             "user": {
@@ -327,8 +302,8 @@ def get_user(request: Request, username: str = Query("")):
 def get_artists(request: Request):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     rows = list_global_artists()
 
@@ -365,8 +340,8 @@ def get_artists(request: Request):
 def get_artist(request: Request, id: str = Query("")):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     entity_id = _decode_entity_id(id, "artist")
     if entity_id is None:
@@ -428,8 +403,8 @@ def get_artist(request: Request, id: str = Query("")):
 def get_album(request: Request, id: str = Query("")):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     entity_id = _decode_entity_id(id, "album")
     if entity_id is None:
@@ -504,8 +479,8 @@ def get_album(request: Request, id: str = Query("")):
 def get_song(request: Request, id: str = Query("")):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     entity_id = _decode_entity_id(id, "track")
     if entity_id is None:
@@ -564,8 +539,8 @@ def get_album_list2(
 ):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     albums = list_global_albums(type, size=size, offset=offset)
 
@@ -596,8 +571,8 @@ def search3(
 ):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     matches = search_global_catalog(
         query,
@@ -650,8 +625,8 @@ def search3(
 def stream(request: Request, id: str = Query("")):
     try:
         user = _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     entity_id = _decode_entity_id(id, "track")
     if entity_id is None:
@@ -718,8 +693,8 @@ def stream(request: Request, id: str = Query("")):
 def get_cover_art(request: Request, id: str = Query("")):
     try:
         user = _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     entity_type: EntityKind
     if id.startswith(("al-", "gal-")):
@@ -776,8 +751,8 @@ def scrobble(
 ):
     try:
         user = _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     if submission != "true":
         return _subsonic_response({})
@@ -873,8 +848,8 @@ def scrobble(
 def get_playlists(request: Request):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
     return _subsonic_response({"playlists": {"playlist": []}})
 
 
@@ -887,8 +862,8 @@ def get_playlists(request: Request):
 def get_starred2(request: Request):
     try:
         user = _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
     return _subsonic_response(
         {
             "starred2": {
@@ -912,8 +887,8 @@ def get_starred2(request: Request):
 def get_random_songs(request: Request, size: int = Query(10, ge=1, le=500)):
     try:
         _require_subsonic_auth(request)
-    except SubsonicAuthError:
-        return _subsonic_error(40, "Wrong username or password")
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
 
     tracks = get_random_global_tracks(size)
 

@@ -91,7 +91,8 @@ from crate.api.schemas.auth import (
     RefreshTokenRequest,
     OAuthStartResponse,
     RevokeSessionsResponse,
-    SubsonicTokenResponse,
+    SubsonicCredentialCreatedResponse,
+    SubsonicCredentialStatusResponse,
 )
 from crate.api.schemas.common import ApiErrorResponse, OkResponse, TaskEnqueueResponse
 from crate.api.schemas.genres import (
@@ -645,7 +646,8 @@ __all__ = [
     "StackContainerLogsResponse",
     "StackContainerResponse",
     "StackStatusResponse",
-    "SubsonicTokenResponse",
+    "SubsonicCredentialCreatedResponse",
+    "SubsonicCredentialStatusResponse",
     "SubsonicAlbum",
     "SubsonicAlbumDetail",
     "SubsonicAlbumList2",

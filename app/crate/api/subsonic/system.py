@@ -8,8 +8,6 @@ from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.params import RequestParameters, collect_parameters
 from crate.subsonic.protocol import API_VERSION, render_response
 
-from . import legacy
-
 router = APIRouter(prefix="/rest", tags=["subsonic"])
 
 
@@ -46,23 +44,23 @@ async def _handle_system_request(
     response_format = _response_format(params)
     try:
         _validate_common_parameters(params)
-        if requires_auth and not legacy._subsonic_auth(request):
-            raise OpenSubsonicError(
-                ErrorCode.INVALID_CREDENTIALS, "Wrong username or password"
-            )
+        if requires_auth:
+            from crate.subsonic.auth import authenticate
+
+            authenticate(params)
     except OpenSubsonicError as error:
         return render_response(error=error, response_format=response_format)
     return render_response(payload, response_format=response_format)
 
 
-@router.get("/ping")
-@router.get("/ping.view", include_in_schema=False)
+@router.api_route("/ping", methods=["GET", "POST"])
+@router.api_route("/ping.view", methods=["GET", "POST"], include_in_schema=False)
 async def ping(request: Request) -> Response:
     return await _handle_system_request(request, payload={}, requires_auth=True)
 
 
-@router.get("/getLicense")
-@router.get("/getLicense.view", include_in_schema=False)
+@router.api_route("/getLicense", methods=["GET", "POST"])
+@router.api_route("/getLicense.view", methods=["GET", "POST"], include_in_schema=False)
 async def get_license(request: Request) -> Response:
     return await _handle_system_request(
         request,
@@ -77,8 +75,10 @@ async def get_license(request: Request) -> Response:
     )
 
 
-@router.get("/getOpenSubsonicExtensions")
-@router.get("/getOpenSubsonicExtensions.view", include_in_schema=False)
+@router.api_route("/getOpenSubsonicExtensions", methods=["GET", "POST"])
+@router.api_route(
+    "/getOpenSubsonicExtensions.view", methods=["GET", "POST"], include_in_schema=False
+)
 async def get_open_subsonic_extensions(request: Request) -> Response:
     return await _handle_system_request(
         request,

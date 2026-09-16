@@ -82,7 +82,7 @@ def test_v1_system_routes_support_view_aliases_and_public_extensions() -> None:
     client = TestClient(app)
     query = {"u": "diego", "v": "1.16.1", "c": "contract-test", "f": "json"}
 
-    with patch("crate.api.subsonic.legacy._subsonic_auth", return_value={"id": 1}):
+    with patch("crate.subsonic.auth.authenticate", return_value={"id": 1}):
         ping = client.get("/rest/ping", params=query)
         ping_view = client.get("/rest/ping.view", params=query)
         license_response = client.get("/rest/getLicense", params=query)
@@ -128,6 +128,40 @@ def test_v1_missing_common_parameter_returns_protocol_error_not_fastapi_422() ->
     assert response.status_code == 200
     assert response.json()["subsonic-response"]["status"] == "failed"
     assert response.json()["subsonic-response"]["error"]["code"] == 10
+
+
+def test_v1_missing_authentication_returns_auth_mechanism_error() -> None:
+    app = FastAPI()
+    app.include_router(create_subsonic_router("v1"))
+
+    response = TestClient(app).get(
+        "/rest/ping", params={"v": "1.16.1", "c": "contract-test", "f": "json"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["subsonic-response"]["error"]["code"] == 42
+
+
+def test_v1_ping_accepts_posted_form_credentials() -> None:
+    app = FastAPI()
+    app.include_router(create_subsonic_router("v1"))
+    form = {
+        "v": "1.16.1",
+        "c": "contract-test",
+        "u": "listener",
+        "p": "dedicated-secret",
+        "f": "json",
+    }
+
+    with patch("crate.subsonic.auth.authenticate") as authenticate:
+        authenticate.return_value = {"id": 1}
+        response = TestClient(app).post("/rest/ping", data=form)
+
+    assert response.status_code == 200
+    assert response.json()["subsonic-response"]["status"] == "ok"
+    params = authenticate.call_args.args[0]
+    assert params.first("u") == "listener"
+    assert params.first("p") == "dedicated-secret"
 
 
 def test_legacy_engine_retains_existing_system_routes() -> None:

@@ -32,7 +32,11 @@ async def collect_parameters(request: Request) -> RequestParameters:
         and content_type == "application/x-www-form-urlencoded"
     ):
         form = await request.form()
-        items.extend(form.multi_items())
+        items.extend(
+            (name, value)
+            for name, value in form.multi_items()
+            if isinstance(value, str)
+        )
 
     grouped: defaultdict[str, list[str]] = defaultdict(list)
     for name, value in items:

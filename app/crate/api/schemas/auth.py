@@ -207,8 +207,14 @@ class RevokeSessionsResponse(OkResponse):
     revoked: int
 
 
-class SubsonicTokenResponse(BaseModel):
-    subsonic_token: str | None = None
+class SubsonicCredentialCreatedResponse(BaseModel):
+    api_key: str = Field(
+        description="New API key; returned only on creation or rotation"
+    )
+
+
+class SubsonicCredentialStatusResponse(BaseModel):
+    configured: bool
 
 
 class OAuthStartResponse(BaseModel):

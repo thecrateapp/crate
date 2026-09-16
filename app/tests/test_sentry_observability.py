@@ -86,6 +86,110 @@ def test_sentry_scrubber_redacts_credentials_and_sensitive_query_values():
     assert event["request"]["headers"]["Authorization"] == "Bearer secret"
 
 
+def test_sentry_scrubber_redacts_opensubsonic_query_and_form_credentials():
+    from crate.observability.sentry import scrub_sentry_event
+
+    event = {
+        "request": {
+            "url": (
+                "https://api.example.test/rest/ping?u=listener&p=plain"
+                "&T=challenge&S=salt&APIKEY=secret&c=feishin"
+            ),
+            "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+            "data": "u=listener&p=plain&T=challenge&S=salt&APIKEY=secret&f=json",
+        }
+    }
+
+    scrubbed = scrub_sentry_event(event)
+
+    assert scrubbed["request"]["url"] == (
+        "https://api.example.test/rest/ping?u=listener&p=[Filtered]"
+        "&T=[Filtered]&S=[Filtered]&APIKEY=[Filtered]&c=feishin"
+    )
+    assert scrubbed["request"]["data"] == (
+        "u=listener&p=[Filtered]&T=[Filtered]&S=[Filtered]&APIKEY=[Filtered]&f=json"
+    )
+
+
+def test_sentry_scrubber_drops_multipart_form_body():
+    from crate.observability.sentry import scrub_sentry_event
+
+    scrubbed = scrub_sentry_event(
+        {
+            "request": {
+                "headers": {"content-type": "multipart/form-data; boundary=abc"},
+                "data": '--abc\r\nname="p"\r\n\r\nsecret\r\n--abc--',
+            }
+        }
+    )
+
+    assert scrubbed["request"]["data"] == "[Filtered]"
+
+
+def test_sentry_scrubber_detects_urlencoded_credentials_without_content_type():
+    from crate.observability.sentry import scrub_sentry_event
+
+    scrubbed = scrub_sentry_event(
+        {"request": {"data": "u=listener&p=plain&apiKey=secret"}}
+    )
+
+    assert scrubbed["request"]["data"] == ("u=listener&p=[Filtered]&apiKey=[Filtered]")
+
+
+def test_sentry_scrubber_redacts_embedded_subsonic_urls_in_breadcrumbs_and_exceptions():
+    from crate.observability.sentry import scrub_sentry_event
+
+    scrubbed = scrub_sentry_event(
+        {
+            "breadcrumbs": {
+                "values": [
+                    {
+                        "message": (
+                            "Request failed: https://api.example.test/rest/ping"
+                            "?u=listener&p=plain&apiKey=secret"
+                        )
+                    }
+                ]
+            },
+            "exception": {
+                "values": [
+                    {
+                        "value": (
+                            "GET /rest/ping?u=listener&T=challenge&S=salt returned 500"
+                        )
+                    }
+                ]
+            },
+        }
+    )
+
+    breadcrumb = scrubbed["breadcrumbs"]["values"][0]["message"]
+    exception = scrubbed["exception"]["values"][0]["value"]
+    assert "p=[Filtered]" in breadcrumb
+    assert "apiKey=[Filtered]" in breadcrumb
+    assert "plain" not in breadcrumb
+    assert "T=[Filtered]" in exception
+    assert "S=[Filtered]" in exception
+    assert "challenge" not in exception
+    assert "salt" not in exception
+
+
+def test_sentry_scrubber_preserves_short_non_subsonic_query_parameters():
+    from crate.observability.sentry import scrub_sentry_event
+
+    scrubbed = scrub_sentry_event(
+        {
+            "request": {
+                "url": "https://api.example.test/api/catalog?p=2&s=similarity&t=recent"
+            }
+        }
+    )
+
+    assert scrubbed["request"]["url"] == (
+        "https://api.example.test/api/catalog?p=2&s=similarity&t=recent"
+    )
+
+
 def test_init_sentry_configures_sdk_once(monkeypatch):
     from crate.observability import sentry
 

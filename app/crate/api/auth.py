@@ -56,7 +56,8 @@ from crate.api.schemas.auth import (
     RefreshTokenRequest,
     RegisterRequest,
     RevokeSessionsResponse,
-    SubsonicTokenResponse,
+    SubsonicCredentialCreatedResponse,
+    SubsonicCredentialStatusResponse,
     UpdateProfileRequest,
     UpdateUserRoleRequest,
     UpdateUserStatusRequest,
@@ -2038,42 +2039,45 @@ def change_password(request: Request, body: ChangePasswordRequest):
 
 @router.post(
     "/subsonic-token",
-    response_model=SubsonicTokenResponse,
+    response_model=SubsonicCredentialCreatedResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Generate or rotate the Subsonic token",
+    summary="Create or rotate an OpenSubsonic API key",
 )
 def generate_subsonic_token(request: Request):
-    """Generate or regenerate a Subsonic API token for the current user."""
+    """Generate or rotate a one-time-display OpenSubsonic API key."""
+    from crate.subsonic.auth import create_user_credential
+
     user = _require_auth(request)
-    token = secrets.token_hex(16)
-    update_user(user["id"], subsonic_token=token)
-    return {"subsonic_token": token}
+    return {"api_key": create_user_credential(user["id"])}
 
 
 @router.delete(
     "/subsonic-token",
     response_model=OkResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Delete the Subsonic token",
+    summary="Revoke the OpenSubsonic API key",
 )
 def delete_subsonic_token(request: Request):
-    """Remove the Subsonic API token for the current user."""
+    """Revoke the current user's OpenSubsonic API key."""
+    from crate.subsonic.auth import revoke_user_credential
+
     user = _require_auth(request)
-    update_user(user["id"], subsonic_token=None)
+    revoke_user_credential(user["id"])
     return {"ok": True}
 
 
 @router.get(
     "/subsonic-token",
-    response_model=SubsonicTokenResponse,
+    response_model=SubsonicCredentialStatusResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Get the current Subsonic token",
+    summary="Read OpenSubsonic API key status",
 )
 def get_subsonic_token(request: Request):
-    """Get the current Subsonic API token (if set)."""
+    """Report whether an OpenSubsonic key exists without revealing it."""
+    from crate.subsonic.auth import has_user_credential
+
     user = _require_auth(request)
-    db_user = get_user_by_id(user["id"])
-    return {"subsonic_token": db_user.get("subsonic_token") if db_user else None}
+    return {"configured": has_user_credential(user["id"])}
 
 
 @router.post(
