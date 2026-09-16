@@ -127,9 +127,17 @@ def test_v1_system_routes_support_view_aliases_and_public_extensions() -> None:
     assert ping.status_code == ping_view.status_code == 200
     assert ping.json() == ping_view.json()
     assert license_response.json()["subsonic-response"]["license"]["valid"] is True
-    assert extensions.json()["subsonic-response"]["openSubsonicExtensions"] == []
+    assert extensions.json()["subsonic-response"]["openSubsonicExtensions"] == [
+        {"name": "indexBasedQueue", "versions": [1]}
+    ]
     assert extensions.json()["subsonic-response"]["openSubsonic"] is True
     assert "/rest/getMusicFolders" in {route.path for route in router.routes}
+    assert {
+        "/rest/getPlayQueue",
+        "/rest/getPlayQueueByIndex",
+        "/rest/savePlayQueue",
+        "/rest/savePlayQueueByIndex",
+    }.issubset({route.path for route in router.routes})
     assert sum(route.path == "/rest/ping" for route in router.routes) == 1
 
 

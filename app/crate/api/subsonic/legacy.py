@@ -33,6 +33,7 @@ from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.services import catalog
 from crate.subsonic.services import preferences
 from crate.subsonic.services import playback as playback_service
+from crate.subsonic.services import queues as queue_service
 from crate.subsonic.services import playlists as playlist_service
 from crate.subsonic.services.artwork import serve_playlist_cover
 from crate.subsonic.serializers import serialize_album, serialize_song
@@ -1023,6 +1024,73 @@ async def get_now_playing(request: Request):
     return _subsonic_response(
         {"nowPlaying": {"entry": playback_service.get_now_playing_entries()}}
     )
+
+
+@router.get("/getPlayQueue", summary="Return the authenticated user's play queue")
+@router.get("/getPlayQueue.view", include_in_schema=False)
+async def get_play_queue(request: Request):
+    from crate.subsonic.params import collect_parameters
+
+    params = await collect_parameters(request)
+    try:
+        user = _require_subsonic_auth_params(params)
+        queue = queue_service.get_play_queue(user, by_index=False)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    return _subsonic_response({"playQueue": queue})
+
+
+@router.get(
+    "/getPlayQueueByIndex",
+    summary="Return the authenticated user's play queue by index",
+)
+@router.get("/getPlayQueueByIndex.view", include_in_schema=False)
+async def get_play_queue_by_index(request: Request):
+    from crate.subsonic.params import collect_parameters
+
+    params = await collect_parameters(request)
+    try:
+        user = _require_subsonic_auth_params(params)
+        queue = queue_service.get_play_queue(user, by_index=True)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    return _subsonic_response({"playQueue": queue})
+
+
+@router.get("/savePlayQueue", response_model=SubsonicOkResponse)
+@router.get("/savePlayQueue.view", include_in_schema=False)
+async def save_play_queue(request: Request):
+    from crate.subsonic.params import collect_parameters
+
+    params = await collect_parameters(request)
+    try:
+        user = _require_subsonic_auth_params(params)
+        queue_service.save_play_queue(params, user, by_index=False)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    return _subsonic_response({})
+
+
+@router.get("/savePlayQueueByIndex", response_model=SubsonicOkResponse)
+@router.get("/savePlayQueueByIndex.view", include_in_schema=False)
+async def save_play_queue_by_index(request: Request):
+    from crate.subsonic.params import collect_parameters
+
+    params = await collect_parameters(request)
+    try:
+        user = _require_subsonic_auth_params(params)
+        queue_service.save_play_queue(params, user, by_index=True)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+    except OpenSubsonicError as error:
+        return _subsonic_error(error.code, error.message)
+    return _subsonic_response({})
 
 
 # ── Playlists ───────────────────────────────────────────────────

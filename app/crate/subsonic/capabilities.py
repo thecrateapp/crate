@@ -6,7 +6,9 @@ from typing import Literal
 OpenSubsonicEngine = Literal["legacy", "v1"]
 
 # Extensions are added only when their complete behavior is implemented.
-OPEN_SUBSONIC_EXTENSIONS: tuple[dict[str, object], ...] = ()
+OPEN_SUBSONIC_EXTENSIONS: tuple[dict[str, object], ...] = (
+    {"name": "indexBasedQueue", "versions": [1]},
+)
 
 
 def selected_engine(value: str | None = None) -> OpenSubsonicEngine:
