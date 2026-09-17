@@ -1702,60 +1702,58 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         )
         artist_id = int(artist_row["id"])
         created_publications: list[ArtistHeroArtifactIdentity] = []
-        with (
-            artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
-            _artist_hero_activation_guard(artist_id, created_publications),
-        ):
-            render_manifest = _publish_artist_hero_manifest(
-                artist_row=artist_row,
-                revision=revision,
-                rendered=rendered_compositions,
-                raw_sources=raw_sources,
-                recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
-                existing=existing,
-                enabled=tuple(
-                    composition
-                    for composition, is_enabled in (
-                        ("desktop", desktop_enabled),
-                        ("mobile", mobile_enabled),
-                    )
-                    if is_enabled
-                ),
-                created_publications=created_publications,
-            )
-            if render_manifest is None and isinstance(
-                existing.get("render_manifest"), Mapping
-            ):
-                return {
-                    "status": "conflict",
-                    "reason": "artist-hero-manifest-incomplete",
-                    "artist_id": artist_id,
-                }
-            applied = upsert_artist_hero_artwork(
-                artist_id=artist_id,
-                provenance="manual",
-                review_status="approved",
-                source_width=legacy_width,
-                source_height=legacy_height,
-                desktop_recipe=desktop_recipe,
-                mobile_recipe=mobile_recipe,
-                revision=revision,
-                desktop_source_width=desktop_width,
-                desktop_source_height=desktop_height,
-                desktop_source_origin=desktop_origin,
-                mobile_source_width=mobile_width,
-                mobile_source_height=mobile_height,
-                mobile_source_origin=mobile_origin,
-                desktop_enabled=desktop_enabled,
-                mobile_enabled=mobile_enabled,
-                render_manifest=render_manifest,
-                expected_revision=existing.get("revision"),
-                expected_manifest=existing.get("render_manifest"),
-            )
-            if applied is False:
-                _rollback_unactivated_artist_hero_publications(
-                    artist_id, created_publications
+        with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+            with _artist_hero_activation_guard(artist_id, created_publications):
+                render_manifest = _publish_artist_hero_manifest(
+                    artist_row=artist_row,
+                    revision=revision,
+                    rendered=rendered_compositions,
+                    raw_sources=raw_sources,
+                    recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
+                    existing=existing,
+                    enabled=tuple(
+                        composition
+                        for composition, is_enabled in (
+                            ("desktop", desktop_enabled),
+                            ("mobile", mobile_enabled),
+                        )
+                        if is_enabled
+                    ),
+                    created_publications=created_publications,
                 )
+                if render_manifest is None and isinstance(
+                    existing.get("render_manifest"), Mapping
+                ):
+                    return {
+                        "status": "conflict",
+                        "reason": "artist-hero-manifest-incomplete",
+                        "artist_id": artist_id,
+                    }
+                applied = upsert_artist_hero_artwork(
+                    artist_id=artist_id,
+                    provenance="manual",
+                    review_status="approved",
+                    source_width=legacy_width,
+                    source_height=legacy_height,
+                    desktop_recipe=desktop_recipe,
+                    mobile_recipe=mobile_recipe,
+                    revision=revision,
+                    desktop_source_width=desktop_width,
+                    desktop_source_height=desktop_height,
+                    desktop_source_origin=desktop_origin,
+                    mobile_source_width=mobile_width,
+                    mobile_source_height=mobile_height,
+                    mobile_source_origin=mobile_origin,
+                    desktop_enabled=desktop_enabled,
+                    mobile_enabled=mobile_enabled,
+                    render_manifest=render_manifest,
+                    expected_revision=existing.get("revision"),
+                    expected_manifest=existing.get("render_manifest"),
+                )
+                if applied is False:
+                    _rollback_unactivated_artist_hero_publications(
+                        artist_id, created_publications
+                    )
             if applied is not False:
                 _save_artist_hero_jpeg_atomic(img, dest)
                 for target, rendered in rendered_compositions.items():
@@ -1967,64 +1965,64 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
         else existing.get("mobile_enabled", True)
     )
     created_publications: list[ArtistHeroArtifactIdentity] = []
-    with (
-        artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
-        _artist_hero_activation_guard(artist_id, created_publications),
-    ):
-        render_manifest = _publish_artist_hero_manifest(
-            artist_row=artist_row,
-            revision=revision,
-            rendered=rendered_compositions,
-            raw_sources={
-                target: raw for target, (raw, _image) in loaded_sources.items()
-            },
-            recipes=recipes,
-            existing=existing,
-            enabled=tuple(
-                composition
-                for composition, is_enabled in (
-                    ("desktop", desktop_enabled),
-                    ("mobile", mobile_enabled),
-                )
-                if is_enabled
-            ),
-            created_publications=created_publications,
-        )
-        if render_manifest is None and isinstance(
-            existing.get("render_manifest"), Mapping
-        ):
-            return {
-                "status": "conflict",
-                "reason": "artist-hero-manifest-incomplete",
-                "artist_id": artist_id,
-            }
-        applied = upsert_artist_hero_artwork(
-            artist_id=artist_id,
-            provenance="manual",
-            review_status="approved",
-            source_width=int(existing.get("source_width") or desktop_image.width),
-            source_height=int(existing.get("source_height") or desktop_image.height),
-            desktop_recipe=desktop_recipe,
-            mobile_recipe=mobile_recipe,
-            revision=revision,
-            desktop_source_width=desktop_source_width,
-            desktop_source_height=desktop_source_height,
-            desktop_source_origin=existing.get("desktop_source_origin")
-            or "manual-upload",
-            mobile_source_width=mobile_source_width,
-            mobile_source_height=mobile_source_height,
-            mobile_source_origin=existing.get("mobile_source_origin")
-            or "manual-upload",
-            desktop_enabled=desktop_enabled,
-            mobile_enabled=mobile_enabled,
-            render_manifest=render_manifest,
-            expected_revision=existing.get("revision"),
-            expected_manifest=existing.get("render_manifest"),
-        )
-        if applied is False:
-            _rollback_unactivated_artist_hero_publications(
-                artist_id, created_publications
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+        with _artist_hero_activation_guard(artist_id, created_publications):
+            render_manifest = _publish_artist_hero_manifest(
+                artist_row=artist_row,
+                revision=revision,
+                rendered=rendered_compositions,
+                raw_sources={
+                    target: raw for target, (raw, _image) in loaded_sources.items()
+                },
+                recipes=recipes,
+                existing=existing,
+                enabled=tuple(
+                    composition
+                    for composition, is_enabled in (
+                        ("desktop", desktop_enabled),
+                        ("mobile", mobile_enabled),
+                    )
+                    if is_enabled
+                ),
+                created_publications=created_publications,
             )
+            if render_manifest is None and isinstance(
+                existing.get("render_manifest"), Mapping
+            ):
+                return {
+                    "status": "conflict",
+                    "reason": "artist-hero-manifest-incomplete",
+                    "artist_id": artist_id,
+                }
+            applied = upsert_artist_hero_artwork(
+                artist_id=artist_id,
+                provenance="manual",
+                review_status="approved",
+                source_width=int(existing.get("source_width") or desktop_image.width),
+                source_height=int(
+                    existing.get("source_height") or desktop_image.height
+                ),
+                desktop_recipe=desktop_recipe,
+                mobile_recipe=mobile_recipe,
+                revision=revision,
+                desktop_source_width=desktop_source_width,
+                desktop_source_height=desktop_source_height,
+                desktop_source_origin=existing.get("desktop_source_origin")
+                or "manual-upload",
+                mobile_source_width=mobile_source_width,
+                mobile_source_height=mobile_source_height,
+                mobile_source_origin=existing.get("mobile_source_origin")
+                or "manual-upload",
+                desktop_enabled=desktop_enabled,
+                mobile_enabled=mobile_enabled,
+                render_manifest=render_manifest,
+                expected_revision=existing.get("revision"),
+                expected_manifest=existing.get("render_manifest"),
+            )
+            if applied is False:
+                _rollback_unactivated_artist_hero_publications(
+                    artist_id, created_publications
+                )
         if applied is not False:
             for target, rendered in rendered_compositions.items():
                 _save_artist_hero_webp_atomic(
@@ -2254,60 +2252,60 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
     desktop_enabled = existing.get("desktop_enabled", True) is not False
     mobile_enabled = existing.get("mobile_enabled", True) is not False
     created_publications: list[ArtistHeroArtifactIdentity] = []
-    with (
-        artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
-        _artist_hero_activation_guard(artist_id, created_publications),
-    ):
-        render_manifest = _publish_artist_hero_manifest(
-            artist_row=artist_row,
-            revision=revision,
-            rendered=rendered_compositions,
-            raw_sources={
-                target: raw for target, (raw, _image) in loaded_sources.items()
-            },
-            recipes=recipes,
-            existing=existing,
-            enabled=tuple(
-                composition
-                for composition, is_enabled in (
-                    ("desktop", desktop_enabled),
-                    ("mobile", mobile_enabled),
-                )
-                if is_enabled
-            ),
-            created_publications=created_publications,
-        )
-        if render_manifest is None and isinstance(
-            existing.get("render_manifest"), Mapping
-        ):
-            return {
-                "status": "conflict",
-                "reason": "artist-hero-manifest-incomplete",
-                "artist_id": artist_id,
-            }
-        applied = upsert_artist_hero_artwork(
-            artist_id=artist_id,
-            provenance=str(existing["provenance"]),
-            review_status=str(existing["review_status"]),
-            source_width=int(existing.get("source_width") or desktop_image.width),
-            source_height=int(existing.get("source_height") or desktop_image.height),
-            desktop_recipe=desktop_recipe,
-            mobile_recipe=mobile_recipe,
-            revision=revision,
-            desktop_source_width=desktop_source_width,
-            desktop_source_height=desktop_source_height,
-            desktop_source_origin=existing.get("desktop_source_origin"),
-            mobile_source_width=mobile_source_width,
-            mobile_source_height=mobile_source_height,
-            mobile_source_origin=existing.get("mobile_source_origin"),
-            render_manifest=render_manifest,
-            expected_revision=existing.get("revision"),
-            expected_manifest=existing.get("render_manifest"),
-        )
-        if applied is False:
-            _rollback_unactivated_artist_hero_publications(
-                artist_id, created_publications
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+        with _artist_hero_activation_guard(artist_id, created_publications):
+            render_manifest = _publish_artist_hero_manifest(
+                artist_row=artist_row,
+                revision=revision,
+                rendered=rendered_compositions,
+                raw_sources={
+                    target: raw for target, (raw, _image) in loaded_sources.items()
+                },
+                recipes=recipes,
+                existing=existing,
+                enabled=tuple(
+                    composition
+                    for composition, is_enabled in (
+                        ("desktop", desktop_enabled),
+                        ("mobile", mobile_enabled),
+                    )
+                    if is_enabled
+                ),
+                created_publications=created_publications,
             )
+            if render_manifest is None and isinstance(
+                existing.get("render_manifest"), Mapping
+            ):
+                return {
+                    "status": "conflict",
+                    "reason": "artist-hero-manifest-incomplete",
+                    "artist_id": artist_id,
+                }
+            applied = upsert_artist_hero_artwork(
+                artist_id=artist_id,
+                provenance=str(existing["provenance"]),
+                review_status=str(existing["review_status"]),
+                source_width=int(existing.get("source_width") or desktop_image.width),
+                source_height=int(
+                    existing.get("source_height") or desktop_image.height
+                ),
+                desktop_recipe=desktop_recipe,
+                mobile_recipe=mobile_recipe,
+                revision=revision,
+                desktop_source_width=desktop_source_width,
+                desktop_source_height=desktop_source_height,
+                desktop_source_origin=existing.get("desktop_source_origin"),
+                mobile_source_width=mobile_source_width,
+                mobile_source_height=mobile_source_height,
+                mobile_source_origin=existing.get("mobile_source_origin"),
+                render_manifest=render_manifest,
+                expected_revision=existing.get("revision"),
+                expected_manifest=existing.get("render_manifest"),
+            )
+            if applied is False:
+                _rollback_unactivated_artist_hero_publications(
+                    artist_id, created_publications
+                )
         if applied is not False:
             for composition, rendered in rendered_compositions.items():
                 _save_artist_hero_webp_atomic(
@@ -2383,39 +2381,37 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
     canonical_source = _artist_hero_jpeg_content(image)
     revision = artist_hero_revision(canonical_source, b":derived-hero")
     created_publications: list[ArtistHeroArtifactIdentity] = []
-    with (
-        artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)),
-        _artist_hero_activation_guard(artist_id, created_publications),
-    ):
-        render_manifest = _publish_artist_hero_manifest(
-            artist_row=artist_row,
-            revision=revision,
-            rendered=rendered,
-            raw_sources={"desktop": canonical_source, "mobile": canonical_source},
-            recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
-            existing=existing or {},
-            enabled=("desktop", "mobile"),
-            created_publications=created_publications,
-        )
-        applied = upsert_artist_hero_artwork(
-            artist_id=artist_id,
-            provenance="derived_background",
-            review_status="unreviewed",
-            source_width=image.width,
-            source_height=image.height,
-            desktop_recipe=desktop_recipe,
-            mobile_recipe=mobile_recipe,
-            revision=revision,
-            desktop_enabled=True,
-            mobile_enabled=True,
-            render_manifest=render_manifest,
-            expected_revision=(existing or {}).get("revision"),
-            expected_manifest=(existing or {}).get("render_manifest"),
-        )
-        if applied is False:
-            _rollback_unactivated_artist_hero_publications(
-                artist_id, created_publications
+    with artist_hero_publication_lock(_artist_hero_lock_identity(artist_row)):
+        with _artist_hero_activation_guard(artist_id, created_publications):
+            render_manifest = _publish_artist_hero_manifest(
+                artist_row=artist_row,
+                revision=revision,
+                rendered=rendered,
+                raw_sources={"desktop": canonical_source, "mobile": canonical_source},
+                recipes={"desktop": desktop_recipe, "mobile": mobile_recipe},
+                existing=existing or {},
+                enabled=("desktop", "mobile"),
+                created_publications=created_publications,
             )
+            applied = upsert_artist_hero_artwork(
+                artist_id=artist_id,
+                provenance="derived_background",
+                review_status="unreviewed",
+                source_width=image.width,
+                source_height=image.height,
+                desktop_recipe=desktop_recipe,
+                mobile_recipe=mobile_recipe,
+                revision=revision,
+                desktop_enabled=True,
+                mobile_enabled=True,
+                render_manifest=render_manifest,
+                expected_revision=(existing or {}).get("revision"),
+                expected_manifest=(existing or {}).get("render_manifest"),
+            )
+            if applied is False:
+                _rollback_unactivated_artist_hero_publications(
+                    artist_id, created_publications
+                )
         if applied is not False:
             _save_artist_hero_jpeg_atomic(
                 image,

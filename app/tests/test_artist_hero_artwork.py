@@ -1939,6 +1939,91 @@ def test_recompose_handler_refreshes_legacy_output_without_changing_profile(
     assert events == ["broadcast", "wait", "warm"]
 
 
+def test_recompose_does_not_roll_back_publications_when_legacy_write_fails(
+    monkeypatch, tmp_path
+):
+    from crate.artist_hero_publication import ArtistHeroArtifactIdentity
+    from crate.worker_handlers.artwork import _handle_recompose_artist_hero
+
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    Image.new("RGB", (700, 1000), color=(230, 50, 70)).save(
+        artist_dir / "artist-hero-source.jpg", "JPEG"
+    )
+    profile = {
+        "artist_id": 7,
+        "provenance": "manual",
+        "review_status": "approved",
+        "source_width": 700,
+        "source_height": 1000,
+        "desktop_recipe": _crop_recipe(700, 1000),
+        "mobile_recipe": _crop_recipe(700, 1000),
+        "revision": "legacy-renderer-revision",
+        "desktop_source_width": 700,
+        "desktop_source_height": 1000,
+        "mobile_source_width": 700,
+        "mobile_source_height": 1000,
+    }
+    activated_manifests = []
+    cleanup_attempts = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_library_artist",
+        lambda name: {"id": 7, "entity_uid": "artist-entity", "name": name},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.resolve_artist_dir",
+        lambda *args, **kwargs: artist_dir,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_artist_hero_artwork",
+        lambda _artist_id: profile,
+    )
+
+    def publish(**kwargs):
+        revision = kwargs["revision"]
+        artifacts = {}
+        for composition in kwargs["rendered"]:
+            kwargs["created_publications"].append(
+                ArtistHeroArtifactIdentity("artist-entity", composition, revision)
+            )
+            artifacts[composition] = {"render_revision": revision}
+        return {"manifest_version": 1, "artifacts": artifacts}
+
+    def activate(**kwargs):
+        activated_manifests.append(kwargs["render_manifest"])
+        return True
+
+    def fail_legacy_write(_image, _destination):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork._publish_artist_hero_manifest", publish
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.upsert_artist_hero_artwork", activate
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork._rollback_unactivated_artist_hero_publications",
+        lambda artist_id, identities: cleanup_attempts.append(
+            (artist_id, tuple(identities))
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork._save_artist_hero_webp_atomic",
+        fail_legacy_write,
+    )
+
+    with pytest.raises(OSError, match="disk full"):
+        _handle_recompose_artist_hero(
+            "task-1", {"artist": "Converge"}, {"library_path": str(tmp_path)}
+        )
+
+    assert len(activated_manifests) == 1
+    assert activated_manifests[0]["artifacts"]
+    assert cleanup_attempts == []
+
+
 def test_recompose_handler_rejects_incomplete_active_manifest(monkeypatch, tmp_path):
     from crate.worker_handlers.artwork import _handle_recompose_artist_hero
 
