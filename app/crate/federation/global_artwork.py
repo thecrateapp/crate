@@ -266,13 +266,26 @@ def serve_global_artwork(
         except (GlobalAlbumNotFound, NoArtworkSource) as exc:
             raise HTTPException(status_code=404, detail="Artwork not found") from exc
         if selection["kind"] == "local":
-            from crate.api.browse_album import api_cover_by_id
-
-            return api_cover_by_id(
-                int(selection["local_album_id"]),
-                size=size,
-                image_format=image_format,
+            from crate.api.browse_album import (
+                api_cover_by_entity_uid,
+                api_cover_by_id,
             )
+
+            entity_uid = selection.get("local_album_entity_uid")
+            if entity_uid:
+                return api_cover_by_entity_uid(
+                    str(entity_uid),
+                    size=size,
+                    image_format=image_format,
+                )
+            local_album_id = selection.get("local_album_id")
+            if local_album_id is not None:
+                return api_cover_by_id(
+                    int(local_album_id),
+                    size=size,
+                    image_format=image_format,
+                )
+            raise HTTPException(status_code=404, detail="Artwork not found")
     elif entity_type == "artist":
         try:
             selection = resolve_global_artist_photo(global_entity_uid)
@@ -300,10 +313,10 @@ __all__ = [
     "GlobalAlbumNotFound",
     "GlobalArtistNotFound",
     "NoArtistBackgroundSource",
-    "NoArtworkSource",
     "NoArtistPhotoSource",
+    "NoArtworkSource",
+    "resolve_global_album_artwork",
     "resolve_global_artist_background",
     "resolve_global_artist_photo",
-    "resolve_global_album_artwork",
     "serve_global_artwork",
 ]

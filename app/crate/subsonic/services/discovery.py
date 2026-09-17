@@ -9,7 +9,10 @@ from typing import Any
 
 from crate.db.queries.artist_bliss_centroids import get_artist_bliss_centroid
 from crate.db.queries.bliss_similarity_candidates import get_bliss_candidates
-from crate.db.queries.bliss_track_lookup import get_track_with_artist
+from crate.db.queries.bliss_track_lookup import (
+    get_same_artist_tracks,
+    get_track_with_artist,
+)
 from crate.db.queries.subsonic_discovery import (
     get_discovery_seed_tracks,
     get_global_tracks_by_local_ids,
@@ -62,7 +65,7 @@ def get_lyrics(artist: str | None, title: str | None) -> dict[str, str]:
     artist_name = (artist or "").strip()
     song_title = (title or "").strip()
     cached = (
-        get_cached_lyrics(artist_name, song_title)
+        get_cached_lyrics(artist_name, song_title, max_age_seconds=None)
         if artist_name and song_title
         else None
     )
@@ -81,7 +84,11 @@ def get_lyrics_by_song_id(identifier: str) -> dict[str, list[dict[str, Any]]]:
     _entity_id, metadata = track
     artist = str(metadata.get("artist") or "").strip()
     title = str(metadata.get("title") or "").strip()
-    cached = get_cached_lyrics(artist, title) if artist and title else None
+    cached = (
+        get_cached_lyrics(artist, title, max_age_seconds=None)
+        if artist and title
+        else None
+    )
     if not cached:
         return {"structuredLyrics": []}
 
@@ -268,17 +275,21 @@ def _seed_for_identifier(identifier: str) -> dict[str, Any] | None:
         if track_result is None:
             raise OpenSubsonicError(ErrorCode.NOT_FOUND, "Track not found")
         _track_entity, track = track_result
-        bliss_track = get_track_with_artist(str(track.get("path") or ""))
+        bliss_track = get_track_with_artist(track_path=str(track.get("path") or ""))
         if bliss_track is None:
             return None
         vector = _valid_vector(bliss_track.get("bliss_vector"))
+        track_path = str(bliss_track.get("path") or track.get("path") or "")
+        artist_name = str(
+            bliss_track.get("album_artist") or bliss_track.get("artist") or ""
+        ).strip()
         seeds = [
-            {"path": bliss_track.get("path")},
+            {"path": track_path},
         ]
 
-    if vector is None:
+    if vector is None and kind != "track":
         return None
-    return {
+    seed = {
         "vector": vector,
         "paths": {
             str(seed["path"])
@@ -286,6 +297,54 @@ def _seed_for_identifier(identifier: str) -> dict[str, Any] | None:
             if seed.get("path") is not None and str(seed["path"])
         },
     }
+    if kind == "track":
+        seed.update(
+            {
+                "track_path": track_path,
+                "artist_id": bliss_track.get("artist_id"),
+                "artist_name": artist_name,
+            }
+        )
+    return seed
+
+
+def _same_artist_similar_songs(
+    seed: dict[str, Any], *, limit: int
+) -> list[dict[str, Any]]:
+    track_path = str(seed.get("track_path") or "")
+    artist_name = str(seed.get("artist_name") or "").strip()
+    if not track_path or not artist_name:
+        return []
+
+    rows = get_same_artist_tracks(
+        artist_id=seed.get("artist_id"),
+        artist_name=artist_name,
+        exclude_path=track_path,
+        limit=MAX_COUNT,
+    )
+    local_ids: list[int] = []
+    seen_local_ids: set[int] = set()
+    for row in rows:
+        path = str(row.get("path") or "")
+        try:
+            local_id = int(row["track_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not path or path == track_path or local_id in seen_local_ids:
+            continue
+        seen_local_ids.add(local_id)
+        local_ids.append(local_id)
+
+    if not local_ids:
+        return []
+
+    tracks_by_local_id = get_global_tracks_by_local_ids(local_ids)
+    tracks = [
+        tracks_by_local_id[local_id]
+        for local_id in local_ids
+        if local_id in tracks_by_local_id
+    ]
+    return _serialize_unique_songs(tracks, identity_key="global_track_uid", limit=limit)
 
 
 def get_similar_songs(
@@ -298,9 +357,12 @@ def get_similar_songs(
     seed = _seed_for_identifier(identifier)
     if seed is None:
         return []
+    vector = _valid_vector(seed.get("vector"))
+    if vector is None:
+        return _same_artist_similar_songs(seed, limit=limit)
 
     candidates = get_bliss_candidates(
-        bliss_vector=seed["vector"],
+        bliss_vector=vector,
         exclude_paths=sorted(seed["paths"]),
         limit=MAX_COUNT,
     )
@@ -318,7 +380,7 @@ def get_similar_songs(
         seen_ids.add(local_id)
         ordered_ids.append(local_id)
     if not ordered_ids:
-        return []
+        return _same_artist_similar_songs(seed, limit=limit)
 
     tracks_by_local_id = get_global_tracks_by_local_ids(ordered_ids)
     result: list[dict[str, Any]] = []
@@ -334,7 +396,7 @@ def get_similar_songs(
         result.append(serialize_song(track))
         if len(result) >= limit:
             break
-    return result
+    return result or _same_artist_similar_songs(seed, limit=limit)
 
 
 __all__ = [

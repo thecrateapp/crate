@@ -95,6 +95,17 @@ _FAKE_GLOBAL_TRACK = {
 _SUBSONIC_BASE = "/rest"
 
 
+def _v1_subsonic_test_client():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from crate.api.subsonic import create_subsonic_router
+
+    app = FastAPI()
+    app.include_router(create_subsonic_router("v1"))
+    return TestClient(app)
+
+
 @contextmanager
 def _subsonic_auth_ok():
     """Mock subsonic auth functions to authenticate successfully."""
@@ -166,6 +177,49 @@ class TestSubsonicSystem:
         with _subsonic_auth_ok():
             resp = test_app.get(f"{_SUBSONIC_BASE}/ping?u=admin&p=admin")
             assert resp.headers.get("content-type", "").startswith("application/json")
+
+    def test_ping_accepts_older_client_protocol_version(self):
+        with _v1_subsonic_test_client() as client, _subsonic_auth_ok():
+            resp = client.get(
+                f"{_SUBSONIC_BASE}/ping.view",
+                params={
+                    "u": "admin",
+                    "p": "admin",
+                    "v": "1.13.0",
+                    "c": "Feishin",
+                    "f": "json",
+                },
+            )
+
+        sr = _subsonic_ok_response(resp)
+        assert sr["openSubsonic"] is True
+
+    def test_extensions_accept_older_client_protocol_version(self):
+        with _v1_subsonic_test_client() as client:
+            resp = client.get(
+                f"{_SUBSONIC_BASE}/getOpenSubsonicExtensions.view",
+                params={"v": "1.13.0", "c": "Feishin", "f": "json"},
+            )
+
+        sr = _subsonic_ok_response(resp)
+        assert {"name": "songLyrics", "versions": [1, 2]} in sr[
+            "openSubsonicExtensions"
+        ]
+
+    def test_ping_rejects_future_client_protocol_version(self):
+        with _v1_subsonic_test_client() as client, _subsonic_auth_ok():
+            resp = client.get(
+                f"{_SUBSONIC_BASE}/ping.view",
+                params={
+                    "u": "admin",
+                    "p": "admin",
+                    "v": "1.17.0",
+                    "c": "future-client",
+                    "f": "json",
+                },
+            )
+
+        _subsonic_error_response(resp, code=20)
 
     def test_ping_missing_credentials(self, test_app):
         with _subsonic_auth_fail():

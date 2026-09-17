@@ -66,6 +66,7 @@ def test_stars_round_trip_for_listen_and_open_subsonic(pg_db):
             "name": "Shared Star Album",
             "path": "/music/Shared Star Artist/Shared Star Album",
             "track_count": 1,
+            "has_cover": 1,
         }
     )
     pg_db.upsert_track(
@@ -109,6 +110,7 @@ def test_stars_round_trip_for_listen_and_open_subsonic(pg_db):
     assert first_starred["artist"][0]["id"] == f"ar-{artist_id}"
     assert first_starred["album"][0]["id"] == f"al-{album_id}"
     assert first_starred["song"][0]["id"] == str(track_id)
+    assert first_starred["song"][0]["coverArt"] == f"al-{album_id}"
     assert get_starred(second_user["id"])["artist"][0]["id"] == f"ar-{artist_id}"
 
     assert unstar(first_user["id"], "artist", f"ar-{artist_id}") is True

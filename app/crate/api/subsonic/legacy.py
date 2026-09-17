@@ -383,15 +383,11 @@ def get_lyrics_by_song_id(request: Request):
     try:
         _require_subsonic_auth(request)
         enhanced = (request.query_params.get("enhanced") or "false").strip().lower()
-        if enhanced not in {"", "false", "0"}:
-            if enhanced in {"true", "1"}:
-                raise OpenSubsonicError(
-                    ErrorCode.INCOMPATIBLE_SERVER,
-                    "Enhanced lyrics are not supported",
-                )
+        if enhanced not in {"", "false", "0", "true", "1"}:
             raise OpenSubsonicError(
                 ErrorCode.MISSING_PARAMETER, "Invalid parameter 'enhanced'"
             )
+        # LRC sources provide synchronized line timing, but no word-level cue data.
         lyrics = discovery_service.get_lyrics_by_song_id(
             request.query_params.get("id") or ""
         )

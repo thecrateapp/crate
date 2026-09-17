@@ -9,7 +9,7 @@ OpenSubsonicEngine = Literal["legacy", "v1"]
 OPEN_SUBSONIC_EXTENSIONS: tuple[dict[str, object], ...] = (
     {"name": "formPost", "versions": [1]},
     {"name": "indexBasedQueue", "versions": [1]},
-    {"name": "songLyrics", "versions": [1]},
+    {"name": "songLyrics", "versions": [1, 2]},
     {"name": "topSongsByArtistId", "versions": [1]},
 )
 

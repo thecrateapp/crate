@@ -30,7 +30,24 @@ def _validate_common_parameters(params: RequestParameters) -> None:
         raise OpenSubsonicError(
             ErrorCode.MISSING_PARAMETER, "Required parameter 'v' is missing"
         )
-    if version != API_VERSION:
+
+    requested_parts = version.split(".")
+    supported_parts = API_VERSION.split(".")
+    if (
+        len(requested_parts) != 3
+        or any(not part.isascii() or not part.isdigit() for part in requested_parts)
+        or len(supported_parts) != 3
+    ):
+        raise OpenSubsonicError(
+            ErrorCode.INCOMPATIBLE_CLIENT, "Incompatible client protocol version"
+        )
+
+    requested_version = tuple(int(part) for part in requested_parts)
+    supported_version = tuple(int(part) for part in supported_parts)
+    if (
+        requested_version[0] != supported_version[0]
+        or requested_version > supported_version
+    ):
         raise OpenSubsonicError(
             ErrorCode.INCOMPATIBLE_CLIENT, "Incompatible client protocol version"
         )

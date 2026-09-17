@@ -102,6 +102,39 @@ def test_global_cover_art_uses_canonical_resolver_with_subsonic_user(test_app):
     )
 
 
+def test_local_global_cover_uses_entity_uid_for_artwork_delivery():
+    from crate.federation import global_artwork
+
+    image = Response(b"local-cover", media_type="image/jpeg")
+    selection = {
+        "kind": "local",
+        "local_album_id": 34,
+        "local_album_entity_uid": "stable-album-uid",
+    }
+    with (
+        patch(
+            "crate.federation.global_artwork.resolve_global_album_artwork",
+            return_value=selection,
+        ),
+        patch(
+            "crate.api.browse_album.api_cover_by_entity_uid", return_value=image
+        ) as by_entity_uid,
+        patch("crate.api.browse_album.api_cover_by_id", return_value=image) as by_id,
+    ):
+        response = global_artwork.serve_global_artwork(
+            ALBUM_UID,
+            entity_type="album",
+            user=USER,
+            size=320,
+        )
+
+    assert response is image
+    by_entity_uid.assert_called_once_with(
+        "stable-album-uid", size=320, image_format=None
+    )
+    by_id.assert_not_called()
+
+
 def test_artwork_references_from_all_media_serializers_resolve(test_app):
     from crate.subsonic.serializers import (
         serialize_album,
