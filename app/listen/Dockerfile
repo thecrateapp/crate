@@ -3,14 +3,21 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy shared UI package first (workspace dependency)
+# Copy shared workspace packages first.
 COPY shared/ui/ /app-shared/shared/ui/
+COPY shared/cast/ /app-shared/shared/cast/
 
-# Install deps — strip @crate/ui from package.json (it's a local workspace
-# package, not on npm) then install, then symlink it into node_modules.
+# Install deps — local workspace packages are not on npm; install the rest,
+# then link the local packages into node_modules.
 COPY listen/package.json listen/package-lock.json* ./
-RUN sed -i '/"@crate\/ui"/d' package.json && npm install --ignore-scripts --legacy-peer-deps --package-lock=false
-RUN mkdir -p node_modules/@crate && ln -s /app-shared/shared/ui node_modules/@crate/ui
+RUN sed -i \
+      -e '/"@crate\/ui"/d' \
+      -e '/"@crate\/cast-protocol"/d' \
+      package.json \
+    && npm install --ignore-scripts --legacy-peer-deps --package-lock=false
+RUN mkdir -p node_modules/@crate \
+    && ln -s /app-shared/shared/ui node_modules/@crate/ui \
+    && ln -s /app-shared/shared/cast node_modules/@crate/cast-protocol
 
 # Copy shared code (imported by listen via relative paths)
 COPY shared/ /app-shared/shared/
@@ -21,7 +28,7 @@ COPY listen/ .
 # Fix shared imports to work with Docker layout
 RUN ln -s /app-shared/shared ../shared
 
-# Symlink node_modules into shared/ui so its imports resolve react etc.
+# Symlink node_modules into shared/ui so its imports resolve React etc.
 RUN rm -rf /app-shared/shared/ui/node_modules && ln -s /app/node_modules /app-shared/shared/ui/node_modules
 
 ARG VITE_SENTRY_DSN=
