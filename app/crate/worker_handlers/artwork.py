@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 
 import base64
 import hashlib
@@ -159,6 +159,65 @@ def _save_artist_hero_jpeg_atomic(image: PILImage, destination: Path) -> None:
         finally:
             if temporary_path and temporary_path.exists():
                 temporary_path.unlink()
+
+
+@contextmanager
+def _artist_hero_legacy_outputs_guard(
+    destinations: Iterable[Path],
+) -> Iterator[Callable[[], None]]:
+    backups: list[tuple[Path, Path | None]] = []
+    try:
+        for destination in dict.fromkeys(destinations):
+            backup_path = None
+            if destination.exists():
+                with tempfile.NamedTemporaryFile(
+                    dir=destination.parent,
+                    prefix=f".{destination.name}.",
+                    suffix=".backup",
+                    delete=False,
+                ) as backup:
+                    backup_path = Path(backup.name)
+                backup_path.unlink()
+                backup_path.hardlink_to(destination)
+            backups.append((destination, backup_path))
+    except Exception:
+        for _destination, backup_path in backups:
+            if backup_path is not None:
+                backup_path.unlink(missing_ok=True)
+        raise
+
+    rolled_back = False
+
+    def rollback() -> None:
+        nonlocal rolled_back
+        if rolled_back:
+            return
+        for destination, backup_path in reversed(backups):
+            if backup_path is None:
+                destination.unlink(missing_ok=True)
+            elif backup_path.exists():
+                backup_path.replace(destination)
+        rolled_back = True
+
+    try:
+        yield rollback
+    except Exception:
+        try:
+            rollback()
+        except OSError:
+            log.warning("Could not restore legacy artist hero outputs", exc_info=True)
+        raise
+    finally:
+        for _destination, backup_path in backups:
+            if backup_path is not None:
+                try:
+                    backup_path.unlink(missing_ok=True)
+                except OSError:
+                    log.warning(
+                        "Could not remove legacy artist hero backup %s",
+                        backup_path,
+                        exc_info=True,
+                    )
 
 
 def _artist_hero_jpeg_content(image: PILImage) -> bytes:
@@ -1729,38 +1788,46 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
                         "reason": "artist-hero-manifest-incomplete",
                         "artist_id": artist_id,
                     }
-                applied = upsert_artist_hero_artwork(
-                    artist_id=artist_id,
-                    provenance="manual",
-                    review_status="approved",
-                    source_width=legacy_width,
-                    source_height=legacy_height,
-                    desktop_recipe=desktop_recipe,
-                    mobile_recipe=mobile_recipe,
-                    revision=revision,
-                    desktop_source_width=desktop_width,
-                    desktop_source_height=desktop_height,
-                    desktop_source_origin=desktop_origin,
-                    mobile_source_width=mobile_width,
-                    mobile_source_height=mobile_height,
-                    mobile_source_origin=mobile_origin,
-                    desktop_enabled=desktop_enabled,
-                    mobile_enabled=mobile_enabled,
-                    render_manifest=render_manifest,
-                    expected_revision=existing.get("revision"),
-                    expected_manifest=existing.get("render_manifest"),
+                legacy_destinations = [dest]
+                legacy_destinations.extend(
+                    _safe_dest(found_dir / f"artist-hero-{target}.webp")
+                    for target in rendered_compositions
                 )
-                if applied is False:
-                    _rollback_unactivated_artist_hero_publications(
-                        artist_id, created_publications
+                with _artist_hero_legacy_outputs_guard(
+                    legacy_destinations
+                ) as rollback_legacy:
+                    _save_artist_hero_jpeg_atomic(img, dest)
+                    for target, rendered in rendered_compositions.items():
+                        _save_artist_hero_webp_atomic(
+                            rendered,
+                            _safe_dest(found_dir / f"artist-hero-{target}.webp"),
+                        )
+                    applied = upsert_artist_hero_artwork(
+                        artist_id=artist_id,
+                        provenance="manual",
+                        review_status="approved",
+                        source_width=legacy_width,
+                        source_height=legacy_height,
+                        desktop_recipe=desktop_recipe,
+                        mobile_recipe=mobile_recipe,
+                        revision=revision,
+                        desktop_source_width=desktop_width,
+                        desktop_source_height=desktop_height,
+                        desktop_source_origin=desktop_origin,
+                        mobile_source_width=mobile_width,
+                        mobile_source_height=mobile_height,
+                        mobile_source_origin=mobile_origin,
+                        desktop_enabled=desktop_enabled,
+                        mobile_enabled=mobile_enabled,
+                        render_manifest=render_manifest,
+                        expected_revision=existing.get("revision"),
+                        expected_manifest=existing.get("render_manifest"),
                     )
-            if applied is not False:
-                _save_artist_hero_jpeg_atomic(img, dest)
-                for target, rendered in rendered_compositions.items():
-                    _save_artist_hero_webp_atomic(
-                        rendered,
-                        _safe_dest(found_dir / f"artist-hero-{target}.webp"),
-                    )
+                    if applied is False:
+                        rollback_legacy()
+                        _rollback_unactivated_artist_hero_publications(
+                            artist_id, created_publications
+                        )
         if applied is False:
             return {
                 "status": "conflict",
@@ -1994,41 +2061,49 @@ def _handle_compose_artist_hero(task_id: str, params: dict, config: dict) -> dic
                     "reason": "artist-hero-manifest-incomplete",
                     "artist_id": artist_id,
                 }
-            applied = upsert_artist_hero_artwork(
-                artist_id=artist_id,
-                provenance="manual",
-                review_status="approved",
-                source_width=int(existing.get("source_width") or desktop_image.width),
-                source_height=int(
-                    existing.get("source_height") or desktop_image.height
-                ),
-                desktop_recipe=desktop_recipe,
-                mobile_recipe=mobile_recipe,
-                revision=revision,
-                desktop_source_width=desktop_source_width,
-                desktop_source_height=desktop_source_height,
-                desktop_source_origin=existing.get("desktop_source_origin")
-                or "manual-upload",
-                mobile_source_width=mobile_source_width,
-                mobile_source_height=mobile_source_height,
-                mobile_source_origin=existing.get("mobile_source_origin")
-                or "manual-upload",
-                desktop_enabled=desktop_enabled,
-                mobile_enabled=mobile_enabled,
-                render_manifest=render_manifest,
-                expected_revision=existing.get("revision"),
-                expected_manifest=existing.get("render_manifest"),
+            legacy_destinations = tuple(
+                artist_dir / output_names[target] for target in rendered_compositions
             )
-            if applied is False:
-                _rollback_unactivated_artist_hero_publications(
-                    artist_id, created_publications
+            with _artist_hero_legacy_outputs_guard(
+                legacy_destinations
+            ) as rollback_legacy:
+                for target, rendered in rendered_compositions.items():
+                    _save_artist_hero_webp_atomic(
+                        rendered,
+                        artist_dir / output_names[target],
+                    )
+                applied = upsert_artist_hero_artwork(
+                    artist_id=artist_id,
+                    provenance="manual",
+                    review_status="approved",
+                    source_width=int(
+                        existing.get("source_width") or desktop_image.width
+                    ),
+                    source_height=int(
+                        existing.get("source_height") or desktop_image.height
+                    ),
+                    desktop_recipe=desktop_recipe,
+                    mobile_recipe=mobile_recipe,
+                    revision=revision,
+                    desktop_source_width=desktop_source_width,
+                    desktop_source_height=desktop_source_height,
+                    desktop_source_origin=existing.get("desktop_source_origin")
+                    or "manual-upload",
+                    mobile_source_width=mobile_source_width,
+                    mobile_source_height=mobile_source_height,
+                    mobile_source_origin=existing.get("mobile_source_origin")
+                    or "manual-upload",
+                    desktop_enabled=desktop_enabled,
+                    mobile_enabled=mobile_enabled,
+                    render_manifest=render_manifest,
+                    expected_revision=existing.get("revision"),
+                    expected_manifest=existing.get("render_manifest"),
                 )
-        if applied is not False:
-            for target, rendered in rendered_compositions.items():
-                _save_artist_hero_webp_atomic(
-                    rendered,
-                    artist_dir / output_names[target],
-                )
+                if applied is False:
+                    rollback_legacy()
+                    _rollback_unactivated_artist_hero_publications(
+                        artist_id, created_publications
+                    )
     if applied is False:
         return {
             "status": "conflict",
@@ -2281,37 +2356,46 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
                     "reason": "artist-hero-manifest-incomplete",
                     "artist_id": artist_id,
                 }
-            applied = upsert_artist_hero_artwork(
-                artist_id=artist_id,
-                provenance=str(existing["provenance"]),
-                review_status=str(existing["review_status"]),
-                source_width=int(existing.get("source_width") or desktop_image.width),
-                source_height=int(
-                    existing.get("source_height") or desktop_image.height
-                ),
-                desktop_recipe=desktop_recipe,
-                mobile_recipe=mobile_recipe,
-                revision=revision,
-                desktop_source_width=desktop_source_width,
-                desktop_source_height=desktop_source_height,
-                desktop_source_origin=existing.get("desktop_source_origin"),
-                mobile_source_width=mobile_source_width,
-                mobile_source_height=mobile_source_height,
-                mobile_source_origin=existing.get("mobile_source_origin"),
-                render_manifest=render_manifest,
-                expected_revision=existing.get("revision"),
-                expected_manifest=existing.get("render_manifest"),
+            legacy_destinations = tuple(
+                artist_dir / output_names[composition]
+                for composition in rendered_compositions
             )
-            if applied is False:
-                _rollback_unactivated_artist_hero_publications(
-                    artist_id, created_publications
+            with _artist_hero_legacy_outputs_guard(
+                legacy_destinations
+            ) as rollback_legacy:
+                for composition, rendered in rendered_compositions.items():
+                    _save_artist_hero_webp_atomic(
+                        rendered,
+                        artist_dir / output_names[composition],
+                    )
+                applied = upsert_artist_hero_artwork(
+                    artist_id=artist_id,
+                    provenance=str(existing["provenance"]),
+                    review_status=str(existing["review_status"]),
+                    source_width=int(
+                        existing.get("source_width") or desktop_image.width
+                    ),
+                    source_height=int(
+                        existing.get("source_height") or desktop_image.height
+                    ),
+                    desktop_recipe=desktop_recipe,
+                    mobile_recipe=mobile_recipe,
+                    revision=revision,
+                    desktop_source_width=desktop_source_width,
+                    desktop_source_height=desktop_source_height,
+                    desktop_source_origin=existing.get("desktop_source_origin"),
+                    mobile_source_width=mobile_source_width,
+                    mobile_source_height=mobile_source_height,
+                    mobile_source_origin=existing.get("mobile_source_origin"),
+                    render_manifest=render_manifest,
+                    expected_revision=existing.get("revision"),
+                    expected_manifest=existing.get("render_manifest"),
                 )
-        if applied is not False:
-            for composition, rendered in rendered_compositions.items():
-                _save_artist_hero_webp_atomic(
-                    rendered,
-                    artist_dir / output_names[composition],
-                )
+                if applied is False:
+                    rollback_legacy()
+                    _rollback_unactivated_artist_hero_publications(
+                        artist_id, created_publications
+                    )
     if applied is False:
         return {
             "status": "conflict",
@@ -2401,36 +2485,44 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
                     "reason": "artist-hero-manifest-incomplete",
                     "artist_id": artist_id,
                 }
-            applied = upsert_artist_hero_artwork(
-                artist_id=artist_id,
-                provenance="derived_background",
-                review_status="unreviewed",
-                source_width=image.width,
-                source_height=image.height,
-                desktop_recipe=desktop_recipe,
-                mobile_recipe=mobile_recipe,
-                revision=revision,
-                desktop_enabled=True,
-                mobile_enabled=True,
-                render_manifest=render_manifest,
-                expected_revision=(existing or {}).get("revision"),
-                expected_manifest=(existing or {}).get("render_manifest"),
-            )
-            if applied is False:
-                _rollback_unactivated_artist_hero_publications(
-                    artist_id, created_publications
-                )
-        if applied is not False:
-            _save_artist_hero_jpeg_atomic(
-                image,
+            legacy_destinations = (
                 artist_dir / "artist-hero-source.jpg",
+                artist_dir / "artist-hero-desktop.webp",
+                artist_dir / "artist-hero-mobile.webp",
             )
-            _save_artist_hero_webp_atomic(
-                rendered["desktop"], artist_dir / "artist-hero-desktop.webp"
-            )
-            _save_artist_hero_webp_atomic(
-                rendered["mobile"], artist_dir / "artist-hero-mobile.webp"
-            )
+            with _artist_hero_legacy_outputs_guard(
+                legacy_destinations
+            ) as rollback_legacy:
+                _save_artist_hero_jpeg_atomic(
+                    image,
+                    artist_dir / "artist-hero-source.jpg",
+                )
+                _save_artist_hero_webp_atomic(
+                    rendered["desktop"], artist_dir / "artist-hero-desktop.webp"
+                )
+                _save_artist_hero_webp_atomic(
+                    rendered["mobile"], artist_dir / "artist-hero-mobile.webp"
+                )
+                applied = upsert_artist_hero_artwork(
+                    artist_id=artist_id,
+                    provenance="derived_background",
+                    review_status="unreviewed",
+                    source_width=image.width,
+                    source_height=image.height,
+                    desktop_recipe=desktop_recipe,
+                    mobile_recipe=mobile_recipe,
+                    revision=revision,
+                    desktop_enabled=True,
+                    mobile_enabled=True,
+                    render_manifest=render_manifest,
+                    expected_revision=(existing or {}).get("revision"),
+                    expected_manifest=(existing or {}).get("render_manifest"),
+                )
+                if applied is False:
+                    rollback_legacy()
+                    _rollback_unactivated_artist_hero_publications(
+                        artist_id, created_publications
+                    )
     if applied is False:
         return {
             "status": "conflict",

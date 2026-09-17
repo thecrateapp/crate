@@ -1939,17 +1939,25 @@ def test_recompose_handler_refreshes_legacy_output_without_changing_profile(
     assert events == ["broadcast", "wait", "warm"]
 
 
-def test_recompose_does_not_roll_back_publications_when_legacy_write_fails(
+def test_recompose_does_not_activate_manifest_when_legacy_write_fails(
     monkeypatch, tmp_path
 ):
     from crate.artist_hero_publication import ArtistHeroArtifactIdentity
     from crate.worker_handlers.artwork import _handle_recompose_artist_hero
+    from crate.worker_handlers.artwork import _save_artist_hero_webp_atomic
 
     artist_dir = tmp_path / "Converge"
     artist_dir.mkdir()
     Image.new("RGB", (700, 1000), color=(230, 50, 70)).save(
         artist_dir / "artist-hero-source.jpg", "JPEG"
     )
+    legacy_paths = (
+        artist_dir / "artist-hero-desktop.webp",
+        artist_dir / "artist-hero-mobile.webp",
+    )
+    for legacy_path in legacy_paths:
+        Image.new("RGB", (32, 32), color=(20, 40, 60)).save(legacy_path, "WEBP")
+    legacy_before = {path: path.read_bytes() for path in legacy_paths}
     profile = {
         "artist_id": 7,
         "provenance": "manual",
@@ -1966,6 +1974,7 @@ def test_recompose_does_not_roll_back_publications_when_legacy_write_fails(
     }
     activated_manifests = []
     cleanup_attempts = []
+    legacy_write_count = 0
 
     monkeypatch.setattr(
         "crate.worker_handlers.artwork.get_library_artist",
@@ -1995,6 +2004,11 @@ def test_recompose_does_not_roll_back_publications_when_legacy_write_fails(
         return True
 
     def fail_legacy_write(_image, _destination):
+        nonlocal legacy_write_count
+        legacy_write_count += 1
+        if legacy_write_count == 1:
+            _save_artist_hero_webp_atomic(_image, _destination)
+            return
         raise OSError("disk full")
 
     monkeypatch.setattr(
@@ -2019,9 +2033,11 @@ def test_recompose_does_not_roll_back_publications_when_legacy_write_fails(
             "task-1", {"artist": "Converge"}, {"library_path": str(tmp_path)}
         )
 
-    assert len(activated_manifests) == 1
-    assert activated_manifests[0]["artifacts"]
-    assert cleanup_attempts == []
+    assert activated_manifests == []
+    assert legacy_write_count == 2
+    assert {path: path.read_bytes() for path in legacy_paths} == legacy_before
+    assert len(cleanup_attempts) == 1
+    assert len(cleanup_attempts[0][1]) == 2
 
 
 def test_recompose_handler_rejects_incomplete_active_manifest(monkeypatch, tmp_path):
