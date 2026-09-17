@@ -6,6 +6,7 @@ import fnmatch
 import json
 import re
 import subprocess
+import sys
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -231,6 +232,21 @@ def validate_manifest(
             raise ManifestError(f"{name} service mapping is invalid")
 
 
+def baseline_release_sha(
+    manifest: dict,
+    *,
+    registry: str,
+    owner: str,
+) -> str | None:
+    if not isinstance(manifest, dict):
+        return None
+    try:
+        validate_manifest(manifest, registry=registry, owner=owner)
+    except ManifestError:
+        return None
+    return manifest["release_sha"]
+
+
 def assemble_manifest(
     *,
     release_sha: str,
@@ -351,6 +367,11 @@ def _build_parser() -> argparse.ArgumentParser:
     env_parser.add_argument("--manifest", required=True)
     env_parser.add_argument("--output")
 
+    baseline_parser = subparsers.add_parser("baseline-sha")
+    baseline_parser.add_argument("--manifest", required=True)
+    baseline_parser.add_argument("--registry", required=True)
+    baseline_parser.add_argument("--owner", required=True)
+
     refs_parser = subparsers.add_parser("refs")
     refs_parser.add_argument("--manifest", required=True)
 
@@ -394,6 +415,20 @@ def main() -> int:
             registry=args.registry,
             owner=args.owner,
         )
+        return 0
+    if args.command == "baseline-sha":
+        manifest = _load_manifest(args.manifest)
+        assert manifest is not None
+        baseline = baseline_release_sha(
+            manifest, registry=args.registry, owner=args.owner
+        )
+        if baseline is None:
+            print(
+                "release manifest is incompatible; forcing a full image build",
+                file=sys.stderr,
+            )
+        else:
+            print(baseline)
         return 0
     if args.command == "env":
         manifest = _load_manifest(args.manifest)

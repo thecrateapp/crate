@@ -24,6 +24,7 @@ jobs:
       contents: read
       packages: read
     outputs:
+      baseline_available: ${{ steps.baseline.outputs.available }}
       api: ${{ steps.filter.outputs.api }}
       readplane: ${{ steps.filter.outputs.readplane }}
       worker: ${{ steps.filter.outputs.worker }}
@@ -53,32 +54,40 @@ jobs:
         run: |
           set -Eeuo pipefail
           baseline=""
+          baseline_available=false
           if docker pull -q "$MANIFEST_IMAGE" >/dev/null 2>&1; then
             container="$(docker create "$MANIFEST_IMAGE" true)"
             trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
             docker cp "$container:/release-manifest.json" /tmp/previous-release.json
-            python scripts/release_manifest.py validate \
+            baseline="$(python scripts/release_manifest.py baseline-sha \
               --manifest /tmp/previous-release.json \
               --registry "$REGISTRY" \
-              --owner "$OWNER"
-            baseline="$(python scripts/release_manifest.py base-sha \
-              --manifest /tmp/previous-release.json)"
+              --owner "$OWNER" 2>/dev/null || true)"
+            if [[ -n "$baseline" ]]; then
+              baseline_available=true
+            else
+              echo "::warning::The promoted release manifest is incompatible; rebuilding all images."
+            fi
           fi
           echo "sha=$baseline" >> "$GITHUB_OUTPUT"
+          echo "available=$baseline_available" >> "$GITHUB_OUTPUT"
 
       - name: Detect affected images
         id: filter
         env:
           BASE_SHA: ${{ steps.baseline.outputs.sha }}
+          BASELINE_AVAILABLE: ${{ steps.baseline.outputs.available }}
           REQUESTED_IMAGES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.images || '' }}
         run: |
           set -Eeuo pipefail
           args=(detect --head "$GITHUB_SHA")
-          if [[ -n "$BASE_SHA" ]]; then
+          if [[ "$BASELINE_AVAILABLE" == "true" ]]; then
             args+=(--base "$BASE_SHA")
-          fi
-          if [[ -n "$REQUESTED_IMAGES" ]]; then
-            args+=(--requested "$REQUESTED_IMAGES")
+            if [[ -n "$REQUESTED_IMAGES" ]]; then
+              args+=(--requested "$REQUESTED_IMAGES")
+            fi
+          elif [[ -n "$REQUESTED_IMAGES" ]]; then
+            echo "::warning::No compatible release baseline; rebuilding all images instead of the requested subset."
           fi
           python scripts/release_manifest.py "${args[@]}" >> "$GITHUB_OUTPUT"
 
@@ -595,6 +604,7 @@ jobs:
       attestations: write
       artifact-metadata: write
     env:
+      BASELINE_AVAILABLE: ${{ needs.changes.outputs.baseline_available }}
       CHANGED_API: ${{ needs.changes.outputs.api }}
       CHANGED_READPLANE: ${{ needs.changes.outputs.readplane }}
       CHANGED_WORKER: ${{ needs.changes.outputs.worker }}
@@ -669,7 +679,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           previous_args=()
-          if docker pull -q "$STABLE_MANIFEST" >/dev/null 2>&1; then
+          if [[ "$BASELINE_AVAILABLE" == "true" ]]; then
+            docker pull -q "$STABLE_MANIFEST" >/dev/null
             container="$(docker create "$STABLE_MANIFEST" true)"
             trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
             docker cp "$container:/release-manifest.json" /tmp/previous-release.json

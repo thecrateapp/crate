@@ -55,6 +55,27 @@ def test_cast_receiver_change_only_selects_receiver_image() -> None:
     assert detect_changed_images(["app/cast-receiver/src/App.tsx"]) == {"cast-receiver"}
 
 
+def test_legacy_manifest_without_cast_receiver_is_not_a_usable_baseline() -> None:
+    previous = _previous_manifest()
+    del previous["images"]["cast-receiver"]
+
+    assert (
+        release_manifest.baseline_release_sha(
+            previous, registry="ghcr.io", owner="thecrateapp"
+        )
+        is None
+    )
+
+
+def test_complete_manifest_returns_its_release_sha_as_baseline() -> None:
+    assert (
+        release_manifest.baseline_release_sha(
+            _previous_manifest(), registry="ghcr.io", owner="thecrateapp"
+        )
+        == PREVIOUS_SHA
+    )
+
+
 def test_cast_receiver_font_change_selects_every_font_consumer() -> None:
     assert detect_changed_images(["app/shared/fonts/poppins.css"]) == {
         "cast-receiver",
