@@ -380,6 +380,8 @@
   "crate.page.loading": "Loading Crate...",
   "crate.page.kicker": "A crate by {name}",
   "crate.page.share": "Share Crate",
+  "crate.page.play": "Play",
+  "crate.page.shuffle": "Shuffle",
   "crate.page.edit": "Edit Crate",
   "crate.page.albums": "The records",
   "crate.page.noAlbums": "This Crate does not have any albums yet.",

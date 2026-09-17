@@ -72,6 +72,20 @@ class CrateDetailResponse(CrateSummaryResponse):
     albums: list[CrateAlbumResponse] = Field(default_factory=list)
 
 
+class CratePlaybackTrackResponse(BaseModel):
+    global_track_uid: str
+    global_album_uid: str
+    global_artist_uid: str
+    local_track_id: int | None = None
+    local_track_entity_uid: str | None = None
+    title: str
+    artist: str
+    album: str | None = None
+    duration: int | None = None
+    disc_number: int | None = None
+    track_number: int | None = None
+
+
 class CrateCreateResponse(BaseModel):
     id: str
 
@@ -124,6 +138,7 @@ __all__ = [
     "CrateInviteResponse",
     "CrateMemberResponse",
     "CrateMembersMutationResponse",
+    "CratePlaybackTrackResponse",
     "CrateSummaryResponse",
     "CreateCrateInviteRequest",
     "CreateCrateRequest",

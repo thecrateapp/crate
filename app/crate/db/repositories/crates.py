@@ -151,14 +151,27 @@ def add_crate_album(
             current.execute(
                 text(
                     """
-                    INSERT INTO crate_albums (
-                        crate_id, global_album_uid, position, added_by
-                    ) VALUES (
-                        CAST(:crate_id AS uuid), CAST(:album_uid AS uuid),
-                        :position, :added_by
+                    WITH inserted AS (
+                        INSERT INTO crate_albums (
+                            crate_id, global_album_uid, position, added_by
+                        ) VALUES (
+                            CAST(:crate_id AS uuid), CAST(:album_uid AS uuid),
+                            :position, :added_by
+                        )
+                        ON CONFLICT (crate_id, global_album_uid) DO NOTHING
+                        RETURNING global_album_uid, position
                     )
-                    ON CONFLICT (crate_id, global_album_uid) DO NOTHING
-                    RETURNING global_album_uid::text, position, added_by, added_at
+                    SELECT
+                        inserted.global_album_uid::text AS global_album_uid,
+                        inserted.position,
+                        album.canonical_name AS name,
+                        album.artist_name,
+                        album.year,
+                        album.has_cover,
+                        album.artwork_source_json
+                    FROM inserted
+                    JOIN global_catalog_albums album
+                      ON album.global_album_uid = inserted.global_album_uid
                     """
                 ),
                 {

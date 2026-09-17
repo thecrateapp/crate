@@ -21,6 +21,7 @@ from crate.api.schemas.crates import (
     CrateInviteResponse,
     CrateMemberResponse,
     CrateMembersMutationResponse,
+    CratePlaybackTrackResponse,
     CrateSummaryResponse,
     CreateCrateInviteRequest,
     CreateCrateRequest,
@@ -32,6 +33,7 @@ from crate.db.queries.crates import (
     get_crate_access,
     get_crate_invite,
     get_crate_members,
+    get_crate_playback_tracks,
     get_crates_for_user,
 )
 from crate.db.repositories.crates import (
@@ -179,6 +181,18 @@ def get_one(request: Request, crate_id: UUID):
     return crate
 
 
+@router.get(
+    "/{crate_id}/playback",
+    response_model=list[CratePlaybackTrackResponse],
+    responses=_CRATE_RESPONSES,
+    summary="Get playable tracks for a Crate in album order",
+)
+def playback(request: Request, crate_id: UUID):
+    user = _require_auth(request)
+    _require_crate_access(crate_id, user["id"])
+    return get_crate_playback_tracks(str(crate_id))
+
+
 @router.put(
     "/{crate_id}",
     response_model=OkResponse,
@@ -232,7 +246,9 @@ def add_album(request: Request, crate_id: UUID, body: AddCrateAlbumRequest):
     user = _require_auth(request)
     _require_editor(crate_id, user["id"])
     try:
-        add_crate_album(str(crate_id), str(body.global_album_uid), added_by=user["id"])
+        added_album = add_crate_album(
+            str(crate_id), str(body.global_album_uid), added_by=user["id"]
+        )
     except CrateNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Crate not found") from exc
     except CrateAlbumNotFoundError as exc:
@@ -241,13 +257,7 @@ def add_album(request: Request, crate_id: UUID, body: AddCrateAlbumRequest):
         raise HTTPException(
             status_code=409, detail="Album is already in this Crate"
         ) from exc
-
-    crate = _get_crate_or_404(crate_id)
-    return next(
-        album
-        for album in crate["albums"]
-        if album["global_album_uid"] == str(body.global_album_uid)
-    )
+    return added_album
 
 
 @router.delete(

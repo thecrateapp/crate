@@ -11,6 +11,35 @@ from tests.conftest import PG_AVAILABLE
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
 
+@pytest.mark.parametrize(
+    "query_name", ["get_crates_for_user", "get_public_crates_for_user"]
+)
+def test_crate_list_summaries_use_set_based_album_aggregation(query_name):
+    from crate.db.queries import crates
+
+    class Result:
+        def mappings(self):
+            return self
+
+        def all(self):
+            return []
+
+    class Session:
+        statement = ""
+
+        def execute(self, statement, _params):
+            self.statement = str(statement)
+            return Result()
+
+    session = Session()
+    getattr(crates, query_name)(1, session=session)
+
+    sql = session.statement.lower()
+    assert "crate_album_summary" in sql
+    assert "group by ca.crate_id" in sql
+    assert "select count(*)" not in sql
+
+
 def _create_user(email: str) -> int:
     from crate.db.tx import transaction_scope
 
@@ -57,6 +86,57 @@ def _seed_global_album(title: str) -> str:
             {"uid": album_uid, "artist_uid": artist_uid, "title": title},
         )
     return album_uid
+
+
+def _seed_global_track(
+    album_uid: str,
+    title: str,
+    *,
+    disc_number: int,
+    track_number: int,
+    available: bool = True,
+) -> str:
+    from crate.db.tx import transaction_scope
+
+    track_uid = str(uuid4())
+    with transaction_scope() as session:
+        artist_uid = session.execute(
+            text(
+                """
+                SELECT global_artist_uid::text
+                FROM global_catalog_albums
+                WHERE global_album_uid = CAST(:album_uid AS uuid)
+                """
+            ),
+            {"album_uid": album_uid},
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_tracks (
+                    global_track_uid, global_album_uid, global_artist_uid,
+                    canonical_title, normalized_title, artist_name, album_name,
+                    disc_number, track_number, duration_seconds,
+                    has_local, has_remote
+                ) VALUES (
+                    CAST(:track_uid AS uuid), CAST(:album_uid AS uuid),
+                    CAST(:artist_uid AS uuid), :title, :title, 'Crate Test Artist',
+                    'Crate Test Album', :disc_number, :track_number, 180,
+                    :has_local, false
+                )
+                """
+            ),
+            {
+                "track_uid": track_uid,
+                "album_uid": album_uid,
+                "artist_uid": artist_uid,
+                "title": title,
+                "disc_number": disc_number,
+                "track_number": track_number,
+                "has_local": available,
+            },
+        )
+    return track_uid
 
 
 def _album_order(crate_id: str) -> list[str]:
@@ -272,3 +352,78 @@ def test_disabling_collaboration_revokes_members_and_pending_invites(pg_db):
             ).scalar_one()
             == 0
         )
+
+
+def test_crate_playback_tracks_follow_crate_and_disc_track_order(pg_db):
+    from crate.db.queries.crates import get_crate_playback_tracks
+    from crate.db.repositories.crates import add_crate_album, create_crate
+
+    crate_id = create_crate(owner_id=1, name="Ordered playback")
+    first_album = _seed_global_album("First album")
+    second_album = _seed_global_album("Second album")
+    first_disc_two = _seed_global_track(
+        first_album, "Disc two", disc_number=2, track_number=1
+    )
+    first_disc_one_track_two = _seed_global_track(
+        first_album, "Disc one track two", disc_number=1, track_number=2
+    )
+    first_disc_one_track_one = _seed_global_track(
+        first_album, "Disc one track one", disc_number=1, track_number=1
+    )
+    second_album_track = _seed_global_track(
+        second_album, "Second album track", disc_number=1, track_number=1
+    )
+    add_crate_album(crate_id, first_album)
+    add_crate_album(crate_id, second_album)
+
+    tracks = get_crate_playback_tracks(crate_id)
+
+    assert [track["global_track_uid"] for track in tracks] == [
+        first_disc_one_track_one,
+        first_disc_one_track_two,
+        first_disc_two,
+        second_album_track,
+    ]
+
+
+def test_crate_playback_skips_unavailable_tracks_and_empty_albums(pg_db):
+    from crate.db.queries.crates import get_crate_playback_tracks
+    from crate.db.repositories.crates import add_crate_album, create_crate
+
+    crate_id = create_crate(owner_id=1, name="Partially available")
+    album_with_tracks = _seed_global_album("Partially available album")
+    empty_album = _seed_global_album("Empty album")
+    available_track = _seed_global_track(
+        album_with_tracks, "Available", disc_number=1, track_number=1
+    )
+    _seed_global_track(
+        album_with_tracks,
+        "Unavailable",
+        disc_number=1,
+        track_number=2,
+        available=False,
+    )
+    add_crate_album(crate_id, album_with_tracks)
+    add_crate_album(crate_id, empty_album)
+
+    tracks = get_crate_playback_tracks(crate_id)
+
+    assert [track["global_track_uid"] for track in tracks] == [available_track]
+
+
+def test_crate_playback_is_empty_when_no_tracks_are_available(pg_db):
+    from crate.db.queries.crates import get_crate_playback_tracks
+    from crate.db.repositories.crates import add_crate_album, create_crate
+
+    crate_id = create_crate(owner_id=1, name="Unavailable")
+    album_uid = _seed_global_album("Unavailable album")
+    _seed_global_track(
+        album_uid,
+        "Unavailable track",
+        disc_number=1,
+        track_number=1,
+        available=False,
+    )
+    add_crate_album(crate_id, album_uid)
+
+    assert get_crate_playback_tracks(crate_id) == []

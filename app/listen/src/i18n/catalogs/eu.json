@@ -380,6 +380,8 @@
   "crate.page.loading": "Crate kargatzen...",
   "crate.page.kicker": "{name}(r)en Crate bat",
   "crate.page.share": "Partekatu Crate-a",
+  "crate.page.play": "Erreproduzitu",
+  "crate.page.shuffle": "Ausazko erreprodukzioa",
   "crate.page.edit": "Editatu Crate-a",
   "crate.page.albums": "Diskoak",
   "crate.page.noAlbums": "Crate honek ez du albumik oraindik.",

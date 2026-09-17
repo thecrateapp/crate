@@ -1,16 +1,26 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Disc3, Pencil, Share2 } from "@crate/ui/icons";
+import {
+  ArrowLeft,
+  Disc3,
+  Pencil,
+  Play,
+  Share2,
+  Shuffle,
+} from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { CrateEditor } from "@/components/CrateEditor";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { useApi } from "@/hooks/use-api";
+import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
 import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
-import type { CrateDetail } from "@/pages/crates-types";
+import { shuffleArray } from "@/lib/utils";
+import { toPlayableTrack } from "@/lib/playable-track";
+import type { CrateDetail, CratePlaybackTrack } from "@/pages/crates-types";
 
 export function Crate() {
   const { t } = useTranslation();
@@ -19,8 +29,53 @@ export function Crate() {
   const { data, loading, refetch } = useApi<CrateDetail>(
     crateId ? `/api/crates/${crateId}` : null,
   );
+  const { data: playbackData, loading: playbackLoading } = useApi<
+    CratePlaybackTrack[]
+  >(crateId ? `/api/crates/${crateId}/playback` : null);
+  const { playAll } = usePlayerActions();
   const [editing, setEditing] = useState(false);
   const canEdit = data?.access === "owner" || data?.access === "collaborator";
+  const playerTracks = useMemo<Track[]>(
+    () =>
+      (playbackData ?? []).map((track) =>
+        toPlayableTrack(
+          {
+            id: track.local_track_id ?? track.global_track_uid,
+            globalTrackUid: track.global_track_uid,
+            globalAlbumUid: track.global_album_uid,
+            globalArtistUid: track.global_artist_uid,
+            entity_uid: track.local_track_entity_uid,
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration: track.duration,
+            libraryTrackId: track.local_track_id,
+          },
+          {
+            cover: albumCoverApiUrl(
+              {
+                globalAlbumUid: track.global_album_uid,
+                albumName: track.album,
+                artistName: track.artist,
+              },
+              { size: 512 },
+            ),
+          },
+        ),
+      ),
+    [playbackData],
+  );
+  const canPlay = !playbackLoading && playerTracks.length > 0;
+
+  function startCratePlayback(tracks: Track[]) {
+    if (!data || tracks.length === 0) return;
+    playAll(tracks, 0, {
+      type: "crate",
+      name: data.name,
+      id: data.id,
+      href: `/crate/${data.id}`,
+    });
+  }
 
   if (editing && data && canEdit) {
     return (
@@ -116,6 +171,24 @@ export function Crate() {
             {t("common.albumCountLabel", { count: data.albums.length })}
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => startCratePlayback(playerTracks)}
+              disabled={!canPlay}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Play size={16} fill="currentColor" />
+              {t("crate.page.play")}
+            </button>
+            <button
+              type="button"
+              onClick={() => startCratePlayback(shuffleArray(playerTracks))}
+              disabled={!canPlay}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Shuffle size={16} />
+              {t("crate.page.shuffle")}
+            </button>
             {data.visibility === "public" ? (
               <button
                 type="button"

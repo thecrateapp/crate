@@ -380,6 +380,8 @@
   "crate.page.loading": "Caricamento del Crate...",
   "crate.page.kicker": "Un Crate di {name}",
   "crate.page.share": "Condividi Crate",
+  "crate.page.play": "Riproduci",
+  "crate.page.shuffle": "Riproduzione casuale",
   "crate.page.edit": "Modifica Crate",
   "crate.page.albums": "I dischi",
   "crate.page.noAlbums": "Questo Crate non contiene ancora album.",

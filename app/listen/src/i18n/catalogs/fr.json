@@ -380,6 +380,8 @@
   "crate.page.loading": "Chargement du Crate...",
   "crate.page.kicker": "Un Crate de {name}",
   "crate.page.share": "Partager le Crate",
+  "crate.page.play": "Lire",
+  "crate.page.shuffle": "Lecture aléatoire",
   "crate.page.edit": "Modifier le Crate",
   "crate.page.albums": "Les disques",
   "crate.page.noAlbums": "Ce Crate ne contient pas encore d'albums.",

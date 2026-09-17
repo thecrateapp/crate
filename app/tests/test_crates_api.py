@@ -107,6 +107,46 @@ def _seed_album(title: str) -> str:
     return album_uid
 
 
+def _seed_playback_track(album_uid: str, title: str, *, available: bool = True) -> str:
+    from crate.db.tx import transaction_scope
+
+    track_uid = str(uuid4())
+    with transaction_scope() as session:
+        artist_uid = session.execute(
+            text(
+                """
+                SELECT global_artist_uid::text
+                FROM global_catalog_albums
+                WHERE global_album_uid = CAST(:album_uid AS uuid)
+                """
+            ),
+            {"album_uid": album_uid},
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_tracks (
+                    global_track_uid, global_album_uid, global_artist_uid,
+                    canonical_title, normalized_title, artist_name, album_name,
+                    disc_number, track_number, duration_seconds, has_local
+                ) VALUES (
+                    CAST(:track_uid AS uuid), CAST(:album_uid AS uuid),
+                    CAST(:artist_uid AS uuid), :title, :title, 'API Test Artist',
+                    'API Test Album', 1, 1, 180, :available
+                )
+                """
+            ),
+            {
+                "track_uid": track_uid,
+                "album_uid": album_uid,
+                "artist_uid": artist_uid,
+                "title": title,
+                "available": available,
+            },
+        )
+    return track_uid
+
+
 def test_create_defaults_private_and_requires_authentication(pg_db, crate_api_client):
     response = crate_api_client.post(
         "/api/crates",
@@ -280,6 +320,46 @@ def test_album_endpoints_validate_uniqueness_and_preserve_manual_order(
     ] == reordered[1:]
 
 
+def test_add_album_returns_inserted_snapshot_if_album_is_removed_afterward(
+    pg_db, crate_api_client, monkeypatch
+):
+    from crate.api import crates as crate_routes
+    from crate.db.repositories.crates import (
+        add_crate_album as add_album_to_repository,
+        create_crate,
+        remove_crate_album,
+    )
+
+    crate_id = create_crate(owner_id=1, name="Concurrent edit")
+    album_uid = _seed_album("Removed immediately")
+
+    def add_then_remove(crate_id_arg, album_uid_arg, *, added_by=None):
+        inserted = add_album_to_repository(
+            crate_id_arg, album_uid_arg, added_by=added_by
+        )
+        assert remove_crate_album(crate_id_arg, album_uid_arg)
+        return inserted
+
+    monkeypatch.setattr(crate_routes, "add_crate_album", add_then_remove)
+
+    response = crate_api_client.post(
+        f"/api/crates/{crate_id}/albums",
+        json={"global_album_uid": album_uid},
+        headers=_headers(1),
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "global_album_uid": album_uid,
+        "position": 0,
+        "name": "Removed immediately",
+        "artist_name": "API Test Artist",
+        "year": None,
+        "has_cover": False,
+        "artwork_source_json": {},
+    }
+
+
 def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
     pg_db,
     crate_api_client,
@@ -441,3 +521,24 @@ def test_only_owner_can_delete_crate_and_delete_cascades_contents(
     deleted = crate_api_client.delete(url, headers=_headers(1))
     assert deleted.status_code == 200
     assert crate_api_client.get(url, headers=_headers(1)).status_code == 404
+
+
+def test_crate_playback_endpoint_returns_catalog_tracks_only_to_crate_members(
+    pg_db,
+    crate_api_client,
+):
+    from crate.db.repositories.crates import add_crate_album, create_crate
+
+    crate_id = create_crate(owner_id=1, name="API playback")
+    album_uid = _seed_album("Playable album")
+    track_uid = _seed_playback_track(album_uid, "Playable track")
+    _seed_playback_track(album_uid, "Unavailable track", available=False)
+    add_crate_album(crate_id, album_uid)
+
+    response = crate_api_client.get(
+        f"/api/crates/{crate_id}/playback", headers=_headers(1)
+    )
+
+    assert response.status_code == 200
+    assert [track["global_track_uid"] for track in response.json()] == [track_uid]
+    assert crate_api_client.get(f"/api/crates/{crate_id}/playback").status_code == 401

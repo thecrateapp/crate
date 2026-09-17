@@ -37,6 +37,20 @@ export interface CrateDetail extends CrateSummary {
   albums: CrateAlbum[];
 }
 
+export interface CratePlaybackTrack {
+  global_track_uid: string;
+  global_album_uid: string;
+  global_artist_uid: string;
+  local_track_id?: number | null;
+  local_track_entity_uid?: string | null;
+  title: string;
+  artist: string;
+  album?: string | null;
+  duration?: number | null;
+  disc_number?: number | null;
+  track_number?: number | null;
+}
+
 export interface CrateMember {
   crate_id: string;
   user_id: number;
