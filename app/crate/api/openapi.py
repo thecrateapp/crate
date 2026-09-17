@@ -81,6 +81,11 @@ _TAG_METADATA = [
         "description": "User playlists and sharing flows.",
     },
     {
+        "name": "crates",
+        "x-displayName": "Crates",
+        "description": "Album collections and collaboration flows.",
+    },
+    {
         "name": "cast",
         "x-displayName": "Cast Receivers",
         "description": "Short-lived receiver tickets and cast media delivery.",
@@ -216,6 +221,7 @@ _TAG_GROUPS = [
         "tags": [
             "browse",
             "playlists",
+            "crates",
             "cast",
             "radio",
             "genres",
@@ -340,6 +346,7 @@ _AUTH_REQUIRED_PREFIXES = frozenset(
         "/api/offline",
         "/api/users",
         "/api/jam",
+        "/api/crates",
         "/api/curation",
         "/api/artwork",
         "/api/manage",

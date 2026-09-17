@@ -321,6 +321,26 @@ def test_jam_mutations_invalidate_jam_scope():
     assert cache_events._match_invalidation_scopes("/api/jam/rooms/abc/end") == ["jam"]
 
 
+def test_crate_mutations_invalidate_collection_and_crate_detail():
+    from crate.api import cache_events
+    from crate.db.cache_invalidation import cache_prefixes_for_scopes
+
+    crate_id = "7ee76303-7aa6-4317-a5d3-18c2e1360b1c"
+    assert cache_events._match_invalidation_scopes("/api/crates") == ["crates"]
+    assert cache_events._match_invalidation_scopes(
+        f"/api/crates/{crate_id}/albums"
+    ) == [
+        "crates",
+        f"crate:{crate_id}",
+    ]
+    assert cache_events._match_invalidation_scopes(
+        "/api/crates/invites/example-token/accept"
+    ) == ["crates"]
+    assert cache_events._should_append_invalidation_domain_event("crates") is True
+    assert cache_prefixes_for_scopes(["crates"]) == {"crate:"}
+    assert f"crate:{crate_id}" in cache_prefixes_for_scopes([f"crate:{crate_id}"])
+
+
 def test_admin_auth_mutations_invalidate_readplane_identity_cache():
     from crate.api import cache_events
 

@@ -443,6 +443,7 @@ def create_app() -> FastAPI:
     )
     from crate.api.settings import router as settings_router
     from crate.api.playlists import router as playlists_router
+    from crate.api.crates import me_router as crates_me_router, router as crates_router
     from crate.api.offline import router as offline_router
     from crate.api.curation import router as curation_router
     from crate.api.system_playlists import router as system_playlists_router
@@ -505,6 +506,8 @@ def create_app() -> FastAPI:
     app.include_router(management_admin_router)
     app.include_router(settings_router)
     app.include_router(playlists_router)
+    app.include_router(crates_router)
+    app.include_router(crates_me_router)
     app.include_router(curation_router)
     app.include_router(system_playlists_router)
     app.include_router(genres_router)

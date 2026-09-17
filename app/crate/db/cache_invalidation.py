@@ -31,6 +31,7 @@ _SCOPE_CACHE_PREFIXES = {
     "shows": ("shows:",),
     "upcoming": ("upcoming:",),
     "playlists": ("playlist:",),
+    "crates": ("crate:",),
     "curation": ("curation:",),
 }
 

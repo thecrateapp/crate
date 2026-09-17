@@ -249,6 +249,34 @@ def test_openapi_types_playlist_routes_and_keeps_filter_options_public(test_app)
     )
 
 
+def test_openapi_types_crate_collection_and_invite_routes(test_app):
+    data = test_app.get("/openapi.json").json()
+    collection_operation = data["paths"]["/api/me/crates"]["get"]
+    create_operation = data["paths"]["/api/crates"]["post"]
+    detail_operation = data["paths"]["/api/crates/{crate_id}"]["get"]
+    accept_operation = data["paths"]["/api/crates/invites/{token}/accept"]["post"]
+
+    assert collection_operation["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+    collection_schema = collection_operation["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]
+    assert collection_schema["type"] == "array"
+    assert collection_schema["items"]["$ref"].endswith("/CrateSummaryResponse")
+    assert create_operation["responses"]["201"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/CrateCreateResponse")
+    assert detail_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/CrateDetailResponse")
+    assert accept_operation["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+
+
 def test_openapi_types_settings_routes_and_marks_them_authenticated(test_app):
     data = test_app.get("/openapi.json").json()
     get_operation = data["paths"]["/api/settings"]["get"]
