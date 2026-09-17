@@ -75,6 +75,7 @@ the methods registered for each operation.
 | `getSimilarSongs2`          | GET, POST |
 | `getSong`                   | GET, POST |
 | `getSongsByGenre`           | GET, POST |
+| `getStarred`                | GET, POST |
 | `getStarred2`               | GET, POST |
 | `getTopSongs`               | GET, POST |
 | `getUser`                   | GET, POST |

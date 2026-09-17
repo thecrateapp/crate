@@ -211,6 +211,56 @@ def test_starred_tracks_are_read_from_global_likes(test_app):
     assert song["starred"] == starred["starred"]
 
 
+def test_starred_v1_returns_user_scoped_favorites(test_app):
+    starred = {
+        "artist": [],
+        "album": [
+            {
+                "id": f"gal-{ALBUM_UID}",
+                "name": "Blending",
+                "artist": "High Vis",
+                "artistId": f"ga-{ARTIST_UID}",
+                "year": 2022,
+                "songCount": 4,
+                "duration": 1200,
+                "coverArt": f"gal-{ALBUM_UID}",
+            }
+        ],
+        "song": [
+            {
+                "id": f"gt-{TRACK_UID}",
+                "title": "Marigold",
+                "isDir": False,
+                "artist": "High Vis",
+                "album": "Blending",
+                "starred": "2026-07-14T10:00:00+00:00",
+            }
+        ],
+    }
+    with (
+        _auth(),
+        patch(
+            "crate.api.subsonic.legacy.preferences.get_starred",
+            return_value=starred,
+        ) as query,
+    ):
+        response = test_app.get("/rest/getStarred.view?u=listener&p=secret&f=json")
+
+    assert response.status_code == 200
+    query.assert_called_once_with(USER["id"])
+    response_payload = response.json()
+    from tests.subsonic.contract_helpers import validate_json_response
+
+    assert validate_json_response(response_payload) == []
+    payload = response_payload["subsonic-response"]["starred"]
+    album = payload["album"][0]
+    assert album["id"] == f"gal-{ALBUM_UID}"
+    assert album["isDir"] is True
+    assert album["title"] == "Blending"
+    song = payload["song"][0]
+    assert song["id"] == f"gt-{TRACK_UID}"
+
+
 def test_legacy_favorite_alias_is_deduplicated_after_global_resolution():
     from crate.subsonic.services import preferences
 

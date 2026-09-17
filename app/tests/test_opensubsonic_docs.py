@@ -24,26 +24,38 @@ def _endpoint_table() -> str:
         methods = set(getattr(route, "methods", ()) or ()) & {"GET", "POST"}
         operations.setdefault(operation, set()).update(methods)
 
+    rows = [
+        (f"`{operation}`", ", ".join(sorted(methods)))
+        for operation, methods in sorted(operations.items())
+    ]
+    operation_width = max(len("Operation"), *(len(operation) for operation, _ in rows))
+    methods_width = max(len("Methods"), *(len(methods) for _, methods in rows))
     return "\n".join(
         [
-            "| Operation | Methods |",
-            "| --- | --- |",
+            f"| {'Operation':<{operation_width}} | {'Methods':<{methods_width}} |",
+            f"| {'-' * operation_width} | {'-' * methods_width} |",
             *[
-                f"| `{operation}` | {', '.join(sorted(methods))} |"
-                for operation, methods in sorted(operations.items())
+                f"| {operation:<{operation_width}} | {methods:<{methods_width}} |"
+                for operation, methods in rows
             ],
         ]
     )
 
 
 def _extension_table() -> str:
+    rows = [
+        (f"`{extension['name']}`", ", ".join(map(str, extension["versions"])))
+        for extension in advertised_extensions()
+    ]
+    extension_width = max(len("Extension"), *(len(name) for name, _ in rows))
+    versions_width = max(len("Versions"), *(len(versions) for _, versions in rows))
     return "\n".join(
         [
-            "| Extension | Versions |",
-            "| --- | --- |",
+            f"| {'Extension':<{extension_width}} | {'Versions':<{versions_width}} |",
+            f"| {'-' * extension_width} | {'-' * versions_width} |",
             *[
-                f"| `{extension['name']}` | {', '.join(map(str, extension['versions']))} |"
-                for extension in advertised_extensions()
+                f"| {name:<{extension_width}} | {versions:<{versions_width}} |"
+                for name, versions in rows
             ],
         ]
     )

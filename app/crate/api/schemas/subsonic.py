@@ -17,6 +17,7 @@ class SubsonicResponseBase(_SubsonicModel):
     version: str
     type: str
     server_version: str = Field(alias="serverVersion")
+    open_subsonic: bool = Field(default=True, alias="openSubsonic")
     error: SubsonicErrorDetail | None = None
 
 
@@ -111,6 +112,23 @@ class SubsonicSong(_SubsonicModel):
     user_rating: int | None = Field(default=None, alias="userRating")
 
 
+class SubsonicChild(_SubsonicModel):
+    id: str
+    is_dir: bool = Field(alias="isDir")
+    title: str
+    name: str | None = None
+    parent: str | None = None
+    album: str | None = None
+    artist: str | None = None
+    artist_id: str | None = Field(default=None, alias="artistId")
+    year: int | None = None
+    cover_art: str | None = Field(default=None, alias="coverArt")
+    song_count: int | None = Field(default=None, alias="songCount")
+    duration: float | None = None
+    created: str | None = None
+    starred: str | None = None
+
+
 class SubsonicArtistDetail(_SubsonicModel):
     id: str
     name: str
@@ -198,6 +216,12 @@ class SubsonicStarred2(_SubsonicModel):
     artist: list[SubsonicArtist]
     album: list[SubsonicAlbum]
     song: list[SubsonicSong]
+
+
+class SubsonicStarred(_SubsonicModel):
+    artist: list[SubsonicArtist]
+    album: list[SubsonicChild]
+    song: list[SubsonicChild]
 
 
 class SubsonicRandomSongs(_SubsonicModel):
@@ -370,6 +394,14 @@ class SubsonicStarred2Body(SubsonicResponseBase):
 
 class SubsonicStarred2Response(SubsonicEnvelopeBase):
     subsonic_response: SubsonicStarred2Body = Field(alias="subsonic-response")
+
+
+class SubsonicStarredBody(SubsonicResponseBase):
+    starred: SubsonicStarred | None = None
+
+
+class SubsonicStarredResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicStarredBody = Field(alias="subsonic-response")
 
 
 class SubsonicRandomSongsBody(SubsonicResponseBase):

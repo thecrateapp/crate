@@ -58,6 +58,7 @@ from crate.api.schemas.subsonic import (
     SubsonicArtistInfoResponse,
     SubsonicAlbumInfoResponse,
     SubsonicSongResponse,
+    SubsonicStarredResponse,
     SubsonicStarred2Response,
     SubsonicUserResponse,
 )
@@ -126,6 +127,7 @@ def _subsonic_response(data: dict, status: str = "ok") -> JSONResponse:
                 "version": SUBSONIC_API_VERSION,
                 "type": SERVER_NAME,
                 "serverVersion": "0.1.0",
+                "openSubsonic": True,
                 **data,
             }
         }
@@ -1284,6 +1286,55 @@ def _parse_playlist_indexes(values: list[str] | None) -> list[int] | None:
 
 
 # ── Other stubs (required by clients but not critical) ──────────
+
+
+@router.get(
+    "/getStarred",
+    response_model=SubsonicStarredResponse,
+    summary="List starred artists, albums, and songs",
+)
+@router.get("/getStarred.view", include_in_schema=False)
+def get_starred(request: Request):
+    try:
+        user = _require_subsonic_auth(request)
+    except SubsonicAuthError as error:
+        return _subsonic_auth_error_response(error)
+
+    starred = preferences.get_starred(int(user["id"]))
+    legacy_albums = []
+    for album in starred["album"]:
+        name = str(album.get("name") or "")
+        child = {
+            "id": album["id"],
+            "isDir": True,
+            "title": name,
+            "name": name,
+            "album": name,
+        }
+        if album.get("artistId"):
+            child["parent"] = album["artistId"]
+        for field in (
+            "artist",
+            "artistId",
+            "year",
+            "coverArt",
+            "songCount",
+            "duration",
+            "created",
+        ):
+            if album.get(field) is not None:
+                child[field] = album[field]
+        legacy_albums.append(child)
+
+    return _subsonic_response(
+        {
+            "starred": {
+                "artist": starred["artist"],
+                "album": legacy_albums,
+                "song": starred["song"],
+            }
+        }
+    )
 
 
 @router.get(
