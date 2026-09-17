@@ -412,6 +412,14 @@ class SubsonicSongsResponse(SubsonicEnvelopeBase):
     subsonic_response: SubsonicSongsBody = Field(alias="subsonic-response")
 
 
+class SubsonicSongsByGenreBody(SubsonicResponseBase):
+    songs_by_genre: SubsonicSongs | None = Field(default=None, alias="songsByGenre")
+
+
+class SubsonicSongsByGenreResponse(SubsonicEnvelopeBase):
+    subsonic_response: SubsonicSongsByGenreBody = Field(alias="subsonic-response")
+
+
 class SubsonicAlbumListBody(SubsonicResponseBase):
     album_list: SubsonicAlbumList | None = Field(default=None, alias="albumList")
 

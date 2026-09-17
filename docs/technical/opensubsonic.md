@@ -166,3 +166,45 @@ flag value fails closed during router selection.
 This is the implementation contract, not authorization to activate the v1
 engine in production. The production cutover and legacy retirement are the
 separate post-merge Cut S runbook.
+
+## Automated interoperability gate
+
+The OpenSubsonic workflow runs only when `/rest`, its contract fixtures, or
+this profile changes. It builds an isolated API + PostgreSQL + Redis stack,
+seeds a disposable catalog and user credential, and probes the API over HTTP.
+The fixtures cover extension discovery without authentication, all three
+advertised authentication mechanisms, artist/album/track browse, artwork,
+search and genres, playlist CRUD, stars/ratings/scrobble, saved queues, byte
+range seeking, download, and every advertised extension. They do not depend on
+client user-agent values or modify the production catalog.
+
+To run the same gate locally:
+
+```bash
+docker compose -f docker-compose.opensubsonic-smoke.yaml -p crate-opensubsonic-smoke \
+  up --build --abort-on-container-exit --exit-code-from smoke
+docker compose -f docker-compose.opensubsonic-smoke.yaml -p crate-opensubsonic-smoke \
+  down --volumes --remove-orphans
+```
+
+The project name is intentionally explicit: cleanup removes only the isolated
+smoke stack and its two named fixture volumes.
+
+## Release-candidate client smoke matrix
+
+The HTTP harness is deterministic protocol coverage, not a substitute for
+running independent GUI clients. Before signing off a release candidate, run
+the following against a disposable account and fixture library, then record
+client build, OS/device, date, pass/fail, and a redacted evidence link in the
+release notes. Never record the API key or password in evidence.
+
+| Client    | Fixture role                | Required manual checks                                        | Result     |
+| --------- | --------------------------- | ------------------------------------------------------------- | ---------- |
+| Feishin   | Required desktop fixture    | Connect, browse/search, artwork, play/seek, playlist, ratings | Pending RC |
+| Symfonium | Independent Android fixture | Connect, browse/artwork, play/seek, saved queue, scrobble     | Pending RC |
+| Subtracks | Independent Android fixture | Connect, browse/search, artwork, play/seek, playlist          | Pending RC |
+
+Use the same disposable server profile and library for each client, but create
+separate credentials where the client stores credentials persistently. A
+failure must first be reduced to a reproducible protocol request/response
+fixture; do not add client-specific production branches to accommodate it.

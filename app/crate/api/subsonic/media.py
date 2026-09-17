@@ -18,6 +18,31 @@ from crate.subsonic.services import media as media_service
 
 router = OpenSubsonicAPIRouter(prefix="/rest", tags=["subsonic"])
 
+_AUDIO_CONTENT_TYPES = (
+    "audio/aac",
+    "audio/flac",
+    "audio/mp4",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/opus",
+    "audio/wav",
+)
+_MEDIA_RESPONSES = {
+    200: {
+        "description": "Audio bytes, or a Subsonic error envelope.",
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/SubsonicOkResponse"}
+            },
+            **{
+                content_type: {"schema": {"type": "string", "format": "binary"}}
+                for content_type in _AUDIO_CONTENT_TYPES
+            },
+        },
+    },
+    404: {"description": "The requested track media was not found."},
+}
+
 
 def _auth_documentation(
     username: str = Query("", alias="u"),
@@ -90,6 +115,7 @@ def _required_id(request: Request) -> str:
     "/stream",
     summary="Stream or transcode a track",
     dependencies=[Depends(_auth_documentation), Depends(_stream_documentation)],
+    responses=_MEDIA_RESPONSES,
 )
 @router.get("/stream.view", include_in_schema=False)
 def stream(request: Request) -> Response:
@@ -109,6 +135,7 @@ def stream(request: Request) -> Response:
     "/download",
     summary="Download the original track file",
     dependencies=[Depends(_auth_documentation), Depends(_download_documentation)],
+    responses=_MEDIA_RESPONSES,
 )
 @router.get("/download.view", include_in_schema=False)
 def download(request: Request) -> Response:

@@ -1,0 +1,74 @@
+name: OpenSubsonic Interoperability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/crate/subsonic/**"
+      - "app/crate/api/subsonic/**"
+      - "app/crate/api/schemas/subsonic.py"
+      - "app/crate/db/queries/subsonic_*.py"
+      - "app/crate/db/repositories/subsonic_*.py"
+      - "app/crate/db/migrations/versions/*opensubsonic*.py"
+      - "app/tests/subsonic/**"
+      - "app/tests/test_subsonic_api.py"
+      - "app/tests/test_openapi_contract.py"
+      - "app/tests/contracts/opensubsonic/**"
+      - "app/tests/test_opensubsonic_docs.py"
+      - "app/config.yaml"
+      - "app/Dockerfile"
+      - "app/requirements*.txt"
+      - "docs/technical/opensubsonic.md"
+      - "docker-compose.opensubsonic-smoke.yaml"
+      - ".github/workflows/opensubsonic-smoke.yml"
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "app/crate/subsonic/**"
+      - "app/crate/api/subsonic/**"
+      - "app/crate/api/schemas/subsonic.py"
+      - "app/crate/db/queries/subsonic_*.py"
+      - "app/crate/db/repositories/subsonic_*.py"
+      - "app/crate/db/migrations/versions/*opensubsonic*.py"
+      - "app/tests/subsonic/**"
+      - "app/tests/test_subsonic_api.py"
+      - "app/tests/test_openapi_contract.py"
+      - "app/tests/contracts/opensubsonic/**"
+      - "app/tests/test_opensubsonic_docs.py"
+      - "app/config.yaml"
+      - "app/Dockerfile"
+      - "app/requirements*.txt"
+      - "docs/technical/opensubsonic.md"
+      - "docker-compose.opensubsonic-smoke.yaml"
+      - ".github/workflows/opensubsonic-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: opensubsonic-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    name: OpenSubsonic protocol smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run isolated Dockerized interoperability probes
+        run: >-
+          docker compose
+          -f docker-compose.opensubsonic-smoke.yaml
+          -p crate-opensubsonic-smoke
+          up --build --abort-on-container-exit --exit-code-from smoke
+
+      - name: Remove isolated smoke stack
+        if: always()
+        run: >-
+          docker compose
+          -f docker-compose.opensubsonic-smoke.yaml
+          -p crate-opensubsonic-smoke
+          down --volumes --remove-orphans

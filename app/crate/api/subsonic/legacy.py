@@ -51,7 +51,7 @@ from crate.api.schemas.subsonic import (
     SubsonicPlaylistsResponse,
     SubsonicPlaylistResponse,
     SubsonicRandomSongsResponse,
-    SubsonicSongsResponse,
+    SubsonicSongsByGenreResponse,
     SubsonicSearchResponse,
     SubsonicSearchResult2Response,
     SubsonicSearchResult3Response,
@@ -330,7 +330,7 @@ def get_genres(request: Request):
 
 @router.get(
     "/getSongsByGenre",
-    response_model=SubsonicSongsResponse,
+    response_model=SubsonicSongsByGenreResponse,
     summary="List songs matching a genre",
 )
 @router.get("/getSongsByGenre.view", include_in_schema=False)
@@ -354,7 +354,7 @@ def get_songs_by_genre(
         genre.strip(), size=count, offset=offset, music_folder_id=musicFolderId
     )
     return _subsonic_response(
-        {"songs": {"song": [_global_song_payload(track) for track in tracks]}}
+        {"songsByGenre": {"song": [_global_song_payload(track) for track in tracks]}}
     )
 
 

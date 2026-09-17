@@ -1220,7 +1220,7 @@ class TestSubsonicPlaylistEndpoints:
                 "&genre=post-rock&count=4&offset=2&musicFolderId=1"
             )
 
-        songs = _subsonic_ok_response(response)["songs"]["song"]
+        songs = _subsonic_ok_response(response)["songsByGenre"]["song"]
         assert len(songs) == 1
         tracks_by_genre.assert_called_once_with(
             "post-rock", size=4, offset=2, music_folder_id="1"

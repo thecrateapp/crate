@@ -1226,7 +1226,10 @@ def test_openapi_types_browse_shows_upcoming_and_media_routes(test_app):
 
 
 def test_openapi_types_subsonic_routes_and_hides_view_aliases(test_app):
+    from crate.streaming.service import STREAM_MEDIA_TYPES
+
     data = test_app.get("/openapi.json").json()
+    schemas = data["components"]["schemas"]
 
     assert "/rest/ping" in data["paths"]
     assert {
@@ -1260,7 +1263,9 @@ def test_openapi_types_subsonic_routes_and_hides_view_aliases(test_app):
     album_list_operation = data["paths"]["/rest/getAlbumList2"]["get"]
     search_operation = data["paths"]["/rest/search3"]["get"]
     stream_operation = data["paths"]["/rest/stream"]["get"]
+    download_operation = data["paths"]["/rest/download"]["get"]
     cover_operation = data["paths"]["/rest/getCoverArt"]["get"]
+    songs_by_genre_operation = data["paths"]["/rest/getSongsByGenre"]["get"]
     scrobble_post_operation = data["paths"]["/rest/scrobble"]["post"]
     random_operation = data["paths"]["/rest/getRandomSongs"]["get"]
 
@@ -1286,14 +1291,25 @@ def test_openapi_types_subsonic_routes_and_hides_view_aliases(test_app):
     assert random_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/SubsonicRandomSongsResponse")
+    assert songs_by_genre_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/SubsonicSongsByGenreResponse")
+    assert "songsByGenre" in schemas["SubsonicSongsByGenreBody"]["properties"]
 
     stream_content = stream_operation["responses"]["200"]["content"]
     assert "application/json" in stream_content
-    assert "audio/mpeg" in stream_content
     assert stream_content["application/json"]["schema"]["$ref"].endswith(
         "/SubsonicOkResponse"
     )
-    assert stream_content["audio/mpeg"]["schema"]["format"] == "binary"
+    audio_content_types = set(STREAM_MEDIA_TYPES.values())
+    assert audio_content_types <= stream_content.keys()
+    assert (
+        audio_content_types <= download_operation["responses"]["200"]["content"].keys()
+    )
+    assert all(
+        stream_content[content_type]["schema"]["format"] == "binary"
+        for content_type in audio_content_types
+    )
 
     cover_content = cover_operation["responses"]["200"]["content"]
     assert "application/json" in cover_content
@@ -1301,7 +1317,6 @@ def test_openapi_types_subsonic_routes_and_hides_view_aliases(test_app):
     assert cover_content["image/jpeg"]["schema"]["format"] == "binary"
     assert "size" in {p["name"] for p in cover_operation["parameters"]}
 
-    schemas = data["components"]["schemas"]
     assert "coverArt" in schemas["SubsonicArtist"]["properties"]
     assert "coverArt" in schemas["SubsonicArtistDetail"]["properties"]
 
