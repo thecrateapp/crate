@@ -2393,6 +2393,14 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
                 enabled=("desktop", "mobile"),
                 created_publications=created_publications,
             )
+            if render_manifest is None and isinstance(
+                (existing or {}).get("render_manifest"), Mapping
+            ):
+                return {
+                    "status": "conflict",
+                    "reason": "artist-hero-manifest-incomplete",
+                    "artist_id": artist_id,
+                }
             applied = upsert_artist_hero_artwork(
                 artist_id=artist_id,
                 provenance="derived_background",

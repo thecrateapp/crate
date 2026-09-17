@@ -2217,6 +2217,69 @@ def test_derive_handler_creates_unreviewed_hero_from_large_background(
     warm.assert_called_once_with()
 
 
+def test_derive_handler_preserves_incomplete_active_manifest(monkeypatch, tmp_path):
+    from crate.worker_handlers.artwork import _handle_derive_artist_hero
+
+    artist_dir = tmp_path / "Converge"
+    artist_dir.mkdir()
+    Image.new("RGB", (2200, 1100), color=(36, 75, 92)).save(
+        artist_dir / "background.jpg"
+    )
+    profile = {
+        "provenance": "derived_background",
+        "review_status": "unreviewed",
+        "revision": "existing-revision",
+        "render_manifest": {
+            "manifest_version": 1,
+            "artifacts": {"desktop": {"render_revision": "existing-revision"}},
+        },
+    }
+    upserts = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_library_artist",
+        lambda name: {"id": 7, "entity_uid": "artist-entity", "name": name},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.resolve_artist_dir",
+        lambda *args, **kwargs: artist_dir,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.get_artist_hero_artwork",
+        lambda _artist_id: profile,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork._publish_artist_hero_manifest",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.upsert_artist_hero_artwork",
+        lambda **kwargs: upserts.append(kwargs),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.queue_artwork_materialization",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork._broadcast_artwork_invalidation",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork._warm_recent_home_discovery_snapshots",
+        lambda: None,
+    )
+
+    result = _handle_derive_artist_hero(
+        "task-1", {"artist": "Converge"}, {"library_path": str(tmp_path)}
+    )
+
+    assert result == {
+        "status": "conflict",
+        "reason": "artist-hero-manifest-incomplete",
+        "artist_id": 7,
+    }
+    assert upserts == []
+
+
 def test_derive_handler_never_overwrites_manual_artwork(monkeypatch, tmp_path):
     from crate.worker_handlers.artwork import _handle_derive_artist_hero
 
