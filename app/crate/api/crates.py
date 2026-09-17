@@ -162,11 +162,7 @@ def accept_invite(request: Request, token: str):
     if accepted is None:
         raise HTTPException(status_code=404, detail="Invite not found or expired")
     crate_id = accepted["crate_id"]
-    return {
-        "ok": True,
-        "crate_id": crate_id,
-        "members": get_crate_members(crate_id),
-    }
+    return {"ok": True, "crate_id": crate_id}
 
 
 @router.get(

@@ -112,7 +112,6 @@ class CrateInvitePreviewResponse(BaseModel):
 
 class CrateInviteAcceptResponse(OkResponse):
     crate_id: str
-    members: list[CrateMemberResponse] = Field(default_factory=list)
 
 
 __all__ = [

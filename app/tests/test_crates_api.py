@@ -341,6 +341,38 @@ def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
     )
 
 
+def test_accepting_crate_invite_does_not_return_member_directory(
+    pg_db,
+    crate_api_client,
+):
+    existing_member_id = _create_user(f"crate-existing-member-{uuid4()}@example.test")
+    invitee_id = _create_user(f"crate-new-member-{uuid4()}@example.test")
+    crate_id = _create_crate(is_collaborative=True)
+
+    invite = crate_api_client.post(
+        f"/api/crates/{crate_id}/invites",
+        json={"expires_in_hours": 168, "max_uses": 2},
+        headers=_headers(1),
+    )
+    assert invite.status_code == 201
+    token = invite.json()["token"]
+
+    existing_member_acceptance = crate_api_client.post(
+        f"/api/crates/invites/{token}/accept",
+        headers=_headers(existing_member_id),
+    )
+    assert existing_member_acceptance.status_code == 200
+
+    accepted = crate_api_client.post(
+        f"/api/crates/invites/{token}/accept",
+        headers=_headers(invitee_id),
+    )
+
+    assert accepted.status_code == 200
+    assert accepted.json()["crate_id"] == crate_id
+    assert "members" not in accepted.json()
+
+
 def test_expired_and_revoked_invites_cannot_be_accepted(pg_db, crate_api_client):
     from crate.db.tx import transaction_scope
 
