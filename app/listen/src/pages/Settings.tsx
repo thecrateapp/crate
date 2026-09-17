@@ -4,6 +4,7 @@ import { AccountSection } from "@/components/settings/AccountSection";
 import { BandcampSection } from "@/components/settings/BandcampSection";
 import { LanguageSection } from "@/components/settings/LanguageSection";
 import { LinksSection } from "@/components/settings/LinksSection";
+import { OpenSubsonicCredentialsSection } from "@/components/settings/OpenSubsonicCredentialsSection";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { PlaybackSection } from "@/components/settings/PlaybackSection";
 import { ScrobbleSection } from "@/components/settings/ScrobbleSection";
@@ -32,6 +33,7 @@ export function Settings() {
       <ShowsLocationSection />
       <SleepTimerSection />
       <AccountSection />
+      <OpenSubsonicCredentialsSection />
       <ScrobbleSection />
       <BandcampSection />
       <LinksSection />

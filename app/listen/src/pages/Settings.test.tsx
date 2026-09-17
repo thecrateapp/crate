@@ -37,6 +37,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
         if (method === "PUT") return body;
         return { remote_scrobbling_enabled: false };
       }
+      if (url === "/api/auth/subsonic-token") {
+        return { configured: false };
+      }
       return {};
     }),
   };
@@ -68,6 +71,7 @@ describe("Settings", () => {
     expect(screen.getByText("Al terminar la pista")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("tu-handle")).toBeInTheDocument();
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
+    expect(screen.getByText("OpenSubsonic")).toBeInTheDocument();
     expect(container.querySelector(".settings-header")).toBeInTheDocument();
     expect(container.querySelector(".settings-section")).toBeInTheDocument();
   });
