@@ -9,7 +9,7 @@ Spec: http://www.subsonic.org/pages/api.jsp
 import logging
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from crate.db.queries.subsonic_global import (
@@ -27,6 +27,7 @@ from crate.subsonic.global_ids import (
 from crate.subsonic.params import RequestParameters
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.protocol import render_response
+from crate.subsonic.routes import OpenSubsonicAPIRouter
 from crate.subsonic.services import catalog
 from crate.subsonic.services import discovery as discovery_service
 from crate.subsonic.services import preferences
@@ -91,7 +92,7 @@ def _subsonic_docs_params(
     del username, password, token, salt, version, client, response_format
 
 
-router = APIRouter(
+router = OpenSubsonicAPIRouter(
     prefix="/rest", tags=["subsonic"], dependencies=[Depends(_subsonic_docs_params)]
 )
 

@@ -161,6 +161,7 @@ def test_v1_system_routes_support_view_aliases_and_public_extensions() -> None:
     assert ping.json() == ping_view.json()
     assert license_response.json()["subsonic-response"]["license"]["valid"] is True
     assert extensions.json()["subsonic-response"]["openSubsonicExtensions"] == [
+        {"name": "formPost", "versions": [1]},
         {"name": "indexBasedQueue", "versions": [1]},
         {"name": "songLyrics", "versions": [1]},
         {"name": "topSongsByArtistId", "versions": [1]},

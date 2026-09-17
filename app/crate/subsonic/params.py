@@ -30,6 +30,7 @@ async def collect_parameters(request: Request) -> RequestParameters:
     if (
         request.method.upper() == "POST"
         and content_type == "application/x-www-form-urlencoded"
+        and not getattr(request.state, "subsonic_form_params_merged", False)
     ):
         form = await request.form()
         items.extend(

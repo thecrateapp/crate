@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import Depends, Query, Request
 from fastapi.responses import Response
 
 from crate.federation.playback_service import PlaybackServiceError
@@ -13,9 +13,10 @@ from crate.subsonic.auth import authenticate
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.params import RequestParameters
 from crate.subsonic.protocol import render_response
+from crate.subsonic.routes import OpenSubsonicAPIRouter
 from crate.subsonic.services import media as media_service
 
-router = APIRouter(prefix="/rest", tags=["subsonic"])
+router = OpenSubsonicAPIRouter(prefix="/rest", tags=["subsonic"])
 
 
 def _auth_documentation(

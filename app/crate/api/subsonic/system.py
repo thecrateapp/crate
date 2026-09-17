@@ -3,7 +3,7 @@
 import logging
 from typing import Any, Callable
 
-from fastapi import APIRouter, Request
+from fastapi import Request
 from fastapi.responses import Response
 
 from crate.db.queries.subsonic_user_queries import get_user_by_username
@@ -11,12 +11,13 @@ from crate.subsonic.capabilities import advertised_extensions
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.params import RequestParameters, collect_parameters
 from crate.subsonic.protocol import API_VERSION, render_response
+from crate.subsonic.routes import OpenSubsonicAPIRouter
 from crate.subsonic.services import system_operations
 from crate.subsonic.services.avatars import fetch_avatar
 from crate.user_avatars import AvatarProxyError, AvatarUnavailable
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/rest", tags=["subsonic"])
+router = OpenSubsonicAPIRouter(prefix="/rest", tags=["subsonic"])
 
 
 def _response_format(params: RequestParameters) -> str:
