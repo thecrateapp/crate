@@ -1,3 +1,19 @@
+---
+title: Cast release checklist
+summary: Physical-device and protocol acceptance checks for a Crate Cast release candidate.
+section: operations
+audience: [developer, operator]
+status: canonical
+order: 150
+verified: 2026-09-17
+sources:
+  [
+    app/cast-receiver,
+    app/listen,
+    docs/plans/2026-09-14-crate-cast-receiver-implementation-plan.md,
+  ]
+---
+
 # Cast release checklist
 
 Complete this checklist against the exact release candidate commit. Record the

@@ -223,6 +223,8 @@ def capture_handled_http_error(*, method: str, route: str, status_code: int) -> 
         scope.set_tag("http.method", normalized_method)
         scope.set_tag("http.route", normalized_route)
         scope.set_tag("http.status_code", str(normalized_status))
+        if normalized_route == "/rest" or normalized_route.startswith("/rest/"):
+            scope.set_tag("protocol", "opensubsonic")
         scope.set_context(
             "http_response",
             {

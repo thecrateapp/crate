@@ -96,6 +96,18 @@ const loaders: Record<string, MarkdownLoader> = {
     import(
       "../../../docs/technical/09-playback-realtime-and-subsonic.md?raw"
     ).then((module) => module.default),
+  "docs/technical/opensubsonic.md": () =>
+    import("../../../docs/technical/opensubsonic.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/operators/cast-receiver.md": () =>
+    import("../../../docs/operators/cast-receiver.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/testing/cast-release-checklist.md": () =>
+    import("../../../docs/testing/cast-release-checklist.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/10-development-deployment-and-operations.md": () =>
     import(
       "../../../docs/technical/10-development-deployment-and-operations.md?raw"

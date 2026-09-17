@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi.responses import JSONResponse, Response
 
-from crate.subsonic.errors import OpenSubsonicError
+from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 
 API_VERSION = "1.16.1"
 SERVER_NAME = "Crate"
@@ -37,6 +37,8 @@ def render_response(
     error: OpenSubsonicError | None = None,
     response_format: str = "xml",
 ) -> Response:
+    if error is not None:
+        _record_protocol_error(error)
     envelope = response_envelope(data, error)
     if response_format == "json":
         return JSONResponse(content=envelope)
@@ -46,6 +48,16 @@ def render_response(
         content=_render_xml(envelope["subsonic-response"]),
         media_type="application/xml",
     )
+
+
+def _record_protocol_error(error: OpenSubsonicError) -> None:
+    try:
+        code = ErrorCode(error.code).name.lower()
+    except (TypeError, ValueError):
+        code = "other"
+    from crate.metrics import record_counter_later
+
+    record_counter_later("opensubsonic.protocol.errors", {"code": code})
 
 
 def _render_xml(envelope: dict[str, Any]) -> bytes:

@@ -422,6 +422,10 @@ class TestSubsonicBrowse:
         with (
             _subsonic_auth_ok(),
             patch(
+                "crate.api.subsonic.legacy.preferences.with_user_rating",
+                side_effect=lambda user_id, song: song,
+            ),
+            patch(
                 "crate.subsonic.services.catalog.album_detail",
                 return_value={
                     "id": f"gal-{_GLOBAL_ALBUM_UID}",
@@ -464,6 +468,10 @@ class TestSubsonicBrowse:
         with (
             _subsonic_auth_ok(),
             patch(
+                "crate.api.subsonic.legacy.preferences.with_user_rating",
+                side_effect=lambda user_id, song: song,
+            ),
+            patch(
                 "crate.subsonic.services.catalog.song_detail",
                 return_value={
                     "id": f"gt-{_GLOBAL_TRACK_UID}",
@@ -496,6 +504,10 @@ class TestSubsonicBrowse:
     def test_get_song_mp3_content_type(self, test_app):
         with (
             _subsonic_auth_ok(),
+            patch(
+                "crate.api.subsonic.legacy.preferences.with_user_rating",
+                side_effect=lambda user_id, song: song,
+            ),
             patch(
                 "crate.subsonic.services.catalog.song_detail",
                 return_value={
@@ -1084,7 +1096,8 @@ class TestSubsonicPlaylistEndpoints:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.get_starred_global_tracks", return_value=[]
+                "crate.api.subsonic.legacy.preferences.get_starred",
+                return_value={"artist": [], "album": [], "song": []},
             ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getStarred2?u=admin&p=admin")

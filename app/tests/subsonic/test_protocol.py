@@ -38,6 +38,30 @@ def test_json_error_envelope_matches_open_subsonic_golden() -> None:
     assert validate_json_response(payload) == []
 
 
+def test_protocol_errors_record_only_a_bounded_error_code(monkeypatch) -> None:
+    from crate import metrics
+
+    records = []
+    monkeypatch.setattr(
+        metrics,
+        "record_counter_later",
+        lambda name, tags=None: records.append((name, tags)),
+    )
+
+    render_response(
+        error=OpenSubsonicError(
+            ErrorCode.INVALID_CREDENTIALS,
+            "do-not-include-password-or-username",
+        ),
+        response_format="json",
+    )
+
+    assert records == [
+        ("opensubsonic.protocol.errors", {"code": "invalid_credentials"})
+    ]
+    assert "do-not-include-password-or-username" not in repr(records)
+
+
 def test_xml_success_envelope_serializes_payload_attributes() -> None:
     response = render_response(
         {"license": {"valid": True, "email": "crate@local"}},

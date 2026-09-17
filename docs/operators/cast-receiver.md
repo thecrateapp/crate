@@ -1,3 +1,18 @@
+---
+title: Cast receiver operations
+summary: Configure and operate Crate's hosted Google Cast receiver safely.
+section: operations
+audience: [operator]
+status: canonical
+order: 140
+verified: 2026-09-17
+sources:
+  [
+    app/cast-receiver,
+    docs/plans/2026-09-14-crate-cast-receiver-implementation-plan.md,
+  ]
+---
+
 # Cast receiver operations
 
 Crate ships its Custom Web Receiver as the independent

@@ -99,6 +99,33 @@
     "order": 98
   },
   {
+    "sourcePath": "docs/technical/opensubsonic.md",
+    "route": "/architecture/opensubsonic-profile",
+    "section": "architecture",
+    "title": "OpenSubsonic compatibility profile",
+    "summary": "Crate's supported OpenSubsonic API, authentication, observability and rollout contract.",
+    "keywords": ["opensubsonic", "subsonic", "rest", "compatibility"],
+    "order": 99
+  },
+  {
+    "sourcePath": "docs/operators/cast-receiver.md",
+    "route": "/operations/cast-receiver",
+    "section": "operations",
+    "title": "Cast receiver operations",
+    "summary": "Configure and operate Crate's hosted Google Cast receiver safely.",
+    "keywords": ["cast", "receiver", "google cast", "operations"],
+    "order": 140
+  },
+  {
+    "sourcePath": "docs/testing/cast-release-checklist.md",
+    "route": "/operations/cast-release-checklist",
+    "section": "operations",
+    "title": "Cast release checklist",
+    "summary": "Physical-device and protocol acceptance checks for a Crate Cast release candidate.",
+    "keywords": ["cast", "release", "checklist", "devices"],
+    "order": 150
+  },
+  {
     "sourcePath": "docs/technical/developer-guide.md",
     "route": "/developer/developer-guide",
     "section": "developer",

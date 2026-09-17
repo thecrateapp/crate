@@ -417,6 +417,7 @@ def test_capture_handled_http_error_groups_by_route_without_query_data(monkeypat
         "/rest/getAlbum.view",
         "500",
     ]
+    assert ("protocol", "opensubsonic") in scope.tags
     assert scope.contexts == [
         (
             "http_response",
