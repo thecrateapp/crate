@@ -68,20 +68,26 @@ def plan_artist_hero_migration(
     """
 
     artist_id_raw = artist_row.get("id")
+    artist_id: int | None = None
+    if isinstance(artist_id_raw, (int, str)):
+        try:
+            artist_id = int(artist_id_raw)
+        except ValueError:
+            pass
     entity_uid = str(artist_row.get("entity_uid") or "")
     expected_revision = str(profile.get("revision") or "")
     enabled = _enabled_compositions(profile)
 
     def skipped(reason: str) -> ArtistHeroMigrationPlan:
         return ArtistHeroMigrationPlan(
-            artist_id=int(artist_id_raw) if artist_id_raw is not None else None,
+            artist_id=artist_id,
             entity_uid=entity_uid,
             expected_revision=expected_revision,
             enabled=enabled,
             skip_reason=reason,
         )
 
-    if artist_id_raw is None:
+    if artist_id is None:
         return skipped("missing-artist-id")
     if not entity_uid:
         return skipped("missing-entity-uid")
@@ -110,7 +116,7 @@ def plan_artist_hero_migration(
         recipes[composition] = dict(recipe)
 
     return ArtistHeroMigrationPlan(
-        artist_id=int(artist_id_raw),
+        artist_id=artist_id,
         entity_uid=entity_uid,
         expected_revision=expected_revision,
         enabled=enabled,

@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
@@ -138,30 +137,8 @@ def test_get_playlist_hides_private_playlist_from_other_users():
 
 
 def test_update_playlist_removes_zero_based_indices_in_descending_order():
-    session = MagicMock()
-
-    @contextmanager
-    def fake_transaction():
-        yield session
-
     with (
-        patch("crate.subsonic.services.playlists.transaction_scope", fake_transaction),
-        patch(
-            "crate.subsonic.services.playlists.get_playlist_record",
-            return_value=_PLAYLIST,
-        ),
-        patch(
-            "crate.subsonic.services.playlists.get_playlist_tracks",
-            return_value=[{}, {}, {}],
-        ),
-        patch("crate.subsonic.services.playlists.is_playlist_owner", return_value=True),
-        patch("crate.subsonic.services.playlists.update_playlist_record") as update,
-        patch(
-            "crate.subsonic.services.playlists.playlist_cover_abspath",
-            return_value=None,
-        ),
-        patch("crate.subsonic.services.playlists.lock_playlist", return_value=True),
-        patch("crate.subsonic.services.playlists.remove_playlist_track") as remove,
+        patch("crate.subsonic.services.playlists.update_subsonic_playlist") as update,
     ):
         playlists.update_playlist(
             _USER,
@@ -173,14 +150,12 @@ def test_update_playlist_removes_zero_based_indices_in_descending_order():
         )
 
     update.assert_called_once_with(
-        12, session=session, name="New name", description="Updated", visibility="public"
-    )
-    assert [call.args[1] for call in remove.call_args_list] == [3, 1]
-    assert all(
-        call.kwargs["session"] is session
-        and call.kwargs["record_exclusion"] is False
-        and call.kwargs["excluded_by_user_id"] == 7
-        for call in remove.call_args_list
+        12,
+        user_id=7,
+        is_admin=False,
+        fields={"name": "New name", "description": "Updated", "visibility": "public"},
+        remove_indexes=[0, 2],
+        tracks_to_add=[],
     )
 
 
@@ -189,7 +164,7 @@ def test_create_playlist_rejects_unresolvable_song_before_writing():
         patch(
             "crate.subsonic.services.playlists.catalog.song_detail", return_value=None
         ),
-        patch("crate.subsonic.services.playlists.create_playlist_record") as create,
+        patch("crate.subsonic.services.playlists.create_subsonic_playlist") as create,
     ):
         with pytest.raises(OpenSubsonicError) as error:
             playlists.create_playlist(_USER, name="Bad playlist", song_ids=[_TRACK_ID])
@@ -199,60 +174,42 @@ def test_create_playlist_rejects_unresolvable_song_before_writing():
 
 
 def test_create_playlist_marks_added_songs_as_manual():
-    session = MagicMock()
     result = {"id": "pl-12", "name": "Set"}
 
-    @contextmanager
-    def fake_transaction():
-        yield session
-
     with (
-        patch("crate.subsonic.services.playlists.transaction_scope", fake_transaction),
         patch(
             "crate.subsonic.services.playlists.catalog.song_detail", return_value=_TRACK
         ),
         patch(
-            "crate.subsonic.services.playlists.create_playlist_record", return_value=12
-        ),
-        patch("crate.subsonic.services.playlists.add_playlist_tracks") as add,
+            "crate.subsonic.services.playlists.create_subsonic_playlist",
+            return_value=12,
+        ) as create,
         patch("crate.subsonic.services.playlists.get_playlist", return_value=result),
     ):
         assert (
             playlists.create_playlist(_USER, name="Set", song_ids=[_TRACK_ID]) == result
         )
 
-    add.assert_called_once_with(
-        12,
+    create.assert_called_once_with(
+        "Set",
+        7,
         [
             {
                 "global_track_uid": "33333333-3333-4333-8333-333333333333",
                 "source": "manual",
             }
         ],
-        session=session,
     )
 
 
 def test_create_playlist_with_existing_id_replaces_tracks_as_manual():
-    session = MagicMock()
     result = {"id": "pl-12", "name": "Set"}
 
-    @contextmanager
-    def fake_transaction():
-        yield session
-
     with (
-        patch("crate.subsonic.services.playlists.transaction_scope", fake_transaction),
         patch(
             "crate.subsonic.services.playlists.catalog.song_detail", return_value=_TRACK
         ),
-        patch("crate.subsonic.services.playlists.lock_playlist", return_value=True),
-        patch(
-            "crate.subsonic.services.playlists.get_playlist_record",
-            return_value=_PLAYLIST,
-        ),
-        patch("crate.subsonic.services.playlists.is_playlist_owner", return_value=True),
-        patch("crate.subsonic.services.playlists.replace_playlist_tracks") as replace,
+        patch("crate.subsonic.services.playlists.replace_subsonic_playlist") as replace,
         patch("crate.subsonic.services.playlists.get_playlist", return_value=result),
     ):
         assert (
@@ -262,37 +219,24 @@ def test_create_playlist_with_existing_id_replaces_tracks_as_manual():
 
     replace.assert_called_once_with(
         12,
-        [
+        user_id=7,
+        is_admin=False,
+        name=None,
+        tracks=[
             {
                 "global_track_uid": "33333333-3333-4333-8333-333333333333",
                 "source": "manual",
             }
         ],
-        session=session,
     )
 
 
 def test_update_playlist_rejects_out_of_range_indices_without_mutation():
-    session = MagicMock()
-
-    @contextmanager
-    def fake_transaction():
-        yield session
-
     with (
-        patch("crate.subsonic.services.playlists.transaction_scope", fake_transaction),
-        patch("crate.subsonic.services.playlists.lock_playlist", return_value=True),
         patch(
-            "crate.subsonic.services.playlists.get_playlist_record",
-            return_value=_PLAYLIST,
-        ),
-        patch("crate.subsonic.services.playlists.is_playlist_owner", return_value=True),
-        patch(
-            "crate.subsonic.services.playlists.get_playlist_tracks", return_value=[{}]
-        ),
-        patch("crate.subsonic.services.playlists.update_playlist_record") as update,
-        patch("crate.subsonic.services.playlists.remove_playlist_track") as remove,
-        patch("crate.subsonic.services.playlists.add_playlist_tracks") as add,
+            "crate.subsonic.services.playlists.update_subsonic_playlist",
+            side_effect=playlists.PlaylistMutationError("invalid-index"),
+        ) as update,
     ):
         with pytest.raises(OpenSubsonicError) as error:
             playlists.update_playlist(
@@ -300,63 +244,44 @@ def test_update_playlist_rejects_out_of_range_indices_without_mutation():
             )
 
     assert error.value.code == ErrorCode.NOT_FOUND
-    update.assert_not_called()
-    remove.assert_not_called()
-    add.assert_not_called()
+    update.assert_called_once()
 
 
 def test_delete_playlist_requires_owner_and_does_not_remove_other_users_playlist():
-    session = MagicMock()
-
-    @contextmanager
-    def fake_transaction():
-        yield session
-
     with (
-        patch("crate.subsonic.services.playlists.transaction_scope", fake_transaction),
-        patch("crate.subsonic.services.playlists.lock_playlist", return_value=True),
         patch(
-            "crate.subsonic.services.playlists.get_playlist_record",
-            return_value=_PLAYLIST,
-        ),
-        patch(
-            "crate.subsonic.services.playlists.is_playlist_owner", return_value=False
-        ),
-        patch("crate.subsonic.services.playlists.delete_playlist_record") as delete,
+            "crate.subsonic.services.playlists.delete_subsonic_playlist",
+            side_effect=playlists.PlaylistMutationError("not-authorized"),
+        ) as delete,
     ):
         with pytest.raises(OpenSubsonicError) as error:
             playlists.delete_playlist({"id": 99, "role": "user"}, "pl-12")
 
     assert error.value.code == ErrorCode.NOT_AUTHORIZED
-    delete.assert_not_called()
+    delete.assert_called_once_with(12, user_id=99, is_admin=False)
 
 
 def test_mutation_returns_not_found_when_playlist_lock_finds_no_row():
-    session = MagicMock()
-
-    @contextmanager
-    def fake_transaction():
-        yield session
-
     with (
-        patch("crate.subsonic.services.playlists.transaction_scope", fake_transaction),
-        patch("crate.subsonic.services.playlists.lock_playlist", return_value=False),
-        patch("crate.subsonic.services.playlists.get_playlist_record") as load,
-        patch("crate.subsonic.services.playlists.update_playlist_record") as update,
+        patch(
+            "crate.subsonic.services.playlists.update_subsonic_playlist",
+            side_effect=playlists.PlaylistMutationError("not-found"),
+        ) as update,
     ):
         with pytest.raises(OpenSubsonicError) as error:
             playlists.update_playlist(_USER, "pl-404", name="Missing")
 
     assert error.value.code == ErrorCode.NOT_FOUND
-    load.assert_not_called()
-    update.assert_not_called()
+    update.assert_called_once()
 
 
 def test_playlist_mutation_locks_row_before_loading_it():
+    from crate.db.repositories.playlists_mutate import lock_playlist
+
     session = MagicMock()
     session.execute.return_value.first.return_value = (12,)
 
-    assert playlists.lock_playlist(12, session=session)
+    assert lock_playlist(12, session=session)
 
     statement = str(session.execute.call_args.args[0])
     assert "FOR UPDATE" in statement

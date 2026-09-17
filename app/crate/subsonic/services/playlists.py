@@ -13,22 +13,14 @@ from crate.db.repositories.playlists_collection_reads import (
 from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
 from crate.db.repositories.playlists_membership_reads import (
     can_view_playlist,
-    is_playlist_owner,
 )
-from crate.db.repositories.playlists_mutate import (
-    delete_playlist as delete_playlist_record,
-    lock_playlist,
-    update_playlist as update_playlist_record,
+from crate.db.repositories.subsonic_playlist_mutations import (
+    PlaylistMutationError,
+    create_subsonic_playlist,
+    delete_subsonic_playlist,
+    replace_subsonic_playlist,
+    update_subsonic_playlist,
 )
-from crate.db.repositories.playlists_create import (
-    create_playlist as create_playlist_record,
-)
-from crate.db.repositories.playlists_tracks import (
-    add_playlist_tracks,
-    remove_playlist_track,
-    replace_playlist_tracks,
-)
-from crate.db.tx import transaction_scope
 from crate.playlist_covers import playlist_cover_abspath
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.global_ids import (
@@ -88,30 +80,24 @@ def create_playlist(
             raise OpenSubsonicError(
                 ErrorCode.MISSING_PARAMETER, "Playlist name is required"
             )
-        with transaction_scope() as session:
-            new_id = create_playlist_record(
-                name=name.strip(),
-                user_id=int(user["id"]),
-                scope="user",
-                visibility="private",
-                session=session,
-            )
-            if tracks:
-                add_playlist_tracks(new_id, tracks, session=session)
+        new_id = create_subsonic_playlist(name.strip(), int(user["id"]), tracks)
         return get_playlist(user, encode_subsonic_playlist_id(new_id))
 
     target_id = _decode_playlist_id(playlist_id)
-    with transaction_scope() as session:
-        playlist = _lock_and_get_playlist(target_id, session)
-        _require_owner(playlist, user)
-        if name is not None:
-            if not name.strip():
-                raise OpenSubsonicError(
-                    ErrorCode.MISSING_PARAMETER, "Playlist name cannot be empty"
-                )
-            update_playlist_record(target_id, session=session, name=name.strip())
-        if song_ids is not None:
-            replace_playlist_tracks(target_id, tracks, session=session)
+    if name is not None and not name.strip():
+        raise OpenSubsonicError(
+            ErrorCode.MISSING_PARAMETER, "Playlist name cannot be empty"
+        )
+    try:
+        replace_subsonic_playlist(
+            target_id,
+            user_id=int(user["id"]),
+            is_admin=user.get("role") == "admin",
+            name=name.strip() if name is not None else None,
+            tracks=tracks if song_ids is not None else None,
+        )
+    except PlaylistMutationError as error:
+        _raise_playlist_mutation_error(error)
     return get_playlist(user, encode_subsonic_playlist_id(target_id))
 
 
@@ -127,51 +113,40 @@ def update_playlist(
 ) -> None:
     playlist_id = _decode_playlist_id(identifier)
     tracks = _resolve_song_ids(song_ids_to_add or [])
-    with transaction_scope() as session:
-        playlist = _lock_and_get_playlist(playlist_id, session)
-        _require_owner(playlist, user)
-
-        removals = sorted(set(song_indexes_to_remove or []), reverse=True)
-        current_tracks = get_playlist_tracks(playlist_id, session=session)
-        if any(index < 0 or index >= len(current_tracks) for index in removals):
-            raise OpenSubsonicError(
-                ErrorCode.NOT_FOUND, "Playlist song index not found"
-            )
-
-        fields: dict[str, Any] = {}
-        if name is not None:
-            if not name.strip():
-                raise OpenSubsonicError(
-                    ErrorCode.MISSING_PARAMETER, "Playlist name cannot be empty"
-                )
-            fields["name"] = name.strip()
-        if comment is not None:
-            fields["description"] = comment
-        if public is not None:
-            fields["visibility"] = "public" if public else "private"
-        if fields:
-            update_playlist_record(playlist_id, session=session, **fields)
-
-        for index in removals:
-            # OpenSubsonic indices are zero-based; Crate stores positions from 1.
-            remove_playlist_track(
-                playlist_id,
-                index + 1,
-                session=session,
-                record_exclusion=bool(playlist.get("is_smart")),
-                excluded_by_user_id=int(user["id"]),
-            )
-        if tracks:
-            add_playlist_tracks(playlist_id, tracks, session=session)
+    if name is not None and not name.strip():
+        raise OpenSubsonicError(
+            ErrorCode.MISSING_PARAMETER, "Playlist name cannot be empty"
+        )
+    fields: dict[str, Any] = {}
+    if name is not None:
+        fields["name"] = name.strip()
+    if comment is not None:
+        fields["description"] = comment
+    if public is not None:
+        fields["visibility"] = "public" if public else "private"
+    try:
+        update_subsonic_playlist(
+            playlist_id,
+            user_id=int(user["id"]),
+            is_admin=user.get("role") == "admin",
+            fields=fields,
+            remove_indexes=song_indexes_to_remove or [],
+            tracks_to_add=tracks,
+        )
+    except PlaylistMutationError as error:
+        _raise_playlist_mutation_error(error)
 
 
 def delete_playlist(user: dict[str, Any], identifier: str) -> None:
     playlist_id = _decode_playlist_id(identifier)
-    with transaction_scope() as session:
-        playlist = _lock_and_get_playlist(playlist_id, session)
-        _require_owner(playlist, user)
-        if not delete_playlist_record(playlist_id, session=session):
-            raise OpenSubsonicError(ErrorCode.NOT_FOUND, "Playlist not found")
+    try:
+        delete_subsonic_playlist(
+            playlist_id,
+            user_id=int(user["id"]),
+            is_admin=user.get("role") == "admin",
+        )
+    except PlaylistMutationError as error:
+        _raise_playlist_mutation_error(error)
 
 
 def _resolve_song_ids(song_ids: list[str]) -> list[dict[str, Any]]:
@@ -193,20 +168,15 @@ def _resolve_song_ids(song_ids: list[str]) -> list[dict[str, Any]]:
     return result
 
 
-def _lock_and_get_playlist(playlist_id: int, session) -> dict:
-    if not lock_playlist(playlist_id, session=session):
-        raise OpenSubsonicError(ErrorCode.NOT_FOUND, "Playlist not found")
-    playlist = get_playlist_record(playlist_id, session=session)
-    if playlist is None:
-        raise OpenSubsonicError(ErrorCode.NOT_FOUND, "Playlist not found")
-    return playlist
-
-
-def _require_owner(playlist: dict, user: dict[str, Any]) -> None:
-    if _is_read_only(playlist):
+def _raise_playlist_mutation_error(error: PlaylistMutationError) -> None:
+    if error.reason == "not-authorized":
         raise OpenSubsonicError(ErrorCode.NOT_AUTHORIZED, "Playlist is read-only")
-    if user.get("role") != "admin" and not is_playlist_owner(playlist, int(user["id"])):
-        raise OpenSubsonicError(ErrorCode.NOT_AUTHORIZED, "Playlist is read-only")
+    message = (
+        "Playlist song index not found"
+        if error.reason == "invalid-index"
+        else "Playlist not found"
+    )
+    raise OpenSubsonicError(ErrorCode.NOT_FOUND, message)
 
 
 def _can_view(playlist: dict | None, user: dict[str, Any]) -> bool:

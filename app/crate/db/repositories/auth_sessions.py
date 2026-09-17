@@ -36,9 +36,12 @@ def create_session(
         label = device_label or (parse_device_label(user_agent) if user_agent else None)
         fingerprint = (device_fingerprint or "").strip() or None
         now = datetime.now(timezone.utc)
+        expires_at_dt = coerce_datetime(expires_at)
+        if expires_at_dt is None:
+            raise ValueError("Session expiry must be a valid datetime")
 
         def refresh_reusable(reusable: AuthSession) -> dict:
-            reusable.expires_at = coerce_datetime(expires_at)
+            reusable.expires_at = expires_at_dt
             reusable.last_seen_at = now
             reusable.last_seen_ip = last_seen_ip
             reusable.user_agent = user_agent

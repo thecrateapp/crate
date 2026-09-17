@@ -175,24 +175,21 @@ def _assert_ok(envelope: dict[str, Any], endpoint: str) -> dict[str, Any]:
 
 def _seed_fixture() -> SmokeFixture:
     from PIL import Image
-    from sqlalchemy import text
-
     from crate.db.queries.subsonic_global import (
         get_global_album_by_local_id,
         get_global_artist_by_local_id,
         get_global_track_by_local_id,
     )
     from crate.db.queries.subsonic_user_queries import get_user_by_username
-    from crate.db.orm.library import LibraryArtist
+    from crate.db.jobs.analysis_popularity import update_track_popularity
+    from crate.db.repositories.library_artist_reads import get_library_artist
     from crate.db.repositories.lyrics import store_lyrics
     from crate.db.repositories.library_album_upserts import upsert_album
     from crate.db.repositories.library_artist_upserts import upsert_artist
     from crate.db.repositories.library_track_reads import get_library_track_by_path
     from crate.db.repositories.library_track_upserts import upsert_track
-    from crate.db.tx import read_scope, transaction_scope
     from crate.federation.global_reconciliation import reconcile_local_catalog
     from crate.subsonic.auth import create_user_credential
-    from sqlalchemy import select
 
     root = Path(os.environ.get("CRATE_SMOKE_MUSIC_ROOT", "/music")).resolve()
     artist_name = "Crate OpenSubsonic Smoke Fixture"
@@ -249,11 +246,7 @@ def _seed_fixture() -> SmokeFixture:
     local_track_id = int(track["id"])
 
     reconcile_local_catalog()
-    with transaction_scope() as session:
-        session.execute(
-            text("UPDATE library_tracks SET lastfm_playcount = 1 WHERE id = :id"),
-            {"id": local_track_id},
-        )
+    update_track_popularity(local_track_id, listeners=0, playcount=1)
 
     store_lyrics(
         artist_name,
@@ -268,11 +261,10 @@ def _seed_fixture() -> SmokeFixture:
         raise RuntimeError("The API startup did not seed the smoke admin user")
     secret = create_user_credential(int(user["id"]))
 
-    with read_scope() as session:
-        local_artist_id = session.execute(
-            select(LibraryArtist.id).where(LibraryArtist.name == artist_name)
-        ).scalar_one()
-    artist = get_global_artist_by_local_id(int(local_artist_id))
+    local_artist = get_library_artist(artist_name)
+    if local_artist is None or local_artist.get("id") is None:
+        raise RuntimeError("Smoke artist was not persisted in the local catalog")
+    artist = get_global_artist_by_local_id(int(local_artist["id"]))
     album = get_global_album_by_local_id(local_album_id)
     global_track = get_global_track_by_local_id(local_track_id)
     if not artist or not album or not global_track:

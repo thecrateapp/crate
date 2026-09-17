@@ -7,14 +7,15 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import text
-
 from crate.db.cache_store import delete_cache, set_cache
 from crate.db.cache_runtime import get_redis
 from crate.db.queries.subsonic_global import get_global_track
+from crate.db.queries.subsonic_user_queries import (
+    get_active_usernames,
+    get_recent_now_playing_rows,
+)
 from crate.db.queries.subsonic_track_queries import get_track_full
 from crate.db.repositories.user_library_playback_writes import record_play_event
-from crate.db.tx import read_scope
 from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 from crate.subsonic.global_ids import (
     SubsonicEntityId,
@@ -192,7 +193,11 @@ def scrobble(params: RequestParameters, user: dict) -> None:
         record_play_event(
             user_id,
             client_event_id=client_event_id,
-            track_id=int(entity_id.local_id) if entity_id.scope == "local" else None,
+            track_id=(
+                entity_id.local_id
+                if entity_id.scope == "local" and entity_id.local_id is not None
+                else None
+            ),
             global_track_uid=(
                 str(entity_id.global_uid) if entity_id.scope == "global" else None
             ),
@@ -241,21 +246,7 @@ def _read_active_now_playing() -> list[tuple[int, dict]]:
             log.debug("Could not read now-playing cache from Redis", exc_info=True)
 
     try:
-        with read_scope() as session:
-            rows = (
-                session.execute(
-                    text(
-                        """
-                        SELECT key, value_json
-                        FROM cache
-                        WHERE key LIKE 'now_playing:%'
-                          AND updated_at >= NOW() - INTERVAL '7 hours'
-                        """
-                    )
-                )
-                .mappings()
-                .all()
-            )
+        rows = get_recent_now_playing_rows()
         active = []
         for row in rows:
             try:
@@ -274,26 +265,7 @@ def _read_active_now_playing() -> list[tuple[int, dict]]:
 
 
 def _get_usernames(user_ids: list[int]) -> dict[int, str]:
-    if not user_ids:
-        return {}
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                    SELECT id, COALESCE(username, email) AS username
-                    FROM users
-                    WHERE id = ANY(:user_ids)
-                      AND status = 'active'
-                      AND deleted_at IS NULL
-                    """
-                ),
-                {"user_ids": user_ids},
-            )
-            .mappings()
-            .all()
-        )
-    return {int(row["id"]): str(row["username"] or "") for row in rows}
+    return get_active_usernames(user_ids)
 
 
 def _is_active(payload: dict, *, now: datetime) -> bool:

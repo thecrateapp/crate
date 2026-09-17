@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
+from typing import Any
 
 from fastapi import Depends, Query, Request
 from fastapi.responses import Response
@@ -27,7 +28,7 @@ _AUDIO_CONTENT_TYPES = (
     "audio/opus",
     "audio/wav",
 )
-_MEDIA_RESPONSES = {
+_MEDIA_RESPONSES: dict[int | str, dict[str, Any]] = {
     200: {
         "description": "Audio bytes, or a Subsonic error envelope.",
         "content": {

@@ -339,6 +339,8 @@ def update_cast_session_queue(
         if not current_row:
             return None
         current = _session_from_row(dict(current_row))
+        if current is None:
+            return None
         duplicate = session.execute(
             text(
                 """
@@ -395,6 +397,8 @@ def update_cast_session_queue(
             .one()
         )
         result = _session_from_row(dict(row))
+        if result is None:
+            raise RuntimeError("Updated Cast session was not returned")
         session.execute(
             text(
                 """
@@ -449,6 +453,8 @@ def update_cast_session_state(
         if not current_row:
             return None
         current = _session_from_row(dict(current_row))
+        if current is None:
+            return None
         if current and state_seq <= current["state_seq"]:
             return current
         _validate_cursor(current["queue"], current_index)

@@ -29,7 +29,10 @@ log = logging.getLogger(__name__)
 def _handle_generate_cast_spectrum(task_id: str, params: dict, config: dict) -> dict:
     del config
     try:
-        track_id = int(params.get("track_id"))
+        raw_track_id = params.get("track_id")
+        if isinstance(raw_track_id, bool) or not isinstance(raw_track_id, (int, str)):
+            raise ValueError
+        track_id = int(raw_track_id)
     except (TypeError, ValueError):
         raise ValueError("track_id is required") from None
     requested_fingerprint = str(params.get("source_fingerprint") or "").strip()

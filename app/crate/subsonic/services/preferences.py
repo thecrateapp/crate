@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
-
-from sqlalchemy import text
+from typing import Any, Literal
 
 from crate.db.queries.browse_media_favorites import list_favorites
+from crate.db.queries.subsonic_global import (
+    get_global_album_by_local_id,
+    get_global_artist_by_local_id,
+    get_global_track_by_local_id,
+    get_local_entity_id_by_global_uid,
+)
 from crate.db.queries.user_library_library import (
     get_followed_artists,
     get_liked_tracks,
@@ -17,6 +21,11 @@ from crate.db.queries.user_library_library import (
 from crate.db.repositories.browse_media_favorites import (
     add_favorite,
     remove_favorite,
+)
+from crate.db.repositories.library_album_reads import get_library_album_by_id
+from crate.db.repositories.library_artist_reads import (
+    get_library_artist,
+    get_library_artist_by_id,
 )
 from crate.db.repositories.global_user_library import (
     follow_global_artist,
@@ -39,9 +48,9 @@ from crate.db.repositories.user_media_preferences import (
     get_track_rating,
     set_track_rating,
 )
-from crate.db.tx import read_scope
 from crate.subsonic.global_ids import (
     SubsonicEntityId,
+    EntityKind,
     SubsonicIdError,
     decode_subsonic_id,
     encode_subsonic_id,
@@ -49,7 +58,8 @@ from crate.subsonic.global_ids import (
 from crate.subsonic.serializers import serialize_album, serialize_song
 
 
-_KIND_ALIASES = {"track": "song", "song": "song"}
+SubsonicItemKind = Literal["artist", "album", "song"]
+_KIND_ALIASES: dict[str, SubsonicItemKind] = {"track": "song", "song": "song"}
 _FAVORITE_IDENTITY_COLUMNS = {
     "artist": ("global_catalog_artists", "global_artist_uid", "local_artist_id"),
     "album": ("global_catalog_albums", "global_album_uid", "local_album_id"),
@@ -57,11 +67,18 @@ _FAVORITE_IDENTITY_COLUMNS = {
 }
 
 
-def _decode_item(item_type: str, item_id: str) -> tuple[str, SubsonicEntityId, str]:
-    kind = _KIND_ALIASES.get(item_type, item_type)
-    if kind not in {"artist", "album", "song"}:
+def _decode_item(
+    item_type: str, item_id: str
+) -> tuple[SubsonicItemKind, SubsonicEntityId, str]:
+    if item_type in _KIND_ALIASES:
+        kind: SubsonicItemKind = _KIND_ALIASES[item_type]
+    elif item_type == "artist":
+        kind = "artist"
+    elif item_type == "album":
+        kind = "album"
+    else:
         raise ValueError("type must be song, album, or artist")
-    entity_kind = "track" if kind == "song" else kind
+    entity_kind: EntityKind = "track" if kind == "song" else kind
     raw_id = str(item_id or "").strip()
     if raw_id.isdecimal() and kind in {"artist", "album"}:
         raw_id = ("ar-" if kind == "artist" else "al-") + raw_id
@@ -73,45 +90,26 @@ def _decode_item(item_type: str, item_id: str) -> tuple[str, SubsonicEntityId, s
 
 
 def _local_artist_name(artist_id: int) -> str | None:
-    with read_scope() as session:
-        return session.execute(
-            text("SELECT name FROM library_artists WHERE id = :id"),
-            {"id": artist_id},
-        ).scalar_one_or_none()
+    artist = get_library_artist_by_id(artist_id)
+    return str(artist["name"]) if artist is not None else None
 
 
 def _local_album_exists(album_id: int) -> bool:
-    with read_scope() as session:
-        return (
-            session.execute(
-                text("SELECT 1 FROM library_albums WHERE id = :id"),
-                {"id": album_id},
-            ).first()
-            is not None
-        )
+    return get_library_album_by_id(album_id) is not None
 
 
 def _favorite_artist_id(artist_name: str) -> str:
-    with read_scope() as session:
-        artist_id = session.execute(
-            text(
-                "SELECT id FROM library_artists WHERE name = :name ORDER BY id LIMIT 1"
-            ),
-            {"name": artist_name},
-        ).scalar_one_or_none()
-    if artist_id is None:
+    artist = get_library_artist(artist_name)
+    if artist is None or artist.get("id") is None:
         return "name:" + artist_name.casefold()
-    from crate.db.queries.subsonic_global import get_global_artist_by_local_id
-
-    artist = get_global_artist_by_local_id(int(artist_id))
-    if artist:
-        return "ga-" + str(artist["global_artist_uid"])
+    artist_id = int(artist["id"])
+    global_artist = get_global_artist_by_local_id(artist_id)
+    if global_artist:
+        return "ga-" + str(global_artist["global_artist_uid"])
     return "ar-" + str(artist_id)
 
 
 def _favorite_album_id(album_id: int) -> str:
-    from crate.db.queries.subsonic_global import get_global_album_by_local_id
-
     album = get_global_album_by_local_id(album_id)
     if album:
         return "gal-" + str(album["global_album_uid"])
@@ -119,47 +117,44 @@ def _favorite_album_id(album_id: int) -> str:
 
 
 def _favorite_ids_for_entity(
-    kind: str, entity_id: SubsonicEntityId, canonical_id: str
+    kind: SubsonicItemKind, entity_id: SubsonicEntityId, canonical_id: str
 ) -> set[str]:
     aliases = {canonical_id}
-    table, global_column, local_column = _FAVORITE_IDENTITY_COLUMNS[kind]
-    with read_scope() as session:
-        if entity_id.scope == "global":
-            local_id = session.execute(
-                text(
-                    f"SELECT {local_column} FROM {table} "
-                    f"WHERE {global_column} = CAST(:uid AS uuid)"
-                ),
-                {"uid": entity_id.global_uid},
-            ).scalar_one_or_none()
-            if local_id is not None:
-                aliases.add(
-                    encode_subsonic_id(
-                        SubsonicEntityId(
-                            kind="track" if kind == "song" else kind,
-                            scope="local",
-                            local_id=int(local_id),
-                        )
+    entity_kind: EntityKind = "track" if kind == "song" else kind
+    if entity_id.scope == "global" and entity_id.global_uid:
+        local_id = get_local_entity_id_by_global_uid(entity_kind, entity_id.global_uid)
+        if local_id is not None:
+            aliases.add(
+                encode_subsonic_id(
+                    SubsonicEntityId(
+                        kind=entity_kind,
+                        scope="local",
+                        local_id=local_id,
                     )
                 )
-        else:
-            global_uid = session.execute(
-                text(
-                    f"SELECT {global_column}::text FROM {table} "
-                    f"WHERE {local_column} = :local_id"
-                ),
-                {"local_id": entity_id.local_id},
-            ).scalar_one_or_none()
-            if global_uid:
-                aliases.add(
-                    encode_subsonic_id(
-                        SubsonicEntityId(
-                            kind="track" if kind == "song" else kind,
-                            scope="global",
-                            global_uid=str(global_uid),
-                        )
+            )
+    elif entity_id.scope == "local" and entity_id.local_id is not None:
+        lookup = {
+            "artist": get_global_artist_by_local_id,
+            "album": get_global_album_by_local_id,
+            "track": get_global_track_by_local_id,
+        }[entity_kind]
+        global_entity = lookup(entity_id.local_id)
+        global_uid = (
+            global_entity.get(f"global_{entity_kind}_uid")
+            if global_entity is not None
+            else None
+        )
+        if global_uid:
+            aliases.add(
+                encode_subsonic_id(
+                    SubsonicEntityId(
+                        kind=entity_kind,
+                        scope="global",
+                        global_uid=str(global_uid),
                     )
                 )
+            )
     return aliases
 
 
@@ -271,18 +266,9 @@ def star_track_reference(
     elif resolved_track_id is not None:
         favorite_id = str(resolved_track_id)
     else:
-        with read_scope() as session:
-            row = session.execute(
-                text(
-                    "SELECT id FROM library_tracks WHERE "
-                    "(:entity_uid IS NOT NULL AND entity_uid = CAST(:entity_uid AS uuid)) "
-                    "OR (:path IS NOT NULL AND path = :path) LIMIT 1"
-                ),
-                {"entity_uid": track_entity_uid, "path": track_path},
-            ).first()
-        if row is None:
+        if reference is None:
             return None
-        favorite_id = str(int(row[0]))
+        favorite_id = str(int(reference["track_id"]))
     add_favorite(
         user_id,
         "song",
@@ -367,7 +353,7 @@ def set_rating(user_id: int, item_id: str, rating: int) -> bool:
         raise ValueError("Rating can only be set for songs")
     return set_track_rating(
         user_id,
-        int(entity_id.local_id) if entity_id.scope == "local" else None,
+        entity_id.local_id if entity_id.scope == "local" else None,
         rating,
         global_track_uid=(
             str(entity_id.global_uid) if entity_id.scope == "global" else None
@@ -387,7 +373,7 @@ def get_rating(user_id: int, track_id: int | str) -> int:
             return 0
         return get_track_rating(
             user_id,
-            int(entity_id.local_id) if entity_id.scope == "local" else None,
+            entity_id.local_id if entity_id.scope == "local" else None,
             global_track_uid=(
                 str(entity_id.global_uid) if entity_id.scope == "global" else None
             ),
@@ -483,7 +469,7 @@ def _include_legacy_favorites(
             detail["starred"] = favorite.get("created_at")
             detail["user_rating"] = get_track_rating(
                 user_id,
-                int(entity_id.local_id) if entity_id.scope == "local" else None,
+                entity_id.local_id if entity_id.scope == "local" else None,
                 global_track_uid=(
                     str(entity_id.global_uid) if entity_id.scope == "global" else None
                 ),

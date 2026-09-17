@@ -133,17 +133,18 @@ class _PinnedHTTPConnection(http.client.HTTPConnection):
         self.sock = socket.create_connection(
             (self._pinned_address, self.port),
             self.timeout,
-            self.source_address,
+            None,
         )
 
 
 class _PinnedHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, target: _PublicUrlTarget, address: str) -> None:
+        self._ssl_context = ssl.create_default_context()
         super().__init__(
             target.hostname,
             target.port,
             timeout=15,
-            context=ssl.create_default_context(),
+            context=self._ssl_context,
         )
         self._pinned_address = address
 
@@ -151,10 +152,10 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         raw_socket = socket.create_connection(
             (self._pinned_address, self.port),
             self.timeout,
-            self.source_address,
+            None,
         )
         try:
-            self.sock = self._context.wrap_socket(
+            self.sock = self._ssl_context.wrap_socket(
                 raw_socket,
                 server_hostname=self.host,
             )

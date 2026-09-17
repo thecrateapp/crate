@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from io import BufferedIOBase
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     import numpy as np
@@ -321,11 +321,13 @@ def generate_spectrum_artifact(
     if process.stdout is None or process.stderr is None:
         process.kill()
         raise RuntimeError("ffmpeg pipes were not created")
+    stdout = process.stdout
+    stderr = process.stderr
 
     error_output = bytearray()
 
     def drain_errors() -> None:
-        while chunk := process.stderr.read(4096):
+        while chunk := stderr.read(4096):
             remaining = 16_384 - len(error_output)
             if remaining > 0:
                 error_output.extend(chunk[:remaining])
@@ -334,7 +336,7 @@ def generate_spectrum_artifact(
     error_thread.start()
     try:
         frames, duration_ms = analyse_pcm_stream(
-            process.stdout,
+            cast(BufferedIOBase, stdout),
             cancelled=cancelled,
         )
     except SpectrumGenerationCancelled:

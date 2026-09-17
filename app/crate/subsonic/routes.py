@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from typing import Any
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, HTTPException, Request
@@ -78,7 +79,7 @@ class OpenSubsonicAPIRouter(APIRouter):
         endpoint,
         *,
         methods: Collection[str] | None = None,
-        **kwargs: object,
+        **kwargs: Any,
     ) -> None:
         normalized_methods = {method.upper() for method in (methods or {"GET"})}
         if "GET" in normalized_methods:

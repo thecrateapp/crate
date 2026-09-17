@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import text
 
+from crate.subsonic.global_ids import EntityKind
 from crate.db.tx import read_scope
 
 _AVAILABLE_SOURCE = """
@@ -18,6 +19,31 @@ _AVAILABLE_SOURCE = """
         )
     )
 """
+
+_LOCAL_ENTITY_ID_BY_GLOBAL_UID: dict[EntityKind, tuple[str, str, str]] = {
+    "artist": (
+        "global_catalog_artists",
+        "global_artist_uid",
+        "local_artist_id",
+    ),
+    "album": ("global_catalog_albums", "global_album_uid", "local_album_id"),
+    "track": ("global_catalog_tracks", "global_track_uid", "local_track_id"),
+}
+
+
+def get_local_entity_id_by_global_uid(
+    entity_kind: EntityKind, global_uid: str
+) -> int | None:
+    table, global_column, local_column = _LOCAL_ENTITY_ID_BY_GLOBAL_UID[entity_kind]
+    with read_scope() as session:
+        value = session.execute(
+            text(
+                f"SELECT {local_column} FROM {table} "
+                f"WHERE {global_column} = CAST(:uid AS uuid)"
+            ),
+            {"uid": global_uid},
+        ).scalar_one_or_none()
+    return int(value) if value is not None else None
 
 
 def list_global_artists() -> list[dict]:
@@ -378,7 +404,7 @@ def list_global_albums(
             "AND membership.global_genre_uid IN "
             "(SELECT global_genre_uid FROM genre_tree))"
         )
-        params["genre"] = genre.strip()
+        params["genre"] = (genre or "").strip()
     if list_type == "starred":
         filters.append(
             "EXISTS (SELECT 1 FROM global_catalog_tracks liked_track "
@@ -389,7 +415,11 @@ def list_global_albums(
         )
     order = _ALBUM_ORDERS[list_type]
     if list_type == "byYear":
-        direction = "DESC" if from_year > to_year else "ASC"
+        direction = (
+            "DESC"
+            if from_year is not None and to_year is not None and from_year > to_year
+            else "ASC"
+        )
         order = f"entity.year {direction}, entity.canonical_name ASC, entity.global_album_uid"
     with read_scope() as session:
         rows = session.execute(
@@ -812,7 +842,7 @@ def get_random_global_tracks(
             "AND membership.global_genre_uid IN "
             "(SELECT global_genre_uid FROM genre_tree))"
         )
-        params["genre"] = genre.strip()
+        params["genre"] = (genre or "").strip()
     if from_year is not None:
         filters.append(
             "album.year ~ '^[0-9]{4}$' "

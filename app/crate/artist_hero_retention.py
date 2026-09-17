@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
 from crate.artist_hero_publication import (
     ArtistHeroArtifactIdentity,
+    ArtistHeroComposition,
     artist_hero_artifact_root,
 )
 
@@ -136,7 +138,7 @@ def plan_artist_hero_publication_cleanup(
         try:
             identity = ArtistHeroArtifactIdentity(
                 artist_entity_uid=artist_entity_uid,
-                composition=composition,
+                composition=cast(ArtistHeroComposition, composition),
                 render_revision=revision,
             )
         except ValueError:

@@ -187,7 +187,7 @@ def test_v1_system_routes_support_view_aliases_and_public_extensions() -> None:
     assert extensions.json()["subsonic-response"]["openSubsonicExtensions"] == [
         {"name": "formPost", "versions": [1]},
         {"name": "indexBasedQueue", "versions": [1]},
-        {"name": "songLyrics", "versions": [1]},
+        {"name": "songLyrics", "versions": [1, 2]},
         {"name": "topSongsByArtistId", "versions": [1]},
     ]
     assert extensions.json()["subsonic-response"]["openSubsonic"] is True

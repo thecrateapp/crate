@@ -295,6 +295,7 @@ def artist_hero_profile_contract(
             "render_version": ARTIST_HERO_RENDER_VERSION,
             "compositions": compositions,
         }
+    assert artifacts is not None
 
     public_artifacts: dict[str, dict[str, str]] = {}
     for composition, artifact in artifacts.items():

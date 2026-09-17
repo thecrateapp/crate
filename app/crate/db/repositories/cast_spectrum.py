@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from datetime import timedelta
 import uuid
+from typing import cast
 
 from sqlalchemy import text
+from sqlalchemy.engine import CursorResult
 
 from crate.db.tx import optional_scope, read_scope
 
@@ -236,7 +238,7 @@ def complete_cast_spectrum_generation(
                 "byte_size": byte_size,
             },
         )
-    return result.rowcount == 1
+    return cast(CursorResult, result).rowcount == 1
 
 
 def fail_cast_spectrum_generation(
@@ -274,7 +276,7 @@ def fail_cast_spectrum_generation(
                 "error": str(error)[:1000],
             },
         )
-    return result.rowcount == 1
+    return cast(CursorResult, result).rowcount == 1
 
 
 def release_cast_spectrum_generation(
@@ -309,7 +311,7 @@ def release_cast_spectrum_generation(
                 "generation_token": token,
             },
         )
-    return result.rowcount == 1
+    return cast(CursorResult, result).rowcount == 1
 
 
 def mark_cast_spectrum_missing(
@@ -342,4 +344,4 @@ def mark_cast_spectrum_missing(
                 "source_fingerprint": source_fingerprint,
             },
         )
-    return result.rowcount == 1
+    return cast(CursorResult, result).rowcount == 1

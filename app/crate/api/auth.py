@@ -1184,7 +1184,7 @@ def _create_login_session(
         device_label=request.headers.get("x-device-label"),
         device_fingerprint=_request_device_fingerprint(request, app_id=app),
     )
-    session_id = session["id"]
+    session_id = str(session["id"])
     token = create_jwt(
         user["id"],
         user["email"],

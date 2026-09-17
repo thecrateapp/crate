@@ -84,6 +84,7 @@ def test_global_album_detail_contains_global_song_ids(test_app):
             "crate.subsonic.services.catalog.list_global_album_tracks",
             return_value=[_track()],
         ),
+        patch("crate.api.subsonic.legacy.preferences.get_rating", return_value=0),
     ):
         response = test_app.get(
             f"/rest/getAlbum?u=listener&p=secret&id=gal-{ALBUM_UID}"
@@ -147,9 +148,10 @@ def test_global_search_applies_server_side_caps(test_app):
     with (
         _auth(),
         patch(
-            "crate.api.subsonic.legacy.search_global_catalog",
+            "crate.subsonic.services.catalog.search_global_catalog",
             return_value={"artists": [], "albums": [], "tracks": []},
         ) as search,
+        patch("crate.api.subsonic.legacy.preferences.get_rating", return_value=0),
     ):
         response = test_app.get(
             "/rest/search3?u=listener&p=secret&query=vis"
@@ -157,9 +159,11 @@ def test_global_search_applies_server_side_caps(test_app):
         )
 
     assert response.status_code == 200
-    search.assert_called_once_with(
-        "vis", artist_limit=100, album_limit=100, track_limit=200
-    )
+    search.assert_called_once()
+    assert search.call_args.args == ("vis",)
+    assert search.call_args.kwargs["artist_limit"] == 100
+    assert search.call_args.kwargs["album_limit"] == 100
+    assert search.call_args.kwargs["track_limit"] == 200
 
 
 def test_legacy_local_track_id_remains_accepted(test_app):
@@ -170,6 +174,7 @@ def test_legacy_local_track_id_remains_accepted(test_app):
             "crate.subsonic.services.catalog.get_global_track_by_local_id",
             return_value=local,
         ),
+        patch("crate.api.subsonic.legacy.preferences.get_rating", return_value=0),
     ):
         response = test_app.get("/rest/getSong?u=listener&p=secret&id=9")
 
