@@ -1062,6 +1062,39 @@ class TestHandleFetchAlbumCover:
         )
         assert result == {"status": "already_has_cover"}
 
+    def test_existing_cover_repairs_catalog_availability(self, monkeypatch, tmp_path):
+        album_dir = tmp_path / "Band" / "Album"
+        album_dir.mkdir(parents=True)
+        (album_dir / "cover.jpg").write_bytes(b"existing")
+        marked_albums = []
+        materialized_assets = []
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.set_album_has_cover",
+            marked_albums.append,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_album_by_id",
+            lambda _album_id: {"entity_uid": "album-entity"},
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: materialized_assets.append(
+                (asset.kind, asset.entity_key, reason)
+            ),
+        )
+
+        result = _handle_fetch_album_cover(
+            "task-1",
+            {"path": str(album_dir), "album_id": 132},
+            {},
+        )
+
+        assert result == {"status": "already_has_cover"}
+        assert marked_albums == [132]
+        assert materialized_assets == [
+            ("album-cover", "album-entity", "existing-cover")
+        ]
+
     def test_already_has_folder_jpg(self, tmp_path):
         album_dir = tmp_path / "Band" / "Album2"
         album_dir.mkdir(parents=True)

@@ -2844,6 +2844,18 @@ def _handle_rollback_artist_hero(task_id: str, params: dict, config: dict) -> di
     }
 
 
+def _mark_album_cover_available(album_id: int | str, *, reason: str) -> None:
+    numeric_album_id = int(album_id)
+    set_album_has_cover(numeric_album_id)
+    album_row = get_library_album_by_id(numeric_album_id)
+    entity_uid = str(album_row.get("entity_uid") or "") if album_row else ""
+    if entity_uid:
+        queue_artwork_materialization(
+            ArtworkAsset("album-cover", entity_uid),
+            reason=reason,
+        )
+
+
 def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
     """Search all sources for a cover for a specific album."""
     from crate.artwork import extract_embedded_cover, fetch_cover_from_caa, save_cover
@@ -2859,6 +2871,8 @@ def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
         return {"error": "Album directory not found"}
 
     if any((album_dir / c).exists() for c in ("cover.jpg", "cover.png", "folder.jpg")):
+        if album_id:
+            _mark_album_cover_available(album_id, reason="existing-cover")
         return {"status": "already_has_cover"}
 
     cover_data = None
@@ -2907,13 +2921,7 @@ def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
     if cover_data:
         save_cover(album_dir, cover_data)
         if album_id:
-            set_album_has_cover(album_id)
-            album_row = get_library_album_by_id(int(album_id))
-            if album_row and album_row.get("entity_uid"):
-                queue_artwork_materialization(
-                    ArtworkAsset("album-cover", str(album_row["entity_uid"])),
-                    reason="source-write",
-                )
+            _mark_album_cover_available(album_id, reason="source-write")
         emit_task_event(
             task_id,
             "cover_applied",

@@ -397,3 +397,42 @@ def test_global_adapter_reads_singleton_catalog_without_duplicates(pg_db):
     assert song_detail(str(local_track_id))["id"] == global_subsonic_id(
         "track", tracks[0]["global_track_uid"]
     )
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_global_entity_lookups_do_not_return_unrelated_local_rows(pg_db):
+    artist_name = "OpenSubsonic UID Filter Fixture"
+    pg_db.upsert_artist({"name": artist_name})
+    album_id = pg_db.upsert_album(
+        {
+            "artist": artist_name,
+            "name": "UID Filter Album",
+            "path": f"/music/{artist_name}/UID Filter Album",
+            "track_count": 1,
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": album_id,
+            "artist": artist_name,
+            "album": "UID Filter Album",
+            "filename": "01 - UID Filter Track.flac",
+            "title": "UID Filter Track",
+            "path": f"/music/{artist_name}/UID Filter Album/01 - UID Filter Track.flac",
+            "duration": 100,
+            "format": "flac",
+        }
+    )
+
+    from crate.db.queries.subsonic_global import (
+        get_global_album,
+        get_global_artist,
+        get_global_track,
+    )
+    from crate.federation.global_reconciliation import reconcile_local_catalog
+
+    reconcile_local_catalog()
+
+    assert get_global_artist("ffffffff-ffff-4fff-8fff-fffffffffff1") is None
+    assert get_global_album("ffffffff-ffff-4fff-8fff-fffffffffff2") is None
+    assert get_global_track("ffffffff-ffff-4fff-8fff-fffffffffff3") is None

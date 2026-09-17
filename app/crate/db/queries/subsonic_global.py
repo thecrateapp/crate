@@ -7,13 +7,15 @@ from sqlalchemy import text
 from crate.db.tx import read_scope
 
 _AVAILABLE_SOURCE = """
-    entity.has_local OR EXISTS (
-        SELECT 1
-        FROM global_catalog_sources source
-        WHERE source.global_entity_uid = entity.{uid_column}
-          AND source.entity_type = :entity_type
-          AND NOT source.source_stale
-          AND source.source_deleted_at IS NULL
+    (
+        entity.has_local OR EXISTS (
+            SELECT 1
+            FROM global_catalog_sources source
+            WHERE source.global_entity_uid = entity.{uid_column}
+              AND source.entity_type = :entity_type
+              AND NOT source.source_stale
+              AND source.source_deleted_at IS NULL
+        )
     )
 """
 
