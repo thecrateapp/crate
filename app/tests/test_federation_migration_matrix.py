@@ -8,6 +8,7 @@ import uuid
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 import psycopg2
 
 
@@ -39,12 +40,23 @@ def _reset_schema() -> None:
     connection.close()
 
 
-def _migrate(revision: str, *, downgrade: bool = False) -> None:
+def _alembic_config() -> Config:
     config = Config(str(ROOT / "app/alembic.ini"))
     config.set_main_option(
         "script_location",
         str(ROOT / "app/crate/db/migrations"),
     )
+    return config
+
+
+def _migration_head() -> str:
+    head = ScriptDirectory.from_config(_alembic_config()).get_current_head()
+    assert head is not None
+    return head
+
+
+def _migrate(revision: str, *, downgrade: bool = False) -> None:
+    config = _alembic_config()
     operation = command.downgrade if downgrade else command.upgrade
     operation(config, revision)
 
@@ -306,7 +318,7 @@ def _seed_063_legacy_state() -> dict[str, str]:
 
 
 def _assert_hardened_state(ids: dict[str, str]) -> None:
-    assert _scalar("SELECT version_num FROM alembic_version") == "097"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     assert (
         _scalar(
             "SELECT status FROM federation_local_keys WHERE node_uid = %s",
@@ -356,7 +368,7 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "097"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     for table in (
         "federation_local_keys",
         "federation_catalog_changes",
@@ -387,7 +399,7 @@ def test_080_upgrade_removes_deprecated_navidrome_column(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "097"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     assert (
         _scalar(
             """
@@ -428,7 +440,7 @@ def test_real_main_049_snapshot_upgrades_without_user_data_loss(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "097"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     assert _scalar("SELECT email FROM users WHERE id = %s", (ids["user_id"],)) == (
         "legacy@example.test"
     )
