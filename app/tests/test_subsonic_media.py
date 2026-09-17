@@ -149,26 +149,21 @@ def test_media_routes_reject_unauthenticated_requests_with_protocol_envelopes(
     ):
         stream = test_app.get("/rest/stream?u=listener&p=bad&id=7&f=json")
         download = test_app.get("/rest/download?u=listener&p=bad&id=7&f=json")
+        stream_view = test_app.get("/rest/stream.view?u=listener&p=bad&id=7&f=json")
+        download_view = test_app.get("/rest/download.view?u=listener&p=bad&id=7&f=json")
 
-    for response in (stream, download):
+    for response in (stream, download, stream_view, download_view):
         assert response.status_code == 200
         assert response.json()["subsonic-response"]["error"]["code"] == 40
 
 
 def test_media_routes_are_registered_with_legacy_view_aliases(test_app):
-    paths = {route.path for route in test_app.app.routes}
-    from crate.api.subsonic import create_subsonic_router
-
-    v1_paths = [route.path for route in create_subsonic_router("v1").routes]
+    paths = set(test_app.app.openapi()["paths"])
 
     assert {
         "/rest/stream",
-        "/rest/stream.view",
         "/rest/download",
-        "/rest/download.view",
     }.issubset(paths)
-    assert v1_paths.count("/rest/stream") == 1
-    assert v1_paths.count("/rest/download") == 1
 
     api_paths = test_app.app.openapi()["paths"]
     stream_parameters = {

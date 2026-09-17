@@ -382,15 +382,20 @@ def test_discovery_endpoints_return_subsonic_auth_errors(test_app):
 def test_discovery_routes_and_complete_extensions_are_registered(test_app):
     from crate.subsonic.capabilities import advertised_extensions
 
-    paths = {route.path for route in test_app.app.routes}
+    paths = set(test_app.app.openapi()["paths"])
     assert {
         "/rest/getLyrics",
-        "/rest/getLyrics.view",
         "/rest/getLyricsBySongId",
         "/rest/getTopSongs",
         "/rest/getSimilarSongs",
         "/rest/getSimilarSongs2",
     }.issubset(paths)
+    with patch("crate.subsonic.auth.authenticate", return_value=None):
+        alias = test_app.get(
+            "/rest/getLyrics.view?u=listener&p=bad&artist=Artist&title=Song&f=json"
+        )
+    assert alias.status_code == 200
+    assert alias.json()["subsonic-response"]["error"]["code"] == 40
     assert {"name": "songLyrics", "versions": [1, 2]} in advertised_extensions()
     assert {"name": "topSongsByArtistId", "versions": [1]} in advertised_extensions()
 
