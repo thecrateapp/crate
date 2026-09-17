@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/getsentry/sentry-go"
@@ -31,6 +32,74 @@ func TestLoadSentrySettings(t *testing.T) {
 	}
 	if settings.TracesSampleRate != 0.25 {
 		t.Fatalf("trace sample rate = %v, want 0.25", settings.TracesSampleRate)
+	}
+}
+
+func TestScrubEventDropsBenignHTTPAbortNoise(t *testing.T) {
+	tests := []struct {
+		name  string
+		event *sentry.Event
+		drop  bool
+	}{
+		{
+			name:  "message",
+			event: &sentry.Event{Message: "net/http: abort Handler"},
+			drop:  true,
+		},
+		{
+			name: "exception",
+			event: &sentry.Event{Exception: []sentry.Exception{
+				{Value: "net/http: abort Handler"},
+			}},
+			drop: true,
+		},
+		{
+			name:  "real failure",
+			event: &sentry.Event{Message: "upstream unavailable"},
+			drop:  false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := ScrubEvent(test.event, nil)
+			if (got == nil) != test.drop {
+				t.Fatalf("ScrubEvent() nil = %v, want drop %v", got == nil, test.drop)
+			}
+		})
+	}
+}
+
+func TestCaptureOperationErrorUsesStableGroupingAndTags(t *testing.T) {
+	transport := &sentry.MockTransport{}
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn:       "https://public@example.ingest.sentry.io/1",
+		Transport: transport,
+	}); err != nil {
+		t.Fatalf("init Sentry: %v", err)
+	}
+
+	errorValue := errors.New("upstream unavailable")
+	CaptureOperationError(errorValue, "fallback.proxy", map[string]string{
+		"route_class": "interactive",
+	})
+
+	events := transport.Events()
+	if len(events) != 1 {
+		t.Fatalf("captured %d events, want 1", len(events))
+	}
+	event := events[0]
+	if len(event.Fingerprint) != 2 ||
+		event.Fingerprint[0] != "readplane-operation-failure" ||
+		event.Fingerprint[1] != "fallback.proxy" {
+		t.Fatalf("unexpected fingerprint: %#v", event.Fingerprint)
+	}
+	if event.Tags["operation"] != "fallback.proxy" ||
+		event.Tags["route_class"] != "interactive" {
+		t.Fatalf("unexpected tags: %#v", event.Tags)
+	}
+	if len(event.Exception) != 1 || event.Exception[0].Value != errorValue.Error() {
+		t.Fatalf("unexpected exception: %#v", event.Exception)
 	}
 }
 

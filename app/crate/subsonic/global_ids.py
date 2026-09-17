@@ -18,6 +18,7 @@ _LOCAL_PREFIXES: dict[EntityKind, str] = {
     "album": "al-",
     "track": "",
 }
+_PLAYLIST_PREFIX = "pl-"
 
 
 class SubsonicIdError(ValueError):
@@ -90,6 +91,25 @@ def global_subsonic_id(kind: EntityKind, global_uid: str) -> str:
     )
 
 
+def encode_subsonic_playlist_id(playlist_id: int) -> str:
+    if playlist_id <= 0:
+        raise SubsonicIdError()
+    return f"{_PLAYLIST_PREFIX}{playlist_id}"
+
+
+def decode_subsonic_playlist_id(value: str) -> int:
+    raw = str(value or "").strip()
+    if not raw.startswith(_PLAYLIST_PREFIX):
+        raise SubsonicIdError()
+    try:
+        playlist_id = int(raw[len(_PLAYLIST_PREFIX) :])
+    except ValueError as exc:
+        raise SubsonicIdError() from exc
+    if playlist_id <= 0:
+        raise SubsonicIdError()
+    return playlist_id
+
+
 def local_subsonic_id(kind: EntityKind, local_id: int) -> str:
     return encode_subsonic_id(
         SubsonicEntityId(kind=kind, scope="local", local_id=local_id)
@@ -101,7 +121,9 @@ __all__ = [
     "SubsonicEntityId",
     "SubsonicIdError",
     "decode_subsonic_id",
+    "decode_subsonic_playlist_id",
     "encode_subsonic_id",
+    "encode_subsonic_playlist_id",
     "global_subsonic_id",
     "local_subsonic_id",
 ]

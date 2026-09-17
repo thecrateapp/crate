@@ -122,6 +122,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
     "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
     "refresh_probable_setlist": TaskPoolConfig("fast", 1, 180, 3),
+    "generate_cast_spectrum": TaskPoolConfig("heavy", 1, 1200, 2),
     # New content processing (priority 1)
     "process_new_content": TaskPoolConfig("default", 1, 14400, 0),
     "enrich_artist": TaskPoolConfig("fast", 1, 180, 2),
@@ -173,6 +174,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "fetch_artwork_all": TaskPoolConfig("maintenance", 3, 3600, 0),
     "backfill_artwork_variants": TaskPoolConfig("maintenance", 3, 900, 1),
     "backfill_artist_heroes": TaskPoolConfig("maintenance", 3, 1800, 0),
+    "migrate_artist_heroes": TaskPoolConfig("maintenance", 3, 1800, 0),
+    "migrate_artist_hero": TaskPoolConfig("maintenance", 3, 1800, 0),
+    "rollback_artist_hero": TaskPoolConfig("maintenance", 3, 1800, 0),
     "derive_artist_hero": TaskPoolConfig("maintenance", 2, 180, 0),
     "cleanup_artwork_variants": TaskPoolConfig("maintenance", 3, 1800, 0),
     "repair_artwork_variants": TaskPoolConfig("maintenance", 3, 3600, 1),
@@ -755,6 +759,16 @@ def _execute_task(task_type: str, task_id: str):
             error = str(result.get("error") or "Task failed")[:500]
             update_task(task_id, status="failed", result=result, error=error)
             log.warning("Task %s (%s) failed: %s", task_id, task_type, error)
+            from crate.observability.sentry import capture_task_failure
+
+            capture_task_failure(
+                task_type=task_type,
+                task_id=task_id,
+                queue=get_queue_for_task(task_type),
+                error=error,
+                retry_count=int(task.get("retry_count") or 0),
+                max_retries=int(task.get("max_retries") or 0),
+            )
             _try_fan_in_parent(task, task_type, task_id)
             try:
                 from crate.metrics import record as _record
@@ -827,7 +841,17 @@ def _execute_task(task_type: str, task_id: str):
             _try_fan_in_parent(task, task_type, task_id)
 
     except Exception as e:
-        log.exception("Task %s (%s) failed", task_id, task_type)
+        from crate.observability.sentry import capture_task_exception
+
+        capture_task_exception(
+            e,
+            task_type=task_type,
+            task_id=task_id,
+            queue=get_queue_for_task(task_type),
+            retry_count=int(task.get("retry_count") or 0),
+            max_retries=int(task.get("max_retries") or 0),
+        )
+        log.warning("Task %s (%s) failed", task_id, task_type, exc_info=True)
         try:
             from crate.metrics import record as _record
 
@@ -871,7 +895,19 @@ def _execute_task(task_type: str, task_id: str):
     except BaseException as e:
         if e.__class__.__name__ != "TimeLimitExceeded":
             raise
-        log.exception("Task %s (%s) exceeded time limit", task_id, task_type)
+        from crate.observability.sentry import capture_task_exception
+
+        capture_task_exception(
+            e,
+            task_type=task_type,
+            task_id=task_id,
+            queue=get_queue_for_task(task_type),
+            retry_count=int(task.get("retry_count") or 0),
+            max_retries=int(task.get("max_retries") or 0),
+        )
+        log.warning(
+            "Task %s (%s) exceeded time limit", task_id, task_type, exc_info=True
+        )
         try:
             from crate.metrics import record as _record
 

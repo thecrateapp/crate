@@ -21,6 +21,9 @@ def test_template_database_is_never_the_default_runtime_target(
 
 def test_pg_db_uses_an_isolated_clone_of_the_initialized_template(pg_db) -> None:
     del pg_db
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
     from crate.db.tx import read_scope
 
     with read_scope() as session:
@@ -32,7 +35,12 @@ def test_pg_db_uses_an_isolated_clone_of_the_initialized_template(pg_db) -> None
 
     assert database_name != TEST_DB_NAME
     assert database_name.startswith(f"{TEST_DB_NAME}_case_")
-    assert revision == "091"
+    app_root = os.path.dirname(os.path.dirname(__file__))
+    config = Config(os.path.join(app_root, "alembic.ini"))
+    config.set_main_option(
+        "script_location", os.path.join(app_root, "crate", "db", "migrations")
+    )
+    assert revision == ScriptDirectory.from_config(config).get_current_head()
     assert admin_count >= 1
     assert os.environ["CRATE_POSTGRES_DB"] == database_name
 

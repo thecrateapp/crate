@@ -79,6 +79,7 @@ describe("Shell", () => {
     expect(screen.getByRole("menuitem", { name: /Playlists/i })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: /Artists/i })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: /Albums/i })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /Crates/i })).toBeVisible();
     expect(
       screen.getByRole("menuitem", { name: /Liked tracks/i }),
     ).toBeVisible();
@@ -89,6 +90,15 @@ describe("Shell", () => {
     expect(
       screen.getByRole("menuitem", { name: /Playlists/i }),
     ).not.toHaveClass("rounded-2xl");
+  });
+
+  it("keeps Crates in the desktop Collection menu", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />);
+    fireEvent.click(screen.getByRole("button", { name: "Collection" }));
+
+    expect(screen.getByRole("button", { name: /Crates/i })).toBeVisible();
   });
 
   it("uses the overlay mobile header on public genre pages", () => {
@@ -156,6 +166,64 @@ describe("Shell", () => {
       "max-w-[1560px]",
       "px-10",
     );
+  });
+
+  it("uses semantic tokens for desktop shell surfaces and navigation", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />, { route: "/stats" });
+
+    expect(screen.getByRole("complementary")).toHaveClass(
+      "border-border-quiet",
+      "bg-surface-canvas",
+    );
+    expect(screen.getByTestId("listen-header")).toHaveClass(
+      "border-border-quiet",
+      "bg-surface-chrome",
+      "shadow-chrome",
+    );
+    expect(screen.getByRole("link", { name: "Stats" })).toHaveClass(
+      "text-accent-action",
+    );
+  });
+
+  it("keeps the discovery-active brand label on the accent token", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />, {
+      playerState: { isPlaying: true },
+      playerActions: {
+        currentTrack: {
+          id: "discovery-track",
+          title: "Discovery track",
+          artist: "Crate",
+        },
+        playSource: {
+          type: "radio",
+          name: "Discovery Radio",
+          radio: { seedType: "discovery" },
+        },
+      },
+    });
+
+    const brandLabel = screen
+      .getAllByText("Crate")
+      .find((element) => element.tagName === "SPAN");
+
+    expect(brandLabel).toHaveClass("text-accent-action");
+    expect(brandLabel).not.toHaveClass("text-text-primary");
+  });
+
+  it("keeps the inactive brand label on the primary text token", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />);
+
+    const brandLabel = screen
+      .getAllByText("Crate")
+      .find((element) => element.tagName === "SPAN");
+
+    expect(brandLabel).toHaveClass("text-text-primary");
   });
 
   it("overlays the mobile Home header on the hero", () => {

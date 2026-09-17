@@ -14,7 +14,8 @@
  */
 import { apiFetch } from "@/lib/api";
 
-const QUEUE_KEY = "listen-pending-play-events";
+export const PENDING_PLAY_EVENTS_STORAGE_KEY = "listen-pending-play-events:v1";
+const LEGACY_PENDING_PLAY_EVENTS_STORAGE_KEY = "listen-pending-play-events";
 const MAX_QUEUE_SIZE = 500;
 const MAX_ATTEMPTS = 5;
 const RETRY_BASE_MS = 2000;
@@ -37,10 +38,29 @@ function generateId(): string {
 
 function readQueue(): QueuedEvent[] {
   try {
-    const raw = localStorage.getItem(QUEUE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const currentRaw = localStorage.getItem(PENDING_PLAY_EVENTS_STORAGE_KEY);
+    const legacyRaw = localStorage.getItem(
+      LEGACY_PENDING_PLAY_EVENTS_STORAGE_KEY,
+    );
+    const current = currentRaw ? JSON.parse(currentRaw) : [];
+    const legacy = legacyRaw ? JSON.parse(legacyRaw) : [];
+    const currentEvents: QueuedEvent[] = Array.isArray(current) ? current : [];
+    const legacyEvents: QueuedEvent[] = Array.isArray(legacy) ? legacy : [];
+    if (!legacyRaw) return currentEvents;
+
+    const seen = new Set<string>();
+    const migrated = [...legacyEvents, ...currentEvents]
+      .filter((event) => {
+        if (!event || typeof event.id !== "string" || seen.has(event.id)) {
+          return false;
+        }
+        seen.add(event.id);
+        return true;
+      })
+      .slice(-MAX_QUEUE_SIZE);
+    writeQueue(migrated);
+    localStorage.removeItem(LEGACY_PENDING_PLAY_EVENTS_STORAGE_KEY);
+    return migrated;
   } catch {
     return [];
   }
@@ -48,7 +68,10 @@ function readQueue(): QueuedEvent[] {
 
 function writeQueue(events: QueuedEvent[]): void {
   try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(events));
+    localStorage.setItem(
+      PENDING_PLAY_EVENTS_STORAGE_KEY,
+      JSON.stringify(events),
+    );
   } catch {
     /* quota exceeded or storage disabled — drop silently */
   }
@@ -117,6 +140,8 @@ export async function flushQueue(): Promise<{
       }
 
       try {
+        // Replay order is part of the queue contract; requests are retried in order.
+        // react-doctor-disable-next-line async-await-in-loop
         const response = await apiFetch(event.endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -177,7 +202,8 @@ export function queueSize(): number {
  */
 export function clearQueue(): void {
   try {
-    localStorage.removeItem(QUEUE_KEY);
+    localStorage.removeItem(PENDING_PLAY_EVENTS_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_PENDING_PLAY_EVENTS_STORAGE_KEY);
   } catch {
     /* ignore */
   }

@@ -51,6 +51,41 @@ def test_listen_change_only_selects_listen_image() -> None:
     assert detect_changed_images(["app/listen/src/App.tsx"]) == {"listen"}
 
 
+def test_cast_receiver_change_only_selects_receiver_image() -> None:
+    assert detect_changed_images(["app/cast-receiver/src/App.tsx"]) == {"cast-receiver"}
+
+
+def test_legacy_manifest_without_cast_receiver_is_not_a_usable_baseline() -> None:
+    previous = _previous_manifest()
+    del previous["images"]["cast-receiver"]
+
+    assert (
+        release_manifest.baseline_release_sha(
+            previous, registry="ghcr.io", owner="thecrateapp"
+        )
+        is None
+    )
+
+
+def test_complete_manifest_returns_its_release_sha_as_baseline() -> None:
+    assert (
+        release_manifest.baseline_release_sha(
+            _previous_manifest(), registry="ghcr.io", owner="thecrateapp"
+        )
+        == PREVIOUS_SHA
+    )
+
+
+def test_cast_receiver_font_change_selects_every_font_consumer() -> None:
+    assert detect_changed_images(["app/shared/fonts/poppins.css"]) == {
+        "cast-receiver",
+        "docs",
+        "listen",
+        "site",
+        "ui",
+    }
+
+
 def test_shared_frontend_change_selects_every_shared_consumer() -> None:
     assert detect_changed_images(["app/shared/web/api.ts"]) == {
         "docs",
@@ -79,6 +114,17 @@ def test_backend_change_selects_backend_compatibility_group() -> None:
             {
                 "analysis-worker",
                 "api",
+                "media-worker",
+                "playback-worker",
+                "worker",
+            },
+        ),
+        (
+            "app/.dockerignore",
+            {
+                "analysis-worker",
+                "api",
+                "cast-receiver",
                 "media-worker",
                 "playback-worker",
                 "worker",
@@ -164,4 +210,8 @@ def test_release_environment_uses_immutable_digest_references() -> None:
 
     assert f"CRATE_RELEASE_SHA={RELEASE_SHA}" in rendered
     assert "CRATE_LISTEN_IMAGE=ghcr.io/thecrateapp/crate-listen@sha256:" in rendered
+    assert (
+        "CRATE_CAST_RECEIVER_IMAGE=ghcr.io/thecrateapp/crate-cast-receiver@sha256:"
+        in rendered
+    )
     assert ":latest" not in rendered

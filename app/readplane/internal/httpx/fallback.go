@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/thecrateapp/crate/app/readplane/internal/observability"
 )
 
 const (
@@ -216,12 +218,29 @@ func (p *FallbackProxy) newReverseProxy() *httputil.ReverseProxy {
 		if isTimeoutError(err) || errors.Is(request.Context().Err(), context.DeadlineExceeded) {
 			p.timeouts.Add(1)
 		}
-		p.recordFailure(classifyFallbackRoute(request))
+		routeClass := classifyFallbackRoute(request)
+		if !errors.Is(request.Context().Err(), context.Canceled) {
+			observability.CaptureOperationError(err, "fallback.proxy", map[string]string{
+				"route_class": fallbackRouteName(routeClass),
+			})
+		}
+		p.recordFailure(routeClass)
 		MarkReadplane(w, "miss")
 		MarkVersion(w, p.version)
 		WriteError(w, http.StatusBadGateway, "Readplane fallback failed")
 	}
 	return proxy
+}
+
+func fallbackRouteName(routeClass fallbackRouteClass) string {
+	switch routeClass {
+	case fallbackArtwork:
+		return "artwork"
+	case fallbackStreaming:
+		return "streaming"
+	default:
+		return "interactive"
+	}
 }
 
 func (p *FallbackProxy) recordFailure(routeClass fallbackRouteClass) {

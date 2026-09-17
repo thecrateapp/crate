@@ -25,6 +25,7 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.redis_sse import close_pubsub, open_pubsub
+from crate.subsonic.services import preferences
 from crate.api.schemas.acquisition import (
     ArtistSuggestionCreateRequest,
     ArtistSuggestionResponse,
@@ -146,14 +147,8 @@ from crate.db.repositories.recommendations import (
 from crate.db.repositories.shows import attend_show, create_show_reminder, unattend_show
 from crate.db.repositories.tasks import create_task
 from crate.db.repositories.user_library import (
-    follow_artist,
-    like_track,
     record_play,
     record_play_event,
-    save_album,
-    unfollow_artist,
-    unlike_track,
-    unsave_album,
 )
 from crate.db.user_stats_dashboard_surface import get_user_stats_dashboard
 from crate.db.repositories.user_library_shared import resolve_track_reference_read
@@ -687,7 +682,7 @@ def list_follows(request: Request):
 )
 def follow(request: Request, body: FollowRequest):
     user = _require_auth(request)
-    added = follow_artist(user["id"], body.artist_name)
+    added = preferences.follow_artist_for_user(user["id"], body.artist_name)
     return {"ok": True, "added": added}
 
 
@@ -712,7 +707,7 @@ def follow_by_id(request: Request, artist_id: int):
 )
 def unfollow(request: Request, artist_name: str):
     user = _require_auth(request)
-    removed = unfollow_artist(user["id"], artist_name)
+    removed = preferences.unfollow_artist_for_user(user["id"], artist_name)
     if not removed:
         raise HTTPException(status_code=404, detail="Not following this artist")
     return {"ok": True}
@@ -777,7 +772,7 @@ def list_saved_albums(request: Request):
 )
 def save_album_endpoint(request: Request, body: SaveAlbumRequest):
     user = _require_auth(request)
-    added = save_album(user["id"], body.album_id)
+    added = preferences.save_album_for_user(user["id"], body.album_id)
     return {"ok": True, "added": added}
 
 
@@ -789,7 +784,7 @@ def save_album_endpoint(request: Request, body: SaveAlbumRequest):
 )
 def unsave_album_endpoint(request: Request, album_id: int):
     user = _require_auth(request)
-    removed = unsave_album(user["id"], album_id)
+    removed = preferences.unsave_album_for_user(user["id"], album_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Album not in library")
     return {"ok": True}
@@ -817,7 +812,7 @@ def list_likes(request: Request, limit: int = 100):
 )
 def like(request: Request, body: LikeTrackRequest):
     user = _require_auth(request)
-    added = like_track(
+    added = preferences.star_track_reference(
         user["id"],
         global_track_uid=body.global_track_uid,
         track_id=body.track_id,
@@ -837,7 +832,7 @@ def like(request: Request, body: LikeTrackRequest):
 )
 def unlike(request: Request, body: LikeTrackRequest):
     user = _require_auth(request)
-    removed = unlike_track(
+    removed = preferences.unstar_track_reference(
         user["id"],
         global_track_uid=body.global_track_uid,
         track_id=body.track_id,

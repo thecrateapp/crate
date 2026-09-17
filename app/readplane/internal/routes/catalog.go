@@ -27,10 +27,11 @@ func (s *Server) searchRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) favoritesRoute(w http.ResponseWriter, r *http.Request) {
-	if !s.requireCatalogAuth(w, r) {
+	user, ok := s.requireCatalogUser(w, r)
+	if !ok {
 		return
 	}
-	payload, err := s.catalog.Favorites(r.Context())
+	payload, err := s.catalog.Favorites(r.Context(), user.ID)
 	s.writeCatalogPayload(w, r, payload, err, "Favorites unavailable", "Not found")
 }
 
@@ -340,12 +341,16 @@ func (s *Server) trackByIDRoute(w http.ResponseWriter, r *http.Request, trackID 
 		s.fallbackOrRouteMiss(w, r)
 		return
 	}
-	if !s.requireCatalogAuth(w, r) {
+	if action == "info" {
+		user, ok := s.requireCatalogUser(w, r)
+		if !ok {
+			return
+		}
+		payload, err := s.catalog.TrackInfoByID(r.Context(), user.ID, trackID)
+		s.writeCatalogPayload(w, r, payload, err, "Track info unavailable", "Track not found")
 		return
 	}
-	if action == "info" {
-		payload, err := s.catalog.TrackInfoByID(r.Context(), trackID)
-		s.writeCatalogPayload(w, r, payload, err, "Track info unavailable", "Track not found")
+	if !s.requireCatalogAuth(w, r) {
 		return
 	}
 	if action == "eq-features" {
@@ -378,12 +383,16 @@ func (s *Server) trackByEntityRoute(w http.ResponseWriter, r *http.Request, enti
 		s.fallbackOrRouteMiss(w, r)
 		return
 	}
-	if !s.requireCatalogAuth(w, r) {
+	if action == "info" {
+		user, ok := s.requireCatalogUser(w, r)
+		if !ok {
+			return
+		}
+		payload, err := s.catalog.TrackInfoByEntityUID(r.Context(), user.ID, entityUID)
+		s.writeCatalogPayload(w, r, payload, err, "Track info unavailable", "Track not found")
 		return
 	}
-	if action == "info" {
-		payload, err := s.catalog.TrackInfoByEntityUID(r.Context(), entityUID)
-		s.writeCatalogPayload(w, r, payload, err, "Track info unavailable", "Track not found")
+	if !s.requireCatalogAuth(w, r) {
 		return
 	}
 	if action == "eq-features" {

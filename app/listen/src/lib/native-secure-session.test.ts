@@ -82,4 +82,13 @@ describe("native secure session bridge", () => {
     ).rejects.toBeInstanceOf(NativeSecureSessionUnavailableError);
     expect(localStorage.getItem("crate.session.server-1")).toBeNull();
   });
+
+  it("preserves the original native error as `cause` for diagnostics", async () => {
+    const nativeError = new Error("decrypt failed: bad tag");
+    plugin.get.mockRejectedValue(nativeError);
+
+    await expect(
+      getSecureSessionValue("crate.session.server-1"),
+    ).rejects.toMatchObject({ cause: nativeError });
+  });
 });

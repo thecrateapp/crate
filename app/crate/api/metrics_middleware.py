@@ -13,6 +13,34 @@ log = logging.getLogger(__name__)
 
 # Patterns that normalize dynamic path segments to templates.
 _PATH_NORMALIZERS = [
+    (
+        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/artwork"),
+        "/api/cast/sessions/{lease}/items/{item_id}/artwork",
+    ),
+    (
+        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/stream"),
+        "/api/cast/sessions/{lease}/items/{item_id}/stream",
+    ),
+    (
+        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/spectrum"),
+        "/api/cast/sessions/{lease}/items/{item_id}/spectrum",
+    ),
+    (
+        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+"),
+        "/api/cast/sessions/{lease}/items/{item_id}",
+    ),
+    (
+        re.compile(r"/api/cast/sessions/[^/]+/state"),
+        "/api/cast/sessions/{lease}/state",
+    ),
+    (
+        re.compile(r"/api/cast/sessions/[^/]+/checkpoints"),
+        "/api/cast/sessions/{lease}/checkpoints",
+    ),
+    (
+        re.compile(r"/api/cast/sessions/[^/]+"),
+        "/api/cast/sessions/{lease}",
+    ),
     (re.compile(r"/api/tracks/(\d+)"), "/api/tracks/{id}"),
     (re.compile(r"/api/tracks/by-entity/[^/]+"), "/api/tracks/by-entity/{entity_uid}"),
     (
@@ -43,6 +71,7 @@ _PATH_NORMALIZERS = [
     (re.compile(r"/api/me/home/section/.+"), "/api/me/home/section/{id}"),
     (re.compile(r"/api/events/task/[a-f0-9]+"), "/api/events/task/{id}"),
 ]
+_OPENSUBSONIC_ROUTE = re.compile(r"^/rest/([A-Za-z0-9]+)(?:\.view)?$")
 
 _SKIP_METRICS_PREFIXES = (
     "/api/stream/",
@@ -61,7 +90,12 @@ _active_streams = 0
 _active_streams_lock = Lock()
 
 
-def _normalize_path(path: str) -> str:
+def _normalize_path(path: str, route_path: str | None = None) -> str:
+    if path == "/rest" or path.startswith("/rest/"):
+        match = _OPENSUBSONIC_ROUTE.fullmatch(route_path or "")
+        if match:
+            return f"/rest/{match.group(1)}"
+        return "/rest/{unmatched}"
     for pattern, template in _PATH_NORMALIZERS:
         if pattern.match(path):
             return template
@@ -69,6 +103,8 @@ def _normalize_path(path: str) -> str:
 
 
 def _should_skip_metrics(path: str) -> bool:
+    if path == "/rest" or path.startswith("/rest/"):
+        return False
     if not path.startswith("/api/"):
         return True
     if path.startswith(_SKIP_METRICS_PREFIXES):
@@ -106,6 +142,15 @@ def _classify_metric_target(
     content_type = (_get_header(headers, "content-type") or "").lower()
     if content_type.startswith("text/event-stream"):
         return "stream"
+    if path in {
+        "/rest/stream",
+        "/rest/stream.view",
+        "/rest/download",
+        "/rest/download.view",
+    } and content_type.startswith(("audio/", "application/octet-stream")):
+        return "stream"
+    if path == "/rest" or path.startswith("/rest/"):
+        return "opensubsonic"
     return "api"
 
 
@@ -137,7 +182,7 @@ class MetricsMiddleware:
         status_code = 500
         response_headers: list[tuple[bytes, bytes]] | None = None
         stream_started = False
-        normalized_path = _normalize_path(path)
+        normalized_path = _normalize_path(path, _route_path(scope))
 
         async def send_wrapper(message: Message) -> None:
             nonlocal status_code, response_headers, stream_started
@@ -150,6 +195,7 @@ class MetricsMiddleware:
                 ):
                     stream_started = True
                     concurrent = _increment_active_streams()
+                    normalized_path = _normalize_path(path, _route_path(scope))
                     record_later(
                         _STREAM_CONCURRENT_METRIC,
                         float(concurrent),
@@ -190,7 +236,7 @@ class MetricsMiddleware:
                 _STREAM_CONCURRENT_METRIC,
                 float(concurrent),
                 {
-                    "method": scope.get("method", "GET"),
+                    "method": _normalize_method(path, scope.get("method", "GET")),
                     "path": normalized_path,
                     "status": str(status_code),
                 },
@@ -216,12 +262,17 @@ class MetricsMiddleware:
         if target is None:
             return
 
-        template = _normalize_path(path)
+        template = _normalize_path(path, _route_path(scope))
+        is_opensubsonic = path == "/rest" or path.startswith("/rest/")
+        method = _normalize_method(path, scope.get("method", "GET"))
         tags = {
-            "method": scope.get("method", "GET"),
+            "method": method,
             "path": template,
             "status": str(status_code),
         }
+
+        if is_opensubsonic and status_code >= 400:
+            record_counter_later("opensubsonic.request.errors", tags)
 
         if target == "stream":
             record_counter_later(_STREAM_REQUESTS_METRIC, tags)
@@ -230,7 +281,7 @@ class MetricsMiddleware:
 
         record_later(_HTTP_LATENCY_METRIC, elapsed_ms, tags)
         record_route_latency_later(
-            method=scope.get("method", "GET"),
+            method=method,
             path=template,
             status=status_code,
             elapsed_ms=elapsed_ms,
@@ -244,8 +295,20 @@ class MetricsMiddleware:
             record_counter_later(_HTTP_SLOW_METRIC, tags)
             log.warning(
                 "Slow API request %s %s -> %s in %.1fms",
-                scope.get("method", "GET"),
+                method,
                 template,
                 status_code,
                 elapsed_ms,
             )
+
+
+def _route_path(scope: Scope) -> str | None:
+    route = scope.get("route")
+    path = getattr(route, "path", None)
+    return path if isinstance(path, str) else None
+
+
+def _normalize_method(path: str, method: str) -> str:
+    if path == "/rest" or path.startswith("/rest/"):
+        return method if method in {"GET", "POST"} else "OTHER"
+    return method

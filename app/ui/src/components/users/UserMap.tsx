@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useApi } from "@/hooks/use-api";
+import { cartoBasemapTileUrl } from "@/lib/carto-basemap";
 import {
   groupMapUsers,
   type MapUser,
@@ -267,8 +268,8 @@ export function UserMap({
           attributionControl
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+            url={cartoBasemapTileUrl()}
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
           <FitBounds groups={groups} />
           {groups.map((group) => (
@@ -288,7 +289,7 @@ export function UserMap({
           <dialog
             open
             aria-label="User map details"
-            className="absolute right-3 top-3 z-[1000] max-h-[calc(100%-24px)] w-[min(360px,calc(100%-24px))] overflow-y-auto rounded-md border border-white/12 bg-[#11111f]/95 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            className="absolute bottom-auto left-auto right-3 top-3 z-[1000] m-0 max-h-[calc(100%-24px)] w-[min(360px,calc(100%-24px))] overflow-y-auto rounded-md border border-white/12 bg-[#11111f]/95 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

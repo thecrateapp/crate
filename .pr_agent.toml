@@ -1,6 +1,6 @@
 [config]
-model = "deepseek/deepseek-v4-pro"
-fallback_models = ["deepseek/deepseek-v4-flash"]
+model = "deepseek/deepseek-v4-flash"
+fallback_models = ["deepseek/deepseek-v4-pro"]
 ai_timeout = 300
 large_patch_policy = "clip"
 max_model_tokens = 32000

@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
+use crate::observability;
 use crate::package::{build_album_package, build_track_artifact, PackageJob, TrackArtifactJob};
 
 const MAX_HEADER_BYTES: usize = 64 * 1024;
@@ -22,9 +23,15 @@ pub fn serve(addr: &str) -> io::Result<()> {
             Ok(mut stream) => {
                 if let Err(err) = handle_connection(&mut stream) {
                     eprintln!("crate-media-worker request failed: {err}");
+                    if should_capture_connection_error(&err) {
+                        observability::capture_operation_error(&err, "server.connection", &[]);
+                    }
                 }
             }
-            Err(err) => eprintln!("crate-media-worker accept failed: {err}"),
+            Err(err) => {
+                eprintln!("crate-media-worker accept failed: {err}");
+                observability::capture_operation_error(&err, "server.accept", &[]);
+            }
         }
     }
 
@@ -40,56 +47,129 @@ fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
 }
 
 fn handle_request<W: Write>(request: Request, writer: &mut W) -> io::Result<()> {
-    match (request.method.as_str(), request.path.as_str()) {
-        ("GET", "/healthz") => write_json(
-            writer,
-            200,
-            json!({"ok": true, "service": "crate-media-worker"}),
-        ),
-        ("POST", "/v1/packages/album") => {
-            let job: Result<PackageJob, _> = serde_json::from_slice(&request.body);
-            match job {
-                Ok(job) => {
-                    let result = build_album_package(job);
-                    let status = if result.ok { 200 } else { 500 };
-                    write_json(writer, status, serde_json::to_value(result).unwrap_or_else(|err| {
-                        json!({"ok": false, "errors": [format!("serialize response: {err}")]})
-                    }))
-                }
-                Err(err) => write_json(
-                    writer,
-                    400,
-                    json!({"ok": false, "errors": [format!("invalid package job: {err}")]}),
-                ),
-            }
-        }
-        ("POST", "/v1/packages/track") => {
-            let job: Result<TrackArtifactJob, _> = serde_json::from_slice(&request.body);
-            match job {
-                Ok(job) => {
-                    let result = build_track_artifact(job);
-                    let status = if result.ok { 200 } else { 500 };
-                    write_json(
-                        writer,
-                        status,
-                        serde_json::to_value(result).unwrap_or_else(|err| {
-                            json!({"ok": false, "errors": [format!("serialize response: {err}")]})
-                        }),
-                    )
-                }
-                Err(err) => write_json(
-                    writer,
-                    400,
-                    json!({"ok": false, "errors": [format!("invalid track artifact job: {err}")]}),
-                ),
-            }
-        }
-        _ => write_json(
-            writer,
-            404,
-            json!({"ok": false, "errors": ["unknown route"]}),
-        ),
+    let route = match request.path.as_str() {
+        "/healthz" | "/v1/packages/album" | "/v1/packages/track" => request.path.as_str(),
+        _ => "<unmatched>",
+    };
+    let transaction_name = format!("{} {route}", request.method);
+    let mut transaction_context = sentry::TransactionContext::new(&transaction_name, "http.server");
+    if request.path == "/healthz" {
+        transaction_context.set_sampled(false);
     }
+    let transaction = sentry::start_transaction(transaction_context);
+    transaction.set_tag("http.method", &request.method);
+    transaction.set_tag("http.route", route);
+    let transaction_for_scope = transaction.clone();
+    let mut status = 404;
+
+    let result = sentry::with_scope(
+        |scope| scope.set_span(Some(transaction_for_scope.into())),
+        || match (request.method.as_str(), request.path.as_str()) {
+            ("GET", "/healthz") => {
+                status = 200;
+                write_json(
+                    writer,
+                    status,
+                    json!({"ok": true, "service": "crate-media-worker"}),
+                )
+            }
+            ("POST", "/v1/packages/album") => {
+                let job: Result<PackageJob, _> = serde_json::from_slice(&request.body);
+                match job {
+                    Ok(job) => {
+                        let job_id = job.job_id.clone();
+                        let package_result = build_album_package(job);
+                        status = if package_result.ok { 200 } else { 500 };
+                        if !package_result.ok {
+                            observability::capture_job_failure(
+                                "package.album",
+                                job_id.as_deref(),
+                                &package_result.errors,
+                            );
+                        }
+                        write_json(
+                            writer,
+                            status,
+                            serde_json::to_value(package_result).unwrap_or_else(|err| {
+                                json!({"ok": false, "errors": [format!("serialize response: {err}")]})
+                            }),
+                        )
+                    }
+                    Err(err) => {
+                        status = 400;
+                        write_json(
+                            writer,
+                            status,
+                            json!({"ok": false, "errors": [format!("invalid package job: {err}")]}),
+                        )
+                    }
+                }
+            }
+            ("POST", "/v1/packages/track") => {
+                let job: Result<TrackArtifactJob, _> = serde_json::from_slice(&request.body);
+                match job {
+                    Ok(job) => {
+                        let job_id = job.job_id.clone();
+                        let artifact_result = build_track_artifact(job);
+                        status = if artifact_result.ok { 200 } else { 500 };
+                        if !artifact_result.ok {
+                            observability::capture_job_failure(
+                                "package.track",
+                                job_id.as_deref(),
+                                &artifact_result.errors,
+                            );
+                        }
+                        write_json(
+                            writer,
+                            status,
+                            serde_json::to_value(artifact_result).unwrap_or_else(|err| {
+                                json!({"ok": false, "errors": [format!("serialize response: {err}")]})
+                            }),
+                        )
+                    }
+                    Err(err) => {
+                        status = 400;
+                        write_json(
+                            writer,
+                            status,
+                            json!({"ok": false, "errors": [format!("invalid track artifact job: {err}")]}),
+                        )
+                    }
+                }
+            }
+            _ => {
+                status = 404;
+                write_json(
+                    writer,
+                    status,
+                    json!({"ok": false, "errors": ["unknown route"]}),
+                )
+            }
+        },
+    );
+
+    transaction.set_tag("http.status_code", status);
+    transaction.set_status(if result.is_err() || status >= 500 {
+        sentry::protocol::SpanStatus::InternalError
+    } else if status == 404 {
+        sentry::protocol::SpanStatus::NotFound
+    } else if status >= 400 {
+        sentry::protocol::SpanStatus::InvalidArgument
+    } else {
+        sentry::protocol::SpanStatus::Ok
+    });
+    transaction.finish();
+    result
+}
+
+fn should_capture_connection_error(err: &io::Error) -> bool {
+    !matches!(
+        err.kind(),
+        io::ErrorKind::BrokenPipe
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::ConnectionReset
+            | io::ErrorKind::UnexpectedEof
+    )
 }
 
 struct Request {
@@ -176,11 +256,7 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
     buffer.windows(4).position(|window| window == b"\r\n\r\n")
 }
 
-fn write_json<W: Write>(
-    stream: &mut W,
-    status: u16,
-    payload: serde_json::Value,
-) -> io::Result<()> {
+fn write_json<W: Write>(stream: &mut W, status: u16, payload: serde_json::Value) -> io::Result<()> {
     let status_text = match status {
         200 => "OK",
         400 => "Bad Request",
@@ -313,11 +389,61 @@ mod tests {
     }
 
     #[test]
+    fn failed_track_job_returns_500_and_reports_the_job_failure() {
+        let temp = tempfile::tempdir().unwrap();
+        let body = serde_json::to_vec(&json!({
+            "job_id": "job-visible",
+            "source_path": temp.path().join("missing.flac"),
+            "output_path": temp.path().join("artifact.flac"),
+            "write_rich_tags": false
+        }))
+        .unwrap();
+
+        let events = sentry::test::with_captured_events(|| {
+            let req = build_request("POST", "/v1/packages/track", &body);
+            let response = send_raw_request(&req);
+            assert!(String::from_utf8_lossy(&response).contains("500 Internal Server Error"));
+        });
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].message.as_deref(),
+            Some("Media job failed: package.track")
+        );
+        assert_eq!(events[0].extra.get("job_id"), Some(&json!("job-visible")));
+    }
+
+    #[test]
     fn response_has_json_content_type() {
         let req = build_request("GET", "/healthz", b"");
         let resp = send_raw_request(&req);
         let body = String::from_utf8_lossy(&resp);
         assert!(body.contains("Content-Type: application/json"));
+    }
+
+    #[test]
+    fn package_request_emits_a_named_http_transaction() {
+        let envelopes = sentry::test::with_captured_envelopes_options(
+            || {
+                let req = build_request("POST", "/v1/packages/track", b"invalid");
+                let _ = send_raw_request(&req);
+            },
+            sentry::ClientOptions {
+                traces_sample_rate: 1.0,
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(envelopes.len(), 1);
+        let transaction = match envelopes[0].items().next() {
+            Some(sentry::protocol::EnvelopeItem::Transaction(transaction)) => transaction,
+            _ => panic!("expected an HTTP transaction"),
+        };
+        assert_eq!(transaction.name.as_deref(), Some("POST /v1/packages/track"));
+        assert_eq!(
+            transaction.tags.get("http.status_code").map(String::as_str),
+            Some("400")
+        );
     }
 
     // ── read_request unit tests ──────────────────────────────────────
@@ -338,5 +464,21 @@ mod tests {
         let mut input = Cursor::new(raw);
         let req = read_request(&mut input).unwrap();
         assert_eq!(req.body, b"");
+    }
+
+    #[test]
+    fn connection_error_filter_keeps_server_failures_and_drops_client_disconnects() {
+        let cases = [
+            (io::ErrorKind::BrokenPipe, false),
+            (io::ErrorKind::ConnectionReset, false),
+            (io::ErrorKind::UnexpectedEof, false),
+            (io::ErrorKind::TimedOut, true),
+            (io::ErrorKind::InvalidData, true),
+        ];
+
+        for (kind, expected) in cases {
+            let error = io::Error::new(kind, "test");
+            assert_eq!(should_capture_connection_error(&error), expected);
+        }
     }
 }

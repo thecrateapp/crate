@@ -54,6 +54,23 @@ export function captureRenderError(error: Error, info: ErrorInfo): void {
   });
 }
 
+export function captureRuntimeError(
+  error: unknown,
+  operation: string,
+): Promise<void> {
+  return withSentry((sentry) => {
+    sentry.withScope((scope) => {
+      scope.setTag("runtime.operation", operation);
+      scope.setFingerprint([
+        "listen-runtime-error",
+        operation,
+        "{{ default }}",
+      ]);
+      sentry.captureException(error);
+    });
+  });
+}
+
 export function setSentryUser(userId: number | string | null): Promise<void> {
   return withSentry((sentry) => {
     sentry.setUser(userId == null ? null : { id: String(userId) });

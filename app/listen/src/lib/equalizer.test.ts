@@ -223,6 +223,19 @@ describe("equalizer-prefs round-trip", () => {
     expect(snapshot.gains).toEqual(custom);
   });
 
+  it("migrates custom gains stored with the legacy key", async () => {
+    const custom = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    localStorage.setItem("listen-eq-preset", "custom");
+    localStorage.setItem("listen-eq-gains", JSON.stringify(custom));
+    const { getEqualizerGains } = await import("./equalizer-prefs");
+
+    expect(getEqualizerGains()).toEqual(custom);
+    expect(localStorage.getItem("listen-eq-gains:v1")).toBe(
+      JSON.stringify(custom),
+    );
+    expect(localStorage.getItem("listen-eq-gains")).toBeNull();
+  });
+
   it("falls back to flat when stored gains are malformed", async () => {
     localStorage.setItem("listen-eq-gains", "not-an-array");
     const { getEqualizerGains } = await import("./equalizer-prefs");

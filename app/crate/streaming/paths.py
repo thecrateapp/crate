@@ -16,6 +16,36 @@ def stream_cache_root() -> Path:
     return cache_root() / "stream-cache"
 
 
+def resolve_confined_path(root: Path, relative_path: str | Path) -> Path | None:
+    """Resolve a relative path only when its target remains below ``root``."""
+
+    stored = Path(relative_path)
+    if stored.is_absolute() or ".." in stored.parts:
+        return None
+    resolved_root = root.resolve()
+    candidate = (resolved_root / stored).resolve(strict=False)
+    return candidate if candidate.is_relative_to(resolved_root) else None
+
+
+def resolve_confined_entry_path(root: Path, relative_path: str | Path) -> Path | None:
+    """Return a confined lexical entry without following its final symlink."""
+
+    stored = Path(relative_path)
+    if stored.is_absolute() or ".." in stored.parts:
+        return None
+    resolved_root = root.resolve()
+    current = resolved_root
+    for part in stored.parts[:-1]:
+        current /= part
+        if current.is_symlink():
+            return None
+    candidate = resolved_root / stored
+    resolved_parent = candidate.parent.resolve(strict=False)
+    if not resolved_parent.is_relative_to(resolved_root):
+        return None
+    return candidate
+
+
 def variant_relative_path(cache_key: str, preset: str, extension: str) -> str:
     safe_preset = "".join(
         ch if ch.isalnum() or ch in ("_", "-") else "-" for ch in preset
@@ -34,7 +64,4 @@ def resolve_data_file(relative_path: str | None) -> Path | None:
         return None
     stored = Path(relative_path)
     root = cache_root() if stored.parts[:1] == ("stream-cache",) else data_root()
-    candidate = (root / relative_path).resolve()
-    if not candidate.is_relative_to(root):
-        return None
-    return candidate
+    return resolve_confined_path(root, relative_path)

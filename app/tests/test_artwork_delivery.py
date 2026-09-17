@@ -38,9 +38,34 @@ def test_deliver_artwork_prefers_materialized_variant(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.media_type == "image/webp"
     assert response.headers["etag"]
+    assert response.headers["last-modified"]
     assert response.headers["x-crate-artwork"] == "variant"
     assert str(getattr(response, "path")).endswith("384.webp")
     assert queued == []
+
+
+def test_deliver_artwork_can_buffer_materialized_variant(monkeypatch, tmp_path):
+    from crate.api import artwork_delivery
+    from crate.artwork_materializer import materialize_artwork
+    from crate.artwork_variants import ArtworkAsset
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    asset = ArtworkAsset("album-cover", "album-entity")
+    materialize_artwork(asset, _jpeg_bytes())
+
+    response = artwork_delivery.deliver_artwork(
+        asset,
+        requested_size=320,
+        local_original=None,
+        missing_response=Response(status_code=404),
+        buffer_file=True,
+    )
+
+    assert response.status_code == 200
+    assert response.media_type == "image/webp"
+    assert response.headers["x-crate-artwork"] == "variant"
+    assert response.body.startswith(b"RIFF")
+    assert not hasattr(response, "path")
 
 
 def test_deliver_artwork_can_mark_authenticated_variants_private(monkeypatch, tmp_path):

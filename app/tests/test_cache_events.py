@@ -350,3 +350,54 @@ def test_admin_auth_mutations_invalidate_readplane_identity_cache():
     assert cache_events._match_invalidation_scopes("/api/admin/auth/users/7/role") == [
         "auth"
     ]
+
+
+def test_open_subsonic_star_get_mutations_invalidate_likes(monkeypatch):
+    from crate.api import cache_events
+
+    invalidations: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        cache_events,
+        "broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
+
+    async def app(_scope, _receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(_message):
+        return None
+
+    async def run_request(path: str, query_string: str = ""):
+        await cache_events.CacheInvalidationMiddleware(app)(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": path,
+                "query_string": query_string.encode(),
+            },
+            receive,
+            send,
+        )
+
+    async def run_requests():
+        await run_request("/rest/star.view", "id=gt-111")
+        await run_request("/rest/unstar.view", "id=gt-111")
+        await run_request("/rest/star", "id=gt-112")
+        await run_request("/rest/star.view", "artistId=ga-222")
+        await run_request("/rest/unstar.view", "albumId=gal-333")
+        await run_request("/rest/getStarred.view")
+
+    asyncio.run(run_requests())
+
+    assert invalidations == [
+        ("likes",),
+        ("likes",),
+        ("likes",),
+        ("follows", "home", "upcoming"),
+        ("saved_albums", "home"),
+    ]

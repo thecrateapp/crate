@@ -76,6 +76,36 @@ interface SearchResponse {
   artists?: ArtistSearchResult[];
 }
 
+interface ArtistIdentity {
+  artistId?: number;
+  artistEntityUid?: string;
+}
+
+export async function refreshArtistProbableSetlist(
+  identity: ArtistIdentity,
+  refetchEnrichment: () => Promise<EnrichmentData | null>,
+): Promise<{ enrichment: EnrichmentData; status: string }> {
+  const endpoint = artistActionApiPath(identity, "probable-setlist/refresh");
+  if (!endpoint) throw new Error("Artist reference missing");
+
+  const queued = await api<{ task_id: string; status?: string }>(
+    endpoint,
+    "POST",
+  );
+  const task = await waitForTask(queued.task_id, 120000);
+  if (task.status !== "completed") {
+    throw new Error(task.error || "Probable setlist refresh failed");
+  }
+
+  const enrichment = await refetchEnrichment();
+  if (!enrichment) {
+    throw new Error("Setlist refreshed, but artist data could not be reloaded");
+  }
+  const status =
+    typeof task.result?.status === "string" ? task.result.status : "ready";
+  return { enrichment, status };
+}
+
 export function MergeArtistDialog({
   open,
   currentArtistId,
@@ -149,7 +179,10 @@ export function MergeArtistDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <label className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <label
+            htmlFor="merge-artist-target"
+            className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+          >
             Target artist
           </label>
           <div className="relative">
@@ -158,6 +191,7 @@ export function MergeArtistDialog({
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
             />
             <Input
+              id="merge-artist-target"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               className="pl-9"
@@ -244,6 +278,7 @@ interface ArtistTabContentProps {
     downloadingDiscog: boolean;
     canDownloadTidal: boolean;
     canEditMetadata: boolean;
+    refreshingSetlist: boolean;
   };
   onResearchBio: () => void;
   missingAlbums: { title: string; first_release_date: string; type: string }[];
@@ -275,6 +310,7 @@ interface ArtistTabContentProps {
       album_slug?: string;
     }[],
   ) => void;
+  onRefreshSetlist: () => void;
   upcomingShows: ArtistShowEvent[];
   mergedSimilar: ReturnType<typeof buildMergedSimilarArtists>;
 }
@@ -303,6 +339,7 @@ function ArtistTabContent({
   onDownloadDiscography,
   allTrackTitles,
   onTrackTitlesLoaded,
+  onRefreshSetlist,
   upcomingShows,
   mergedSimilar,
 }: ArtistTabContentProps) {
@@ -314,6 +351,7 @@ function ArtistTabContent({
     downloadingDiscog,
     canDownloadTidal,
     canEditMetadata,
+    refreshingSetlist,
   } = flags;
   return (
     <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 pt-6 md:px-8">
@@ -368,6 +406,9 @@ function ArtistTabContent({
           setlistData={setlistData}
           allTrackTitles={allTrackTitles}
           onTrackTitlesLoaded={onTrackTitlesLoaded}
+          canRefresh={canEditMetadata}
+          refreshing={refreshingSetlist}
+          onRefresh={onRefreshSetlist}
         />
       ) : null}
       {activeTab === "shows" ? (
@@ -579,8 +620,11 @@ function useArtistPageData() {
     }) || null,
   );
   const topTracks = useTopTracks(data?.id, data?.entity_uid);
-  const { enrichment: fetchedEnrichment, loading: enrichmentLoading } =
-    useArtistEnrichment(data?.id, data?.entity_uid);
+  const {
+    enrichment: fetchedEnrichment,
+    loading: enrichmentLoading,
+    refetch: refetchEnrichment,
+  } = useArtistEnrichment(data?.id, data?.entity_uid);
   const { isAdmin, hasCapability } = useAuth();
   const canEditMetadata = hasCapability("library.metadata.write");
   const canRepairArtist = hasCapability("library.repair.run");
@@ -616,6 +660,7 @@ function useArtistPageData() {
     topTracks,
     fetchedEnrichment,
     enrichmentLoading,
+    refetchEnrichment,
     isAdmin,
     canEditMetadata,
     canRepairArtist,
@@ -636,6 +681,7 @@ function useArtistPageUiState() {
   const [bgCacheBust, setBgCacheBust] = useState("");
   const [bgLoaded, setBgLoaded] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [refreshingSetlist, setRefreshingSetlist] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [showMissing, setShowMissing] = useState(true);
   const [downloadingDiscog, setDownloadingDiscog] = useState(false);
@@ -669,6 +715,8 @@ function useArtistPageUiState() {
     setBgLoaded,
     enriching,
     setEnriching,
+    refreshingSetlist,
+    setRefreshingSetlist,
     activeTab,
     setActiveTab,
     showMissing,
@@ -797,8 +845,11 @@ function useArtistPageActions({
   data,
   navigate,
   refetch,
+  refetchEnrichment,
   tidalMissing,
   setEnriching,
+  setRefreshingSetlist,
+  setEnrichment,
   setShowRepairDialog,
   setDownloadingDiscog,
   setTidalMissing,
@@ -806,10 +857,15 @@ function useArtistPageActions({
   setMetadataAction,
   setMergingArtist,
   setShowMergeArtist,
-}: Pick<ArtistPageDataState, "data" | "navigate" | "refetch"> &
+}: Pick<
+  ArtistPageDataState,
+  "data" | "navigate" | "refetch" | "refetchEnrichment"
+> &
   Pick<
     ArtistPageUiState,
     | "setEnriching"
+    | "setRefreshingSetlist"
+    | "setEnrichment"
     | "setShowRepairDialog"
     | "setDownloadingDiscog"
     | "setCreatingCorePlaylist"
@@ -819,6 +875,32 @@ function useArtistPageActions({
   > &
   Pick<ArtistPageAuxiliaryState, "tidalMissing" | "setTidalMissing">) {
   const artistName = data?.name ?? "";
+
+  async function refreshProbableSetlist() {
+    setRefreshingSetlist(true);
+    try {
+      const result = await refreshArtistProbableSetlist(
+        { artistId: data?.id, artistEntityUid: data?.entity_uid },
+        refetchEnrichment,
+      );
+      setEnrichment(result.enrichment);
+      if (result.status === "missing") {
+        toast.success("Setlist refresh completed", {
+          description: "Setlist.fm returned no usable recent concerts.",
+        });
+      } else {
+        toast.success("Probable setlist refreshed");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to refresh probable setlist",
+      );
+    } finally {
+      setRefreshingSetlist(false);
+    }
+  }
 
   async function enrichArtist() {
     setEnriching(true);
@@ -1002,6 +1084,7 @@ function useArtistPageActions({
   }
 
   return {
+    refreshProbableSetlist,
     enrichArtist,
     applyBioResearchProposal,
     analyzeArtist,
@@ -1029,8 +1112,11 @@ function useArtistPageModel() {
     data: dataState.data,
     navigate: dataState.navigate,
     refetch: dataState.refetch,
+    refetchEnrichment: dataState.refetchEnrichment,
     tidalMissing: auxiliaryState.tidalMissing,
     setEnriching: uiState.setEnriching,
+    setRefreshingSetlist: uiState.setRefreshingSetlist,
+    setEnrichment: uiState.setEnrichment,
     setShowRepairDialog: uiState.setShowRepairDialog,
     setDownloadingDiscog: uiState.setDownloadingDiscog,
     setTidalMissing: auxiliaryState.setTidalMissing,
@@ -1066,6 +1152,7 @@ function useArtistPageModel() {
     bgCacheBust,
     bgLoaded,
     enriching,
+    refreshingSetlist,
     activeTab,
     showMissing,
     downloadingDiscog,
@@ -1157,6 +1244,7 @@ function useArtistPageModel() {
     canMergeArtist,
     isAdmin,
     enriching,
+    refreshingSetlist,
     creatingCorePlaylist,
     photoLoaded,
     photoError,
@@ -1187,6 +1275,7 @@ function useArtistPageModel() {
     setShowMergeArtist: uiState.setShowMergeArtist,
     setIssueCountOverride: uiState.setIssueCountOverride,
     refetch,
+    refreshProbableSetlist: actionState.refreshProbableSetlist,
     enrichArtist: actionState.enrichArtist,
     analyzeArtist: actionState.analyzeArtist,
     createArtistCorePlaylist: actionState.createArtistCorePlaylist,
@@ -1237,6 +1326,7 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
     canMergeArtist,
     isAdmin,
     enriching,
+    refreshingSetlist,
     creatingCorePlaylist,
     photoLoaded,
     photoError,
@@ -1267,6 +1357,7 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
     setShowMergeArtist,
     setIssueCountOverride,
     refetch,
+    refreshProbableSetlist,
     enrichArtist,
     analyzeArtist,
     createArtistCorePlaylist,
@@ -1370,6 +1461,7 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
           downloadingDiscog,
           canDownloadTidal,
           canEditMetadata,
+          refreshingSetlist,
         }}
         onResearchBio={() => setShowBioResearch(true)}
         missingAlbums={missingAlbums}
@@ -1380,6 +1472,7 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
         onDownloadDiscography={() => void downloadMissingDiscography()}
         allTrackTitles={allTrackTitles}
         onTrackTitlesLoaded={setAllTrackTitles}
+        onRefreshSetlist={() => void refreshProbableSetlist()}
         upcomingShows={upcomingShows}
         mergedSimilar={mergedSimilar}
       />

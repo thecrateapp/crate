@@ -90,6 +90,7 @@ function mockJsonResponse(body: unknown): Response {
 
 beforeEach(() => {
   localStorage.clear();
+  setAuthToken(null);
   vi.restoreAllMocks();
   redirectToLoginMock.mockClear();
   captureApiErrorMock.mockClear();
@@ -318,8 +319,8 @@ describe("apiWsUrl", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("auth tokens", () => {
-  it("getAuthToken reads from localStorage", () => {
-    localStorage.setItem("listen-auth-token", "abc");
+  it("getAuthToken reads from in-memory web session", () => {
+    setAuthToken("abc");
     expect(getAuthToken()).toBe("abc");
   });
 
@@ -327,11 +328,8 @@ describe("auth tokens", () => {
     expect(getAuthToken()).toBeNull();
   });
 
-  it("getAuthTokenExpiresAt reads from localStorage", () => {
-    localStorage.setItem(
-      "listen-auth-token-expires-at",
-      "2025-01-01T00:00:00.000Z",
-    );
+  it("getAuthTokenExpiresAt reads from in-memory web session", () => {
+    setAuthToken("abc", "2025-01-01T00:00:00.000Z");
     expect(getAuthTokenExpiresAt()).toBe("2025-01-01T00:00:00.000Z");
   });
 
@@ -950,6 +948,30 @@ describe("native (configurable server) mode", () => {
     return s;
   }
 
+  it("keeps a server-scoped OAuth request on its originating server", async () => {
+    const serverA = setupServer("https://api-a.example.com", "secret-a");
+    const serverB = serverStore.addServer("https://api-b.example.com");
+    serverStore.setCurrentServerId(serverB.id);
+    serverStore.setCurrentServerToken("secret-b");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(mockJsonResponse({ ok: true }));
+
+    await apiMod.apiForServer(serverA.id, "/api/auth/native/exchange", "POST", {
+      code: "one-time-code",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api-a.example.com/api/auth/native/exchange",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.not.objectContaining({
+          Authorization: expect.anything(),
+        }),
+      }),
+    );
+  });
+
   describe("getApiBase", () => {
     it("returns empty when no server configured", () => {
       expect(apiMod.getApiBase()).toBe("");
@@ -1312,6 +1334,75 @@ describe("native (configurable server) mode", () => {
           server.id,
         ),
       ).toBe("fresh-artwork-ticket");
+    });
+
+    it("waits for targets queued behind an in-flight refresh", async () => {
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      let resolveFirst: ((response: Response) => void) | undefined;
+      let resolveSecond: ((response: Response) => void) | undefined;
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveFirst = resolve;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveSecond = resolve;
+            }),
+        );
+
+      const first = apiMod.refreshMediaAccessTickets([
+        { audience: "artwork", path: "/api/albums/1/cover" },
+      ]);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+      let secondSettled = false;
+      const second = apiMod
+        .refreshMediaAccessTickets([
+          { audience: "artwork", path: "/api/albums/2/cover" },
+        ])
+        .then((result) => {
+          secondSettled = true;
+          return result;
+        });
+      await Promise.resolve();
+      expect(secondSettled).toBe(false);
+
+      resolveFirst?.(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/1/cover",
+              ticket: "first-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+      await expect(first).resolves.toBe(true);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(secondSettled).toBe(false);
+
+      resolveSecond?.(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/2/cover",
+              ticket: "second-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+      await expect(second).resolves.toBe(true);
     });
 
     it("waits for a cold exact-path ticket before returning a protected URL", async () => {

@@ -1014,6 +1014,7 @@ def test_update_artist_metadata_writes_audit_and_invalidates(monkeypatch):
 
     audit = MagicMock()
     invalidations: list[tuple[str, ...]] = []
+    invalidation_waits: list[float] = []
 
     monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
     monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
@@ -1031,6 +1032,10 @@ def test_update_artist_metadata_writes_audit_and_invalidates(monkeypatch):
     monkeypatch.setattr(
         "crate.api.cache_events.broadcast_invalidation",
         lambda *scopes: invalidations.append(scopes),
+    )
+    monkeypatch.setattr(
+        "crate.api.cache_events.wait_for_cache_invalidation",
+        lambda *, timeout=2.0: invalidation_waits.append(timeout) or True,
     )
 
     result = _handle_update_artist_metadata(
@@ -1060,7 +1065,8 @@ def test_update_artist_metadata_writes_audit_and_invalidates(monkeypatch):
     assert audit.call_args.kwargs["user_id"] == 77
     assert audit.call_args.kwargs["details"]["before"] == {"bio": "Old"}
     assert audit.call_args.kwargs["details"]["after"] == {"bio": "New"}
-    assert invalidations == [("library", "home", "artist:12")]
+    assert invalidations == [("library", "home", "artist_bio", "artist:12")]
+    assert invalidation_waits == [2.0]
 
 
 def test_quarantine_track_moves_file_deletes_db_and_invalidates(tmp_path, monkeypatch):
@@ -1709,6 +1715,10 @@ def test_merge_artist_moves_albums_reassigns_db_and_rescans(tmp_path, monkeypatc
             (source_artist, target_artist, old_path, new_path)
         ),
     )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion",
+        lambda _name, operation: operation(),
+    )
     monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
     monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
     monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
@@ -1802,6 +1812,10 @@ def test_merge_artist_preserves_duplicate_artist_photo_sidecar(tmp_path, monkeyp
     monkeypatch.setattr(
         "crate.worker_handlers.management.merge_artist_into_artist",
         MagicMock(),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.run_artist_deletion",
+        lambda _name, operation: operation(),
     )
     monkeypatch.setattr("crate.worker_handlers.management.log_audit", MagicMock())
     monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())

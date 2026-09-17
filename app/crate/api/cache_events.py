@@ -18,6 +18,7 @@ import logging
 import re
 from time import time
 from typing import Any, AsyncIterator
+from urllib.parse import parse_qs
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import StreamingResponse
@@ -92,6 +93,7 @@ _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
         "artist_bio",
     }
 )
+_SUBSONIC_STAR_MUTATION_PATH = re.compile(r"^/rest/(?:star|unstar)(?:\.view)?$")
 
 
 def _get_redis() -> Any:
@@ -506,7 +508,30 @@ _INVALIDATION_RULES: list[tuple[re.Pattern[str], list[str]]] = [
 ]
 
 
-def _match_invalidation_scopes(path: str) -> list[str]:
+def _subsonic_star_invalidation_scopes(query_string: bytes) -> list[str]:
+    params = parse_qs(query_string.decode("utf-8", errors="replace"))
+    scopes: list[str] = []
+
+    if params.get("artistId"):
+        scopes.extend(("follows", "home", "upcoming"))
+    if params.get("albumId"):
+        scopes.extend(("saved_albums", "home"))
+
+    for item_id in params.get("id", []):
+        if item_id.startswith(("ga-", "ar-")):
+            scopes.extend(("follows", "home", "upcoming"))
+        elif item_id.startswith(("gal-", "al-")):
+            scopes.extend(("saved_albums", "home"))
+        else:
+            scopes.append("likes")
+
+    return list(dict.fromkeys(scopes))
+
+
+def _match_invalidation_scopes(path: str, query_string: bytes = b"") -> list[str]:
+    if _SUBSONIC_STAR_MUTATION_PATH.fullmatch(path):
+        return _subsonic_star_invalidation_scopes(query_string)
+
     for pattern, scope_templates in _INVALIDATION_RULES:
         match = pattern.match(path)
         if not match:
@@ -546,7 +571,11 @@ class CacheInvalidationMiddleware:
 
         await self.app(scope, receive, send_wrapper)
 
-        if method in ("POST", "PUT", "PATCH", "DELETE") and 200 <= status_code < 300:
-            scopes = _match_invalidation_scopes(path)
+        is_method_mutation = method in ("POST", "PUT", "PATCH", "DELETE")
+        is_subsonic_star_get = (
+            method == "GET" and _SUBSONIC_STAR_MUTATION_PATH.fullmatch(path)
+        )
+        if (is_method_mutation or is_subsonic_star_get) and 200 <= status_code < 300:
+            scopes = _match_invalidation_scopes(path, scope.get("query_string", b""))
             if scopes:
                 broadcast_invalidation(*scopes)

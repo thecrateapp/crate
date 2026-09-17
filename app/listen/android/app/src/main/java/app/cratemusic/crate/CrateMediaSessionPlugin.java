@@ -73,6 +73,11 @@ public class CrateMediaSessionPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void cancelPendingResume(PluginCall call) {
+        call.resolve();
+    }
+
+    @PluginMethod
     public void getOutputCapabilities(PluginCall call) {
         JSObject payload = new JSObject();
         payload.put("platform", "android");

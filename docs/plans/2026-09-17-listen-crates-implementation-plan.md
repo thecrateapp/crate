@@ -14,7 +14,7 @@
 
 - Work only in the record-collections worktree on branch codex/feat/record-collections.
 - Use TDD for each behavior: add a focused failing test, run it and confirm the failure, implement the smallest passing change, then run the focused suite.
-- The initial feature branch migration head was 089. After integrating `main`, revision 090 is `dirty_source_retry_backoff`; the Crates schema therefore lives in revision 091.
+- The initial feature branch migration head was 089. After integrating the current `main`, Crates follows its migration head at revision 098 and uses revision 099.
 - Use concrete modules under db/queries and db/repositories. Do not add new internal imports through crate.db.__init__.py.
 - Keep public visibility separate from collaboration. New crates default to private; the owner alone controls visibility, invite/member management, and deletion.
 - Follow current Listen behavior for social previews and authenticated app pages; do not add anonymous full-page playback in this cut.
@@ -23,8 +23,8 @@
 ### Task 1: Add persistent Crate schema
 
 **Files:**
-- Create: app/crate/db/migrations/versions/091_listen_crates.py
-- Create: app/crate/db/schema_sections/crates_v091.py
+- Create: app/crate/db/migrations/versions/099_listen_crates.py
+- Create: app/crate/db/schema_sections/crates_v099.py
 - Create: app/crate/db/schema_sections/curation_crates.py
 - Modify: app/crate/db/schema_sections/curation.py
 - Test: app/tests/test_crates_schema.py

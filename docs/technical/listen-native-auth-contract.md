@@ -2,17 +2,17 @@
 
 ## Scope
 
-Android and iOS use a two-stage OAuth exchange. Provider credentials remain
+Android, iOS and Tauri use the same two-stage OAuth exchange. Provider credentials remain
 server-side and Crate access/refresh tokens are returned only by an
-authenticated HTTPS response from the configured Crate API. Web and Tauri
-retain their existing callback contracts.
+HTTPS response from the exact configured Crate API that started the flow. Web
+retains its browser callback contract.
 
 ## Start
 
 `POST /api/auth/oauth/{google|apple}/start`
 
-Native requests must send `X-Crate-App: listen-android` or
-`X-Crate-App: listen-ios` and:
+Native requests must send `X-Crate-App: listen-android`, `listen-ios` or
+`listen-tauri` and:
 
 ```json
 {
@@ -64,8 +64,10 @@ store.
 Capacitor stores `crate.session.<server-id>` in Android Keystore-backed
 AES-GCM storage or iOS Keychain with
 `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`. Transient OAuth records use
-`crate.oauth.<state>`. Public server metadata in `localStorage` contains only
-id, label, URL and access-token expiry.
+`crate.oauth.<state>`. Tauri currently stores its per-server session and
+transient OAuth record in desktop WebView storage until its native secret-store
+migration. Public Capacitor server metadata in `localStorage` contains only id,
+label, URL and access-token expiry.
 
 Migration copies and reads back each legacy secret before rewriting public
 metadata. Any secure-store failure leaves the legacy record untouched and
@@ -73,20 +75,14 @@ blocks authentication bootstrap with a recoverable restart screen.
 
 ## Rollout and compatibility
 
-- `NATIVE_OAUTH_EXCHANGE_ENABLED` enables the new start/callback/exchange path.
-- `NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED` keeps released clients working during
-  migration and defaults to enabled.
-- Deploy the backend and verify Redis first, enable exchange on a test node,
-  then publish the native client.
+- `NATIVE_OAUTH_EXCHANGE_ENABLED` defaults to enabled and controls the secure
+  start/callback/exchange path.
+- Deploy the backend and verify Redis before publishing a native client that
+  depends on this contract.
 - Roll back an exchange incident by disabling
   `NATIVE_OAUTH_EXCHANGE_ENABLED`. Existing sessions and secure-store records
   remain valid; do not roll back the database or reintroduce credentials in
-  redirects.
-- Disable credential redirects only after supported native versions sustain at
-  least 95% exchange adoption for 30 days and no beta rollback is active.
-
-Legacy callback parsing remains in the client during that window, but it
-accepts only the exact `cratemusic://oauth/callback` URL.
+  redirects. Native credential redirects cannot be enabled at runtime.
 
 ## Errors and redaction
 

@@ -107,4 +107,19 @@ describe("UserMap", () => {
       expect(inspectUser).toHaveBeenCalledWith(users[1]);
     });
   });
+
+  it("keeps the user overlay separated from the map edges", async () => {
+    useApiMock.mockReturnValue({ data: { users }, loading: false });
+    const user = userEvent.setup();
+
+    render(<UserMap onInspectUser={vi.fn()} />);
+
+    await user.click(
+      screen.getByRole("button", { name: "2 users at Madrid, Spain" }),
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "User map details" }),
+    ).toHaveClass("bottom-auto", "left-auto", "right-3", "top-3", "m-0");
+  });
 });
