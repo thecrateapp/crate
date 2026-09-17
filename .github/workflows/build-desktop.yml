@@ -248,6 +248,8 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
+          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
           version="$(node -p "require('./app/listen-desktop/src-tauri/tauri.conf.json').version")"
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
@@ -270,6 +272,8 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
+          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
 
       - name: Generate macOS dSYMs

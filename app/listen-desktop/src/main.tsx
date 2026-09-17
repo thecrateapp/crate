@@ -8,6 +8,7 @@ import { HashRouter } from "react-router";
 import { Toaster } from "sonner";
 
 import { App } from "@/App";
+import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
 import { I18nProvider } from "@/i18n";
 import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import { initSentry } from "@/lib/sentry";
@@ -22,7 +23,9 @@ import { initTauriRuntime } from "./lib/tauri-init";
 initTauriRuntime();
 initSentry();
 void primeOfflineRuntimeProfile();
-initializeThemeSkin();
+initializeThemeSkin({
+  ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED,
+});
 
 function ThemeAwareToaster() {
   const resolvedMode = useSyncExternalStore(

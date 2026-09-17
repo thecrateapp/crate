@@ -116,6 +116,7 @@ interface ThemeSkinOptions {
   storage?: StorageReader & Partial<StorageWriter>;
   matchMedia?: MatchMedia;
   persist?: boolean;
+  ignoreStoredPreferences?: boolean;
 }
 
 function getBrowserStorage(): Storage | undefined {
@@ -258,12 +259,14 @@ function applyRuntimeAppearance(
   resolvedMode: ResolvedColorMode,
   prefersReducedMotion: boolean,
   storage: ThemeSkinOptions["storage"],
+  ignoreStoredPreferences: boolean,
 ): void {
   clearRuntimeAppearance(root);
 
-  const storedPreferences = storage?.getItem
-    ? readAppearancePreferences(storage)
-    : createDefaultAppearancePreferences();
+  const storedPreferences =
+    !ignoreStoredPreferences && storage?.getItem
+      ? readAppearancePreferences(storage)
+      : createDefaultAppearancePreferences();
   const appearance = resolveAppearance(
     {
       ...storedPreferences,
@@ -312,6 +315,7 @@ export function applyThemeSkin(
       resolvedMode,
       reducedMotionQuery?.matches ?? false,
       storage,
+      options.ignoreStoredPreferences ?? false,
     );
 
     if (selection.mode === "system" && mediaQuery) {
@@ -325,6 +329,7 @@ export function applyThemeSkin(
           nextMode,
           reducedMotionQuery?.matches ?? false,
           storage,
+          options.ignoreStoredPreferences ?? false,
         );
         publishThemeSkin({
           ...selection,
@@ -350,6 +355,7 @@ export function applyThemeSkin(
           nextMode,
           event.matches,
           storage,
+          options.ignoreStoredPreferences ?? false,
         );
         publishThemeSkin({
           ...selection,
@@ -391,14 +397,18 @@ export function initializeThemeSkin(
   options: ThemeSkinOptions = {},
 ): AppliedThemeSkinSelection {
   const storage = options.storage ?? getBrowserStorage();
-  const stored = readStoredThemeSkin(storage);
-  const status = storage
-    ? inspectAppearancePreferences(storage).status
-    : "default";
+  const ignoreStoredPreferences = options.ignoreStoredPreferences ?? false;
+  const stored = ignoreStoredPreferences
+    ? DEFAULT_THEME_SKIN
+    : readStoredThemeSkin(storage);
+  const status =
+    !ignoreStoredPreferences && storage
+      ? inspectAppearancePreferences(storage).status
+      : "default";
 
   return applyThemeSkin(stored.mode, stored.skin, {
     ...options,
     storage,
-    persist: status === "legacy",
+    persist: !ignoreStoredPreferences && status === "legacy",
   });
 }

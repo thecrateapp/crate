@@ -429,6 +429,8 @@ jobs:
             VITE_SENTRY_RELEASE=crate-${{ github.sha }}
             VITE_CAST_CUSTOM_RECEIVER_ENABLED=${{ vars.CAST_CUSTOM_RECEIVER_ENABLED || 'false' }}
             VITE_CAST_RECEIVER_APP_ID=${{ vars.CAST_RECEIVER_APP_ID || 'CC1AD845' }}
+            VITE_CRATE_CONNECT_FEATURE_ENABLED=${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
+            VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED=${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
 
   build-cast-receiver:
     needs: changes

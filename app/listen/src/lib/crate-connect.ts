@@ -11,7 +11,7 @@ export const CONNECT_ENABLED_EVENT = "crate:connect-enabled-changed";
 export function isCrateConnectFeatureFlagEnabled(
   value: string | undefined,
 ): boolean {
-  return value !== "false";
+  return value === "true";
 }
 
 export const CRATE_CONNECT_FEATURE_ENABLED = isCrateConnectFeatureFlagEnabled(

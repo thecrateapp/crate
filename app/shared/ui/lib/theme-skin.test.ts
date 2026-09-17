@@ -188,6 +188,45 @@ describe("theme and skin runtime", () => {
     expect(values.has(APPEARANCE_CORRUPT_BACKUP_STORAGE_KEY)).toBe(false);
   });
 
+  it("ignores persisted appearance preferences when appearance is disabled", () => {
+    const values = new Map([
+      [
+        APPEARANCE_STORAGE_KEY,
+        JSON.stringify({
+          version: 2,
+          mode: "light",
+          preset: "crateRed",
+          overrides: { accent: "violet" },
+          presentation: { density: "compact" },
+          accessibility: { motion: "reduced" },
+        }),
+      ],
+    ]);
+    const storedPayload = values.get(APPEARANCE_STORAGE_KEY);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    } as unknown as Storage;
+
+    const selection = initializeThemeSkin({
+      root: document.documentElement,
+      storage,
+      ignoreStoredPreferences: true,
+    });
+
+    expect(selection).toEqual({ ...DEFAULT_THEME_SKIN, resolvedMode: "dark" });
+    expect(document.documentElement.dataset.crateMode).toBe("dark");
+    expect(document.documentElement.dataset.crateSkin).toBe("default");
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--crate-token-color-primary",
+      ),
+    ).not.toBe("#ff375f");
+    expect(document.documentElement.dataset.crateDensity).not.toBe("compact");
+    expect(document.documentElement.dataset.crateMotion).not.toBe("reduced");
+    expect(values.get(APPEARANCE_STORAGE_KEY)).toBe(storedPayload);
+  });
+
   it("applies runtime appearance tokens on cold boot and system changes", () => {
     const root = document.documentElement;
     const darkMedia = createMatchMedia(true);

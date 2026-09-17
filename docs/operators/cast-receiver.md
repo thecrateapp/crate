@@ -38,8 +38,9 @@ SENTRY_CAST_RECEIVER_TRACES_SAMPLE_RATE=0.05
 
 `CAST_RECEIVER_APP_ID` is public configuration, not a secret. The Android and
 iOS workflows inject these same variables into the web bundle and native SDKs.
-Tag builds fail closed when the custom receiver is disabled, the IDs differ,
-or the ID is missing, malformed, or still `CC1AD845`.
+Tagged builds may keep using Google's default receiver while the custom
+receiver is disabled. If enabled, the release gate requires matching
+registered IDs that are valid 8-character values and not `CC1AD845`.
 
 GitHub Actions repository variables used by static sender builds:
 

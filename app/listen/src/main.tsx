@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
+import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "./app-shell/feature-flags";
 import { App } from "./App";
 import { I18nProvider } from "./i18n/I18nProvider";
 import { startMediaAccessTicketRefresh } from "./lib/api";
@@ -105,7 +106,9 @@ async function bootstrap(): Promise<void> {
   }
 
   startMediaAccessTicketRefresh();
-  const appliedTheme = initializeThemeSkin();
+  const appliedTheme = initializeThemeSkin({
+    ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED,
+  });
   syncThemeColor(document.documentElement, appliedTheme.resolvedMode);
   await initCapacitor();
   void primeOfflineRuntimeProfile().catch((error) => {

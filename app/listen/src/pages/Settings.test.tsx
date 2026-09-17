@@ -76,6 +76,14 @@ describe("Settings", () => {
     expect(container.querySelector(".settings-section")).toBeInTheDocument();
   });
 
+  it("does not show the appearance settings while the feature is disabled", () => {
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    expect(
+      screen.queryByRole("heading", { name: "Appearance" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("changes and stores the selected Listen language", async () => {
     const user = userEvent.setup();
 

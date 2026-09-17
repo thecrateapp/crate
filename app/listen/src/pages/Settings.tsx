@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { AccountSection } from "@/components/settings/AccountSection";
 import { BandcampSection } from "@/components/settings/BandcampSection";
+import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
 import { LanguageSection } from "@/components/settings/LanguageSection";
 import { LinksSection } from "@/components/settings/LinksSection";
 import { OpenSubsonicCredentialsSection } from "@/components/settings/OpenSubsonicCredentialsSection";
@@ -25,7 +26,7 @@ export function Settings() {
         <p className="mt-1 text-sm text-text-muted">{t("settings.subtitle")}</p>
       </div>
 
-      <ThemeSkinSection />
+      {LISTEN_APPEARANCE_SETTINGS_ENABLED ? <ThemeSkinSection /> : null}
       <LanguageSection i18n={i18n} />
       <PlaybackSection />
       <OfflineSection />

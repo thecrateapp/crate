@@ -153,20 +153,17 @@ this profile. Clients should feature-detect via
 
 | Value    | Behavior                                                             |
 | -------- | -------------------------------------------------------------------- |
-| `legacy` | Default when unset; keeps the compatibility adapter active.          |
+| `legacy` | Keeps the compatibility adapter active; use it to roll back.         |
 | `v1`     | Selects the split v1 system/media routers and Crate-backed services. |
 
-Roll out by setting the variable to `v1` for the API service and restarting it
-only after the release's migrations and smoke checks are complete. Observe
+Production and development Compose default this flag to `v1`; explicitly set
+`legacy` only for rollback. After release migrations and smoke checks, observe
 authentication denials, protocol error codes, route latency, artwork failures,
-stream starts and worker pressure. To roll back, restore `legacy` and restart
-the API; the additive OpenSubsonic credential data is retained. Do not remove
-or reverse credential migrations as part of a code rollback. An unsupported
-flag value fails closed during router selection.
-
-This is the implementation contract, not authorization to activate the v1
-engine in production. The production cutover and legacy retirement are the
-separate post-merge Cut S runbook.
+stream starts and worker pressure. To roll back, set `legacy` and restart the
+API; the additive OpenSubsonic credential data is retained. Do not remove or
+reverse credential migrations as part of a code rollback. An unsupported flag
+value fails closed during router selection. When the variable is absent outside
+Compose, the API keeps the legacy adapter as a conservative fallback.
 
 ## Automated interoperability gate
 

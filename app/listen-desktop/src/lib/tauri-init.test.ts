@@ -77,13 +77,15 @@ describe("shouldUseTauriHttpPlugin", () => {
 });
 
 describe("desktop appearance bootstrap", () => {
-  it("restores the persisted theme and renders a mode-aware toaster", () => {
+  it("uses the release appearance gate and renders a mode-aware toaster", () => {
     const source = readFileSync(
       new URL("../main.tsx", import.meta.url),
       "utf8",
     );
 
-    expect(source).toContain("initializeThemeSkin();");
+    expect(source).toContain(
+      "ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED",
+    );
     expect(source).toContain("<ThemeAwareToaster />");
     expect(source).not.toContain('<Toaster theme="dark"');
   });

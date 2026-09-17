@@ -31,11 +31,12 @@ test("rejects release server URLs that use HTTP", () => {
   );
 });
 
-test("requires one matching registered Cast receiver for tagged releases", () => {
+test("validates matching registered Cast IDs when tagged builds enable custom Cast", () => {
   assert.throws(
     () =>
       validateReleaseMobileConfig({
         CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+        VITE_CAST_CUSTOM_RECEIVER_ENABLED: "true",
       }),
     /registered Cast receiver/i,
   );
@@ -59,15 +60,13 @@ test("requires one matching registered Cast receiver for tagged releases", () =>
       }),
     /must match/i,
   );
-  assert.throws(
-    () =>
-      validateReleaseMobileConfig({
-        CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
-        CRATE_CAST_RECEIVER_APP_ID: "ABCD1234",
-        VITE_CAST_RECEIVER_APP_ID: "ABCD1234",
-        VITE_CAST_CUSTOM_RECEIVER_ENABLED: "false",
-      }),
-    /must be enabled/i,
+  assert.doesNotThrow(() =>
+    validateReleaseMobileConfig({
+      CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+      CRATE_CAST_RECEIVER_APP_ID: "ABCD1234",
+      VITE_CAST_RECEIVER_APP_ID: "ABCD1234",
+      VITE_CAST_CUSTOM_RECEIVER_ENABLED: "false",
+    }),
   );
 
   assert.doesNotThrow(() =>
@@ -76,6 +75,17 @@ test("requires one matching registered Cast receiver for tagged releases", () =>
       CRATE_CAST_RECEIVER_APP_ID: "ABCD1234",
       VITE_CAST_RECEIVER_APP_ID: "ABCD1234",
       VITE_CAST_CUSTOM_RECEIVER_ENABLED: "true",
+    }),
+  );
+});
+
+test("allows tagged releases to use Google's default receiver when custom Cast is off", () => {
+  assert.doesNotThrow(() =>
+    validateReleaseMobileConfig({
+      CRATE_REQUIRE_CUSTOM_CAST_RECEIVER: "true",
+      CRATE_CAST_RECEIVER_APP_ID: "CC1AD845",
+      VITE_CAST_RECEIVER_APP_ID: "CC1AD845",
+      VITE_CAST_CUSTOM_RECEIVER_ENABLED: "false",
     }),
   );
 });

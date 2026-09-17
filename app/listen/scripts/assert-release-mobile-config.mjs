@@ -13,7 +13,10 @@ export function validateReleaseMobileConfig(env) {
       throw new Error("Release mobile server URLs must use HTTPS");
     }
   }
-  if (env.CRATE_REQUIRE_CUSTOM_CAST_RECEIVER === "true") {
+  if (
+    env.CRATE_REQUIRE_CUSTOM_CAST_RECEIVER === "true" &&
+    env.VITE_CAST_CUSTOM_RECEIVER_ENABLED === "true"
+  ) {
     const nativeAppId = env.CRATE_CAST_RECEIVER_APP_ID?.trim();
     const webAppId = env.VITE_CAST_RECEIVER_APP_ID?.trim();
     const registeredAppId = /^[A-Za-z0-9]{8}$/;
@@ -32,11 +35,6 @@ export function validateReleaseMobileConfig(env) {
     if (nativeAppId !== webAppId) {
       throw new Error(
         "Native and web Cast receiver application IDs must match",
-      );
-    }
-    if (env.VITE_CAST_CUSTOM_RECEIVER_ENABLED !== "true") {
-      throw new Error(
-        "The custom Cast receiver must be enabled for tagged releases",
       );
     }
   }
