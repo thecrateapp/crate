@@ -268,3 +268,4 @@ def test_streaming_repository_marks_variants_missing_in_one_batch(monkeypatch):
     assert updated == 2
     assert executed[0][1] == {"cache_keys": ["a", "b"]}
     assert "status = 'pending'" in executed[0][0]
+    assert "task_id = NULL" in executed[0][0]

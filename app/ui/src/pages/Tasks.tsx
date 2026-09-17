@@ -175,6 +175,9 @@ interface PlaybackDeliverySnapshot {
     variant_tracks: number;
     ready: number;
     pending: number;
+    pending_active?: number;
+    pending_unassigned?: number;
+    pending_stale?: number;
     running: number;
     failed: number;
     ready_tracks: number;
@@ -1030,7 +1033,17 @@ function PlaybackDeliveryPanel({
           >
             {runtime?.active ?? 0}/{runtime?.limit ?? 1} transcodes
           </CrateChip>
-          <CrateChip>{stats?.pending ?? 0} pending</CrateChip>
+          <CrateChip>
+            {stats?.pending_active ?? stats?.pending ?? 0} active pending
+          </CrateChip>
+          {(stats?.pending_unassigned ?? 0) > 0 ? (
+            <CrateChip>{stats?.pending_unassigned} unassigned</CrateChip>
+          ) : null}
+          {(stats?.pending_stale ?? 0) > 0 ? (
+            <CrateChip className="border-amber-400/25 bg-amber-400/10 text-amber-100">
+              {stats?.pending_stale} stale
+            </CrateChip>
+          ) : null}
           <CrateChip>{stats?.failed ?? 0} failed</CrateChip>
         </div>
         <Button

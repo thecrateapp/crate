@@ -33,6 +33,7 @@ _SCOPE_CACHE_PREFIXES = {
     "playlists": ("playlist:",),
     "crates": ("crate:",),
     "curation": ("curation:",),
+    "artist_bio": ("enrichment:", "lastfm:artist:", "listen:artist_page:"),
 }
 
 

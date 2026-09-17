@@ -36,6 +36,7 @@ import {
 } from "@/components/stats/stats-model";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
+import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
   albumCoverApiUrl,
   albumPagePath,
@@ -114,8 +115,16 @@ export function Stats() {
     : username
       ? `/api/users/${encodeURIComponent(username)}/stats/dashboard`
       : "/api/me/stats/dashboard";
-  const { data: dashboard, loading: dashboardLoading } = useApi<StatsDashboard>(
+  const {
+    data: dashboard,
+    loading: dashboardLoading,
+    refetch: refetchDashboard,
+  } = useApi<StatsDashboard>(
     `${statsEndpoint}?${statsPeriodQuery}&tracks_limit=12&artists_limit=10&albums_limit=12&genres_limit=10&replay_limit=36`,
+  );
+  usePendingStatsSnapshotRefresh(
+    dashboard?.snapshot?.pending === true,
+    refetchDashboard,
   );
 
   const overview = dashboard?.overview;

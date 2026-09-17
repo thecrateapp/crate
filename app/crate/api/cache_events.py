@@ -89,6 +89,7 @@ _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
         "curation",
         "playlists",
         "crates",
+        "artist_bio",
     }
 )
 
@@ -252,6 +253,7 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "crates",
                 "shows",
                 "upcoming",
+                "artist_bio",
             }
             or scope.startswith(("artist:", "album:", "playlist:", "crate:"))
             for scope in scopes
@@ -267,6 +269,7 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "curation",
                 "playlists",
                 "crates",
+                "artist_bio",
             }
             or scope.startswith(("artist:", "album:", "playlist:", "crate:"))
             for scope in scopes

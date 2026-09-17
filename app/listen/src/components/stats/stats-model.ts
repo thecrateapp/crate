@@ -191,6 +191,17 @@ export interface StatsAffinity {
   affinity_reasons: string[];
 }
 
+export interface StatsSnapshot {
+  scope?: string | null;
+  subject_key?: string | null;
+  version?: number;
+  built_at?: string | null;
+  stale_after?: string | null;
+  stale?: boolean;
+  pending?: boolean;
+  generation_ms?: number;
+}
+
 export interface StatsDashboard {
   window: StatsPeriodKey;
   subject?: StatsSubject | null;
@@ -203,6 +214,7 @@ export interface StatsDashboard {
   replay: ReplayMix;
   story?: StatsStory;
   viewer_affinity?: StatsAffinity | null;
+  snapshot?: StatsSnapshot;
 }
 
 export interface RecapHighlight {
