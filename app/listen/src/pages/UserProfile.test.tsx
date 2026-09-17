@@ -10,11 +10,15 @@ vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
 }));
 
-vi.mock("@/lib/api", () => ({
-  api: vi.fn(async () => ({ ok: true })),
-  getApiBase: vi.fn(() => ""),
-  getAuthToken: vi.fn(() => null),
-}));
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    api: vi.fn(async () => ({ ok: true })),
+    getApiBase: vi.fn(() => ""),
+    getAuthToken: vi.fn(() => null),
+  };
+});
 
 describe("UserProfile", () => {
   beforeEach(() => {
@@ -34,6 +38,23 @@ describe("UserProfile", () => {
         following_count: 9,
         friends_count: 3,
         public_playlists: [],
+        public_crates: [
+          {
+            id: "77777777-7777-4777-8777-777777777777",
+            name: "Year-end records",
+            description: "Our favorite albums this year.",
+            visibility: "public",
+            is_collaborative: false,
+            album_count: 3,
+            first_album: {
+              global_album_uid: "11111111-1111-4111-8111-111111111111",
+              position: 0,
+              name: "Blending",
+              artist_name: "High Vis",
+              has_cover: true,
+            },
+          },
+        ],
         relationship_state: {
           following: false,
           followed_by: false,
@@ -94,6 +115,13 @@ describe("UserProfile", () => {
     expect(screen.getByText("35")).toBeVisible();
     expect(screen.getByText("2h 20m")).toBeVisible();
     expect(screen.getByText("Public Record")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Public Crates" }),
+    ).toBeVisible();
+    expect(screen.getByText("Year-end records")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /Year-end records/ }),
+    ).toHaveAttribute("href", "/crate/77777777-7777-4777-8777-777777777777");
     expect(screen.getByText("Jane Band")).toBeVisible();
     expect(screen.getByText("via upload")).toBeVisible();
     expect(
@@ -114,6 +142,7 @@ describe("UserProfile", () => {
         following_count: 9,
         friends_count: 3,
         public_playlists: [],
+        public_crates: [],
         relationship_state: {
           following: true,
           followed_by: false,
@@ -163,5 +192,6 @@ describe("UserProfile", () => {
     expect(screen.getByText("Aún mapeando")).toBeVisible();
     expect(screen.getByText("Contribuciones a la biblioteca")).toBeVisible();
     expect(screen.getByText("Aún no hay playlists públicas.")).toBeVisible();
+    expect(screen.getByText("Aún no hay Crates públicas.")).toBeVisible();
   });
 });

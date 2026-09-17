@@ -5,13 +5,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   Plus,
   Heart,
   Users,
   Disc,
+  Disc3,
   ListMusic,
   Download,
   ExternalLink,
@@ -61,6 +62,7 @@ import { toTrackRowData } from "@/lib/track-row-data";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
+import { Crates } from "@/pages/Crates";
 
 type Tab =
   | "playlists"
@@ -68,6 +70,7 @@ type Tab =
   | "albums"
   | "liked"
   | "bandcamp"
+  | "crates"
   | "contributions";
 
 type TabIcon = ComponentType<{ size?: number; className?: string }>;
@@ -226,6 +229,7 @@ const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
   { key: "albums", labelKey: "nav.collection.albums", icon: Disc },
   { key: "liked", labelKey: "library.tabs.liked", icon: Heart },
   { key: "bandcamp", labelKey: "nav.collection.bandcamp", icon: BandcampLogo },
+  { key: "crates", labelKey: "nav.collection.crates", icon: Disc3 },
   {
     key: "contributions",
     labelKey: "nav.collection.contributions",
@@ -239,6 +243,7 @@ const tabTitleKeys: Record<Tab, string> = {
   albums: "nav.collection.albums",
   liked: "nav.collection.likedTracks",
   bandcamp: "nav.collection.bandcamp",
+  crates: "nav.collection.crates",
   contributions: "nav.collection.contributions",
 };
 
@@ -268,6 +273,7 @@ function parseTab(value: string | null): Tab {
     value === "albums" ||
     value === "liked" ||
     value === "bandcamp" ||
+    value === "crates" ||
     value === "contributions"
   )
     return value;
@@ -1454,6 +1460,7 @@ function LikedTab() {
 export function Library() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { section } = useParams<{ section?: string }>();
   const isDesktop = useIsDesktop();
   const { data: stats, refetch: refetchStats } = useApi<MeStats>(
@@ -1474,6 +1481,10 @@ export function Library() {
   } = usePullToRefresh(onRefresh);
 
   function setTab(tab: Tab) {
+    if (section) {
+      navigate(`/collection/${tab}`);
+      return;
+    }
     setSearchParams({ tab });
   }
 
@@ -1534,6 +1545,7 @@ export function Library() {
       {tab === "albums" && <AlbumsTab key={refreshKey} />}
       {tab === "liked" && <LikedTab key={refreshKey} />}
       {tab === "bandcamp" && <BandcampTab key={refreshKey} />}
+      {tab === "crates" && <Crates key={refreshKey} />}
       {tab === "contributions" && <ContributionsTab key={refreshKey} />}
     </div>
   );

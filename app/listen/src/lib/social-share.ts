@@ -26,6 +26,7 @@ export type ShareSubjectKind =
   | "album"
   | "artist"
   | "playlist"
+  | "crate"
   | "genre";
 
 export interface SharePayload {

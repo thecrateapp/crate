@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.db.queries.crates import (
+    get_public_crates_for_user as get_public_crates_for_user,
+)
 from crate.db.queries.social_shared import user_profile_sql
 from crate.db.tx import read_scope
 

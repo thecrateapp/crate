@@ -40,6 +40,22 @@ describe("ShareSheetHost", () => {
     );
   });
 
+  it("supports Crate share previews", async () => {
+    renderWithListenProviders(<ShareSheetHost />);
+
+    act(() => {
+      openShareSheet({
+        kind: "crate",
+        title: "Year-end records",
+        subtitle: "Jane Doe",
+        url: "https://listen.example/share/crate/77777777-7777-4777-8777-777777777777",
+      });
+    });
+
+    expect(await screen.findByText("Share Crate")).toBeInTheDocument();
+    expect(screen.getByText("Year-end records")).toBeVisible();
+  });
+
   it("localizes the share sheet chrome", async () => {
     renderWithListenProviders(<ShareSheetHost />, { locale: "es" });
 

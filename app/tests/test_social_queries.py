@@ -117,6 +117,43 @@ class TestSocialRelationships:
 
 
 class TestSocialProfiles:
+    def test_get_public_crates_for_user_excludes_private_and_collaborated_crates(
+        self, pg_db
+    ):
+        from crate.db.queries.social_profiles import get_public_crates_for_user
+        from crate.db.repositories.crates import create_crate, update_crate
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        with transaction_scope() as session:
+            _create_user2(session)
+
+        public_id = create_crate(owner_id=1, name="Public records")
+        create_crate(owner_id=1, name="Private records")
+        collaborator_id = create_crate(
+            owner_id=2,
+            name="A crate I only collaborate on",
+            is_collaborative=True,
+        )
+        assert update_crate(public_id, visibility="public")
+        assert update_crate(collaborator_id, visibility="public")
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO crate_members (crate_id, user_id, invited_by)
+                    VALUES (:crate_id, 1, 2)
+                    """
+                ),
+                {"crate_id": collaborator_id},
+            )
+
+        crates = get_public_crates_for_user(1)
+
+        assert [crate["id"] for crate in crates] == [public_id]
+        assert crates[0]["name"] == "Public records"
+
     def test_get_followers_empty(self, pg_db):
         from crate.db.queries.social_profiles import get_followers
 

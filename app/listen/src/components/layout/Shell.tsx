@@ -13,6 +13,7 @@ import {
   Collection,
   Music,
   Disc,
+  Disc3,
   Heart,
   Users,
   ListMusic,
@@ -333,6 +334,11 @@ function Sidebar() {
                   label: t("nav.collection.artists"),
                 },
                 {
+                  to: "/library?tab=crates",
+                  icon: Disc3,
+                  label: t("nav.collection.crates"),
+                },
+                {
                   to: "/bandcamp",
                   icon: BandcampLogo,
                   label: t("nav.collection.bandcamp"),
@@ -391,6 +397,11 @@ const COLLECTION_SECTIONS = [
     to: "/collection/artists",
     icon: Users,
     labelKey: "nav.collection.artists",
+  },
+  {
+    to: "/collection/crates",
+    icon: Disc3,
+    labelKey: "nav.collection.crates",
   },
   { to: "/collection/albums", icon: Disc, labelKey: "nav.collection.albums" },
   {

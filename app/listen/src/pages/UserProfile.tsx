@@ -25,6 +25,7 @@ import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { contributionSourceLabel } from "@/lib/contributions";
 import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
 import { formatTotalDuration } from "@/lib/utils";
+import type { PublicCrate } from "@/pages/crates-types";
 
 interface RelationshipState {
   following: boolean;
@@ -94,6 +95,7 @@ interface PublicProfile {
   following_count: number;
   friends_count: number;
   public_playlists: PublicPlaylist[];
+  public_crates: PublicCrate[];
   relationship_state: RelationshipState;
   affinity_score: number;
   affinity_band: "low" | "medium" | "high" | "very_high";
@@ -367,6 +369,7 @@ export function UserProfile() {
     public_playlists: data.public_playlists.length,
   };
   const contributions = data.contributions_preview || [];
+  const publicCrates = data.public_crates || [];
 
   return (
     <div className="space-y-6">
@@ -671,6 +674,74 @@ export function UserProfile() {
                         {playlist.description ? (
                           <div className="mt-1 truncate text-xs text-muted-foreground">
                             {playlist.description}
+                          </div>
+                        ) : null}
+                      </div>
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <Disc3 size={16} className="text-cyan-300" />
+              <h2 className="text-lg font-semibold text-foreground">
+                {t("userProfile.crates.title")}
+              </h2>
+            </div>
+            <div className="mt-4 space-y-3">
+              {publicCrates.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                  {t("userProfile.crates.empty")}
+                </div>
+              ) : (
+                publicCrates.map((crate) => {
+                  const firstAlbum = crate.first_album;
+                  const coverUrl = firstAlbum?.has_cover
+                    ? albumCoverApiUrl(
+                        {
+                          globalAlbumUid: firstAlbum.global_album_uid,
+                          albumName: firstAlbum.name,
+                          artistName: firstAlbum.artist_name,
+                        },
+                        { size: 192 },
+                      )
+                    : null;
+
+                  return (
+                    <Link
+                      key={crate.id}
+                      to={`/crate/${crate.id}`}
+                      className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3 transition-colors hover:bg-white/[0.05]"
+                    >
+                      {coverUrl ? (
+                        <CrateImage
+                          src={coverUrl}
+                          alt={firstAlbum?.name ?? ""}
+                          className="h-14 w-14 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 bg-cyan-300/10 text-cyan-200">
+                          <Disc3 size={20} />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-foreground">
+                          {crate.name}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {t("common.albumCountLabel", {
+                            count: crate.album_count,
+                          })}
+                          {crate.is_collaborative
+                            ? ` · ${t("userProfile.crates.collaborative")}`
+                            : ""}
+                        </div>
+                        {crate.description ? (
+                          <div className="mt-1 truncate text-xs text-muted-foreground">
+                            {crate.description}
                           </div>
                         ) : null}
                       </div>
