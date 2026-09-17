@@ -484,6 +484,9 @@ function responseFor(pathname: string): unknown {
   if (pathname === "/api/auth/config") {
     return { registration_enabled: false, password_login_enabled: true };
   }
+  if (pathname === "/api/auth/subsonic-token") {
+    return { configured: false };
+  }
   if (pathname === "/api/me/location") {
     return {
       city: "Madrid",
