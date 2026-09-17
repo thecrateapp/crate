@@ -111,7 +111,7 @@ Only complete capabilities are advertised. The list is generated from
 | -------------------- | -------- |
 | `formPost`           | 1        |
 | `indexBasedQueue`    | 1        |
-| `songLyrics`         | 1        |
+| `songLyrics`         | 1, 2     |
 | `topSongsByArtistId` | 1        |
 
 <!-- opensubsonic-extensions:end -->
