@@ -11,6 +11,12 @@ _LEGACY_SYSTEM_PATHS = {
     "/rest/ping.view",
     "/rest/getLicense",
     "/rest/getLicense.view",
+    "/rest/getScanStatus",
+    "/rest/getScanStatus.view",
+    "/rest/startScan",
+    "/rest/startScan.view",
+    "/rest/getAvatar",
+    "/rest/getAvatar.view",
 }
 _LEGACY_MEDIA_PATHS = {
     "/rest/stream",

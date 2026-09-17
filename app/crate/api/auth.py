@@ -118,6 +118,12 @@ from crate.db.repositories.auth import (
 )
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.repositories.tasks import create_task
+from crate.user_avatars import (
+    AvatarProxyError,
+    AvatarUnavailable,
+    fetch_avatar,
+    is_proxyable_avatar_url,
+)
 
 log = logging.getLogger(__name__)
 
@@ -776,18 +782,7 @@ def _revoke_user_sessions(user_id: int, current_session_id: str | None = None) -
 
 
 def _is_proxyable_avatar_url(value: str) -> bool:
-    try:
-        parsed = urlparse(value)
-    except Exception:
-        return False
-    if parsed.scheme != "https":
-        return False
-    host = (parsed.hostname or "").lower()
-    return (
-        host == "lh3.googleusercontent.com"
-        or host.endswith(".googleusercontent.com")
-        or host in {"www.gravatar.com", "secure.gravatar.com", "gravatar.com"}
-    )
+    return is_proxyable_avatar_url(value)
 
 
 def _google_configured() -> bool:
@@ -1792,36 +1787,17 @@ def auth_user_avatar(request: Request, user_id: int):
     _require_auth(request)
     target = get_user_by_id(user_id)
     avatar = (target or {}).get("avatar")
-    if not avatar or not _is_proxyable_avatar_url(avatar):
-        raise HTTPException(status_code=404, detail="Avatar not available")
-
     try:
-        upstream = requests.get(
-            avatar,
-            headers={"User-Agent": "Crate/1.0 (+https://cratemusic.app)"},
-            timeout=8,
-        )
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Avatar fetch failed") from exc
-
-    if upstream.status_code != 200:
+        content, content_type = fetch_avatar(avatar)
+    except AvatarUnavailable as exc:
+        raise HTTPException(status_code=404, detail="Avatar not available") from exc
+    except AvatarProxyError as exc:
         raise HTTPException(
-            status_code=upstream.status_code if upstream.status_code < 500 else 502,
-            detail="Avatar fetch failed",
-        )
-    content_type = (
-        upstream.headers.get("content-type", "image/jpeg")
-        .split(";", 1)[0]
-        .strip()
-        .lower()
-    )
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=502, detail="Avatar response was not an image")
-    if len(upstream.content) > 2_000_000:
-        raise HTTPException(status_code=502, detail="Avatar image is too large")
+            status_code=exc.status_code, detail="Avatar fetch failed"
+        ) from exc
 
     return Response(
-        content=upstream.content,
+        content=content,
         media_type=content_type,
         headers={
             "Cache-Control": "private, max-age=86400",

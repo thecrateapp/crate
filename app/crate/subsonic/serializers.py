@@ -107,7 +107,7 @@ def serialize_user(user: Mapping[str, Any]) -> dict[str, Any]:
     projection = UserProjection(
         username=str(user.get("username") or user.get("email") or ""),
         email=str(user.get("email") or ""),
-        adminRole=user.get("role") == "admin",
+        adminRole=user.get("role") in {"owner", "admin"},
         scrobblingEnabled=True,
         settingsRole=True,
         downloadRole=True,
@@ -118,7 +118,7 @@ def serialize_user(user: Mapping[str, Any]) -> dict[str, Any]:
         podcastRole=False,
         streamRole=True,
         jukeboxRole=False,
-        shareRole=True,
+        shareRole=False,
     )
     return _dump(projection)
 

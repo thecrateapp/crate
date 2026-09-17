@@ -777,6 +777,7 @@ class TestAuthUserAvatarProxy:
             headers={"content-type": "image/jpeg"},
             content=b"avatar-bytes",
         )
+        upstream.iter_content.return_value = [b"avatar-bytes"]
 
         with (
             patch(
