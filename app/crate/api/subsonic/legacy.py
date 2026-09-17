@@ -8,18 +8,14 @@ Spec: http://www.subsonic.org/pages/api.jsp
 
 import logging
 from collections import defaultdict
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 
 from crate.db.queries.subsonic_global import (
     get_global_tracks_by_genre,
     get_random_global_tracks,
     list_global_albums,
-)
-from crate.db.queries.subsonic_track_queries import (
-    get_track_path_and_format,
 )
 from crate.subsonic.global_ids import (
     EntityKind,
@@ -39,7 +35,6 @@ from crate.subsonic.services import queues as queue_service
 from crate.subsonic.services import playlists as playlist_service
 from crate.subsonic.services.artwork import serve_playlist_cover
 from crate.subsonic.serializers import serialize_album, serialize_song
-from crate.api._deps import library_path
 from crate.api.schemas.subsonic import (
     SubsonicAlbumListResponse,
     SubsonicAlbumList2Response,
@@ -959,79 +954,6 @@ def _get_album_info(request: Request, identifier: str | None):
 
 
 @router.get(
-    "/stream",
-    summary="Stream a track through the Subsonic API",
-    responses={
-        200: {
-            "description": "Audio stream for the requested track, or a Subsonic error envelope.",
-            "content": {
-                "application/json": {
-                    "schema": {"$ref": "#/components/schemas/SubsonicOkResponse"}
-                },
-                "audio/mpeg": {"schema": {"type": "string", "format": "binary"}},
-                "audio/flac": {"schema": {"type": "string", "format": "binary"}},
-                "audio/ogg": {"schema": {"type": "string", "format": "binary"}},
-                "audio/mp4": {"schema": {"type": "string", "format": "binary"}},
-                "audio/aac": {"schema": {"type": "string", "format": "binary"}},
-                "audio/wav": {"schema": {"type": "string", "format": "binary"}},
-                "audio/opus": {"schema": {"type": "string", "format": "binary"}},
-            },
-        },
-        403: {"description": "Forbidden path outside the library root."},
-        404: {"description": "Track file not found."},
-    },
-)
-@router.get("/stream.view", include_in_schema=False)
-def stream(request: Request, id: str = Query("")):
-    try:
-        user = _require_subsonic_auth(request)
-    except SubsonicAuthError as error:
-        return _subsonic_auth_error_response(error)
-
-    entity_id = _decode_entity_id(id, "track")
-    if entity_id is None:
-        return _subsonic_error(70, "Invalid Subsonic entity ID")
-    if entity_id.scope == "global":
-        from crate.federation.playback_service import (
-            PlaybackServiceError,
-            stream_global_track,
-        )
-
-        try:
-            return stream_global_track(
-                str(entity_id.global_uid),
-                user=user,
-                request_headers=dict(request.headers),
-            )
-        except PlaybackServiceError as exc:
-            return Response(status_code=exc.status_code)
-
-    track_id = int(entity_id.local_id or 0)
-    track = get_track_path_and_format(track_id)
-    if not track:
-        return Response(status_code=404)
-
-    lib = library_path()
-    filepath = Path(track["path"])
-    if not filepath.is_absolute():
-        filepath = lib / filepath
-    # Prevent path traversal
-    if not filepath.resolve().is_relative_to(lib.resolve()):
-        return Response(status_code=403)
-    if not filepath.is_file():
-        return Response(status_code=404)
-
-    media_type = _content_type(track["format"])
-    return FileResponse(
-        path=str(filepath),
-        media_type=media_type,
-        headers={
-            "Cache-Control": "public, max-age=86400",
-        },
-    )
-
-
-@router.get(
     "/getCoverArt",
     summary="Fetch artist, album or playlist artwork via the Subsonic API",
     responses={
@@ -1506,16 +1428,3 @@ def get_random_songs(
 
 
 # ── Helpers ─────────────────────────────────────────────────────
-
-
-def _content_type(fmt: str | None) -> str:
-    m = {
-        "flac": "audio/flac",
-        "mp3": "audio/mpeg",
-        "ogg": "audio/ogg",
-        "m4a": "audio/mp4",
-        "aac": "audio/aac",
-        "wav": "audio/wav",
-        "opus": "audio/opus",
-    }
-    return m.get((fmt or "mp3").lower(), "audio/mpeg")

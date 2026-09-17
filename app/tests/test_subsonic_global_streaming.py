@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from unittest.mock import patch
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from fastapi import Response
 import pytest
@@ -24,6 +26,10 @@ def _auth():
     return patch("crate.subsonic.auth.authenticate", return_value=USER)
 
 
+def _media_auth():
+    return patch("crate.api.subsonic.media.authenticate", return_value=USER)
+
+
 def test_global_stream_is_proxied_without_exposing_ticket_or_redirect(test_app):
     proxied = Response(
         b"audio",
@@ -32,14 +38,15 @@ def test_global_stream_is_proxied_without_exposing_ticket_or_redirect(test_app):
         headers={"Content-Range": "bytes 0-4/5", "Accept-Ranges": "bytes"},
     )
     with (
-        _auth(),
+        _media_auth(),
         patch(
             "crate.federation.playback_service.stream_global_track",
             return_value=proxied,
         ) as stream,
     ):
         response = test_app.get(
-            f"/rest/stream?u=listener&p=secret&id=gt-{TRACK_UID}",
+            f"/rest/stream?u=listener&p=secret&id=gt-{TRACK_UID}"
+            "&format=m4a&maxBitRate=160",
             headers={"Range": "bytes=0-4"},
         )
 
@@ -50,11 +57,12 @@ def test_global_stream_is_proxied_without_exposing_ticket_or_redirect(test_app):
     request_headers = stream.call_args.kwargs["request_headers"]
     assert request_headers["range"] == "bytes=0-4"
     assert stream.call_args.kwargs["user"] == USER
+    assert stream.call_args.kwargs["delivery_policy"] == "data_saver"
 
 
 def test_global_stream_maps_internal_playback_failure_without_leaking_detail(test_app):
     with (
-        _auth(),
+        _media_auth(),
         patch(
             "crate.federation.playback_service.stream_global_track",
             side_effect=PlaybackServiceError(503, "peer secret detail"),
@@ -215,6 +223,80 @@ def test_local_global_source_rejects_paths_outside_library(tmp_path):
             stream_global_track(TRACK_UID, user=USER, request_headers={})
 
     assert error.value.status_code == 403
+
+
+def test_remote_stream_disconnect_closes_upstream_context_and_client(monkeypatch):
+    from crate.federation import playback_service
+
+    node_uid = "55555555-5555-4555-8555-555555555555"
+    peer_uid = "44444444-4444-4444-8444-444444444444"
+    upstream = MagicMock()
+    upstream.status_code = 200
+    upstream.headers = {"content-type": "audio/flac"}
+    upstream.iter_bytes.return_value = iter((b"first", b"second"))
+
+    context = MagicMock()
+    context.__enter__.return_value = upstream
+    client = MagicMock()
+    client.stream.return_value = context
+
+    monkeypatch.setattr(
+        playback_service,
+        "resolve_global_track_playback",
+        lambda _uid: {
+            "kind": "remote",
+            "node_uid": peer_uid,
+            "remote_entity_uid": "track-remote",
+        },
+    )
+    monkeypatch.setattr(
+        playback_service.federation_repo,
+        "get_local_node",
+        lambda: {
+            "node_uid": node_uid,
+            "active_key_id": "key-1",
+            "private_key_ref": "ref-1",
+        },
+    )
+    monkeypatch.setattr(
+        playback_service.federation_repo,
+        "get_peer",
+        lambda _uid: {
+            "trust_state": "approved",
+            "api_base_url": "https://peer.example.test",
+        },
+    )
+    monkeypatch.setattr(
+        playback_service,
+        "build_outbound_user_assertion",
+        lambda **_kwargs: "assertion",
+    )
+    monkeypatch.setattr(
+        playback_service,
+        "federated_post",
+        lambda **_kwargs: SimpleNamespace(
+            status_code=200, json=lambda: {"ticket_uid": "ticket-1"}
+        ),
+    )
+    monkeypatch.setattr(
+        playback_service, "SignedFederationClient", lambda **_kwargs: client
+    )
+    monkeypatch.setattr(
+        playback_service, "get_shared_client", lambda _timeout: object()
+    )
+    monkeypatch.setattr(playback_service, "_remember_source", lambda **_kwargs: None)
+
+    async def disconnect_after_first_chunk():
+        response = playback_service.stream_global_track(
+            TRACK_UID, user=USER, request_headers={}
+        )
+        assert await anext(response.body_iterator) == b"first"
+        await response.body_iterator.aclose()
+
+    asyncio.run(disconnect_after_first_chunk())
+
+    context.__exit__.assert_called_once_with(None, None, None)
+    client.close.assert_called_once_with()
 
 
 @pytest.mark.parametrize(

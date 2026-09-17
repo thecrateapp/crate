@@ -7,6 +7,7 @@ response shape, auth behavior, and error handling.
 
 from contextlib import contextmanager
 import hashlib
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 # ── Synthetic test data ──────────────────────────────────────────────
@@ -97,7 +98,10 @@ _SUBSONIC_BASE = "/rest"
 @contextmanager
 def _subsonic_auth_ok():
     """Mock subsonic auth functions to authenticate successfully."""
-    with patch("crate.subsonic.auth.authenticate", return_value=_FAKE_USER):
+    with (
+        patch("crate.subsonic.auth.authenticate", return_value=_FAKE_USER),
+        patch("crate.api.subsonic.media.authenticate", return_value=_FAKE_USER),
+    ):
         yield
 
 
@@ -106,9 +110,15 @@ def _subsonic_auth_fail():
     """Mock subsonic auth functions so authentication fails."""
     from crate.subsonic.errors import ErrorCode, OpenSubsonicError
 
-    with patch(
-        "crate.subsonic.auth.authenticate",
-        side_effect=OpenSubsonicError(ErrorCode.INVALID_CREDENTIALS, "invalid"),
+    with (
+        patch(
+            "crate.subsonic.auth.authenticate",
+            side_effect=OpenSubsonicError(ErrorCode.INVALID_CREDENTIALS, "invalid"),
+        ),
+        patch(
+            "crate.api.subsonic.media.authenticate",
+            side_effect=OpenSubsonicError(ErrorCode.INVALID_CREDENTIALS, "invalid"),
+        ),
     ):
         yield
 
@@ -1240,55 +1250,64 @@ class TestSubsonicPlaylistEndpoints:
 
 
 class TestSubsonicStream:
-    """stream endpoint."""
+    """Stream and download endpoints."""
 
     def test_stream_serves_file(self, test_app, tmp_path):
         test_file = tmp_path / "01 - Test.flac"
         test_file.write_bytes(b"fake audio data")
         track_data = {"id": 1, "path": "01 - Test.flac", "format": "flac"}
+        resolution = SimpleNamespace(file_path=test_file, media_type="audio/flac")
 
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.get_track_path_and_format",
+                "crate.subsonic.services.media.get_track_full",
                 return_value=track_data,
             ),
-            patch("crate.api.subsonic.legacy.library_path", return_value=tmp_path),
+            patch(
+                "crate.subsonic.services.media.resolve_playback",
+                return_value=resolution,
+            ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=admin&p=admin&id=1")
             assert resp.status_code == 200
             assert resp.headers["content-type"] == "audio/flac"
-            assert "Cache-Control" in resp.headers
+            assert resp.content == b"fake audio data"
+            assert resp.headers["cache-control"] == "private, no-store"
 
     def test_stream_track_not_in_db(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch(
-                "crate.api.subsonic.legacy.get_track_path_and_format", return_value=None
-            ),
+            patch("crate.subsonic.services.media.get_track_full", return_value=None),
         ):
-            resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=admin&p=admin&id=999")
-            assert resp.status_code == 404
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/stream?u=admin&p=admin&id=999&f=json"
+            )
+            _subsonic_error_response(resp, code=70)
 
     def test_stream_unauthorized(self, test_app):
         with _subsonic_auth_fail():
-            resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=bad&p=bad&id=1")
+            resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=bad&p=bad&id=1&f=json")
             _subsonic_error_response(resp, code=40)
 
     def test_stream_absolute_path_serves(self, test_app, tmp_path):
         test_file = tmp_path / "track.flac"
         test_file.write_bytes(b"fake audio")
         track_data = {"id": 1, "path": str(test_file), "format": "flac"}
+        resolution = SimpleNamespace(file_path=test_file, media_type="audio/flac")
 
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.get_track_path_and_format",
+                "crate.subsonic.services.media.get_track_full",
                 return_value=track_data,
             ),
-            patch("crate.api.subsonic.legacy.library_path", return_value=tmp_path),
+            patch(
+                "crate.subsonic.services.media.resolve_playback",
+                return_value=resolution,
+            ),
         ):
-            resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=admin&p=admin&id=1")
+            resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=admin&p=admin&id=1&f=json")
             assert resp.status_code == 200
 
     def test_stream_file_missing_on_disk(self, test_app, tmp_path):
@@ -1297,13 +1316,13 @@ class TestSubsonicStream:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.legacy.get_track_path_and_format",
+                "crate.subsonic.services.media.get_track_full",
                 return_value=track_data,
             ),
-            patch("crate.api.subsonic.legacy.library_path", return_value=tmp_path),
+            patch("crate.subsonic.services.media.resolve_playback", return_value=None),
         ):
-            resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=admin&p=admin&id=1")
-            assert resp.status_code == 404
+            resp = test_app.get(f"{_SUBSONIC_BASE}/stream?u=admin&p=admin&id=1&f=json")
+            _subsonic_error_response(resp, code=70)
 
 
 class TestSubsonicCoverArt:
