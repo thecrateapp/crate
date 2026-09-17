@@ -55,6 +55,7 @@ class DeviceListResponse(BaseModel):
 class QueueTrackReference(BaseModel):
     model_config = ConfigDict(extra="allow")
 
+    subsonic_id: str | None = Field(default=None, max_length=160)
     track_id: int | None = None
     track_entity_uid: UUID | str | None = None
     path: str | None = None

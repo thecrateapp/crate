@@ -1,6 +1,82 @@
 from __future__ import annotations
 
 
+def test_revision_scoped_artist_hero_source_does_not_fall_back_to_legacy_file(
+    monkeypatch, tmp_path
+):
+    from PIL import Image
+
+    from crate import artwork_sources
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        publish_artist_hero_artifact,
+    )
+    from crate.artwork_variants import ArtworkAsset
+
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path))
+    artist_dir = tmp_path / "Artist"
+    artist_dir.mkdir()
+    (artist_dir / "artist-hero-desktop.webp").write_bytes(b"legacy")
+    monkeypatch.setattr(
+        artwork_sources,
+        "get_library_artist_by_entity_uid",
+        lambda _uid: {"entity_uid": "artist-entity", "name": "Artist"},
+    )
+    monkeypatch.setattr(artwork_sources, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        artwork_sources,
+        "resolve_artist_dir",
+        lambda *_args, **_kwargs: artist_dir,
+    )
+    identity = ArtistHeroArtifactIdentity(
+        "artist-entity", "desktop", "renderer:revision-a"
+    )
+    publish_artist_hero_artifact(
+        identity,
+        Image.new("RGB", (16, 8), color="red"),
+        source_fingerprint="sha256:source-a",
+        recipe_hash="recipe-a",
+        renderer_version="renderer",
+        source_content=b"editable-source-a",
+    )
+
+    source = artwork_sources.resolve_artwork_source(
+        ArtworkAsset("artist-hero", identity.asset_key)
+    )
+
+    assert source is not None
+    assert source.content != b"legacy"
+    assert source.origin == "revision-artifact"
+
+
+def test_revision_scoped_artist_hero_source_rejects_artifact_symlink_escape(
+    monkeypatch, tmp_path
+):
+    from crate import artwork_sources
+    from crate.artist_hero_publication import (
+        ArtistHeroArtifactIdentity,
+        artist_hero_artifact_source_path,
+    )
+    from crate.artwork_variants import ArtworkAsset
+
+    cache_root = tmp_path / "cache"
+    outside_artifact = tmp_path / "outside.webp"
+    outside_artifact.write_bytes(b"outside")
+    monkeypatch.setenv("CACHE_DIR", str(cache_root))
+    identity = ArtistHeroArtifactIdentity(
+        "artist-entity", "desktop", "renderer:revision-a"
+    )
+    artifact_path = artist_hero_artifact_source_path(identity)
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.symlink_to(outside_artifact)
+
+    source = artwork_sources.resolve_artwork_source(
+        ArtworkAsset("artist-hero", identity.asset_key)
+    )
+
+    assert source is None
+
+
 def test_album_source_prefers_canonical_cover(monkeypatch, tmp_path):
     from crate import artwork_sources
     from crate.artwork_variants import ArtworkAsset
@@ -163,6 +239,33 @@ def test_genre_release_and_external_sources_use_durable_local_files(
         ).content
         == b"external"
     )
+
+
+def test_playlist_cover_source_uses_the_persisted_playlist_cover(monkeypatch, tmp_path):
+    from crate import artwork_sources
+    from crate.artwork_variants import ArtworkAsset
+
+    cover = tmp_path / "playlist-7.jpg"
+    cover.write_bytes(b"playlist-cover")
+    monkeypatch.setattr(
+        artwork_sources,
+        "get_playlist_cover_path",
+        lambda playlist_id: cover.name if playlist_id == 7 else None,
+    )
+    monkeypatch.setattr(
+        artwork_sources,
+        "playlist_cover_abspath",
+        lambda _cover_path: cover,
+        raising=False,
+    )
+
+    source = artwork_sources.resolve_artwork_source(
+        ArtworkAsset("playlist-cover", "7"), allow_provider=False
+    )
+
+    assert source is not None
+    assert source.content == b"playlist-cover"
+    assert source.media_type == "image/jpeg"
 
 
 def test_missing_artist_background_is_resolved_by_worker_provider(

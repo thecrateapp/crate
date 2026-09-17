@@ -61,6 +61,11 @@ https://listen.dev.lespedants.org {
 	}
 }
 
+https://cast.dev.lespedants.org {
+	import local_tls
+	reverse_proxy cast-receiver:80
+}
+
 https://docs.dev.cratemusic.app {
 	import local_tls
 	reverse_proxy host.docker.internal:5175

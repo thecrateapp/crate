@@ -11,11 +11,12 @@ import {
 function buildDesktopDeepLink(search: string): string | null {
   const params = new URLSearchParams(search);
   if (params.get("desktop") !== "tauri") return null;
-  const token = params.get("token");
-  if (!token) return null;
+  const code = params.get("code");
+  const state = params.get("state");
+  if (!code || !state) return null;
 
   const deepLink = new URL("cratemusic://oauth/callback");
-  for (const key of ["token", "refresh_token", "access_expires_at", "next"]) {
+  for (const key of ["code", "state", "next"]) {
     const value = params.get(key);
     if (value) deepLink.searchParams.set(key, value);
   }
@@ -36,10 +37,16 @@ export function AuthCallback() {
   const awaitingAuthRef = useRef(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
     const deepLink = buildDesktopDeepLink(window.location.search);
     if (deepLink) {
       setDesktopDeepLink(deepLink);
       openDesktopDeepLink(deepLink);
+      return;
+    }
+    if (params.get("desktop") === "tauri") {
+      clearPendingOAuthNext();
+      navigate("/login", { replace: true });
       return;
     }
 
@@ -72,20 +79,20 @@ export function AuthCallback() {
 
   if (desktopDeepLink) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-surface px-6 text-white">
-        <div className="w-full max-w-md rounded-[12px] border border-white/10 bg-white/[0.04] p-8 text-center shadow-[0_24px_80px_-48px_rgba(0,0,0,0.9)]">
+      <div className="flex min-h-dvh items-center justify-center bg-surface-canvas px-6 text-text-primary">
+        <div className="w-full max-w-md rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-8 text-center shadow-card">
           <img
             src="/icons/logo.svg"
             alt="Crate"
-            className="mx-auto mb-4 h-14 w-14"
+            className="mx-auto mb-4 size-14"
           />
           <h1 className="text-2xl font-bold">{t("authCallback.title")}</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
+          <p className="mt-3 text-sm leading-6 text-text-secondary">
             {t("authCallback.desktopHint")}
           </p>
           <a
             href={desktopDeepLink}
-            className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-cyan-300 px-6 text-sm font-semibold text-[#041217] transition hover:bg-cyan-200"
+            className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-accent-action px-6 text-sm font-semibold text-accent-action-foreground transition hover:bg-accent-action-hover"
           >
             {t("authCallback.openCrate")}
           </a>

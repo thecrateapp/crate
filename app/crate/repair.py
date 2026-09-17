@@ -5,6 +5,11 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from crate.artist_lifecycle import (
+    ArtistIdentityChangedError,
+    delete_artist,
+    run_artist_merge,
+)
 from crate.audio import read_tags
 from crate.db.audit import log_audit
 from crate.db.jobs.repair import (
@@ -22,7 +27,6 @@ from crate.db.jobs.repair import (
 )
 from crate.db.repositories.library import (
     delete_album,
-    delete_artist,
     delete_track,
     get_library_artist,
 )
@@ -391,7 +395,16 @@ class LibraryRepair:
                         )
                     )
                 try:
-                    result = fixer(issue, dry_run=dry_run, task_id=task_id)
+                    try:
+                        result = fixer(issue, dry_run=dry_run, task_id=task_id)
+                    except ArtistIdentityChangedError:
+                        result = {
+                            "action": check,
+                            "target": self._issue_target(check, issue),
+                            "applied": False,
+                            "fs_write": False,
+                            "details": {"error": "stale artist identity"},
+                        }
                     if result:
                         actions.append(result)
                         if result.get("applied"):
@@ -1358,7 +1371,17 @@ class LibraryRepair:
         }
 
         if not dry_run:
-            rename_artist(artist_name, tag_name, details.get("folder", ""))
+            try:
+                run_artist_merge(
+                    artist_name,
+                    lambda: rename_artist(
+                        artist_name, tag_name, details.get("folder", "")
+                    ),
+                )
+            except ArtistIdentityChangedError:
+                result["applied"] = False
+                result["details"]["error"] = "stale artist identity"
+                return result
             log_audit(
                 "fix_canonical_mismatch",
                 "artist",

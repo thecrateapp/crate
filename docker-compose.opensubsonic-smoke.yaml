@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_USER: crate
+      POSTGRES_PASSWORD: crate_smoke
+      POSTGRES_DB: crate_smoke
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crate -d crate_smoke"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build:
+      context: ./app
+      target: api
+    environment: &smoke-environment
+      TZ: UTC
+      CRATE_CONFIG: /app/config.yaml
+      CRATE_RUNTIME: api
+      CRATE_POSTGRES_USER: crate
+      CRATE_POSTGRES_PASSWORD: crate_smoke
+      CRATE_POSTGRES_DB: crate_smoke
+      CRATE_POSTGRES_HOST: postgres
+      POSTGRES_SUPERUSER_USER: crate
+      POSTGRES_SUPERUSER_PASSWORD: crate_smoke
+      POSTGRES_SUPERUSER_DB: crate_smoke
+      CRATE_OPEN_SUBSONIC_ENGINE: v1
+      CRATE_DB_INIT_RETRY_TIMEOUT_SECONDS: "180"
+      CRATE_POSTGRES_CONNECT_TIMEOUT_SECONDS: "5"
+      DEFAULT_ADMIN_PASSWORD: smoke-only
+      JWT_SECRET: crate-opensubsonic-smoke-jwt-secret-32-bytes
+      CRATE_FEDERATION_SUBJECT_SECRET: crate-opensubsonic-smoke-subject-secret-32-bytes
+      CRATE_FEDERATION_CURSOR_SECRET: crate-opensubsonic-smoke-cursor-secret-32-bytes
+      DATA_DIR: /data
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/0
+      REDIS_DURABLE_URL: redis://redis:6379/0
+      SENTRY_DSN: ""
+    volumes:
+      - ./app/config.yaml:/app/config.yaml:ro
+      - opensubsonic-smoke-music:/music
+      - opensubsonic-smoke-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen(
+          'http://127.0.0.1:8585/rest/getOpenSubsonicExtensions?v=1.16.1&c=health&f=json',
+          timeout=3)
+      interval: 5s
+      timeout: 4s
+      retries: 45
+      start_period: 30s
+
+  smoke:
+    build:
+      context: ./app
+      target: api
+    entrypoint: ["python"]
+    command: ["-m", "crate.subsonic.interoperability"]
+    environment:
+      <<: *smoke-environment
+      CRATE_OPENSUBSONIC_BASE_URL: http://api:8585/rest
+    volumes:
+      - ./app/config.yaml:/app/config.yaml:ro
+      - opensubsonic-smoke-music:/music
+      - opensubsonic-smoke-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  opensubsonic-smoke-music:
+  opensubsonic-smoke-data:

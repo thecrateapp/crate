@@ -117,9 +117,35 @@ func WrapHTTP(handler http.Handler) http.Handler {
 	}).Handle(handler)
 }
 
+// CaptureOperationError reports a handled runtime failure with stable grouping.
+func CaptureOperationError(err error, operation string, tags map[string]string) *sentry.EventID {
+	if err == nil {
+		return nil
+	}
+	normalizedOperation := strings.TrimSpace(operation)
+	if normalizedOperation == "" {
+		normalizedOperation = "unknown"
+	}
+
+	var eventID *sentry.EventID
+	sentry.WithScope(func(scope *sentry.Scope) {
+		scope.SetLevel(sentry.LevelError)
+		scope.SetFingerprint([]string{"readplane-operation-failure", normalizedOperation})
+		scope.SetTag("operation", normalizedOperation)
+		for key, value := range tags {
+			scope.SetTag(key, value)
+		}
+		eventID = sentry.CaptureException(err)
+	})
+	return eventID
+}
+
 // ScrubEvent removes credentials and user-identifying data before sending.
 func ScrubEvent(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 	if event == nil {
+		return nil
+	}
+	if isBenignHTTPAbort(event) {
 		return nil
 	}
 	if event.Request != nil {
@@ -150,6 +176,19 @@ func ScrubEvent(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 		}
 	}
 	return event
+}
+
+func isBenignHTTPAbort(event *sentry.Event) bool {
+	const abortMessage = "net/http: abort Handler"
+	if strings.TrimSpace(event.Message) == abortMessage {
+		return true
+	}
+	for _, exception := range event.Exception {
+		if strings.TrimSpace(exception.Value) == abortMessage {
+			return true
+		}
+	}
+	return false
 }
 
 func sampleRate(name string, fallback float64) float64 {

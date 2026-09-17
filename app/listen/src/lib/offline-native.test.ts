@@ -2,13 +2,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const filesystemMock = vi.hoisted(() => ({
   readFile: vi.fn(),
+  getUri: vi.fn(),
   writeFile: vi.fn(async () => undefined),
   mkdir: vi.fn(async () => undefined),
   stat: vi.fn(),
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
 }));
-const verifyAssetsMock = vi.hoisted(() => vi.fn());
+const { excludeFromBackupMock, verifyAssetsMock } = vi.hoisted(() => ({
+  excludeFromBackupMock: vi.fn(),
+  verifyAssetsMock: vi.fn(),
+}));
 
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
@@ -17,6 +21,7 @@ vi.mock("@capacitor/core", () => ({
     isNativePlatform: () => true,
   },
   registerPlugin: () => ({
+    excludeFromBackup: excludeFromBackupMock,
     verifyAssets: verifyAssetsMock,
   }),
 }));
@@ -50,6 +55,9 @@ describe("native offline playback bootstrap", () => {
 
   it("loads persisted native media assets before resolving playback URLs", async () => {
     localStorage.setItem("listen-auth-user-id", "42");
+    filesystemMock.getUri.mockResolvedValue({
+      uri: "file:///current-container/offline-media/profile/song.m4a",
+    });
     filesystemMock.readFile.mockImplementation(async ({ path }) => {
       if (String(path).includes("offline-index-")) {
         return { data: JSON.stringify({ items: {} }) };
@@ -83,13 +91,13 @@ describe("native offline playback bootstrap", () => {
     await primeOfflineRuntimeProfile("https://api.example.test");
 
     expect(getOfflineNativePlaybackUrl({ entityUid: "track-entity-1" })).toBe(
-      "capacitor://localhost/_capacitor_file_/offline-media/profile/song.m4a",
+      "capacitor://localhost/file:///current-container/offline-media/profile/song.m4a",
     );
     expect(
       getOfflineNativePlaybackUrl({ entityUid: "track-entity-1" }, undefined, {
         target: "android-native",
       }),
-    ).toBe("file:///offline-media/profile/song.m4a");
+    ).toBe("file:///current-container/offline-media/profile/song.m4a");
   });
 
   it("verifies a bounded asset batch in one native bridge call", async () => {
@@ -124,5 +132,43 @@ describe("native offline playback bootstrap", () => {
 
     expect(verifyAssetsMock).toHaveBeenCalledTimes(1);
     expect(results.map((result) => result.valid)).toEqual([true, false]);
+  });
+
+  it("chunks integrity checks at the native bridge batch limit", async () => {
+    verifyAssetsMock.mockImplementation(async ({ assets }) => ({
+      assets: assets.map(({ path }: { path: string }) => ({
+        path,
+        exists: true,
+        size: 128,
+        valid: true,
+      })),
+    }));
+    const { verifyNativeOfflineAssets } = await import("@/lib/offline-native");
+    const assets = Array.from({ length: 501 }, (_, index) => ({
+      path: `offline-media/track-${index}.m4a`,
+      expectedBytes: 128,
+    }));
+
+    const results = await verifyNativeOfflineAssets(assets);
+
+    expect(results).toHaveLength(501);
+    expect(verifyAssetsMock).toHaveBeenCalledTimes(2);
+    expect(verifyAssetsMock.mock.calls[0]?.[0].assets).toHaveLength(500);
+    expect(verifyAssetsMock.mock.calls[1]?.[0].assets).toHaveLength(1);
+    expect(filesystemMock.stat).not.toHaveBeenCalled();
+  });
+
+  it("protects iOS offline media from device backups", async () => {
+    excludeFromBackupMock.mockResolvedValue({ excluded: true });
+    const { excludeNativeOfflineAssetFromBackup } = await import(
+      "@/lib/offline-native"
+    );
+
+    await expect(
+      excludeNativeOfflineAssetFromBackup("offline-media/profile/song.m4a"),
+    ).resolves.toBeUndefined();
+    expect(excludeFromBackupMock).toHaveBeenCalledWith({
+      path: "offline-media/profile/song.m4a",
+    });
   });
 });

@@ -444,6 +444,7 @@ def test_catalog_track_effective_eq_endpoint_returns_flat_for_remote_only_track(
 
 
 def test_catalog_track_info_endpoint_returns_remote_global_metadata(test_app):
+    global_uid = str(uuid.uuid4())
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
             "crate.api.catalog.get_global_track_info",
@@ -460,8 +461,12 @@ def test_catalog_track_info_endpoint_returns_remote_global_metadata(test_app):
             "crate.api.catalog.resolve_global_source",
             lambda **_kwargs: {"kind": "local"},
         )
+        monkeypatch.setattr(
+            "crate.api.catalog.preferences.get_rating",
+            lambda _user_id, track_id: 3 if track_id == f"gt-{global_uid}" else 0,
+        )
 
-        response = test_app.get(f"/api/catalog/tracks/{uuid.uuid4()}/info")
+        response = test_app.get(f"/api/catalog/tracks/{global_uid}/info")
 
     assert response.status_code == 200
     payload = response.json()
@@ -469,6 +474,7 @@ def test_catalog_track_info_endpoint_returns_remote_global_metadata(test_app):
     assert payload["artist"] == "High Vis"
     assert payload["album"] == "Guided Tour"
     assert payload["entity_uid"] is None
+    assert payload["rating"] == 3
 
 
 def test_catalog_track_info_endpoint_hydrates_remote_track_info_facet(test_app):
@@ -513,6 +519,7 @@ def test_catalog_track_info_endpoint_hydrates_remote_track_info_facet(test_app):
                 "path": "/music/Rival Schools/Found/69 Guns.flac",
             },
         )
+        monkeypatch.setattr("crate.api.catalog.preferences.get_rating", lambda *_: 0)
 
         response = test_app.get(f"/api/catalog/tracks/{global_uid}/info")
 

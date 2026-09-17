@@ -56,16 +56,22 @@ from crate.api.schemas.auth import (
     RefreshTokenRequest,
     RegisterRequest,
     RevokeSessionsResponse,
-    SubsonicTokenResponse,
+    SubsonicCredentialCreatedResponse,
+    SubsonicCredentialStatusResponse,
     UpdateProfileRequest,
     UpdateUserRoleRequest,
     UpdateUserStatusRequest,
 )
 from crate.api.native_oauth import (
+    complete_exchange as complete_native_oauth_exchange,
+    exchange_session_id as native_oauth_exchange_session_id,
+    get_completed_exchange as get_completed_native_oauth_exchange,
     InvalidNativeOAuthHandoff,
+    NativeOAuthCompletionUnknown,
     NativeOAuthUnavailable,
     consume_handoff as consume_native_oauth_handoff,
     issue_handoff as issue_native_oauth_handoff,
+    restore_handoff as restore_native_oauth_handoff,
 )
 from crate.api.schemas.common import OkResponse
 from crate.auth import (
@@ -88,6 +94,7 @@ from crate.db.repositories.auth import (
     create_auth_invite,
     create_session,
     create_user,
+    delete_session,
     get_session,
     get_user_by_email,
     get_user_by_external_identity,
@@ -111,6 +118,12 @@ from crate.db.repositories.auth import (
 )
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.repositories.tasks import create_task
+from crate.user_avatars import (
+    AvatarProxyError,
+    AvatarUnavailable,
+    fetch_avatar,
+    is_proxyable_avatar_url,
+)
 
 log = logging.getLogger(__name__)
 
@@ -348,11 +361,7 @@ def _env_enabled(name: str, default: bool = False) -> bool:
 
 
 def _native_oauth_exchange_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", False)
-
-
-def _native_oauth_legacy_redirect_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED", True)
+    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", True)
 
 
 _NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
@@ -369,12 +378,12 @@ def _validate_native_oauth_start(
     challenge: str | None,
     state: str | None,
 ) -> bool:
+    native_callback = (return_to or "").startswith("cratemusic://")
+    if native_callback and return_to != _NATIVE_CALLBACK_URL:
+        raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
     requested = challenge is not None or state is not None
     if not requested:
-        if (
-            _is_mobile_native_listen_app_id(app_id)
-            and not _native_oauth_legacy_redirect_enabled()
-        ):
+        if native_callback or _is_native_listen_app_id(app_id):
             raise HTTPException(
                 status_code=426,
                 detail="Native app upgrade required",
@@ -385,7 +394,7 @@ def _validate_native_oauth_start(
             status_code=503,
             detail="Native OAuth exchange is not enabled",
         )
-    if mode != "login" or not _is_mobile_native_listen_app_id(app_id):
+    if mode != "login" or not _is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
     if return_to != _NATIVE_CALLBACK_URL:
         raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
@@ -412,21 +421,6 @@ def _is_listen_return_to(return_to: str | None) -> bool:
     except Exception:
         return False
     return host == "listen" or host.startswith("listen.")
-
-
-def _is_tauri_loopback_return_to(return_to: str | None) -> bool:
-    if not return_to:
-        return False
-    try:
-        parsed = urlparse(return_to)
-    except Exception:
-        return False
-    return (
-        parsed.scheme == "http"
-        and parsed.hostname in {"127.0.0.1", "localhost"}
-        and parsed.port == 17654
-        and parsed.path == "/oauth/callback"
-    )
 
 
 def _request_host(request: Request) -> str:
@@ -788,18 +782,7 @@ def _revoke_user_sessions(user_id: int, current_session_id: str | None = None) -
 
 
 def _is_proxyable_avatar_url(value: str) -> bool:
-    try:
-        parsed = urlparse(value)
-    except Exception:
-        return False
-    if parsed.scheme != "https":
-        return False
-    host = (parsed.hostname or "").lower()
-    return (
-        host == "lh3.googleusercontent.com"
-        or host.endswith(".googleusercontent.com")
-        or host in {"www.gravatar.com", "secure.gravatar.com", "gravatar.com"}
-    )
+    return is_proxyable_avatar_url(value)
 
 
 def _google_configured() -> bool:
@@ -914,9 +897,7 @@ def _allowed_redirect_origins() -> set[str]:
 def _callback_origin(return_to: str | None = None, *, app_id: str | None = None) -> str:
     allowed = _allowed_redirect_origins()
     if return_to and (
-        return_to.startswith("cratemusic://")
-        or _is_tauri_loopback_return_to(return_to)
-        or _is_native_listen_app_id(app_id)
+        return_to.startswith("cratemusic://") or _is_native_listen_app_id(app_id)
     ):
         # Native/Tauri OAuth still needs an HTTPS callback registered with
         # Google/Apple. Keep it on Listen, not Admin, so desktop/mobile auth
@@ -943,8 +924,6 @@ def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> 
     if not return_to:
         return "/"
     if return_to.startswith("cratemusic://"):
-        return return_to
-    if app_id == "listen-tauri" and _is_tauri_loopback_return_to(return_to):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
         return return_to
@@ -1182,7 +1161,11 @@ def _build_apple_client_secret() -> str:
 
 
 def _create_login_session(
-    user: dict, request: Request, *, app_id: str | None = None
+    user: dict,
+    request: Request,
+    *,
+    app_id: str | None = None,
+    session_id: str | None = None,
 ) -> tuple[str, dict, str | None]:
     user = _ensure_user_active(user)
     app = app_id or request.headers.get("x-crate-app")
@@ -1190,7 +1173,7 @@ def _create_login_session(
     access_expiry_hours = _access_expiry_hours(request, app_id=app)
     expires_at_dt = datetime.now(timezone.utc) + timedelta(hours=session_expiry_hours)
     expires_at = expires_at_dt.isoformat()
-    session_id = secrets.token_urlsafe(24)
+    session_id = session_id or secrets.token_urlsafe(24)
     session = create_session(
         session_id,
         user["id"],
@@ -1201,7 +1184,7 @@ def _create_login_session(
         device_label=request.headers.get("x-device-label"),
         device_fingerprint=_request_device_fingerprint(request, app_id=app),
     )
-    session_id = session["id"]
+    session_id = str(session["id"])
     token = create_jwt(
         user["id"],
         user["email"],
@@ -1804,36 +1787,17 @@ def auth_user_avatar(request: Request, user_id: int):
     _require_auth(request)
     target = get_user_by_id(user_id)
     avatar = (target or {}).get("avatar")
-    if not avatar or not _is_proxyable_avatar_url(avatar):
-        raise HTTPException(status_code=404, detail="Avatar not available")
-
     try:
-        upstream = requests.get(
-            avatar,
-            headers={"User-Agent": "Crate/1.0 (+https://cratemusic.app)"},
-            timeout=8,
-        )
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Avatar fetch failed") from exc
-
-    if upstream.status_code != 200:
+        content, content_type = fetch_avatar(avatar)
+    except AvatarUnavailable as exc:
+        raise HTTPException(status_code=404, detail="Avatar not available") from exc
+    except AvatarProxyError as exc:
         raise HTTPException(
-            status_code=upstream.status_code if upstream.status_code < 500 else 502,
-            detail="Avatar fetch failed",
-        )
-    content_type = (
-        upstream.headers.get("content-type", "image/jpeg")
-        .split(";", 1)[0]
-        .strip()
-        .lower()
-    )
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=502, detail="Avatar response was not an image")
-    if len(upstream.content) > 2_000_000:
-        raise HTTPException(status_code=502, detail="Avatar image is too large")
+            status_code=exc.status_code, detail="Avatar fetch failed"
+        ) from exc
 
     return Response(
-        content=upstream.content,
+        content=content,
         media_type=content_type,
         headers={
             "Cache-Control": "private, max-age=86400",
@@ -2051,42 +2015,45 @@ def change_password(request: Request, body: ChangePasswordRequest):
 
 @router.post(
     "/subsonic-token",
-    response_model=SubsonicTokenResponse,
+    response_model=SubsonicCredentialCreatedResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Generate or rotate the Subsonic token",
+    summary="Create or rotate an OpenSubsonic API key",
 )
 def generate_subsonic_token(request: Request):
-    """Generate or regenerate a Subsonic API token for the current user."""
+    """Generate or rotate a one-time-display OpenSubsonic API key."""
+    from crate.subsonic.auth import create_user_credential
+
     user = _require_auth(request)
-    token = secrets.token_hex(16)
-    update_user(user["id"], subsonic_token=token)
-    return {"subsonic_token": token}
+    return {"api_key": create_user_credential(user["id"])}
 
 
 @router.delete(
     "/subsonic-token",
     response_model=OkResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Delete the Subsonic token",
+    summary="Revoke the OpenSubsonic API key",
 )
 def delete_subsonic_token(request: Request):
-    """Remove the Subsonic API token for the current user."""
+    """Revoke the current user's OpenSubsonic API key."""
+    from crate.subsonic.auth import revoke_user_credential
+
     user = _require_auth(request)
-    update_user(user["id"], subsonic_token=None)
+    revoke_user_credential(user["id"])
     return {"ok": True}
 
 
 @router.get(
     "/subsonic-token",
-    response_model=SubsonicTokenResponse,
+    response_model=SubsonicCredentialStatusResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Get the current Subsonic token",
+    summary="Read OpenSubsonic API key status",
 )
 def get_subsonic_token(request: Request):
-    """Get the current Subsonic API token (if set)."""
+    """Report whether an OpenSubsonic key exists without revealing it."""
+    from crate.subsonic.auth import has_user_credential
+
     user = _require_auth(request)
-    db_user = get_user_by_id(user["id"])
-    return {"subsonic_token": db_user.get("subsonic_token") if db_user else None}
+    return {"configured": has_user_credential(user["id"])}
 
 
 @router.post(
@@ -2383,14 +2350,14 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     native_challenge = parsed_state.get("native_code_challenge")
     native_state = parsed_state.get("native_state")
-    if native_challenge is not None or native_state is not None:
-        _validate_native_oauth_start(
-            app_id=app_id,
-            mode=str(parsed_state.get("mode") or ""),
-            return_to=parsed_state.get("return_to"),
-            challenge=native_challenge,
-            state=native_state,
-        )
+    native_exchange = _validate_native_oauth_start(
+        app_id=app_id,
+        mode=str(parsed_state.get("mode") or ""),
+        return_to=parsed_state.get("return_to"),
+        challenge=native_challenge,
+        state=native_state,
+    )
+    if native_exchange:
         try:
             handoff_code = issue_native_oauth_handoff(
                 user_id=int(user["id"]),
@@ -2422,19 +2389,6 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     return_to = parsed_state.get("return_to") or "/"
     safe_return = _validate_return_to(return_to, app_id=app_id)
-
-    if safe_return.startswith("cratemusic://"):
-        redirect_url = _append_query_param(safe_return, "token", token)
-        access_expires_at = _access_expires_at_from_token(token)
-        if access_expires_at:
-            redirect_url = _append_query_param(
-                redirect_url, "access_expires_at", _iso_datetime(access_expires_at)
-            )
-        if refresh_token:
-            redirect_url = _append_query_param(
-                redirect_url, "refresh_token", refresh_token
-            )
-        return RedirectResponse(url=redirect_url)
 
     if safe_return.startswith("http"):
         redirect_url = _post_auth_redirect_url(safe_return, token)
@@ -2484,7 +2438,7 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             detail="Native OAuth exchange is not enabled",
         )
     app_id = (request.headers.get("x-crate-app") or "").strip().lower()
-    if not _is_mobile_native_listen_app_id(app_id):
+    if not _is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
     if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
         raise HTTPException(
@@ -2494,6 +2448,14 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
     if not _NATIVE_STATE_RE.fullmatch(body.state):
         raise HTTPException(status_code=400, detail="Invalid native OAuth state")
     try:
+        completed = get_completed_native_oauth_exchange(
+            code=body.code,
+            state=body.state,
+            verifier=body.code_verifier,
+            app_id=app_id,
+        )
+        if completed is not None:
+            return completed
         handoff = consume_native_oauth_handoff(
             code=body.code,
             state=body.state,
@@ -2511,15 +2473,55 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
         ) from exc
     if not secrets.compare_digest(handoff.app_id, app_id):
         raise HTTPException(status_code=401, detail="Native OAuth client mismatch")
-    user = get_user_by_id(handoff.user_id)
-    user = _ensure_user_active(user)
-    update_user_last_login(user["id"])
-    token, session, refresh_token = _create_login_session(
-        user,
-        request,
-        app_id=app_id,
-    )
-    return _auth_login_payload(user, token, session, refresh_token)
+    try:
+        user = get_user_by_id(handoff.user_id)
+        user = _ensure_user_active(user)
+        update_user_last_login(user["id"])
+        requested_session_id = native_oauth_exchange_session_id(body.code)
+        session_already_existed = get_session(requested_session_id) is not None
+        token, session, refresh_token = _create_login_session(
+            user,
+            request,
+            app_id=app_id,
+            session_id=requested_session_id,
+        )
+        session_was_created = (
+            not session_already_existed and session["id"] == requested_session_id
+        )
+        payload = _auth_login_payload(user, token, session, refresh_token)
+    except Exception:
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.warning("Failed to restore native OAuth handoff", exc_info=True)
+        raise
+    try:
+        complete_native_oauth_exchange(
+            code=body.code,
+            handoff=handoff,
+            payload=payload,
+        )
+    except NativeOAuthUnavailable as exc:
+        if session_was_created and not isinstance(exc, NativeOAuthCompletionUnknown):
+            try:
+                delete_session(str(session["id"]))
+            except Exception:
+                log.error(
+                    "Failed to delete incomplete native OAuth session",
+                    exc_info=True,
+                )
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.error(
+                "Failed to restore native OAuth handoff after cache failure",
+                exc_info=True,
+            )
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is temporarily unavailable",
+        ) from exc
+    return payload
 
 
 @router.post(

@@ -69,9 +69,9 @@ def run_worker(config: dict):
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    from crate.observability import init_sentry
+    from crate.observability import init_sentry, resolve_service_name
 
-    init_sentry("workers")
+    init_sentry(resolve_service_name("workers"))
 
     from crate.utils import init_musicbrainz
 
@@ -594,6 +594,9 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "recompose_artist_hero",
             "derive_artist_hero",
             "backfill_artist_heroes",
+            "migrate_artist_heroes",
+            "migrate_artist_hero",
+            "rollback_artist_hero",
             "backfill_artwork_variants",
             "cleanup_artwork_variants",
             "repair_artwork_variants",
@@ -727,6 +730,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "warmup_stream_variants",
             "cleanup_stream_variants",
         ),
+    ),
+    (
+        "crate.worker_handlers.cast_spectrum",
+        "CAST_SPECTRUM_TASK_HANDLERS",
+        ("generate_cast_spectrum",),
     ),
 )
 

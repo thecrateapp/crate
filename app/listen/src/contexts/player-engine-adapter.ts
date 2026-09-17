@@ -9,7 +9,6 @@ import {
   ensureMediaAccessUrl,
   getApiBase,
   getAuthToken,
-  refreshMediaAccessTickets,
   resolveMaybeApiAssetUrl,
   resolveMaybeApiStreamUrl,
 } from "@/lib/api";
@@ -32,6 +31,10 @@ export function toEngineTrack(
   const androidNativeHttp =
     options.target === "android-native" &&
     isTrustedNativeApiUrl(resolvedUrl, getApiBase());
+  const androidNativeArtwork =
+    options.target === "android-native" &&
+    artwork != null &&
+    isTrustedNativeApiUrl(artwork, getApiBase());
 
   return {
     id: track.id,
@@ -40,7 +43,10 @@ export function toEngineTrack(
     title: track.title || "Unknown",
     artist: track.artist || "",
     album: track.album || undefined,
-    artwork,
+    artwork: androidNativeArtwork ? withoutCredentialQuery(artwork) : artwork,
+    artworkAuthorization: androidNativeArtwork
+      ? bearerAuthorizationHeader()
+      : undefined,
     durationMs:
       track.duration && track.duration > 0
         ? Math.round(track.duration * 1000)
@@ -146,9 +152,6 @@ export async function toStartupEngineTracks(
   options: StreamUrlOptions = {},
 ): Promise<EngineTrack[]> {
   await ensureFreshAuthToken();
-  if (options.target === "android-native") {
-    await refreshNativeArtworkTickets(tracks);
-  }
   const engineTracks = toEngineTracks(tracks, eqGainsByTrackId, options);
   const normalizedIndex = Math.max(
     0,
@@ -171,43 +174,6 @@ export async function toStartupEngineTracks(
     }),
   );
   return engineTracks;
-}
-
-async function refreshNativeArtworkTickets(tracks: Track[]): Promise<void> {
-  const apiBase = getApiBase();
-  if (!apiBase) return;
-  let apiOrigin: string;
-  try {
-    apiOrigin = new URL(apiBase).origin;
-  } catch {
-    return;
-  }
-
-  const targets = new Map<string, { audience: "artwork"; path: string }>();
-  for (const track of tracks) {
-    if (!track.albumCover) continue;
-    try {
-      const artwork = new URL(track.albumCover, apiBase);
-      if (
-        artwork.origin === apiOrigin &&
-        artwork.pathname.startsWith("/api/")
-      ) {
-        targets.set(artwork.pathname, {
-          audience: "artwork",
-          path: artwork.pathname,
-        });
-      }
-    } catch {
-      // Invalid artwork is left to the visual placeholder.
-    }
-  }
-
-  const pending = Array.from(targets.values());
-  for (let index = 0; index < pending.length; index += 128) {
-    await refreshMediaAccessTickets(pending.slice(index, index + 128)).catch(
-      () => false,
-    );
-  }
 }
 
 function hasFreshRemoteStream(track: Track): boolean {

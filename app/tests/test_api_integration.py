@@ -553,12 +553,18 @@ class TestPlaybackRelated:
 class TestSubsonicEndpoints:
     """Open Subsonic-compatible endpoints used by external clients."""
 
+    @staticmethod
+    def _api_key(api_client):
+        response = api_client.post("/api/auth/subsonic-token")
+        assert response.status_code == 200, response.text
+        return response.json()["api_key"]
+
     def test_subsonic_ping(self, api_client):
+        api_key = self._api_key(api_client)
         resp = api_client.get(
             "/rest/ping",
             params={
-                "u": "admin@cratemusic.app",
-                "p": "admin",
+                "apiKey": api_key,
                 "v": "1.16.1",
                 "c": "pytest",
                 "f": "json",
@@ -570,9 +576,9 @@ class TestSubsonicEndpoints:
         assert data["subsonic-response"]["version"] == "1.16.1"
 
     def test_subsonic_get_music_folders_and_artists(self, api_client):
+        api_key = self._api_key(api_client)
         common = {
-            "u": "admin@cratemusic.app",
-            "p": "admin",
+            "apiKey": api_key,
             "v": "1.16.1",
             "c": "pytest",
             "f": "json",

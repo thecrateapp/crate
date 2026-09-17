@@ -1,5 +1,5 @@
-import { screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -23,6 +23,59 @@ describe("Stats page", () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("refreshes the extracted stats controller while a snapshot is pending", () => {
+    vi.useFakeTimers();
+    const refetch = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: {
+        window: "30d",
+        overview: {
+          window: "30d",
+          play_count: 0,
+          complete_play_count: 0,
+          skip_count: 0,
+          minutes_listened: 0,
+          active_days: 0,
+          skip_rate: 0,
+          top_artist: null,
+        },
+        trends: { window: "30d", points: [] },
+        top_tracks: { window: "30d", items: [] },
+        top_artists: { window: "30d", items: [] },
+        top_albums: { window: "30d", items: [] },
+        top_genres: { window: "30d", items: [] },
+        replay: {
+          window: "30d",
+          title: "Replay",
+          subtitle: "Pending",
+          track_count: 0,
+          minutes_listened: 0,
+          items: [],
+        },
+        snapshot: { pending: true },
+      },
+      loading: false,
+      error: null,
+      refetch,
+    });
+
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it("localizes the main stats chrome", () => {
     renderWithListenProviders(<Stats />, {
       route: "/stats",
@@ -38,6 +91,30 @@ describe("Stats page", () => {
     expect(
       screen.getByText("Tus estadísticas esperan una señal"),
     ).toBeInTheDocument();
+  });
+
+  it("uses semantic tokens for the stats shell and hero", () => {
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    expect(
+      container.querySelector(".stats-page-atmosphere"),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".stats-page-grid")).toBeInTheDocument();
+
+    const hero = container.querySelector(".stats-hero-surface");
+    expect(hero).toBeInTheDocument();
+    expect(hero).not.toHaveClass("bg-[#101116]");
+    expect(hero).not.toHaveClass("shadow-black/35");
+    expect(hero?.querySelector(".stats-hero-overlay")).toBeInTheDocument();
+
+    const heroTitle = container.querySelector(".stats-hero-title");
+    expect(heroTitle).toBeInTheDocument();
+    expect(heroTitle).not.toHaveClass("text-white");
+    expect(container.querySelectorAll(".stats-hero-metric")).toHaveLength(3);
   });
 
   it("localizes data-backed stats panels", () => {

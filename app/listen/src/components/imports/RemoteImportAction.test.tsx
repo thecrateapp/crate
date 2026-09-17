@@ -46,6 +46,7 @@ const mockedApi = vi.mocked(api);
 describe("RemoteImportAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedApi.mockReset();
     MockEventSource.instances = [];
     vi.stubGlobal("EventSource", MockEventSource);
   });
@@ -108,13 +109,16 @@ describe("RemoteImportAction", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
     await screen.findByText("Waiting for administrator approval");
+    await waitFor(() =>
+      expect(MockEventSource.instances[0]?.url).toBe("/api/events"),
+    );
 
     await act(async () => {
       MockEventSource.instances[0]?.emit("message", { tasks: [] });
     });
 
     await waitFor(() =>
-      expect(mockedApi).toHaveBeenCalledWith(
+      expect(mockedApi).toHaveBeenLastCalledWith(
         "/api/federation/remote/import-requests/request-1",
       ),
     );

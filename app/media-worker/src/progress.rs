@@ -318,7 +318,7 @@ enum RedisValue {
 fn write_command(stream: &mut TcpStream, args: &[&str]) -> io::Result<()> {
     write!(stream, "*{}\r\n", args.len())?;
     for arg in args {
-        write!(stream, "${}\r\n", arg.as_bytes().len())?;
+        write!(stream, "${}\r\n", arg.len())?;
         stream.write_all(arg.as_bytes())?;
         stream.write_all(b"\r\n")?;
     }
@@ -333,7 +333,7 @@ fn read_response(stream: &mut TcpStream) -> io::Result<RedisValue> {
             let _ = read_line(stream)?;
             Ok(RedisValue::Other)
         }
-        b'-' => Err(io::Error::new(io::ErrorKind::Other, read_line(stream)?)),
+        b'-' => Err(io::Error::other(read_line(stream)?)),
         b':' => {
             let line = read_line(stream)?;
             Ok(RedisValue::Integer(line.parse::<i64>().unwrap_or(0)))

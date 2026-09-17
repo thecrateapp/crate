@@ -10,7 +10,7 @@ from typing import Any
 import requests
 from requests import RequestException
 
-from crate.db.cache_store import get_cache, set_cache
+from crate.db.cache_store import delete_cache, get_cache, set_cache
 
 log = logging.getLogger(__name__)
 
@@ -323,14 +323,21 @@ def get_cached_probable_setlist(artist_name: str) -> list[dict] | None:
     return _normalize_cached_songs(cached)
 
 
-def queue_probable_setlist_refresh(artist_name: str) -> str | None:
-    task_ids = queue_probable_setlist_refreshes([artist_name])
+def queue_probable_setlist_refresh(
+    artist_name: str, *, force: bool = False
+) -> str | None:
+    task_ids = queue_probable_setlist_refreshes([artist_name], force=force)
     return task_ids[0] if task_ids else None
 
 
-def queue_probable_setlist_refreshes(artist_names: list[str]) -> list[str]:
+def queue_probable_setlist_refreshes(
+    artist_names: list[str], *, force: bool = False
+) -> list[str]:
     """Queue cache refreshes without performing provider I/O in the caller."""
-    from crate.db.repositories.tasks import create_task_dedup
+    from crate.db.repositories.tasks import (
+        create_task_dedup,
+        find_active_task_by_type_params,
+    )
 
     queued: list[str] = []
     seen: set[str] = set()
@@ -340,39 +347,53 @@ def queue_probable_setlist_refreshes(artist_names: list[str]) -> list[str]:
         if not artist_name or normalized in seen:
             continue
         seen.add(normalized)
-        if get_cached_probable_setlist(artist_name):
-            continue
-        status = get_cache(
-            _probable_status_key(artist_name),
-            max_age_seconds=_NEGATIVE_TTL_SECONDS,
-        )
-        if isinstance(status, dict) and status.get("status") in {"pending", "missing"}:
-            continue
+        if not force:
+            if get_cached_probable_setlist(artist_name):
+                continue
+            status = get_cache(
+                _probable_status_key(artist_name),
+                max_age_seconds=_NEGATIVE_TTL_SECONDS,
+            )
+            if isinstance(status, dict) and status.get("status") in {
+                "pending",
+                "missing",
+            }:
+                continue
         set_cache(
             _probable_status_key(artist_name),
             {"status": "pending"},
             ttl=_PENDING_TTL_SECONDS,
         )
+        params: dict[str, Any] = {"artist_name": artist_name}
+        if force:
+            params["force"] = True
         task_id = create_task_dedup(
             "refresh_probable_setlist",
-            {"artist_name": artist_name},
+            params,
             dedup_key=normalized,
         )
+        if not task_id:
+            task_id = find_active_task_by_type_params(
+                "refresh_probable_setlist",
+                params,
+                dedup_key=normalized,
+            )
         if task_id:
             queued.append(task_id)
     return queued
 
 
-def refresh_probable_setlist(artist_name: str) -> dict:
+def refresh_probable_setlist(artist_name: str, *, force: bool = False) -> dict:
     """Refresh one probable setlist from a worker-owned provider call."""
     normalized_name = _normalized_artist_name(artist_name)
-    songs = get_probable_setlist(normalized_name)
+    songs = get_probable_setlist(normalized_name, force=force)
     if songs:
         set_cache(
             _probable_status_key(normalized_name),
             {"status": "ready"},
             ttl=_PROBABLE_TTL_SECONDS,
         )
+        delete_cache(f"enrichment:{normalized_name.casefold()}")
         return {
             "status": "ready",
             "artist_name": normalized_name,
@@ -386,10 +407,13 @@ def refresh_probable_setlist(artist_name: str) -> dict:
     return {"status": "missing", "artist_name": normalized_name, "songs": 0}
 
 
-def get_probable_setlist(artist_name: str, num_setlists: int = 30) -> list[dict] | None:
-    cached = get_cached_probable_setlist(artist_name)
-    if cached:
-        return cached
+def get_probable_setlist(
+    artist_name: str, num_setlists: int = 30, *, force: bool = False
+) -> list[dict] | None:
+    if not force:
+        cached = get_cached_probable_setlist(artist_name)
+        if cached:
+            return cached
 
     mbid = search_artist(artist_name)
     if not mbid:

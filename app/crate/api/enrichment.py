@@ -13,6 +13,7 @@ from crate.api.openapi_responses import (
 )
 from crate.api.permissions import require_permission
 from crate.artist_bio import normalize_artist_bio
+from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.utility import (
     ArtistAnalysisDataResponse,
     ArtistEnrichmentResponse,
@@ -248,6 +249,47 @@ def get_artist_enrichment_by_entity_uid(request: Request, artist_entity_uid: str
     if not artist_name:
         raise HTTPException(status_code=404, detail="Not found")
     return get_artist_enrichment(request, artist_name)
+
+
+def _queue_probable_setlist_refresh(artist_name: str) -> dict[str, str]:
+    task_id = setlistfm.queue_probable_setlist_refresh(artist_name, force=True)
+    if not task_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not queue probable setlist refresh",
+        )
+    return {"task_id": task_id, "status": "queued"}
+
+
+@router.post(
+    "/api/artists/{artist_id}/probable-setlist/refresh",
+    response_model=TaskEnqueueResponse,
+    responses=_ENRICHMENT_RESPONSES,
+    summary="Force-refresh an artist probable setlist",
+)
+def refresh_probable_setlist_by_id(request: Request, artist_id: int):
+    require_permission(request, "library.metadata.write")
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        raise HTTPException(status_code=404, detail="Not found")
+    return _queue_probable_setlist_refresh(artist_name)
+
+
+@router.post(
+    "/api/artists/by-entity/{artist_entity_uid}/probable-setlist/refresh",
+    response_model=TaskEnqueueResponse,
+    responses=_ENRICHMENT_RESPONSES,
+    summary="Force-refresh an artist probable setlist by entity UID",
+)
+def refresh_probable_setlist_by_entity_uid(
+    request: Request,
+    artist_entity_uid: str,
+):
+    require_permission(request, "library.metadata.write")
+    artist_name = artist_name_from_entity_uid(artist_entity_uid)
+    if not artist_name:
+        raise HTTPException(status_code=404, detail="Not found")
+    return _queue_probable_setlist_refresh(artist_name)
 
 
 def _build_from_db(artist: Mapping[str, Any]) -> dict:

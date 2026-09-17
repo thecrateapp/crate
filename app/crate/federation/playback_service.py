@@ -61,7 +61,9 @@ def _local_track(selection: dict) -> dict | None:
     return get_track_delivery_row_by_id(int(local_id)) if local_id is not None else None
 
 
-def _local_file_response(selection: dict) -> FileResponse:
+def _local_file_response(
+    selection: dict, *, delivery_policy: str = "original"
+) -> FileResponse:
     track = _local_track(selection)
     if track is None:
         raise PlaybackServiceError(404, "Track not found")
@@ -76,11 +78,14 @@ def _local_file_response(selection: dict) -> FileResponse:
         raise PlaybackServiceError(403, "Track path is outside the library")
     if not path.is_file():
         raise PlaybackServiceError(404, "Track file not found")
-    from crate.streaming.service import media_type_for_path
+    from crate.streaming.service import resolve_playback
 
+    resolution = resolve_playback(track, delivery_policy, enqueue=True)
+    if resolution is None:
+        raise PlaybackServiceError(404, "Track file not found")
     return FileResponse(
-        str(path),
-        media_type=media_type_for_path(path),
+        str(resolution.file_path),
+        media_type=resolution.media_type,
         headers={"Cache-Control": "private, no-store", "Accept-Ranges": "bytes"},
     )
 
@@ -105,7 +110,7 @@ def stream_global_track(
             origin=origin,
             source_node_uid=source_node_uid,
         )
-        return _local_file_response(selection)
+        return _local_file_response(selection, delivery_policy=delivery_policy)
 
     local_node = federation_repo.get_local_node()
     peer = federation_repo.get_peer(str(selection["node_uid"]))

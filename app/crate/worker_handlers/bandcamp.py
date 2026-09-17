@@ -798,7 +798,10 @@ def _handle_bandcamp_discover_refresh(
         session_material = session_material_from_payload(session_payload)
         result = BandcampDiscoverClient(
             session_material,
-            cache_key=f"bandcamp:discover:user:{user_id}",
+            cache_key=(
+                f"bandcamp:discover:user:{user_id}:session:"
+                f"{str(connection.get('session_fingerprint') or '').strip()}"
+            ),
         ).fetch_followed()
         persisted = refresh_bandcamp_discover_for_user(
             user_id,

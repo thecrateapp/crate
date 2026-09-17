@@ -8,6 +8,7 @@ import uuid
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 import psycopg2
 
 
@@ -39,12 +40,23 @@ def _reset_schema() -> None:
     connection.close()
 
 
-def _migrate(revision: str, *, downgrade: bool = False) -> None:
+def _alembic_config() -> Config:
     config = Config(str(ROOT / "app/alembic.ini"))
     config.set_main_option(
         "script_location",
         str(ROOT / "app/crate/db/migrations"),
     )
+    return config
+
+
+def _migration_head() -> str:
+    head = ScriptDirectory.from_config(_alembic_config()).get_current_head()
+    assert head is not None
+    return head
+
+
+def _migrate(revision: str, *, downgrade: bool = False) -> None:
+    config = _alembic_config()
     operation = command.downgrade if downgrade else command.upgrade
     operation(config, revision)
 
@@ -306,7 +318,7 @@ def _seed_063_legacy_state() -> dict[str, str]:
 
 
 def _assert_hardened_state(ids: dict[str, str]) -> None:
-    assert _scalar("SELECT version_num FROM alembic_version") == "090"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     assert (
         _scalar(
             "SELECT status FROM federation_local_keys WHERE node_uid = %s",
@@ -356,7 +368,7 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "090"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     for table in (
         "federation_local_keys",
         "federation_catalog_changes",
@@ -367,6 +379,8 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
         "domain_event_outbox",
         "global_catalog_search_documents",
         "global_catalog_search_projection_state",
+        "cast_playback_sessions",
+        "cast_playback_session_mutations",
     ):
         assert _scalar("SELECT to_regclass(%s) IS NOT NULL", (f"public.{table}",))
 
@@ -385,7 +399,7 @@ def test_080_upgrade_removes_deprecated_navidrome_column(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "090"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     assert (
         _scalar(
             """
@@ -426,7 +440,7 @@ def test_real_main_049_snapshot_upgrades_without_user_data_loss(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "090"
+    assert _scalar("SELECT version_num FROM alembic_version") == _migration_head()
     assert _scalar("SELECT email FROM users WHERE id = %s", (ids["user_id"],)) == (
         "legacy@example.test"
     )
@@ -559,3 +573,68 @@ def test_head_rolls_back_to_063_boundary_and_reupgrades(pg_db):
     _migrate("head")
 
     _assert_hardened_state(ids)
+
+
+def test_097_encrypts_legacy_subsonic_tokens_and_supports_downgrade(pg_db):
+    del pg_db
+    _reset_schema()
+    _migrate("096")
+
+    connection = _connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO users (email, username, name, created_at, subsonic_token)
+                VALUES (
+                    'subsonic-legacy@example.test', 'subsonic-legacy',
+                    'Subsonic Legacy', NOW(), 'legacy-token-for-encryption'
+                )
+                RETURNING id
+                """
+            )
+            user_id = cursor.fetchone()[0]
+        connection.commit()
+    finally:
+        connection.close()
+
+    _migrate("097")
+
+    assert _scalar("SELECT version_num FROM alembic_version") == "097"
+    assert (
+        _scalar("SELECT subsonic_token IS NULL FROM users WHERE id = %s", (user_id,))
+        is True
+    )
+    credential = _scalar(
+        """
+        SELECT secret_ref || '|' || api_key_digest
+        FROM user_subsonic_credentials WHERE user_id = %s
+        """,
+        (user_id,),
+    )
+    secret_ref, digest = credential.split("|")
+    assert digest == hashlib.sha256(b"legacy-token-for-encryption").hexdigest()
+
+    from crate.db.repositories.subsonic_credentials import (
+        get_user_subsonic_credential_by_api_key_digest,
+        get_user_subsonic_credential_by_identity,
+    )
+
+    by_identity = get_user_subsonic_credential_by_identity("subsonic-legacy")
+    by_api_key = get_user_subsonic_credential_by_api_key_digest(digest)
+    assert by_identity["id"] == user_id
+    assert by_identity["secret_ref"] == secret_ref
+    assert by_api_key["id"] == user_id
+
+    from crate.credentials import load_secret
+
+    assert load_secret(secret_ref, scope="opensubsonic")["secret"] == (
+        "legacy-token-for-encryption"
+    )
+
+    _migrate("096", downgrade=True)
+
+    assert (
+        _scalar("SELECT subsonic_token FROM users WHERE id = %s", (user_id,))
+        == "legacy-token-for-encryption"
+    )

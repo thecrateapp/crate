@@ -38,6 +38,7 @@ compose if the change involves readplane-routed endpoints or SSE.
 | Listen    |       5174 | `https://listen.dev.lespedants.org` |
 | Docs      |       5175 | `https://docs.dev.cratemusic.app`   |
 | Site      |       5176 | `https://www.dev.cratemusic.app`    |
+| Cast UI   |       8591 | `https://cast.dev.lespedants.org`   |
 | API       |       8585 | `https://api.dev.lespedants.org`    |
 | Readplane |       8686 | `http://localhost:8686`             |
 
@@ -47,13 +48,34 @@ media worker and Caddy. The dev fixture has three artists and 122 tracks.
 
 ## Sentry observability
 
-The API, readplane and worker processes use the DSNs configured in the local
-`.env` (`SENTRY_API_DSN`, `SENTRY_READPLANE_DSN` and `SENTRY_WORKERS_DSN`).
-Listen and Admin use their browser/Capacitor DSNs at build time. Production CI
-reads `SENTRY_ADMIN_DSN` and `SENTRY_LISTEN_DSN` from GitHub Actions Variables,
-and uses the `SENTRY_AUTH_TOKEN` Actions Secret only to upload source maps.
-The SDKs keep default PII collection disabled and redact credentials, cookies,
-query strings and user contact fields before sending events.
+Sentry is split by runtime so failures remain attributable and queryable:
+
+| Runtime                         | Sentry project        | Configuration                                                |
+| ------------------------------- | --------------------- | ------------------------------------------------------------ |
+| FastAPI                         | `crate-api`           | `SENTRY_API_DSN` in `.env`                                   |
+| Python workers and projector    | `crate-workers`       | `SENTRY_WORKERS_DSN` plus a per-process `SENTRY_SERVICE` tag |
+| Go readplane                    | `crate-readplane`     | `SENTRY_READPLANE_DSN` in `.env`                             |
+| Rust media worker               | `crate-media-worker`  | `SENTRY_MEDIA_WORKER_DSN` in `.env`                          |
+| Admin                           | `crate-admin`         | `SENTRY_ADMIN_DSN` GitHub Actions Variable                   |
+| Listen web, Capacitor and Tauri | `crate-listen`        | `SENTRY_LISTEN_DSN` GitHub Actions Variable                  |
+| Cast receiver                   | `crate-cast-receiver` | `SENTRY_CAST_RECEIVER_DSN` GitHub Actions Variable           |
+| Public site                     | `crate-site`          | `SENTRY_SITE_DSN` GitHub Actions Variable                    |
+| Documentation site              | `crate-docs`          | `SENTRY_DOCS_DSN` GitHub Actions Variable                    |
+
+Runtime DSNs are injected by Compose. Browser DSNs are public identifiers and
+are embedded by the production image/mobile workflows. The
+`SENTRY_AUTH_TOKEN` Actions Secret is used only during trusted push builds to
+upload source maps, Android R8 mappings and Tauri native debug symbols; it is
+never stored in a runtime image. Android symbol upload runs only for signed tag
+releases. The current iOS workflow builds an unsigned simulator app, so there
+is no distributed iOS archive or production dSYM to upload yet.
+
+All deployable builds use the Git SHA in `SENTRY_RELEASE`. The SDKs keep
+default PII collection disabled and redact credentials, cookies, query strings
+and user contact fields before sending events. Handled API 5xx responses,
+terminal task failures, projector failures and media-worker job failures are
+captured explicitly because they do not necessarily raise an uncaught process
+exception.
 
 Local frontend builds run without Sentry unless `VITE_SENTRY_DSN` is exported.
 This keeps development noise and accidental local event uploads opt-in.
@@ -75,6 +97,19 @@ your change.
 
 The seeded development account is `admin@cratemusic.app` / `admin`.
 
+The Cast receiver can be previewed without a physical device or CAF runtime:
+
+```bash
+npm run --workspace=app/cast-receiver dev -- --host --port 5179
+# Open http://localhost:5179/?preview=1
+```
+
+Physical Cast devices require a publicly reachable HTTPS receiver URL and a
+registered development application ID; they do not trust the local mkcert CA.
+See [Cast receiver operations](../operators/cast-receiver.md) and complete the
+[Cast release checklist](../testing/cast-release-checklist.md) before enabling
+the custom receiver.
+
 ## Focused workflows
 
 ```bash
@@ -87,9 +122,9 @@ make dev-logs s=worker
 make dev-down
 ```
 
-The npm workspace includes four web packages: `app/shared/ui`, `app/ui`,
-`app/listen` and `app/listen-desktop`. Docs and Site are standalone Vite apps;
-their dependencies are installed by `make dev`.
+The npm workspace includes `app/shared/ui`, the shared Cast protocol,
+`app/cast-receiver`, `app/ui`, `app/listen` and `app/listen-desktop`. Docs and
+Site are standalone Vite apps; their dependencies are installed by `make dev`.
 
 ## Federation harness
 

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -7,7 +7,7 @@ import {
 } from "@/test/render-with-listen-providers";
 import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
 
-import { PlayerBar } from "./PlayerBar";
+import { PlayerBar, PlayerSurfaceFallback } from "./PlayerBar";
 
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => false));
 const isLikedMock = vi.hoisted(() => vi.fn(() => false));
@@ -145,6 +145,28 @@ describe("PlayerBar mobile mini-player", () => {
     expect(screen.queryByTestId("player-track-menu")).toBeNull();
   });
 
+  it("uses semantic tokens for player surface fallbacks", () => {
+    const mobileFallback = renderWithListenProviders(<PlayerSurfaceFallback />);
+    const fullscreenFallback = renderWithListenProviders(
+      <PlayerSurfaceFallback fullscreen />,
+    );
+
+    expect(
+      mobileFallback.container.querySelector(".listen-player-surface-fallback"),
+    ).toBeInTheDocument();
+    expect(
+      fullscreenFallback.container.querySelector(
+        ".listen-player-fullscreen-scrim",
+      ),
+    ).toBeInTheDocument();
+    expect(mobileFallback.container.innerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
+    expect(fullscreenFallback.container.innerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
+  });
+
   it("leaves the mobile dock glass to the shared Shell backdrop", () => {
     const track = createMockTrack({
       title: "Glass Dock",
@@ -170,6 +192,163 @@ describe("PlayerBar mobile mini-player", () => {
     });
 
     expect(container.querySelector(".listen-mobile-player-glass")).toBeNull();
+  });
+
+  it("uses semantic tokens for the desktop progress control", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Progress",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    const progress = container.querySelector(".listen-player-progress");
+
+    expect(progress).toBeInTheDocument();
+    expect(
+      progress?.querySelector(".listen-player-progress-track"),
+    ).toBeInTheDocument();
+    expect(progress?.innerHTML).not.toContain("rgba(");
+  });
+
+  it("uses semantic tokens for desktop transport controls", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Transport",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    for (const label of [
+      "Enable shuffle",
+      "Previous track",
+      "Next track",
+      "Repeat: off",
+    ]) {
+      const buttons = screen.getAllByRole("button", { name: label });
+
+      for (const button of buttons) {
+        expect(button.className).toContain("text-text-");
+        expect(button.className).toContain("hover:text-accent-action");
+        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button.className).not.toContain("text-white/");
+        expect(button.className).not.toContain("rgba(");
+      }
+    }
+  });
+
+  it("uses semantic tokens for the desktop shell and track identity", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Shell Track",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    const shell = container.querySelector(".listen-player-shell");
+    const artwork = container.querySelector(".listen-player-artwork");
+
+    expect(shell).toBeInTheDocument();
+    expect(artwork).toBeInTheDocument();
+    expect(screen.getByText("Semantic Shell Track")).toHaveClass(
+      "text-text-primary",
+    );
+    expect(screen.getByText("Crate")).toHaveClass("text-text-muted");
+    expect(shell?.outerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
+  });
+
+  it("uses the accent token for active shuffle and repeat states", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Active Transport",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack: track,
+        queue: [track],
+        shuffle: true,
+        repeat: "one",
+      },
+    });
+
+    const activeGlow = "drop-shadow-accent-action";
+
+    expect(screen.getByRole("button", { name: "Disable shuffle" })).toHaveClass(
+      "text-accent-action",
+      activeGlow,
+    );
+    expect(screen.getByRole("button", { name: "Repeat: one" })).toHaveClass(
+      "text-accent-action",
+      activeGlow,
+    );
+  });
+
+  it("uses semantic tokens for desktop player actions", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Actions",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    for (const label of ["Queue", "Lyrics", "Expand player"]) {
+      const buttons = screen.getAllByRole("button", { name: label });
+
+      for (const button of buttons) {
+        expect(button.className).toContain("text-text-");
+        expect(button.className).toContain("hover:text-accent-action");
+        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button.className).not.toContain("text-white/");
+        expect(button.className).not.toContain("rgba(");
+      }
+    }
+  });
+
+  it("uses compact counter typography for the desktop queue count", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const currentTrack = createMockTrack({
+      id: "queue-current",
+      title: "Current Track",
+      artist: "Crate",
+    });
+    const nextTrack = createMockTrack({
+      id: "queue-next",
+      title: "Next Track",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack,
+        currentIndex: 0,
+        queue: [currentTrack, nextTrack],
+      },
+    });
+
+    const queueCounter = screen
+      .getAllByRole("button", { name: "Queue" })
+      .map((button) => within(button).queryByText("1"))
+      .find((node): node is HTMLElement => node !== null);
+
+    expect(queueCounter).toHaveTextContent("1");
+    expect(queueCounter).toHaveClass("text-counter");
+    expect(queueCounter).not.toHaveClass("text-xs");
   });
 
   it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
@@ -306,7 +485,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("h-12"));
+      .find((button) => button.className.includes("size-12"));
 
     expect(playButton).toBeDefined();
     expect(nextButton).toBeDefined();
@@ -348,7 +527,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("h-12"));
+      .find((button) => button.className.includes("size-12"));
 
     fireEvent.click(playButton!);
     fireEvent.click(nextButton!);

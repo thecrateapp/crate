@@ -34,6 +34,40 @@ func TestArtistTopTracksBySlugPreservesLookupErrors(t *testing.T) {
 	}
 }
 
+func TestFavoritesScopesRowsToAuthenticatedUser(t *testing.T) {
+	var receivedUserID int64
+	store := &Store{
+		favoritesFn: func(_ context.Context, userID int64) (map[string]any, error) {
+			receivedUserID = userID
+			return map[string]any{"items": []any{}}, nil
+		},
+	}
+
+	payload, err := store.Favorites(context.Background(), 42)
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(42), receivedUserID)
+	assert.Equal(t, map[string]any{"items": []any{}}, payload)
+}
+
+func TestTrackInfoUsesAuthenticatedUsersRating(t *testing.T) {
+	var receivedUserID int64
+	store := &Store{
+		trackInfoFn: func(_ context.Context, userID int64, predicate string, identity any) (map[string]any, error) {
+			receivedUserID = userID
+			assert.Equal(t, "t.id = $2", predicate)
+			assert.Equal(t, int64(17), identity)
+			return map[string]any{"rating": int64(4)}, nil
+		},
+	}
+
+	payload, err := store.TrackInfoByID(context.Background(), 42, 17)
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(42), receivedUserID)
+	assert.Equal(t, int64(4), payload["rating"])
+}
+
 func TestBuildLocalFTSQuery(t *testing.T) {
 	tests := []struct {
 		name  string

@@ -1,6 +1,14 @@
 import { renderHook, act } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const { isCastSessionActiveMock } = vi.hoisted(() => ({
+  isCastSessionActiveMock: vi.fn(() => false),
+}));
+
+vi.mock("@/lib/cast-sender", () => ({
+  isCastSessionActive: isCastSessionActiveMock,
+}));
+
 vi.mock("@/lib/remote-playback-state", () => ({
   buildPlaybackStatePayload: vi.fn(
     ({ snapshotKind, queue, currentIndex, isPlaying, claimActive }) => ({
@@ -76,6 +84,7 @@ function makeOptions(queue: Track[] = [TRACK]) {
 afterEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();
+  isCastSessionActiveMock.mockReturnValue(false);
 });
 
 describe("useRemotePlaybackState", () => {
@@ -227,6 +236,23 @@ describe("useRemotePlaybackState", () => {
 
     expect(registerCurrentConnectDevice).not.toHaveBeenCalled();
     expect(markCurrentConnectDevicePresent).not.toHaveBeenCalled();
+    expect(publishPlaybackState).not.toHaveBeenCalled();
+  });
+
+  it("never publishes or claims Connect while Cast owns playback", async () => {
+    vi.useFakeTimers();
+    isCastSessionActiveMock.mockReturnValue(true);
+    const options = makeOptions();
+    options.isPlaying = true;
+    options.isPlayingRef.current = true;
+    const { result } = renderHook(() => useRemotePlaybackState(options));
+
+    await act(async () => {
+      await Promise.resolve();
+      await result.current.publishStructuralNow({ claimActive: true });
+      vi.advanceTimersByTime(10016);
+    });
+
     expect(publishPlaybackState).not.toHaveBeenCalled();
   });
 });

@@ -30,6 +30,18 @@ export function initNativeSentry(): void {
   initialized = true;
 }
 
+export function captureNativeRuntimeError(
+  error: unknown,
+  operation: string,
+): void {
+  Sentry.withScope((scope) => {
+    scope.setTag("runtime.operation", operation);
+    scope.setTag("runtime.platform", "capacitor");
+    scope.setFingerprint(["listen-runtime-error", operation, "{{ default }}"]);
+    Sentry.captureException(error);
+  });
+}
+
 function parseSampleRate(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;

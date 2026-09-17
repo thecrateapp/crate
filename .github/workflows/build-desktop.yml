@@ -14,6 +14,7 @@ on:
       - "package-lock.json"
       - ".github/workflows/build-desktop.yml"
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "app/listen/**"
       - "app/listen-desktop/**"
@@ -30,6 +31,7 @@ defaults:
 
 jobs:
   build-desktop:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -230,16 +232,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test desktop native layer
+        run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
+
       - name: Build macOS tester bundles
         if: runner.os == 'macOS'
         env:
           SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-listen
+          SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
+          SENTRY_ENVIRONMENT: production
           SENTRY_RELEASE: crate-${{ github.sha }}
+          SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_LISTEN_TRACES_SAMPLE_RATE || '0.1' }}
           VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
+          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
           version="$(node -p "require('./app/listen-desktop/src-tauri/tauri.conf.json').version")"
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
@@ -255,11 +265,43 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-listen
+          SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
+          SENTRY_ENVIRONMENT: production
           SENTRY_RELEASE: crate-${{ github.sha }}
+          SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_LISTEN_TRACES_SAMPLE_RATE || '0.1' }}
           VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
+          VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
+          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
+
+      - name: Generate macOS dSYMs
+        if: runner.os == 'macOS' && github.event_name == 'push'
+        run: |
+          found=0
+          while IFS= read -r -d '' binary; do
+            dsymutil "$binary" -o "$binary.dSYM"
+            test -d "$binary.dSYM"
+            found=$((found + 1))
+          done < <(
+            find app/listen-desktop/src-tauri/target \
+              -type f -path '*/release/crate-desktop' -print0
+          )
+          test "$found" -gt 0
+
+      - name: Upload desktop native debug symbols
+        if: github.event_name == 'push'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ninja-development
+          SENTRY_PROJECT: crate-listen
+        run: >-
+          npx --no-install sentry-cli debug-files upload
+          --org "$SENTRY_ORG"
+          --project "$SENTRY_PROJECT"
+          --wait-for 120
+          app/listen-desktop/src-tauri/target
 
       - name: Collect artifacts
         if: runner.os != 'macOS'

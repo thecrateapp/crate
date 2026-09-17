@@ -64,14 +64,10 @@ from crate.db.queries.catalog_local_browse import (
     list_local_catalog_genres,
 )
 from crate.db.repositories.global_user_library import (
-    follow_global_artist,
     is_global_album_saved,
     is_global_artist_followed,
     list_user_global_album_saves,
     list_user_global_artist_follows,
-    save_global_album,
-    unfollow_global_artist,
-    unsave_global_album,
 )
 from crate.db.repositories.global_catalog_state import (
     catalog_serving_mode,
@@ -100,6 +96,7 @@ from crate.federation.global_source_resolver import (
 )
 from crate.local_search import search_local_library
 from crate.metrics import record_later
+from crate.subsonic.services import preferences
 
 router = APIRouter(tags=["catalog"])
 router.include_router(artist_compat_router)
@@ -296,7 +293,7 @@ def catalog_me_follow_state(request: Request, global_artist_uid: str):
 )
 def catalog_me_follow_artist(request: Request, global_artist_uid: str):
     user = _require_auth(request)
-    added = follow_global_artist(int(user["id"]), global_artist_uid)
+    added = preferences.star(int(user["id"]), "artist", "ga-" + global_artist_uid)
     if not added and not is_global_artist_followed(int(user["id"]), global_artist_uid):
         raise HTTPException(status_code=404, detail="Artist not found")
     return {"ok": True, "added": added}
@@ -309,7 +306,7 @@ def catalog_me_follow_artist(request: Request, global_artist_uid: str):
 )
 def catalog_me_unfollow_artist(request: Request, global_artist_uid: str):
     user = _require_auth(request)
-    removed = unfollow_global_artist(int(user["id"]), global_artist_uid)
+    removed = preferences.unstar(int(user["id"]), "artist", "ga-" + global_artist_uid)
     if not removed:
         raise HTTPException(status_code=404, detail="Not following this artist")
     return {"ok": True}
@@ -342,7 +339,7 @@ def catalog_me_album_saved_state(request: Request, global_album_uid: str):
 )
 def catalog_me_save_album(request: Request, global_album_uid: str):
     user = _require_auth(request)
-    added = save_global_album(int(user["id"]), global_album_uid)
+    added = preferences.star(int(user["id"]), "album", "gal-" + global_album_uid)
     if not added and not is_global_album_saved(int(user["id"]), global_album_uid):
         raise HTTPException(status_code=404, detail="Album not found")
     return {"ok": True, "added": added}
@@ -355,7 +352,7 @@ def catalog_me_save_album(request: Request, global_album_uid: str):
 )
 def catalog_me_unsave_album(request: Request, global_album_uid: str):
     user = _require_auth(request)
-    removed = unsave_global_album(int(user["id"]), global_album_uid)
+    removed = preferences.unstar(int(user["id"]), "album", "gal-" + global_album_uid)
     if not removed:
         raise HTTPException(status_code=404, detail="Album not in library")
     return {"ok": True}
@@ -1001,7 +998,7 @@ def _authenticated_stream_redirect_url(request: Request, stream_url: str) -> str
     summary="Get canonical global track metadata",
 )
 def catalog_track_info(request: Request, global_track_uid: str):
-    _require_auth(request)
+    user = _require_auth(request)
     payload = get_global_track_info(global_track_uid)
     if payload is None:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -1021,7 +1018,11 @@ def catalog_track_info(request: Request, global_track_uid: str):
             if exc.status_code != 404:
                 raise
 
-    return _hydrate_catalog_track_info(request, global_track_uid, payload)
+    hydrated = _hydrate_catalog_track_info(request, global_track_uid, payload)
+    hydrated["rating"] = preferences.get_rating(
+        int(user["id"]), "gt-" + global_track_uid
+    )
+    return hydrated
 
 
 def _hydrate_catalog_track_info(

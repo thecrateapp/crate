@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.orm.playlist import Playlist
@@ -55,6 +56,17 @@ def update_playlist(
         return impl(s)
 
 
+def lock_playlist(playlist_id: int, *, session: Session) -> bool:
+    """Serialize playlist mutations performed inside the caller's transaction."""
+    return (
+        session.execute(
+            text("SELECT id FROM playlists WHERE id = :playlist_id FOR UPDATE"),
+            {"playlist_id": playlist_id},
+        ).first()
+        is not None
+    )
+
+
 def delete_playlist(playlist_id: int, *, session: Session | None = None) -> bool:
     def impl(s: Session) -> bool:
         playlist = s.get(Playlist, playlist_id)
@@ -68,4 +80,4 @@ def delete_playlist(playlist_id: int, *, session: Session | None = None) -> bool
         return impl(s)
 
 
-__all__ = ["delete_playlist", "update_playlist"]
+__all__ = ["delete_playlist", "lock_playlist", "update_playlist"]

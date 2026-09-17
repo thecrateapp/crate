@@ -37,6 +37,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
         if (method === "PUT") return body;
         return { remote_scrobbling_enabled: false };
       }
+      if (url === "/api/auth/subsonic-token") {
+        return { configured: false };
+      }
       return {};
     }),
   };
@@ -53,7 +56,9 @@ describe("Settings", () => {
   });
 
   it("localizes the settings page chrome", () => {
-    renderWithListenProviders(<Settings />, { locale: "es" });
+    const { container } = renderWithListenProviders(<Settings />, {
+      locale: "es",
+    });
 
     expect(
       screen.getByRole("heading", { name: "Ajustes" }),
@@ -66,6 +71,17 @@ describe("Settings", () => {
     expect(screen.getByText("Al terminar la pista")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("tu-handle")).toBeInTheDocument();
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
+    expect(screen.getByText("OpenSubsonic")).toBeInTheDocument();
+    expect(container.querySelector(".settings-header")).toBeInTheDocument();
+    expect(container.querySelector(".settings-section")).toBeInTheDocument();
+  });
+
+  it("does not show the appearance settings while the feature is disabled", () => {
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    expect(
+      screen.queryByRole("heading", { name: "Appearance" }),
+    ).not.toBeInTheDocument();
   });
 
   it("changes and stores the selected Listen language", async () => {
