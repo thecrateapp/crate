@@ -166,7 +166,7 @@ def test_crate_migration_can_be_downgraded_and_reapplied(pg_db):
     with read_scope() as session:
         assert not (CRATE_TABLES & _table_names(session))
 
-    command.upgrade(config, "090")
+    command.upgrade(config, "091")
     with read_scope() as session:
         assert CRATE_TABLES <= _table_names(session)
 

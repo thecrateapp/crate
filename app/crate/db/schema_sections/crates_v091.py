@@ -1,9 +1,9 @@
-"""DDL for Alembic revision 090; keep immutable after the revision ships."""
+"""DDL for Alembic revision 091; keep immutable after the revision ships."""
 
 from typing import Any
 
 
-def create_crates_v090_schema(cur: Any) -> None:
+def create_crates_v091_schema(cur: Any) -> None:
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS crates (
