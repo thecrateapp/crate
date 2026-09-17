@@ -27,3 +27,19 @@ test("dev cleanup covers every named container in the dev compose files", () => 
 
   assert.deepEqual([...cleanup].sort(), [...declared].sort());
 });
+
+test("dev API selects the OpenSubsonic v1 engine by default", () => {
+  const compose = readFileSync(
+    resolve(root, "docker-compose.dev.yaml"),
+    "utf8",
+  );
+  const apiService = compose.match(
+    /^  api:\n(?<service>(?:^(?!  [\w-]+:).*(?:\n|$))*)/m,
+  )?.groups?.service;
+
+  assert.ok(apiService, "the dev API service must be declared");
+  assert.match(
+    apiService,
+    /^\s+- CRATE_OPEN_SUBSONIC_ENGINE=\$\{CRATE_OPEN_SUBSONIC_ENGINE:-v1\}$/m,
+  );
+});
