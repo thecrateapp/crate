@@ -421,6 +421,24 @@ def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
     )
 
 
+def test_cannot_create_invite_when_crate_collaboration_is_disabled(
+    pg_db,
+    crate_api_client,
+):
+    crate_id = _create_crate()
+
+    response = crate_api_client.post(
+        f"/api/crates/{crate_id}/invites",
+        json={},
+        headers=_headers(1),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Enable collaboration before creating an invite"
+    )
+
+
 def test_accepting_crate_invite_does_not_return_member_directory(
     pg_db,
     crate_api_client,

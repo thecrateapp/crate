@@ -162,17 +162,23 @@ def test_crate_migration_can_be_downgraded_and_reapplied(pg_db):
     from crate.db.tx import read_scope
 
     config = _alembic_config()
-    command.downgrade(config, "098")
-    with read_scope() as session:
-        assert not (CRATE_TABLES & _table_names(session))
+    try:
+        command.downgrade(config, "098")
+        with read_scope() as session:
+            assert not (CRATE_TABLES & _table_names(session))
 
-    command.upgrade(config, "099")
+        command.upgrade(config, "099")
+        with read_scope() as session:
+            assert CRATE_TABLES <= _table_names(session)
+
+        command.downgrade(config, "098")
+        with read_scope() as session:
+            assert not (CRATE_TABLES & _table_names(session))
+    finally:
+        command.upgrade(config, "099")
+
     with read_scope() as session:
         assert CRATE_TABLES <= _table_names(session)
-
-    command.downgrade(config, "098")
-    with read_scope() as session:
-        assert not (CRATE_TABLES & _table_names(session))
 
 
 def test_curation_bootstrap_registers_crate_schema_idempotently(pg_db):

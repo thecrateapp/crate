@@ -31,7 +31,7 @@ class AddCrateAlbumRequest(BaseModel):
 
 
 class ReorderCrateAlbumsRequest(BaseModel):
-    global_album_uids: list[UUID] = Field(max_length=1000)
+    global_album_uids: list[UUID]
 
 
 class CreateCrateInviteRequest(BaseModel):
