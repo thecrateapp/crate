@@ -32,14 +32,12 @@ export function CrateInvite() {
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
-      <Loader2 size={22} className="animate-spin text-primary" />
+      <Loader2 size={22} className="animate-spin text-accent-action" />
       <div>
-        <p className="text-lg font-medium text-foreground">
+        <p className="text-lg font-medium text-text-primary">
           {t("crateInvite.title")}
         </p>
-        <p className="text-sm text-muted-foreground">
-          {t("crateInvite.subtitle")}
-        </p>
+        <p className="text-sm text-text-muted">{t("crateInvite.subtitle")}</p>
       </div>
     </div>
   );

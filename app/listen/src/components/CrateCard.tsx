@@ -30,9 +30,9 @@ export function CrateCard({ crate, onOpen }: CrateCardProps) {
       type="button"
       aria-label={t("library.crates.open", { name: crate.name })}
       onClick={onOpen}
-      className="flex w-full items-center gap-4 rounded-xl border border-white/8 bg-white/[0.035] p-3 text-left transition-colors hover:bg-white/[0.07]"
+      className="flex w-full items-center gap-4 rounded-xl border border-border-quiet bg-text-primary/[0.035] p-3 text-left transition-colors hover:bg-text-primary/[0.07]"
     >
-      <div className="size-16 shrink-0 overflow-hidden rounded-lg bg-white/5">
+      <div className="size-16 shrink-0 overflow-hidden rounded-lg bg-text-primary/5">
         {cover ? (
           <CrateImage
             src={cover}
@@ -41,21 +41,21 @@ export function CrateCard({ crate, onOpen }: CrateCardProps) {
             className="size-full object-cover"
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-primary/70">
+          <div className="flex size-full items-center justify-center text-accent-action/70">
             <Disc3 size={28} />
           </div>
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate font-semibold text-foreground">
+        <div className="truncate font-semibold text-text-primary">
           {crate.name}
         </div>
         {crate.description && (
-          <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
+          <p className="mt-0.5 line-clamp-1 text-sm text-text-muted">
             {crate.description}
           </p>
         )}
-        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
           {shared ? <Users size={13} /> : <Lock size={13} />}
           <span>
             {shared

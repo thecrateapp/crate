@@ -42,13 +42,13 @@ export function Crates() {
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="hidden text-lg font-semibold text-foreground md:block">
+        <h2 className="hidden text-lg font-semibold text-text-primary md:block">
           {t("library.crates.title")}
         </h2>
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90"
         >
           <Plus size={17} />
           {t("library.crates.new")}
@@ -57,10 +57,10 @@ export function Crates() {
 
       {loading && !crates ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-primary" />
+          <Loader2 size={24} className="animate-spin text-accent-action" />
         </div>
       ) : error ? (
-        <p role="alert" className="py-10 text-center text-sm text-destructive">
+        <p role="alert" className="py-10 text-center text-sm text-state-danger">
           {t("library.crates.loadFailed")}
         </p>
       ) : crates?.length ? (
@@ -74,11 +74,11 @@ export function Crates() {
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-white/10 px-5 py-12 text-center">
-          <h3 className="text-base font-semibold text-foreground">
+        <div className="rounded-xl border border-dashed border-border-quiet px-5 py-12 text-center">
+          <h3 className="text-base font-semibold text-text-primary">
             {t("library.crates.emptyTitle")}
           </h3>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
+          <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
             {t("library.crates.emptyDescription")}
           </p>
         </div>

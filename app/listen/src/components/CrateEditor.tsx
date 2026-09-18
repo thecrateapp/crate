@@ -117,19 +117,20 @@ export function CrateEditor({
         {error ? (
           <p
             role="alert"
-            className="py-12 text-center text-sm text-destructive"
+            className="py-12 text-center text-sm text-state-danger"
           >
             {t("library.crates.loadFailed")}
           </p>
         ) : (
           <div className="flex justify-center py-12">
-            <Loader2 size={24} className="animate-spin text-primary" />
+            <Loader2 size={24} className="animate-spin text-accent-action" />
           </div>
         )}
       </div>
     );
   }
 
+  // The form owns an editable draft; a persisted revision change resets it.
   return (
     <CrateEditorForm
       key={`${crate.id}:${crate.updated_at ?? ""}`}
@@ -314,8 +315,8 @@ function CrateEditorForm({
         />
 
         {isOwner && (
-          <div className="grid gap-4 rounded-xl border border-white/8 bg-white/[0.025] p-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+          <div className="grid gap-4 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
               {t("library.crates.visibility")}
               <select
                 aria-label={t("library.crates.visibility")}
@@ -323,13 +324,13 @@ function CrateEditorForm({
                 onChange={(event) =>
                   setVisibility(event.target.value as "public" | "private")
                 }
-                className="h-11 rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-foreground outline-none focus:border-primary/60"
+                className="h-11 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none focus:border-accent-action/60"
               >
                 <option value="private">{t("library.crates.private")}</option>
                 <option value="public">{t("library.crates.public")}</option>
               </select>
             </label>
-            <label className="flex min-h-11 items-center gap-3 self-end rounded-lg bg-white/[0.035] px-3 py-2 text-sm text-foreground">
+            <label className="flex min-h-11 items-center gap-3 self-end rounded-lg bg-text-primary/[0.035] px-3 py-2 text-sm text-text-primary">
               <input
                 type="checkbox"
                 checked={collaborative}
@@ -340,7 +341,7 @@ function CrateEditorForm({
                 }}
                 className="size-4 accent-primary"
               />
-              <Users size={16} className="text-primary" />
+              <Users size={16} className="text-accent-action" />
               {t("library.crates.allowCollaboration")}
             </label>
           </div>
@@ -358,16 +359,16 @@ function CrateEditorForm({
       </form>
 
       {isOwner && collaborative && (
-        <section className="space-y-3 rounded-xl border border-white/8 bg-white/[0.025] p-4">
+        <section className="space-y-3 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4">
           <div>
-            <h2 className="font-semibold text-foreground">
+            <h2 className="font-semibold text-text-primary">
               {t("library.crates.collaborators")}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-text-muted">
               {t("library.crates.inviteDescription")}
             </p>
             {!collaborationSaved && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-text-muted">
                 {t("library.crates.saveBeforeInvite")}
               </p>
             )}
@@ -376,7 +377,7 @@ function CrateEditorForm({
             type="button"
             disabled={inviteBusy || !collaborationSaved}
             onClick={() => void createInvite()}
-            className="flex min-h-11 items-center gap-2 rounded-lg bg-white/8 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/12 disabled:opacity-50"
+            className="flex min-h-11 items-center gap-2 rounded-lg bg-text-primary/8 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/12 disabled:opacity-50"
           >
             {inviteBusy ? (
               <Loader2 size={16} className="animate-spin" />
@@ -391,13 +392,13 @@ function CrateEditorForm({
                 aria-label={t("library.crates.inviteLink")}
                 readOnly
                 value={inviteLink}
-                className="h-10 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-muted-foreground"
+                className="h-10 min-w-0 flex-1 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-muted"
               />
               <button
                 type="button"
                 aria-label={t("share.copyLink")}
                 onClick={() => void copyInvite()}
-                className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/8 text-foreground hover:bg-white/12"
+                className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-text-primary/8 text-text-primary hover:bg-text-primary/12"
               >
                 <Copy size={16} />
               </button>
@@ -406,9 +407,9 @@ function CrateEditorForm({
           {members?.map((member) => (
             <div
               key={member.user_id}
-              className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.035] px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-lg bg-text-primary/[0.035] px-3 py-2"
             >
-              <span className="truncate text-sm text-foreground">
+              <span className="truncate text-sm text-text-primary">
                 {member.display_name || member.username || `#${member.user_id}`}
               </span>
               <button
@@ -418,7 +419,7 @@ function CrateEditorForm({
                     member.display_name || member.username || member.user_id,
                 })}
                 onClick={() => void removeMember(member.user_id)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-white/8 hover:text-destructive"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-state-danger"
               >
                 <X size={16} />
               </button>
@@ -429,15 +430,15 @@ function CrateEditorForm({
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-lg font-semibold text-text-primary">
             {t("library.crates.albums")}
           </h2>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-text-muted">
             {t("common.albumCountLabel", { count: albums.length })}
           </span>
         </div>
         {albums.length > 0 ? (
-          <ol className="divide-y divide-white/6 overflow-hidden rounded-xl border border-white/8 bg-white/[0.025]">
+          <ol className="divide-y divide-text-primary/6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.025]">
             {albums.map((album, index) => (
               <CrateAlbumRow
                 key={album.global_album_uid}
@@ -450,7 +451,7 @@ function CrateEditorForm({
             ))}
           </ol>
         ) : (
-          <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-text-muted">
             {t("library.crates.noAlbums")}
           </div>
         )}
@@ -461,17 +462,17 @@ function CrateEditorForm({
       </section>
 
       {isOwner && (
-        <section className="border-t border-white/8 pt-5">
+        <section className="border-t border-border-quiet pt-5">
           {deleteConfirmation ? (
-            <div className="space-y-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-              <p className="text-sm text-foreground">
+            <div className="space-y-3 rounded-xl border border-state-danger/20 bg-state-danger/5 p-4">
+              <p className="text-sm text-text-primary">
                 {t("library.crates.deleteConfirmation", { name: crate.name })}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void deleteCrate()}
-                  className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90"
+                  className="rounded-lg bg-state-danger px-4 py-2 text-sm font-medium text-state-danger-foreground hover:bg-state-danger/90"
                 >
                   {t("library.crates.confirmDelete")}
                 </button>
@@ -484,7 +485,7 @@ function CrateEditorForm({
             <button
               type="button"
               onClick={() => setDeleteConfirmation(true)}
-              className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm text-destructive transition-colors hover:bg-destructive/8"
+              className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm text-state-danger transition-colors hover:bg-state-danger/8"
             >
               <Trash2 size={15} />
               {t("library.crates.delete")}
@@ -521,7 +522,7 @@ function CrateAlbumRow({
 
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
-      <div className="size-12 shrink-0 overflow-hidden rounded-md bg-white/5">
+      <div className="size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5">
         {album.has_cover ? (
           <CrateImage
             src={cover}
@@ -530,16 +531,16 @@ function CrateAlbumRow({
             className="size-full object-cover"
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-white/30">
+          <div className="flex size-full items-center justify-center text-text-primary/30">
             <Disc3 size={20} />
           </div>
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">
+        <p className="truncate text-sm font-medium text-text-primary">
           {album.name}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="truncate text-xs text-text-muted">
           {album.artist_name}
           {album.year ? ` · ${album.year}` : ""}
         </p>
@@ -550,7 +551,7 @@ function CrateAlbumRow({
           aria-label={t("library.crates.moveAlbumUp", { name: album.name })}
           disabled={index === 0}
           onClick={() => onMove(index, -1)}
-          className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-white/8 hover:text-foreground disabled:opacity-25"
+          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary disabled:opacity-25"
         >
           <ChevronUp size={17} />
         </button>
@@ -559,7 +560,7 @@ function CrateAlbumRow({
           aria-label={t("library.crates.moveAlbumDown", { name: album.name })}
           disabled={index === total - 1}
           onClick={() => onMove(index, 1)}
-          className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-white/8 hover:text-foreground disabled:opacity-25"
+          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary disabled:opacity-25"
         >
           <ChevronDown size={17} />
         </button>
@@ -567,7 +568,7 @@ function CrateAlbumRow({
           type="button"
           aria-label={t("library.crates.removeAlbum", { name: album.name })}
           onClick={onRemove}
-          className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-white/8 hover:text-destructive"
+          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-state-danger"
         >
           <Trash2 size={15} />
         </button>
@@ -590,11 +591,11 @@ function EditorHeader({
         type="button"
         aria-label={t("common.back")}
         onClick={onBack}
-        className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-white/8 hover:text-foreground"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary"
       >
         <ArrowLeft size={18} />
       </button>
-      <h1 className="min-w-0 truncate text-xl font-bold text-foreground">
+      <h1 className="min-w-0 truncate text-xl font-bold text-text-primary">
         {title}
       </h1>
     </header>
@@ -617,9 +618,9 @@ function TextField({
   required?: boolean;
 }) {
   const className =
-    "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/60";
+    "w-full rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent-action/60";
   return (
-    <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+    <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
       {label}
       {multiline ? (
         <textarea
@@ -655,7 +656,7 @@ function PrimaryButton({
     <button
       type={type}
       disabled={disabled}
-      className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>
@@ -673,7 +674,7 @@ function SecondaryButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-11 items-center justify-center rounded-lg bg-white/6 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
+      className="flex min-h-11 items-center justify-center rounded-lg bg-text-primary/6 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/10"
     >
       {children}
     </button>
