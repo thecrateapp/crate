@@ -118,7 +118,83 @@ export function UserProfileLibrary({ data }: { data: PublicProfile }) {
         </div>
       </div>
       <UserProfilePlaylists data={data} />
+      <UserProfileCrates data={data} />
     </section>
+  );
+}
+
+function UserProfileCrates({ data }: { data: PublicProfile }) {
+  const { t } = useTranslation();
+  const crates = data.public_crates || [];
+
+  return (
+    <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
+      <div className="flex items-center gap-2">
+        <Disc3 size={16} className="user-profile-accent-icon" />
+        <h2 className="text-lg font-semibold text-text-primary">
+          {t("userProfile.crates.title")}
+        </h2>
+      </div>
+      <div className="mt-4 space-y-3">
+        {crates.length === 0 ? (
+          <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-text-muted">
+            {t("userProfile.crates.empty")}
+          </div>
+        ) : (
+          crates.map((crate) => {
+            const firstAlbum = crate.first_album;
+            const coverUrl = firstAlbum?.has_cover
+              ? albumCoverApiUrl(
+                  {
+                    globalAlbumUid: firstAlbum.global_album_uid,
+                    albumName: firstAlbum.name,
+                    artistName: firstAlbum.artist_name,
+                  },
+                  { size: 192 },
+                )
+              : null;
+
+            return (
+              <Link
+                key={crate.id}
+                to={`/crate/${crate.id}`}
+                className="user-profile-item flex items-center gap-4 rounded-lg px-4 py-3"
+              >
+                {coverUrl ? (
+                  <CrateImage
+                    src={coverUrl}
+                    alt={firstAlbum?.name ?? ""}
+                    className="size-14 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="user-profile-accent-panel user-profile-accent-icon flex size-14 items-center justify-center rounded-xl">
+                    <Disc3 size={20} />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-text-primary">
+                    {crate.name}
+                  </div>
+                  <div className="mt-1 text-xs text-text-muted">
+                    {t("common.albumCountLabel", {
+                      count: crate.album_count,
+                    })}
+                    {crate.is_collaborative
+                      ? ` · ${t("userProfile.crates.collaborative")}`
+                      : ""}
+                  </div>
+                  {crate.description ? (
+                    <div className="mt-1 truncate text-xs text-text-muted">
+                      {crate.description}
+                    </div>
+                  ) : null}
+                </div>
+              </Link>
+            );
+          })
+        )}
+      </div>
+    </div>
   );
 }
 

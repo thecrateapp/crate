@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from crate.api.schemas.common import OkResponse
+from crate.api.schemas.crates import CrateSummaryResponse
 from crate.api.schemas.playlists import PlaylistSummaryResponse
 
 
@@ -58,6 +59,7 @@ class SocialPublicProfileResponse(BaseModel):
 
 class SocialProfileDetailResponse(SocialPublicProfileResponse):
     public_playlists: list[PlaylistSummaryResponse] = Field(default_factory=list)
+    public_crates: list[CrateSummaryResponse] = Field(default_factory=list)
     relationship_state: RelationshipStateResponse
     affinity_score: int
     affinity_band: str

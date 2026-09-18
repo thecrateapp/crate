@@ -89,6 +89,7 @@ _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
         "upcoming",
         "curation",
         "playlists",
+        "crates",
         "artist_bio",
     }
 )
@@ -107,7 +108,7 @@ def _get_redis() -> Any:
 def _should_append_invalidation_domain_event(scope: str) -> bool:
     return (
         scope.startswith("home:user:")
-        or scope.startswith(("artist:", "album:", "playlist:"))
+        or scope.startswith(("artist:", "album:", "playlist:", "crate:"))
         or scope in _PROJECTOR_RELEVANT_INVALIDATION_SCOPES
     )
 
@@ -251,11 +252,12 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "global_catalog",
                 "curation",
                 "playlists",
+                "crates",
                 "shows",
                 "upcoming",
                 "artist_bio",
             }
-            or scope.startswith(("artist:", "album:", "playlist:"))
+            or scope.startswith(("artist:", "album:", "playlist:", "crate:"))
             for scope in scopes
         ):
             mark_ui_snapshots_stale(scope_prefix="home:")
@@ -268,9 +270,10 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "upcoming",
                 "curation",
                 "playlists",
+                "crates",
                 "artist_bio",
             }
-            or scope.startswith(("artist:", "album:", "playlist:"))
+            or scope.startswith(("artist:", "album:", "playlist:", "crate:"))
             for scope in scopes
         ):
             mark_ui_snapshots_stale(scope="ops", subject_key="dashboard")
@@ -479,6 +482,12 @@ _INVALIDATION_RULES: list[tuple[re.Pattern[str], list[str]]] = [
     (re.compile(r"^/api/me/location$"), ["shows", "upcoming"]),
     (re.compile(r"^/api/playlists$"), ["playlists"]),
     (re.compile(r"^/api/playlists/(\d+)"), ["playlists", "playlist:{1}"]),
+    (re.compile(r"^/api/crates/invites/[^/]+/accept$"), ["crates"]),
+    (re.compile(r"^/api/crates$"), ["crates"]),
+    (
+        re.compile(r"^/api/crates/([0-9a-fA-F-]{36})(?:/|$)"),
+        ["crates", "crate:{1}"],
+    ),
     (re.compile(r"^/api/curation"), ["curation"]),
     (re.compile(r"^/api/artists/(\d+)/enrich"), ["library", "artist:{1}"]),
     (

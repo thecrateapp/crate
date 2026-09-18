@@ -4,6 +4,94 @@ from __future__ import annotations
 ALBUM_UID = "11111111-1111-4111-8111-111111111111"
 ARTIST_UID = "22222222-2222-4222-8222-222222222222"
 TRACK_UID = "33333333-3333-4333-8333-333333333333"
+CRATE_ID = "77777777-7777-4777-8777-777777777777"
+
+
+def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
+    test_app, monkeypatch
+):
+    from crate.api import share
+
+    crate = {
+        "id": CRATE_ID,
+        "name": "Year-end records",
+        "description": "Our favorite albums this year.",
+        "owner_name": "Jane Doe",
+        "albums": [
+            {
+                "global_album_uid": ALBUM_UID,
+                "name": "Blending",
+                "artist_name": "High Vis",
+                "has_cover": True,
+            }
+        ],
+    }
+    monkeypatch.setattr(share, "get_crate_access", lambda _crate_id, _user_id: "public")
+    monkeypatch.setattr(share, "get_crate", lambda _crate_id: crate)
+
+    response = test_app.get(
+        f"/share/crate/{CRATE_ID}",
+        headers={"host": "listen.example.test", "x-forwarded-proto": "https"},
+    )
+
+    assert response.status_code == 200
+    assert 'property="og:type" content="website"' in response.text
+    assert 'property="og:title" content="Year-end records"' in response.text
+    assert (
+        'property="og:description" content="Our favorite albums this year."'
+        in response.text
+    )
+    assert (
+        f'property="og:image" content="https://listen.example.test/api/catalog/albums/{ALBUM_UID}/cover"'
+        in response.text
+    )
+    assert f'href="https://listen.example.test/crate/{CRATE_ID}"' in response.text
+
+
+def test_public_crate_preview_uses_brand_image_without_album_art(test_app, monkeypatch):
+    from crate.api import share
+
+    crate = {
+        "id": CRATE_ID,
+        "name": "Empty crate",
+        "description": "",
+        "owner_name": "Jane Doe",
+        "albums": [],
+    }
+    monkeypatch.setattr(share, "get_crate_access", lambda _crate_id, _user_id: "public")
+    monkeypatch.setattr(share, "get_crate", lambda _crate_id: crate)
+
+    response = test_app.get(
+        f"/share/crate/{CRATE_ID}",
+        headers={"host": "listen.example.test", "x-forwarded-proto": "https"},
+    )
+
+    assert response.status_code == 200
+    assert (
+        'property="og:image" content="https://listen.example.test/icons/icon-512.png"'
+        in response.text
+    )
+    assert (
+        'property="og:description" content="0 albums curated by Jane Doe on Crate."'
+        in response.text
+    )
+
+
+def test_private_crate_preview_is_not_found_without_loading_private_metadata(
+    test_app, monkeypatch
+):
+    from crate.api import share
+
+    monkeypatch.setattr(share, "get_crate_access", lambda _crate_id, _user_id: "none")
+    monkeypatch.setattr(
+        share,
+        "get_crate",
+        lambda _crate_id: (_ for _ in ()).throw(AssertionError("must not load")),
+    )
+
+    response = test_app.get(f"/share/crate/{CRATE_ID}")
+
+    assert response.status_code == 404
 
 
 def test_human_share_routes_report_catalog_slug_conflicts(test_app, monkeypatch):
