@@ -74,7 +74,7 @@ export function Crates() {
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-white/10 px-5 py-12 text-center">
+        <div className="rounded-xl border border-dashed border-white/10 px-5 py-12 text-center">
           <h3 className="text-base font-semibold text-foreground">
             {t("library.crates.emptyTitle")}
           </h3>

@@ -140,7 +140,7 @@ export function Crate() {
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 pb-12">
-      <section className="grid gap-6 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-5 sm:p-7 md:grid-cols-[minmax(200px,300px)_1fr] md:items-center">
+      <section className="grid gap-6 overflow-hidden rounded-xl border border-white/10 bg-white/[0.035] p-5 sm:p-7 md:grid-cols-[minmax(200px,300px)_1fr] md:items-center">
         <div className="aspect-square overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
           {coverUrl ? (
             <CrateImage
