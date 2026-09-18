@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useReducer, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
@@ -130,15 +130,53 @@ export function CrateEditor({
     );
   }
 
-  // The form owns an editable draft; a persisted revision change resets it.
+  // The form owns an editable draft; a changed server snapshot resets it.
   return (
     <CrateEditorForm
-      key={`${crate.id}:${crate.updated_at ?? ""}`}
+      key={crateEditorSnapshotKey(crate)}
       crate={crate}
       onBack={onBack}
       onDeleted={onDeleted}
     />
   );
+}
+
+interface CrateDraft {
+  name: string;
+  description: string;
+  visibility: CrateDetail["visibility"];
+  collaborative: boolean;
+  collaborationSaved: boolean;
+  albums: CrateAlbum[];
+}
+
+type CrateDraftUpdate =
+  | Partial<CrateDraft>
+  | ((draft: CrateDraft) => Partial<CrateDraft>);
+
+function createCrateDraft(crate: CrateDetail): CrateDraft {
+  return {
+    name: crate.name,
+    description: crate.description ?? "",
+    visibility: crate.visibility,
+    collaborative: crate.is_collaborative,
+    collaborationSaved: crate.is_collaborative,
+    albums: crate.albums,
+  };
+}
+
+function crateDraftReducer(
+  draft: CrateDraft,
+  update: CrateDraftUpdate,
+): CrateDraft {
+  return {
+    ...draft,
+    ...(typeof update === "function" ? update(draft) : update),
+  };
+}
+
+function crateEditorSnapshotKey(crate: CrateDetail): string {
+  return JSON.stringify(crate) ?? crate.id;
 }
 
 function CrateEditorForm({
@@ -152,14 +190,19 @@ function CrateEditorForm({
 }) {
   const { t } = useTranslation();
   const isOwner = crate.access === "owner";
-  const [name, setName] = useState(crate.name);
-  const [description, setDescription] = useState(crate.description ?? "");
-  const [visibility, setVisibility] = useState(crate.visibility);
-  const [collaborative, setCollaborative] = useState(crate.is_collaborative);
-  const [collaborationSaved, setCollaborationSaved] = useState(
-    crate.is_collaborative,
+  const [draft, updateDraft] = useReducer(
+    crateDraftReducer,
+    crate,
+    createCrateDraft,
   );
-  const [albums, setAlbums] = useState(crate.albums);
+  const {
+    name,
+    description,
+    visibility,
+    collaborative,
+    collaborationSaved,
+    albums,
+  } = draft;
   const [saving, setSaving] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -181,7 +224,7 @@ function CrateEditorForm({
         description: description.trim(),
         ...(isOwner ? { visibility, is_collaborative: collaborative } : {}),
       });
-      if (isOwner) setCollaborationSaved(collaborative);
+      if (isOwner) updateDraft({ collaborationSaved: collaborative });
       toast.success(t("library.crates.saved"));
     } catch {
       toast.error(t("library.crates.saveFailed"));
@@ -200,7 +243,7 @@ function CrateEditorForm({
         "POST",
         { global_album_uid: uid },
       );
-      setAlbums((current) => [...current, added]);
+      updateDraft((current) => ({ albums: [...current.albums, added] }));
       toast.success(t("library.crates.albumAdded"));
     } catch {
       toast.error(t("library.crates.albumAddFailed"));
@@ -215,11 +258,11 @@ function CrateEditorForm({
         )}`,
         "DELETE",
       );
-      setAlbums((current) =>
-        current.filter(
+      updateDraft((current) => ({
+        albums: current.albums.filter(
           (item) => item.global_album_uid !== album.global_album_uid,
         ),
-      );
+      }));
     } catch {
       toast.error(t("library.crates.albumRemoveFailed"));
     }
@@ -237,7 +280,9 @@ function CrateEditorForm({
       await api(`/api/crates/${crate.id}/albums/order`, "PUT", {
         global_album_uids: reordered.map((album) => album.global_album_uid),
       });
-      setAlbums(reordered.map((album, position) => ({ ...album, position })));
+      updateDraft({
+        albums: reordered.map((album, position) => ({ ...album, position })),
+      });
     } catch {
       toast.error(t("library.crates.reorderFailed"));
     }
@@ -302,14 +347,14 @@ function CrateEditorForm({
         <TextField
           label={t("common.name")}
           value={name}
-          onChange={setName}
+          onChange={(value) => updateDraft({ name: value })}
           maxLength={120}
           required
         />
         <TextField
           label={t("library.crates.description")}
           value={description}
-          onChange={setDescription}
+          onChange={(value) => updateDraft({ description: value })}
           multiline
           maxLength={2000}
         />
@@ -322,7 +367,9 @@ function CrateEditorForm({
                 aria-label={t("library.crates.visibility")}
                 value={visibility}
                 onChange={(event) =>
-                  setVisibility(event.target.value as "public" | "private")
+                  updateDraft({
+                    visibility: event.target.value as "public" | "private",
+                  })
                 }
                 className="h-11 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none focus:border-accent-action/60"
               >
@@ -335,8 +382,10 @@ function CrateEditorForm({
                 type="checkbox"
                 checked={collaborative}
                 onChange={(event) => {
-                  setCollaborative(event.target.checked);
-                  setCollaborationSaved(false);
+                  updateDraft({
+                    collaborative: event.target.checked,
+                    collaborationSaved: false,
+                  });
                   setInviteLink(null);
                 }}
                 className="size-4 accent-primary"
