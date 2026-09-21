@@ -33,7 +33,7 @@ export function useAlbumPlaybackActions({
 }) {
   const { playAll, playNext } = usePlayerActions();
 
-  const handlePlay = (startIndex = 0) => {
+  const playFromIndex = (startIndex: number) => {
     if (playerTracks.length === 0) return;
     playAll(playerTracks, startIndex, {
       type: "album",
@@ -46,6 +46,8 @@ export function useAlbumPlaybackActions({
     });
   };
 
+  const handlePlay = () => playFromIndex(0);
+
   const handlePlayTrack = (trackId: number | string) => {
     const startIndex = playableAlbumTracks.findIndex(
       (track) => track.id === trackId,
@@ -53,7 +55,7 @@ export function useAlbumPlaybackActions({
     if (startIndex < 0) return;
     clearTrackSelection();
     setSelectionPlaylistPickerOpen(false);
-    handlePlay(startIndex);
+    playFromIndex(startIndex);
   };
 
   const handleShuffle = () => {

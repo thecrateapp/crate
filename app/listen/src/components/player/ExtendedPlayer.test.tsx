@@ -12,6 +12,14 @@ import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 import { ExtendedPlayer } from "./ExtendedPlayer";
 
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => true));
+const resolvedArtistMock = vi.hoisted(() => ({
+  value: null as {
+    id?: number;
+    globalArtistUid?: string;
+    name: string;
+    slug?: string;
+  } | null,
+}));
 type MockVisualizerConfig = {
   surfaceMode: PlayerSurfaceMode;
   useAlbumPalette: boolean;
@@ -37,7 +45,12 @@ vi.mock("@/components/player/SpinningDisc", () => ({
 }));
 
 vi.mock("@/components/player/PlayerTrackIdentity", () => ({
-  PlayerTrackIdentity: () => <div data-testid="player-track-identity" />,
+  PlayerTrackIdentity: (props: Record<string, unknown>) => (
+    <div
+      data-testid="player-track-identity"
+      data-props={JSON.stringify(props)}
+    />
+  ),
 }));
 
 vi.mock("@/components/player/bar/PlayerSeekBar", () => ({
@@ -62,7 +75,7 @@ vi.mock("@/components/player/extended/InfoTab", () => ({
 
 vi.mock("@/components/player/useResolvedPlayerArtist", () => ({
   useResolvedPlayerArtist: () => ({
-    resolvedArtist: null,
+    resolvedArtist: resolvedArtistMock.value,
     artistAvatarUrl: null,
     markArtistPhotoFailed: vi.fn(),
   }),
@@ -108,6 +121,36 @@ describe("ExtendedPlayer", () => {
   beforeEach(() => {
     localStorage.removeItem("listen-eq-enabled");
     useIsDesktopMock.mockReturnValue(true);
+    resolvedArtistMock.value = null;
+  });
+
+  it("enables the artist badge for a global artist identity", () => {
+    resolvedArtistMock.value = {
+      globalArtistUid: "artist-global-1",
+      name: "Crate",
+    };
+    const track = createMockTrack({
+      id: "extended-global-artist-track",
+      entityUid: "extended-global-artist-track",
+      title: "Global artist track",
+      artist: "Crate",
+      globalArtistUid: "artist-global-1",
+    });
+
+    renderWithListenProviders(
+      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      },
+    );
+
+    const identity = screen.getByTestId("player-track-identity");
+    const props = JSON.parse(identity.dataset.props || "{}");
+    expect(props.artistClickable).toBe(true);
   });
 
   it("hides the desktop Equalizer access when it is globally disabled", () => {

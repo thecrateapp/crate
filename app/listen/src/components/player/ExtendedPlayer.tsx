@@ -200,7 +200,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
       open={open}
       t={t}
       state={{
-        artistClickable: !!resolvedArtist?.id,
+        artistClickable: Boolean(
+          resolvedArtist?.id != null || resolvedArtist?.globalArtistUid,
+        ),
         currentTrack,
         crossfadeProgress,
         crossfadeTransition,

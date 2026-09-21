@@ -25,6 +25,15 @@ vi.mock("sonner", () => ({
 
 const apiMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
+const resolvedArtistMock = vi.hoisted(() => ({
+  value: null as {
+    id?: number;
+    globalArtistUid?: string;
+    name: string;
+    slug?: string;
+  } | null,
+}));
+
 vi.mock("@/lib/api", () => ({
   api: apiMock,
   AUTH_TOKEN_EVENT: "crate:auth-token-updated",
@@ -114,7 +123,7 @@ vi.mock("@/components/player/player-source", () => ({
 
 vi.mock("@/components/player/useResolvedPlayerArtist", () => ({
   useResolvedPlayerArtist: () => ({
-    resolvedArtist: null,
+    resolvedArtist: resolvedArtistMock.value,
     artistAvatarUrl: null,
     markArtistPhotoFailed: vi.fn(),
   }),
@@ -241,6 +250,7 @@ describe("FullscreenPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
+    resolvedArtistMock.value = null;
     localStorage.removeItem("listen-eq-enabled");
     androidNativeEngineMock.shouldUseAndroidNativePlayer.mockReturnValue(false);
   });
@@ -395,6 +405,28 @@ describe("FullscreenPlayer", () => {
         expect(identity).toBeInTheDocument();
         const props = JSON.parse(identity.dataset.props || "{}");
         expect(props.currentTrack.id).toBe("t1");
+      });
+    });
+
+    it("keeps the artist badge clickable when only a global artist identity is available", async () => {
+      resolvedArtistMock.value = {
+        globalArtistUid: "artist-global-1",
+        name: "Test Artist",
+      };
+      const track = makeTrack({ globalArtistUid: "artist-global-1" });
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        const identity = screen.getByTestId("player-track-identity");
+        const props = JSON.parse(identity.dataset.props || "{}");
+        expect(props.artistClickable).toBe(true);
       });
     });
 
