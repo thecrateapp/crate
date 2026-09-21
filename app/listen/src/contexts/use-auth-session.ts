@@ -4,7 +4,21 @@ import { type AuthUser } from "@/contexts/auth-context";
 import { applyAuthenticatedUser } from "@/contexts/auth-runtime";
 import { api } from "@/lib/api";
 import { ApiError } from "../../../shared/web/api";
-import { getStoredAuthUserId } from "@/lib/auth-user-storage";
+
+const AUTH_RETRY_BASE_DELAY_MS = 1_500;
+const AUTH_RETRY_MAX_DELAY_MS = 30_000;
+const AUTH_RETRY_MAX_ATTEMPTS = 5;
+const AUTH_RETRY_JITTER_RATIO = 0.2;
+
+function authRetryDelay(attempt: number): number {
+  const exponentialDelay = Math.min(
+    AUTH_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
+    AUTH_RETRY_MAX_DELAY_MS,
+  );
+  const jitter =
+    exponentialDelay * AUTH_RETRY_JITTER_RATIO * (Math.random() * 2 - 1);
+  return Math.max(0, Math.round(exponentialDelay + jitter));
+}
 
 export function useAuthSession() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -13,13 +27,14 @@ export function useAuthSession() {
   const userRef = useRef<AuthUser | null>(null);
   const authRequestRef = useRef<AbortController | null>(null);
   const retryTimerRef = useRef<number | null>(null);
+  const retryAttemptRef = useRef(0);
 
   const setCurrentUser = useCallback((nextUser: AuthUser | null) => {
     userRef.current = nextUser;
     setUser(nextUser);
   }, []);
 
-  const refetch = useCallback(async (): Promise<AuthUser | null> => {
+  const fetchSession = useCallback(async (): Promise<AuthUser | null> => {
     if (retryTimerRef.current !== null) {
       window.clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
@@ -35,6 +50,7 @@ export function useAuthSession() {
       });
       const nextUser = data && data.id ? data : null;
       setCurrentUser(nextUser);
+      retryAttemptRef.current = 0;
       setSessionUnavailable(false);
       applyAuthenticatedUser(nextUser);
       return nextUser;
@@ -46,16 +62,23 @@ export function useAuthSession() {
         error instanceof ApiError && [401, 403].includes(error.status);
       if (isRejectedSession) {
         setCurrentUser(null);
+        retryAttemptRef.current = 0;
         setSessionUnavailable(false);
         applyAuthenticatedUser(null);
         return null;
       }
       setSessionUnavailable(true);
-      if (userRef.current || getStoredAuthUserId()) {
+      if (retryAttemptRef.current < AUTH_RETRY_MAX_ATTEMPTS) {
+        retryAttemptRef.current += 1;
+        const retryDelay = authRetryDelay(retryAttemptRef.current);
         retryTimerRef.current = window.setTimeout(() => {
           retryTimerRef.current = null;
-          void refetch();
-        }, 1500);
+          void fetchSession();
+        }, retryDelay);
+      } else if (!userRef.current) {
+        // There is no authenticated user to preserve. Stop showing the boot
+        // spinner and let ProtectedRoute redirect to login.
+        setSessionUnavailable(false);
       }
       return userRef.current;
     } finally {
@@ -67,6 +90,15 @@ export function useAuthSession() {
       }
     }
   }, []);
+
+  const refetch = useCallback(async (): Promise<AuthUser | null> => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    retryAttemptRef.current = 0;
+    return fetchSession();
+  }, [fetchSession]);
 
   useEffect(() => {
     void refetch();

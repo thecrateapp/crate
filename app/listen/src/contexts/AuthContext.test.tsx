@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,6 +66,7 @@ vi.mock("@/lib/play-event-queue", () => ({
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
+import { ApiError } from "../../../shared/web/api";
 
 function AuthProbe() {
   const { user, loading, logout, refetch, sessionUnavailable } = useAuth();
@@ -102,6 +103,8 @@ describe("AuthProvider", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     localStorage.clear();
   });
 
@@ -194,6 +197,96 @@ describe("AuthProvider", () => {
     expect(syncOfflineProfileToServiceWorkerMock).not.toHaveBeenCalledWith(
       null,
     );
+  });
+
+  it.each([401, 403])(
+    "clears an authenticated session when the API rejects it with ApiError %s",
+    async (status) => {
+      apiMock
+        .mockResolvedValueOnce({
+          id: 7,
+          email: "listener@example.test",
+          name: "Listener",
+          role: "user",
+        })
+        .mockRejectedValueOnce(new ApiError(status, "Session expired"));
+
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <AuthProbe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText("user:7")).toBeTruthy();
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "refetch" }));
+
+      expect(await screen.findByText("anon")).toBeTruthy();
+      expect(screen.queryByText("session-unavailable")).not.toBeInTheDocument();
+      expect(syncOfflineProfileToServiceWorkerMock).toHaveBeenCalledWith(null);
+    },
+  );
+
+  it("retries transient boot failures with a bounded backoff and then redirects to login state", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    apiMock.mockRejectedValue(new Error("Service unavailable"));
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("session-unavailable")).toBeInTheDocument();
+
+    for (const delay of [1500, 3000, 6000, 12000, 24000]) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(delay + 1);
+      });
+    }
+
+    expect(apiMock).toHaveBeenCalledTimes(6);
+    expect(screen.getByText("anon")).toBeInTheDocument();
+    expect(screen.queryByText("session-unavailable")).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("clears a pending auth retry when the provider unmounts", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    apiMock.mockRejectedValue(new Error("Service unavailable"));
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
   });
 
   it("drops previous playback state when the hydrated user changes", async () => {
