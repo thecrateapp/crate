@@ -9,7 +9,7 @@ import { getCurrentServer, SERVER_STORE_EVENT } from "@/lib/server-store";
 import { AuthSpinner } from "@/app-shell/AppFallbacks";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionUnavailable = false } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return connectCacheEvents();
   }, [user]);
 
-  if (loading) {
+  if (loading || (!user && sessionUnavailable)) {
     return <AuthSpinner />;
   }
 

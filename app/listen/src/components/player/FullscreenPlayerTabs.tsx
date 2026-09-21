@@ -160,7 +160,10 @@ export function FullscreenPlayerPlayerTab({
           artistAvatarUrl={player.artistAvatarUrl}
           onArtistAvatarError={markArtistPhotoFailed}
           onArtistClick={actions.goToArtist}
-          artistClickable={!!player.resolvedArtist?.id}
+          artistClickable={Boolean(
+            player.resolvedArtist?.id != null ||
+              player.resolvedArtist?.globalArtistUid,
+          )}
           titleClassName="text-lg"
           albumClassName="text-xs"
         />

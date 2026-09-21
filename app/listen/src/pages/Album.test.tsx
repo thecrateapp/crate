@@ -411,6 +411,30 @@ describe("Album page", () => {
     ).toHaveTextContent("More");
   });
 
+  it("keeps the primary play action native-button safe and starts the album queue", () => {
+    const playAll = vi.fn();
+
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+      playerActions: { playAll },
+    });
+
+    const primary = screen.getByRole("group", {
+      name: "Primary album actions",
+    });
+    const playButton = within(primary).getByRole("button", { name: "Play" });
+
+    expect(playButton).toHaveAttribute("type", "button");
+    fireEvent.click(playButton);
+
+    expect(playAll).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ title: "CULPA" })]),
+      0,
+      expect.objectContaining({ type: "album" }),
+    );
+  });
+
   it("localizes the album action chrome", () => {
     renderWithListenProviders(<Album />, {
       locale: "es",

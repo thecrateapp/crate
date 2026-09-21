@@ -755,8 +755,14 @@ def _execute_task(task_type: str, task_id: str):
                 task_type,
                 result.get("chunks", 0),
             )
-        elif isinstance(result, dict) and result.get("error"):
-            error = str(result.get("error") or "Task failed")[:500]
+        elif isinstance(result, dict) and (
+            result.get("error") or result.get("status") in {"failed", "conflict"}
+        ):
+            error = str(
+                result.get("error")
+                or result.get("reason")
+                or f"Task returned status {result.get('status')}"
+            )[:500]
             update_task(task_id, status="failed", result=result, error=error)
             log.warning("Task %s (%s) failed: %s", task_id, task_type, error)
             from crate.observability.sentry import capture_task_failure
