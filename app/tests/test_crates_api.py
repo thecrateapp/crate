@@ -206,24 +206,23 @@ def test_private_crates_are_hidden_and_collaborators_cannot_manage_owner_setting
         ).status_code
         == 403
     )
-    assert (
-        crate_api_client.get(
-            f"{url}/members", headers=_headers(collaborator_id)
-        ).status_code
-        == 403
+    members_response = crate_api_client.get(
+        f"{url}/members", headers=_headers(collaborator_id)
     )
-    assert (
-        crate_api_client.post(
-            f"{url}/invites",
-            json={},
-            headers=_headers(collaborator_id),
-        ).status_code
-        == 403
+    assert members_response.status_code == 403
+    assert members_response.json()["detail"] == (
+        "Only the owner can manage Crate members"
     )
-    assert (
-        crate_api_client.delete(url, headers=_headers(collaborator_id)).status_code
-        == 403
+    invite_response = crate_api_client.post(
+        f"{url}/invites",
+        json={},
+        headers=_headers(collaborator_id),
     )
+    assert invite_response.status_code == 403
+    assert invite_response.json()["detail"] == "Only the owner can manage Crate invites"
+    delete_response = crate_api_client.delete(url, headers=_headers(collaborator_id))
+    assert delete_response.status_code == 403
+    assert delete_response.json()["detail"] == "Only the owner can delete this Crate"
 
     assert (
         crate_api_client.put(
@@ -469,6 +468,22 @@ def test_accepting_crate_invite_does_not_return_member_directory(
     assert accepted.status_code == 200
     assert accepted.json()["crate_id"] == crate_id
     assert "members" not in accepted.json()
+
+
+def test_zero_hour_crate_invite_is_explicitly_non_expiring(
+    pg_db,
+    crate_api_client,
+):
+    crate_id = _create_crate(is_collaborative=True)
+
+    response = crate_api_client.post(
+        f"/api/crates/{crate_id}/invites",
+        json={"expires_in_hours": 0},
+        headers=_headers(1),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["expires_at"] is None
 
 
 def test_expired_and_revoked_invites_cannot_be_accepted(pg_db, crate_api_client):

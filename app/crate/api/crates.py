@@ -83,12 +83,10 @@ def _require_editor(crate_id: UUID, user_id: int) -> str:
     return access
 
 
-def _require_owner(crate_id: UUID, user_id: int) -> None:
+def _require_owner(crate_id: UUID, user_id: int, *, detail: str) -> None:
     access = _require_crate_access(crate_id, user_id)
     if access != "owner":
-        raise HTTPException(
-            status_code=403, detail="Only the owner can manage Crate members"
-        )
+        raise HTTPException(status_code=403, detail=detail)
 
 
 def _get_crate_or_404(crate_id: UUID) -> dict:
@@ -232,7 +230,11 @@ def update(request: Request, crate_id: UUID, body: UpdateCrateRequest):
 )
 def delete(request: Request, crate_id: UUID):
     user = _require_auth(request)
-    _require_owner(crate_id, user["id"])
+    _require_owner(
+        crate_id,
+        user["id"],
+        detail="Only the owner can delete this Crate",
+    )
     if not delete_crate(str(crate_id)):
         raise HTTPException(status_code=404, detail="Crate not found")
     return {"ok": True}
@@ -306,7 +308,11 @@ def reorder_albums(request: Request, crate_id: UUID, body: ReorderCrateAlbumsReq
 )
 def members(request: Request, crate_id: UUID):
     user = _require_auth(request)
-    _require_owner(crate_id, user["id"])
+    _require_owner(
+        crate_id,
+        user["id"],
+        detail="Only the owner can manage Crate members",
+    )
     return get_crate_members(str(crate_id))
 
 
@@ -318,7 +324,11 @@ def members(request: Request, crate_id: UUID):
 )
 def delete_member(request: Request, crate_id: UUID, user_id: int):
     user = _require_auth(request)
-    _require_owner(crate_id, user["id"])
+    _require_owner(
+        crate_id,
+        user["id"],
+        detail="Only the owner can manage Crate members",
+    )
     if not remove_crate_member(str(crate_id), user_id):
         raise HTTPException(status_code=404, detail="Crate member not found")
     return {"ok": True, "members": get_crate_members(str(crate_id))}
@@ -333,7 +343,11 @@ def delete_member(request: Request, crate_id: UUID, user_id: int):
 )
 def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
     user = _require_auth(request)
-    _require_owner(crate_id, user["id"])
+    _require_owner(
+        crate_id,
+        user["id"],
+        detail="Only the owner can manage Crate invites",
+    )
     try:
         invite_row = create_crate_invite(
             str(crate_id),
@@ -360,7 +374,11 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
 )
 def revoke_invite(request: Request, crate_id: UUID, token: str):
     user = _require_auth(request)
-    _require_owner(crate_id, user["id"])
+    _require_owner(
+        crate_id,
+        user["id"],
+        detail="Only the owner can manage Crate invites",
+    )
     if not revoke_crate_invite(str(crate_id), token):
         raise HTTPException(status_code=404, detail="Invite not found")
     return {"ok": True}

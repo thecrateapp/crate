@@ -361,6 +361,8 @@ def create_crate_invite(
     max_uses: int | None = 20,
     session: Session | None = None,
 ) -> dict:
+    """Create an invite; ``expires_in_hours=0`` means no expiry."""
+
     now = datetime.now(timezone.utc)
     expires_at = (
         now + timedelta(hours=expires_in_hours) if expires_in_hours > 0 else None

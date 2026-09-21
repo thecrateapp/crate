@@ -35,7 +35,12 @@ class ReorderCrateAlbumsRequest(BaseModel):
 
 
 class CreateCrateInviteRequest(BaseModel):
-    expires_in_hours: int = Field(default=168, ge=0, le=8760)
+    expires_in_hours: int = Field(
+        default=168,
+        ge=0,
+        le=8760,
+        description="Hours until expiry; 0 creates a non-expiring invite.",
+    )
     max_uses: int | None = Field(default=20, ge=1, le=500)
 
 
