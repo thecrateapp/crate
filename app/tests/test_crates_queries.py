@@ -11,33 +11,34 @@ from tests.conftest import PG_AVAILABLE
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
 
-@pytest.mark.parametrize(
-    "query_name", ["get_crates_for_user", "get_public_crates_for_user"]
-)
-def test_crate_list_summaries_use_set_based_album_aggregation(query_name):
-    from crate.db.queries import crates
+def test_crate_list_summaries_include_album_count_and_first_album(pg_db):
+    from crate.db.queries.crates import (
+        get_crates_for_user,
+        get_public_crates_for_user,
+    )
+    from crate.db.repositories.crates import add_crate_album, create_crate, update_crate
 
-    class Result:
-        def mappings(self):
-            return self
+    crate_id = create_crate(owner_id=1, name="Summary albums")
+    first_album, second_album = (
+        _seed_global_album("First album"),
+        _seed_global_album("Second album"),
+    )
+    add_crate_album(crate_id, first_album)
+    add_crate_album(crate_id, second_album)
+    assert update_crate(crate_id, visibility="public")
 
-        def all(self):
-            return []
-
-    class Session:
-        statement = ""
-
-        def execute(self, statement, _params):
-            self.statement = str(statement)
-            return Result()
-
-    session = Session()
-    getattr(crates, query_name)(1, session=session)
-
-    sql = session.statement.lower()
-    assert "crate_album_summary" in sql
-    assert "group by ca.crate_id" in sql
-    assert "select count(*)" not in sql
+    for crates in (get_crates_for_user(1), get_public_crates_for_user(1)):
+        assert len(crates) == 1
+        assert crates[0]["album_count"] == 2
+        assert crates[0]["first_album"] == {
+            "global_album_uid": first_album,
+            "position": 0,
+            "name": "First album",
+            "artist_name": "Crate Test Artist",
+            "year": None,
+            "has_cover": False,
+            "artwork_source_json": {},
+        }
 
 
 def _create_user(email: str) -> int:
@@ -282,17 +283,31 @@ def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_d
         remove_crate_album,
         reorder_crate_albums,
     )
+    from crate.db.tx import transaction_scope
 
     crate_id = create_crate(owner_id=1, name="Ordered albums")
     album_ids = [_seed_global_album(f"Album {index}") for index in range(3)]
     for album_id in album_ids:
         add_crate_album(crate_id, album_id, added_by=1)
 
-    assert remove_crate_album(crate_id, album_ids[1]) is True
-    remaining = [album_ids[0], album_ids[2]]
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                CREATE UNIQUE INDEX crate_albums_test_position_unique
+                ON crate_albums(crate_id, position)
+                """
+            )
+        )
+
+    assert remove_crate_album(crate_id, album_ids[0]) is True
+    remaining = [album_ids[1], album_ids[2]]
     assert _album_order(crate_id) == remaining
     crate = get_crate(crate_id)
     assert [album["position"] for album in crate["albums"]] == [0, 1]
+
+    with transaction_scope() as session:
+        session.execute(text("DROP INDEX crate_albums_test_position_unique"))
 
     reorder_crate_albums(crate_id, list(reversed(remaining)))
     assert _album_order(crate_id) == list(reversed(remaining))

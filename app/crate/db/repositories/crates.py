@@ -225,6 +225,22 @@ def remove_crate_album(
         current.execute(
             text(
                 """
+                WITH position_offset AS (
+                    SELECT COALESCE(MAX(position)::bigint, -1) + 1 AS value
+                    FROM crate_albums
+                    WHERE crate_id = CAST(:crate_id AS uuid)
+                )
+                UPDATE crate_albums album
+                SET position = album.position + position_offset.value
+                FROM position_offset
+                WHERE album.crate_id = CAST(:crate_id AS uuid)
+                """
+            ),
+            {"crate_id": crate_id},
+        )
+        current.execute(
+            text(
+                """
                 WITH ordered AS (
                     SELECT
                         global_album_uid,

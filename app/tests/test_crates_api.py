@@ -527,10 +527,21 @@ def test_only_owner_can_delete_crate_and_delete_cascades_contents(
     pg_db,
     crate_api_client,
 ):
+    from crate.db.repositories.crates import add_crate_album
+    from crate.db.tx import transaction_scope
+
     collaborator_id = _create_user(f"crate-delete-collab-{uuid4()}@example.test")
     crate_id = _create_crate(is_collaborative=True)
     _add_member(crate_id, collaborator_id)
+    add_crate_album(crate_id, _seed_album("Cascade album"))
     url = f"/api/crates/{crate_id}"
+
+    invite = crate_api_client.post(
+        f"{url}/invites",
+        json={},
+        headers=_headers(1),
+    )
+    assert invite.status_code == 201
 
     assert (
         crate_api_client.delete(url, headers=_headers(collaborator_id)).status_code
@@ -539,6 +550,29 @@ def test_only_owner_can_delete_crate_and_delete_cascades_contents(
     deleted = crate_api_client.delete(url, headers=_headers(1))
     assert deleted.status_code == 200
     assert crate_api_client.get(url, headers=_headers(1)).status_code == 404
+
+    with transaction_scope() as session:
+        assert (
+            session.execute(
+                text("SELECT count(*) FROM crate_albums WHERE crate_id = :crate_id"),
+                {"crate_id": crate_id},
+            ).scalar_one()
+            == 0
+        )
+        assert (
+            session.execute(
+                text("SELECT count(*) FROM crate_members WHERE crate_id = :crate_id"),
+                {"crate_id": crate_id},
+            ).scalar_one()
+            == 0
+        )
+        assert (
+            session.execute(
+                text("SELECT count(*) FROM crate_invites WHERE crate_id = :crate_id"),
+                {"crate_id": crate_id},
+            ).scalar_one()
+            == 0
+        )
 
 
 def test_crate_playback_endpoint_returns_available_catalog_tracks_for_owner(
