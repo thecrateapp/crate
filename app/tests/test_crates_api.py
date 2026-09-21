@@ -610,7 +610,7 @@ def test_invite_join_url_derives_listen_origin_from_domain(monkeypatch):
             "type": "http",
             "http_version": "1.1",
             "method": "POST",
-            "scheme": "https",
+            "scheme": "http",
             "path": "/api/crates/invites",
             "raw_path": b"/api/crates/invites",
             "query_string": b"",

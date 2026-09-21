@@ -99,10 +99,7 @@ def _listen_public_origin(request: Request) -> str:
         domain = os.environ.get("DOMAIN")
         if not domain:
             raise RuntimeError("CRATE_LISTEN_PUBLIC_BASE_URL must be configured")
-        scheme = request.url.scheme.strip().lower()
-        if scheme not in {"http", "https"}:
-            scheme = "https"
-        listen_origin = f"{scheme}://listen.{domain}"
+        listen_origin = f"https://listen.{domain}"
     return listen_origin.rstrip("/")
 
 
