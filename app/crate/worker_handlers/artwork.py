@@ -2256,16 +2256,16 @@ def _handle_recompose_artist_hero(task_id: str, params: dict, config: dict) -> d
         active_source = _active_artist_hero_source_path(existing, composition)
         if active_source is not None:
             available_paths[composition] = active_source
+        elif specific_path.is_file():
+            available_paths[composition] = specific_path
+        elif legacy_source_path.is_file():
+            available_paths[composition] = legacy_source_path
         elif _active_artist_hero_artifact(existing, composition) is not None:
             return {
                 "status": "conflict",
                 "reason": "artist-hero-manifest-incomplete",
                 "artist_id": int(artist_row["id"]),
             }
-        elif specific_path.is_file():
-            available_paths[composition] = specific_path
-        elif legacy_source_path.is_file():
-            available_paths[composition] = legacy_source_path
     if not available_paths:
         return {"status": "skipped", "reason": "missing-hero-source"}
 

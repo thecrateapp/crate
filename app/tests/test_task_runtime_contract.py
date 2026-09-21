@@ -109,6 +109,71 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
     ]
 
 
+def test_actor_treats_conflict_result_as_failed(monkeypatch):
+    from crate import actors
+    from crate.worker import TASK_HANDLERS
+
+    class Allowed:
+        allowed = True
+
+    task = {
+        "id": "conflict-task",
+        "type": "recompose_artist_hero",
+        "status": "pending",
+        "params": {},
+        "created_at": None,
+        "parent_task_id": None,
+        "retry_count": 0,
+        "max_retries": 0,
+    }
+    updates: list[dict] = []
+
+    monkeypatch.setattr("crate.db.queries.tasks.get_task", lambda _task_id: task)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.start_task",
+        lambda task_id, worker_id=None: {"id": task_id},
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.update_task",
+        lambda task_id, **kwargs: updates.append({"task_id": task_id, **kwargs}),
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.should_defer_task",
+        lambda task_type, params=None: Allowed(),
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.record_decision", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr("crate.config.load_config", lambda: {"library_path": "/tmp"})
+    monkeypatch.setattr("crate.worker._is_cancelled", lambda _task_id: False)
+    monkeypatch.setattr("crate.metrics.record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.telegram.notify_task_failed", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.db.events._publish_to_redis", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(actors, "_try_fan_in_parent", lambda *args, **kwargs: None)
+    monkeypatch.setattr(actors, "_check_memory", lambda: None)
+    monkeypatch.setitem(
+        TASK_HANDLERS,
+        "recompose_artist_hero",
+        lambda _task_id, _params, _config: {
+            "status": "conflict",
+            "reason": "artist-hero-manifest-incomplete",
+            "artist_id": 12776,
+        },
+    )
+
+    actors._execute_task("recompose_artist_hero", "conflict-task")
+
+    assert any(
+        update.get("status") == "failed"
+        and update.get("error") == "artist-hero-manifest-incomplete"
+        for update in updates
+    )
+
+
 def test_actor_task_done_event_includes_handler_result(monkeypatch):
     from crate import actors
     from crate.worker import TASK_HANDLERS

@@ -2114,7 +2114,7 @@ def test_recompose_handler_rejects_incomplete_active_manifest(monkeypatch, tmp_p
     assert not (artist_dir / "artist-hero-desktop.webp").exists()
 
 
-def test_recompose_handler_does_not_fall_back_when_active_source_is_missing(
+def test_recompose_handler_uses_legacy_source_when_active_source_is_missing(
     monkeypatch, tmp_path
 ):
     from crate.worker_handlers.artwork import _handle_recompose_artist_hero
@@ -2174,11 +2174,8 @@ def test_recompose_handler_does_not_fall_back_when_active_source_is_missing(
         "task-1", {"artist": "Converge"}, {"library_path": str(tmp_path)}
     )
 
-    assert result == {
-        "status": "conflict",
-        "reason": "artist-hero-manifest-incomplete",
-        "artist_id": 7,
-    }
+    assert result["status"] == "recomposed"
+    assert result["artist_id"] == 7
 
 
 def test_derive_handler_creates_unreviewed_hero_from_large_background(

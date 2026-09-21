@@ -1484,6 +1484,17 @@ def api_artist_hero(
     local_original = (
         versioned_original if artifact_identity is not None else legacy_original
     )
+    legacy_fallback = bool(
+        artifact_identity is not None
+        and not retained_revision
+        and versioned_original is not None
+        and not versioned_original.is_file()
+        and legacy_original is not None
+        and legacy_original.is_file()
+        and not legacy_original.is_symlink()
+    )
+    if legacy_fallback:
+        local_original = legacy_original
     has_eligible_profile = bool(
         entity_uid
         and profile
@@ -1506,11 +1517,14 @@ def api_artist_hero(
             if size is None or size == canonical_width:
                 if local_original is None or not local_original.is_file():
                     return Response(status_code=404)
-                return deliver_original_artwork(
+                response = deliver_original_artwork(
                     local_original,
                     cache_control="private, no-cache, must-revalidate",
                     buffer_file=buffer_file,
                 )
+                if legacy_fallback:
+                    response.headers["X-Crate-Artwork"] = "hero-fallback"
+                return response
             return deliver_artwork(
                 (
                     artist_hero_artifact_asset(artifact_identity)
@@ -1520,8 +1534,9 @@ def api_artist_hero(
                 requested_size=size,
                 local_original=local_original,
                 missing_response=Response(status_code=404),
+                queue_on_miss=not legacy_fallback,
                 cache_visibility="private",
-                validate_source_revision=True,
+                validate_source_revision=not legacy_fallback,
                 buffer_file=buffer_file,
             )
 
@@ -1529,14 +1544,20 @@ def api_artist_hero(
             if local_original is None or not local_original.is_file():
                 if retained_revision:
                     return _artist_hero_revision_unavailable_response(composition)
+                if artifact_identity is not None:
+                    return _artist_hero_artifact_unavailable_response(composition)
                 _queue_artist_hero_recompose(name, artist_id)
                 return _artist_hero_pending_response(composition, revision)
             response = deliver_hero(buffer_file=True)
-        return _decorate_artist_hero_response(
+        response = _decorate_artist_hero_response(
             response,
             composition,
             artifact_identity.render_revision if artifact_identity else revision,
         )
+        if legacy_fallback:
+            response.headers["Cache-Control"] = "private, no-cache, must-revalidate"
+            response.headers["X-Crate-Artwork"] = "hero-fallback"
+        return response
     return api_artist_background(
         request,
         name,
@@ -1601,6 +1622,17 @@ def _artist_hero_revision_unavailable_response(composition: str) -> Response:
         headers={
             "Cache-Control": "no-store",
             "X-Crate-Artwork": "hero-revision-unavailable",
+            "X-Crate-Hero-Composition": composition,
+        },
+    )
+
+
+def _artist_hero_artifact_unavailable_response(composition: str) -> Response:
+    return Response(
+        status_code=404,
+        headers={
+            "Cache-Control": "no-store",
+            "X-Crate-Artwork": "hero-unavailable",
             "X-Crate-Hero-Composition": composition,
         },
     )
