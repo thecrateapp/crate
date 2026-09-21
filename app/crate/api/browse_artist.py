@@ -1509,6 +1509,8 @@ def api_artist_hero(
         if not renderer_is_current:
             _queue_artist_hero_recompose(name, artist_id)
             return _artist_hero_pending_response(composition, revision)
+        if legacy_fallback:
+            _queue_artist_hero_recompose(name, artist_id)
         canonical_width = (
             DESKTOP_HERO_SIZE[0] if composition == "desktop" else MOBILE_HERO_SIZE[0]
         )
@@ -1545,6 +1547,7 @@ def api_artist_hero(
                 if retained_revision:
                     return _artist_hero_revision_unavailable_response(composition)
                 if artifact_identity is not None:
+                    _queue_artist_hero_recompose(name, artist_id)
                     return _artist_hero_artifact_unavailable_response(composition)
                 _queue_artist_hero_recompose(name, artist_id)
                 return _artist_hero_pending_response(composition, revision)

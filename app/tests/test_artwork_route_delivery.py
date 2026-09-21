@@ -399,7 +399,12 @@ def test_artist_hero_falls_back_to_legacy_output_when_active_publication_is_miss
     assert delivered[0][1]["local_original"] == legacy
     assert delivered[0][1]["validate_source_revision"] is False
     assert response.headers["X-Crate-Artwork"] == "hero-fallback"
-    assert queued == []
+    assert queued == [
+        (
+            ("recompose_artist_hero", {"artist": "Artist"}),
+            {"dedup_key": "recompose-artist-hero:5"},
+        )
+    ]
 
 
 def test_artist_hero_does_not_fall_back_to_legacy_when_active_artifact_is_unsafe(
@@ -479,7 +484,9 @@ def test_artist_hero_does_not_fall_back_to_legacy_when_active_artifact_is_unsafe
     assert response.status_code == 404
     assert response.headers["X-Crate-Artwork"] == "hero-unavailable"
     assert delivered == []
-    assert queued == []
+    assert queued == [
+        ("recompose_artist_hero", {"artist": "Artist"}, "recompose-artist-hero:5")
+    ]
 
 
 def test_artist_hero_does_not_serve_current_artifact_for_unknown_version(
