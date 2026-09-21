@@ -27,7 +27,8 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const { user, loading, refetch, setUser } = useAuthSession();
+  const { user, loading, sessionUnavailable, refetch, setUser } =
+    useAuthSession();
 
   useEffect(() => {
     setSentryUser(user?.id ?? null);
@@ -51,8 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate, setUser]);
 
   const value = useMemo(
-    () => ({ user, loading, refetch, logout }),
-    [user, loading, refetch, logout],
+    () => ({ user, loading, sessionUnavailable, refetch, logout }),
+    [user, loading, sessionUnavailable, refetch, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
