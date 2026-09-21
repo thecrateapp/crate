@@ -273,16 +273,41 @@ def remove_crate_album(
         if removed_position is None:
             return False
 
+        position_offset = current.execute(
+            text(
+                """
+                SELECT COALESCE(MAX(position)::bigint, -1) + 1
+                FROM crate_albums
+                WHERE crate_id = CAST(:crate_id AS uuid)
+                """
+            ),
+            {"crate_id": crate_id},
+        ).scalar_one()
         current.execute(
             text(
                 """
                 UPDATE crate_albums
-                SET position = position - 1
+                SET position = position + :position_offset
                 WHERE crate_id = CAST(:crate_id AS uuid)
                   AND position > :removed_position
                 """
             ),
-            {"crate_id": crate_id, "removed_position": removed_position},
+            {
+                "crate_id": crate_id,
+                "position_offset": position_offset,
+                "removed_position": removed_position,
+            },
+        )
+        current.execute(
+            text(
+                """
+                UPDATE crate_albums
+                SET position = position - :position_offset - 1
+                WHERE crate_id = CAST(:crate_id AS uuid)
+                  AND position >= :position_offset
+                """
+            ),
+            {"crate_id": crate_id, "position_offset": position_offset},
         )
         current.execute(
             text("UPDATE crates SET updated_at = NOW() WHERE id = CAST(:id AS uuid)"),

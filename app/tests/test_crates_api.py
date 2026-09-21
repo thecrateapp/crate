@@ -539,6 +539,29 @@ def test_invite_value_error_is_mapped_to_unprocessable_entity(monkeypatch):
     assert error.value.status_code == 422
 
 
+def test_update_maps_crate_not_found_to_not_found(monkeypatch):
+    from fastapi import HTTPException
+
+    from crate.api import crates as crate_routes
+    from crate.api.schemas.crates import UpdateCrateRequest
+    from crate.db.repositories.crates import CrateNotFoundError
+
+    monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(
+        crate_routes, "_require_editor", lambda *args, **kwargs: "owner"
+    )
+    monkeypatch.setattr(
+        crate_routes,
+        "update_crate",
+        lambda *args, **kwargs: (_ for _ in ()).throw(CrateNotFoundError("missing")),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        crate_routes.update(None, uuid4(), UpdateCrateRequest(name="Renamed"))
+
+    assert error.value.status_code == 404
+
+
 def test_accepting_crate_invite_does_not_return_member_directory(
     pg_db,
     crate_api_client,

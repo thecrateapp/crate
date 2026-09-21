@@ -289,8 +289,12 @@ def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_d
     for album_id in album_ids:
         add_crate_album(crate_id, album_id, added_by=1)
 
-    assert remove_crate_album(crate_id, album_ids[1]) is True
-    remaining = [album_ids[0], album_ids[2], album_ids[3]]
+    reordered = [album_ids[2], album_ids[0], album_ids[3], album_ids[1]]
+    reorder_crate_albums(crate_id, reordered)
+    assert _album_order(crate_id) == reordered
+
+    assert remove_crate_album(crate_id, album_ids[0]) is True
+    remaining = [album_ids[2], album_ids[3], album_ids[1]]
     assert _album_order(crate_id) == remaining
     crate = get_crate(crate_id)
     assert [album["position"] for album in crate["albums"]] == [0, 1, 2]
