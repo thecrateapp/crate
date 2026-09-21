@@ -33,6 +33,11 @@ vi.mock("sonner", () => ({
 
 import { Users } from "./Users";
 
+const recentActivity = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+const staleActivity = new Date(
+  Date.now() - 31 * 24 * 60 * 60 * 1000,
+).toISOString();
+
 const users = Array.from({ length: 21 }, (_, index) => {
   const id = index + 1;
   const inactive = id === 21;
@@ -52,11 +57,9 @@ const users = Array.from({ length: 21 }, (_, index) => {
     current_track: null,
     last_played_at: null,
     last_seen_at: null,
-    last_login: inactive ? "2026-01-01T00:00:00Z" : "2026-08-20T00:00:00Z",
+    last_login: inactive ? staleActivity : recentActivity,
     created_at: "2025-01-01T00:00:00Z",
-    last_activity_at: inactive
-      ? "2026-01-01T00:00:00Z"
-      : "2026-08-20T00:00:00Z",
+    last_activity_at: inactive ? staleActivity : recentActivity,
     activity_status: inactive ? "inactive" : "active",
   };
 });
