@@ -391,6 +391,18 @@ def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
     )
     assert accepted.status_code == 200
     assert accepted.json()["crate_id"] == crate_id
+    assert (
+        crate_api_client.get(
+            f"/api/crates/invites/{token}", headers=_headers(invitee_id)
+        ).status_code
+        == 200
+    )
+    assert (
+        crate_api_client.get(
+            f"/api/crates/invites/{token}", headers=_headers(second_invitee_id)
+        ).status_code
+        == 404
+    )
     detail = crate_api_client.get(crate_url, headers=_headers(invitee_id)).json()
     assert detail["visibility"] == "private"
     assert crate_id in {

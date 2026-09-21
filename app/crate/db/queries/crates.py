@@ -309,7 +309,9 @@ def get_crate_members(crate_id: str, *, session: Session | None = None) -> list[
         return _impl(current)
 
 
-def get_crate_invite(token: str, *, session: Session | None = None) -> dict | None:
+def get_crate_invite(
+    token: str, user_id: int | None = None, *, session: Session | None = None
+) -> dict | None:
     def _impl(current: Session) -> dict | None:
         row = (
             current.execute(
@@ -327,10 +329,19 @@ def get_crate_invite(token: str, *, session: Session | None = None) -> dict | No
                     WHERE invite.token = :token
                       AND crate.is_collaborative IS TRUE
                       AND (invite.expires_at IS NULL OR invite.expires_at > NOW())
-                      AND (invite.max_uses IS NULL OR invite.use_count < invite.max_uses)
+                      AND (
+                          invite.max_uses IS NULL
+                          OR invite.use_count < invite.max_uses
+                          OR EXISTS (
+                              SELECT 1
+                              FROM crate_members member
+                              WHERE member.crate_id = invite.crate_id
+                                AND member.user_id = :user_id
+                          )
+                      )
                     """
                 ),
-                {"token": token},
+                {"token": token, "user_id": user_id},
             )
             .mappings()
             .first()

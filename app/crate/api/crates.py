@@ -144,8 +144,8 @@ def create(request: Request, body: CreateCrateRequest):
     summary="Get a valid Crate invitation preview",
 )
 def get_invite(request: Request, token: str):
-    _require_auth(request)
-    invite = get_crate_invite(token)
+    user = _require_auth(request)
+    invite = get_crate_invite(token, user["id"])
     if invite is None:
         raise HTTPException(status_code=404, detail="Invite not found or expired")
     return invite

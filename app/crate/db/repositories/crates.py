@@ -379,6 +379,9 @@ def create_crate_invite(
 ) -> dict:
     """Create an invite; ``expires_in_hours=0`` means no expiry."""
 
+    if expires_in_hours < 0:
+        raise ValueError("expires_in_hours must be non-negative")
+
     now = datetime.now(timezone.utc)
     expires_at = (
         now + timedelta(hours=expires_in_hours) if expires_in_hours > 0 else None
