@@ -615,7 +615,7 @@ def test_invite_join_url_derives_listen_origin_from_domain(monkeypatch):
             "raw_path": b"/api/crates/invites",
             "query_string": b"",
             "root_path": "",
-            "headers": [(b"x-forwarded-proto", b"javascript")],
+            "headers": [(b"x-forwarded-proto", b"http")],
             "server": ("api.example.test", 443),
             "client": ("127.0.0.1", 1234),
         }

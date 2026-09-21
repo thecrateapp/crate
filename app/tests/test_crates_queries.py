@@ -246,6 +246,7 @@ def test_public_crate_can_be_read_without_a_session(pg_db):
     assert update_crate(crate_id, visibility="public", actor_id=1)
 
     assert get_crate_access(crate_id, None) == "public"
+    assert get_crate_access(crate_id, 1) == "owner"
     assert get_crate_access(crate_id, 2) == "public"
 
 
