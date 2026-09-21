@@ -54,6 +54,7 @@ from crate.db.repositories.crates import (
     revoke_crate_invite,
     update_crate,
 )
+from crate.db.tx import read_scope
 
 router = APIRouter(prefix="/api/crates", tags=["crates"])
 me_router = APIRouter(prefix="/api/me", tags=["crates"])
@@ -88,13 +89,6 @@ def _require_owner(crate_id: UUID, user_id: int, *, detail: str) -> None:
     access = _require_crate_access(crate_id, user_id)
     if access != "owner":
         raise HTTPException(status_code=403, detail=detail)
-
-
-def _get_crate_or_404(crate_id: UUID) -> dict:
-    crate = get_crate(str(crate_id))
-    if crate is None:
-        raise HTTPException(status_code=404, detail="Crate not found")
-    return crate
 
 
 @router.get(
@@ -174,8 +168,13 @@ def accept_invite(request: Request, token: str):
 )
 def get_one(request: Request, crate_id: UUID):
     user = _require_auth(request)
-    access = _require_crate_access(crate_id, user["id"])
-    crate = _get_crate_or_404(crate_id)
+    with read_scope() as session:
+        access = get_crate_access(str(crate_id), user["id"], session=session)
+        if access == "none":
+            raise HTTPException(status_code=404, detail="Crate not found")
+        crate = get_crate(str(crate_id), session=session)
+        if crate is None:
+            raise HTTPException(status_code=404, detail="Crate not found")
     crate["access"] = access
     return crate
 
@@ -191,8 +190,11 @@ def get_one(request: Request, crate_id: UUID):
 )
 def playback(request: Request, crate_id: UUID):
     user = _require_auth(request)
-    _require_crate_access(crate_id, user["id"])
-    return get_crate_playback_tracks(str(crate_id))
+    with read_scope() as session:
+        access = get_crate_access(str(crate_id), user["id"], session=session)
+        if access == "none":
+            raise HTTPException(status_code=404, detail="Crate not found")
+        return get_crate_playback_tracks(str(crate_id), session=session)
 
 
 @router.put(

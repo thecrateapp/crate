@@ -169,6 +169,12 @@ def test_crate_schema_has_private_default_and_required_constraints(pg_db):
     assert any(
         "(crate_id, position)" in index.replace('"', "") for index in index_definitions
     )
+    assert any(
+        "CREATE UNIQUE INDEX" in index
+        and "idx_crate_albums_order_unique" in index
+        and "(crate_id, position)" in index.replace('"', "")
+        for index in index_definitions
+    )
 
 
 def test_crate_migration_can_be_downgraded_and_reapplied(pg_db):

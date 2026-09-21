@@ -36,6 +36,7 @@ from crate.db.repositories.library_track_reads import (
     get_library_track_by_entity_uid,
     get_library_track_by_id,
 )
+from crate.db.tx import read_scope
 from crate.slugs import build_artist_slug, build_public_album_slug, build_track_slug
 from crate.storage_layout import resolve_artist_dir
 
@@ -471,12 +472,12 @@ def share_track(
 @router.get("/share/crate/{crate_id}", include_in_schema=False)
 def share_crate(request: Request, crate_id: uuid.UUID) -> HTMLResponse:
     crate_ref = str(crate_id)
-    if get_crate_access(crate_ref, None) != "public":
-        raise HTTPException(status_code=404, detail="Crate not found")
-
-    crate = get_crate(crate_ref)
-    if not crate:
-        raise HTTPException(status_code=404, detail="Crate not found")
+    with read_scope() as session:
+        if get_crate_access(crate_ref, None, session=session) != "public":
+            raise HTTPException(status_code=404, detail="Crate not found")
+        crate = get_crate(crate_ref, session=session)
+        if not crate:
+            raise HTTPException(status_code=404, detail="Crate not found")
 
     albums = crate.get("albums") or []
     first_album = albums[0] if albums else None

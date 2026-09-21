@@ -459,7 +459,6 @@ def revoke_crate_invite(
 def accept_crate_invite(
     token: str, user_id: int, *, session: Session | None = None
 ) -> dict | None:
-    now = datetime.now(timezone.utc)
     with optional_scope(session) as current:
         invite_crate_id = current.execute(
             text(
@@ -502,11 +501,13 @@ def accept_crate_invite(
                     SELECT
                         invite.crate_id::text AS crate_id,
                         invite.created_by,
-                        invite.expires_at,
                         invite.max_uses,
                         invite.use_count
                     FROM crate_invites invite
                     WHERE invite.token = :token
+                      AND (
+                          invite.expires_at IS NULL OR invite.expires_at > NOW()
+                      )
                     FOR UPDATE
                     """
                 ),
@@ -520,8 +521,6 @@ def accept_crate_invite(
         if invite["crate_id"] != crate["crate_id"]:
             return None
         if not crate["is_collaborative"] or crate["owner_id"] == user_id:
-            return None
-        if invite["expires_at"] is not None and invite["expires_at"] <= now:
             return None
 
         existing_member = current.execute(

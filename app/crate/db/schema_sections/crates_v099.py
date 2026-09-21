@@ -57,7 +57,7 @@ def create_crates_v099_schema(cur: Any) -> None:
     )
     cur.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_crate_albums_order
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_crate_albums_order_unique
         ON crate_albums(crate_id, position)
         """
     )

@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 
 ALBUM_UID = "11111111-1111-4111-8111-111111111111"
 ARTIST_UID = "22222222-2222-4222-8222-222222222222"
 TRACK_UID = "33333333-3333-4333-8333-333333333333"
 CRATE_ID = "77777777-7777-4777-8777-777777777777"
+
+
+class _ReadScope:
+    def __enter__(self):
+        return object()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
+
+
+def _patch_crate_read_scope(monkeypatch, share):
+    monkeypatch.setattr(share, "read_scope", lambda: _ReadScope())
 
 
 def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
@@ -26,8 +40,13 @@ def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
             }
         ],
     }
-    monkeypatch.setattr(share, "get_crate_access", lambda _crate_id, _user_id: "public")
-    monkeypatch.setattr(share, "get_crate", lambda _crate_id: crate)
+    _patch_crate_read_scope(monkeypatch, share)
+    monkeypatch.setattr(
+        share,
+        "get_crate_access",
+        lambda _crate_id, _user_id, *, session: "public",
+    )
+    monkeypatch.setattr(share, "get_crate", lambda _crate_id, *, session: crate)
 
     response = test_app.get(
         f"/share/crate/{CRATE_ID}",
@@ -48,6 +67,39 @@ def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
     assert f'href="https://listen.example.test/crate/{CRATE_ID}"' in response.text
 
 
+def test_public_crate_preview_reuses_one_read_scope(monkeypatch):
+    from crate.api import share
+
+    scope = object()
+    sessions: list[object] = []
+
+    class ReadScope:
+        def __enter__(self):
+            return scope
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    monkeypatch.setattr(share, "read_scope", lambda: ReadScope(), raising=False)
+    monkeypatch.setattr(
+        share,
+        "get_crate_access",
+        lambda _crate_id, _user_id, *, session: sessions.append(session) or "public",
+    )
+    monkeypatch.setattr(
+        share,
+        "get_crate",
+        lambda _crate_id, *, session: (
+            sessions.append(session)
+            or {"name": "Crate", "owner_name": "Owner", "description": "", "albums": []}
+        ),
+    )
+    monkeypatch.setattr(share, "_render_preview", lambda *args, **kwargs: "preview")
+
+    assert share.share_crate(None, UUID(CRATE_ID)) == "preview"
+    assert sessions == [scope, scope]
+
+
 def test_public_crate_preview_uses_brand_image_without_album_art(test_app, monkeypatch):
     from crate.api import share
 
@@ -58,8 +110,13 @@ def test_public_crate_preview_uses_brand_image_without_album_art(test_app, monke
         "owner_name": "Jane Doe",
         "albums": [],
     }
-    monkeypatch.setattr(share, "get_crate_access", lambda _crate_id, _user_id: "public")
-    monkeypatch.setattr(share, "get_crate", lambda _crate_id: crate)
+    _patch_crate_read_scope(monkeypatch, share)
+    monkeypatch.setattr(
+        share,
+        "get_crate_access",
+        lambda _crate_id, _user_id, *, session: "public",
+    )
+    monkeypatch.setattr(share, "get_crate", lambda _crate_id, *, session: crate)
 
     response = test_app.get(
         f"/share/crate/{CRATE_ID}",
@@ -82,11 +139,18 @@ def test_private_crate_preview_is_not_found_without_loading_private_metadata(
 ):
     from crate.api import share
 
-    monkeypatch.setattr(share, "get_crate_access", lambda _crate_id, _user_id: "none")
+    _patch_crate_read_scope(monkeypatch, share)
+    monkeypatch.setattr(
+        share,
+        "get_crate_access",
+        lambda _crate_id, _user_id, *, session: "none",
+    )
     monkeypatch.setattr(
         share,
         "get_crate",
-        lambda _crate_id: (_ for _ in ()).throw(AssertionError("must not load")),
+        lambda _crate_id, *, session: (_ for _ in ()).throw(
+            AssertionError("must not load")
+        ),
     )
 
     response = test_app.get(f"/share/crate/{CRATE_ID}")

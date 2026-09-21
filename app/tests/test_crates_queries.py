@@ -283,42 +283,24 @@ def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_d
         remove_crate_album,
         reorder_crate_albums,
     )
-    from crate.db.tx import transaction_scope
 
     crate_id = create_crate(owner_id=1, name="Ordered albums")
     album_ids = [_seed_global_album(f"Album {index}") for index in range(3)]
     for album_id in album_ids:
         add_crate_album(crate_id, album_id, added_by=1)
 
-    with transaction_scope() as session:
-        session.execute(text("DROP INDEX IF EXISTS crate_albums_test_position_unique"))
-        session.execute(
-            text(
-                """
-                CREATE UNIQUE INDEX crate_albums_test_position_unique
-                ON crate_albums(crate_id, position)
-                """
-            )
-        )
+    assert remove_crate_album(crate_id, album_ids[0]) is True
+    remaining = [album_ids[1], album_ids[2]]
+    assert _album_order(crate_id) == remaining
+    crate = get_crate(crate_id)
+    assert [album["position"] for album in crate["albums"]] == [0, 1]
 
-    try:
-        assert remove_crate_album(crate_id, album_ids[0]) is True
-        remaining = [album_ids[1], album_ids[2]]
-        assert _album_order(crate_id) == remaining
-        crate = get_crate(crate_id)
-        assert [album["position"] for album in crate["albums"]] == [0, 1]
+    reorder_crate_albums(crate_id, list(reversed(remaining)))
+    assert _album_order(crate_id) == list(reversed(remaining))
 
-        reorder_crate_albums(crate_id, list(reversed(remaining)))
-        assert _album_order(crate_id) == list(reversed(remaining))
-
-        with pytest.raises(InvalidCrateAlbumOrderError):
-            reorder_crate_albums(crate_id, remaining[:1])
-        assert _album_order(crate_id) == list(reversed(remaining))
-    finally:
-        with transaction_scope() as session:
-            session.execute(
-                text("DROP INDEX IF EXISTS crate_albums_test_position_unique")
-            )
+    with pytest.raises(InvalidCrateAlbumOrderError):
+        reorder_crate_albums(crate_id, remaining[:1])
+    assert _album_order(crate_id) == list(reversed(remaining))
 
 
 def test_accept_crate_invite_locks_crate_before_invitation(pg_db):
@@ -377,6 +359,8 @@ def test_accept_crate_invite_locks_crate_before_invitation(pg_db):
     }
     lock_statements = [sql for sql in statements if "FOR UPDATE" in sql]
     assert "FROM crates" in lock_statements[0]
+    invite_lock = next(sql for sql in lock_statements if "FROM crate_invites" in sql)
+    assert "NOW()" in invite_lock
 
 
 def test_create_crate_invite_rejects_negative_expiry(pg_db):
