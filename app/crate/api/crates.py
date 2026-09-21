@@ -40,6 +40,7 @@ from crate.db.queries.crates import (
 from crate.db.repositories.crates import (
     CrateAlbumAlreadyExistsError,
     CrateAlbumNotFoundError,
+    CrateAccessDeniedError,
     CrateCollaborationDisabledError,
     CrateNotFoundError,
     InvalidCrateAlbumOrderError,
@@ -214,13 +215,20 @@ def update(request: Request, crate_id: UUID, body: UpdateCrateRequest):
             detail="Only the owner can change Crate visibility or collaboration",
         )
 
-    if not update_crate(
-        str(crate_id),
-        name=body.name,
-        description=body.description,
-        visibility=body.visibility,
-        is_collaborative=body.is_collaborative,
-    ):
+    try:
+        updated = update_crate(
+            str(crate_id),
+            name=body.name,
+            description=body.description,
+            visibility=body.visibility,
+            is_collaborative=body.is_collaborative,
+            actor_id=user["id"],
+        )
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Not allowed to edit this Crate"
+        ) from exc
+    if not updated:
         raise HTTPException(status_code=404, detail="Crate not found")
     return {"ok": True}
 
@@ -238,7 +246,13 @@ def delete(request: Request, crate_id: UUID):
         user["id"],
         detail="Only the owner can delete this Crate",
     )
-    if not delete_crate(str(crate_id)):
+    try:
+        deleted = delete_crate(str(crate_id), actor_id=user["id"])
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Only the owner can delete this Crate"
+        ) from exc
+    if not deleted:
         raise HTTPException(status_code=404, detail="Crate not found")
     return {"ok": True}
 
@@ -257,6 +271,10 @@ def add_album(request: Request, crate_id: UUID, body: AddCrateAlbumRequest):
         added_album = add_crate_album(
             str(crate_id), str(body.global_album_uid), added_by=user["id"]
         )
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Not allowed to edit this Crate"
+        ) from exc
     except CrateNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Crate not found") from exc
     except CrateAlbumNotFoundError as exc:
@@ -277,7 +295,14 @@ def add_album(request: Request, crate_id: UUID, body: AddCrateAlbumRequest):
 def delete_album(request: Request, crate_id: UUID, global_album_uid: UUID):
     user = _require_auth(request)
     _require_editor(crate_id, user["id"])
-    removed = remove_crate_album(str(crate_id), str(global_album_uid))
+    try:
+        removed = remove_crate_album(
+            str(crate_id), str(global_album_uid), actor_id=user["id"]
+        )
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Not allowed to edit this Crate"
+        ) from exc
     if not removed:
         raise HTTPException(status_code=404, detail="Album not found in Crate")
     return {"ok": True}
@@ -294,8 +319,14 @@ def reorder_albums(request: Request, crate_id: UUID, body: ReorderCrateAlbumsReq
     _require_editor(crate_id, user["id"])
     try:
         reorder_crate_albums(
-            str(crate_id), [str(album_uid) for album_uid in body.global_album_uids]
+            str(crate_id),
+            [str(album_uid) for album_uid in body.global_album_uids],
+            actor_id=user["id"],
         )
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Not allowed to edit this Crate"
+        ) from exc
     except CrateNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Crate not found") from exc
     except InvalidCrateAlbumOrderError as exc:
@@ -332,7 +363,13 @@ def delete_member(request: Request, crate_id: UUID, user_id: int):
         user["id"],
         detail="Only the owner can manage Crate members",
     )
-    if not remove_crate_member(str(crate_id), user_id):
+    try:
+        removed = remove_crate_member(str(crate_id), user_id, actor_id=user["id"])
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Only the owner can manage Crate members"
+        ) from exc
+    if not removed:
         raise HTTPException(status_code=404, detail="Crate member not found")
     return {"ok": True, "members": get_crate_members(str(crate_id))}
 
@@ -364,6 +401,12 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
         raise HTTPException(
             status_code=409, detail="Enable collaboration before creating an invite"
         ) from exc
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Only the owner can manage Crate invites"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     join_url = _absolute_url(request, f"/crate/invite/{invite_row['token']}")
     return {**invite_row, "join_url": join_url, "qr_value": join_url}
@@ -382,7 +425,13 @@ def revoke_invite(request: Request, crate_id: UUID, token: str):
         user["id"],
         detail="Only the owner can manage Crate invites",
     )
-    if not revoke_crate_invite(str(crate_id), token):
+    try:
+        revoked = revoke_crate_invite(str(crate_id), token, actor_id=user["id"])
+    except CrateAccessDeniedError as exc:
+        raise HTTPException(
+            status_code=403, detail="Only the owner can manage Crate invites"
+        ) from exc
+    if not revoked:
         raise HTTPException(status_code=404, detail="Invite not found")
     return {"ok": True}
 

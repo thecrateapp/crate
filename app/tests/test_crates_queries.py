@@ -285,15 +285,15 @@ def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_d
     )
 
     crate_id = create_crate(owner_id=1, name="Ordered albums")
-    album_ids = [_seed_global_album(f"Album {index}") for index in range(3)]
+    album_ids = [_seed_global_album(f"Album {index}") for index in range(4)]
     for album_id in album_ids:
         add_crate_album(crate_id, album_id, added_by=1)
 
-    assert remove_crate_album(crate_id, album_ids[0]) is True
-    remaining = [album_ids[1], album_ids[2]]
+    assert remove_crate_album(crate_id, album_ids[1]) is True
+    remaining = [album_ids[0], album_ids[2], album_ids[3]]
     assert _album_order(crate_id) == remaining
     crate = get_crate(crate_id)
-    assert [album["position"] for album in crate["albums"]] == [0, 1]
+    assert [album["position"] for album in crate["albums"]] == [0, 1, 2]
 
     reorder_crate_albums(crate_id, list(reversed(remaining)))
     assert _album_order(crate_id) == list(reversed(remaining))
@@ -301,6 +301,39 @@ def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_d
     with pytest.raises(InvalidCrateAlbumOrderError):
         reorder_crate_albums(crate_id, remaining[:1])
     assert _album_order(crate_id) == list(reversed(remaining))
+
+
+def test_album_mutation_revalidates_editor_access_inside_write_transaction(pg_db):
+    from crate.db.repositories.crates import (
+        CrateAccessDeniedError,
+        add_crate_album,
+        create_crate,
+        update_crate,
+    )
+    from crate.db.tx import transaction_scope
+
+    collaborator_id = _create_user(f"revoked-album-editor-{uuid4()}@example.test")
+    crate_id = create_crate(
+        owner_id=1,
+        name="Revoked editor",
+        is_collaborative=True,
+    )
+    album_id = _seed_global_album("Revoked album")
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO crate_members (crate_id, user_id, invited_by)
+                VALUES (CAST(:crate_id AS uuid), :user_id, 1)
+                """
+            ),
+            {"crate_id": crate_id, "user_id": collaborator_id},
+        )
+
+    assert update_crate(crate_id, is_collaborative=False)
+
+    with pytest.raises(CrateAccessDeniedError):
+        add_crate_album(crate_id, album_id, added_by=collaborator_id)
 
 
 def test_accept_crate_invite_locks_crate_before_invitation(pg_db):

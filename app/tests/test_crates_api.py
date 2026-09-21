@@ -519,6 +519,26 @@ def test_cannot_create_invite_when_crate_collaboration_is_disabled(
     )
 
 
+def test_invite_value_error_is_mapped_to_unprocessable_entity(monkeypatch):
+    from fastapi import HTTPException
+
+    from crate.api import crates as crate_routes
+    from crate.api.schemas.crates import CreateCrateInviteRequest
+
+    monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(crate_routes, "_require_owner", lambda *args, **kwargs: None)
+
+    def raise_value_error(*args, **kwargs):
+        raise ValueError("expires_in_hours must be non-negative")
+
+    monkeypatch.setattr(crate_routes, "create_crate_invite", raise_value_error)
+
+    with pytest.raises(HTTPException) as error:
+        crate_routes.invite(None, uuid4(), CreateCrateInviteRequest())
+
+    assert error.value.status_code == 422
+
+
 def test_accepting_crate_invite_does_not_return_member_directory(
     pg_db,
     crate_api_client,

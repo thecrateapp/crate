@@ -9,7 +9,6 @@ import secrets
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from crate.db.queries.crates import get_crate
 from crate.db.tx import optional_scope
 
 
@@ -31,6 +30,59 @@ class InvalidCrateAlbumOrderError(ValueError):
 
 class CrateCollaborationDisabledError(ValueError):
     """Raised when an invite is requested for a non-collaborative Crate."""
+
+
+class CrateAccessDeniedError(PermissionError):
+    """Raised when a write is attempted without current Crate access."""
+
+
+def _lock_crate_for_write(
+    current: Session,
+    crate_id: str,
+    *,
+    actor_id: int | None = None,
+    owner_only: bool = False,
+) -> dict:
+    row = (
+        current.execute(
+            text(
+                """
+                SELECT
+                    c.id::text AS crate_id,
+                    c.owner_id,
+                    c.is_collaborative,
+                    CASE
+                        WHEN :actor_id IS NULL OR c.owner_id = :actor_id
+                            THEN 'owner'
+                        WHEN c.is_collaborative IS TRUE
+                             AND EXISTS (
+                                 SELECT 1
+                                 FROM crate_members member
+                                 WHERE member.crate_id = c.id
+                                   AND member.user_id = :actor_id
+                             )
+                            THEN 'collaborator'
+                        ELSE 'none'
+                    END AS access
+                FROM crates c
+                WHERE c.id = CAST(:crate_id AS uuid)
+                FOR UPDATE
+                """
+            ),
+            {"actor_id": actor_id, "crate_id": crate_id},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        raise CrateNotFoundError(crate_id)
+
+    access = row["access"]
+    if actor_id is not None and (
+        access == "none" or (owner_only and access != "owner")
+    ):
+        raise CrateAccessDeniedError(crate_id)
+    return dict(row)
 
 
 def create_crate(
@@ -67,6 +119,7 @@ def update_crate(
     description: str | None = None,
     visibility: str | None = None,
     is_collaborative: bool | None = None,
+    actor_id: int | None = None,
     session: Session | None = None,
 ) -> bool:
     updates = {
@@ -79,11 +132,18 @@ def update_crate(
         }.items()
         if value is not None
     }
-    if not updates:
-        return get_crate(crate_id, session=session) is not None
-
     assignments = ", ".join(f"{column} = :{column}" for column in updates)
     with optional_scope(session) as current:
+        _lock_crate_for_write(
+            current,
+            crate_id,
+            actor_id=actor_id,
+            owner_only=actor_id is not None
+            and (visibility is not None or is_collaborative is not None),
+        )
+        if not updates:
+            return True
+
         result = current.execute(
             text(
                 f"""
@@ -118,12 +178,7 @@ def add_crate_album(
     session: Session | None = None,
 ) -> dict:
     with optional_scope(session) as current:
-        exists = current.execute(
-            text("SELECT id FROM crates WHERE id = CAST(:id AS uuid) FOR UPDATE"),
-            {"id": crate_id},
-        ).scalar_one_or_none()
-        if exists is None:
-            raise CrateNotFoundError(crate_id)
+        _lock_crate_for_write(current, crate_id, actor_id=added_by)
 
         album_exists = current.execute(
             text(
@@ -198,64 +253,36 @@ def remove_crate_album(
     crate_id: str,
     global_album_uid: str,
     *,
+    actor_id: int | None = None,
     session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:
-        exists = current.execute(
-            text("SELECT id FROM crates WHERE id = CAST(:id AS uuid) FOR UPDATE"),
-            {"id": crate_id},
-        ).scalar_one_or_none()
-        if exists is None:
-            return False
+        _lock_crate_for_write(current, crate_id, actor_id=actor_id)
 
-        removed = current.execute(
+        removed_position = current.execute(
             text(
                 """
                 DELETE FROM crate_albums
                 WHERE crate_id = CAST(:crate_id AS uuid)
                   AND global_album_uid = CAST(:album_uid AS uuid)
-                RETURNING global_album_uid
+                RETURNING position
                 """
             ),
             {"crate_id": crate_id, "album_uid": global_album_uid},
         ).scalar_one_or_none()
-        if removed is None:
+        if removed_position is None:
             return False
 
         current.execute(
             text(
                 """
-                WITH position_offset AS (
-                    SELECT COALESCE(MAX(position)::bigint, -1) + 1 AS value
-                    FROM crate_albums
-                    WHERE crate_id = CAST(:crate_id AS uuid)
-                )
-                UPDATE crate_albums album
-                SET position = album.position + position_offset.value
-                FROM position_offset
-                WHERE album.crate_id = CAST(:crate_id AS uuid)
+                UPDATE crate_albums
+                SET position = position - 1
+                WHERE crate_id = CAST(:crate_id AS uuid)
+                  AND position > :removed_position
                 """
             ),
-            {"crate_id": crate_id},
-        )
-        current.execute(
-            text(
-                """
-                WITH ordered AS (
-                    SELECT
-                        global_album_uid,
-                        ROW_NUMBER() OVER (ORDER BY position) - 1 AS next_position
-                    FROM crate_albums
-                    WHERE crate_id = CAST(:crate_id AS uuid)
-                )
-                UPDATE crate_albums album
-                SET position = ordered.next_position
-                FROM ordered
-                WHERE album.crate_id = CAST(:crate_id AS uuid)
-                  AND album.global_album_uid = ordered.global_album_uid
-                """
-            ),
-            {"crate_id": crate_id},
+            {"crate_id": crate_id, "removed_position": removed_position},
         )
         current.execute(
             text("UPDATE crates SET updated_at = NOW() WHERE id = CAST(:id AS uuid)"),
@@ -268,6 +295,7 @@ def reorder_crate_albums(
     crate_id: str,
     global_album_uids: Sequence[str],
     *,
+    actor_id: int | None = None,
     session: Session | None = None,
 ) -> None:
     requested = [str(album_uid) for album_uid in global_album_uids]
@@ -275,12 +303,7 @@ def reorder_crate_albums(
         raise InvalidCrateAlbumOrderError("Album ids must not repeat")
 
     with optional_scope(session) as current:
-        exists = current.execute(
-            text("SELECT id FROM crates WHERE id = CAST(:id AS uuid) FOR UPDATE"),
-            {"id": crate_id},
-        ).scalar_one_or_none()
-        if exists is None:
-            raise CrateNotFoundError(crate_id)
+        _lock_crate_for_write(current, crate_id, actor_id=actor_id)
 
         current_ids = set(
             current.execute(
@@ -336,8 +359,14 @@ def reorder_crate_albums(
         )
 
 
-def delete_crate(crate_id: str, *, session: Session | None = None) -> bool:
+def delete_crate(
+    crate_id: str,
+    *,
+    actor_id: int | None = None,
+    session: Session | None = None,
+) -> bool:
     with optional_scope(session) as current:
+        _lock_crate_for_write(current, crate_id, actor_id=actor_id, owner_only=True)
         deleted = current.execute(
             text(
                 """
@@ -352,9 +381,14 @@ def delete_crate(crate_id: str, *, session: Session | None = None) -> bool:
 
 
 def remove_crate_member(
-    crate_id: str, user_id: int, *, session: Session | None = None
+    crate_id: str,
+    user_id: int,
+    *,
+    actor_id: int | None = None,
+    session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:
+        _lock_crate_for_write(current, crate_id, actor_id=actor_id, owner_only=True)
         removed = current.execute(
             text(
                 """
@@ -389,20 +423,10 @@ def create_crate_invite(
     token = secrets.token_urlsafe(24)
 
     with optional_scope(session) as current:
-        collaborative = current.execute(
-            text(
-                """
-                SELECT is_collaborative
-                FROM crates
-                WHERE id = CAST(:crate_id AS uuid)
-                FOR UPDATE
-                """
-            ),
-            {"crate_id": crate_id},
-        ).scalar_one_or_none()
-        if collaborative is None:
-            raise CrateNotFoundError(crate_id)
-        if not collaborative:
+        crate = _lock_crate_for_write(
+            current, crate_id, actor_id=created_by, owner_only=True
+        )
+        if not crate["is_collaborative"]:
             raise CrateCollaborationDisabledError(crate_id)
 
         row = (
@@ -440,9 +464,14 @@ def create_crate_invite(
 
 
 def revoke_crate_invite(
-    crate_id: str, token: str, *, session: Session | None = None
+    crate_id: str,
+    token: str,
+    *,
+    actor_id: int | None = None,
+    session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:
+        _lock_crate_for_write(current, crate_id, actor_id=actor_id, owner_only=True)
         revoked = current.execute(
             text(
                 """
@@ -565,6 +594,7 @@ def accept_crate_invite(
 __all__ = [
     "CrateAlbumAlreadyExistsError",
     "CrateAlbumNotFoundError",
+    "CrateAccessDeniedError",
     "CrateCollaborationDisabledError",
     "CrateNotFoundError",
     "InvalidCrateAlbumOrderError",
