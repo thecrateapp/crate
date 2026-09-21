@@ -31,6 +31,10 @@ class CrateCollaborationDisabledError(ValueError):
     """Raised when an invite is requested for a non-collaborative Crate."""
 
 
+class CrateInviteExhaustedError(LookupError):
+    """Raised when an invite has reached its maximum number of uses."""
+
+
 class CrateAccessDeniedError(PermissionError):
     """Raised when a write is attempted without current Crate access."""
 
@@ -590,7 +594,7 @@ def accept_crate_invite(
             return {"crate_id": invite["crate_id"]}
 
         if invite["max_uses"] is not None and invite["use_count"] >= invite["max_uses"]:
-            return None
+            raise CrateInviteExhaustedError(token)
 
         current.execute(
             text(
@@ -620,6 +624,7 @@ __all__ = [
     "CrateAlbumNotFoundError",
     "CrateAccessDeniedError",
     "CrateCollaborationDisabledError",
+    "CrateInviteExhaustedError",
     "CrateNotFoundError",
     "InvalidCrateAlbumOrderError",
     "add_crate_album",

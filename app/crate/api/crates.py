@@ -42,6 +42,7 @@ from crate.db.repositories.crates import (
     CrateAlbumNotFoundError,
     CrateAccessDeniedError,
     CrateCollaborationDisabledError,
+    CrateInviteExhaustedError,
     CrateNotFoundError,
     InvalidCrateAlbumOrderError,
     accept_crate_invite,
@@ -92,8 +93,7 @@ def _require_owner(crate_id: UUID, user_id: int, *, detail: str) -> None:
         raise HTTPException(status_code=403, detail=detail)
 
 
-def _invite_join_url(request: Request, token: str) -> str:
-    path = f"/crate/invite/{token}"
+def _listen_public_origin(request: Request) -> str:
     listen_origin = os.environ.get("CRATE_LISTEN_PUBLIC_BASE_URL")
     if not listen_origin:
         domain = os.environ.get("DOMAIN")
@@ -107,7 +107,14 @@ def _invite_join_url(request: Request, token: str) -> str:
         if scheme not in {"http", "https"}:
             scheme = "https"
         listen_origin = f"{scheme}://listen.{domain}"
-    return f"{listen_origin.rstrip('/')}{path}"
+    return listen_origin.rstrip("/")
+
+
+def _invite_join_url(
+    request: Request, token: str, *, listen_origin: str | None = None
+) -> str:
+    origin = listen_origin or _listen_public_origin(request)
+    return f"{origin}/crate/invite/{token}"
 
 
 @router.get(
@@ -172,7 +179,13 @@ def get_invite(request: Request, token: str):
 )
 def accept_invite(request: Request, token: str):
     user = _require_auth(request)
-    accepted = accept_crate_invite(token, user["id"])
+    try:
+        accepted = accept_crate_invite(token, user["id"])
+    except CrateInviteExhaustedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Invite has reached its maximum uses",
+        ) from exc
     if accepted is None:
         raise HTTPException(status_code=404, detail="Invite not found or expired")
     crate_id = accepted["crate_id"]
@@ -411,6 +424,13 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
         detail="Only the owner can manage Crate invites",
     )
     try:
+        listen_origin = _listen_public_origin(request)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Listen public URL is not configured",
+        ) from exc
+    try:
         invite_row = create_crate_invite(
             str(crate_id),
             user["id"],
@@ -430,7 +450,9 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    join_url = _invite_join_url(request, invite_row["token"])
+    join_url = _invite_join_url(
+        request, invite_row["token"], listen_origin=listen_origin
+    )
     return {**invite_row, "join_url": join_url, "qr_value": join_url}
 
 

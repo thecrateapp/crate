@@ -486,7 +486,7 @@ def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
             f"/api/crates/invites/{token}/accept",
             headers=_headers(second_invitee_id),
         ).status_code
-        == 404
+        == 410
     )
 
     members = crate_api_client.get(f"{crate_url}/members", headers=_headers(1))
@@ -530,6 +530,7 @@ def test_invite_value_error_is_mapped_to_unprocessable_entity(monkeypatch):
 
     monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
     monkeypatch.setattr(crate_routes, "_require_owner", lambda *args, **kwargs: None)
+    monkeypatch.setenv("CRATE_LISTEN_PUBLIC_BASE_URL", "https://listen.testserver")
 
     def raise_value_error(*args, **kwargs):
         raise ValueError("expires_in_hours must be non-negative")
@@ -624,6 +625,28 @@ def test_invite_join_url_derives_listen_origin_from_domain(monkeypatch):
         crate_routes._invite_join_url(request, "invite-token")
         == "https://listen.example.test/crate/invite/invite-token"
     )
+
+
+def test_invite_requires_public_listen_url_before_persisting(monkeypatch):
+    from fastapi import HTTPException
+
+    from crate.api import crates as crate_routes
+    from crate.api.schemas.crates import CreateCrateInviteRequest
+
+    monkeypatch.delenv("CRATE_LISTEN_PUBLIC_BASE_URL", raising=False)
+    monkeypatch.delenv("DOMAIN", raising=False)
+    monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(crate_routes, "_require_owner", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        crate_routes,
+        "create_crate_invite",
+        lambda *args, **kwargs: pytest.fail("invite must not be persisted"),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        crate_routes.invite(None, uuid4(), CreateCrateInviteRequest())
+
+    assert error.value.status_code == 503
 
 
 def test_zero_hour_crate_invite_is_explicitly_non_expiring(
