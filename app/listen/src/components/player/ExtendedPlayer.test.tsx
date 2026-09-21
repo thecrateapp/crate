@@ -12,6 +12,7 @@ import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 import { ExtendedPlayer } from "./ExtendedPlayer";
 
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => true));
+const navigateMock = vi.hoisted(() => vi.fn());
 const resolvedArtistMock = vi.hoisted(() => ({
   value: null as {
     id?: number;
@@ -20,6 +21,15 @@ const resolvedArtistMock = vi.hoisted(() => ({
     slug?: string;
   } | null,
 }));
+
+vi.mock("react-router", async () => {
+  const actual =
+    await vi.importActual<typeof import("react-router")>("react-router");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
 type MockVisualizerConfig = {
   surfaceMode: PlayerSurfaceMode;
   useAlbumPalette: boolean;
@@ -46,10 +56,13 @@ vi.mock("@/components/player/SpinningDisc", () => ({
 
 vi.mock("@/components/player/PlayerTrackIdentity", () => ({
   PlayerTrackIdentity: (props: Record<string, unknown>) => (
-    <div
-      data-testid="player-track-identity"
-      data-props={JSON.stringify(props)}
-    />
+    <div data-testid="player-track-identity" data-props={JSON.stringify(props)}>
+      <button
+        aria-label="Open artist"
+        disabled={!props.artistClickable}
+        onClick={() => (props.onArtistClick as (() => void) | undefined)?.()}
+      />
+    </div>
   ),
 }));
 
@@ -122,6 +135,7 @@ describe("ExtendedPlayer", () => {
     localStorage.removeItem("listen-eq-enabled");
     useIsDesktopMock.mockReturnValue(true);
     resolvedArtistMock.value = null;
+    navigateMock.mockReset();
   });
 
   it("enables the artist badge for a global artist identity", () => {
@@ -151,6 +165,37 @@ describe("ExtendedPlayer", () => {
     const identity = screen.getByTestId("player-track-identity");
     const props = JSON.parse(identity.dataset.props || "{}");
     expect(props.artistClickable).toBe(true);
+  });
+
+  it("navigates to the artist when the artist badge is clicked", async () => {
+    resolvedArtistMock.value = {
+      id: 42,
+      name: "Crate",
+      slug: "crate",
+    };
+    const track = createMockTrack({
+      id: "extended-artist-navigation-track",
+      entityUid: "extended-artist-navigation-track",
+      title: "Artist navigation",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(
+      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      },
+    );
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Open artist" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/artists/crate");
   });
 
   it("hides the desktop Equalizer access when it is globally disabled", () => {
