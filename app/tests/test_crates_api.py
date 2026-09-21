@@ -429,7 +429,9 @@ def test_add_album_returns_inserted_snapshot_if_album_is_removed_afterward(
 def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
     pg_db,
     crate_api_client,
+    monkeypatch,
 ):
+    monkeypatch.setenv("CRATE_LISTEN_PUBLIC_BASE_URL", "https://listen.example.test/")
     invitee_id = _create_user(f"crate-invitee-{uuid4()}@example.test")
     second_invitee_id = _create_user(f"crate-second-invitee-{uuid4()}@example.test")
     crate_id = _create_crate(is_collaborative=True)
@@ -443,7 +445,7 @@ def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
     assert response.status_code == 201
     invite = response.json()
     token = invite["token"]
-    assert invite["join_url"] == f"http://testserver/crate/invite/{token}"
+    assert invite["join_url"] == f"https://listen.example.test/crate/invite/{token}"
     assert invite["qr_value"] == invite["join_url"]
     assert (
         crate_api_client.get(

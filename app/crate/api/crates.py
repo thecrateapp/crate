@@ -1,5 +1,6 @@
 """Listen Crate API and collaboration workflow."""
 
+import os
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -90,6 +91,14 @@ def _require_owner(crate_id: UUID, user_id: int, *, detail: str) -> None:
     access = _require_crate_access(crate_id, user_id)
     if access != "owner":
         raise HTTPException(status_code=403, detail=detail)
+
+
+def _invite_join_url(request: Request, token: str) -> str:
+    path = f"/crate/invite/{token}"
+    listen_origin = os.environ.get("CRATE_LISTEN_PUBLIC_BASE_URL")
+    if listen_origin:
+        return f"{listen_origin.rstrip('/')}{path}"
+    return _absolute_url(request, path)
 
 
 @router.get(
@@ -412,7 +421,7 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    join_url = _absolute_url(request, f"/crate/invite/{invite_row['token']}")
+    join_url = _invite_join_url(request, invite_row["token"])
     return {**invite_row, "join_url": join_url, "qr_value": join_url}
 
 
