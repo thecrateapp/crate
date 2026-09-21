@@ -93,20 +93,15 @@ def _require_owner(crate_id: UUID, user_id: int, *, detail: str) -> None:
         raise HTTPException(status_code=403, detail=detail)
 
 
-def _listen_public_origin(request: Request) -> str:
+def _listen_public_origin() -> str:
     listen_origin = os.environ.get("CRATE_LISTEN_PUBLIC_BASE_URL")
     if not listen_origin:
-        domain = os.environ.get("DOMAIN")
-        if not domain:
-            raise RuntimeError("CRATE_LISTEN_PUBLIC_BASE_URL must be configured")
-        listen_origin = f"https://listen.{domain}"
+        raise RuntimeError("CRATE_LISTEN_PUBLIC_BASE_URL must be configured")
     return listen_origin.rstrip("/")
 
 
-def _invite_join_url(
-    request: Request, token: str, *, listen_origin: str | None = None
-) -> str:
-    origin = listen_origin or _listen_public_origin(request)
+def _invite_join_url(token: str, *, listen_origin: str | None = None) -> str:
+    origin = listen_origin or _listen_public_origin()
     return f"{origin}/crate/invite/{token}"
 
 
@@ -417,7 +412,7 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
         detail="Only the owner can manage Crate invites",
     )
     try:
-        listen_origin = _listen_public_origin(request)
+        listen_origin = _listen_public_origin()
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -443,9 +438,7 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    join_url = _invite_join_url(
-        request, invite_row["token"], listen_origin=listen_origin
-    )
+    join_url = _invite_join_url(invite_row["token"], listen_origin=listen_origin)
     return {**invite_row, "join_url": join_url, "qr_value": join_url}
 
 

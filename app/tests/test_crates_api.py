@@ -598,31 +598,13 @@ def test_accepting_crate_invite_does_not_return_member_directory(
     assert "members" not in accepted.json()
 
 
-def test_invite_join_url_derives_listen_origin_from_domain(monkeypatch):
-    from starlette.requests import Request
-
+def test_invite_join_url_uses_configured_listen_origin(monkeypatch):
     from crate.api import crates as crate_routes
 
-    monkeypatch.delenv("CRATE_LISTEN_PUBLIC_BASE_URL", raising=False)
-    monkeypatch.setenv("DOMAIN", "example.test")
-    request = Request(
-        {
-            "type": "http",
-            "http_version": "1.1",
-            "method": "POST",
-            "scheme": "http",
-            "path": "/api/crates/invites",
-            "raw_path": b"/api/crates/invites",
-            "query_string": b"",
-            "root_path": "",
-            "headers": [(b"x-forwarded-proto", b"http")],
-            "server": ("api.example.test", 443),
-            "client": ("127.0.0.1", 1234),
-        }
-    )
+    monkeypatch.setenv("CRATE_LISTEN_PUBLIC_BASE_URL", "https://listen.example.test/")
 
     assert (
-        crate_routes._invite_join_url(request, "invite-token")
+        crate_routes._invite_join_url("invite-token")
         == "https://listen.example.test/crate/invite/invite-token"
     )
 
