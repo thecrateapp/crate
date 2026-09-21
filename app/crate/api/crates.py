@@ -185,7 +185,10 @@ def get_one(request: Request, crate_id: UUID):
     "/{crate_id}/playback",
     response_model=list[CratePlaybackTrackResponse],
     responses=_CRATE_RESPONSES,
-    summary="Get playable tracks for a Crate in album order",
+    summary=(
+        "Get playable tracks for an accessible Crate in album order "
+        "(public Crates are available to authenticated users)"
+    ),
 )
 def playback(request: Request, crate_id: UUID):
     user = _require_auth(request)

@@ -50,7 +50,7 @@ class CrateAlbumResponse(BaseModel):
 
 
 class CrateSummaryResponse(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     id: str
     owner_id: int

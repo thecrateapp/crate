@@ -541,7 +541,7 @@ def test_only_owner_can_delete_crate_and_delete_cascades_contents(
     assert crate_api_client.get(url, headers=_headers(1)).status_code == 404
 
 
-def test_crate_playback_endpoint_returns_catalog_tracks_only_to_crate_members(
+def test_crate_playback_endpoint_returns_available_catalog_tracks_for_owner(
     pg_db,
     crate_api_client,
 ):
@@ -559,4 +559,33 @@ def test_crate_playback_endpoint_returns_catalog_tracks_only_to_crate_members(
 
     assert response.status_code == 200
     assert [track["global_track_uid"] for track in response.json()] == [track_uid]
+    stranger_id = _create_user(f"crate-playback-stranger-{uuid4()}@example.test")
+    assert (
+        crate_api_client.get(
+            f"/api/crates/{crate_id}/playback",
+            headers=_headers(stranger_id),
+        ).status_code
+        == 404
+    )
     assert crate_api_client.get(f"/api/crates/{crate_id}/playback").status_code == 401
+
+
+def test_crate_playback_endpoint_allows_authenticated_users_to_play_public_crates(
+    pg_db,
+    crate_api_client,
+):
+    from crate.db.repositories.crates import add_crate_album, create_crate, update_crate
+
+    stranger_id = _create_user(f"crate-public-playback-{uuid4()}@example.test")
+    crate_id = create_crate(owner_id=1, name="Public API playback")
+    assert update_crate(crate_id, visibility="public")
+    album_uid = _seed_album("Public playable album")
+    track_uid = _seed_playback_track(album_uid, "Public playable track")
+    add_crate_album(crate_id, album_uid)
+
+    response = crate_api_client.get(
+        f"/api/crates/{crate_id}/playback", headers=_headers(stranger_id)
+    )
+
+    assert response.status_code == 200
+    assert [track["global_track_uid"] for track in response.json()] == [track_uid]

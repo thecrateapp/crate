@@ -113,7 +113,12 @@ def get_crate_playback_tracks(
         return _impl(current)
 
 
-def get_crates_for_user(user_id: int, *, session: Session | None = None) -> list[dict]:
+def _list_crates(
+    user_id: int,
+    *,
+    public_only: bool,
+    session: Session | None = None,
+) -> list[dict]:
     def _impl(current: Session) -> list[dict]:
         rows = (
             current.execute(
@@ -131,20 +136,32 @@ def get_crates_for_user(user_id: int, *, session: Session | None = None) -> list
                             c.is_collaborative,
                             c.created_at,
                             c.updated_at,
-                            CASE WHEN c.owner_id = :user_id
-                                THEN 'owner' ELSE 'collaborator' END AS access
+                            CASE
+                                WHEN :public_only THEN NULL::text
+                                WHEN c.owner_id = :user_id THEN 'owner'
+                                ELSE 'collaborator'
+                            END AS access
                         FROM crates c
                         JOIN users owner ON owner.id = c.owner_id
-                        WHERE c.owner_id = :user_id
-                           OR (
-                               c.is_collaborative IS TRUE
-                               AND EXISTS (
-                                   SELECT 1
-                                   FROM crate_members member
-                                   WHERE member.crate_id = c.id
-                                     AND member.user_id = :user_id
-                               )
-                           )
+                        WHERE (
+                            :public_only
+                            AND c.owner_id = :user_id
+                            AND c.visibility = 'public'
+                        ) OR (
+                            NOT :public_only
+                            AND (
+                                c.owner_id = :user_id
+                                OR (
+                                    c.is_collaborative IS TRUE
+                                    AND EXISTS (
+                                        SELECT 1
+                                        FROM crate_members member
+                                        WHERE member.crate_id = c.id
+                                          AND member.user_id = :user_id
+                                    )
+                                )
+                            )
+                        )
                     ),
                     crate_album_summary AS (
                         SELECT
@@ -187,95 +204,31 @@ def get_crates_for_user(user_id: int, *, session: Session | None = None) -> list
                     ORDER BY visible.updated_at DESC, visible.id
                     """
                 ),
-                {"user_id": user_id},
+                {"user_id": user_id, "public_only": public_only},
             )
             .mappings()
             .all()
         )
-        return [dict(row) for row in rows]
+        result = [dict(row) for row in rows]
+        if public_only:
+            for row in result:
+                row.pop("access", None)
+        return result
 
     if session is not None:
         return _impl(session)
     with read_scope() as current:
         return _impl(current)
+
+
+def get_crates_for_user(user_id: int, *, session: Session | None = None) -> list[dict]:
+    return _list_crates(user_id, public_only=False, session=session)
 
 
 def get_public_crates_for_user(
     user_id: int, *, session: Session | None = None
 ) -> list[dict]:
-    def _impl(current: Session) -> list[dict]:
-        rows = (
-            current.execute(
-                text(
-                    """
-                    WITH visible_crates AS (
-                        SELECT
-                            c.id,
-                            c.owner_id,
-                            owner.username AS owner_username,
-                            owner.name AS owner_name,
-                            c.name,
-                            c.description,
-                            c.visibility,
-                            c.is_collaborative,
-                            c.created_at,
-                            c.updated_at
-                        FROM crates c
-                        JOIN users owner ON owner.id = c.owner_id
-                        WHERE c.owner_id = :user_id
-                          AND c.visibility = 'public'
-                    ),
-                    crate_album_summary AS (
-                        SELECT
-                            ca.crate_id,
-                            COUNT(*)::integer AS album_count,
-                            jsonb_agg(
-                                jsonb_build_object(
-                                    'global_album_uid', album.global_album_uid::text,
-                                    'position', ca.position,
-                                    'name', album.canonical_name,
-                                    'artist_name', album.artist_name,
-                                    'year', album.year,
-                                    'has_cover', album.has_cover,
-                                    'artwork_source_json', album.artwork_source_json
-                                ) ORDER BY ca.position
-                            ) -> 0 AS first_album
-                        FROM visible_crates visible
-                        JOIN crate_albums ca ON ca.crate_id = visible.id
-                        JOIN global_catalog_albums album
-                          ON album.global_album_uid = ca.global_album_uid
-                        GROUP BY ca.crate_id
-                    )
-                    SELECT
-                        visible.id::text AS id,
-                        visible.owner_id,
-                        visible.owner_username,
-                        visible.owner_name,
-                        visible.name,
-                        visible.description,
-                        visible.visibility,
-                        visible.is_collaborative,
-                        visible.created_at,
-                        visible.updated_at,
-                        COALESCE(summary.album_count, 0) AS album_count,
-                        summary.first_album
-                    FROM visible_crates visible
-                    LEFT JOIN crate_album_summary summary
-                      ON summary.crate_id = visible.id
-                    ORDER BY visible.updated_at DESC, visible.id
-                    """
-                ),
-                {"user_id": user_id},
-            )
-            .mappings()
-            .all()
-        )
-        return [dict(row) for row in rows]
-
-    if session is not None:
-        return _impl(session)
-    with read_scope() as current:
-        return _impl(current)
+    return _list_crates(user_id, public_only=True, session=session)
 
 
 def get_crate_access(

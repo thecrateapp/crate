@@ -4,6 +4,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 import pytest
 from sqlalchemy import text
 
@@ -35,6 +36,18 @@ def _alembic_config() -> Config:
     config = Config(str(app_dir / "alembic.ini"))
     config.set_main_option("script_location", str(app_dir / "crate/db/migrations"))
     return config
+
+
+def _crate_migration_revisions(config: Config) -> tuple[str, str]:
+    script = ScriptDirectory.from_config(config)
+    crate_revision = next(
+        revision
+        for revision in script.walk_revisions()
+        if Path(revision.path).name.endswith("_listen_crates.py")
+    )
+    if not isinstance(crate_revision.down_revision, str):
+        raise AssertionError("Listen Crates migration must have one parent revision")
+    return crate_revision.revision, crate_revision.down_revision
 
 
 def test_crate_relations_exist_after_database_migrations(pg_db):
@@ -162,20 +175,22 @@ def test_crate_migration_can_be_downgraded_and_reapplied(pg_db):
     from crate.db.tx import read_scope
 
     config = _alembic_config()
+    crate_revision, parent_revision = _crate_migration_revisions(config)
     try:
-        command.downgrade(config, "098")
+        # pg_db points both SQLAlchemy and Alembic at a disposable database clone.
+        command.downgrade(config, parent_revision)
         with read_scope() as session:
             assert not (CRATE_TABLES & _table_names(session))
 
-        command.upgrade(config, "099")
+        command.upgrade(config, crate_revision)
         with read_scope() as session:
             assert CRATE_TABLES <= _table_names(session)
 
-        command.downgrade(config, "098")
+        command.downgrade(config, parent_revision)
         with read_scope() as session:
             assert not (CRATE_TABLES & _table_names(session))
     finally:
-        command.upgrade(config, "099")
+        command.upgrade(config, "head")
 
     with read_scope() as session:
         assert CRATE_TABLES <= _table_names(session)
