@@ -399,11 +399,11 @@ def test_add_album_returns_inserted_snapshot_if_album_is_removed_afterward(
     crate_id = create_crate(owner_id=1, name="Concurrent edit")
     album_uid = _seed_album("Removed immediately")
 
-    def add_then_remove(crate_id_arg, album_uid_arg, *, added_by=None):
+    def add_then_remove(crate_id_arg, album_uid_arg, *, added_by: int):
         inserted = add_album_to_repository(
             crate_id_arg, album_uid_arg, added_by=added_by
         )
-        assert remove_crate_album(crate_id_arg, album_uid_arg)
+        assert remove_crate_album(crate_id_arg, album_uid_arg, actor_id=added_by)
         return inserted
 
     monkeypatch.setattr(crate_routes, "add_crate_album", add_then_remove)
@@ -672,7 +672,7 @@ def test_only_owner_can_delete_crate_and_delete_cascades_contents(
     collaborator_id = _create_user(f"crate-delete-collab-{uuid4()}@example.test")
     crate_id = _create_crate(is_collaborative=True)
     _add_member(crate_id, collaborator_id)
-    add_crate_album(crate_id, _seed_album("Cascade album"))
+    add_crate_album(crate_id, _seed_album("Cascade album"), added_by=1)
     url = f"/api/crates/{crate_id}"
 
     invite = crate_api_client.post(
@@ -724,7 +724,7 @@ def test_crate_playback_endpoint_returns_available_catalog_tracks_for_owner(
     album_uid = _seed_album("Playable album")
     track_uid = _seed_playback_track(album_uid, "Playable track")
     _seed_playback_track(album_uid, "Unavailable track", available=False)
-    add_crate_album(crate_id, album_uid)
+    add_crate_album(crate_id, album_uid, added_by=1)
 
     response = crate_api_client.get(
         f"/api/crates/{crate_id}/playback", headers=_headers(1)
@@ -751,10 +751,10 @@ def test_crate_playback_endpoint_allows_authenticated_users_to_play_public_crate
 
     stranger_id = _create_user(f"crate-public-playback-{uuid4()}@example.test")
     crate_id = create_crate(owner_id=1, name="Public API playback")
-    assert update_crate(crate_id, visibility="public")
+    assert update_crate(crate_id, visibility="public", actor_id=1)
     album_uid = _seed_album("Public playable album")
     track_uid = _seed_playback_track(album_uid, "Public playable track")
-    add_crate_album(crate_id, album_uid)
+    add_crate_album(crate_id, album_uid, added_by=1)
 
     response = crate_api_client.get(
         f"/api/crates/{crate_id}/playback", headers=_headers(stranger_id)

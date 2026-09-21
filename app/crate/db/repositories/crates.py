@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
 import secrets
 
 from sqlalchemy import text
@@ -40,7 +39,7 @@ def _lock_crate_for_write(
     current: Session,
     crate_id: str,
     *,
-    actor_id: int | None = None,
+    actor_id: int,
     owner_only: bool = False,
 ) -> dict:
     row = (
@@ -52,7 +51,7 @@ def _lock_crate_for_write(
                     c.owner_id,
                     c.is_collaborative,
                     CASE
-                        WHEN :actor_id IS NULL OR c.owner_id = :actor_id
+                        WHEN c.owner_id = :actor_id
                             THEN 'owner'
                         WHEN c.is_collaborative IS TRUE
                              AND EXISTS (
@@ -78,9 +77,7 @@ def _lock_crate_for_write(
         raise CrateNotFoundError(crate_id)
 
     access = row["access"]
-    if actor_id is not None and (
-        access == "none" or (owner_only and access != "owner")
-    ):
+    if access == "none" or (owner_only and access != "owner"):
         raise CrateAccessDeniedError(crate_id)
     return dict(row)
 
@@ -119,7 +116,7 @@ def update_crate(
     description: str | None = None,
     visibility: str | None = None,
     is_collaborative: bool | None = None,
-    actor_id: int | None = None,
+    actor_id: int,
     session: Session | None = None,
 ) -> bool:
     updates = {
@@ -174,7 +171,7 @@ def add_crate_album(
     crate_id: str,
     global_album_uid: str,
     *,
-    added_by: int | None = None,
+    added_by: int,
     session: Session | None = None,
 ) -> dict:
     with optional_scope(session) as current:
@@ -253,7 +250,7 @@ def remove_crate_album(
     crate_id: str,
     global_album_uid: str,
     *,
-    actor_id: int | None = None,
+    actor_id: int,
     session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:
@@ -320,7 +317,7 @@ def reorder_crate_albums(
     crate_id: str,
     global_album_uids: Sequence[str],
     *,
-    actor_id: int | None = None,
+    actor_id: int,
     session: Session | None = None,
 ) -> None:
     requested = [str(album_uid) for album_uid in global_album_uids]
@@ -387,7 +384,7 @@ def reorder_crate_albums(
 def delete_crate(
     crate_id: str,
     *,
-    actor_id: int | None = None,
+    actor_id: int,
     session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:
@@ -409,7 +406,7 @@ def remove_crate_member(
     crate_id: str,
     user_id: int,
     *,
-    actor_id: int | None = None,
+    actor_id: int,
     session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:
@@ -441,10 +438,6 @@ def create_crate_invite(
     if expires_in_hours < 0:
         raise ValueError("expires_in_hours must be non-negative")
 
-    now = datetime.now(timezone.utc)
-    expires_at = (
-        now + timedelta(hours=expires_in_hours) if expires_in_hours > 0 else None
-    )
     token = secrets.token_urlsafe(24)
 
     with optional_scope(session) as current:
@@ -462,7 +455,12 @@ def create_crate_invite(
                         token, crate_id, created_by, expires_at, max_uses
                     ) VALUES (
                         :token, CAST(:crate_id AS uuid), :created_by,
-                        :expires_at, :max_uses
+                        CASE
+                            WHEN :expires_in_hours > 0
+                            THEN NOW() + make_interval(hours => :expires_in_hours)
+                            ELSE NULL
+                        END,
+                        :max_uses
                     )
                     RETURNING
                         token,
@@ -478,7 +476,7 @@ def create_crate_invite(
                     "token": token,
                     "crate_id": crate_id,
                     "created_by": created_by,
-                    "expires_at": expires_at,
+                    "expires_in_hours": expires_in_hours,
                     "max_uses": max_uses,
                 },
             )
@@ -492,7 +490,7 @@ def revoke_crate_invite(
     crate_id: str,
     token: str,
     *,
-    actor_id: int | None = None,
+    actor_id: int,
     session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:

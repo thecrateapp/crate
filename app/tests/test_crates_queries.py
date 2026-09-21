@@ -23,9 +23,9 @@ def test_crate_list_summaries_include_album_count_and_first_album(pg_db):
         _seed_global_album("First album"),
         _seed_global_album("Second album"),
     )
-    add_crate_album(crate_id, first_album)
-    add_crate_album(crate_id, second_album)
-    assert update_crate(crate_id, visibility="public")
+    add_crate_album(crate_id, first_album, added_by=1)
+    add_crate_album(crate_id, second_album, added_by=1)
+    assert update_crate(crate_id, visibility="public", actor_id=1)
 
     for crates in (get_crates_for_user(1), get_public_crates_for_user(1)):
         assert len(crates) == 1
@@ -168,7 +168,9 @@ def test_new_crates_are_private_and_only_listed_for_the_owner(pg_db):
     from crate.db.repositories.crates import create_crate, update_crate
 
     crate_id = create_crate(owner_id=1, name="Year-end records")
-    assert update_crate(crate_id, name="Year-end crate", description="Our picks")
+    assert update_crate(
+        crate_id, name="Year-end crate", description="Our picks", actor_id=1
+    )
 
     crate = get_crate(crate_id)
     assert crate is not None
@@ -206,7 +208,9 @@ def test_collaborators_can_list_private_crates_but_public_profile_is_owner_only(
         name="Shared but not owned",
         is_collaborative=True,
     )
-    assert update_crate(collaborative_public_id, visibility="public")
+    assert update_crate(
+        collaborative_public_id, visibility="public", actor_id=collaborator_id
+    )
 
     with transaction_scope() as session:
         session.execute(
@@ -239,7 +243,7 @@ def test_public_crate_can_be_read_without_a_session(pg_db):
     from crate.db.repositories.crates import create_crate, update_crate
 
     crate_id = create_crate(owner_id=1, name="Public records")
-    assert update_crate(crate_id, visibility="public")
+    assert update_crate(crate_id, visibility="public", actor_id=1)
 
     assert get_crate_access(crate_id, None) == "public"
     assert get_crate_access(crate_id, 2) == "public"
@@ -290,20 +294,20 @@ def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_d
         add_crate_album(crate_id, album_id, added_by=1)
 
     reordered = [album_ids[2], album_ids[0], album_ids[3], album_ids[1]]
-    reorder_crate_albums(crate_id, reordered)
+    reorder_crate_albums(crate_id, reordered, actor_id=1)
     assert _album_order(crate_id) == reordered
 
-    assert remove_crate_album(crate_id, album_ids[0]) is True
+    assert remove_crate_album(crate_id, album_ids[0], actor_id=1) is True
     remaining = [album_ids[2], album_ids[3], album_ids[1]]
     assert _album_order(crate_id) == remaining
     crate = get_crate(crate_id)
     assert [album["position"] for album in crate["albums"]] == [0, 1, 2]
 
-    reorder_crate_albums(crate_id, list(reversed(remaining)))
+    reorder_crate_albums(crate_id, list(reversed(remaining)), actor_id=1)
     assert _album_order(crate_id) == list(reversed(remaining))
 
     with pytest.raises(InvalidCrateAlbumOrderError):
-        reorder_crate_albums(crate_id, remaining[:1])
+        reorder_crate_albums(crate_id, remaining[:1], actor_id=1)
     assert _album_order(crate_id) == list(reversed(remaining))
 
 
@@ -334,7 +338,7 @@ def test_album_mutation_revalidates_editor_access_inside_write_transaction(pg_db
             {"crate_id": crate_id, "user_id": collaborator_id},
         )
 
-    assert update_crate(crate_id, is_collaborative=False)
+    assert update_crate(crate_id, is_collaborative=False, actor_id=1)
 
     with pytest.raises(CrateAccessDeniedError):
         add_crate_album(crate_id, album_id, added_by=collaborator_id)
@@ -442,7 +446,7 @@ def test_disabling_collaboration_revokes_members_and_pending_invites(pg_db):
             {"crate_id": crate_id},
         )
 
-    assert update_crate(crate_id, is_collaborative=False)
+    assert update_crate(crate_id, is_collaborative=False, actor_id=1)
 
     assert get_crate_access(crate_id, collaborator_id) == "none"
     assert get_crate(crate_id)["is_collaborative"] is False
@@ -482,8 +486,8 @@ def test_crate_playback_tracks_follow_crate_and_disc_track_order(pg_db):
     second_album_track = _seed_global_track(
         second_album, "Second album track", disc_number=1, track_number=1
     )
-    add_crate_album(crate_id, first_album)
-    add_crate_album(crate_id, second_album)
+    add_crate_album(crate_id, first_album, added_by=1)
+    add_crate_album(crate_id, second_album, added_by=1)
 
     tracks = get_crate_playback_tracks(crate_id)
 
@@ -512,8 +516,8 @@ def test_crate_playback_skips_unavailable_tracks_and_empty_albums(pg_db):
         track_number=2,
         available=False,
     )
-    add_crate_album(crate_id, album_with_tracks)
-    add_crate_album(crate_id, empty_album)
+    add_crate_album(crate_id, album_with_tracks, added_by=1)
+    add_crate_album(crate_id, empty_album, added_by=1)
 
     tracks = get_crate_playback_tracks(crate_id)
 
@@ -533,6 +537,6 @@ def test_crate_playback_is_empty_when_no_tracks_are_available(pg_db):
         track_number=1,
         available=False,
     )
-    add_crate_album(crate_id, album_uid)
+    add_crate_album(crate_id, album_uid, added_by=1)
 
     assert get_crate_playback_tracks(crate_id) == []

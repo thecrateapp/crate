@@ -135,8 +135,8 @@ class TestSocialProfiles:
             name="A crate I only collaborate on",
             is_collaborative=True,
         )
-        assert update_crate(public_id, visibility="public")
-        assert update_crate(collaborator_id, visibility="public")
+        assert update_crate(public_id, visibility="public", actor_id=1)
+        assert update_crate(collaborator_id, visibility="public", actor_id=2)
 
         with transaction_scope() as session:
             session.execute(
