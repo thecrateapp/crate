@@ -10,6 +10,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.share import _absolute_url
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.crates import (
     AddCrateAlbumRequest,
@@ -362,7 +363,7 @@ def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
             status_code=409, detail="Enable collaboration before creating an invite"
         ) from exc
 
-    join_url = f"/crate/invite/{invite_row['token']}"
+    join_url = _absolute_url(request, f"/crate/invite/{invite_row['token']}")
     return {**invite_row, "join_url": join_url, "qr_value": join_url}
 
 

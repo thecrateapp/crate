@@ -376,6 +376,8 @@ def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
     assert response.status_code == 201
     invite = response.json()
     token = invite["token"]
+    assert invite["join_url"] == f"http://testserver/crate/invite/{token}"
+    assert invite["qr_value"] == invite["join_url"]
     assert (
         crate_api_client.get(
             f"/api/crates/invites/{token}", headers=_headers(invitee_id)

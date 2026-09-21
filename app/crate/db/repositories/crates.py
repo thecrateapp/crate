@@ -303,6 +303,22 @@ def reorder_crate_albums(
             current.execute(
                 text(
                     """
+                    WITH position_offset AS (
+                        SELECT COALESCE(MAX(position)::bigint, -1) + 1 AS value
+                        FROM crate_albums
+                        WHERE crate_id = CAST(:crate_id AS uuid)
+                    )
+                    UPDATE crate_albums album
+                    SET position = album.position + position_offset.value
+                    FROM position_offset
+                    WHERE album.crate_id = CAST(:crate_id AS uuid)
+                    """
+                ),
+                {"crate_id": crate_id},
+            )
+            current.execute(
+                text(
+                    """
                     UPDATE crate_albums
                     SET position = :position
                     WHERE crate_id = CAST(:crate_id AS uuid)
@@ -442,6 +458,40 @@ def accept_crate_invite(
 ) -> dict | None:
     now = datetime.now(timezone.utc)
     with optional_scope(session) as current:
+        invite_crate_id = current.execute(
+            text(
+                """
+                SELECT crate_id::text
+                FROM crate_invites
+                WHERE token = :token
+                """
+            ),
+            {"token": token},
+        ).scalar_one_or_none()
+        if invite_crate_id is None:
+            return None
+
+        crate = (
+            current.execute(
+                text(
+                    """
+                    SELECT
+                        id::text AS crate_id,
+                        owner_id,
+                        is_collaborative
+                    FROM crates
+                    WHERE id = CAST(:crate_id AS uuid)
+                    FOR UPDATE
+                    """
+                ),
+                {"crate_id": invite_crate_id},
+            )
+            .mappings()
+            .first()
+        )
+        if crate is None:
+            return None
+
         invite = (
             current.execute(
                 text(
@@ -451,13 +501,10 @@ def accept_crate_invite(
                         invite.created_by,
                         invite.expires_at,
                         invite.max_uses,
-                        invite.use_count,
-                        crate.owner_id,
-                        crate.is_collaborative
+                        invite.use_count
                     FROM crate_invites invite
-                    JOIN crates crate ON crate.id = invite.crate_id
                     WHERE invite.token = :token
-                    FOR UPDATE OF invite, crate
+                    FOR UPDATE
                     """
                 ),
                 {"token": token},
@@ -467,7 +514,9 @@ def accept_crate_invite(
         )
         if invite is None:
             return None
-        if not invite["is_collaborative"] or invite["owner_id"] == user_id:
+        if invite["crate_id"] != crate["crate_id"]:
+            return None
+        if not crate["is_collaborative"] or crate["owner_id"] == user_id:
             return None
         if invite["expires_at"] is not None and invite["expires_at"] <= now:
             return None

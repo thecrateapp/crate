@@ -163,26 +163,33 @@ def _list_crates(
                             )
                         )
                     ),
-                    crate_album_summary AS (
+                    crate_album_counts AS (
                         SELECT
                             ca.crate_id,
-                            COUNT(*)::integer AS album_count,
-                            jsonb_agg(
-                                jsonb_build_object(
-                                    'global_album_uid', album.global_album_uid::text,
-                                    'position', ca.position,
-                                    'name', album.canonical_name,
-                                    'artist_name', album.artist_name,
-                                    'year', album.year,
-                                    'has_cover', album.has_cover,
-                                    'artwork_source_json', album.artwork_source_json
-                                ) ORDER BY ca.position
-                            ) -> 0 AS first_album
+                            COUNT(*)::integer AS album_count
                         FROM visible_crates visible
                         JOIN crate_albums ca ON ca.crate_id = visible.id
                         JOIN global_catalog_albums album
                           ON album.global_album_uid = ca.global_album_uid
                         GROUP BY ca.crate_id
+                    ),
+                    crate_first_albums AS (
+                        SELECT DISTINCT ON (ca.crate_id)
+                            ca.crate_id,
+                            jsonb_build_object(
+                                'global_album_uid', album.global_album_uid::text,
+                                'position', ca.position,
+                                'name', album.canonical_name,
+                                'artist_name', album.artist_name,
+                                'year', album.year,
+                                'has_cover', album.has_cover,
+                                'artwork_source_json', album.artwork_source_json
+                            ) AS first_album
+                        FROM visible_crates visible
+                        JOIN crate_albums ca ON ca.crate_id = visible.id
+                        JOIN global_catalog_albums album
+                          ON album.global_album_uid = ca.global_album_uid
+                        ORDER BY ca.crate_id, ca.position, ca.global_album_uid
                     )
                     SELECT
                         visible.id::text AS id,
@@ -195,12 +202,14 @@ def _list_crates(
                         visible.is_collaborative,
                         visible.created_at,
                         visible.updated_at,
-                        COALESCE(summary.album_count, 0) AS album_count,
-                        summary.first_album,
+                        COALESCE(counts.album_count, 0) AS album_count,
+                        first_album.first_album,
                         visible.access
                     FROM visible_crates visible
-                    LEFT JOIN crate_album_summary summary
-                      ON summary.crate_id = visible.id
+                    LEFT JOIN crate_album_counts counts
+                      ON counts.crate_id = visible.id
+                    LEFT JOIN crate_first_albums first_album
+                      ON first_album.crate_id = visible.id
                     ORDER BY visible.updated_at DESC, visible.id
                     """
                 ),

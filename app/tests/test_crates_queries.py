@@ -306,15 +306,70 @@ def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_d
     crate = get_crate(crate_id)
     assert [album["position"] for album in crate["albums"]] == [0, 1]
 
-    with transaction_scope() as session:
-        session.execute(text("DROP INDEX crate_albums_test_position_unique"))
-
     reorder_crate_albums(crate_id, list(reversed(remaining)))
     assert _album_order(crate_id) == list(reversed(remaining))
 
     with pytest.raises(InvalidCrateAlbumOrderError):
         reorder_crate_albums(crate_id, remaining[:1])
     assert _album_order(crate_id) == list(reversed(remaining))
+
+
+def test_accept_crate_invite_locks_crate_before_invitation(pg_db):
+    from crate.db.repositories.crates import accept_crate_invite
+
+    crate_id = str(uuid4())
+    statements: list[str] = []
+
+    class Result:
+        def __init__(self, *, mapping=None, scalar=None):
+            self.mapping = mapping
+            self.scalar = scalar
+
+        def mappings(self):
+            return self
+
+        def first(self):
+            return self.mapping
+
+        def scalar_one_or_none(self):
+            return self.scalar
+
+    class Session:
+        def execute(self, statement, params=None):
+            del params
+            sql = statement.text
+            statements.append(sql)
+            if "SELECT crate_id::text" in sql:
+                return Result(scalar=crate_id)
+            if "FROM crates" in sql and "FOR UPDATE" in sql:
+                return Result(
+                    mapping={
+                        "crate_id": crate_id,
+                        "owner_id": 1,
+                        "is_collaborative": True,
+                    }
+                )
+            if "FROM crate_invites" in sql and "FOR UPDATE" in sql:
+                return Result(
+                    mapping={
+                        "crate_id": crate_id,
+                        "created_by": 1,
+                        "expires_at": None,
+                        "max_uses": None,
+                        "use_count": 0,
+                        "owner_id": 1,
+                        "is_collaborative": True,
+                    }
+                )
+            if "FROM crate_members" in sql:
+                return Result(scalar=None)
+            return Result()
+
+    assert accept_crate_invite("invite-token", 2, session=Session()) == {
+        "crate_id": crate_id
+    }
+    lock_statements = [sql for sql in statements if "FOR UPDATE" in sql]
+    assert "FROM crates" in lock_statements[0]
 
 
 def test_disabling_collaboration_revokes_members_and_pending_invites(pg_db):
