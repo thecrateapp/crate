@@ -341,6 +341,29 @@ def test_crate_mutations_invalidate_collection_and_crate_detail():
     assert f"crate:{crate_id}" in cache_prefixes_for_scopes([f"crate:{crate_id}"])
 
 
+def test_crate_invalidation_does_not_mark_global_ui_snapshots_stale(monkeypatch):
+    from crate.api import cache_events
+
+    marked: list[tuple[str | None, str | None]] = []
+    monkeypatch.setattr(
+        "crate.db.cache_store.delete_cache_prefix",
+        lambda _prefix: None,
+    )
+    monkeypatch.setattr(
+        "crate.db.ui_snapshot_store.mark_ui_snapshots_stale",
+        lambda scope=None, subject_key=None, scope_prefix=None: marked.append(
+            (scope or scope_prefix, subject_key)
+        ),
+    )
+
+    cache_events._clear_backend_cache_for_scopes(
+        ["crates", "crate:7ee76303-7aa6-4317-a5d3-18c2e1360b1c"]
+    )
+
+    assert ("home:", None) not in marked
+    assert ("ops", "dashboard") not in marked
+
+
 def test_admin_auth_mutations_invalidate_readplane_identity_cache():
     from crate.api import cache_events
 

@@ -252,12 +252,11 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "global_catalog",
                 "curation",
                 "playlists",
-                "crates",
                 "shows",
                 "upcoming",
                 "artist_bio",
             }
-            or scope.startswith(("artist:", "album:", "playlist:", "crate:"))
+            or scope.startswith(("artist:", "album:", "playlist:"))
             for scope in scopes
         ):
             mark_ui_snapshots_stale(scope_prefix="home:")
@@ -270,10 +269,9 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
                 "upcoming",
                 "curation",
                 "playlists",
-                "crates",
                 "artist_bio",
             }
-            or scope.startswith(("artist:", "album:", "playlist:", "crate:"))
+            or scope.startswith(("artist:", "album:", "playlist:"))
             for scope in scopes
         ):
             mark_ui_snapshots_stale(scope="ops", subject_key="dashboard")

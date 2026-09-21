@@ -27,6 +27,7 @@ def crate_api_client(test_app, monkeypatch):
         }
 
     monkeypatch.setattr(AuthMiddleware, "resolve_user", resolve_test_user)
+    monkeypatch.setenv("CRATE_LISTEN_PUBLIC_BASE_URL", "https://listen.testserver")
     return test_app
 
 
@@ -594,6 +595,35 @@ def test_accepting_crate_invite_does_not_return_member_directory(
     assert accepted.status_code == 200
     assert accepted.json()["crate_id"] == crate_id
     assert "members" not in accepted.json()
+
+
+def test_invite_join_url_derives_listen_origin_from_domain(monkeypatch):
+    from starlette.requests import Request
+
+    from crate.api import crates as crate_routes
+
+    monkeypatch.delenv("CRATE_LISTEN_PUBLIC_BASE_URL", raising=False)
+    monkeypatch.setenv("DOMAIN", "example.test")
+    request = Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "https",
+            "path": "/api/crates/invites",
+            "raw_path": b"/api/crates/invites",
+            "query_string": b"",
+            "root_path": "",
+            "headers": [],
+            "server": ("api.example.test", 443),
+            "client": ("127.0.0.1", 1234),
+        }
+    )
+
+    assert (
+        crate_routes._invite_join_url(request, "invite-token")
+        == "https://listen.example.test/crate/invite/invite-token"
+    )
 
 
 def test_zero_hour_crate_invite_is_explicitly_non_expiring(

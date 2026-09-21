@@ -11,7 +11,6 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
-from crate.api.share import _absolute_url
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.crates import (
     AddCrateAlbumRequest,
@@ -96,9 +95,17 @@ def _require_owner(crate_id: UUID, user_id: int, *, detail: str) -> None:
 def _invite_join_url(request: Request, token: str) -> str:
     path = f"/crate/invite/{token}"
     listen_origin = os.environ.get("CRATE_LISTEN_PUBLIC_BASE_URL")
-    if listen_origin:
-        return f"{listen_origin.rstrip('/')}{path}"
-    return _absolute_url(request, path)
+    if not listen_origin:
+        domain = os.environ.get("DOMAIN")
+        if not domain:
+            raise RuntimeError("CRATE_LISTEN_PUBLIC_BASE_URL must be configured")
+        scheme = (
+            (request.headers.get("x-forwarded-proto") or request.url.scheme or "https")
+            .split(",")[0]
+            .strip()
+        )
+        listen_origin = f"{scheme}://listen.{domain}"
+    return f"{listen_origin.rstrip('/')}{path}"
 
 
 @router.get(
