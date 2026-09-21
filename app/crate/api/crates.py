@@ -104,6 +104,8 @@ def _invite_join_url(request: Request, token: str) -> str:
             .split(",")[0]
             .strip()
         )
+        if scheme not in {"http", "https"}:
+            scheme = "https"
         listen_origin = f"{scheme}://listen.{domain}"
     return f"{listen_origin.rstrip('/')}{path}"
 

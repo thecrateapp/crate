@@ -486,7 +486,8 @@ def share_crate(request: Request, crate_id: uuid.UUID) -> HTMLResponse:
     )
     description = str(crate.get("description") or "").strip()
     if not description:
-        description = f"{len(albums)} albums curated by {owner_name} on Crate."
+        album_label = "album" if len(albums) == 1 else "albums"
+        description = f"{len(albums)} {album_label} curated by {owner_name} on Crate."
 
     image_path = "/icons/icon-512.png"
     if first_album and first_album.get("has_cover"):

@@ -29,7 +29,7 @@ def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
     crate = {
         "id": CRATE_ID,
         "name": "Year-end records",
-        "description": "Our favorite albums this year.",
+        "description": "",
         "owner_name": "Jane Doe",
         "albums": [
             {
@@ -55,11 +55,11 @@ def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
 
     assert response.status_code == 200
     assert 'property="og:type" content="website"' in response.text
-    assert 'property="og:title" content="Year-end records"' in response.text
     assert (
-        'property="og:description" content="Our favorite albums this year."'
+        'property="og:description" content="1 album curated by Jane Doe on Crate."'
         in response.text
     )
+    assert 'property="og:title" content="Year-end records"' in response.text
     assert (
         f'property="og:image" content="https://listen.example.test/api/catalog/albums/{ALBUM_UID}/cover"'
         in response.text

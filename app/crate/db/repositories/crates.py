@@ -135,8 +135,7 @@ def update_crate(
             current,
             crate_id,
             actor_id=actor_id,
-            owner_only=actor_id is not None
-            and (visibility is not None or is_collaborative is not None),
+            owner_only=visibility is not None or is_collaborative is not None,
         )
         if not updates:
             return True
