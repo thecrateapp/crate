@@ -437,6 +437,8 @@ def create_crate_invite(
 
     if expires_in_hours < 0:
         raise ValueError("expires_in_hours must be non-negative")
+    if max_uses is not None and max_uses < 1:
+        raise ValueError("max_uses must be positive or None")
 
     token = secrets.token_urlsafe(24)
 

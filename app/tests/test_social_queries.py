@@ -120,7 +120,7 @@ class TestSocialProfiles:
     def test_get_public_crates_for_user_excludes_private_and_collaborated_crates(
         self, pg_db
     ):
-        from crate.db.queries.social_profiles import get_public_crates_for_user
+        from crate.db.queries.crates import get_public_crates_for_user
         from crate.db.repositories.crates import create_crate, update_crate
         from crate.db.tx import transaction_scope
         from sqlalchemy import text

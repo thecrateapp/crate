@@ -29,7 +29,7 @@ from crate.db.queries.social import (
     get_relationship_state,
     search_users,
 )
-from crate.db.queries.social_profiles import get_public_crates_for_user
+from crate.db.queries.crates import get_public_crates_for_user
 from crate.db.repositories.social import (
     follow_user,
     get_affinity,

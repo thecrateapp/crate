@@ -415,6 +415,18 @@ def test_create_crate_invite_rejects_negative_expiry(pg_db):
         create_crate_invite(crate_id, 1, expires_in_hours=-1)
 
 
+@pytest.mark.parametrize("max_uses", [0, -1])
+def test_create_crate_invite_rejects_non_positive_max_uses(pg_db, max_uses):
+    from crate.db.repositories.crates import create_crate, create_crate_invite
+
+    crate_id = create_crate(
+        owner_id=1, name="Invalid invite uses", is_collaborative=True
+    )
+
+    with pytest.raises(ValueError, match="positive"):
+        create_crate_invite(crate_id, 1, max_uses=max_uses)
+
+
 def test_disabling_collaboration_revokes_members_and_pending_invites(pg_db):
     from crate.db.queries.crates import get_crate_access, get_crate
     from crate.db.repositories.crates import create_crate, update_crate
