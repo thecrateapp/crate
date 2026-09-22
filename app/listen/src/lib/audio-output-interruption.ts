@@ -58,6 +58,19 @@ export function createAudioOutputInterruptionController(
     }
   };
 
+  const onContextError = (): void => {
+    pauseForInterruption("audio-context-error");
+  };
+
+  const onContextSinkChange = (): void => {
+    if (pendingResume) {
+      resumeAfterInterruption("audio-context-sinkchange");
+      return;
+    }
+
+    pauseForInterruption("audio-context-sinkchange");
+  };
+
   const observe = (): void => {
     if (!installed) return;
 
@@ -69,8 +82,12 @@ export function createAudioOutputInterruptionController(
     if (context === observedContext) return;
 
     observedContext?.removeEventListener("statechange", onContextStateChange);
+    observedContext?.removeEventListener("error", onContextError);
+    observedContext?.removeEventListener("sinkchange", onContextSinkChange);
     observedContext = context;
     observedContext?.addEventListener("statechange", onContextStateChange);
+    observedContext?.addEventListener("error", onContextError);
+    observedContext?.addEventListener("sinkchange", onContextSinkChange);
 
     if (observedContext && observedContext.state !== "running") {
       onContextStateChange();
@@ -173,6 +190,8 @@ export function createAudioOutputInterruptionController(
       onDeviceChange,
     );
     observedContext?.removeEventListener("statechange", onContextStateChange);
+    observedContext?.removeEventListener("error", onContextError);
+    observedContext?.removeEventListener("sinkchange", onContextSinkChange);
     observedContext = null;
     outputDeviceIds = null;
     if (activeController === controller) activeController = null;

@@ -150,6 +150,61 @@ describe("audio output interruption controller", () => {
     controller.dispose();
   });
 
+  it("pauses when Chrome reports an output error without changing exposed device ids", async () => {
+    const mediaDevices = new EventTarget() as MediaDevices;
+    const audioContext = new FakeAudioContext();
+    const pause = vi.fn();
+    const resume = vi.fn();
+
+    const controller = createAudioOutputInterruptionController({
+      enumerateOutputDevices: async () => ["default"],
+      getAudioContext: () => audioContext as unknown as AudioContext,
+      isPlaying: () => true,
+      mediaDevices,
+      pause,
+      resume,
+    });
+    controller.install();
+    await flushAsyncWork();
+
+    audioContext.dispatchEvent(new Event("error"));
+
+    expect(pause).toHaveBeenCalledWith({
+      immediate: true,
+      preserveAudioOutputResume: true,
+    });
+
+    audioContext.state = "running";
+    audioContext.dispatchEvent(new Event("statechange"));
+    expect(resume).toHaveBeenCalledTimes(1);
+    controller.dispose();
+  });
+
+  it("pauses and resumes when the AudioContext sink changes without exposed device ids", async () => {
+    const mediaDevices = new EventTarget() as MediaDevices;
+    const audioContext = new FakeAudioContext();
+    const pause = vi.fn();
+    const resume = vi.fn();
+
+    const controller = createAudioOutputInterruptionController({
+      enumerateOutputDevices: async () => ["default"],
+      getAudioContext: () => audioContext as unknown as AudioContext,
+      isPlaying: () => true,
+      mediaDevices,
+      pause,
+      resume,
+    });
+    controller.install();
+    await flushAsyncWork();
+
+    audioContext.dispatchEvent(new Event("sinkchange"));
+    expect(pause).toHaveBeenCalledTimes(1);
+
+    audioContext.dispatchEvent(new Event("sinkchange"));
+    expect(resume).toHaveBeenCalledTimes(1);
+    controller.dispose();
+  });
+
   it("ignores output additions when no interruption is pending", async () => {
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
