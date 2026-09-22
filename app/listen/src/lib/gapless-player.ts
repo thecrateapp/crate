@@ -343,7 +343,7 @@ export function replaceTrack(index: number, url: string): void {
   replaceQueueTrack(instance, index, url);
 }
 
-function getAudioContext(): AudioContext | null {
+export function getAudioContext(): AudioContext | null {
   return (instance as GaplessOutputInternal | null)?.context ?? null;
 }
 

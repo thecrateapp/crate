@@ -254,7 +254,10 @@ export function useMediaSession({
         "pause",
         () => {
           navigator.mediaSession.playbackState = "paused";
-          actionsRef.current.pause({ immediate: true });
+          actionsRef.current.pause({
+            immediate: true,
+            preserveAudioOutputResume: true,
+          });
         },
       ],
       ["previoustrack", () => actionsRef.current.prev()],

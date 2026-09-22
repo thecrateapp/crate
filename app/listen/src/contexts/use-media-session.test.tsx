@@ -175,7 +175,10 @@ describe("useMediaSession", () => {
 
     getMediaSessionActionHandler("pause")({ action: "pause" });
 
-    expect(controls.pause).toHaveBeenCalledWith({ immediate: true });
+    expect(controls.pause).toHaveBeenCalledWith({
+      immediate: true,
+      preserveAudioOutputResume: true,
+    });
   });
 
   it("synchronizes the Web MediaSession state inside the pause callback", () => {
