@@ -7,6 +7,7 @@ import type { Track } from "./player-types";
 import { useMediaSession } from "./use-media-session";
 
 const runtime = vi.hoisted(() => ({ isNative: false }));
+const audioOutput = vi.hoisted(() => ({ interruptionPending: false }));
 const nativeMediaSession = vi.hoisted(() => ({
   cancelPendingResume: vi.fn(async () => {}),
   controlListener: null as ((event: NativeMediaControlEvent) => void) | null,
@@ -49,6 +50,10 @@ vi.mock("@/lib/native-media-session", () => ({
 
 vi.mock("@/lib/platform", () => ({
   isTauriRuntime: false,
+}));
+
+vi.mock("@/lib/audio-output-interruption", () => ({
+  isAudioOutputInterruptionPending: () => audioOutput.interruptionPending,
 }));
 
 const TRACK_A: Track = {
@@ -127,6 +132,7 @@ function getMediaSessionActionHandler(
 
 beforeEach(() => {
   runtime.isNative = false;
+  audioOutput.interruptionPending = false;
   nativeMediaSession.controlListener = null;
   nativeMediaSession.resumeAllowed = true;
   vi.clearAllMocks();
@@ -170,6 +176,23 @@ afterEach(() => {
 });
 
 describe("useMediaSession", () => {
+  it("does not duplicate an interruption controller resume from a browser play action", () => {
+    audioOutput.interruptionPending = true;
+    renderSession(TRACK_A, 0, false);
+
+    getMediaSessionActionHandler("play")({ action: "play" });
+
+    expect(controls.resume).not.toHaveBeenCalled();
+  });
+
+  it("does not restart playback when the browser repeats play for an active track", () => {
+    renderSession(TRACK_A, 0, true);
+
+    getMediaSessionActionHandler("play")({ action: "play" });
+
+    expect(controls.resume).not.toHaveBeenCalled();
+  });
+
   it("requests an immediate pause from the Web MediaSession handler", () => {
     renderSession();
 

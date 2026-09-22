@@ -20,6 +20,7 @@ export interface AudioOutputInterruptionDependencies {
 export interface AudioOutputInterruptionController {
   cancelPendingResume(): void;
   dispose(): void;
+  hasPendingResume(): boolean;
   install(): void;
   observe(): void;
 }
@@ -34,6 +35,10 @@ let activeController: AudioOutputInterruptionController | null = null;
  */
 export function cancelPendingAudioOutputResume(): void {
   activeController?.cancelPendingResume();
+}
+
+export function isAudioOutputInterruptionPending(): boolean {
+  return activeController?.hasPendingResume() ?? false;
 }
 
 export function createAudioOutputInterruptionController(
@@ -144,6 +149,25 @@ export function createAudioOutputInterruptionController(
     const hasRemovedOutput = [...previous].some((id) => !next.has(id));
     const hasAddedOutput = [...next].some((id) => !previous.has(id));
 
+    // Chrome intentionally hides output identities until the page has been
+    // granted output-selection permission. In that mode enumerateDevices()
+    // returns the same generic/default audiooutput entry for every route, so
+    // there is no set diff to compare. Treat consecutive devicechange events
+    // as the interruption boundary in that opaque mode: the first event is
+    // the removal, the next event is the route becoming available again.
+    const outputIdentityIsOpaque =
+      next.size === 0 || (next.size === 1 && next.has("default"));
+    const previousOutputIdentityIsOpaque =
+      previous.size === 0 || (previous.size === 1 && previous.has("default"));
+    if (outputIdentityIsOpaque && previousOutputIdentityIsOpaque) {
+      if (pendingResume) {
+        resumeAfterInterruption("devicechange");
+      } else {
+        pauseForInterruption("devicechange");
+      }
+      return;
+    }
+
     if (pendingResume) {
       if (hasAddedOutput) {
         resumeAfterInterruption("devicechange");
@@ -200,6 +224,7 @@ export function createAudioOutputInterruptionController(
   const controller: AudioOutputInterruptionController = {
     cancelPendingResume,
     dispose,
+    hasPendingResume: () => pendingResume,
     install,
     observe,
   };

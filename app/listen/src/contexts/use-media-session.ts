@@ -6,6 +6,7 @@ import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
+import { isAudioOutputInterruptionPending } from "@/lib/audio-output-interruption";
 import {
   markNativeMediaSessionPlayingIntent,
   onNativeMediaControl,
@@ -48,6 +49,7 @@ export function useMediaSession({
     next,
     prev,
     seek,
+    isPlaying,
     currentTime,
     duration,
   });
@@ -59,10 +61,11 @@ export function useMediaSession({
       next,
       prev,
       seek,
+      isPlaying,
       currentTime,
       duration,
     };
-  }, [currentTime, duration, next, pause, prev, resume, seek]);
+  }, [currentTime, duration, isPlaying, next, pause, prev, resume, seek]);
 
   useEffect(() => {
     if (shouldUseAndroidNativePlayer()) return;
@@ -249,7 +252,22 @@ export function useMediaSession({
     if (isNative || !("mediaSession" in navigator)) return;
 
     const actions: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
-      ["play", () => actionsRef.current.resume()],
+      [
+        "play",
+        () => {
+          // Chrome can emit a MediaSession play action while it is restoring
+          // a Bluetooth route. The interruption controller owns that resume;
+          // accepting this action as well would start the same source twice
+          // and produce a short playback jump.
+          if (
+            actionsRef.current.isPlaying ||
+            isAudioOutputInterruptionPending()
+          ) {
+            return;
+          }
+          actionsRef.current.resume();
+        },
+      ],
       [
         "pause",
         () => {

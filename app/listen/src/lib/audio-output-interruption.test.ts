@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cancelPendingAudioOutputResume,
   createAudioOutputInterruptionController,
+  isAudioOutputInterruptionPending,
 } from "./audio-output-interruption";
 
 class FakeAudioContext extends EventTarget {
@@ -47,12 +48,14 @@ describe("audio output interruption controller", () => {
       immediate: true,
       preserveAudioOutputResume: true,
     });
+    expect(isAudioOutputInterruptionPending()).toBe(true);
 
     outputDeviceIds = ["default", "headphones"];
     mediaDevices.dispatchEvent(new Event("devicechange"));
     await flushAsyncWork();
 
     expect(resume).toHaveBeenCalledTimes(1);
+    expect(isAudioOutputInterruptionPending()).toBe(false);
     controller.dispose();
   });
 
@@ -231,4 +234,39 @@ describe("audio output interruption controller", () => {
     expect(resume).not.toHaveBeenCalled();
     controller.dispose();
   });
+
+  it.each([[""], ["default"]])(
+    "uses devicechange edges when Chrome exposes only the generic/default output (%s)",
+    async (opaqueDeviceId) => {
+      const mediaDevices = new EventTarget() as MediaDevices;
+      const audioContext = new FakeAudioContext();
+      const pause = vi.fn();
+      const resume = vi.fn();
+
+      const controller = createAudioOutputInterruptionController({
+        enumerateOutputDevices: async () => [opaqueDeviceId],
+        getAudioContext: () => audioContext as unknown as AudioContext,
+        isPlaying: () => true,
+        mediaDevices,
+        pause,
+        resume,
+      });
+      controller.install();
+      await flushAsyncWork();
+
+      mediaDevices.dispatchEvent(new Event("devicechange"));
+      await flushAsyncWork();
+
+      expect(pause).toHaveBeenCalledWith({
+        immediate: true,
+        preserveAudioOutputResume: true,
+      });
+
+      mediaDevices.dispatchEvent(new Event("devicechange"));
+      await flushAsyncWork();
+
+      expect(resume).toHaveBeenCalledTimes(1);
+      controller.dispose();
+    },
+  );
 });
