@@ -25,14 +25,19 @@ describe("audio output interruption controller", () => {
   it("pauses when an output disappears and resumes when it returns", async () => {
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
-    const pause = vi.fn();
-    const resume = vi.fn();
+    let isPlaying = true;
+    const pause = vi.fn(() => {
+      isPlaying = false;
+    });
+    const resume = vi.fn(() => {
+      isPlaying = true;
+    });
     let outputDeviceIds = ["default", "headphones"];
 
     const controller = createAudioOutputInterruptionController({
       enumerateOutputDevices: async () => outputDeviceIds,
       getAudioContext: () => audioContext as unknown as AudioContext,
-      isPlaying: () => true,
+      isPlaying: () => isPlaying,
       mediaDevices,
       pause,
       resume,
@@ -130,13 +135,18 @@ describe("audio output interruption controller", () => {
   it("uses AudioContext state changes when the browser exposes the interruption", () => {
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
-    const pause = vi.fn();
-    const resume = vi.fn();
+    let isPlaying = true;
+    const pause = vi.fn(() => {
+      isPlaying = false;
+    });
+    const resume = vi.fn(() => {
+      isPlaying = true;
+    });
 
     const controller = createAudioOutputInterruptionController({
       enumerateOutputDevices: async () => ["default"],
       getAudioContext: () => audioContext as unknown as AudioContext,
-      isPlaying: () => true,
+      isPlaying: () => isPlaying,
       mediaDevices,
       pause,
       resume,
@@ -156,13 +166,18 @@ describe("audio output interruption controller", () => {
   it("pauses when Chrome reports an output error without changing exposed device ids", async () => {
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
-    const pause = vi.fn();
-    const resume = vi.fn();
+    let isPlaying = true;
+    const pause = vi.fn(() => {
+      isPlaying = false;
+    });
+    const resume = vi.fn(() => {
+      isPlaying = true;
+    });
 
     const controller = createAudioOutputInterruptionController({
       enumerateOutputDevices: async () => ["default"],
       getAudioContext: () => audioContext as unknown as AudioContext,
-      isPlaying: () => true,
+      isPlaying: () => isPlaying,
       mediaDevices,
       pause,
       resume,
@@ -186,13 +201,18 @@ describe("audio output interruption controller", () => {
   it("pauses and resumes when the AudioContext sink changes without exposed device ids", async () => {
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
-    const pause = vi.fn();
-    const resume = vi.fn();
+    let isPlaying = true;
+    const pause = vi.fn(() => {
+      isPlaying = false;
+    });
+    const resume = vi.fn(() => {
+      isPlaying = true;
+    });
 
     const controller = createAudioOutputInterruptionController({
       enumerateOutputDevices: async () => ["default"],
       getAudioContext: () => audioContext as unknown as AudioContext,
-      isPlaying: () => true,
+      isPlaying: () => isPlaying,
       mediaDevices,
       pause,
       resume,
@@ -211,14 +231,19 @@ describe("audio output interruption controller", () => {
   it("ignores output additions when no interruption is pending", async () => {
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
-    const pause = vi.fn();
-    const resume = vi.fn();
+    let isPlaying = true;
+    const pause = vi.fn(() => {
+      isPlaying = false;
+    });
+    const resume = vi.fn(() => {
+      isPlaying = true;
+    });
     let outputDeviceIds = ["default"];
 
     const controller = createAudioOutputInterruptionController({
       enumerateOutputDevices: async () => outputDeviceIds,
       getAudioContext: () => audioContext as unknown as AudioContext,
-      isPlaying: () => true,
+      isPlaying: () => isPlaying,
       mediaDevices,
       pause,
       resume,
@@ -240,13 +265,18 @@ describe("audio output interruption controller", () => {
     async (opaqueDeviceId) => {
       const mediaDevices = new EventTarget() as MediaDevices;
       const audioContext = new FakeAudioContext();
-      const pause = vi.fn();
-      const resume = vi.fn();
+      let isPlaying = true;
+      const pause = vi.fn(() => {
+        isPlaying = false;
+      });
+      const resume = vi.fn(() => {
+        isPlaying = true;
+      });
 
       const controller = createAudioOutputInterruptionController({
         enumerateOutputDevices: async () => [opaqueDeviceId],
         getAudioContext: () => audioContext as unknown as AudioContext,
-        isPlaying: () => true,
+        isPlaying: () => isPlaying,
         mediaDevices,
         pause,
         resume,
@@ -269,4 +299,31 @@ describe("audio output interruption controller", () => {
       controller.dispose();
     },
   );
+
+  it("does not restart playback when the route recovered without pausing it", async () => {
+    const mediaDevices = new EventTarget() as MediaDevices;
+    const audioContext = new FakeAudioContext();
+    const pause = vi.fn();
+    const resume = vi.fn();
+
+    const controller = createAudioOutputInterruptionController({
+      enumerateOutputDevices: async () => [""],
+      getAudioContext: () => audioContext as unknown as AudioContext,
+      isPlaying: () => true,
+      mediaDevices,
+      pause,
+      resume,
+    });
+    controller.install();
+    await flushAsyncWork();
+
+    mediaDevices.dispatchEvent(new Event("devicechange"));
+    await flushAsyncWork();
+    mediaDevices.dispatchEvent(new Event("devicechange"));
+    await flushAsyncWork();
+
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(resume).not.toHaveBeenCalled();
+    controller.dispose();
+  });
 });

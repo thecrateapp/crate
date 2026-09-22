@@ -119,6 +119,15 @@ export function createAudioOutputInterruptionController(
     if (!pendingResume) return;
 
     pendingResume = false;
+    if (dependencies.isPlaying()) {
+      recordDevLog(
+        "audio",
+        "output interruption recovered while playback remained active",
+        { reason },
+        "debug",
+      );
+      return;
+    }
     recordDevLog("audio", "output interruption recovered", { reason }, "info");
     dependencies.resume();
   };
