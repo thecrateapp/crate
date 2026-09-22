@@ -23,6 +23,7 @@ describe("audio output interruption controller", () => {
   });
 
   it("pauses when an output disappears and resumes when it returns", async () => {
+    vi.useFakeTimers();
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
     let isPlaying = true;
@@ -57,11 +58,13 @@ describe("audio output interruption controller", () => {
 
     outputDeviceIds = ["default", "headphones"];
     mediaDevices.dispatchEvent(new Event("devicechange"));
+    await vi.advanceTimersByTimeAsync(300);
     await flushAsyncWork();
 
     expect(resume).toHaveBeenCalledTimes(1);
     expect(isAudioOutputInterruptionPending()).toBe(false);
     controller.dispose();
+    vi.useRealTimers();
   });
 
   it("does not resume after the user explicitly cancels the pending resume", async () => {
@@ -96,6 +99,7 @@ describe("audio output interruption controller", () => {
   });
 
   it("keeps a recent interruption candidate when the browser pauses first", async () => {
+    vi.useFakeTimers();
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
     const pause = vi.fn();
@@ -126,10 +130,12 @@ describe("audio output interruption controller", () => {
 
     outputDeviceIds = ["default", "headphones"];
     mediaDevices.dispatchEvent(new Event("devicechange"));
+    await vi.advanceTimersByTimeAsync(300);
     await flushAsyncWork();
 
     expect(resume).toHaveBeenCalledTimes(1);
     controller.dispose();
+    vi.useRealTimers();
   });
 
   it("uses AudioContext state changes when the browser exposes the interruption", () => {
@@ -263,6 +269,7 @@ describe("audio output interruption controller", () => {
   it.each([[""], ["default"]])(
     "uses devicechange edges when Chrome exposes only the generic/default output (%s)",
     async (opaqueDeviceId) => {
+      vi.useFakeTimers();
       const mediaDevices = new EventTarget() as MediaDevices;
       const audioContext = new FakeAudioContext();
       let isPlaying = true;
@@ -285,6 +292,7 @@ describe("audio output interruption controller", () => {
       await flushAsyncWork();
 
       mediaDevices.dispatchEvent(new Event("devicechange"));
+      await vi.advanceTimersByTimeAsync(300);
       await flushAsyncWork();
 
       expect(pause).toHaveBeenCalledWith({
@@ -293,14 +301,57 @@ describe("audio output interruption controller", () => {
       });
 
       mediaDevices.dispatchEvent(new Event("devicechange"));
+      await vi.advanceTimersByTimeAsync(300);
       await flushAsyncWork();
 
       expect(resume).toHaveBeenCalledTimes(1);
       controller.dispose();
+      vi.useRealTimers();
     },
   );
 
+  it("coalesces duplicate devicechange events in opaque output mode", async () => {
+    vi.useFakeTimers();
+    const mediaDevices = new EventTarget() as MediaDevices;
+    const audioContext = new FakeAudioContext();
+    let isPlaying = true;
+    const pause = vi.fn(() => {
+      isPlaying = false;
+    });
+    const resume = vi.fn(() => {
+      isPlaying = true;
+    });
+
+    const controller = createAudioOutputInterruptionController({
+      enumerateOutputDevices: async () => [""],
+      getAudioContext: () => audioContext as unknown as AudioContext,
+      isPlaying: () => isPlaying,
+      mediaDevices,
+      pause,
+      resume,
+    });
+    controller.install();
+    await flushAsyncWork();
+
+    mediaDevices.dispatchEvent(new Event("devicechange"));
+    mediaDevices.dispatchEvent(new Event("devicechange"));
+    await vi.advanceTimersByTimeAsync(300);
+    await flushAsyncWork();
+
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(resume).not.toHaveBeenCalled();
+
+    mediaDevices.dispatchEvent(new Event("devicechange"));
+    await vi.advanceTimersByTimeAsync(300);
+    await flushAsyncWork();
+
+    expect(resume).toHaveBeenCalledTimes(1);
+    controller.dispose();
+    vi.useRealTimers();
+  });
+
   it("does not restart playback when the route recovered without pausing it", async () => {
+    vi.useFakeTimers();
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
     const pause = vi.fn();
@@ -318,12 +369,15 @@ describe("audio output interruption controller", () => {
     await flushAsyncWork();
 
     mediaDevices.dispatchEvent(new Event("devicechange"));
+    await vi.advanceTimersByTimeAsync(300);
     await flushAsyncWork();
     mediaDevices.dispatchEvent(new Event("devicechange"));
+    await vi.advanceTimersByTimeAsync(300);
     await flushAsyncWork();
 
     expect(pause).toHaveBeenCalledTimes(1);
     expect(resume).not.toHaveBeenCalled();
     controller.dispose();
+    vi.useRealTimers();
   });
 });

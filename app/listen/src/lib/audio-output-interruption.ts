@@ -2,6 +2,7 @@ import type { PlayerPauseOptions } from "@/contexts/player-context";
 import { recordDevLog } from "@/lib/dev-logs";
 
 const INTERRUPTION_CANDIDATE_WINDOW_MS = 2_000;
+const OPAQUE_DEVICE_CHANGE_SETTLE_MS = 300;
 
 export interface AudioOutputMediaDevices {
   addEventListener(type: "devicechange", listener: EventListener): void;
@@ -50,6 +51,7 @@ export function createAudioOutputInterruptionController(
   let outputDeviceIds: Set<string> | null = null;
   let lastPlayingAt: number | null = null;
   let deviceChangeWork = Promise.resolve();
+  let opaqueDeviceChangeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const onContextStateChange = (): void => {
     const state = observedContext?.state as string | undefined;
@@ -189,11 +191,31 @@ export function createAudioOutputInterruptionController(
     }
   };
 
-  const onDeviceChange = (): void => {
+  const enqueueDeviceRefresh = (): void => {
     deviceChangeWork = deviceChangeWork.then(
       () => refreshOutputDevices(),
       () => refreshOutputDevices(),
     );
+  };
+
+  const onDeviceChange = (): void => {
+    const outputIdentityIsOpaque =
+      outputDeviceIds !== null &&
+      (outputDeviceIds.size === 0 ||
+        (outputDeviceIds.size === 1 && outputDeviceIds.has("default")));
+
+    if (outputIdentityIsOpaque) {
+      if (opaqueDeviceChangeTimer !== null) {
+        clearTimeout(opaqueDeviceChangeTimer);
+      }
+      opaqueDeviceChangeTimer = setTimeout(() => {
+        opaqueDeviceChangeTimer = null;
+        enqueueDeviceRefresh();
+      }, OPAQUE_DEVICE_CHANGE_SETTLE_MS);
+      return;
+    }
+
+    enqueueDeviceRefresh();
   };
 
   const cancelPendingResume = (): void => {
@@ -218,6 +240,10 @@ export function createAudioOutputInterruptionController(
     if (!installed) return;
     installed = false;
     cancelPendingResume();
+    if (opaqueDeviceChangeTimer !== null) {
+      clearTimeout(opaqueDeviceChangeTimer);
+      opaqueDeviceChangeTimer = null;
+    }
     dependencies.mediaDevices?.removeEventListener(
       "devicechange",
       onDeviceChange,
