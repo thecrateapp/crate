@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { PublicCrate } from "@/pages/crates-types";
 
 export interface RelationshipState {
   following: boolean;
@@ -68,6 +69,7 @@ export interface PublicProfile {
   following_count: number;
   friends_count: number;
   public_playlists: PublicPlaylist[];
+  public_crates: PublicCrate[];
   relationship_state: RelationshipState;
   affinity_score: number;
   affinity_band: "low" | "medium" | "high" | "very_high";

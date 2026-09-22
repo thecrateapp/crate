@@ -54,6 +54,19 @@ _PLAYLISTS = [
     },
 ]
 
+_PUBLIC_CRATES = [
+    {
+        "id": "77777777-7777-4777-8777-777777777777",
+        "owner_id": 2,
+        "name": "Year-end records",
+        "description": "Our picks",
+        "visibility": "public",
+        "is_collaborative": False,
+        "album_count": 3,
+        "first_album": None,
+    }
+]
+
 _RELATIONSHIP = {"following": False, "followed_by": False, "is_friend": False}
 
 _RELATIONSHIP_FOLLOWING = {"following": True, "followed_by": False, "is_friend": False}
@@ -216,6 +229,10 @@ class TestSocialProfile:
                 return_value=_PLAYLISTS,
             ),
             patch(
+                "crate.api.social.get_public_crates_for_user",
+                return_value=_PUBLIC_CRATES,
+            ),
+            patch(
                 "crate.api.social.get_relationship_state",
                 return_value=_RELATIONSHIP,
             ),
@@ -228,6 +245,9 @@ class TestSocialProfile:
             assert resp.status_code == 200
             data = resp.json()
             assert data["username"] == "listener"
+            assert [crate["name"] for crate in data["public_crates"]] == [
+                "Year-end records"
+            ]
             assert data["display_name"] == "Listener One"
             assert data["followers_count"] == 42
             assert len(data["public_playlists"]) == 1
@@ -253,6 +273,10 @@ class TestSocialProfile:
             ),
             patch(
                 "crate.api.social.get_public_playlists_for_user",
+                return_value=[],
+            ),
+            patch(
+                "crate.api.social.get_public_crates_for_user",
                 return_value=[],
             ),
             patch(
@@ -283,6 +307,10 @@ class TestSocialProfilePage:
             patch(
                 "crate.api.social.get_public_playlists_for_user",
                 return_value=_PLAYLISTS,
+            ),
+            patch(
+                "crate.api.social.get_public_crates_for_user",
+                return_value=_PUBLIC_CRATES,
             ),
             patch(
                 "crate.api.social.get_relationship_state",
@@ -320,6 +348,9 @@ class TestSocialProfilePage:
             assert data["followers_preview"] == _FOLLOWERS
             assert data["following_preview"] == _FOLLOWING
             assert data["contributions_preview"] == []
+            assert [crate["name"] for crate in data["public_crates"]] == [
+                "Year-end records"
+            ]
             assert len(data["followers_preview"]) == 2
             assert len(data["following_preview"]) == 1
 
