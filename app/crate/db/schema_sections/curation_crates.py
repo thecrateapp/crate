@@ -1,4 +1,8 @@
-"""Current Crates schema bootstrap entry point."""
+"""Current Crates schema bootstrap entry point.
+
+The revision-specific module owns the DDL so bootstrap and Alembic stay in
+lockstep; this module is only the stable curation-schema adapter.
+"""
 
 from typing import Any
 
