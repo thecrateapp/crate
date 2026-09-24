@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from sqlalchemy import text
+
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
+from crate.db.tx import read_scope
+from crate.db.queries.genres_shared import MIN_GENRE_MEMBERSHIP_SCORE
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.db.repositories.global_user_library import list_global_collection_artists
 from crate.genre_covers import genre_cover_public_url
@@ -147,6 +151,63 @@ def build_radio_stations_from_context(
     }
 
 
+def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
+    missing_cover_stations = [
+        station
+        for station in stations
+        if station.get("type") == "genre" and not station.get("cover_url")
+    ]
+    if not missing_cover_stations:
+        return
+
+    genre_names = list(
+        dict.fromkeys(station["genre_name"] for station in missing_cover_stations)
+    )
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT DISTINCT ON (requested.genre_name)
+                        requested.genre_name,
+                        la.id AS artist_id
+                    FROM unnest(CAST(:genre_names AS text[])) AS requested(genre_name)
+                    JOIN genres g
+                      ON LOWER(TRIM(g.name)) = LOWER(TRIM(requested.genre_name))
+                    JOIN artist_genres ag ON ag.genre_id = g.id
+                    JOIN library_artists la ON la.name = ag.artist_name
+                    WHERE COALESCE(ag.weight, 0) >= :min_membership_score
+                    ORDER BY
+                        requested.genre_name,
+                        COALESCE(ag.weight, 0) DESC,
+                        COALESCE(la.listeners, 0) DESC,
+                        COALESCE(la.lastfm_playcount, 0) DESC,
+                        COALESCE(la.album_count, 0) DESC,
+                        la.name ASC
+                    """
+                ),
+                {
+                    "genre_names": genre_names,
+                    "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
+                },
+            )
+            .mappings()
+            .all()
+        )
+
+    backgrounds_by_genre = {
+        str(row["genre_name"]).casefold(): (
+            f"/api/artists/{row['artist_id']}/background?size=640&format=webp"
+        )
+        for row in rows
+        if row.get("artist_id") is not None
+    }
+    for station in missing_cover_stations:
+        fallback = backgrounds_by_genre.get(station["genre_name"].casefold())
+        if fallback:
+            station["cover_url"] = fallback
+
+
 def get_user_radio_stations(user_id: int) -> dict:
     context = get_cached_home_context(
         user_id,
@@ -154,4 +215,6 @@ def get_user_radio_stations(user_id: int) -> dict:
         top_album_limit=1,
         top_genre_limit=16,
     )
-    return build_radio_stations_from_context(context)
+    stations = build_radio_stations_from_context(context)
+    _add_genre_station_artwork_fallbacks(stations["genre_stations"])
+    return stations

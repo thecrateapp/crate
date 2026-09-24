@@ -176,13 +176,13 @@ afterEach(() => {
 });
 
 describe("useMediaSession", () => {
-  it("does not duplicate an interruption controller resume from a browser play action", () => {
+  it("honors a media-session play request while output recovery is pending", () => {
     audioOutput.interruptionPending = true;
-    renderSession(TRACK_A, 0, false);
+    renderSession(TRACK_A, 0, true);
 
     getMediaSessionActionHandler("play")({ action: "play" });
 
-    expect(controls.resume).not.toHaveBeenCalled();
+    expect(controls.resume).toHaveBeenCalledTimes(1);
   });
 
   it("does not restart playback when the browser repeats play for an active track", () => {

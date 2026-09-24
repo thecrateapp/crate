@@ -1,4 +1,9 @@
-import { useEffect, useRef, type MutableRefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type MutableRefObject,
+} from "react";
 
 import type { PlayerPauseOptions } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
@@ -28,14 +33,19 @@ export function useAudioOutputInterruption({
   const controllerRef = useRef<AudioOutputInterruptionController | null>(null);
   const pauseRef = useRef(pause);
   const resumeRef = useRef(resume);
-  pauseRef.current = pause;
-  resumeRef.current = resume;
 
-  if (controllerRef.current === null) {
+  useLayoutEffect(() => {
+    pauseRef.current = pause;
+    resumeRef.current = resume;
+  }, [pause, resume]);
+
+  useEffect(() => {
+    if (isNative || isTauriRuntime) return;
+
     const mediaDevices =
       typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
 
-    controllerRef.current = createAudioOutputInterruptionController({
+    const controller = createAudioOutputInterruptionController({
       enumerateOutputDevices: mediaDevices
         ? async () => {
             const devices = await mediaDevices.enumerateDevices();
@@ -50,18 +60,17 @@ export function useAudioOutputInterruption({
       pause: (options) => pauseRef.current(options),
       resume: () => resumeRef.current(),
     });
-  }
-
-  const controller = controllerRef.current;
-
-  useEffect(() => {
-    if (isNative || isTauriRuntime) return;
-
+    controllerRef.current = controller;
     controller.install();
-    return () => controller.dispose();
-  }, [controller]);
+    return () => {
+      controller.dispose();
+      if (controllerRef.current === controller) controllerRef.current = null;
+    };
+  }, [isPlayingRef]);
 
   useEffect(() => {
-    controller.observe();
-  }, [controller, currentTrack?.id, isPlaying]);
+    const controller = controllerRef.current;
+    if (!controller) return;
+    return controller.observe();
+  }, [currentTrack?.id, isPlaying]);
 }

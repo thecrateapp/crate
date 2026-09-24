@@ -256,13 +256,11 @@ export function useMediaSession({
         "play",
         () => {
           // Chrome can emit a MediaSession play action while it is restoring
-          // a Bluetooth route. The interruption controller owns that resume;
-          // accepting this action as well would start the same source twice
-          // and produce a short playback jump.
-          if (
-            actionsRef.current.isPlaying ||
-            isAudioOutputInterruptionPending()
-          ) {
+          // a Bluetooth route. Ignore duplicate play actions during normal
+          // playback, but honor one while an interruption is pending: the
+          // transport state can be stale if the route recovery event was lost.
+          const interruptionPending = isAudioOutputInterruptionPending();
+          if (actionsRef.current.isPlaying && !interruptionPending) {
             return;
           }
           actionsRef.current.resume();

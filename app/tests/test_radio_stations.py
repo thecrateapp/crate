@@ -88,3 +88,50 @@ def test_radio_station_payload_splits_artist_and_genre_stations(monkeypatch):
             "minutes_listened": 320,
         }
     ]
+
+
+def test_genre_stations_fall_back_to_top_artist_background(monkeypatch):
+    from crate.db.queries import radio_stations
+
+    class Result:
+        def mappings(self):
+            return self
+
+        def all(self):
+            return [{"genre_name": "Hardcore", "artist_id": 42}]
+
+    class Session:
+        def execute(self, *_args, **_kwargs):
+            return Result()
+
+    class ReadScope:
+        def __enter__(self):
+            return Session()
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(radio_stations, "read_scope", ReadScope)
+    stations = [
+        {"type": "genre", "genre_name": "Hardcore", "cover_url": None},
+        {"type": "artist", "genre_name": "Hardcore", "cover_url": None},
+    ]
+
+    radio_stations._add_genre_station_artwork_fallbacks(stations)
+
+    assert stations[0]["cover_url"] == "/api/artists/42/background?size=640&format=webp"
+    assert stations[1]["cover_url"] is None
+
+
+def test_genre_station_artwork_fallback_skips_genres_with_covers(monkeypatch):
+    from crate.db.queries import radio_stations
+
+    def fail_if_queried():
+        raise AssertionError("artwork lookup should be skipped")
+
+    monkeypatch.setattr(radio_stations, "read_scope", fail_if_queried)
+    stations = [{"type": "genre", "genre_name": "Hardcore", "cover_url": "/cover.webp"}]
+
+    radio_stations._add_genre_station_artwork_fallbacks(stations)
+
+    assert stations[0]["cover_url"] == "/cover.webp"

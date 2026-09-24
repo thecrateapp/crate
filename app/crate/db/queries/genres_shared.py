@@ -10,6 +10,8 @@ from crate.genre_taxonomy import (
     resolve_genre_eq_preset,
 )
 
+MIN_GENRE_MEMBERSHIP_SCORE = 0.70
+
 
 def _artist_photo_public_url(artist_id: int) -> str:
     return f"/api/artists/{artist_id}/photo?size=640&format=webp"

@@ -2,6 +2,7 @@ import type { PlayerPauseOptions } from "@/contexts/player-context";
 import { recordDevLog } from "@/lib/dev-logs";
 
 const INTERRUPTION_CANDIDATE_WINDOW_MS = 2_000;
+const INTERRUPTION_RESUME_TIMEOUT_MS = 30_000;
 const OPAQUE_DEVICE_CHANGE_SETTLE_MS = 300;
 
 export interface AudioOutputMediaDevices {
@@ -23,7 +24,7 @@ export interface AudioOutputInterruptionController {
   dispose(): void;
   hasPendingResume(): boolean;
   install(): void;
-  observe(): void;
+  observe(): () => void;
 }
 
 let activeController: AudioOutputInterruptionController | null = null;
@@ -47,9 +48,11 @@ export function createAudioOutputInterruptionController(
 ): AudioOutputInterruptionController {
   let installed = false;
   let pendingResume = false;
+  let pendingResumeTimer: ReturnType<typeof setTimeout> | null = null;
   let observedContext: AudioContext | null = null;
   let outputDeviceIds: Set<string> | null = null;
   let lastPlayingAt: number | null = null;
+  let playbackWasActive = false;
   let deviceChangeWork = Promise.resolve();
   let opaqueDeviceChangeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -78,38 +81,89 @@ export function createAudioOutputInterruptionController(
     pauseForInterruption("audio-context-sinkchange");
   };
 
-  const observe = (): void => {
-    if (!installed) return;
+  const observe = (): (() => void) => {
+    if (!installed) return () => {};
 
     if (dependencies.isPlaying()) {
       lastPlayingAt = Date.now();
+      playbackWasActive = true;
+    } else if (playbackWasActive) {
+      lastPlayingAt = Date.now();
+      playbackWasActive = false;
     }
 
     const context = dependencies.getAudioContext();
-    if (context === observedContext) return;
+    const contextChanged = context !== observedContext;
+    if (contextChanged) {
+      observedContext?.removeEventListener("statechange", onContextStateChange);
+      observedContext?.removeEventListener("error", onContextError);
+      observedContext?.removeEventListener("sinkchange", onContextSinkChange);
+      observedContext = context;
+      observedContext?.addEventListener("statechange", onContextStateChange);
+      observedContext?.addEventListener("error", onContextError);
+      observedContext?.addEventListener("sinkchange", onContextSinkChange);
+    }
 
-    observedContext?.removeEventListener("statechange", onContextStateChange);
-    observedContext?.removeEventListener("error", onContextError);
-    observedContext?.removeEventListener("sinkchange", onContextSinkChange);
-    observedContext = context;
-    observedContext?.addEventListener("statechange", onContextStateChange);
-    observedContext?.addEventListener("error", onContextError);
-    observedContext?.addEventListener("sinkchange", onContextSinkChange);
-
-    if (observedContext && observedContext.state !== "running") {
+    if (
+      contextChanged &&
+      observedContext &&
+      observedContext.state !== "running"
+    ) {
       onContextStateChange();
     }
+
+    const contextAtObservation = observedContext;
+    return () => {
+      if (
+        !installed ||
+        !contextAtObservation ||
+        observedContext !== contextAtObservation
+      ) {
+        return;
+      }
+      contextAtObservation.removeEventListener(
+        "statechange",
+        onContextStateChange,
+      );
+      contextAtObservation.removeEventListener("error", onContextError);
+      contextAtObservation.removeEventListener(
+        "sinkchange",
+        onContextSinkChange,
+      );
+      observedContext = null;
+    };
+  };
+
+  const clearPendingResumeTimer = (): void => {
+    if (pendingResumeTimer === null) return;
+    clearTimeout(pendingResumeTimer);
+    pendingResumeTimer = null;
   };
 
   const pauseForInterruption = (reason: string): void => {
     const wasPlayingRecently =
       lastPlayingAt !== null &&
       Date.now() - lastPlayingAt <= INTERRUPTION_CANDIDATE_WINDOW_MS;
-    if (pendingResume || (!dependencies.isPlaying() && !wasPlayingRecently)) {
+    if (
+      pendingResume ||
+      (!dependencies.isPlaying() && !playbackWasActive && !wasPlayingRecently)
+    ) {
       return;
     }
 
     pendingResume = true;
+    pendingResumeTimer = setTimeout(() => {
+      pendingResumeTimer = null;
+      pendingResume = false;
+      lastPlayingAt = null;
+      playbackWasActive = false;
+      recordDevLog(
+        "audio",
+        "output interruption resume expired",
+        { reason },
+        "debug",
+      );
+    }, INTERRUPTION_RESUME_TIMEOUT_MS);
     recordDevLog("audio", "output interruption detected", { reason }, "info");
     dependencies.pause({
       immediate: true,
@@ -120,8 +174,11 @@ export function createAudioOutputInterruptionController(
   const resumeAfterInterruption = (reason: string): void => {
     if (!pendingResume) return;
 
+    clearPendingResumeTimer();
     pendingResume = false;
     if (dependencies.isPlaying()) {
+      lastPlayingAt = Date.now();
+      playbackWasActive = true;
       recordDevLog(
         "audio",
         "output interruption recovered while playback remained active",
@@ -130,6 +187,8 @@ export function createAudioOutputInterruptionController(
       );
       return;
     }
+    lastPlayingAt = null;
+    playbackWasActive = false;
     recordDevLog("audio", "output interruption recovered", { reason }, "info");
     dependencies.resume();
   };
@@ -219,8 +278,10 @@ export function createAudioOutputInterruptionController(
   };
 
   const cancelPendingResume = (): void => {
+    clearPendingResumeTimer();
     pendingResume = false;
     lastPlayingAt = null;
+    playbackWasActive = false;
   };
 
   const install = (): void => {
