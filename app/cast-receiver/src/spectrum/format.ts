@@ -38,13 +38,15 @@ export function decodeCastSpectrum(buffer: ArrayBuffer): CastSpectrumArtifact {
   if (
     version !== 1 ||
     bandCount !== CAST_SPECTRUM_BAND_COUNT ||
-    sampleIntervalMs !== CAST_SPECTRUM_INTERVAL_MS ||
-    normalizationFloorDb !== -80 ||
-    reserved !== 0 ||
-    frameCount > MAX_FRAME_COUNT ||
-    durationMs > MAX_DURATION_MS ||
-    buffer.byteLength !== HEADER_BYTES + frameCount * bandCount
+    sampleIntervalMs !== CAST_SPECTRUM_INTERVAL_MS
   ) {
+    invalidSpectrum();
+  }
+  if (normalizationFloorDb !== -80 || reserved !== 0) invalidSpectrum();
+  if (frameCount > MAX_FRAME_COUNT || durationMs > MAX_DURATION_MS) {
+    invalidSpectrum();
+  }
+  if (buffer.byteLength !== HEADER_BYTES + frameCount * bandCount) {
     invalidSpectrum();
   }
 

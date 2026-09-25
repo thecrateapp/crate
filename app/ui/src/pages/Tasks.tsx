@@ -43,8 +43,8 @@ import {
   isRepairTaskType,
   taskFamily,
   taskNeedsAttention,
-  taskRevalidationIssueCount,
 } from "@/lib/task-insights";
+import { describeTaskResult } from "@/lib/task-results";
 import { cn, timeAgo } from "@/lib/utils";
 import { taskLabel } from "@/lib/task-labels";
 
@@ -335,108 +335,6 @@ function getTaskLabel(task: Task): string {
   if (params.artist_folder && params.album_folder)
     return `${base}: ${params.artist_folder} / ${params.album_folder}`;
   return base;
-}
-
-function describeResult(task: Task): string {
-  if (task.error)
-    return task.error.length > 120
-      ? `${task.error.slice(0, 120)}…`
-      : task.error;
-  const result = task.result;
-  if (!result) return task.status === "completed" ? "Completed" : "";
-
-  const type = task.type;
-
-  if (type === "process_new_content") {
-    const steps = result.steps as Record<string, unknown> | undefined;
-    if (steps) {
-      const done = Object.entries(steps).filter(
-        ([, value]) => value !== "failed" && value !== false,
-      ).length;
-      const failed = Object.entries(steps).filter(
-        ([, value]) => value === "failed",
-      ).length;
-      return `${done} steps done${failed ? `, ${failed} failed` : ""}`;
-    }
-  }
-
-  if (type === "enrich_artist") {
-    if (result.skipped) return "Skipped (recently enriched)";
-    return "Artist enriched";
-  }
-
-  if (type === "enrich_artists" || type === "enrich_mbids") {
-    const parts: string[] = [];
-    if (result.enriched) parts.push(`${result.enriched} enriched`);
-    if (result.skipped) parts.push(`${result.skipped} skipped`);
-    if (result.failed) parts.push(`${result.failed} failed`);
-    return parts.join(", ") || "Done";
-  }
-
-  if (type === "analyze_tracks" || type === "analyze_all") {
-    return `${result.analyzed ?? 0} tracks analyzed${
-      result.failed ? `, ${result.failed} failed` : ""
-    }`;
-  }
-
-  if (type === "compute_bliss") {
-    return `${result.analyzed ?? 0} tracks vectorized${
-      result.failed ? `, ${result.failed} failed` : ""
-    }`;
-  }
-
-  if (type === "compute_popularity") {
-    const parts: string[] = [];
-    if (result.albums) parts.push(`${result.albums} albums`);
-    if (result.tracks) parts.push(`${result.tracks} tracks`);
-    return parts.join(", ") || "Done";
-  }
-
-  if (type === "health_check") return `${result.issue_count ?? 0} issues found`;
-  if (type === "repair") {
-    const summary =
-      (result.summary as Record<string, unknown> | undefined) ?? {};
-    const applied = Number(summary.applied ?? 0);
-    const skipped = Number(summary.skipped ?? 0);
-    const failed = Number(summary.failed ?? 0);
-    const manual = Number(summary.unsupported ?? 0);
-    const remaining = taskRevalidationIssueCount(result);
-    const parts = [`${applied} applied`];
-    if (skipped) parts.push(`${skipped} skipped`);
-    if (failed) parts.push(`${failed} failed`);
-    if (manual) parts.push(`${manual} manual`);
-    if (remaining != null) parts.push(`${remaining} open after revalidation`);
-    return `${parts.join(", ")}${
-      result.fs_changed ? " (filesystem modified)" : ""
-    }`;
-  }
-  if (type === "fix_artist") {
-    const albumsFixed = Number(result.albums_fixed ?? 0);
-    const syncedTracks = Number(result.synced_tracks ?? 0);
-    return `${albumsFixed} albums fixed, ${syncedTracks} tracks synced`;
-  }
-
-  if (type === "library_sync" || type === "library_pipeline") {
-    const parts: string[] = [];
-    if (result.artists_added) parts.push(`+${result.artists_added} artists`);
-    if (result.tracks_total) parts.push(`${result.tracks_total} tracks`);
-    return parts.join(", ") || "Synced";
-  }
-
-  if (type === "match_apply")
-    return `${result.updated ?? 0}/${result.total ?? "?"} tracks tagged`;
-  if (type === "delete_artist" || type === "delete_album") return "Deleted";
-  if (type === "compute_analytics") return "Analytics computed";
-  if (type === "tidal_download")
-    return result.error ? String(result.error) : "Downloaded";
-
-  const keys = Object.keys(result);
-  if (keys.length === 0) return "Done";
-  if (keys.length <= 3)
-    return keys
-      .map((key) => `${key}: ${JSON.stringify(result[key])}`)
-      .join(", ");
-  return `${keys.length} fields`;
 }
 
 function isRepairTask(task: Task): boolean {
@@ -1272,7 +1170,7 @@ function HistoryTaskRow({
 }) {
   const status = getStatusMeta(task.status);
   const Icon = status.icon;
-  const summary = describeResult(task);
+  const summary = describeTaskResult(task);
   const showHumanLog = task.type === "repair" || task.type === "fix_artist";
   const highlightMeta = highlightStatus ? getStatusMeta(highlightStatus) : null;
   const family = taskFamily(task.type);

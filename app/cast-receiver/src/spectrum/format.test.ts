@@ -12,6 +12,7 @@ function envelope(
   overrides: {
     bandCount?: number;
     durationMs?: number;
+    frameCount?: number;
     intervalMs?: number;
     normalizationFloorDb?: number;
     reserved?: number;
@@ -19,14 +20,15 @@ function envelope(
   } = {},
 ): ArrayBuffer {
   const bandCount = overrides.bandCount ?? CAST_SPECTRUM_BAND_COUNT;
-  const buffer = new ArrayBuffer(20 + frames.length * bandCount);
+  const frameCount = overrides.frameCount ?? frames.length;
+  const buffer = new ArrayBuffer(20 + frameCount * bandCount);
   const bytes = new Uint8Array(buffer);
   bytes.set([0x43, 0x52, 0x53, 0x50]);
   const view = new DataView(buffer);
   view.setUint8(4, overrides.version ?? 1);
   view.setUint8(5, bandCount);
   view.setUint16(6, overrides.intervalMs ?? CAST_SPECTRUM_INTERVAL_MS);
-  view.setUint32(8, frames.length);
+  view.setUint32(8, frameCount);
   view.setUint32(
     12,
     overrides.durationMs ?? frames.length * CAST_SPECTRUM_INTERVAL_MS,
@@ -62,6 +64,17 @@ describe("Cast spectrum format", () => {
     ["interval", () => envelope([], { intervalMs: 50 })],
     ["normalization", () => envelope([], { normalizationFloorDb: -60 })],
     ["reserved", () => envelope([], { reserved: 1 })],
+    [
+      "frame limit",
+      () =>
+        envelope([], {
+          frameCount: (4 * 60 * 60 * 1_000) / CAST_SPECTRUM_INTERVAL_MS + 1,
+        }),
+    ],
+    [
+      "duration limit",
+      () => envelope([], { durationMs: 4 * 60 * 60 * 1_000 + 1 }),
+    ],
     [
       "truncated",
       () => envelope([Array(CAST_SPECTRUM_BAND_COUNT).fill(1)]).slice(0, -1),
