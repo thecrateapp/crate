@@ -8,6 +8,7 @@ from crate import tidal
 from crate.m4a_fix import repair_tidal_artifacts
 from crate.worker_handlers.acquisition import (
     _summarize_tidal_audio_quality,
+    _tidal_audio_quality_event,
     _tidal_download_inner,
 )
 
@@ -17,17 +18,22 @@ def _write_mp4_header(path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("quality", "expected_atmos_filter"),
+    ("quality", "expected_tidal_quality", "expected_atmos_filter"),
     [
-        ("normal", "allow"),
-        ("low", "allow"),
-        ("high", "none"),
-        ("max", "none"),
-        ("lossless", "none"),
+        ("normal", "normal", "none"),
+        ("low", "low", "none"),
+        ("high", "high", "none"),
+        ("max", "max", "none"),
+        ("lossless", "max", "none"),
+        ("atmos", "normal", "only"),
     ],
 )
 def test_tidal_download_uses_collision_safe_output_template(
-    tmp_path, monkeypatch, quality, expected_atmos_filter
+    tmp_path,
+    monkeypatch,
+    quality,
+    expected_tidal_quality,
+    expected_atmos_filter,
 ):
     captured: list[list[str]] = []
 
@@ -65,6 +71,7 @@ def test_tidal_download_uses_collision_safe_output_template(
     assert result["success"] is True
     assert result["audio_file_count"] == 1
     cmd = captured[0]
+    assert cmd[cmd.index("-q") + 1] == expected_tidal_quality
     assert cmd[cmd.index("--dolby-atmos") + 1] == expected_atmos_filter
     assert cmd[cmd.index("--output") + 1] == tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.number:02d}" in tidal.TIDDL_OUTPUT_TEMPLATE
@@ -368,6 +375,76 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
     }
 
 
+def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    first_track = album_dir / "01 - Track 1.flac"
+    second_track = album_dir / "02 - Track 2.flac"
+    first_track.write_bytes(b"audio")
+    second_track.write_bytes(b"audio")
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: {
+            "tracks": [
+                {
+                    "path": str(first_track),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": None,
+                }
+            ]
+        },
+    )
+
+    def _read_audio_quality(audio_file):
+        if audio_file == first_track:
+            return {"bit_depth": 24, "sample_rate": 96000}
+        return {"bit_depth": 16, "sample_rate": 44100}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+
+    assert summary == {
+        "tracks_total": 2,
+        "tracks_probed": 2,
+        "profiles": [
+            {"bit_depth": 16, "sample_rate": 44100, "tracks": 1},
+            {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
+        ],
+    }
+
+
+def test_summarize_tidal_audio_quality_falls_back_when_native_probe_raises(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    track = album_dir / "01 - Track 1.flac"
+    track.write_bytes(b"audio")
+
+    def _raise_probe_error(**_kwargs):
+        raise RuntimeError("native probe unavailable")
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", _raise_probe_error)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda _path: {"bit_depth": 24, "sample_rate": 96000},
+    )
+
+    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+
+    assert summary == {
+        "tracks_total": 1,
+        "tracks_probed": 1,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+    }
+
+
 @pytest.mark.parametrize("native_tracks", [[], [{"ok": False, "error": "probe"}]])
 def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
     tmp_path, monkeypatch, native_tracks
@@ -414,6 +491,49 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
     summary = _summarize_tidal_audio_quality([{"path": path}])
 
     assert summary == {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
+
+
+@pytest.mark.parametrize(
+    ("audio_quality", "expected_event"),
+    [
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 2}],
+            },
+            (
+                "info",
+                "Observed downloaded audio quality in 2/2 tracks: "
+                "24-bit / 96000 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 16, "sample_rate": 44100, "tracks": 2}],
+            },
+            (
+                "warn",
+                "Tidal MAX was requested, but no 24-bit audio was confirmed "
+                "(2/2 tracks inspected). Observed: 16-bit / 44100 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {"tracks_total": 2, "tracks_probed": 0, "profiles": []},
+            (
+                "warn",
+                "Tidal MAX was requested, but Crate could not verify the "
+                "downloaded bit depth or sample rate",
+            ),
+        ),
+    ],
+)
+def test_tidal_audio_quality_event_reports_detected_quality(
+    audio_quality, expected_event
+):
+    assert _tidal_audio_quality_event(audio_quality) == expected_event
 
 
 def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypatch):

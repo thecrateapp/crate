@@ -7,6 +7,7 @@ import { checkDiscoveryAvailable, startShapedRadio } from "@/lib/radio";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { RadioPage } from "./Radio";
+import { RadioStationRail } from "./RadioStationRail";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
@@ -109,6 +110,57 @@ describe("RadioPage", () => {
       "radio-station-card",
     );
     expect(screen.getByRole("textbox")).toHaveClass("radio-seed-input");
+  });
+
+  it("only renders the station placeholder when artwork is missing", async () => {
+    const station = {
+      type: "genre" as const,
+      seed_type: "genre" as const,
+      seed_value: "hardcore",
+      seed_label: "hardcore",
+      title: "hardcore Radio",
+      cover_url: null,
+    };
+    const fallbackRender = renderWithListenProviders(
+      <RadioStationRail
+        title="Genre Stations"
+        subtitle=""
+        stations={[station]}
+        loading={false}
+        disabled={false}
+        onStart={vi.fn()}
+      />,
+    );
+    const genreStation = screen.getByRole("button", { name: /hardcore/i });
+    expect(
+      genreStation.querySelector(
+        '.radio-station-placeholder[data-station-type="genre"]',
+      ),
+    ).toBeInTheDocument();
+
+    fallbackRender.unmount();
+    const coveredRender = renderWithListenProviders(
+      <RadioStationRail
+        title="Genre Stations"
+        subtitle=""
+        stations={[
+          {
+            ...station,
+            cover_url: "/api/genres/hardcore/cover?size=640&format=webp",
+          },
+        ]}
+        loading={false}
+        disabled={false}
+        onStart={vi.fn()}
+      />,
+    );
+    const coveredGenreStation = screen.getByRole("button", {
+      name: /hardcore/i,
+    });
+    expect(
+      coveredGenreStation.querySelector(".radio-station-placeholder"),
+    ).not.toBeInTheDocument();
+    coveredRender.unmount();
   });
 
   it("localizes radio chrome", async () => {

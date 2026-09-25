@@ -38,10 +38,12 @@ function RadioStationCard({
       onClick={() => onStart(station)}
       className="radio-station-card group relative aspect-square snap-start overflow-hidden rounded-xl text-left transition duration-300"
     >
-      <div
-        className="radio-station-placeholder absolute inset-0"
-        data-station-type={station.type}
-      />
+      {!imageUrl ? (
+        <div
+          className="radio-station-placeholder absolute inset-0"
+          data-station-type={station.type}
+        />
+      ) : null}
       {imageUrl ? (
         <CrateImage
           src={imageUrl}

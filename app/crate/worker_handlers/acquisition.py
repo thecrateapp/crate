@@ -114,29 +114,42 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
             result = None
 
         native_records = result.get("tracks") if isinstance(result, Mapping) else None
-        records = (
-            [
-                track
-                for track in native_records
-                if isinstance(track, Mapping) and track.get("ok")
-            ]
-            if isinstance(native_records, list)
-            else []
-        )
-        if not records:
-            records = []
-            for audio_file in audio_files:
+        native_by_path: dict[Path, Mapping] = {}
+        if isinstance(native_records, list):
+            for track in native_records:
+                if not isinstance(track, Mapping) or not track.get("ok"):
+                    continue
+                raw_track_path = track.get("path")
+                if not raw_track_path:
+                    continue
                 try:
-                    quality = read_audio_quality(audio_file)
+                    native_by_path[Path(str(raw_track_path)).resolve()] = track
+                except (OSError, RuntimeError):
+                    continue
+
+        records = []
+        for audio_file in audio_files:
+            try:
+                native_record = native_by_path.get(audio_file.resolve())
+            except (OSError, RuntimeError):
+                native_record = None
+            quality = dict(native_record) if native_record is not None else {}
+            if not quality.get("bit_depth") or not quality.get("sample_rate"):
+                try:
+                    fallback_quality = read_audio_quality(audio_file)
                 except Exception:
                     log.debug(
                         "Failed to inspect Tidal audio quality for %s",
                         audio_file,
                         exc_info=True,
                     )
-                    continue
-                if isinstance(quality, Mapping):
-                    records.append({"ok": True, **quality})
+                    fallback_quality = None
+                if isinstance(fallback_quality, Mapping):
+                    for field in ("bit_depth", "sample_rate"):
+                        if not quality.get(field):
+                            quality[field] = fallback_quality.get(field)
+            if quality:
+                records.append(quality)
 
         for track in records:
             try:
@@ -163,6 +176,37 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
             )
         ],
     }
+
+
+def _tidal_audio_quality_event(audio_quality: Mapping) -> tuple[str, str]:
+    profiles = audio_quality["profiles"]
+    observed = ", ".join(
+        f"{profile['bit_depth'] or '?'}-bit / "
+        f"{profile['sample_rate'] or '?'} Hz ({profile['tracks']} tracks)"
+        for profile in profiles
+    )
+    has_24_bit = any(
+        profile["bit_depth"] and profile["bit_depth"] >= 24 for profile in profiles
+    )
+    if has_24_bit:
+        return (
+            "info",
+            f"Observed downloaded audio quality in "
+            f"{audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
+            f"tracks: {observed}",
+        )
+    if profiles:
+        return (
+            "warn",
+            f"Tidal MAX was requested, but no 24-bit audio was confirmed "
+            f"({audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
+            f"tracks inspected). Observed: {observed}",
+        )
+    return (
+        "warn",
+        "Tidal MAX was requested, but Crate could not verify the "
+        "downloaded bit depth or sample rate",
+    )
 
 
 def _emit_acquisition_domain_event(
@@ -1055,35 +1099,7 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     audio_quality = {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
     if (quality or "").lower() in {"max", "lossless"}:
         audio_quality = _summarize_tidal_audio_quality(moved_albums)
-        profiles = audio_quality["profiles"]
-        observed = ", ".join(
-            f"{profile['bit_depth'] or '?'}-bit / "
-            f"{profile['sample_rate'] or '?'} Hz ({profile['tracks']} tracks)"
-            for profile in profiles
-        )
-        has_24_bit = any(
-            profile["bit_depth"] and profile["bit_depth"] >= 24 for profile in profiles
-        )
-        if has_24_bit:
-            message = (
-                f"Observed downloaded audio quality in "
-                f"{audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
-                f"tracks: {observed}"
-            )
-            event_type = "info"
-        elif profiles:
-            message = (
-                f"Tidal MAX was requested, but no 24-bit audio was confirmed "
-                f"({audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
-                f"tracks inspected). Observed: {observed}"
-            )
-            event_type = "warn"
-        else:
-            message = (
-                "Tidal MAX was requested, but Crate could not verify the "
-                "downloaded bit depth or sample rate"
-            )
-            event_type = "warn"
+        event_type, message = _tidal_audio_quality_event(audio_quality)
         emit_task_event(task_id, event_type, {"message": message})
 
     return {

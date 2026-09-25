@@ -679,9 +679,11 @@ def download(
         "high": "high",
         "max": "max",
         "lossless": "max",
+        "atmos": "normal",
     }
-    q = quality_map.get(quality, "max")
-    atmos_filter = "allow" if q in {"low", "normal"} else "none"
+    quality_key = (quality or "").strip().lower()
+    q = quality_map.get(quality_key, "max")
+    atmos_filter = "only" if quality_key == "atmos" else "none"
 
     cmd = [
         "tiddl",
