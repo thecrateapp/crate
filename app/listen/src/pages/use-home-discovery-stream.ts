@@ -10,6 +10,7 @@ import { useApi } from "@/hooks/use-api";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { AUTH_TOKEN_EVENT, api, apiSseUrl } from "@/lib/api";
 import { onCacheInvalidation } from "@/lib/cache";
+import { shouldRefreshHomeDiscoveryForScope } from "./home-discovery-scope";
 import {
   getSseChannelState,
   markSseChannelClosed,
@@ -206,18 +207,7 @@ export function useHomeDiscoveryStream() {
       }, 250);
     };
     const unsubscribe = onCacheInvalidation((scope) => {
-      if (
-        scope === "home" ||
-        scope === "library" ||
-        scope === "global_catalog" ||
-        scope === "upcoming" ||
-        scope.startsWith("home:user:") ||
-        scope.startsWith("artist:") ||
-        scope.startsWith("album:") ||
-        scope.startsWith("playlist:")
-      ) {
-        scheduleFreshRefresh();
-      }
+      if (shouldRefreshHomeDiscoveryForScope(scope)) scheduleFreshRefresh();
     });
     return () => {
       unsubscribe();

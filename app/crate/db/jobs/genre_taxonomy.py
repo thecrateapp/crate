@@ -1,8 +1,10 @@
 import re
 import unicodedata
 
-from crate.db.tx import transaction_scope
 from sqlalchemy import text
+
+from crate.db.tx import transaction_scope
+from crate.genre_alias_rules import genre_alias_is_unchanged
 
 
 def _slugify_genre(value: str) -> str:
@@ -59,19 +61,12 @@ def assign_genre_alias_in_session(
         .mappings()
         .first()
     )
-    if (
-        existing
-        and existing["alias_slug"] == alias_slug
-        and int(existing["genre_id"]) == int(node_row["id"])
-        and existing["origin"] == normalized_origin
-        and (
-            existing["confidence"] == normalized_confidence
-            or (
-                existing["confidence"] is not None
-                and normalized_confidence is not None
-                and float(existing["confidence"]) == normalized_confidence
-            )
-        )
+    if genre_alias_is_unchanged(
+        existing,
+        alias_slug,
+        node_row["id"],
+        normalized_origin,
+        normalized_confidence,
     ):
         return True
 
