@@ -3,7 +3,7 @@ import re
 import shutil
 import time
 import zipfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Mapping
@@ -13,7 +13,7 @@ from crate.acquisition_tasks import (
     build_tidal_download_params,
     tidal_download_dedup_key,
 )
-from crate.audio import get_audio_files, read_tags
+from crate.audio import get_audio_files, read_audio_quality, read_tags
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.domain_events import append_domain_event
@@ -63,11 +63,79 @@ from crate.storage_import import (
     resolve_import_album_target,
     resolve_managed_track_destination,
 )
-from crate.worker_handlers import TaskHandler, is_cancelled, start_scan
+from crate.worker_handlers import (
+    DEFAULT_AUDIO_EXTENSIONS,
+    TaskHandler,
+    is_cancelled,
+    start_scan,
+)
 
 log = logging.getLogger(__name__)
 
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
+
+
+def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
+    """Report the bit depth and sample rates actually present after import."""
+    from crate.crate_cli import run_quality
+
+    profiles: Counter[tuple[int | None, int | None]] = Counter()
+    tracks_total = 0
+    tracks_probed = 0
+    extensions = ",".join(
+        sorted(extension.lstrip(".") for extension in DEFAULT_AUDIO_EXTENSIONS)
+    )
+
+    for album in albums:
+        album_dir = Path(str(album.get("path") or ""))
+        if not album_dir.is_dir():
+            continue
+        audio_files = get_audio_files(album_dir, DEFAULT_AUDIO_EXTENSIONS)
+        tracks_total += len(audio_files)
+        if not audio_files:
+            continue
+
+        try:
+            result = run_quality(directory=str(album_dir), extensions=extensions)
+        except Exception:
+            log.debug(
+                "Failed to inspect Tidal audio quality in %s", album_dir, exc_info=True
+            )
+            result = None
+
+        native_records = (result or {}).get("tracks", [])
+        records = [track for track in native_records if track.get("ok")]
+        if result is None or not native_records:
+            records = []
+            for audio_file in audio_files:
+                quality = read_audio_quality(audio_file)
+                records.append({"ok": True, **quality})
+
+        for track in records:
+            try:
+                bit_depth = int(track.get("bit_depth") or 0) or None
+                sample_rate = int(track.get("sample_rate") or 0) or None
+            except (TypeError, ValueError):
+                continue
+            if bit_depth is None and sample_rate is None:
+                continue
+            profiles[(bit_depth, sample_rate)] += 1
+            tracks_probed += 1
+
+    return {
+        "tracks_total": tracks_total,
+        "tracks_probed": tracks_probed,
+        "profiles": [
+            {"bit_depth": bit_depth, "sample_rate": sample_rate, "tracks": count}
+            for (bit_depth, sample_rate), count in sorted(
+                profiles.items(),
+                key=lambda item: (
+                    item[0][0] or 0,
+                    item[0][1] or 0,
+                ),
+            )
+        ],
+    }
 
 
 def _emit_acquisition_domain_event(
@@ -651,7 +719,7 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
             task_id,
             "warn",
             {
-                "message": f"Normalized {repair['renamed_to_m4a']} AAC/ALAC files to M4A so they can be served directly",
+                "message": f"Normalized {repair['renamed_to_m4a']} MP4 audio files to M4A so they can be served directly",
             },
         )
 
@@ -957,11 +1025,45 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         moved_albums=moved_albums,
     )
 
+    audio_quality = _summarize_tidal_audio_quality(moved_albums)
+    if (quality or "").lower() in {"max", "lossless"}:
+        profiles = audio_quality["profiles"]
+        observed = ", ".join(
+            f"{profile['bit_depth'] or '?'}-bit / "
+            f"{profile['sample_rate'] or '?'} Hz ({profile['tracks']} tracks)"
+            for profile in profiles
+        )
+        has_24_bit = any(
+            profile["bit_depth"] and profile["bit_depth"] >= 24 for profile in profiles
+        )
+        if has_24_bit:
+            message = (
+                f"Observed downloaded audio quality in "
+                f"{audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
+                f"tracks: {observed}"
+            )
+            event_type = "info"
+        elif profiles:
+            message = (
+                f"Tidal MAX was requested, but no 24-bit audio was confirmed "
+                f"({audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
+                f"tracks inspected). Observed: {observed}"
+            )
+            event_type = "warn"
+        else:
+            message = (
+                "Tidal MAX was requested, but Crate could not verify the "
+                "downloaded bit depth or sample rate"
+            )
+            event_type = "warn"
+        emit_task_event(task_id, event_type, {"message": message})
+
     return {
         "success": True,
         "url": url,
         "quality": result.get("quality_fallback", quality),
         "requested_quality": quality,
+        "audio_quality": audio_quality,
         "files": result.get("file_count", 0),
         "artists": modified_artists,
     }

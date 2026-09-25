@@ -689,6 +689,8 @@ def download(
         str(processing_dir),
         "-q",
         q,
+        "--dolby-atmos",
+        "allow",
         "--output",
         TIDDL_OUTPUT_TEMPLATE,
         "url",

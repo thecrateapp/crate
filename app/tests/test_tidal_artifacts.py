@@ -2,9 +2,14 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from crate import tidal
 from crate.m4a_fix import repair_tidal_artifacts
-from crate.worker_handlers.acquisition import _tidal_download_inner
+from crate.worker_handlers.acquisition import (
+    _summarize_tidal_audio_quality,
+    _tidal_download_inner,
+)
 
 
 def _write_mp4_header(path: Path) -> None:
@@ -48,6 +53,7 @@ def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatc
     assert result["success"] is True
     assert result["audio_file_count"] == 1
     cmd = captured[0]
+    assert cmd[cmd.index("--dolby-atmos") + 1] == "allow"
     assert cmd[cmd.index("--output") + 1] == tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.number:02d}" in tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.title_version}" in tidal.TIDDL_OUTPUT_TEMPLATE
@@ -292,13 +298,16 @@ def test_repair_tidal_artifacts_recovers_raw_flac_and_deletes_temp(tmp_path):
     assert summary["unrecoverable"] == 0
 
 
-def test_repair_tidal_artifacts_normalizes_named_aac_to_m4a(tmp_path, monkeypatch):
+@pytest.mark.parametrize("codec", ["aac", "ac4"])
+def test_repair_tidal_artifacts_normalizes_supported_mp4_audio_to_m4a(
+    tmp_path, monkeypatch, codec
+):
     album_dir = tmp_path / "Terror" / "Still Suffer"
     album_dir.mkdir(parents=True)
     invalid_flac = album_dir / "Promised Only Lies.flac"
     _write_mp4_header(invalid_flac)
 
-    monkeypatch.setattr("crate.m4a_fix._probe_audio_codec", lambda _path: "aac")
+    monkeypatch.setattr("crate.m4a_fix._probe_audio_codec", lambda _path: codec)
 
     summary = repair_tidal_artifacts(tmp_path, allow_lossy_rename=True)
 
@@ -307,6 +316,44 @@ def test_repair_tidal_artifacts_normalizes_named_aac_to_m4a(tmp_path, monkeypatc
     assert not invalid_flac.exists()
     assert summary["lossy_files"] == ["Terror/Still Suffer/Promised Only Lies.flac"]
     assert summary["unrecoverable"] == 0
+
+
+def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rates(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - Track 1.flac").write_bytes(b"audio")
+    (album_dir / "02 - Track 2.flac").write_bytes(b"audio")
+    records = [
+        {
+            "path": str(album_dir / "01 - Track 1.flac"),
+            "ok": True,
+            "bit_depth": 24,
+            "sample_rate": 96000,
+        },
+        {
+            "path": str(album_dir / "02 - Track 2.flac"),
+            "ok": True,
+            "bit_depth": 16,
+            "sample_rate": 44100,
+        },
+    ]
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: {"tracks": records},
+    )
+
+    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+
+    assert summary == {
+        "tracks_total": 2,
+        "tracks_probed": 2,
+        "profiles": [
+            {"bit_depth": 16, "sample_rate": 44100, "tracks": 1},
+            {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
+        ],
+    }
 
 
 def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypatch):
@@ -322,6 +369,24 @@ def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypat
     assert summary["deleted"] == 0
     assert summary["unrecoverable"] == 1
     assert summary["lossy_files"] == ["Terror/Still Suffer/tmpcafebabe"]
+
+
+def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    atmos_file = album_dir / "01 - Track.m4a"
+    _write_mp4_header(atmos_file)
+
+    monkeypatch.setattr("crate.m4a_fix._probe_audio_codec", lambda _path: "ac4")
+
+    summary = repair_tidal_artifacts(tmp_path, allow_lossy_rename=True)
+
+    assert atmos_file.exists()
+    assert summary["renamed_to_m4a"] == 0
+    assert summary["unrecoverable"] == 0
+    assert summary["lossy_files"] == []
 
 
 def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tree(
@@ -436,4 +501,9 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
     assert result["success"] is True
     assert result["files"] == 10
     assert result["quality"] == "normal"
+    assert result["audio_quality"] == {
+        "tracks_total": 0,
+        "tracks_probed": 0,
+        "profiles": [],
+    }
     assert download_calls == ["max", "max", "normal"]
