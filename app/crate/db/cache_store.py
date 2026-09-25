@@ -36,6 +36,31 @@ def _populate_cache_after_database_read(
     _mem_set(key, value)
 
 
+def _cached_value_from_database_row(
+    key: str,
+    max_age_seconds: int | None,
+    redis_client: Any | None,
+    row: Any | None,
+) -> Any | None:
+    if not row:
+        return None
+    if max_age_seconds is not None:
+        try:
+            updated = row["updated_at"]
+            if isinstance(updated, str):
+                updated = datetime.fromisoformat(updated)
+            if updated.tzinfo is None:
+                updated = updated.replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - updated).total_seconds()
+            if age > max_age_seconds:
+                return None
+        except (ValueError, TypeError):
+            return None
+    value = row["value_json"]
+    _populate_cache_after_database_read(key, value, redis_client, max_age_seconds)
+    return value
+
+
 def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
     val = _mem_get(key, max_age_seconds=max_age_seconds)
     if val is not None:
@@ -71,23 +96,9 @@ def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
                 .mappings()
                 .first()
             )
-            if not row:
-                return None
-            if max_age_seconds is not None:
-                try:
-                    updated = row["updated_at"]
-                    if isinstance(updated, str):
-                        updated = datetime.fromisoformat(updated)
-                    if updated.tzinfo is None:
-                        updated = updated.replace(tzinfo=timezone.utc)
-                    age = (datetime.now(timezone.utc) - updated).total_seconds()
-                    if age > max_age_seconds:
-                        return None
-                except (ValueError, TypeError):
-                    return None
-            val = row["value_json"]
-            _populate_cache_after_database_read(key, val, redis_client, max_age_seconds)
-            return val
+            return _cached_value_from_database_row(
+                key, max_age_seconds, redis_client, row
+            )
     except Exception:
         return None
 

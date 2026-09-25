@@ -1,6 +1,6 @@
 import json
 from contextlib import nullcontext
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from crate.db.cache_runtime import _mask_url_secret
 
@@ -169,3 +169,47 @@ def test_database_cache_hit_survives_redis_write_failure(monkeypatch):
 
     assert cache_store.get_cache("artist:high-vis") == value
     assert memory_writes == [("artist:high-vis", value)]
+
+
+def test_missing_database_cache_row_is_not_cached(monkeypatch):
+    from crate.db import cache_store
+
+    memory_writes = []
+    monkeypatch.setattr(cache_store, "_mem_get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        cache_store, "_mem_set", lambda *args: memory_writes.append(args)
+    )
+    monkeypatch.setattr(cache_store, "get_redis", lambda: None)
+    monkeypatch.setattr(
+        cache_store,
+        "read_scope",
+        lambda: nullcontext(_CacheSession(None)),
+    )
+
+    assert cache_store.get_cache("missing") is None
+    assert memory_writes == []
+
+
+def test_stale_database_cache_row_is_not_cached(monkeypatch):
+    from crate.db import cache_store
+
+    redis_client = _RedisWriteThrough()
+    memory_writes = []
+    row = {
+        "value_json": {"artist": "High Vis"},
+        "updated_at": datetime.now(timezone.utc) - timedelta(minutes=2),
+    }
+    monkeypatch.setattr(cache_store, "_mem_get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        cache_store, "_mem_set", lambda *args: memory_writes.append(args)
+    )
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis_client)
+    monkeypatch.setattr(
+        cache_store,
+        "read_scope",
+        lambda: nullcontext(_CacheSession(row)),
+    )
+
+    assert cache_store.get_cache("stale", max_age_seconds=60) is None
+    assert redis_client.writes == []
+    assert memory_writes == []
