@@ -16,7 +16,19 @@ def _write_mp4_header(path: Path) -> None:
     path.write_bytes(b"\x00\x00\x00\x18ftypisom" + b"\x00" * 64)
 
 
-def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("quality", "expected_atmos_filter"),
+    [
+        ("normal", "allow"),
+        ("low", "allow"),
+        ("high", "none"),
+        ("max", "none"),
+        ("lossless", "none"),
+    ],
+)
+def test_tidal_download_uses_collision_safe_output_template(
+    tmp_path, monkeypatch, quality, expected_atmos_filter
+):
     captured: list[list[str]] = []
 
     class FakeProc:
@@ -46,14 +58,14 @@ def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatc
 
     result = tidal.download(
         "https://tidal.com/album/413046494",
-        quality="normal",
+        quality=quality,
         task_id="task-hood",
     )
 
     assert result["success"] is True
     assert result["audio_file_count"] == 1
     cmd = captured[0]
-    assert cmd[cmd.index("--dolby-atmos") + 1] == "allow"
+    assert cmd[cmd.index("--dolby-atmos") + 1] == expected_atmos_filter
     assert cmd[cmd.index("--output") + 1] == tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.number:02d}" in tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.title_version}" in tidal.TIDDL_OUTPUT_TEMPLATE
@@ -389,6 +401,19 @@ def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
         "tracks_probed": 1,
         "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
     }
+
+
+@pytest.mark.parametrize("path", [None, "", "   ", Path(), "."])
+def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
+    tmp_path, monkeypatch, path
+):
+    (tmp_path / "01 - unrelated.flac").write_bytes(b"audio")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("crate.crate_cli.run_quality", lambda **_kwargs: {"tracks": []})
+
+    summary = _summarize_tidal_audio_quality([{"path": path}])
+
+    assert summary == {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
 
 
 def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypatch):

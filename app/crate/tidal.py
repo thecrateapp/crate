@@ -681,6 +681,7 @@ def download(
         "lossless": "max",
     }
     q = quality_map.get(quality, "max")
+    atmos_filter = "allow" if q in {"low", "normal"} else "none"
 
     cmd = [
         "tiddl",
@@ -690,7 +691,7 @@ def download(
         "-q",
         q,
         "--dolby-atmos",
-        "allow",
+        atmos_filter,
         "--output",
         TIDDL_OUTPUT_TEMPLATE,
         "url",

@@ -75,6 +75,16 @@ log = logging.getLogger(__name__)
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
 
 
+def _existing_album_dir(raw_path: object) -> Path | None:
+    path_value = str(raw_path or "").strip()
+    if not path_value:
+        return None
+    album_dir = Path(path_value)
+    if album_dir == Path("."):
+        return None
+    return album_dir if album_dir.is_dir() else None
+
+
 def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     """Report the bit depth and sample rates actually present after import."""
     from crate.crate_cli import run_quality
@@ -87,8 +97,8 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     )
 
     for album in albums:
-        album_dir = Path(str(album.get("path") or ""))
-        if not album_dir.is_dir():
+        album_dir = _existing_album_dir(album.get("path"))
+        if album_dir is None:
             continue
         audio_files = get_audio_files(album_dir, DEFAULT_AUDIO_EXTENSIONS)
         tracks_total += len(audio_files)
@@ -943,8 +953,8 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
                 candidate_album = str(moved_album.get("album") or "")
                 if current_album and candidate_album != current_album:
                     continue
-                album_dir = Path(str(moved_album.get("path") or ""))
-                if not album_dir.is_dir():
+                album_dir = _existing_album_dir(moved_album.get("path"))
+                if album_dir is None:
                     continue
                 cover_path = album_dir / "cover.jpg"
                 if not cover_path.exists():
@@ -976,9 +986,9 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         for index, moved_album in enumerate(moved_albums, start=1):
             current_artist = str(moved_album.get("artist") or "")
             current_album_name = str(moved_album.get("album") or "")
-            album_dir = Path(str(moved_album.get("path") or ""))
+            album_dir = _existing_album_dir(moved_album.get("path"))
             try:
-                if album_dir.is_dir():
+                if album_dir is not None:
                     p.done = index
                     p.item = entity_label(
                         artist=current_artist, album=current_album_name
@@ -2211,8 +2221,8 @@ def _handle_soulseek_download(task_id: str, params: dict, config: dict) -> dict:
 
         try:
             sync = LibrarySync(config)
-            album_dir = Path(str(moved_info.get("path") or ""))
-            if album_dir.is_dir():
+            album_dir = _existing_album_dir(moved_info.get("path"))
+            if album_dir is not None:
                 sync.sync_album(album_dir, artist)
         except Exception:
             log.warning(
@@ -2470,11 +2480,11 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
     for index, imported_album in enumerate(imported_album_targets, start=1):
         artist = str(imported_album.get("artist") or "").strip()
         album = str(imported_album.get("album") or "").strip()
-        album_dir = Path(str(imported_album.get("dest") or ""))
+        album_dir = _existing_album_dir(imported_album.get("dest"))
         p_upload.done = index
         p_upload.item = entity_label(artist=artist, album=album)
         emit_progress(task_id, p_upload)
-        if not artist or not album_dir.is_dir():
+        if not artist or album_dir is None:
             continue
         try:
             result = sync.sync_album(album_dir, artist)

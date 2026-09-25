@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 from decimal import Decimal
 
 from sqlalchemy import text
 
+from crate.db.home_cache import _get_or_compute_home_cache
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
 from crate.db.tx import read_scope
 from crate.db.queries.genres_shared import MIN_GENRE_MEMBERSHIP_SCORE
@@ -11,6 +13,8 @@ from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.db.repositories.global_user_library import list_global_collection_artists
 from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
+
+_GENRE_STATION_ARTWORK_CACHE_SECONDS = 600
 
 
 def _int_value(value: object) -> int:
@@ -151,18 +155,7 @@ def build_radio_stations_from_context(
     }
 
 
-def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
-    missing_cover_stations = [
-        station
-        for station in stations
-        if station.get("type") == "genre" and not station.get("cover_url")
-    ]
-    if not missing_cover_stations:
-        return
-
-    genre_names = list(
-        dict.fromkeys(station["genre_name"] for station in missing_cover_stations)
-    )
+def _load_genre_station_artwork_fallbacks(genre_names: list[str]) -> dict[str, str]:
     with read_scope() as session:
         rows = (
             session.execute(
@@ -195,15 +188,52 @@ def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
             .all()
         )
 
-    backgrounds_by_genre = {
-        str(row["genre_name"]).casefold(): (
+    return {
+        str(row["genre_name"]).strip().casefold(): (
             f"/api/artists/{row['artist_id']}/background?size=640&format=webp"
         )
         for row in rows
         if row.get("artist_id") is not None
     }
+
+
+def _cached_genre_station_artwork_fallbacks(genre_names: list[str]) -> dict[str, str]:
+    names_by_key = {
+        name.strip().casefold(): name.strip()
+        for name in genre_names
+        if name and name.strip()
+    }
+    if not names_by_key:
+        return {}
+
+    normalized_names = sorted(names_by_key)
+    cache_fingerprint = hashlib.sha256(
+        "\0".join(normalized_names).encode("utf-8")
+    ).hexdigest()
+    cache_key = f"home:radio-genre-artwork:v1:{cache_fingerprint}"
+    names_to_query = [names_by_key[name] for name in normalized_names]
+    return _get_or_compute_home_cache(
+        cache_key,
+        max_age_seconds=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
+        ttl=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
+        compute=lambda: _load_genre_station_artwork_fallbacks(names_to_query),
+    )
+
+
+def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
+    missing_cover_stations = [
+        station
+        for station in stations
+        if station.get("type") == "genre" and not station.get("cover_url")
+    ]
+    if not missing_cover_stations:
+        return
+
+    backgrounds_by_genre = _cached_genre_station_artwork_fallbacks(
+        [station["genre_name"] for station in missing_cover_stations]
+    )
     for station in missing_cover_stations:
-        fallback = backgrounds_by_genre.get(station["genre_name"].casefold())
+        fallback = backgrounds_by_genre.get(station["genre_name"].strip().casefold())
         if fallback:
             station["cover_url"] = fallback
 

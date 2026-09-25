@@ -1,3 +1,9 @@
+import pytest
+from sqlalchemy import text
+
+from tests.conftest import PG_AVAILABLE
+
+
 def test_radio_station_payload_splits_artist_and_genre_stations(monkeypatch):
     from crate.db.queries import radio_stations
 
@@ -112,6 +118,11 @@ def test_genre_stations_fall_back_to_top_artist_background(monkeypatch):
             return False
 
     monkeypatch.setattr(radio_stations, "read_scope", ReadScope)
+    monkeypatch.setattr(
+        radio_stations,
+        "_get_or_compute_home_cache",
+        lambda _key, *, compute, **_kwargs: compute(),
+    )
     stations = [
         {"type": "genre", "genre_name": "Hardcore", "cover_url": None},
         {"type": "artist", "genre_name": "Hardcore", "cover_url": None},
@@ -135,3 +146,85 @@ def test_genre_station_artwork_fallback_skips_genres_with_covers(monkeypatch):
     radio_stations._add_genre_station_artwork_fallbacks(stations)
 
     assert stations[0]["cover_url"] == "/cover.webp"
+
+
+def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
+    from crate.db.queries import radio_stations
+
+    class Result:
+        def mappings(self):
+            return self
+
+        def all(self):
+            return [{"genre_name": "Hardcore", "artist_id": 42}]
+
+    class Session:
+        def execute(self, *_args, **_kwargs):
+            return Result()
+
+    class ReadScope:
+        def __enter__(self):
+            return Session()
+
+        def __exit__(self, *_args):
+            return False
+
+    cache = {}
+    cache_misses = []
+
+    def cached_compute(cache_key, *, compute, **_kwargs):
+        if cache_key not in cache:
+            cache_misses.append(cache_key)
+            cache[cache_key] = compute()
+        return cache[cache_key]
+
+    monkeypatch.setattr(radio_stations, "read_scope", ReadScope)
+    monkeypatch.setattr(radio_stations, "_get_or_compute_home_cache", cached_compute)
+
+    for _ in range(2):
+        stations = [{"type": "genre", "genre_name": "Hardcore", "cover_url": None}]
+        radio_stations._add_genre_station_artwork_fallbacks(stations)
+        assert stations[0]["cover_url"] == (
+            "/api/artists/42/background?size=640&format=webp"
+        )
+
+    assert len(cache_misses) == 1
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_genre_station_artwork_fallback_query_uses_top_artist(pg_db, monkeypatch):
+    from crate.db.queries import radio_stations
+    from crate.db.tx import read_scope
+
+    monkeypatch.setattr(
+        radio_stations,
+        "_get_or_compute_home_cache",
+        lambda _key, *, compute, **_kwargs: compute(),
+    )
+
+    lower_ranked_artist = "Radio Fallback Lower Ranked"
+    preferred_artist = "Radio Fallback Preferred"
+    genre_name = "integration radio fallback genre"
+    pg_db.upsert_artist({"name": lower_ranked_artist})
+    pg_db.upsert_artist({"name": preferred_artist})
+    pg_db.set_artist_genres(lower_ranked_artist, [(genre_name, 0.8, "test")])
+    pg_db.set_artist_genres(preferred_artist, [(genre_name, 0.95, "test")])
+
+    with read_scope() as session:
+        expected_artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = :name"),
+            {"name": preferred_artist},
+        ).scalar_one()
+
+    stations = [
+        {
+            "type": "genre",
+            "genre_name": genre_name.upper(),
+            "cover_url": None,
+        }
+    ]
+    radio_stations._add_genre_station_artwork_fallbacks(stations)
+
+    assert stations[0]["cover_url"] == (
+        f"/api/artists/{expected_artist_id}/background?size=640&format=webp"
+    )
