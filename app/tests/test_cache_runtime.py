@@ -1,4 +1,6 @@
 import json
+from contextlib import nullcontext
+from datetime import datetime, timezone
 
 from crate.db.cache_runtime import _mask_url_secret
 
@@ -90,3 +92,80 @@ def test_l1_hit_respects_stricter_requested_max_age(monkeypatch):
     )
 
     assert cache_store.get_cache("key", max_age_seconds=10) is None
+
+
+class _CacheRowResult:
+    def __init__(self, row):
+        self.row = row
+
+    def mappings(self):
+        return self
+
+    def first(self):
+        return self.row
+
+
+class _CacheSession:
+    def __init__(self, row):
+        self.row = row
+
+    def execute(self, *_args, **_kwargs):
+        return _CacheRowResult(self.row)
+
+
+class _RedisWriteThrough(_RedisWithTTL):
+    def __init__(self, *, fail_write: bool = False):
+        super().__init__(None, -2)
+        self.raw = None
+        self.fail_write = fail_write
+        self.writes = []
+
+    def setex(self, key: str, ttl: int, value: str):
+        if self.fail_write:
+            raise RuntimeError("Redis unavailable")
+        self.writes.append((key, ttl, value))
+
+
+def test_database_cache_hit_populates_redis_and_l1(monkeypatch):
+    from crate.db import cache_store
+
+    value = {"artist": "High Vis"}
+    redis_client = _RedisWriteThrough()
+    memory_writes = []
+    row = {"value_json": value, "updated_at": datetime.now(timezone.utc)}
+    monkeypatch.setattr(cache_store, "_mem_get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        cache_store, "_mem_set", lambda key, item: memory_writes.append((key, item))
+    )
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis_client)
+    monkeypatch.setattr(
+        cache_store,
+        "read_scope",
+        lambda: nullcontext(_CacheSession(row)),
+    )
+
+    assert cache_store.get_cache("artist:high-vis", max_age_seconds=90) == value
+    assert redis_client.writes == [("cache:artist:high-vis", 90, json.dumps(value))]
+    assert memory_writes == [("artist:high-vis", value)]
+
+
+def test_database_cache_hit_survives_redis_write_failure(monkeypatch):
+    from crate.db import cache_store
+
+    value = {"artist": "High Vis"}
+    redis_client = _RedisWriteThrough(fail_write=True)
+    memory_writes = []
+    row = {"value_json": value, "updated_at": datetime.now(timezone.utc)}
+    monkeypatch.setattr(cache_store, "_mem_get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        cache_store, "_mem_set", lambda key, item: memory_writes.append((key, item))
+    )
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis_client)
+    monkeypatch.setattr(
+        cache_store,
+        "read_scope",
+        lambda: nullcontext(_CacheSession(row)),
+    )
+
+    assert cache_store.get_cache("artist:high-vis") == value
+    assert memory_writes == [("artist:high-vis", value)]

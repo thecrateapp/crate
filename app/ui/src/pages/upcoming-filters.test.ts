@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildUpcomingCityOptions,
+  formatUpcomingReleaseDate,
   filterUpcomingItems,
   type UpcomingFilterItem,
 } from "./upcoming-filters";
@@ -46,5 +47,10 @@ describe("upcoming filters", () => {
       "Madrid",
       1,
     ]);
+  });
+
+  it("formats release dates with the popover's full date format", () => {
+    expect(formatUpcomingReleaseDate("2026-09-15")).toBe("Tue, Sep 15, 2026");
+    expect(formatUpcomingReleaseDate("")).toBe("");
   });
 });

@@ -19,6 +19,7 @@ import {
   buildUpcomingCityOptions,
   buildUpcomingGenreOptions,
   filterUpcomingItems,
+  formatUpcomingReleaseDate,
 } from "./upcoming-filters";
 import { toast } from "sonner";
 import {
@@ -926,15 +927,7 @@ function ReleasePopoverContent({
   onDownload?: (id: number) => void;
   onDismiss?: (id: number) => void;
 }) {
-  const dateObj = item.date ? new Date(item.date + "T12:00:00") : null;
-  const dateStr = dateObj
-    ? dateObj.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "";
+  const dateStr = formatUpcomingReleaseDate(item.date);
   const albumHref = getReleaseAlbumHref(item);
 
   return (

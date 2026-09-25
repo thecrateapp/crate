@@ -21,6 +21,21 @@ from crate.db.cache_runtime import (
 from crate.db.tx import read_scope, transaction_scope
 
 
+def _populate_cache_after_database_read(
+    key: str,
+    value: Any,
+    redis_client: Any | None,
+    max_age_seconds: int | None,
+) -> None:
+    if redis_client and value is not None:
+        try:
+            redis_ttl = max_age_seconds or 86400
+            redis_client.setex(f"cache:{key}", redis_ttl, json.dumps(value))
+        except Exception:
+            pass
+    _mem_set(key, value)
+
+
 def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
     val = _mem_get(key, max_age_seconds=max_age_seconds)
     if val is not None:
@@ -71,13 +86,7 @@ def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
                 except (ValueError, TypeError):
                     return None
             val = row["value_json"]
-            if redis_client and val is not None:
-                try:
-                    redis_ttl = max_age_seconds or 86400
-                    redis_client.setex(f"cache:{key}", redis_ttl, json.dumps(val))
-                except Exception:
-                    pass
-            _mem_set(key, val)
+            _populate_cache_after_database_read(key, val, redis_client, max_age_seconds)
             return val
     except Exception:
         return None

@@ -18,6 +18,18 @@ function normalize(value: string | undefined): string {
   return (value || "").trim().toLowerCase();
 }
 
+export function formatUpcomingReleaseDate(date: string): string {
+  const dateObj = date ? new Date(`${date}T12:00:00`) : null;
+  return dateObj
+    ? dateObj.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+}
+
 export function filterUpcomingItems<T extends UpcomingFilterItem>(
   items: T[],
   filters: UpcomingFilterState,
