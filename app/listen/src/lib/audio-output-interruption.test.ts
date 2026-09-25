@@ -98,6 +98,42 @@ describe("audio output interruption controller", () => {
     controller.dispose();
   });
 
+  it("does not treat a recently user-paused track as an output interruption", async () => {
+    vi.useFakeTimers();
+    const mediaDevices = new EventTarget() as MediaDevices;
+    const audioContext = new FakeAudioContext();
+    let isPlaying = true;
+    const pause = vi.fn(() => {
+      isPlaying = false;
+    });
+    const resume = vi.fn();
+    let outputDeviceIds = ["default", "headphones"];
+
+    const controller = createAudioOutputInterruptionController({
+      enumerateOutputDevices: async () => outputDeviceIds,
+      getAudioContext: () => audioContext as unknown as AudioContext,
+      isPlaying: () => isPlaying,
+      mediaDevices,
+      pause,
+      resume,
+    });
+    controller.install();
+    await flushAsyncWork();
+    await vi.advanceTimersByTimeAsync(100);
+
+    isPlaying = false;
+    cancelPendingAudioOutputResume();
+    outputDeviceIds = ["default"];
+    mediaDevices.dispatchEvent(new Event("devicechange"));
+    await flushAsyncWork();
+
+    expect(pause).not.toHaveBeenCalled();
+    expect(controller.hasPendingResume()).toBe(false);
+    expect(resume).not.toHaveBeenCalled();
+    controller.dispose();
+    vi.useRealTimers();
+  });
+
   it.each([false, true])(
     "recognizes browser-paused playback after a long track (observe first: %s)",
     async (observeBeforeDeviceChange) => {

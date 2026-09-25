@@ -71,6 +71,9 @@ export function useAudioOutputInterruption({
   useEffect(() => {
     const controller = controllerRef.current;
     if (!controller) return;
-    return controller.observe();
+    const cleanupObservation = controller.observe();
+    return () => {
+      cleanupObservation();
+    };
   }, [currentTrack?.id, isPlaying]);
 }

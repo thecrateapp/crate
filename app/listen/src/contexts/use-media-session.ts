@@ -272,7 +272,6 @@ export function useMediaSession({
           navigator.mediaSession.playbackState = "paused";
           actionsRef.current.pause({
             immediate: true,
-            preserveAudioOutputResume: true,
           });
         },
       ],

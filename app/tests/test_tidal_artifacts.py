@@ -356,8 +356,9 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
     }
 
 
+@pytest.mark.parametrize("native_tracks", [[], [{"ok": False, "error": "probe"}]])
 def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, native_tracks
 ):
     album_dir = tmp_path / "Terror" / "Still Suffer"
     album_dir.mkdir(parents=True)
@@ -365,7 +366,10 @@ def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
     for audio_file in audio_files:
         audio_file.write_bytes(b"audio")
 
-    monkeypatch.setattr("crate.crate_cli.run_quality", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: {"tracks": native_tracks},
+    )
 
     def _read_audio_quality(audio_file):
         if audio_file == audio_files[0]:

@@ -113,7 +113,7 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
             if isinstance(native_records, list)
             else []
         )
-        if not isinstance(native_records, list) or not native_records:
+        if not records:
             records = []
             for audio_file in audio_files:
                 try:
