@@ -356,6 +356,37 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
     }
 
 
+def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    audio_files = [album_dir / f"{index:02d}.flac" for index in range(1, 4)]
+    for audio_file in audio_files:
+        audio_file.write_bytes(b"audio")
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", lambda **_kwargs: None)
+
+    def _read_audio_quality(audio_file):
+        if audio_file == audio_files[0]:
+            raise OSError("unreadable track")
+        if audio_file == audio_files[1]:
+            return None
+        return {"bit_depth": 24, "sample_rate": 96000}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+
+    assert summary == {
+        "tracks_total": 3,
+        "tracks_probed": 1,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+    }
+
+
 def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypatch):
     album_dir = tmp_path / "Terror" / "Still Suffer"
     album_dir.mkdir(parents=True)
@@ -389,8 +420,19 @@ def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
     assert summary["lossy_files"] == []
 
 
-def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tree(
-    tmp_path, monkeypatch
+@pytest.mark.parametrize(
+    ("requested_quality", "expected_download_calls", "expected_quality_inspections"),
+    [
+        ("max", ["max", "max", "normal"], 1),
+        ("normal", ["normal"], 0),
+    ],
+)
+def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
+    tmp_path,
+    monkeypatch,
+    requested_quality,
+    expected_download_calls,
+    expected_quality_inspections,
 ):
     initial_dir = tmp_path / "initial" / "Terror" / "Still Suffer"
     initial_dir.mkdir(parents=True)
@@ -484,6 +526,16 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         lambda *args, **kwargs: ["Terror"],
     )
     monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
+    quality_inspections = []
+
+    def _record_quality_inspection(albums):
+        quality_inspections.append(albums)
+        return _summarize_tidal_audio_quality(albums)
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._summarize_tidal_audio_quality",
+        _record_quality_inspection,
+    )
     (tmp_path / "library" / "Terror" / "Still Suffer").mkdir(
         parents=True, exist_ok=True
     )
@@ -493,7 +545,7 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         {"artist": "Terror", "album": "Still Suffer", "content_type": "album"},
         {"library_path": str(tmp_path / "library")},
         "https://tidal.com/album/493246888",
-        "max",
+        requested_quality,
         38,
         tmp_path / "library",
     )
@@ -506,4 +558,5 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         "tracks_probed": 0,
         "profiles": [],
     }
-    assert download_calls == ["max", "max", "normal"]
+    assert download_calls == expected_download_calls
+    assert len(quality_inspections) == expected_quality_inspections

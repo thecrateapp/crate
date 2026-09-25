@@ -103,13 +103,30 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
             )
             result = None
 
-        native_records = (result or {}).get("tracks", [])
-        records = [track for track in native_records if track.get("ok")]
-        if result is None or not native_records:
+        native_records = result.get("tracks") if isinstance(result, Mapping) else None
+        records = (
+            [
+                track
+                for track in native_records
+                if isinstance(track, Mapping) and track.get("ok")
+            ]
+            if isinstance(native_records, list)
+            else []
+        )
+        if not isinstance(native_records, list) or not native_records:
             records = []
             for audio_file in audio_files:
-                quality = read_audio_quality(audio_file)
-                records.append({"ok": True, **quality})
+                try:
+                    quality = read_audio_quality(audio_file)
+                except Exception:
+                    log.debug(
+                        "Failed to inspect Tidal audio quality for %s",
+                        audio_file,
+                        exc_info=True,
+                    )
+                    continue
+                if isinstance(quality, Mapping):
+                    records.append({"ok": True, **quality})
 
         for track in records:
             try:
@@ -1025,8 +1042,9 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         moved_albums=moved_albums,
     )
 
-    audio_quality = _summarize_tidal_audio_quality(moved_albums)
+    audio_quality = {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
     if (quality or "").lower() in {"max", "lossless"}:
+        audio_quality = _summarize_tidal_audio_quality(moved_albums)
         profiles = audio_quality["profiles"]
         observed = ", ".join(
             f"{profile['bit_depth'] or '?'}-bit / "
