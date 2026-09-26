@@ -136,7 +136,9 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
             quality = dict(native_record) if native_record is not None else {}
             if not quality.get("bit_depth") or not quality.get("sample_rate"):
                 try:
-                    fallback_quality = read_audio_quality(audio_file)
+                    fallback_quality = read_audio_quality(
+                        audio_file, use_native_probe=False
+                    )
                 except Exception:
                     log.debug(
                         "Failed to inspect Tidal audio quality for %s",
@@ -1106,11 +1108,12 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     )
 
     audio_quality = {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
-    if (quality or "").lower() in {"max", "lossless"}:
+    if (quality or "").lower() in {"max", "lossless"} and not result.get(
+        "quality_fallback"
+    ):
         audio_quality = _summarize_tidal_audio_quality(moved_albums)
-        if not result.get("quality_fallback"):
-            event_type, message = _tidal_audio_quality_event(audio_quality, quality)
-            emit_task_event(task_id, event_type, {"message": message})
+        event_type, message = _tidal_audio_quality_event(audio_quality, quality)
+        emit_task_event(task_id, event_type, {"message": message})
 
     return {
         "success": True,

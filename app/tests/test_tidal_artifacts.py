@@ -429,7 +429,10 @@ def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
         },
     )
 
-    def _read_audio_quality(audio_file):
+    fallback_calls = []
+
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
+        fallback_calls.append((audio_file, use_native_probe))
         if audio_file == first_track:
             return {"bit_depth": 24, "sample_rate": 96000}
         return {"bit_depth": 16, "sample_rate": 44100}
@@ -448,6 +451,7 @@ def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
             {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
         ],
     }
+    assert fallback_calls == [(first_track, False), (second_track, False)]
 
 
 def test_summarize_tidal_audio_quality_falls_back_when_native_probe_raises(
@@ -464,7 +468,10 @@ def test_summarize_tidal_audio_quality_falls_back_when_native_probe_raises(
     monkeypatch.setattr("crate.crate_cli.run_quality", _raise_probe_error)
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.read_audio_quality",
-        lambda _path: {"bit_depth": 24, "sample_rate": 96000},
+        lambda _path, *, use_native_probe=True: {
+            "bit_depth": 24,
+            "sample_rate": 96000,
+        },
     )
 
     summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
@@ -491,7 +498,7 @@ def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
         lambda **_kwargs: {"tracks": native_tracks},
     )
 
-    def _read_audio_quality(audio_file):
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
         if audio_file == audio_files[0]:
             raise OSError("unreadable track")
         if audio_file == audio_files[1]:
@@ -639,10 +646,10 @@ def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
         "album_dir_lookup_error",
     ),
     [
-        ("max", ["max", "max", "normal"], 1, False),
+        ("max", ["max", "max", "normal"], 0, False),
         ("normal", ["normal"], 0, False),
         ("atmos", ["atmos"], 0, False),
-        ("max", ["max", "max", "normal"], 1, True),
+        ("max", ["max", "max", "normal"], 0, True),
     ],
 )
 def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
