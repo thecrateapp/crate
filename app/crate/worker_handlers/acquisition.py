@@ -1135,28 +1135,45 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         moved_albums=moved_albums,
     )
 
-    audio_quality = {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
-    if (quality or "").lower() in {"max", "lossless"} and not result.get(
-        "quality_fallback"
-    ):
-        try:
-            audio_quality = _summarize_tidal_audio_quality(moved_albums)
-            event_type, message = _tidal_audio_quality_event(audio_quality, quality)
-        except Exception:
-            log.warning(
-                "Failed to inspect downloaded Tidal audio quality for task %s",
-                task_id,
-                exc_info=True,
-            )
-        else:
+    audio_quality: dict | None = None
+    audio_quality_status = "not_applicable"
+    quality_event: tuple[str, str] | None = None
+    quality_key = (quality or "").strip().lower()
+    if not result.get("quality_fallback"):
+        if quality_key == "atmos":
+            audio_quality_status = "not_verifiable"
+            quality_event = _tidal_audio_quality_event({}, quality_key)
+        elif quality_key in {"max", "lossless"}:
             try:
-                emit_task_event(task_id, event_type, {"message": message})
+                audio_quality = _summarize_tidal_audio_quality(moved_albums)
             except Exception:
+                audio_quality_status = "failed"
                 log.warning(
-                    "Failed to report downloaded Tidal audio quality for task %s",
+                    "Failed to inspect downloaded Tidal audio quality for task %s",
                     task_id,
                     exc_info=True,
                 )
+            else:
+                tracks_total = audio_quality["tracks_total"]
+                tracks_probed = audio_quality["tracks_probed"]
+                if tracks_total == 0 or tracks_probed == 0:
+                    audio_quality_status = "unverified"
+                elif tracks_probed < tracks_total:
+                    audio_quality_status = "partial"
+                else:
+                    audio_quality_status = "inspected"
+                quality_event = _tidal_audio_quality_event(audio_quality, quality_key)
+
+    if quality_event is not None:
+        event_type, message = quality_event
+        try:
+            emit_task_event(task_id, event_type, {"message": message})
+        except Exception:
+            log.warning(
+                "Failed to report downloaded Tidal audio quality for task %s",
+                task_id,
+                exc_info=True,
+            )
 
     return {
         "success": True,
@@ -1164,6 +1181,7 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         "quality": result.get("quality_fallback", quality),
         "requested_quality": quality,
         "audio_quality": audio_quality,
+        "audio_quality_status": audio_quality_status,
         "files": result.get("file_count", 0),
         "artists": modified_artists,
     }

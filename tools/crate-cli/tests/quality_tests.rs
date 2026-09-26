@@ -1,5 +1,7 @@
 mod common;
 
+use std::process::Command;
+
 use tempfile::TempDir;
 
 #[test]
@@ -40,4 +42,39 @@ fn test_quality_directory_reports_errors() {
         .tracks
         .iter()
         .any(|track| track.path == invalid.to_string_lossy() && !track.ok));
+}
+
+#[test]
+fn test_quality_cli_accepts_multiple_target_directories_without_scanning_siblings() {
+    let root = TempDir::new().unwrap();
+    let album_one = root.path().join("Album One");
+    let album_two = root.path().join("Album Two");
+    let unrelated_album = root.path().join("Unrelated Album");
+    std::fs::create_dir_all(&album_one).unwrap();
+    std::fs::create_dir_all(&album_two).unwrap();
+    std::fs::create_dir_all(&unrelated_album).unwrap();
+    common::create_test_wav_at(&album_one, "one.wav", 440.0, 1.0);
+    common::create_test_wav_at(&album_two, "two.wav", 440.0, 1.0);
+    common::create_test_wav_at(&unrelated_album, "unrelated.wav", 440.0, 1.0);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_crate-cli"))
+        .args(["quality", "--dir"])
+        .arg(&album_one)
+        .arg(&album_two)
+        .args(["--extensions", "wav"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "CLI failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["total_files"], 2);
+    let tracks = result["tracks"].as_array().unwrap();
+    assert_eq!(tracks.len(), 2);
+    assert!(tracks
+        .iter()
+        .all(|track| !track["path"].as_str().unwrap().contains("Unrelated Album")));
 }
