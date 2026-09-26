@@ -586,6 +586,47 @@ def test_summarize_tidal_audio_quality_ignores_preexisting_tracks_in_imported_al
     }
 
 
+def test_summarize_tidal_audio_quality_scans_album_when_imported_file_list_is_empty(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    track = album_dir / "01 - Existing.flac"
+    track.write_bytes(b"audio")
+    quality_calls = []
+
+    def _run_quality(**kwargs):
+        quality_calls.append(kwargs)
+        return {
+            "tracks": [
+                {
+                    "path": str(track),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": 96000,
+                }
+            ]
+        }
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", _run_quality)
+    monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 45)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda *_args, **_kwargs: pytest.fail("native probe should cover the track"),
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": []}]
+    )
+
+    assert quality_calls == [{"files": [str(track)], "timeout": 45}]
+    assert summary == {
+        "tracks_total": 1,
+        "tracks_probed": 1,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+    }
+
+
 def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
     tmp_path, monkeypatch
 ):
