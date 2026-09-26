@@ -172,6 +172,7 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
                     LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
                     LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
                     WHERE COALESCE(ag.weight, 0) >= :min_membership_score
+                      AND NULLIF(BTRIM(COALESCE(tn.slug, g.slug)), '') IS NOT NULL
                     ORDER BY
                         LOWER(BTRIM(COALESCE(tn.slug, g.slug))),
                         COALESCE(ag.weight, 0) DESC,
@@ -194,7 +195,7 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
             f"/api/artists/{row['artist_id']}/background?size=640&format=webp"
         )
         for row in rows
-        if row.get("artist_id") is not None
+        if row.get("artist_id") is not None and str(row.get("genre_slug") or "").strip()
     }
 
 

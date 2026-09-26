@@ -211,6 +211,8 @@ def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
             return [
                 {"genre_slug": "hardcore", "artist_id": 42},
                 {"genre_slug": "post-punk", "artist_id": 43},
+                {"genre_slug": None, "artist_id": 44},
+                {"genre_slug": "  ", "artist_id": 45},
             ]
 
     class Session:
