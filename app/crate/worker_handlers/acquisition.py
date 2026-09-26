@@ -1157,7 +1157,9 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     if not result.get("quality_fallback"):
         if quality_key == "atmos":
             audio_quality_status = "not_verifiable"
-            quality_event = _tidal_audio_quality_event({}, quality_key)
+            quality_event = _tidal_audio_quality_event(
+                {"tracks_total": 0, "tracks_probed": 0, "profiles": []}, quality_key
+            )
         elif quality_key in {"max", "lossless"}:
             try:
                 audio_quality = _summarize_tidal_audio_quality(moved_albums)

@@ -862,6 +862,14 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
                 "Crate cannot verify Tidal atmos quality from bit depth metadata",
             ),
         ),
+        (
+            {"tracks_total": 0, "tracks_probed": 0, "profiles": []},
+            "atmos",
+            (
+                "warn",
+                "Crate cannot verify Tidal atmos quality from bit depth metadata",
+            ),
+        ),
     ],
 )
 def test_tidal_audio_quality_event_reports_detected_quality(
