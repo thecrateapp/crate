@@ -15,7 +15,7 @@ from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
 _GENRE_STATION_ARTWORK_CACHE_SECONDS = 600
-_GENRE_STATION_ARTWORK_CACHE_KEY = "home:radio-genre-artwork:v1"
+_GENRE_STATION_ARTWORK_CACHE_KEY = "home:radio-genre-artwork:v2"
 log = logging.getLogger(__name__)
 
 
@@ -157,7 +157,13 @@ def build_radio_stations_from_context(
     }
 
 
-def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
+def _load_genre_station_artwork_fallbacks(genre_slugs: list[str]) -> dict[str, str]:
+    normalized_genre_slugs = sorted(
+        {slug.strip().lower() for slug in genre_slugs if slug.strip()}
+    )
+    if not normalized_genre_slugs:
+        return {}
+
     with read_scope() as session:
         rows = (
             session.execute(
@@ -173,6 +179,7 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
                     LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
                     WHERE COALESCE(ag.weight, 0) >= :min_membership_score
                       AND NULLIF(BTRIM(COALESCE(tn.slug, g.slug)), '') IS NOT NULL
+                      AND LOWER(BTRIM(COALESCE(tn.slug, g.slug))) = ANY(:genre_slugs)
                     ORDER BY
                         LOWER(BTRIM(COALESCE(tn.slug, g.slug))),
                         COALESCE(ag.weight, 0) DESC,
@@ -184,6 +191,7 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
                 ),
                 {
                     "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
+                    "genre_slugs": normalized_genre_slugs,
                 },
             )
             .mappings()
@@ -199,12 +207,18 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
     }
 
 
-def _cached_genre_station_artwork_fallbacks() -> dict[str, str]:
+def _cached_genre_station_artwork_fallbacks(genre_slugs: list[str]) -> dict[str, str]:
+    normalized_genre_slugs = sorted(
+        {slug.strip().lower() for slug in genre_slugs if slug.strip()}
+    )
+    if not normalized_genre_slugs:
+        return {}
+    cache_key = f"{_GENRE_STATION_ARTWORK_CACHE_KEY}:{','.join(normalized_genre_slugs)}"
     return get_or_compute_home_cache(
-        _GENRE_STATION_ARTWORK_CACHE_KEY,
+        cache_key,
         max_age_seconds=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
         ttl=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
-        compute=_load_genre_station_artwork_fallbacks,
+        compute=lambda: _load_genre_station_artwork_fallbacks(normalized_genre_slugs),
     )
 
 
@@ -221,7 +235,15 @@ def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
         return
 
     try:
-        backgrounds_by_genre = _cached_genre_station_artwork_fallbacks()
+        requested_genre_slugs = sorted(
+            {
+                station["genre_slug"].strip().lower()
+                for station in missing_cover_stations
+            }
+        )
+        backgrounds_by_genre = _cached_genre_station_artwork_fallbacks(
+            requested_genre_slugs
+        )
     except Exception:
         log.warning("Failed to load genre station artwork fallbacks", exc_info=True)
         return

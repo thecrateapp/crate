@@ -119,7 +119,9 @@ def test_get_user_radio_stations_applies_fallback_to_builder_genre_stations(
     monkeypatch.setattr(
         radio_stations,
         "_cached_genre_station_artwork_fallbacks",
-        lambda: {"hardcore": "/api/artists/42/background?size=640&format=webp"},
+        lambda _genre_slugs: {
+            "hardcore": "/api/artists/42/background?size=640&format=webp"
+        },
     )
 
     result = radio_stations.get_user_radio_stations(7)
@@ -188,6 +190,8 @@ def test_genre_station_fallback_uses_sql_lower_normalization_for_unicode_slugs(
 ):
     from crate.db.queries import radio_stations
 
+    query_calls = []
+
     class Result:
         def mappings(self):
             return self
@@ -196,7 +200,8 @@ def test_genre_station_fallback_uses_sql_lower_normalization_for_unicode_slugs(
             return [{"genre_slug": "straße", "artist_id": 42}]
 
     class Session:
-        def execute(self, *_args, **_kwargs):
+        def execute(self, statement, params):
+            query_calls.append((str(statement), params))
             return Result()
 
     class ReadScope:
@@ -207,17 +212,19 @@ def test_genre_station_fallback_uses_sql_lower_normalization_for_unicode_slugs(
             return False
 
     monkeypatch.setattr(radio_stations, "read_scope", ReadScope)
-    backgrounds = radio_stations._load_genre_station_artwork_fallbacks()
+    backgrounds = radio_stations._load_genre_station_artwork_fallbacks(["Straße"])
     monkeypatch.setattr(
         radio_stations,
         "_cached_genre_station_artwork_fallbacks",
-        lambda: backgrounds,
+        lambda _genre_slugs: backgrounds,
     )
     stations = [{"type": "genre", "genre_slug": "Straße", "cover_url": None}]
 
     radio_stations._add_genre_station_artwork_fallbacks(stations)
 
     assert list(backgrounds) == ["straße"]
+    assert query_calls[0][1]["genre_slugs"] == ["straße"]
+    assert "= ANY(:genre_slugs)" in query_calls[0][0]
     assert stations[0]["cover_url"] == (
         "/api/artists/42/background?size=640&format=webp"
     )
@@ -226,7 +233,7 @@ def test_genre_station_fallback_uses_sql_lower_normalization_for_unicode_slugs(
 def test_genre_station_artwork_fallback_skips_genres_with_covers(monkeypatch):
     from crate.db.queries import radio_stations
 
-    def fail_if_queried():
+    def fail_if_queried(_genre_slugs):
         raise AssertionError("artwork lookup should be skipped")
 
     monkeypatch.setattr(radio_stations, "read_scope", fail_if_queried)
@@ -240,7 +247,7 @@ def test_genre_station_artwork_fallback_skips_genres_with_covers(monkeypatch):
 def test_genre_station_artwork_fallback_skips_missing_or_blank_slugs(monkeypatch):
     from crate.db.queries import radio_stations
 
-    def fail_if_queried():
+    def fail_if_queried(*_args):
         raise AssertionError("artwork lookup should be skipped without a genre slug")
 
     monkeypatch.setattr(
@@ -262,7 +269,7 @@ def test_genre_station_artwork_fallback_failure_does_not_break_stations(
 ):
     from crate.db.queries import radio_stations
 
-    def fail_lookup():
+    def fail_lookup(_genre_slugs):
         raise RuntimeError("database unavailable")
 
     monkeypatch.setattr(
@@ -288,20 +295,26 @@ def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
     from crate.db.queries import radio_stations
 
     class Result:
+        def __init__(self, rows):
+            self.rows = rows
+
         def mappings(self):
             return self
 
         def all(self):
-            return [
+            return self.rows
+
+    class Session:
+        def execute(self, _statement, params):
+            rows = [
                 {"genre_slug": "hardcore", "artist_id": 42},
                 {"genre_slug": "post-punk", "artist_id": 43},
                 {"genre_slug": None, "artist_id": 44},
                 {"genre_slug": "  ", "artist_id": 45},
             ]
-
-    class Session:
-        def execute(self, *_args, **_kwargs):
-            return Result()
+            return Result(
+                [row for row in rows if row["genre_slug"] in params["genre_slugs"]]
+            )
 
     class ReadScope:
         def __enter__(self):
@@ -338,11 +351,12 @@ def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
             f"/api/artists/{artist_id}/background?size=640&format=webp"
         )
 
-    assert cache_misses == [radio_stations._GENRE_STATION_ARTWORK_CACHE_KEY]
+    assert cache_misses == [
+        f"{radio_stations._GENRE_STATION_ARTWORK_CACHE_KEY}:hardcore",
+        f"{radio_stations._GENRE_STATION_ARTWORK_CACHE_KEY}:post-punk",
+    ]
     assert all(
-        key == radio_stations._GENRE_STATION_ARTWORK_CACHE_KEY
-        and kwargs == {"max_age_seconds": 600, "ttl": 600}
-        for key, kwargs in cache_calls
+        kwargs == {"max_age_seconds": 600, "ttl": 600} for _, kwargs in cache_calls
     )
 
 

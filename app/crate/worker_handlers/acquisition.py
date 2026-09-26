@@ -102,7 +102,7 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
         if album_dir is None:
             continue
         explicit_audio_files = album.get("audio_files")
-        if isinstance(explicit_audio_files, list) and explicit_audio_files:
+        if isinstance(explicit_audio_files, list):
             audio_files = [
                 audio_file
                 for raw_path in explicit_audio_files
