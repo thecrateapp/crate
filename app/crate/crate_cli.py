@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
 
@@ -114,7 +115,7 @@ def run_scan(
 
 
 def run_quality(
-    directory: str = "",
+    directory: str | Sequence[str] = "",
     file: str = "",
     extensions: str = "flac,mp3,m4a,ogg,opus,wav",
     timeout: int | None = None,
@@ -127,7 +128,8 @@ def run_quality(
     if file:
         args.extend(["--file", file])
     elif directory:
-        args.extend(["--dir", directory, "--extensions", extensions])
+        directories = [directory] if isinstance(directory, str) else list(directory)
+        args.extend(["--dir", *directories, "--extensions", extensions])
     else:
         return None
     try:

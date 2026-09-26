@@ -382,13 +382,13 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
     }
     assert quality_calls == [
         {
-            "directory": str(album_dir),
+            "directory": [str(album_dir)],
             "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
         }
     ]
 
 
-def test_summarize_tidal_audio_quality_batches_sibling_album_probes(
+def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
     tmp_path, monkeypatch
 ):
     artist_dir = tmp_path / "Terror"
@@ -416,7 +416,7 @@ def test_summarize_tidal_audio_quality_batches_sibling_album_probes(
                     "bit_depth": 24,
                     "sample_rate": 96000,
                 }
-                for track in [*tracks, unrelated_track]
+                for track in tracks
             ]
         }
 
@@ -432,10 +432,11 @@ def test_summarize_tidal_audio_quality_batches_sibling_album_probes(
 
     assert quality_calls == [
         {
-            "directory": str(artist_dir),
+            "directory": [str(album_dir) for album_dir in album_dirs],
             "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
         }
     ]
+    assert unrelated_track.exists()
     assert summary == {
         "tracks_total": 2,
         "tracks_probed": 2,
@@ -678,6 +679,18 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
                 "warn",
                 "Tidal lossless was requested, but Crate could not verify the "
                 "downloaded bit depth or sample rate",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 1,
+                "tracks_probed": 1,
+                "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+            },
+            "atmos",
+            (
+                "warn",
+                "Crate cannot verify Tidal atmos quality from bit depth metadata",
             ),
         ),
     ],

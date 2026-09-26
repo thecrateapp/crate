@@ -73,6 +73,39 @@ def test_run_quality_uses_quality_subcommand(monkeypatch):
     ]
 
 
+def test_run_quality_batches_multiple_target_directories(monkeypatch):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(
+        directory=["/music/Artist/Album One", "/music/Artist/Album Two"]
+    ) == {"tracks": []}
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--dir",
+        "/music/Artist/Album One",
+        "/music/Artist/Album Two",
+        "--extensions",
+        "flac,mp3,m4a,ogg,opus,wav",
+    ]
+
+
 def test_run_diff_uses_diff_subcommand(monkeypatch):
     from crate import crate_cli
 

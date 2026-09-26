@@ -92,7 +92,7 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     profiles: Counter[tuple[int | None, int | None]] = Counter()
     tracks_total = 0
     tracks_probed = 0
-    album_groups: dict[Path, list[tuple[Path, list[Path]]]] = {}
+    album_audio_files: list[tuple[Path, list[Path]]] = []
     extensions = ",".join(
         sorted(extension.lstrip(".") for extension in DEFAULT_AUDIO_EXTENSIONS)
     )
@@ -105,20 +105,23 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
         tracks_total += len(audio_files)
         if not audio_files:
             continue
-        album_groups.setdefault(album_dir.parent, []).append((album_dir, audio_files))
+        album_audio_files.append((album_dir, audio_files))
 
-    for parent_dir, albums_in_group in album_groups.items():
-        scan_dir = parent_dir if len(albums_in_group) > 1 else albums_in_group[0][0]
+    native_by_path: dict[Path, Mapping] = {}
+    if album_audio_files:
         try:
-            result = run_quality(directory=str(scan_dir), extensions=extensions)
+            result = run_quality(
+                directory=[str(album_dir) for album_dir, _ in album_audio_files],
+                extensions=extensions,
+            )
         except Exception:
             log.debug(
-                "Failed to inspect Tidal audio quality in %s", scan_dir, exc_info=True
+                "Failed to inspect Tidal audio quality for imported albums",
+                exc_info=True,
             )
             result = None
 
         native_records = result.get("tracks") if isinstance(result, Mapping) else None
-        native_by_path: dict[Path, Mapping] = {}
         if isinstance(native_records, list):
             for track in native_records:
                 if not isinstance(track, Mapping) or not track.get("ok"):
@@ -131,43 +134,43 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
                 except (OSError, RuntimeError):
                     continue
 
-        for _album_dir, audio_files in albums_in_group:
-            records = []
-            for audio_file in audio_files:
+    for _album_dir, audio_files in album_audio_files:
+        records = []
+        for audio_file in audio_files:
+            try:
+                native_record = native_by_path.get(audio_file.resolve())
+            except (OSError, RuntimeError):
+                native_record = None
+            quality = dict(native_record) if native_record is not None else {}
+            if not quality.get("bit_depth") or not quality.get("sample_rate"):
                 try:
-                    native_record = native_by_path.get(audio_file.resolve())
-                except (OSError, RuntimeError):
-                    native_record = None
-                quality = dict(native_record) if native_record is not None else {}
-                if not quality.get("bit_depth") or not quality.get("sample_rate"):
-                    try:
-                        fallback_quality = read_audio_quality(
-                            audio_file, use_native_probe=False
-                        )
-                    except Exception:
-                        log.debug(
-                            "Failed to inspect Tidal audio quality for %s",
-                            audio_file,
-                            exc_info=True,
-                        )
-                        fallback_quality = None
-                    if isinstance(fallback_quality, Mapping):
-                        for field in ("bit_depth", "sample_rate"):
-                            if not quality.get(field):
-                                quality[field] = fallback_quality.get(field)
-                if quality:
-                    records.append(quality)
+                    fallback_quality = read_audio_quality(
+                        audio_file, use_native_probe=False
+                    )
+                except Exception:
+                    log.debug(
+                        "Failed to inspect Tidal audio quality for %s",
+                        audio_file,
+                        exc_info=True,
+                    )
+                    fallback_quality = None
+                if isinstance(fallback_quality, Mapping):
+                    for field in ("bit_depth", "sample_rate"):
+                        if not quality.get(field):
+                            quality[field] = fallback_quality.get(field)
+            if quality:
+                records.append(quality)
 
-            for track in records:
-                try:
-                    bit_depth = int(track.get("bit_depth") or 0) or None
-                    sample_rate = int(track.get("sample_rate") or 0) or None
-                except (TypeError, ValueError):
-                    continue
-                if bit_depth is None and sample_rate is None:
-                    continue
-                profiles[(bit_depth, sample_rate)] += 1
-                tracks_probed += 1
+        for track in records:
+            try:
+                bit_depth = int(track.get("bit_depth") or 0) or None
+                sample_rate = int(track.get("sample_rate") or 0) or None
+            except (TypeError, ValueError):
+                continue
+            if bit_depth is None and sample_rate is None:
+                continue
+            profiles[(bit_depth, sample_rate)] += 1
+            tracks_probed += 1
 
     return {
         "tracks_total": tracks_total,
@@ -189,7 +192,15 @@ def _tidal_audio_quality_event(
     audio_quality: Mapping, requested_quality: str
 ) -> tuple[str, str]:
     quality_key = requested_quality.strip().lower()
-    quality_label = "MAX" if quality_key == "max" else "lossless"
+    quality_targets = {"max": ("MAX", 24), "lossless": ("lossless", 16)}
+    quality_target = quality_targets.get(quality_key)
+    if quality_target is None:
+        return (
+            "warn",
+            f"Crate cannot verify Tidal {quality_key or 'unknown'} quality from "
+            "bit depth metadata",
+        )
+    quality_label, required_bit_depth = quality_target
     profiles = audio_quality["profiles"]
     observed = ", ".join(
         f"{profile['bit_depth'] or '?'}-bit / "
@@ -198,7 +209,6 @@ def _tidal_audio_quality_event(
         f"{'track' if profile['tracks'] == 1 else 'tracks'})"
         for profile in profiles
     )
-    required_bit_depth = 24 if quality_key == "max" else 16
     qualifying_tracks = sum(
         profile["tracks"]
         for profile in profiles

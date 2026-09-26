@@ -56,8 +56,8 @@ enum Command {
     Quality {
         #[arg(short, long)]
         file: Option<PathBuf>,
-        #[arg(short, long)]
-        dir: Option<PathBuf>,
+        #[arg(short, long, num_args = 1..)]
+        dir: Vec<PathBuf>,
         #[arg(long, default_value = "flac,mp3,m4a,ogg,opus,wav")]
         extensions: String,
     },
@@ -194,5 +194,41 @@ fn main() {
             extensions,
             model_path,
         } => analyze::run_analyze(file, dir, extensions, model_path),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Command};
+    use clap::Parser;
+    use std::path::PathBuf;
+
+    #[test]
+    fn quality_command_accepts_multiple_target_directories() {
+        let cli = Cli::try_parse_from([
+            "crate-cli",
+            "quality",
+            "--dir",
+            "/music/Artist/Album One",
+            "/music/Artist/Album Two",
+            "--extensions",
+            "flac",
+        ])
+        .unwrap();
+
+        let Command::Quality {
+            dir, extensions, ..
+        } = cli.command
+        else {
+            panic!("expected quality command");
+        };
+        assert_eq!(
+            dir,
+            vec![
+                PathBuf::from("/music/Artist/Album One"),
+                PathBuf::from("/music/Artist/Album Two"),
+            ]
+        );
+        assert_eq!(extensions, "flac");
     }
 }

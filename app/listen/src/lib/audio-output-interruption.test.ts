@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   cancelPendingAudioOutputResume,
@@ -21,6 +21,11 @@ function flushAsyncWork(): Promise<void> {
 describe("audio output interruption controller", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    cancelPendingAudioOutputResume();
+    vi.useRealTimers();
   });
 
   it("pauses when an output disappears and resumes when it returns", async () => {
