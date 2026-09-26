@@ -1033,8 +1033,8 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         for index, moved_album in enumerate(moved_albums, start=1):
             current_artist = str(moved_album.get("artist") or "")
             current_album_name = str(moved_album.get("album") or "")
-            album_dir = _existing_album_dir(moved_album.get("path"))
             try:
+                album_dir = _existing_album_dir(moved_album.get("path"))
                 if album_dir is not None:
                     p.done = index
                     p.item = entity_label(

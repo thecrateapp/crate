@@ -606,11 +606,17 @@ def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
 
 
 @pytest.mark.parametrize(
-    ("requested_quality", "expected_download_calls", "expected_quality_inspections"),
+    (
+        "requested_quality",
+        "expected_download_calls",
+        "expected_quality_inspections",
+        "album_dir_lookup_error",
+    ),
     [
-        ("max", ["max", "max", "normal"], 1),
-        ("normal", ["normal"], 0),
-        ("atmos", ["atmos"], 0),
+        ("max", ["max", "max", "normal"], 1, False),
+        ("normal", ["normal"], 0, False),
+        ("atmos", ["atmos"], 0, False),
+        ("max", ["max", "max", "normal"], 1, True),
     ],
 )
 def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
@@ -619,6 +625,7 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
     requested_quality,
     expected_download_calls,
     expected_quality_inspections,
+    album_dir_lookup_error,
 ):
     initial_dir = tmp_path / "initial" / "Terror" / "Still Suffer"
     initial_dir.mkdir(parents=True)
@@ -713,6 +720,22 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
         lambda *args, **kwargs: ["Terror"],
     )
     monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
+    if album_dir_lookup_error:
+        from crate.worker_handlers import acquisition
+
+        original_existing_album_dir = acquisition._existing_album_dir
+        lookup_failed = False
+
+        def _raise_once(raw_path):
+            nonlocal lookup_failed
+            if not lookup_failed:
+                lookup_failed = True
+                raise OSError("temporary album path lookup failure")
+            return original_existing_album_dir(raw_path)
+
+        monkeypatch.setattr(
+            "crate.worker_handlers.acquisition._existing_album_dir", _raise_once
+        )
     quality_inspections = []
 
     def _record_quality_inspection(albums):
