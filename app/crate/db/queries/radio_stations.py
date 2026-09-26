@@ -209,14 +209,20 @@ def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
     missing_cover_stations = [
         station
         for station in stations
-        if station.get("type") == "genre" and not station.get("cover_url")
+        if station.get("type") == "genre"
+        and not station.get("cover_url")
+        and isinstance(station.get("genre_slug"), str)
+        and station["genre_slug"].strip()
     ]
     if not missing_cover_stations:
         return
 
     backgrounds_by_genre = _cached_genre_station_artwork_fallbacks()
     for station in missing_cover_stations:
-        fallback = backgrounds_by_genre.get(station["genre_slug"].strip().casefold())
+        genre_slug = station.get("genre_slug")
+        if not isinstance(genre_slug, str) or not genre_slug.strip():
+            continue
+        fallback = backgrounds_by_genre.get(genre_slug.strip().casefold())
         if fallback:
             station["cover_url"] = fallback
 

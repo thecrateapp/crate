@@ -1,5 +1,4 @@
 import json
-import shutil
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -19,7 +18,6 @@ def _write_mp4_header(path: Path) -> None:
     path.write_bytes(b"\x00\x00\x00\x18ftypisom" + b"\x00" * 64)
 
 
-@pytest.mark.skipif(shutil.which("tiddl") is None, reason="tiddl CLI is not installed")
 @pytest.mark.parametrize("atmos_filter", ["none", "only"])
 def test_installed_tiddl_cli_accepts_dolby_atmos_filter_values(atmos_filter):
     result = subprocess.run(

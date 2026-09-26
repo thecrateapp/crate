@@ -153,6 +153,26 @@ def test_genre_station_artwork_fallback_skips_genres_with_covers(monkeypatch):
     assert stations[0]["cover_url"] == "/cover.webp"
 
 
+def test_genre_station_artwork_fallback_skips_missing_or_blank_slugs(monkeypatch):
+    from crate.db.queries import radio_stations
+
+    def fail_if_queried():
+        raise AssertionError("artwork lookup should be skipped without a genre slug")
+
+    monkeypatch.setattr(
+        radio_stations, "_cached_genre_station_artwork_fallbacks", fail_if_queried
+    )
+    stations = [
+        {"type": "genre", "genre_name": "Hardcore", "cover_url": None},
+        {"type": "genre", "genre_slug": "  ", "cover_url": None},
+    ]
+
+    radio_stations._add_genre_station_artwork_fallbacks(stations)
+
+    assert stations[0]["cover_url"] is None
+    assert stations[1]["cover_url"] is None
+
+
 def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
     from crate.db.queries import radio_stations
 
