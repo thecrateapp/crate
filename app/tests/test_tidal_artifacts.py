@@ -526,6 +526,8 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
         track = album_dir / "01 - Track.flac"
         track.write_bytes(b"audio")
         tracks.append(track)
+    duplicate_track = album_dirs[1] / "02 - Same Track.flac"
+    duplicate_track.symlink_to(tracks[0])
 
     unrelated_track = artist_dir / "Existing Album" / "01 - Existing.flac"
     unrelated_track.parent.mkdir()
@@ -556,11 +558,11 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
 
     summary = _summarize_tidal_audio_quality(
         [
+            {"path": str(album_dirs[0]), "audio_files": [str(tracks[0])]},
             {
-                "path": str(album_dir),
-                "audio_files": [str(track)],
-            }
-            for album_dir, track in zip(album_dirs, tracks, strict=True)
+                "path": str(album_dirs[1]),
+                "audio_files": [str(tracks[1]), str(duplicate_track)],
+            },
         ]
     )
 
@@ -989,17 +991,6 @@ def test_tidal_audio_quality_event_reports_detected_quality(
 ):
     assert (
         _tidal_audio_quality_event(audio_quality, requested_quality) == expected_event
-    )
-
-
-def test_tidal_audio_quality_event_reports_partial_inspection_without_profiles():
-    assert _tidal_audio_quality_event(
-        {"tracks_total": 10, "tracks_probed": 5, "profiles": []}, "max"
-    ) == (
-        "warn",
-        "Tidal MAX was requested, but only 5/10 tracks were inspected. "
-        "No bit depth or sample rate could be verified for the inspected tracks; "
-        "5 tracks remain uninspected, so overall compliance is unknown.",
     )
 
 

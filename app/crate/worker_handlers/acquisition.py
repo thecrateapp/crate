@@ -99,6 +99,7 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     tracks_total = 0
     tracks_probed = 0
     album_audio_files: list[tuple[Path, list[Path]]] = []
+    seen_audio_paths: set[Path] = set()
 
     for album in albums:
         album_dir = _existing_album_dir(album.get("path"))
@@ -107,13 +108,24 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
         explicit_audio_files = album.get("audio_files")
         if not isinstance(explicit_audio_files, list):
             continue
-        audio_files = [
-            audio_file
-            for raw_path in explicit_audio_files
-            if str(raw_path or "").strip()
-            and (audio_file := Path(str(raw_path))).is_file()
-            and audio_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
-        ]
+        audio_files = []
+        for raw_path in explicit_audio_files:
+            if not str(raw_path or "").strip():
+                continue
+            audio_file = Path(str(raw_path))
+            if (
+                not audio_file.is_file()
+                or audio_file.suffix.lower() not in DEFAULT_AUDIO_EXTENSIONS
+            ):
+                continue
+            try:
+                resolved_audio_path = audio_file.resolve()
+            except (OSError, RuntimeError):
+                resolved_audio_path = audio_file.absolute()
+            if resolved_audio_path in seen_audio_paths:
+                continue
+            seen_audio_paths.add(resolved_audio_path)
+            audio_files.append(audio_file)
         tracks_total += len(audio_files)
         if not audio_files:
             continue
@@ -256,23 +268,14 @@ def _tidal_audio_quality_event(
                 f"0/{tracks_total} {track_label}. Overall compliance is unknown "
                 "because none of the downloaded tracks could be verified.",
             )
-        if profiles:
-            return (
-                "warn",
-                f"Tidal {quality_label} was requested, but only "
-                f"{tracks_probed}/{tracks_total} {track_label} were inspected. "
-                f"Among inspected tracks, {qualifying_tracks} met the "
-                f"{required_bit_depth}-bit target; {uninspected_tracks} "
-                f"{uninspected_label} {uninspected_verb} uninspected, so overall "
-                f"compliance is unknown. Observed: {observed}",
-            )
         return (
             "warn",
             f"Tidal {quality_label} was requested, but only "
             f"{tracks_probed}/{tracks_total} {track_label} were inspected. "
-            "No bit depth or sample rate could be verified for the inspected "
-            f"tracks; {uninspected_tracks} {uninspected_label} "
-            f"{uninspected_verb} uninspected, so overall compliance is unknown.",
+            f"Among inspected tracks, {qualifying_tracks} met the "
+            f"{required_bit_depth}-bit target; {uninspected_tracks} "
+            f"{uninspected_label} {uninspected_verb} uninspected, so overall "
+            f"compliance is unknown. Observed: {observed}",
         )
     if profiles:
         if qualifying_tracks:
