@@ -191,7 +191,7 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
         )
 
     return {
-        str(row["genre_slug"]).strip().casefold(): (
+        str(row["genre_slug"]).strip().lower(): (
             f"/api/artists/{row['artist_id']}/background?size=640&format=webp"
         )
         for row in rows
@@ -230,7 +230,7 @@ def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
         genre_slug = station.get("genre_slug")
         if not isinstance(genre_slug, str) or not genre_slug.strip():
             continue
-        fallback = backgrounds_by_genre.get(genre_slug.strip().casefold())
+        fallback = backgrounds_by_genre.get(genre_slug.strip().lower())
         if fallback:
             station["cover_url"] = fallback
 

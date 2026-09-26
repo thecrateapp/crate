@@ -183,6 +183,46 @@ def test_genre_stations_fall_back_to_top_artist_background(monkeypatch):
     assert stations[1]["cover_url"] is None
 
 
+def test_genre_station_fallback_uses_sql_lower_normalization_for_unicode_slugs(
+    monkeypatch,
+):
+    from crate.db.queries import radio_stations
+
+    class Result:
+        def mappings(self):
+            return self
+
+        def all(self):
+            return [{"genre_slug": "straße", "artist_id": 42}]
+
+    class Session:
+        def execute(self, *_args, **_kwargs):
+            return Result()
+
+    class ReadScope:
+        def __enter__(self):
+            return Session()
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(radio_stations, "read_scope", ReadScope)
+    backgrounds = radio_stations._load_genre_station_artwork_fallbacks()
+    monkeypatch.setattr(
+        radio_stations,
+        "_cached_genre_station_artwork_fallbacks",
+        lambda: backgrounds,
+    )
+    stations = [{"type": "genre", "genre_slug": "Straße", "cover_url": None}]
+
+    radio_stations._add_genre_station_artwork_fallbacks(stations)
+
+    assert list(backgrounds) == ["straße"]
+    assert stations[0]["cover_url"] == (
+        "/api/artists/42/background?size=640&format=webp"
+    )
+
+
 def test_genre_station_artwork_fallback_skips_genres_with_covers(monkeypatch):
     from crate.db.queries import radio_stations
 
