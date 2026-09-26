@@ -257,10 +257,10 @@ export function useMediaSession({
         () => {
           // React transport state can remain stale when the browser pauses
           // playback while restoring an output route. Use the audio engine's
-          // state to avoid restarting active audio, but still honor Play when
-          // the engine has actually stopped.
+          // state to avoid restarting active audio. If the engine cannot
+          // report its state, do not trust potentially stale React state.
           const engineIsPlaying = isGaplessPlaybackActive();
-          if (engineIsPlaying ?? actionsRef.current.isPlaying) return;
+          if (engineIsPlaying === true) return;
           actionsRef.current.resume();
         },
       ],
