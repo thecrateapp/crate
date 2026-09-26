@@ -173,9 +173,9 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
             except (OSError, RuntimeError):
                 native_record = None
             quality = dict(native_record) if native_record is not None else {}
-            if not quality.get("bit_depth") or not quality.get("sample_rate"):
-                if fallback_attempts >= TIDAL_QUALITY_FALLBACK_MAX_TRACKS:
-                    continue
+            if (
+                not quality.get("bit_depth") or not quality.get("sample_rate")
+            ) and fallback_attempts < TIDAL_QUALITY_FALLBACK_MAX_TRACKS:
                 fallback_attempts += 1
                 try:
                     fallback_quality = read_audio_quality(

@@ -800,6 +800,54 @@ def test_summarize_tidal_audio_quality_caps_python_fallback_probes(
     }
 
 
+def test_summarize_tidal_audio_quality_keeps_partial_native_data_after_fallback_cap(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Partial Native Metadata"
+    album_dir.mkdir(parents=True)
+    audio_files = [album_dir / f"{index:02d}.flac" for index in range(1, 9)]
+    for audio_file in audio_files:
+        audio_file.write_bytes(b"audio")
+
+    fallback_calls = []
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: {
+            "tracks": [
+                {
+                    "path": str(audio_file),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": None,
+                }
+                for audio_file in audio_files
+            ]
+        },
+    )
+
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
+        fallback_calls.append(audio_file)
+        return {"sample_rate": 96000}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(path) for path in audio_files]}]
+    )
+
+    assert fallback_calls == audio_files[:5]
+    assert summary == {
+        "tracks_total": 8,
+        "tracks_probed": 8,
+        "profiles": [
+            {"bit_depth": 24, "sample_rate": None, "tracks": 3},
+            {"bit_depth": 24, "sample_rate": 96000, "tracks": 5},
+        ],
+    }
+
+
 @pytest.mark.parametrize("native_tracks", [[], [{"ok": False, "error": "probe"}]])
 def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
     tmp_path, monkeypatch, native_tracks
