@@ -524,7 +524,7 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
     }
 
 
-def test_summarize_tidal_audio_quality_ignores_preexisting_tracks_in_imported_album(
+def test_summarize_tidal_audio_quality_caps_timeout_and_ignores_preexisting_tracks(
     tmp_path, monkeypatch
 ):
     album_dir = tmp_path / "Terror" / "Still Suffer"

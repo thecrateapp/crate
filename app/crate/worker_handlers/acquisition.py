@@ -73,6 +73,8 @@ from crate.worker_handlers import (
 log = logging.getLogger(__name__)
 
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
+# Quality probes run inline with acquisition, so cap their wall time to avoid
+# stalling the worker on slow storage; the configured CLI timeout may lower it.
 TIDAL_QUALITY_PROBE_TIMEOUT_SECONDS = 45
 
 
