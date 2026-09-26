@@ -169,19 +169,45 @@ def _load_genre_station_artwork_fallbacks(genre_slugs: list[str]) -> dict[str, s
             session.execute(
                 text(
                     """
-                    SELECT DISTINCT ON (LOWER(BTRIM(COALESCE(tn.slug, g.slug))))
-                        LOWER(BTRIM(COALESCE(tn.slug, g.slug))) AS genre_slug,
+                    WITH matching_genres AS MATERIALIZED (
+                        SELECT g.id, tn.slug AS genre_slug
+                        FROM genre_taxonomy_nodes tn
+                        JOIN genre_taxonomy_aliases gta ON gta.genre_id = tn.id
+                        JOIN genres g ON g.slug = gta.alias_slug
+                        WHERE tn.slug = ANY(:genre_slugs)
+
+                        UNION ALL
+
+                        SELECT g.id, g.slug AS genre_slug
+                        FROM genres g
+                        WHERE g.slug = ANY(:genre_slugs)
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM genre_taxonomy_aliases gta
+                              WHERE gta.alias_slug = g.slug
+                          )
+
+                        UNION ALL
+
+                        SELECT g.id, LOWER(BTRIM(g.slug)) AS genre_slug
+                        FROM genres g
+                        WHERE g.slug <> ALL(:genre_slugs)
+                          AND LOWER(BTRIM(g.slug)) = ANY(:genre_slugs)
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM genre_taxonomy_aliases gta
+                              WHERE gta.alias_slug = g.slug
+                          )
+                    )
+                    SELECT DISTINCT ON (mg.genre_slug)
+                        mg.genre_slug,
                         la.id AS artist_id
-                    FROM genres g
-                    JOIN artist_genres ag ON ag.genre_id = g.id
+                    FROM matching_genres mg
+                    JOIN artist_genres ag ON ag.genre_id = mg.id
                     JOIN library_artists la ON la.name = ag.artist_name
-                    LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
-                    LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
                     WHERE COALESCE(ag.weight, 0) >= :min_membership_score
-                      AND NULLIF(BTRIM(COALESCE(tn.slug, g.slug)), '') IS NOT NULL
-                      AND LOWER(BTRIM(COALESCE(tn.slug, g.slug))) = ANY(:genre_slugs)
                     ORDER BY
-                        LOWER(BTRIM(COALESCE(tn.slug, g.slug))),
+                        mg.genre_slug,
                         COALESCE(ag.weight, 0) DESC,
                         COALESCE(la.listeners, 0) DESC,
                         COALESCE(la.lastfm_playcount, 0) DESC,

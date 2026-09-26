@@ -1255,7 +1255,11 @@ def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
     assert result["audio_quality_status"] == expected_quality_status
     assert download_calls == expected_download_calls
     assert len(quality_inspections) == expected_quality_inspections
-    if not quality_inspection_empty and not quality_inspection_partial:
+    if (
+        not quality_inspection_empty
+        and not quality_inspection_partial
+        and not quality_inspection_error
+    ):
         assert not any(
             len(event) > 2
             and isinstance(event[2], dict)
@@ -1322,5 +1326,13 @@ def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
             len(event) > 2
             and isinstance(event[2], dict)
             and "Observed downloaded audio quality" in event[2].get("message", "")
+            for event in task_events
+        )
+        assert any(
+            len(event) > 2
+            and event[1] == "warn"
+            and isinstance(event[2], dict)
+            and "could not complete audio quality verification"
+            in event[2].get("message", "")
             for event in task_events
         )

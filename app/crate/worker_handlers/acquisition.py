@@ -73,8 +73,10 @@ from crate.worker_handlers import (
 log = logging.getLogger(__name__)
 
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
-# Quality probes run inline with acquisition, so cap their wall time to avoid
-# stalling the worker on slow storage; the configured CLI timeout may lower it.
+# Keep this verification inline so the acquisition task can report the imported
+# audio quality before completion. Its accepted cost is one CLI probe capped at
+# 45s plus metadata-only fallback reads for at most five tracks; move it to the
+# analysis queue before increasing either bound or doing full-file analysis.
 TIDAL_QUALITY_PROBE_TIMEOUT_SECONDS = 45
 TIDAL_QUALITY_FALLBACK_MAX_TRACKS = 5
 
@@ -1202,6 +1204,15 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
                     "Failed to inspect downloaded Tidal audio quality for task %s",
                     task_id,
                     exc_info=True,
+                )
+                quality_label = {
+                    "max": "MAX",
+                    "lossless": "lossless",
+                }.get(quality_key, quality_key or "requested")
+                quality_event = (
+                    "warn",
+                    f"Tidal {quality_label} was requested, but Crate could not "
+                    "complete audio quality verification.",
                 )
             else:
                 tracks_total = audio_quality["tracks_total"]
