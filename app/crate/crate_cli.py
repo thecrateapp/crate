@@ -78,6 +78,11 @@ def _quality_timeout() -> int:
         return 300
 
 
+def quality_timeout_seconds() -> int:
+    """Return the configured bound for audio quality probes."""
+    return _quality_timeout()
+
+
 def _diff_timeout() -> int:
     try:
         return max(1, int(os.environ.get("CRATE_CLI_DIFF_TIMEOUT_SECONDS", "300")))
@@ -134,7 +139,10 @@ def run_quality(
         return None
     try:
         result = subprocess.run(
-            args, capture_output=True, text=True, timeout=timeout or _quality_timeout()
+            args,
+            capture_output=True,
+            text=True,
+            timeout=timeout or quality_timeout_seconds(),
         )
         if result.returncode != 0:
             log.warning("crate-cli quality failed: %s", result.stderr[:200])

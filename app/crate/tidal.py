@@ -683,7 +683,6 @@ def download(
     }
     quality_key = (quality or "").strip().lower()
     q = quality_map.get(quality_key, "max")
-    atmos_filter = "only" if quality_key == "atmos" else "none"
 
     cmd = [
         "tiddl",
@@ -692,13 +691,17 @@ def download(
         str(processing_dir),
         "-q",
         q,
-        "--dolby-atmos",
-        atmos_filter,
-        "--output",
-        TIDDL_OUTPUT_TEMPLATE,
-        "url",
-        url,
     ]
+    if quality_key == "atmos":
+        cmd.extend(["--dolby-atmos", "only"])
+    cmd.extend(
+        [
+            "--output",
+            TIDDL_OUTPUT_TEMPLATE,
+            "url",
+            url,
+        ]
+    )
 
     log.info("Tidal download: %s (quality=%s)", url, q)
 

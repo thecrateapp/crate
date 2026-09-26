@@ -106,6 +106,22 @@ def test_run_quality_batches_multiple_target_directories(monkeypatch):
     ]
 
 
+def test_quality_timeout_seconds_uses_bounded_configured_value(monkeypatch):
+    from crate import crate_cli
+
+    monkeypatch.setenv("CRATE_CLI_QUALITY_TIMEOUT_SECONDS", "45")
+
+    assert crate_cli.quality_timeout_seconds() == 45
+
+
+def test_quality_timeout_seconds_rejects_non_positive_config(monkeypatch):
+    from crate import crate_cli
+
+    monkeypatch.setenv("CRATE_CLI_QUALITY_TIMEOUT_SECONDS", "0")
+
+    assert crate_cli.quality_timeout_seconds() == 1
+
+
 def test_run_diff_uses_diff_subcommand(monkeypatch):
     from crate import crate_cli
 

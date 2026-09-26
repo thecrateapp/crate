@@ -87,7 +87,7 @@ def _existing_album_dir(raw_path: object) -> Path | None:
 
 def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     """Report the bit depth and sample rates actually present after import."""
-    from crate.crate_cli import run_quality
+    from crate.crate_cli import quality_timeout_seconds, run_quality
 
     profiles: Counter[tuple[int | None, int | None]] = Counter()
     tracks_total = 0
@@ -113,6 +113,7 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
             result = run_quality(
                 directory=[str(album_dir) for album_dir, _ in album_audio_files],
                 extensions=extensions,
+                timeout=quality_timeout_seconds(),
             )
         except Exception:
             log.debug(

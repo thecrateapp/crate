@@ -20,11 +20,11 @@ def _write_mp4_header(path: Path) -> None:
 @pytest.mark.parametrize(
     ("quality", "expected_tidal_quality", "expected_atmos_filter"),
     [
-        ("normal", "normal", "none"),
-        ("low", "low", "none"),
-        ("high", "high", "none"),
-        ("max", "max", "none"),
-        ("lossless", "max", "none"),
+        ("normal", "normal", None),
+        ("low", "low", None),
+        ("high", "high", None),
+        ("max", "max", None),
+        ("lossless", "max", None),
         ("atmos", "normal", "only"),
     ],
 )
@@ -72,7 +72,10 @@ def test_tidal_download_uses_collision_safe_output_template(
     assert result["audio_file_count"] == 1
     cmd = captured[0]
     assert cmd[cmd.index("-q") + 1] == expected_tidal_quality
-    assert cmd[cmd.index("--dolby-atmos") + 1] == expected_atmos_filter
+    if expected_atmos_filter is None:
+        assert "--dolby-atmos" not in cmd
+    else:
+        assert cmd[cmd.index("--dolby-atmos") + 1] == expected_atmos_filter
     assert cmd[cmd.index("--output") + 1] == tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.number:02d}" in tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.title_version}" in tidal.TIDDL_OUTPUT_TEMPLATE
@@ -369,6 +372,7 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
         "crate.crate_cli.run_quality",
         _run_quality,
     )
+    monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 45)
 
     summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
 
@@ -384,6 +388,7 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
         {
             "directory": [str(album_dir)],
             "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
+            "timeout": 45,
         }
     ]
 
@@ -421,6 +426,7 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
         }
 
     monkeypatch.setattr("crate.crate_cli.run_quality", _run_quality)
+    monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 45)
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.read_audio_quality",
         lambda *_args, **_kwargs: pytest.fail("native probe should cover all tracks"),
@@ -434,6 +440,7 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
         {
             "directory": [str(album_dir) for album_dir in album_dirs],
             "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
+            "timeout": 45,
         }
     ]
     assert unrelated_track.exists()
