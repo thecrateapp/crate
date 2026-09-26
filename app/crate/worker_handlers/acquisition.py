@@ -181,7 +181,8 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
 def _tidal_audio_quality_event(
     audio_quality: Mapping, requested_quality: str
 ) -> tuple[str, str]:
-    quality_label = "MAX" if requested_quality.lower() == "max" else "lossless"
+    quality_key = requested_quality.strip().lower()
+    quality_label = "MAX" if quality_key == "max" else "lossless"
     profiles = audio_quality["profiles"]
     observed = ", ".join(
         f"{profile['bit_depth'] or '?'}-bit / "
@@ -191,7 +192,10 @@ def _tidal_audio_quality_event(
     has_24_bit = any(
         profile["bit_depth"] and profile["bit_depth"] >= 24 for profile in profiles
     )
-    if has_24_bit:
+    has_16_bit = any(
+        profile["bit_depth"] and profile["bit_depth"] >= 16 for profile in profiles
+    )
+    if has_24_bit or (quality_key == "lossless" and has_16_bit):
         return (
             "info",
             f"Observed downloaded audio quality in "
@@ -199,9 +203,11 @@ def _tidal_audio_quality_event(
             f"tracks: {observed}",
         )
     if profiles:
+        required_bit_depth = 24 if quality_key == "max" else 16
         return (
             "warn",
-            f"Tidal {quality_label} was requested, but no 24-bit audio was confirmed "
+            f"Tidal {quality_label} was requested, but no {required_bit_depth}-bit "
+            "audio was confirmed "
             f"({audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
             f"tracks inspected). Observed: {observed}",
         )

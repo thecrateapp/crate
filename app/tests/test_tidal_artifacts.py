@@ -561,9 +561,22 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
             },
             "lossless",
             (
+                "info",
+                "Observed downloaded audio quality in 2/2 tracks: "
+                "16-bit / 44100 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 8, "sample_rate": 22050, "tracks": 2}],
+            },
+            "lossless",
+            (
                 "warn",
-                "Tidal lossless was requested, but no 24-bit audio was confirmed "
-                "(2/2 tracks inspected). Observed: 16-bit / 44100 Hz (2 tracks)",
+                "Tidal lossless was requested, but no 16-bit audio was confirmed "
+                "(2/2 tracks inspected). Observed: 8-bit / 22050 Hz (2 tracks)",
             ),
         ),
         (
