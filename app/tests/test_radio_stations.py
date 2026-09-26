@@ -298,3 +298,68 @@ def test_genre_station_artwork_fallback_query_uses_top_artist(pg_db, monkeypatch
     assert stations[0]["cover_url"] == (
         f"/api/artists/{expected_artist_id}/background?size=640&format=webp"
     )
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_genre_station_artwork_fallback_groups_case_insensitive_slugs(
+    pg_db, monkeypatch
+):
+    from crate.db.queries import radio_stations
+    from crate.db.tx import read_scope, transaction_scope
+
+    monkeypatch.setattr(
+        radio_stations,
+        "get_or_compute_home_cache",
+        lambda _key, *, compute, **_kwargs: compute(),
+    )
+
+    preferred_artist = "Casefold Genre Preferred Artist"
+    lower_ranked_artist = "Casefold Genre Lower Ranked Artist"
+    pg_db.upsert_artist({"name": preferred_artist})
+    pg_db.upsert_artist({"name": lower_ranked_artist})
+    with transaction_scope() as session:
+        upper_slug_id = session.execute(
+            text("INSERT INTO genres (name, slug) VALUES (:name, :slug) RETURNING id"),
+            {"name": "Casefold Genre Upper", "slug": "CasefoldGenre"},
+        ).scalar_one()
+        lower_slug_id = session.execute(
+            text("INSERT INTO genres (name, slug) VALUES (:name, :slug) RETURNING id"),
+            {"name": "Casefold Genre Lower", "slug": "casefoldgenre"},
+        ).scalar_one()
+        session.execute(
+            text(
+                "INSERT INTO artist_genres (artist_name, genre_id, weight, source) "
+                "VALUES (:artist_name, :genre_id, :weight, 'test')"
+            ),
+            [
+                {
+                    "artist_name": preferred_artist,
+                    "genre_id": upper_slug_id,
+                    "weight": 0.95,
+                },
+                {
+                    "artist_name": lower_ranked_artist,
+                    "genre_id": lower_slug_id,
+                    "weight": 0.8,
+                },
+            ],
+        )
+
+    with read_scope() as session:
+        expected_artist_id = session.execute(
+            text("SELECT id FROM library_artists WHERE name = :name"),
+            {"name": preferred_artist},
+        ).scalar_one()
+
+    stations = [
+        {
+            "type": "genre",
+            "genre_slug": "casefoldgenre",
+            "cover_url": None,
+        }
+    ]
+    radio_stations._add_genre_station_artwork_fallbacks(stations)
+
+    assert stations[0]["cover_url"] == (
+        f"/api/artists/{expected_artist_id}/background?size=640&format=webp"
+    )

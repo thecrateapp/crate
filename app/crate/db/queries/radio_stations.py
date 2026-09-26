@@ -163,8 +163,8 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
             session.execute(
                 text(
                     """
-                    SELECT DISTINCT ON (COALESCE(tn.slug, g.slug))
-                        COALESCE(tn.slug, g.slug) AS genre_slug,
+                    SELECT DISTINCT ON (LOWER(BTRIM(COALESCE(tn.slug, g.slug))))
+                        LOWER(BTRIM(COALESCE(tn.slug, g.slug))) AS genre_slug,
                         la.id AS artist_id
                     FROM genres g
                     JOIN artist_genres ag ON ag.genre_id = g.id
@@ -173,7 +173,7 @@ def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
                     LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
                     WHERE COALESCE(ag.weight, 0) >= :min_membership_score
                     ORDER BY
-                        COALESCE(tn.slug, g.slug),
+                        LOWER(BTRIM(COALESCE(tn.slug, g.slug))),
                         COALESCE(ag.weight, 0) DESC,
                         COALESCE(la.listeners, 0) DESC,
                         COALESCE(la.lastfm_playcount, 0) DESC,

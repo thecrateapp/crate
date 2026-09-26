@@ -99,6 +99,43 @@ describe("audio output interruption controller", () => {
     controller.dispose();
   });
 
+  it("disposes the previous controller when a new one is installed", () => {
+    const firstContext = new FakeAudioContext();
+    const firstPause = vi.fn();
+    const first = createAudioOutputInterruptionController({
+      getAudioContext: () => firstContext as unknown as AudioContext,
+      isPlaying: () => true,
+      pause: firstPause,
+      resume: vi.fn(),
+    });
+    first.install();
+
+    firstContext.state = "suspended";
+    firstContext.dispatchEvent(new Event("statechange"));
+    expect(isAudioOutputInterruptionPending()).toBe(true);
+
+    const secondContext = new FakeAudioContext();
+    const second = createAudioOutputInterruptionController({
+      getAudioContext: () => secondContext as unknown as AudioContext,
+      isPlaying: () => true,
+      pause: vi.fn(),
+      resume: vi.fn(),
+    });
+    second.install();
+
+    expect(firstPause).toHaveBeenCalledTimes(1);
+    expect(first.hasPendingResume()).toBe(false);
+    expect(isAudioOutputInterruptionPending()).toBe(false);
+
+    secondContext.state = "suspended";
+    secondContext.dispatchEvent(new Event("statechange"));
+    first.dispose();
+    expect(isAudioOutputInterruptionPending()).toBe(true);
+
+    second.dispose();
+    expect(isAudioOutputInterruptionPending()).toBe(false);
+  });
+
   it("does not treat a recently user-paused track as an output interruption", async () => {
     vi.useFakeTimers();
     const mediaDevices = new EventTarget() as MediaDevices;

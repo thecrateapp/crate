@@ -357,6 +357,9 @@ export function createAudioOutputInterruptionController(
 
   const install = (): void => {
     if (installed) return;
+    if (activeController && activeController !== controller) {
+      activeController.dispose();
+    }
     installed = true;
     activeController = controller;
 
