@@ -6,7 +6,7 @@ import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
-import { isAudioOutputInterruptionPending } from "@/lib/audio-output-interruption";
+import { isGaplessPlaybackActive } from "@/lib/gapless-player";
 import {
   markNativeMediaSessionPlayingIntent,
   onNativeMediaControl,
@@ -255,14 +255,12 @@ export function useMediaSession({
       [
         "play",
         () => {
-          // Chrome can emit a MediaSession play action while it is restoring
-          // a Bluetooth route. Ignore duplicate play actions during normal
-          // playback, but honor one while an interruption is pending: the
-          // transport state can be stale if the route recovery event was lost.
-          const interruptionPending = isAudioOutputInterruptionPending();
-          if (actionsRef.current.isPlaying && !interruptionPending) {
-            return;
-          }
+          // React transport state can remain stale when the browser pauses
+          // playback while restoring an output route. Use the audio engine's
+          // state to avoid restarting active audio, but still honor Play when
+          // the engine has actually stopped.
+          const engineIsPlaying = isGaplessPlaybackActive();
+          if (engineIsPlaying ?? actionsRef.current.isPlaying) return;
           actionsRef.current.resume();
         },
       ],

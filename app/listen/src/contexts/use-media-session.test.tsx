@@ -7,7 +7,7 @@ import type { Track } from "./player-types";
 import { useMediaSession } from "./use-media-session";
 
 const runtime = vi.hoisted(() => ({ isNative: false }));
-const audioOutput = vi.hoisted(() => ({ interruptionPending: false }));
+const gaplessPlayer = vi.hoisted(() => ({ isPlaying: true }));
 const nativeMediaSession = vi.hoisted(() => ({
   cancelPendingResume: vi.fn(async () => {}),
   controlListener: null as ((event: NativeMediaControlEvent) => void) | null,
@@ -52,8 +52,8 @@ vi.mock("@/lib/platform", () => ({
   isTauriRuntime: false,
 }));
 
-vi.mock("@/lib/audio-output-interruption", () => ({
-  isAudioOutputInterruptionPending: () => audioOutput.interruptionPending,
+vi.mock("@/lib/gapless-player", () => ({
+  isGaplessPlaybackActive: () => gaplessPlayer.isPlaying,
 }));
 
 const TRACK_A: Track = {
@@ -132,7 +132,7 @@ function getMediaSessionActionHandler(
 
 beforeEach(() => {
   runtime.isNative = false;
-  audioOutput.interruptionPending = false;
+  gaplessPlayer.isPlaying = true;
   nativeMediaSession.controlListener = null;
   nativeMediaSession.resumeAllowed = true;
   vi.clearAllMocks();
@@ -176,8 +176,8 @@ afterEach(() => {
 });
 
 describe("useMediaSession", () => {
-  it("honors a media-session play request while output recovery is pending", () => {
-    audioOutput.interruptionPending = true;
+  it("honors Play when the audio engine stopped despite stale transport state", () => {
+    gaplessPlayer.isPlaying = false;
     renderSession(TRACK_A, 0, true);
 
     getMediaSessionActionHandler("play")({ action: "play" });

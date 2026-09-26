@@ -11,6 +11,7 @@ export interface AudioOutputMediaDevices {
 }
 
 export interface AudioOutputInterruptionDependencies {
+  enumerateInputDevices?: () => Promise<readonly string[] | null>;
   enumerateOutputDevices?: () => Promise<readonly string[] | null>;
   getAudioContext: () => AudioContext | null;
   isPlaying: () => boolean;
@@ -51,6 +52,7 @@ export function createAudioOutputInterruptionController(
   let pendingResumeTimer: ReturnType<typeof setTimeout> | null = null;
   let observedContext: AudioContext | null = null;
   let outputDeviceIds: Set<string> | null = null;
+  let inputDeviceIds: Set<string> | null = null;
   let lastPlayingAt: number | null = null;
   let playbackWasActive = false;
   let deviceChangeWork = Promise.resolve();
@@ -211,41 +213,105 @@ export function createAudioOutputInterruptionController(
 
     if (!installed || !nextDeviceIds) return;
 
+    let nextInputDeviceIds: readonly string[] | null = null;
+    if (dependencies.enumerateInputDevices) {
+      try {
+        nextInputDeviceIds = await dependencies.enumerateInputDevices();
+      } catch (error) {
+        recordDevLog(
+          "audio",
+          "input device enumeration failed",
+          { error: String(error) },
+          "debug",
+        );
+      }
+    }
+    if (!installed) return;
+
     const next = new Set(nextDeviceIds.filter(Boolean));
     const previous = outputDeviceIds;
     outputDeviceIds = next;
+    const previousInput = inputDeviceIds;
+    if (nextInputDeviceIds) {
+      inputDeviceIds = new Set(nextInputDeviceIds.filter(Boolean));
+    }
     if (!previous) return;
 
     const hasRemovedOutput = [...previous].some((id) => !next.has(id));
-    const hasAddedOutput = [...next].some((id) => !previous.has(id));
+    const currentInput = inputDeviceIds;
+    const inputDevicesChanged =
+      previousInput !== null &&
+      currentInput !== null &&
+      (previousInput.size !== currentInput.size ||
+        [...previousInput].some((id) => !currentInput.has(id)));
 
-    // Chrome intentionally hides output identities until the page has been
-    // granted output-selection permission. In that mode enumerateDevices()
-    // returns the same generic/default audiooutput entry for every route, so
-    // there is no set diff to compare. Treat consecutive devicechange events
-    // as the interruption boundary in that opaque mode: the first event is
-    // the removal, the next event is the route becoming available again.
+    // Chrome can hide output identities until output-selection permission is
+    // granted. A generic devicechange is not proof that the active output
+    // changed: microphone and camera changes fire the same event. Only use it
+    // as a recovery signal when the active sink is observable (handled below),
+    // or as a pause signal when AudioContext confirms it was interrupted.
     const outputIdentityIsOpaque =
       next.size === 0 || (next.size === 1 && next.has("default"));
     const previousOutputIdentityIsOpaque =
       previous.size === 0 || (previous.size === 1 && previous.has("default"));
     if (outputIdentityIsOpaque && previousOutputIdentityIsOpaque) {
-      if (pendingResume) {
-        resumeAfterInterruption("devicechange");
-      } else {
-        pauseForInterruption("devicechange");
+      const contextState = dependencies.getAudioContext()?.state;
+      if (
+        !pendingResume &&
+        (contextState === "suspended" || contextState === "interrupted")
+      ) {
+        pauseForInterruption(`devicechange-audio-context-${contextState}`);
+      } else if (inputDevicesChanged) {
+        recordDevLog(
+          "audio",
+          "ignored devicechange without an identifiable output change",
+          { reason: "input-device-change" },
+          "debug",
+        );
       }
       return;
     }
+
+    const context = dependencies.getAudioContext() as
+      | (AudioContext & { sinkId?: unknown })
+      | null;
+    const sinkId =
+      typeof context?.sinkId === "string"
+        ? context.sinkId
+        : context?.sinkId &&
+            typeof context.sinkId === "object" &&
+            "id" in context.sinkId &&
+            typeof context.sinkId.id === "string"
+          ? context.sinkId.id
+          : null;
+    const activeSinkId = sinkId && sinkId !== "default" ? sinkId : null;
+    const previousExplicitOutputs = [...previous].filter(
+      (id) => id !== "default",
+    );
+    const nextExplicitOutputs = [...next].filter((id) => id !== "default");
+    const removedExplicitOutputs = previousExplicitOutputs.filter(
+      (id) => !next.has(id),
+    );
+    const addedExplicitOutputs = nextExplicitOutputs.filter(
+      (id) => !previous.has(id),
+    );
+    const activeOutputWasRemoved = activeSinkId
+      ? previous.has(activeSinkId) && !next.has(activeSinkId)
+      : previousExplicitOutputs.length === 1 &&
+        nextExplicitOutputs.length === 0 &&
+        removedExplicitOutputs.length === 1;
+    const activeOutputReturned = activeSinkId
+      ? next.has(activeSinkId)
+      : nextExplicitOutputs.length === 1 && addedExplicitOutputs.length === 1;
 
     if (pendingResume) {
-      if (hasAddedOutput) {
+      if (activeOutputReturned) {
         resumeAfterInterruption("devicechange");
       }
       return;
     }
 
-    if (hasRemovedOutput) {
+    if (hasRemovedOutput && activeOutputWasRemoved) {
       pauseForInterruption("devicechange");
     }
   };
@@ -314,6 +380,7 @@ export function createAudioOutputInterruptionController(
     observedContext?.removeEventListener("sinkchange", onContextSinkChange);
     observedContext = null;
     outputDeviceIds = null;
+    inputDeviceIds = null;
     if (activeController === controller) activeController = null;
   };
 

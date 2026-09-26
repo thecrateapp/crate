@@ -54,6 +54,17 @@ export function useAudioOutputInterruption({
               .map((device) => device.deviceId);
           }
         : undefined,
+      enumerateInputDevices: mediaDevices
+        ? async () => {
+            const devices = await mediaDevices.enumerateDevices();
+            return devices
+              .filter((device) => device.kind !== "audiooutput")
+              .map(
+                (device) =>
+                  `${device.kind}:${device.deviceId}:${device.groupId}`,
+              );
+          }
+        : undefined,
       getAudioContext,
       isPlaying: () => isPlayingRef.current,
       mediaDevices,
