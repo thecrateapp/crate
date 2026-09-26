@@ -134,19 +134,17 @@ def run_quality(
     path_argument = (str, os.PathLike)
     target_files = [files] if isinstance(files, path_argument) else list(files or [])
     target_files = [target for target in target_files if str(target).strip()]
+    target_file = [file] if str(file or "").strip() else []
+    target_directories = (
+        [directory] if isinstance(directory, path_argument) else list(directory or [])
+    )
+    target_directories = [path for path in target_directories if str(path).strip()]
     if target_files:
         args.extend(["--file", *target_files])
-    elif file:
-        args.extend(["--file", file])
-    elif directory:
-        directories = (
-            [directory]
-            if isinstance(directory, path_argument)
-            else [path for path in directory if str(path).strip()]
-        )
-        if not directories:
-            return None
-        args.extend(["--dir", *directories, "--extensions", extensions])
+    elif target_file:
+        args.extend(["--file", *target_file])
+    elif target_directories:
+        args.extend(["--dir", *target_directories, "--extensions", extensions])
     else:
         return None
     try:

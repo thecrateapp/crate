@@ -202,6 +202,53 @@ def test_run_quality_ignores_blank_file_entries_and_falls_back_to_directory(
     ]
 
 
+def test_run_quality_ignores_blank_single_file_and_falls_back_to_directory(
+    monkeypatch,
+):
+    from crate import crate_cli
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "supports_command", lambda _command: True)
+    monkeypatch.setattr(
+        crate_cli.subprocess,
+        "run",
+        lambda args, **_kwargs: (
+            calls.append(args)
+            or SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+        ),
+    )
+
+    assert crate_cli.run_quality(file=" ", directory="/music/Artist/Album") == {
+        "tracks": []
+    }
+    assert calls == [
+        [
+            "/usr/local/bin/crate-cli",
+            "quality",
+            "--dir",
+            "/music/Artist/Album",
+            "--extensions",
+            "flac,mp3,m4a,ogg,opus,wav",
+        ]
+    ]
+
+
+def test_run_quality_returns_none_when_only_blank_file_targets_are_given(monkeypatch):
+    from crate import crate_cli
+
+    calls = []
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "supports_command", lambda _command: True)
+    monkeypatch.setattr(
+        crate_cli.subprocess, "run", lambda *args, **_kwargs: calls.append(args)
+    )
+
+    assert crate_cli.run_quality(file=" ") is None
+    assert crate_cli.run_quality(files=" ") is None
+    assert calls == []
+
+
 def test_run_quality_accepts_pathlike_targets_and_filters_blank_directories(
     monkeypatch,
 ):
