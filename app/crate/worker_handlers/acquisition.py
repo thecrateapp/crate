@@ -1111,9 +1111,24 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     if (quality or "").lower() in {"max", "lossless"} and not result.get(
         "quality_fallback"
     ):
-        audio_quality = _summarize_tidal_audio_quality(moved_albums)
-        event_type, message = _tidal_audio_quality_event(audio_quality, quality)
-        emit_task_event(task_id, event_type, {"message": message})
+        try:
+            audio_quality = _summarize_tidal_audio_quality(moved_albums)
+            event_type, message = _tidal_audio_quality_event(audio_quality, quality)
+        except Exception:
+            log.warning(
+                "Failed to inspect downloaded Tidal audio quality for task %s",
+                task_id,
+                exc_info=True,
+            )
+        else:
+            try:
+                emit_task_event(task_id, event_type, {"message": message})
+            except Exception:
+                log.warning(
+                    "Failed to report downloaded Tidal audio quality for task %s",
+                    task_id,
+                    exc_info=True,
+                )
 
     return {
         "success": True,

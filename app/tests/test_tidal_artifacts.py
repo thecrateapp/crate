@@ -627,13 +627,15 @@ def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
         "expected_quality_inspections",
         "album_dir_lookup_error",
         "fallback_to_normal",
+        "quality_inspection_error",
     ),
     [
-        ("max", ["max", "max", "normal"], 0, False, True),
-        ("normal", ["normal"], 0, False, False),
-        ("atmos", ["atmos"], 0, False, False),
-        ("max", ["max", "max", "normal"], 0, True, True),
-        ("max", ["max"], 1, False, False),
+        ("max", ["max", "max", "normal"], 0, False, True, False),
+        ("normal", ["normal"], 0, False, False, False),
+        ("atmos", ["atmos"], 0, False, False, False),
+        ("max", ["max", "max", "normal"], 0, True, True, False),
+        ("max", ["max"], 1, False, False, False),
+        ("max", ["max"], 1, False, False, True),
     ],
 )
 def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
@@ -644,6 +646,7 @@ def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
     expected_quality_inspections,
     album_dir_lookup_error,
     fallback_to_normal,
+    quality_inspection_error,
 ):
     initial_dir = tmp_path / "initial" / "Terror" / "Still Suffer"
     initial_dir.mkdir(parents=True)
@@ -770,6 +773,8 @@ def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
 
     def _record_quality_inspection(albums):
         quality_inspections.append(albums)
+        if quality_inspection_error:
+            raise OSError("temporary quality inspection failure")
         if not fallback_to_normal and requested_quality == "max":
             return observed_quality
         return _summarize_tidal_audio_quality(albums)
@@ -797,7 +802,7 @@ def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
     assert result["quality"] == ("normal" if fallback_to_normal else requested_quality)
     assert result["audio_quality"] == (
         observed_quality
-        if expected_quality_inspections
+        if expected_quality_inspections and not quality_inspection_error
         else {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
     )
     assert download_calls == expected_download_calls
@@ -822,12 +827,19 @@ def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
             and "retrying in normal quality" in event[2].get("message", "")
             for event in task_events
         )
-    if expected_quality_inspections:
+    if expected_quality_inspections and not quality_inspection_error:
         assert any(
             len(event) > 2
             and event[1] == "info"
             and isinstance(event[2], dict)
             and "Observed downloaded audio quality in 10/10 tracks"
             in event[2].get("message", "")
+            for event in task_events
+        )
+    if quality_inspection_error:
+        assert not any(
+            len(event) > 2
+            and isinstance(event[2], dict)
+            and "Observed downloaded audio quality" in event[2].get("message", "")
             for event in task_events
         )
