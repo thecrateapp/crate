@@ -173,6 +173,33 @@ def test_genre_station_artwork_fallback_skips_missing_or_blank_slugs(monkeypatch
     assert stations[1]["cover_url"] is None
 
 
+def test_genre_station_artwork_fallback_failure_does_not_break_stations(
+    monkeypatch, caplog
+):
+    from crate.db.queries import radio_stations
+
+    def fail_lookup():
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        radio_stations, "_cached_genre_station_artwork_fallbacks", fail_lookup
+    )
+    stations = [
+        {
+            "type": "genre",
+            "genre_name": "Hardcore",
+            "genre_slug": "hardcore",
+            "cover_url": None,
+        }
+    ]
+
+    with caplog.at_level("WARNING", logger=radio_stations.__name__):
+        radio_stations._add_genre_station_artwork_fallbacks(stations)
+
+    assert stations[0]["cover_url"] is None
+    assert "Failed to load genre station artwork fallbacks" in caplog.text
+
+
 def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
     from crate.db.queries import radio_stations
 
@@ -199,8 +226,10 @@ def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
 
     cache = {}
     cache_misses = []
+    cache_calls = []
 
     def cached_compute(cache_key, *, compute, **_kwargs):
+        cache_calls.append((cache_key, _kwargs))
         if cache_key not in cache:
             cache_misses.append(cache_key)
             cache[cache_key] = compute()
@@ -224,6 +253,11 @@ def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
         )
 
     assert cache_misses == [radio_stations._GENRE_STATION_ARTWORK_CACHE_KEY]
+    assert all(
+        key == radio_stations._GENRE_STATION_ARTWORK_CACHE_KEY
+        and kwargs == {"max_age_seconds": 600, "ttl": 600}
+        for key, kwargs in cache_calls
+    )
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")

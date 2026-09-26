@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from sqlalchemy import text
@@ -15,6 +16,7 @@ from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
 _GENRE_STATION_ARTWORK_CACHE_SECONDS = 600
 _GENRE_STATION_ARTWORK_CACHE_KEY = "home:radio-genre-artwork:v1"
+log = logging.getLogger(__name__)
 
 
 def _int_value(value: object) -> int:
@@ -217,7 +219,12 @@ def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
     if not missing_cover_stations:
         return
 
-    backgrounds_by_genre = _cached_genre_station_artwork_fallbacks()
+    try:
+        backgrounds_by_genre = _cached_genre_station_artwork_fallbacks()
+    except Exception:
+        log.warning("Failed to load genre station artwork fallbacks", exc_info=True)
+        return
+
     for station in missing_cover_stations:
         genre_slug = station.get("genre_slug")
         if not isinstance(genre_slug, str) or not genre_slug.strip():
