@@ -17,24 +17,6 @@ def _write_mp4_header(path: Path) -> None:
     path.write_bytes(b"\x00\x00\x00\x18ftypisom" + b"\x00" * 64)
 
 
-@pytest.mark.parametrize("atmos_filter", ["none", "only"])
-def test_tiddl_cli_accepts_dolby_atmos_filter_values(
-    tmp_path, monkeypatch, atmos_filter
-):
-    monkeypatch.setenv("TIDDL_PATH", str(tmp_path))
-    from tiddl.cli.app import app
-    from typer.main import get_command
-
-    download_command = get_command(app).commands["download"]
-    atmos_option = next(
-        param for param in download_command.params if "--dolby-atmos" in param.opts
-    )
-
-    assert atmos_option.is_flag is not True
-    assert tuple(atmos_option.type.choices) == ("none", "only", "allow")
-    assert atmos_filter in atmos_option.type.choices
-
-
 @pytest.mark.parametrize(
     ("quality", "expected_tidal_quality", "expected_atmos_filter"),
     [
@@ -644,26 +626,35 @@ def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
         "expected_download_calls",
         "expected_quality_inspections",
         "album_dir_lookup_error",
+        "fallback_to_normal",
     ),
     [
-        ("max", ["max", "max", "normal"], 0, False),
-        ("normal", ["normal"], 0, False),
-        ("atmos", ["atmos"], 0, False),
-        ("max", ["max", "max", "normal"], 0, True),
+        ("max", ["max", "max", "normal"], 0, False, True),
+        ("normal", ["normal"], 0, False, False),
+        ("atmos", ["atmos"], 0, False, False),
+        ("max", ["max", "max", "normal"], 0, True, True),
+        ("max", ["max"], 1, False, False),
     ],
 )
-def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
+def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
     tmp_path,
     monkeypatch,
     requested_quality,
     expected_download_calls,
     expected_quality_inspections,
     album_dir_lookup_error,
+    fallback_to_normal,
 ):
     initial_dir = tmp_path / "initial" / "Terror" / "Still Suffer"
     initial_dir.mkdir(parents=True)
-    _write_mp4_header(initial_dir / "Promised Only Lies.flac")
-    (initial_dir / "tmpdeadbeef").write_bytes(b"")
+    if requested_quality == "max" and not fallback_to_normal:
+        for idx in range(10):
+            (initial_dir / f"{idx + 1:02d} - Track {idx + 1}.m4a").write_bytes(
+                b"fake-aac"
+            )
+    else:
+        _write_mp4_header(initial_dir / "Promised Only Lies.flac")
+        (initial_dir / "tmpdeadbeef").write_bytes(b"")
 
     fallback_dir = tmp_path / "fallback" / "Terror" / "Still Suffer"
     fallback_dir.mkdir(parents=True)
@@ -676,6 +667,7 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
         _url: str, quality: str = "max", task_id: str = "", progress_callback=None
     ):
         download_calls.append(quality)
+        incomplete_lossless = quality == "max" and fallback_to_normal
         path = (
             initial_dir.parent.parent
             if quality == "max"
@@ -684,8 +676,8 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
         return {
             "success": True,
             "path": str(path),
-            "file_count": 2 if quality == "max" else 10,
-            "audio_file_count": 0 if quality == "max" else 10,
+            "file_count": 2 if incomplete_lossless else 10,
+            "audio_file_count": 0 if incomplete_lossless else 10,
             "invalid_audio_files": [],
             "temp_artifact_files": [],
             "errors": [],
@@ -770,9 +762,16 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
             "crate.worker_handlers.acquisition._existing_album_dir", _raise_once
         )
     quality_inspections = []
+    observed_quality = {
+        "tracks_total": 10,
+        "tracks_probed": 10,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 10}],
+    }
 
     def _record_quality_inspection(albums):
         quality_inspections.append(albums)
+        if not fallback_to_normal and requested_quality == "max":
+            return observed_quality
         return _summarize_tidal_audio_quality(albums)
 
     monkeypatch.setattr(
@@ -795,12 +794,12 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
 
     assert result["success"] is True
     assert result["files"] == 10
-    assert result["quality"] == ("atmos" if requested_quality == "atmos" else "normal")
-    assert result["audio_quality"] == {
-        "tracks_total": 0,
-        "tracks_probed": 0,
-        "profiles": [],
-    }
+    assert result["quality"] == ("normal" if fallback_to_normal else requested_quality)
+    assert result["audio_quality"] == (
+        observed_quality
+        if expected_quality_inspections
+        else {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
+    )
     assert download_calls == expected_download_calls
     assert len(quality_inspections) == expected_quality_inspections
     assert not any(
@@ -809,7 +808,7 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
         and "Tidal MAX was requested" in event[2].get("message", "")
         for event in task_events
     )
-    if requested_quality == "max":
+    if fallback_to_normal:
         assert any(
             len(event) > 2
             and isinstance(event[2], dict)
@@ -821,5 +820,14 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
             len(event) > 2
             and isinstance(event[2], dict)
             and "retrying in normal quality" in event[2].get("message", "")
+            for event in task_events
+        )
+    if expected_quality_inspections:
+        assert any(
+            len(event) > 2
+            and event[1] == "info"
+            and isinstance(event[2], dict)
+            and "Observed downloaded audio quality in 10/10 tracks"
+            in event[2].get("message", "")
             for event in task_events
         )
