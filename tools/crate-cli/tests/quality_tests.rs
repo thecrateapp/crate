@@ -23,6 +23,38 @@ fn test_quality_file_reads_technical_metadata() {
 }
 
 #[test]
+fn test_quality_cli_probes_only_explicit_files_from_an_album_directory() {
+    let dir = TempDir::new().unwrap();
+    let downloaded_one = common::create_test_wav(&dir, "downloaded-one.wav", 440.0, 1.0);
+    let downloaded_two = common::create_test_wav(&dir, "downloaded-two.wav", 440.0, 1.0);
+    common::create_test_wav(&dir, "preexisting.wav", 440.0, 1.0);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_crate-cli"))
+        .args(["quality", "--file"])
+        .arg(&downloaded_one)
+        .arg(&downloaded_two)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "CLI failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["total_files"], 2);
+    let paths: Vec<_> = result["tracks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|track| track["path"].as_str().unwrap())
+        .collect();
+    assert!(paths.contains(&downloaded_one.to_str().unwrap()));
+    assert!(paths.contains(&downloaded_two.to_str().unwrap()));
+    assert!(paths.iter().all(|path| !path.ends_with("preexisting.wav")));
+}
+
+#[test]
 fn test_quality_directory_reports_errors() {
     let dir = TempDir::new().unwrap();
     let valid = common::create_test_wav(&dir, "track.wav", 440.0, 1.0);

@@ -849,8 +849,8 @@ def move_to_library_detailed(
 ) -> list[dict[str, object]]:
     """Move downloaded files from processing dir to library.
 
-    Returns one record per imported album-like target:
-    ``{"artist": str, "album": str, "path": str, "moved": int}``.
+    Returns one record per imported album-like target with moved audio paths:
+    ``{"artist": str, "album": str, "path": str, "moved": int, "audio_files": list[str]}``.
 
     Implementation notes:
 
@@ -881,6 +881,7 @@ def move_to_library_detailed(
             dst, artist_name, album_name
         )
         moved = 0
+        moved_paths: list[Path] = []
         for file_path in root_files:
             if (
                 managed_track_names
@@ -902,6 +903,7 @@ def move_to_library_detailed(
                 dest_file.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(file_path), str(dest_file))
                 moved += 1
+                moved_paths.append(dest_file)
             except Exception:
                 log.warning(
                     "move_to_library: failed to move root file %s -> %s",
@@ -915,6 +917,11 @@ def move_to_library_detailed(
             "album": album_name,
             "path": str(target_album_dir),
             "moved": moved,
+            "audio_files": [
+                str(path)
+                for path in moved_paths
+                if path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+            ],
         }
 
     for item in sorted(src.iterdir()):
@@ -930,6 +937,7 @@ def move_to_library_detailed(
                 _, target_album_dir, managed_track_names = resolve_import_album_target(
                     dst, artist_name, album_name
                 )
+                moved_paths: list[Path] = []
                 try:
                     moved = move_album_tree(
                         album_item,
@@ -938,6 +946,7 @@ def move_to_library_detailed(
                         artist_name=artist_name,
                         album_name=album_name,
                         replace_existing_audio=replace_existing_audio,
+                        moved_paths=moved_paths,
                     )
                     key = (artist_name, album_name, str(target_album_dir))
                     imported_targets[key] = {
@@ -945,6 +954,11 @@ def move_to_library_detailed(
                         "album": album_name,
                         "path": str(target_album_dir),
                         "moved": int(moved),
+                        "audio_files": [
+                            str(path)
+                            for path in moved_paths
+                            if path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+                        ],
                     }
                 except Exception:
                     log.warning(
@@ -989,6 +1003,14 @@ def move_to_library_detailed(
                         "path": str(target_album_dir),
                         "moved": (moved_count if isinstance(moved_count, int) else 0)
                         + 1,
+                        "audio_files": [
+                            *(existing.get("audio_files", []) if existing else []),
+                            *(
+                                [str(dest_file)]
+                                if dest_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+                                else []
+                            ),
+                        ],
                     }
                 except Exception:
                     log.warning(

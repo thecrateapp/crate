@@ -87,13 +87,27 @@ fn probe_file(path: &Path) -> QualityTrack {
 }
 
 pub fn quality_file(path: PathBuf) -> QualityResult {
-    let track = probe_file(&path);
-    let error_count = usize::from(!track.ok);
+    quality_files(vec![path])
+}
+
+pub fn quality_files(mut paths: Vec<PathBuf>) -> QualityResult {
+    paths.sort();
+    paths.dedup();
+    let tracks: Vec<QualityTrack> = paths.par_iter().map(|path| probe_file(path)).collect();
+    let error_count = tracks.iter().filter(|track| !track.ok).count();
+    let root = if paths.len() == 1 {
+        paths
+            .first()
+            .and_then(|path| path.parent())
+            .map(|parent| parent.to_string_lossy().to_string())
+    } else {
+        None
+    };
     QualityResult {
-        root: path.parent().map(|p| p.to_string_lossy().to_string()),
-        tracks: vec![track],
-        total_files: 1,
+        root,
+        total_files: tracks.len(),
         error_count,
+        tracks,
     }
 }
 
@@ -125,9 +139,9 @@ pub fn quality_directories(dirs: Vec<PathBuf>, extensions: String) -> QualityRes
     }
 }
 
-pub fn run_quality(file: Option<PathBuf>, dirs: Vec<PathBuf>, extensions: String) {
-    let result = if let Some(file_path) = file {
-        quality_file(file_path)
+pub fn run_quality(files: Vec<PathBuf>, dirs: Vec<PathBuf>, extensions: String) {
+    let result = if !files.is_empty() {
+        quality_files(files)
     } else if !dirs.is_empty() {
         quality_directories(dirs, extensions)
     } else {

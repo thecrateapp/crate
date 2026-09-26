@@ -96,6 +96,50 @@ def test_radio_station_payload_splits_artist_and_genre_stations(monkeypatch):
     ]
 
 
+def test_get_user_radio_stations_applies_fallback_to_builder_genre_stations(
+    monkeypatch,
+):
+    from crate.db.queries import radio_stations
+
+    context = {"top_genres": [{"genre_name": "Hardcore"}]}
+    genre_stations = [{"type": "genre", "genre_slug": "hardcore", "cover_url": None}]
+    payload = {"artist_stations": [], "genre_stations": genre_stations}
+    context_calls = []
+
+    def get_context(user_id, **kwargs):
+        context_calls.append((user_id, kwargs))
+        return context
+
+    monkeypatch.setattr(radio_stations, "get_cached_home_context", get_context)
+    monkeypatch.setattr(
+        radio_stations,
+        "build_radio_stations_from_context",
+        lambda value: payload if value is context else pytest.fail("wrong context"),
+    )
+    monkeypatch.setattr(
+        radio_stations,
+        "_cached_genre_station_artwork_fallbacks",
+        lambda: {"hardcore": "/api/artists/42/background?size=640&format=webp"},
+    )
+
+    result = radio_stations.get_user_radio_stations(7)
+
+    assert result is payload
+    assert context_calls == [
+        (
+            7,
+            {
+                "top_artist_limit": 24,
+                "top_album_limit": 1,
+                "top_genre_limit": 16,
+            },
+        )
+    ]
+    assert genre_stations[0]["cover_url"] == (
+        "/api/artists/42/background?size=640&format=webp"
+    )
+
+
 def test_genre_stations_fall_back_to_top_artist_background(monkeypatch):
     from crate.db.queries import radio_stations
 

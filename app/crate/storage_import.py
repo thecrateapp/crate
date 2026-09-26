@@ -238,6 +238,7 @@ def move_album_tree(
     artist_name: str,
     album_name: str,
     replace_existing_audio: bool = False,
+    moved_paths: list[Path] | None = None,
 ) -> int:
     moved = 0
     if managed_track_names:
@@ -260,6 +261,8 @@ def move_album_tree(
             try:
                 move_file(src, dest)
                 moved += 1
+                if moved_paths is not None:
+                    moved_paths.append(dest)
             except Exception:
                 log.warning("Failed to move %s -> %s", src, dest, exc_info=True)
         shutil.rmtree(staged_album_dir, ignore_errors=True)
@@ -274,6 +277,8 @@ def move_album_tree(
         try:
             move_file(src, dest)
             moved += 1
+            if moved_paths is not None:
+                moved_paths.append(dest)
         except Exception:
             log.warning("Failed to move %s -> %s", src, dest, exc_info=True)
     shutil.rmtree(staged_album_dir, ignore_errors=True)

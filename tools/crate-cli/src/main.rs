@@ -54,8 +54,8 @@ enum Command {
     },
     /// Probe audio technical metadata without running full analysis
     Quality {
-        #[arg(short, long)]
-        file: Option<PathBuf>,
+        #[arg(short, long, num_args = 1.., conflicts_with = "dir")]
+        file: Vec<PathBuf>,
         #[arg(short, long, num_args = 1..)]
         dir: Vec<PathBuf>,
         #[arg(long, default_value = "flac,mp3,m4a,ogg,opus,wav")]
@@ -230,5 +230,29 @@ mod tests {
             ]
         );
         assert_eq!(extensions, "flac");
+    }
+
+    #[test]
+    fn quality_command_accepts_multiple_explicit_files() {
+        let cli = Cli::try_parse_from([
+            "crate-cli",
+            "quality",
+            "--file",
+            "/music/Album/track-one.flac",
+            "/music/Album/track-two.flac",
+        ])
+        .unwrap();
+
+        let Command::Quality { file, dir, .. } = cli.command else {
+            panic!("expected quality command");
+        };
+        assert_eq!(
+            file,
+            vec![
+                PathBuf::from("/music/Album/track-one.flac"),
+                PathBuf::from("/music/Album/track-two.flac"),
+            ]
+        );
+        assert!(dir.is_empty());
     }
 }

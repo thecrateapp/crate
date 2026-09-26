@@ -73,6 +73,7 @@ from crate.worker_handlers import (
 log = logging.getLogger(__name__)
 
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
+TIDAL_QUALITY_PROBE_TIMEOUT_SECONDS = 45
 
 
 def _existing_album_dir(raw_path: object) -> Path | None:
@@ -93,15 +94,22 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     tracks_total = 0
     tracks_probed = 0
     album_audio_files: list[tuple[Path, list[Path]]] = []
-    extensions = ",".join(
-        sorted(extension.lstrip(".") for extension in DEFAULT_AUDIO_EXTENSIONS)
-    )
 
     for album in albums:
         album_dir = _existing_album_dir(album.get("path"))
         if album_dir is None:
             continue
-        audio_files = get_audio_files(album_dir, DEFAULT_AUDIO_EXTENSIONS)
+        explicit_audio_files = album.get("audio_files")
+        if isinstance(explicit_audio_files, list):
+            audio_files = [
+                audio_file
+                for raw_path in explicit_audio_files
+                if str(raw_path or "").strip()
+                and (audio_file := Path(str(raw_path))).is_file()
+                and audio_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+            ]
+        else:
+            audio_files = get_audio_files(album_dir, DEFAULT_AUDIO_EXTENSIONS)
         tracks_total += len(audio_files)
         if not audio_files:
             continue
@@ -111,9 +119,14 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     if album_audio_files:
         try:
             result = run_quality(
-                directory=[str(album_dir) for album_dir, _ in album_audio_files],
-                extensions=extensions,
-                timeout=quality_timeout_seconds(),
+                files=[
+                    str(audio_file)
+                    for _album_dir, audio_files in album_audio_files
+                    for audio_file in audio_files
+                ],
+                timeout=min(
+                    quality_timeout_seconds(), TIDAL_QUALITY_PROBE_TIMEOUT_SECONDS
+                ),
             )
         except Exception:
             log.debug(

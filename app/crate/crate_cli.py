@@ -124,13 +124,17 @@ def run_quality(
     file: str = "",
     extensions: str = "flac,mp3,m4a,ogg,opus,wav",
     timeout: int | None = None,
+    files: str | Sequence[str] | None = None,
 ) -> dict | None:
     """Probe technical audio metadata with Rust CLI. Returns QualityResult or None."""
     binary = find_binary()
     if not binary or not supports_command("quality"):
         return None
     args = [binary, "quality"]
-    if file:
+    target_files = [files] if isinstance(files, str) else list(files or [])
+    if target_files:
+        args.extend(["--file", *target_files])
+    elif file:
         args.extend(["--file", file])
     elif directory:
         directories = [directory] if isinstance(directory, str) else list(directory)

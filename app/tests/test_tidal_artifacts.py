@@ -273,11 +273,44 @@ def test_move_to_library_detailed_imports_loose_tiddl_audio_root(tmp_path, monke
             "album": "Get to It & Regenerate",
             "path": str(library / "Quicksand" / "Get to It & Regenerate"),
             "moved": 1,
+            "audio_files": [
+                str(library / "Quicksand" / "Get to It & Regenerate" / loose_track.name)
+            ],
         }
     ]
     assert (
         library / "Quicksand" / "Get to It & Regenerate" / loose_track.name
     ).exists()
+
+
+def test_move_to_library_detailed_tracks_only_audio_files_for_quality_checks(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    staged_album = processing / "Artist" / "Album"
+    library = tmp_path / "library"
+    staged_album.mkdir(parents=True)
+    track = staged_album / "01 - New Track.flac"
+    track.write_bytes(b"fLaC" + b"\x00" * 128)
+    (staged_album / "cover.jpg").write_bytes(b"cover")
+
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, Path(root) / artist / album, False),
+    )
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    assert moved == [
+        {
+            "artist": "Artist",
+            "album": "Album",
+            "path": str(library / "Artist" / "Album"),
+            "moved": 2,
+            "audio_files": [str(library / "Artist" / "Album" / track.name)],
+        }
+    ]
 
 
 def test_refresh_token_keeps_tiddl_cli_success_path(tmp_path, monkeypatch):
@@ -386,8 +419,10 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
     }
     assert quality_calls == [
         {
-            "directory": [str(album_dir)],
-            "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
+            "files": [
+                str(album_dir / "01 - Track 1.flac"),
+                str(album_dir / "02 - Track 2.flac"),
+            ],
             "timeout": 45,
         }
     ]
@@ -438,8 +473,7 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
 
     assert quality_calls == [
         {
-            "directory": [str(album_dir) for album_dir in album_dirs],
-            "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
+            "files": [str(track) for track in tracks],
             "timeout": 45,
         }
     ]
@@ -448,6 +482,68 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
         "tracks_total": 2,
         "tracks_probed": 2,
         "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 2}],
+    }
+
+
+def test_summarize_tidal_audio_quality_ignores_preexisting_tracks_in_imported_album(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    existing_track = album_dir / "01 - Existing.flac"
+    downloaded_track = album_dir / "02 - Downloaded.flac"
+    existing_track.write_bytes(b"audio")
+    downloaded_track.write_bytes(b"audio")
+    quality_calls = []
+
+    def _run_quality(**kwargs):
+        quality_calls.append(kwargs)
+        return {
+            "tracks": [
+                {
+                    "path": str(downloaded_track),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": 96000,
+                },
+                {
+                    "path": str(existing_track),
+                    "ok": True,
+                    "bit_depth": 16,
+                    "sample_rate": 44100,
+                },
+            ]
+        }
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", _run_quality)
+    monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 300)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_audio_files",
+        lambda *_args, **_kwargs: pytest.fail(
+            "explicit imported audio files should avoid scanning the album directory"
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda *_args, **_kwargs: pytest.fail(
+            "native probe should cover imported track"
+        ),
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [
+            {
+                "path": str(album_dir),
+                "audio_files": [str(downloaded_track)],
+            }
+        ]
+    )
+
+    assert quality_calls == [{"files": [str(downloaded_track)], "timeout": 45}]
+    assert summary == {
+        "tracks_total": 1,
+        "tracks_probed": 1,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
     }
 
 
