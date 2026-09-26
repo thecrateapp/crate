@@ -137,6 +137,70 @@ def test_run_quality_accepts_multiple_explicit_files(monkeypatch):
     ]
 
 
+def test_run_quality_ignores_blank_explicit_files_and_falls_back_to_file(monkeypatch):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(files="", file="/music/fallback.flac") == {
+        "tracks": []
+    }
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--file",
+        "/music/fallback.flac",
+    ]
+
+
+def test_run_quality_ignores_blank_file_entries_and_falls_back_to_directory(
+    monkeypatch,
+):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(files=["", "  "], directory="/music/Artist/Album") == {
+        "tracks": []
+    }
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--dir",
+        "/music/Artist/Album",
+        "--extensions",
+        "flac,mp3,m4a,ogg,opus,wav",
+    ]
+
+
 def test_quality_timeout_seconds_uses_bounded_configured_value(monkeypatch):
     from crate import crate_cli
 

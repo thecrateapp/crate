@@ -132,6 +132,7 @@ def run_quality(
         return None
     args = [binary, "quality"]
     target_files = [files] if isinstance(files, str) else list(files or [])
+    target_files = [target for target in target_files if target.strip()]
     if target_files:
         args.extend(["--file", *target_files])
     elif file:
