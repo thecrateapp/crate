@@ -446,7 +446,16 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
     )
     monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 45)
 
-    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+    summary = _summarize_tidal_audio_quality(
+        [
+            {
+                "path": str(album_dir),
+                "audio_files": [
+                    str(album_dir / f"0{n} - Track {n}.flac") for n in (1, 2)
+                ],
+            }
+        ]
+    )
 
     assert summary == {
         "tracks_total": 2,
@@ -507,7 +516,13 @@ def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
     )
 
     summary = _summarize_tidal_audio_quality(
-        [{"path": str(album_dir)} for album_dir in album_dirs]
+        [
+            {
+                "path": str(album_dir),
+                "audio_files": [str(track)],
+            }
+            for album_dir, track in zip(album_dirs, tracks, strict=True)
+        ]
     )
 
     assert quality_calls == [
@@ -613,6 +628,24 @@ def test_summarize_tidal_audio_quality_does_not_scan_preexisting_tracks_when_imp
     }
 
 
+def test_summarize_tidal_audio_quality_does_not_scan_when_import_file_list_is_missing(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - Existing.flac").write_bytes(b"audio")
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_audio_files",
+        lambda *_args, **_kwargs: pytest.fail(
+            "quality summary must use imported paths"
+        ),
+    )
+
+    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+
+    assert summary == {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
+
+
 def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
     tmp_path, monkeypatch
 ):
@@ -648,7 +681,9 @@ def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
         "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
     )
 
-    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(first_track), str(second_track)]}]
+    )
 
     assert summary == {
         "tracks_total": 2,
@@ -681,12 +716,46 @@ def test_summarize_tidal_audio_quality_falls_back_when_native_probe_raises(
         },
     )
 
-    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(track)]}]
+    )
 
     assert summary == {
         "tracks_total": 1,
         "tracks_probed": 1,
         "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+    }
+
+
+def test_summarize_tidal_audio_quality_caps_python_fallback_probes(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Long Album"
+    album_dir.mkdir(parents=True)
+    audio_files = [album_dir / f"{index:02d}.flac" for index in range(1, 9)]
+    for audio_file in audio_files:
+        audio_file.write_bytes(b"audio")
+
+    fallback_calls = []
+    monkeypatch.setattr("crate.crate_cli.run_quality", lambda **_kwargs: None)
+
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
+        fallback_calls.append(audio_file)
+        return {"bit_depth": 24, "sample_rate": 96000}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(path) for path in audio_files]}]
+    )
+
+    assert fallback_calls == audio_files[:5]
+    assert summary == {
+        "tracks_total": 8,
+        "tracks_probed": 5,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 5}],
     }
 
 
@@ -716,7 +785,9 @@ def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
         "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
     )
 
-    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(path) for path in audio_files]}]
+    )
 
     assert summary == {
         "tracks_total": 3,

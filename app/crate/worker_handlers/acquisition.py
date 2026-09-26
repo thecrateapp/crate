@@ -76,6 +76,7 @@ NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
 # Quality probes run inline with acquisition, so cap their wall time to avoid
 # stalling the worker on slow storage; the configured CLI timeout may lower it.
 TIDAL_QUALITY_PROBE_TIMEOUT_SECONDS = 45
+TIDAL_QUALITY_FALLBACK_MAX_TRACKS = 5
 
 
 def _existing_album_dir(raw_path: object) -> Path | None:
@@ -102,16 +103,15 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
         if album_dir is None:
             continue
         explicit_audio_files = album.get("audio_files")
-        if isinstance(explicit_audio_files, list):
-            audio_files = [
-                audio_file
-                for raw_path in explicit_audio_files
-                if str(raw_path or "").strip()
-                and (audio_file := Path(str(raw_path))).is_file()
-                and audio_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
-            ]
-        else:
-            audio_files = get_audio_files(album_dir, DEFAULT_AUDIO_EXTENSIONS)
+        if not isinstance(explicit_audio_files, list):
+            continue
+        audio_files = [
+            audio_file
+            for raw_path in explicit_audio_files
+            if str(raw_path or "").strip()
+            and (audio_file := Path(str(raw_path))).is_file()
+            and audio_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+        ]
         tracks_total += len(audio_files)
         if not audio_files:
             continue
@@ -150,6 +150,7 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
                 except (OSError, RuntimeError):
                     continue
 
+    fallback_attempts = 0
     for _album_dir, audio_files in album_audio_files:
         records = []
         for audio_file in audio_files:
@@ -159,6 +160,9 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
                 native_record = None
             quality = dict(native_record) if native_record is not None else {}
             if not quality.get("bit_depth") or not quality.get("sample_rate"):
+                if fallback_attempts >= TIDAL_QUALITY_FALLBACK_MAX_TRACKS:
+                    continue
+                fallback_attempts += 1
                 try:
                     fallback_quality = read_audio_quality(
                         audio_file, use_native_probe=False
