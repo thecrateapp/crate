@@ -982,6 +982,13 @@ def move_to_library_detailed(
                         album_name,
                         exc_info=True,
                     )
+                    record_imported_target(
+                        artist_name,
+                        album_name,
+                        target_album_dir,
+                        len(moved_paths),
+                        moved_paths,
+                    )
             elif album_item.is_file():
                 artist_name, album_name = infer_album_identity(
                     item, fallback_artist=item.name

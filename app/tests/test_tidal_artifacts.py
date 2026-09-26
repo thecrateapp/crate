@@ -352,6 +352,45 @@ def test_move_to_library_detailed_merges_audio_files_for_duplicate_album_targets
     ]
 
 
+def test_move_to_library_detailed_records_audio_moved_before_album_failure(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    staged_album = processing / "Artist" / "Album"
+    library = tmp_path / "library"
+    staged_album.mkdir(parents=True)
+    (staged_album / "01 - Imported Track.flac").write_bytes(b"audio")
+    target = library / "Artist" / "Album"
+    imported_track = target / "01 - Imported Track.flac"
+
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, Path(root) / artist / album, False),
+    )
+
+    def move_then_fail(*_args, moved_paths, **_kwargs):
+        imported_track.parent.mkdir(parents=True, exist_ok=True)
+        imported_track.write_bytes(b"audio")
+        moved_paths.append(imported_track)
+        raise OSError("simulated failure after the first file moved")
+
+    monkeypatch.setattr(tidal, "move_album_tree", move_then_fail)
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    assert moved == [
+        {
+            "artist": "Artist",
+            "album": "Album",
+            "path": str(target),
+            "moved": 1,
+            "audio_files": [str(imported_track)],
+        }
+    ]
+    assert imported_track.is_file()
+
+
 def test_refresh_token_keeps_tiddl_cli_success_path(tmp_path, monkeypatch):
     auth_dir = tmp_path / ".tiddl"
     auth_dir.mkdir()
@@ -894,9 +933,10 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
             "max",
             (
                 "warn",
-                "Tidal MAX was requested, but only 1 of 2 tracks met the 24-bit "
-                "target (1/2 tracks inspected). Observed: 24-bit / 96000 Hz "
-                "(1 track)",
+                "Tidal MAX was requested, but only 1/2 tracks were inspected. "
+                "Among inspected tracks, 1 met the 24-bit target; 1 track remains "
+                "uninspected, so overall compliance is unknown. Observed: "
+                "24-bit / 96000 Hz (1 track)",
             ),
         ),
         (
@@ -917,8 +957,9 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
             "lossless",
             (
                 "warn",
-                "Tidal lossless was requested, but Crate could not verify the "
-                "downloaded bit depth or sample rate",
+                "Tidal lossless was requested, but Crate inspected 0/2 tracks. "
+                "Overall compliance is unknown because none of the downloaded "
+                "tracks could be verified.",
             ),
         ),
         (
@@ -948,6 +989,17 @@ def test_tidal_audio_quality_event_reports_detected_quality(
 ):
     assert (
         _tidal_audio_quality_event(audio_quality, requested_quality) == expected_event
+    )
+
+
+def test_tidal_audio_quality_event_reports_partial_inspection_without_profiles():
+    assert _tidal_audio_quality_event(
+        {"tracks_total": 10, "tracks_probed": 5, "profiles": []}, "max"
+    ) == (
+        "warn",
+        "Tidal MAX was requested, but only 5/10 tracks were inspected. "
+        "No bit depth or sample rate could be verified for the inspected tracks; "
+        "5 tracks remain uninspected, so overall compliance is unknown.",
     )
 
 
@@ -1244,7 +1296,8 @@ def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
             and event[1] == "warn"
             and isinstance(event[2], dict)
             and "Tidal MAX was requested" in event[2].get("message", "")
-            and "9/10 tracks inspected" in event[2].get("message", "")
+            and "9/10 tracks were inspected" in event[2].get("message", "")
+            and "overall compliance is unknown" in event[2].get("message", "")
             for event in task_events
         )
     if quality_inspection_empty:

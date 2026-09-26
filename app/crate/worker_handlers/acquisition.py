@@ -243,6 +243,35 @@ def _tidal_audio_quality_event(
             f"Observed downloaded audio quality in "
             f"{tracks_probed}/{tracks_total} {track_label}: {observed}",
         )
+    if tracks_total > tracks_probed:
+        uninspected_tracks = tracks_total - tracks_probed
+        uninspected_label = "track" if uninspected_tracks == 1 else "tracks"
+        uninspected_verb = "remains" if uninspected_tracks == 1 else "remain"
+        if tracks_probed == 0:
+            return (
+                "warn",
+                f"Tidal {quality_label} was requested, but Crate inspected "
+                f"0/{tracks_total} {track_label}. Overall compliance is unknown "
+                "because none of the downloaded tracks could be verified.",
+            )
+        if profiles:
+            return (
+                "warn",
+                f"Tidal {quality_label} was requested, but only "
+                f"{tracks_probed}/{tracks_total} {track_label} were inspected. "
+                f"Among inspected tracks, {qualifying_tracks} met the "
+                f"{required_bit_depth}-bit target; {uninspected_tracks} "
+                f"{uninspected_label} {uninspected_verb} uninspected, so overall "
+                f"compliance is unknown. Observed: {observed}",
+            )
+        return (
+            "warn",
+            f"Tidal {quality_label} was requested, but only "
+            f"{tracks_probed}/{tracks_total} {track_label} were inspected. "
+            "No bit depth or sample rate could be verified for the inspected "
+            f"tracks; {uninspected_tracks} {uninspected_label} "
+            f"{uninspected_verb} uninspected, so overall compliance is unknown.",
+        )
     if profiles:
         if qualifying_tracks:
             return (
