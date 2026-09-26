@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.tx import read_scope
 from crate.db.queries.genres_shared import MIN_GENRE_MEMBERSHIP_SCORE
+from crate.db.tx import read_scope
 from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
 
 

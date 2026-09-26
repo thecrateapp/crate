@@ -191,26 +191,36 @@ def _tidal_audio_quality_event(
         f"{profile['sample_rate'] or '?'} Hz ({profile['tracks']} tracks)"
         for profile in profiles
     )
-    has_24_bit = any(
-        profile["bit_depth"] and profile["bit_depth"] >= 24 for profile in profiles
+    required_bit_depth = 24 if quality_key == "max" else 16
+    qualifying_tracks = sum(
+        profile["tracks"]
+        for profile in profiles
+        if profile["bit_depth"] and profile["bit_depth"] >= required_bit_depth
     )
-    has_16_bit = any(
-        profile["bit_depth"] and profile["bit_depth"] >= 16 for profile in profiles
-    )
-    if has_24_bit or (quality_key == "lossless" and has_16_bit):
+    tracks_total = audio_quality["tracks_total"]
+    tracks_probed = audio_quality["tracks_probed"]
+    if tracks_total > 0 and qualifying_tracks == tracks_total == tracks_probed:
         return (
             "info",
             f"Observed downloaded audio quality in "
-            f"{audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
+            f"{tracks_probed}/{tracks_total} "
             f"tracks: {observed}",
         )
     if profiles:
-        required_bit_depth = 24 if quality_key == "max" else 16
+        if qualifying_tracks:
+            return (
+                "warn",
+                f"Tidal {quality_label} was requested, but only "
+                f"{qualifying_tracks}/{tracks_total} tracks met the "
+                f"{required_bit_depth}-bit target "
+                f"({tracks_probed}/{tracks_total} tracks inspected). "
+                f"Observed: {observed}",
+            )
         return (
             "warn",
             f"Tidal {quality_label} was requested, but no {required_bit_depth}-bit "
             "audio was confirmed "
-            f"({audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
+            f"({tracks_probed}/{tracks_total} "
             f"tracks inspected). Observed: {observed}",
         )
     return (

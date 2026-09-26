@@ -544,6 +544,23 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
         ),
         (
             {
+                "tracks_total": 10,
+                "tracks_probed": 10,
+                "profiles": [
+                    {"bit_depth": 16, "sample_rate": 44100, "tracks": 9},
+                    {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
+                ],
+            },
+            "max",
+            (
+                "warn",
+                "Tidal MAX was requested, but only 1/10 tracks met the 24-bit "
+                "target (10/10 tracks inspected). Observed: 16-bit / 44100 Hz "
+                "(9 tracks), 24-bit / 96000 Hz (1 tracks)",
+            ),
+        ),
+        (
+            {
                 "tracks_total": 2,
                 "tracks_probed": 2,
                 "profiles": [{"bit_depth": 16, "sample_rate": 44100, "tracks": 2}],
@@ -553,6 +570,37 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
                 "info",
                 "Observed downloaded audio quality in 2/2 tracks: "
                 "16-bit / 44100 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [
+                    {"bit_depth": 8, "sample_rate": 22050, "tracks": 1},
+                    {"bit_depth": 16, "sample_rate": 44100, "tracks": 1},
+                ],
+            },
+            "lossless",
+            (
+                "warn",
+                "Tidal lossless was requested, but only 1/2 tracks met the 16-bit "
+                "target (2/2 tracks inspected). Observed: 8-bit / 22050 Hz "
+                "(1 tracks), 16-bit / 44100 Hz (1 tracks)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 1,
+                "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+            },
+            "max",
+            (
+                "warn",
+                "Tidal MAX was requested, but only 1/2 tracks met the 24-bit "
+                "target (1/2 tracks inspected). Observed: 24-bit / 96000 Hz "
+                "(1 tracks)",
             ),
         ),
         (
