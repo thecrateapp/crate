@@ -23,14 +23,16 @@ def test_tiddl_cli_accepts_dolby_atmos_filter_values(
 ):
     monkeypatch.setenv("TIDDL_PATH", str(tmp_path))
     from tiddl.cli.app import app
-    from typer.testing import CliRunner
+    from typer.main import get_command
 
-    result = CliRunner().invoke(
-        app, ["download", "--dolby-atmos", atmos_filter, "--help"]
+    download_command = get_command(app).commands["download"]
+    atmos_option = next(
+        param for param in download_command.params if "--dolby-atmos" in param.opts
     )
 
-    assert result.exit_code == 0, result.output
-    assert "--dolby-atmos" in result.output
+    assert atmos_option.is_flag is not True
+    assert tuple(atmos_option.type.choices) == ("none", "only", "allow")
+    assert atmos_filter in atmos_option.type.choices
 
 
 @pytest.mark.parametrize(
@@ -590,6 +592,7 @@ def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
     [
         ("max", ["max", "max", "normal"], 1),
         ("normal", ["normal"], 0),
+        ("atmos", ["atmos"], 0),
     ],
 )
 def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
@@ -718,7 +721,7 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
 
     assert result["success"] is True
     assert result["files"] == 10
-    assert result["quality"] == "normal"
+    assert result["quality"] == ("atmos" if requested_quality == "atmos" else "normal")
     assert result["audio_quality"] == {
         "tracks_total": 0,
         "tracks_probed": 0,
@@ -734,6 +737,13 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
     )
     if requested_quality == "max":
         assert any(
+            len(event) > 2
+            and isinstance(event[2], dict)
+            and "retrying in normal quality" in event[2].get("message", "")
+            for event in task_events
+        )
+    else:
+        assert not any(
             len(event) > 2
             and isinstance(event[2], dict)
             and "retrying in normal quality" in event[2].get("message", "")
