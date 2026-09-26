@@ -512,7 +512,7 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
 
 
 @pytest.mark.parametrize(
-    ("audio_quality", "expected_event"),
+    ("audio_quality", "requested_quality", "expected_event"),
     [
         (
             {
@@ -520,6 +520,7 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
                 "tracks_probed": 2,
                 "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 2}],
             },
+            "max",
             (
                 "info",
                 "Observed downloaded audio quality in 2/2 tracks: "
@@ -532,6 +533,7 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
                 "tracks_probed": 2,
                 "profiles": [{"bit_depth": 16, "sample_rate": 44100, "tracks": 2}],
             },
+            "max",
             (
                 "warn",
                 "Tidal MAX was requested, but no 24-bit audio was confirmed "
@@ -539,19 +541,35 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
             ),
         ),
         (
-            {"tracks_total": 2, "tracks_probed": 0, "profiles": []},
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 16, "sample_rate": 44100, "tracks": 2}],
+            },
+            "lossless",
             (
                 "warn",
-                "Tidal MAX was requested, but Crate could not verify the "
+                "Tidal lossless was requested, but no 24-bit audio was confirmed "
+                "(2/2 tracks inspected). Observed: 16-bit / 44100 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {"tracks_total": 2, "tracks_probed": 0, "profiles": []},
+            "lossless",
+            (
+                "warn",
+                "Tidal lossless was requested, but Crate could not verify the "
                 "downloaded bit depth or sample rate",
             ),
         ),
     ],
 )
 def test_tidal_audio_quality_event_reports_detected_quality(
-    audio_quality, expected_event
+    audio_quality, requested_quality, expected_event
 ):
-    assert _tidal_audio_quality_event(audio_quality) == expected_event
+    assert (
+        _tidal_audio_quality_event(audio_quality, requested_quality) == expected_event
+    )
 
 
 def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypatch):

@@ -178,7 +178,10 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     }
 
 
-def _tidal_audio_quality_event(audio_quality: Mapping) -> tuple[str, str]:
+def _tidal_audio_quality_event(
+    audio_quality: Mapping, requested_quality: str
+) -> tuple[str, str]:
+    quality_label = "MAX" if requested_quality.lower() == "max" else "lossless"
     profiles = audio_quality["profiles"]
     observed = ", ".join(
         f"{profile['bit_depth'] or '?'}-bit / "
@@ -198,13 +201,13 @@ def _tidal_audio_quality_event(audio_quality: Mapping) -> tuple[str, str]:
     if profiles:
         return (
             "warn",
-            f"Tidal MAX was requested, but no 24-bit audio was confirmed "
+            f"Tidal {quality_label} was requested, but no 24-bit audio was confirmed "
             f"({audio_quality['tracks_probed']}/{audio_quality['tracks_total']} "
             f"tracks inspected). Observed: {observed}",
         )
     return (
         "warn",
-        "Tidal MAX was requested, but Crate could not verify the "
+        f"Tidal {quality_label} was requested, but Crate could not verify the "
         "downloaded bit depth or sample rate",
     )
 
@@ -1100,7 +1103,7 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     if (quality or "").lower() in {"max", "lossless"}:
         audio_quality = _summarize_tidal_audio_quality(moved_albums)
         if not result.get("quality_fallback"):
-            event_type, message = _tidal_audio_quality_event(audio_quality)
+            event_type, message = _tidal_audio_quality_event(audio_quality, quality)
             emit_task_event(task_id, event_type, {"message": message})
 
     return {

@@ -292,7 +292,31 @@ describe("audio output interruption controller", () => {
     controller.dispose();
   });
 
-  it("pauses and resumes when the AudioContext sink changes without exposed device ids", async () => {
+  it("ignores a sink change while running without a confirmed interruption", async () => {
+    const mediaDevices = new EventTarget() as MediaDevices;
+    const audioContext = new FakeAudioContext();
+    const pause = vi.fn();
+    const resume = vi.fn();
+
+    const controller = createAudioOutputInterruptionController({
+      enumerateOutputDevices: async () => ["default"],
+      getAudioContext: () => audioContext as unknown as AudioContext,
+      isPlaying: () => true,
+      mediaDevices,
+      pause,
+      resume,
+    });
+    controller.install();
+    await flushAsyncWork();
+
+    audioContext.dispatchEvent(new Event("sinkchange"));
+    expect(pause).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+    expect(controller.hasPendingResume()).toBe(false);
+    controller.dispose();
+  });
+
+  it("uses a sink change to recover only after an interruption was observed", async () => {
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
     let isPlaying = true;
@@ -314,11 +338,15 @@ describe("audio output interruption controller", () => {
     controller.install();
     await flushAsyncWork();
 
+    audioContext.state = "suspended";
     audioContext.dispatchEvent(new Event("sinkchange"));
     expect(pause).toHaveBeenCalledTimes(1);
+    expect(controller.hasPendingResume()).toBe(true);
 
-    audioContext.dispatchEvent(new Event("sinkchange"));
+    audioContext.state = "running";
+    audioContext.dispatchEvent(new Event("statechange"));
     expect(resume).toHaveBeenCalledTimes(1);
+    expect(controller.hasPendingResume()).toBe(false);
     controller.dispose();
   });
 

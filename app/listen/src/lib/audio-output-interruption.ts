@@ -75,12 +75,17 @@ export function createAudioOutputInterruptionController(
   };
 
   const onContextSinkChange = (): void => {
+    const state = observedContext?.state as string | undefined;
     if (pendingResume) {
-      resumeAfterInterruption("audio-context-sinkchange");
+      if (state === "running") {
+        resumeAfterInterruption("audio-context-sinkchange");
+      }
       return;
     }
 
-    pauseForInterruption("audio-context-sinkchange");
+    if (state === "suspended" || state === "interrupted") {
+      pauseForInterruption(`audio-context-sinkchange-${state}`);
+    }
   };
 
   const observe = (): (() => void) => {
