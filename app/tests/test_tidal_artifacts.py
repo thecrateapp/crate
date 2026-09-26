@@ -376,9 +376,16 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
             "sample_rate": 44100,
         },
     ]
+
+    quality_calls = []
+
+    def _run_quality(**kwargs):
+        quality_calls.append(kwargs)
+        return {"tracks": records}
+
     monkeypatch.setattr(
         "crate.crate_cli.run_quality",
-        lambda **_kwargs: {"tracks": records},
+        _run_quality,
     )
 
     summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
@@ -391,6 +398,12 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
             {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
         ],
     }
+    assert quality_calls == [
+        {
+            "directory": str(album_dir),
+            "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
+        }
+    ]
 
 
 def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
