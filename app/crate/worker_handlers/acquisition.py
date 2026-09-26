@@ -1099,8 +1099,9 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     audio_quality = {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
     if (quality or "").lower() in {"max", "lossless"}:
         audio_quality = _summarize_tidal_audio_quality(moved_albums)
-        event_type, message = _tidal_audio_quality_event(audio_quality)
-        emit_task_event(task_id, event_type, {"message": message})
+        if not result.get("quality_fallback"):
+            event_type, message = _tidal_audio_quality_event(audio_quality)
+            emit_task_event(task_id, event_type, {"message": message})
 
     return {
         "success": True,

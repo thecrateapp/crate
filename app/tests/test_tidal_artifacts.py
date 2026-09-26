@@ -1,5 +1,4 @@
 import json
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -19,17 +18,19 @@ def _write_mp4_header(path: Path) -> None:
 
 
 @pytest.mark.parametrize("atmos_filter", ["none", "only"])
-def test_installed_tiddl_cli_accepts_dolby_atmos_filter_values(atmos_filter):
-    result = subprocess.run(
-        ["tiddl", "download", "--dolby-atmos", atmos_filter, "--help"],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
+def test_tiddl_cli_accepts_dolby_atmos_filter_values(
+    tmp_path, monkeypatch, atmos_filter
+):
+    monkeypatch.setenv("TIDDL_PATH", str(tmp_path))
+    from tiddl.cli.app import app
+    from typer.testing import CliRunner
+
+    result = CliRunner().invoke(
+        app, ["download", "--dolby-atmos", atmos_filter, "--help"]
     )
 
-    assert result.returncode == 0, result.stderr
-    assert "--dolby-atmos" in result.stdout
+    assert result.exit_code == 0, result.output
+    assert "--dolby-atmos" in result.output
 
 
 @pytest.mark.parametrize(
@@ -656,9 +657,10 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
         ],
     )
     monkeypatch.setattr("crate.library_sync.LibrarySync", _DummySync)
+    task_events = []
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.emit_task_event",
-        lambda *args, **kwargs: None,
+        lambda *args, **kwargs: task_events.append(args),
     )
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.emit_progress", lambda *args, **kwargs: None
@@ -724,3 +726,16 @@ def test_tidal_download_inner_inspects_quality_only_for_lossless_requests(
     }
     assert download_calls == expected_download_calls
     assert len(quality_inspections) == expected_quality_inspections
+    assert not any(
+        len(event) > 2
+        and isinstance(event[2], dict)
+        and "Tidal MAX was requested" in event[2].get("message", "")
+        for event in task_events
+    )
+    if requested_quality == "max":
+        assert any(
+            len(event) > 2
+            and isinstance(event[2], dict)
+            and "retrying in normal quality" in event[2].get("message", "")
+            for event in task_events
+        )

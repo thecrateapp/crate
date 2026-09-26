@@ -6,10 +6,10 @@ from sqlalchemy import text
 
 from crate.db.home_cache import get_or_compute_home_cache
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
-from crate.db.tx import read_scope
 from crate.db.queries.genres_shared import MIN_GENRE_MEMBERSHIP_SCORE
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.db.repositories.global_user_library import list_global_collection_artists
+from crate.db.tx import read_scope
 from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
