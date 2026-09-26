@@ -18,6 +18,10 @@ import {
 } from "@/lib/gapless-player";
 import { isOnline as isRuntimeOnline } from "@/lib/capacitor";
 import { isCastSessionActive } from "@/lib/cast-sender";
+import {
+  cancelPendingAudioOutputResume,
+  isAudioOutputInterruptionPending,
+} from "@/lib/audio-output-interruption";
 
 interface UsePlayerEngineCallbacksParams {
   callbacksRef: MutableRefObject<GaplessPlayerCallbacks>;
@@ -262,6 +266,7 @@ export function usePlayerEngineCallbacks({
     },
     onAllFinished: () => {
       if (isCastSessionActive()) return;
+      cancelPendingAudioOutputResume();
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       cancelSoftInterruption();
@@ -282,6 +287,9 @@ export function usePlayerEngineCallbacks({
         return;
       }
       if (isPlaybackGestureRequiredError(err)) {
+        if (!isAudioOutputInterruptionPending()) {
+          cancelPendingAudioOutputResume();
+        }
         console.warn("[gapless] playback requires a user gesture:", err);
         cancelRestoreAutoplay();
         requireUserGestureToResume();
@@ -294,6 +302,9 @@ export function usePlayerEngineCallbacks({
           err,
         );
         return;
+      }
+      if (!isAudioOutputInterruptionPending()) {
+        cancelPendingAudioOutputResume();
       }
       console.error("[gapless] error:", err);
       cancelRestoreAutoplay();

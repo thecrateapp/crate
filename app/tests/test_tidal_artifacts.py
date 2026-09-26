@@ -1,4 +1,6 @@
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,6 +17,20 @@ from crate.worker_handlers.acquisition import (
 
 def _write_mp4_header(path: Path) -> None:
     path.write_bytes(b"\x00\x00\x00\x18ftypisom" + b"\x00" * 64)
+
+
+@pytest.mark.skipif(shutil.which("tiddl") is None, reason="tiddl CLI is not installed")
+def test_installed_tiddl_cli_supports_dolby_atmos_filter():
+    result = subprocess.run(
+        ["tiddl", "download", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--dolby-atmos" in result.stdout
 
 
 @pytest.mark.parametrize(

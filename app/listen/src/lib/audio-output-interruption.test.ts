@@ -122,8 +122,11 @@ describe("audio output interruption controller", () => {
     await flushAsyncWork();
     await vi.advanceTimersByTimeAsync(100);
 
-    isPlaying = false;
+    // Transport controls cancel before the engine's pause callback and the
+    // resulting React observation, matching the production event order.
     cancelPendingAudioOutputResume();
+    isPlaying = false;
+    controller.observe();
     outputDeviceIds = ["default"];
     mediaDevices.dispatchEvent(new Event("devicechange"));
     await flushAsyncWork();
