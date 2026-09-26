@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 from decimal import Decimal
 
 from sqlalchemy import text
 
-from crate.db.home_cache import _get_or_compute_home_cache
+from crate.db.home_cache import get_or_compute_home_cache
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
 from crate.db.tx import read_scope
 from crate.db.queries.genres_shared import MIN_GENRE_MEMBERSHIP_SCORE
@@ -15,6 +14,7 @@ from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
 _GENRE_STATION_ARTWORK_CACHE_SECONDS = 600
+_GENRE_STATION_ARTWORK_CACHE_KEY = "home:radio-genre-artwork:v1"
 
 
 def _int_value(value: object) -> int:
@@ -155,23 +155,23 @@ def build_radio_stations_from_context(
     }
 
 
-def _load_genre_station_artwork_fallbacks(genre_names: list[str]) -> dict[str, str]:
+def _load_genre_station_artwork_fallbacks() -> dict[str, str]:
     with read_scope() as session:
         rows = (
             session.execute(
                 text(
                     """
-                    SELECT DISTINCT ON (requested.genre_name)
-                        requested.genre_name,
+                    SELECT DISTINCT ON (COALESCE(tn.slug, g.slug))
+                        COALESCE(tn.slug, g.slug) AS genre_slug,
                         la.id AS artist_id
-                    FROM unnest(CAST(:genre_names AS text[])) AS requested(genre_name)
-                    JOIN genres g
-                      ON LOWER(TRIM(g.name)) = LOWER(TRIM(requested.genre_name))
+                    FROM genres g
                     JOIN artist_genres ag ON ag.genre_id = g.id
                     JOIN library_artists la ON la.name = ag.artist_name
+                    LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
+                    LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
                     WHERE COALESCE(ag.weight, 0) >= :min_membership_score
                     ORDER BY
-                        requested.genre_name,
+                        COALESCE(tn.slug, g.slug),
                         COALESCE(ag.weight, 0) DESC,
                         COALESCE(la.listeners, 0) DESC,
                         COALESCE(la.lastfm_playcount, 0) DESC,
@@ -180,7 +180,6 @@ def _load_genre_station_artwork_fallbacks(genre_names: list[str]) -> dict[str, s
                     """
                 ),
                 {
-                    "genre_names": genre_names,
                     "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
                 },
             )
@@ -189,7 +188,7 @@ def _load_genre_station_artwork_fallbacks(genre_names: list[str]) -> dict[str, s
         )
 
     return {
-        str(row["genre_name"]).strip().casefold(): (
+        str(row["genre_slug"]).strip().casefold(): (
             f"/api/artists/{row['artist_id']}/background?size=640&format=webp"
         )
         for row in rows
@@ -197,26 +196,12 @@ def _load_genre_station_artwork_fallbacks(genre_names: list[str]) -> dict[str, s
     }
 
 
-def _cached_genre_station_artwork_fallbacks(genre_names: list[str]) -> dict[str, str]:
-    names_by_key = {
-        name.strip().casefold(): name.strip()
-        for name in genre_names
-        if name and name.strip()
-    }
-    if not names_by_key:
-        return {}
-
-    normalized_names = sorted(names_by_key)
-    cache_fingerprint = hashlib.sha256(
-        "\0".join(normalized_names).encode("utf-8")
-    ).hexdigest()
-    cache_key = f"home:radio-genre-artwork:v1:{cache_fingerprint}"
-    names_to_query = [names_by_key[name] for name in normalized_names]
-    return _get_or_compute_home_cache(
-        cache_key,
+def _cached_genre_station_artwork_fallbacks() -> dict[str, str]:
+    return get_or_compute_home_cache(
+        _GENRE_STATION_ARTWORK_CACHE_KEY,
         max_age_seconds=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
         ttl=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
-        compute=lambda: _load_genre_station_artwork_fallbacks(names_to_query),
+        compute=_load_genre_station_artwork_fallbacks,
     )
 
 
@@ -229,11 +214,9 @@ def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
     if not missing_cover_stations:
         return
 
-    backgrounds_by_genre = _cached_genre_station_artwork_fallbacks(
-        [station["genre_name"] for station in missing_cover_stations]
-    )
+    backgrounds_by_genre = _cached_genre_station_artwork_fallbacks()
     for station in missing_cover_stations:
-        fallback = backgrounds_by_genre.get(station["genre_name"].strip().casefold())
+        fallback = backgrounds_by_genre.get(station["genre_slug"].strip().casefold())
         if fallback:
             station["cover_url"] = fallback
 

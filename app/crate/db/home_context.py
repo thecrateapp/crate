@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy import text
 
-from crate.db.home_cache import _get_or_compute_home_cache
+from crate.db.home_cache import get_or_compute_home_cache
 from crate.db.queries.home import get_followed_artist_genre_names
 from crate.db.releases import get_new_releases
 from crate.db.tx import read_scope
@@ -281,7 +281,7 @@ def get_cached_home_context(
         f"home:context:{_HOME_CONTEXT_CACHE_VERSION}:{_home_context_cache_mode()}:"
         f"{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
     )
-    return _get_or_compute_home_cache(
+    return get_or_compute_home_cache(
         cache_key,
         max_age_seconds=600,
         ttl=600,

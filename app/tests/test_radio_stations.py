@@ -104,7 +104,7 @@ def test_genre_stations_fall_back_to_top_artist_background(monkeypatch):
             return self
 
         def all(self):
-            return [{"genre_name": "Hardcore", "artist_id": 42}]
+            return [{"genre_slug": "hardcore", "artist_id": 42}]
 
     class Session:
         def execute(self, *_args, **_kwargs):
@@ -120,11 +120,16 @@ def test_genre_stations_fall_back_to_top_artist_background(monkeypatch):
     monkeypatch.setattr(radio_stations, "read_scope", ReadScope)
     monkeypatch.setattr(
         radio_stations,
-        "_get_or_compute_home_cache",
+        "get_or_compute_home_cache",
         lambda _key, *, compute, **_kwargs: compute(),
     )
     stations = [
-        {"type": "genre", "genre_name": "Hardcore", "cover_url": None},
+        {
+            "type": "genre",
+            "genre_name": "Hardcore",
+            "genre_slug": "hardcore",
+            "cover_url": None,
+        },
         {"type": "artist", "genre_name": "Hardcore", "cover_url": None},
     ]
 
@@ -156,7 +161,10 @@ def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
             return self
 
         def all(self):
-            return [{"genre_name": "Hardcore", "artist_id": 42}]
+            return [
+                {"genre_slug": "hardcore", "artist_id": 42},
+                {"genre_slug": "post-punk", "artist_id": 43},
+            ]
 
     class Session:
         def execute(self, *_args, **_kwargs):
@@ -179,16 +187,23 @@ def test_genre_station_artwork_fallbacks_are_cached(monkeypatch):
         return cache[cache_key]
 
     monkeypatch.setattr(radio_stations, "read_scope", ReadScope)
-    monkeypatch.setattr(radio_stations, "_get_or_compute_home_cache", cached_compute)
+    monkeypatch.setattr(radio_stations, "get_or_compute_home_cache", cached_compute)
 
-    for _ in range(2):
-        stations = [{"type": "genre", "genre_name": "Hardcore", "cover_url": None}]
+    for genre_slug, artist_id in [("hardcore", 42), ("post-punk", 43)]:
+        stations = [
+            {
+                "type": "genre",
+                "genre_name": genre_slug,
+                "genre_slug": genre_slug,
+                "cover_url": None,
+            }
+        ]
         radio_stations._add_genre_station_artwork_fallbacks(stations)
         assert stations[0]["cover_url"] == (
-            "/api/artists/42/background?size=640&format=webp"
+            f"/api/artists/{artist_id}/background?size=640&format=webp"
         )
 
-    assert len(cache_misses) == 1
+    assert cache_misses == [radio_stations._GENRE_STATION_ARTWORK_CACHE_KEY]
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
@@ -198,7 +213,7 @@ def test_genre_station_artwork_fallback_query_uses_top_artist(pg_db, monkeypatch
 
     monkeypatch.setattr(
         radio_stations,
-        "_get_or_compute_home_cache",
+        "get_or_compute_home_cache",
         lambda _key, *, compute, **_kwargs: compute(),
     )
 
@@ -220,6 +235,7 @@ def test_genre_station_artwork_fallback_query_uses_top_artist(pg_db, monkeypatch
         {
             "type": "genre",
             "genre_name": genre_name.upper(),
+            "genre_slug": radio_stations.resolve_genre_slug(genre_name),
             "cover_url": None,
         }
     ]
