@@ -59,3 +59,37 @@ def test_read_audio_quality_falls_back_to_mutagen(monkeypatch, tmp_path):
         "sample_rate": 48000,
         "bit_depth": 24,
     }
+
+
+def test_read_audio_quality_can_skip_redundant_native_probe(monkeypatch, tmp_path):
+    from crate import audio
+
+    track = tmp_path / "track.flac"
+    track.write_bytes(b"audio")
+    native_calls = []
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **kwargs: native_calls.append(kwargs),
+    )
+    monkeypatch.setattr(
+        audio.mutagen,
+        "File",
+        lambda _path: SimpleNamespace(
+            info=SimpleNamespace(
+                length=2.5,
+                bitrate=960000,
+                sample_rate=48000,
+                bits_per_sample=24,
+            )
+        ),
+    )
+
+    quality = audio.read_audio_quality(track, use_native_probe=False)
+
+    assert quality == {
+        "duration": 2.5,
+        "bitrate": 960000,
+        "sample_rate": 48000,
+        "bit_depth": 24,
+    }
+    assert native_calls == []

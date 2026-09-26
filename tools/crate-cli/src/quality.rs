@@ -87,35 +87,63 @@ fn probe_file(path: &Path) -> QualityTrack {
 }
 
 pub fn quality_file(path: PathBuf) -> QualityResult {
-    let track = probe_file(&path);
-    let error_count = usize::from(!track.ok);
-    QualityResult {
-        root: path.parent().map(|p| p.to_string_lossy().to_string()),
-        tracks: vec![track],
-        total_files: 1,
-        error_count,
-    }
+    quality_files(vec![path])
 }
 
-pub fn quality_directory(dir: PathBuf, extensions: String) -> QualityResult {
-    let exts = parse_extensions(&extensions);
-    let files = collect_audio_files(&dir, &exts);
-    let tracks: Vec<QualityTrack> = files.par_iter().map(|path| probe_file(path)).collect();
+pub fn quality_files(mut paths: Vec<PathBuf>) -> QualityResult {
+    paths.sort();
+    paths.dedup();
+    let tracks: Vec<QualityTrack> = paths.par_iter().map(|path| probe_file(path)).collect();
     let error_count = tracks.iter().filter(|track| !track.ok).count();
-
+    let root = if paths.len() == 1 {
+        paths
+            .first()
+            .and_then(|path| path.parent())
+            .map(|parent| parent.to_string_lossy().to_string())
+    } else {
+        None
+    };
     QualityResult {
-        root: Some(dir.to_string_lossy().to_string()),
+        root,
         total_files: tracks.len(),
         error_count,
         tracks,
     }
 }
 
-pub fn run_quality(file: Option<PathBuf>, dir: Option<PathBuf>, extensions: String) {
-    let result = if let Some(file_path) = file {
-        quality_file(file_path)
-    } else if let Some(dir_path) = dir {
-        quality_directory(dir_path, extensions)
+pub fn quality_directory(dir: PathBuf, extensions: String) -> QualityResult {
+    quality_directories(vec![dir], extensions)
+}
+
+pub fn quality_directories(dirs: Vec<PathBuf>, extensions: String) -> QualityResult {
+    let exts = parse_extensions(&extensions);
+    let mut files: Vec<PathBuf> = dirs
+        .iter()
+        .flat_map(|dir| collect_audio_files(dir, &exts))
+        .collect();
+    files.sort();
+    files.dedup();
+    let tracks: Vec<QualityTrack> = files.par_iter().map(|path| probe_file(path)).collect();
+    let error_count = tracks.iter().filter(|track| !track.ok).count();
+    let root = if dirs.len() == 1 {
+        dirs.first().map(|dir| dir.to_string_lossy().to_string())
+    } else {
+        None
+    };
+
+    QualityResult {
+        root,
+        total_files: tracks.len(),
+        error_count,
+        tracks,
+    }
+}
+
+pub fn run_quality(files: Vec<PathBuf>, dirs: Vec<PathBuf>, extensions: String) {
+    let result = if !files.is_empty() {
+        quality_files(files)
+    } else if !dirs.is_empty() {
+        quality_directories(dirs, extensions)
     } else {
         QualityResult {
             root: None,
@@ -125,4 +153,34 @@ pub fn run_quality(file: Option<PathBuf>, dir: Option<PathBuf>, extensions: Stri
         }
     };
     println!("{}", serde_json::to_string(&result).unwrap_or_default());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quality_directories;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn quality_directory_scans_only_requested_directories() {
+        let temp = TempDir::new().unwrap();
+        let album_one = temp.path().join("Album One");
+        let album_two = temp.path().join("Album Two");
+        let unrelated_album = temp.path().join("Unrelated Album");
+        fs::create_dir_all(&album_one).unwrap();
+        fs::create_dir_all(&album_two).unwrap();
+        fs::create_dir_all(&unrelated_album).unwrap();
+        fs::write(album_one.join("one.flac"), b"not audio").unwrap();
+        fs::write(album_two.join("two.flac"), b"not audio").unwrap();
+        fs::write(unrelated_album.join("unrelated.flac"), b"not audio").unwrap();
+
+        let result = quality_directories(vec![album_one, album_two], "flac".to_string());
+
+        assert_eq!(result.root, None);
+        assert_eq!(result.total_files, 2);
+        assert!(result
+            .tracks
+            .iter()
+            .all(|track| !track.path.contains("Unrelated Album")));
+    }
 }

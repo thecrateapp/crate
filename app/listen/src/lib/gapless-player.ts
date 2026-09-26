@@ -103,6 +103,11 @@ export function getPlayer(): Gapless5 | null {
   return instance;
 }
 
+export function isGaplessPlaybackActive(): boolean | null {
+  const player = instance as (Gapless5 & { isPlaying?: () => boolean }) | null;
+  return typeof player?.isPlaying === "function" ? player.isPlaying() : null;
+}
+
 export function getAnalyserNode(): AnalyserNode | null {
   return currentAnalyser;
 }
@@ -343,7 +348,7 @@ export function replaceTrack(index: number, url: string): void {
   replaceQueueTrack(instance, index, url);
 }
 
-function getAudioContext(): AudioContext | null {
+export function getAudioContext(): AudioContext | null {
   return (instance as GaplessOutputInternal | null)?.context ?? null;
 }
 

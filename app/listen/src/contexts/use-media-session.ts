@@ -6,6 +6,7 @@ import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
+import { isGaplessPlaybackActive } from "@/lib/gapless-player";
 import {
   markNativeMediaSessionPlayingIntent,
   onNativeMediaControl,
@@ -48,6 +49,7 @@ export function useMediaSession({
     next,
     prev,
     seek,
+    isPlaying,
     currentTime,
     duration,
   });
@@ -59,10 +61,11 @@ export function useMediaSession({
       next,
       prev,
       seek,
+      isPlaying,
       currentTime,
       duration,
     };
-  }, [currentTime, duration, next, pause, prev, resume, seek]);
+  }, [currentTime, duration, isPlaying, next, pause, prev, resume, seek]);
 
   useEffect(() => {
     if (shouldUseAndroidNativePlayer()) return;
@@ -249,12 +252,25 @@ export function useMediaSession({
     if (isNative || !("mediaSession" in navigator)) return;
 
     const actions: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
-      ["play", () => actionsRef.current.resume()],
+      [
+        "play",
+        () => {
+          // React transport state can remain stale when the browser pauses
+          // playback while restoring an output route. Use the audio engine's
+          // state to avoid restarting active audio. If the engine cannot
+          // report its state, do not trust potentially stale React state.
+          const engineIsPlaying = isGaplessPlaybackActive();
+          if (engineIsPlaying === true) return;
+          actionsRef.current.resume();
+        },
+      ],
       [
         "pause",
         () => {
           navigator.mediaSession.playbackState = "paused";
-          actionsRef.current.pause({ immediate: true });
+          actionsRef.current.pause({
+            immediate: true,
+          });
         },
       ],
       ["previoustrack", () => actionsRef.current.prev()],

@@ -7,6 +7,7 @@ import {
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
 } from "./use-desktop-tray-commands";
+import { useAudioOutputInterruption } from "./use-audio-output-interruption";
 import { useMediaSession } from "./use-media-session";
 import { usePlayerShortcuts } from "./use-player-shortcuts";
 
@@ -63,6 +64,14 @@ export function usePlayerPlatformIntegrations({
     resume,
   });
   useDesktopTrayNowPlaying({ currentTrack, isPlaying });
+
+  useAudioOutputInterruption({
+    currentTrack,
+    isPlaying,
+    isPlayingRef,
+    pause,
+    resume,
+  });
 
   useMediaSession({
     currentTime,

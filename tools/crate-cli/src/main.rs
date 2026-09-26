@@ -54,10 +54,10 @@ enum Command {
     },
     /// Probe audio technical metadata without running full analysis
     Quality {
-        #[arg(short, long)]
-        file: Option<PathBuf>,
-        #[arg(short, long)]
-        dir: Option<PathBuf>,
+        #[arg(short, long, num_args = 1.., conflicts_with = "dir")]
+        file: Vec<PathBuf>,
+        #[arg(short, long, num_args = 1..)]
+        dir: Vec<PathBuf>,
         #[arg(long, default_value = "flac,mp3,m4a,ogg,opus,wav")]
         extensions: String,
     },
@@ -194,5 +194,65 @@ fn main() {
             extensions,
             model_path,
         } => analyze::run_analyze(file, dir, extensions, model_path),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Command};
+    use clap::Parser;
+    use std::path::PathBuf;
+
+    #[test]
+    fn quality_command_accepts_multiple_target_directories() {
+        let cli = Cli::try_parse_from([
+            "crate-cli",
+            "quality",
+            "--dir",
+            "/music/Artist/Album One",
+            "/music/Artist/Album Two",
+            "--extensions",
+            "flac",
+        ])
+        .unwrap();
+
+        let Command::Quality {
+            dir, extensions, ..
+        } = cli.command
+        else {
+            panic!("expected quality command");
+        };
+        assert_eq!(
+            dir,
+            vec![
+                PathBuf::from("/music/Artist/Album One"),
+                PathBuf::from("/music/Artist/Album Two"),
+            ]
+        );
+        assert_eq!(extensions, "flac");
+    }
+
+    #[test]
+    fn quality_command_accepts_multiple_explicit_files() {
+        let cli = Cli::try_parse_from([
+            "crate-cli",
+            "quality",
+            "--file",
+            "/music/Album/track-one.flac",
+            "/music/Album/track-two.flac",
+        ])
+        .unwrap();
+
+        let Command::Quality { file, dir, .. } = cli.command else {
+            panic!("expected quality command");
+        };
+        assert_eq!(
+            file,
+            vec![
+                PathBuf::from("/music/Album/track-one.flac"),
+                PathBuf::from("/music/Album/track-two.flac"),
+            ]
+        );
+        assert!(dir.is_empty());
     }
 }

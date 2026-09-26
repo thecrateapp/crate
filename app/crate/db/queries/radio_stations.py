@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
+from sqlalchemy import text
+
+from crate.db.home_cache import get_or_compute_home_cache
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
+from crate.db.queries.genres_shared import MIN_GENRE_MEMBERSHIP_SCORE
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.db.repositories.global_user_library import list_global_collection_artists
+from crate.db.tx import read_scope
 from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
+
+_GENRE_STATION_ARTWORK_CACHE_SECONDS = 600
+_GENRE_STATION_ARTWORK_CACHE_KEY = "home:radio-genre-artwork:v2"
+log = logging.getLogger(__name__)
 
 
 def _int_value(value: object) -> int:
@@ -147,6 +157,132 @@ def build_radio_stations_from_context(
     }
 
 
+def _load_genre_station_artwork_fallbacks(genre_slugs: list[str]) -> dict[str, str]:
+    normalized_genre_slugs = sorted(
+        {slug.strip().lower() for slug in genre_slugs if slug.strip()}
+    )
+    if not normalized_genre_slugs:
+        return {}
+
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    WITH matching_genres AS MATERIALIZED (
+                        SELECT g.id, tn.slug AS genre_slug
+                        FROM genre_taxonomy_nodes tn
+                        JOIN genre_taxonomy_aliases gta ON gta.genre_id = tn.id
+                        JOIN genres g ON g.slug = gta.alias_slug
+                        WHERE tn.slug = ANY(:genre_slugs)
+
+                        UNION ALL
+
+                        SELECT g.id, g.slug AS genre_slug
+                        FROM genres g
+                        WHERE g.slug = ANY(:genre_slugs)
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM genre_taxonomy_aliases gta
+                              WHERE gta.alias_slug = g.slug
+                          )
+
+                        UNION ALL
+
+                        SELECT g.id, LOWER(BTRIM(g.slug)) AS genre_slug
+                        FROM genres g
+                        WHERE g.slug <> ALL(:genre_slugs)
+                          AND LOWER(BTRIM(g.slug)) = ANY(:genre_slugs)
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM genre_taxonomy_aliases gta
+                              WHERE gta.alias_slug = g.slug
+                          )
+                    )
+                    SELECT DISTINCT ON (mg.genre_slug)
+                        mg.genre_slug,
+                        la.id AS artist_id
+                    FROM matching_genres mg
+                    JOIN artist_genres ag ON ag.genre_id = mg.id
+                    JOIN library_artists la ON la.name = ag.artist_name
+                    WHERE COALESCE(ag.weight, 0) >= :min_membership_score
+                    ORDER BY
+                        mg.genre_slug,
+                        COALESCE(ag.weight, 0) DESC,
+                        COALESCE(la.listeners, 0) DESC,
+                        COALESCE(la.lastfm_playcount, 0) DESC,
+                        COALESCE(la.album_count, 0) DESC,
+                        la.name ASC
+                    """
+                ),
+                {
+                    "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
+                    "genre_slugs": normalized_genre_slugs,
+                },
+            )
+            .mappings()
+            .all()
+        )
+
+    return {
+        str(row["genre_slug"]).strip().lower(): (
+            f"/api/artists/{row['artist_id']}/background?size=640&format=webp"
+        )
+        for row in rows
+        if row.get("artist_id") is not None and str(row.get("genre_slug") or "").strip()
+    }
+
+
+def _cached_genre_station_artwork_fallbacks(genre_slugs: list[str]) -> dict[str, str]:
+    normalized_genre_slugs = sorted(
+        {slug.strip().lower() for slug in genre_slugs if slug.strip()}
+    )
+    if not normalized_genre_slugs:
+        return {}
+    cache_key = f"{_GENRE_STATION_ARTWORK_CACHE_KEY}:{','.join(normalized_genre_slugs)}"
+    return get_or_compute_home_cache(
+        cache_key,
+        max_age_seconds=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
+        ttl=_GENRE_STATION_ARTWORK_CACHE_SECONDS,
+        compute=lambda: _load_genre_station_artwork_fallbacks(normalized_genre_slugs),
+    )
+
+
+def _add_genre_station_artwork_fallbacks(stations: list[dict]) -> None:
+    missing_cover_stations = [
+        station
+        for station in stations
+        if station.get("type") == "genre"
+        and not station.get("cover_url")
+        and isinstance(station.get("genre_slug"), str)
+        and station["genre_slug"].strip()
+    ]
+    if not missing_cover_stations:
+        return
+
+    try:
+        requested_genre_slugs = sorted(
+            {
+                station["genre_slug"].strip().lower()
+                for station in missing_cover_stations
+            }
+        )
+        backgrounds_by_genre = _cached_genre_station_artwork_fallbacks(
+            requested_genre_slugs
+        )
+    except Exception:
+        log.warning("Failed to load genre station artwork fallbacks", exc_info=True)
+        return
+
+    for station in missing_cover_stations:
+        genre_slug = station.get("genre_slug")
+        if not isinstance(genre_slug, str) or not genre_slug.strip():
+            continue
+        fallback = backgrounds_by_genre.get(genre_slug.strip().lower())
+        if fallback:
+            station["cover_url"] = fallback
+
+
 def get_user_radio_stations(user_id: int) -> dict:
     context = get_cached_home_context(
         user_id,
@@ -154,4 +290,6 @@ def get_user_radio_stations(user_id: int) -> dict:
         top_album_limit=1,
         top_genre_limit=16,
     )
-    return build_radio_stations_from_context(context)
+    stations = build_radio_stations_from_context(context)
+    _add_genre_station_artwork_fallbacks(stations["genre_stations"])
+    return stations

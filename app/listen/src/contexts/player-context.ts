@@ -36,6 +36,7 @@ export interface JamTransportControls {
 
 export interface PlayerPauseOptions {
   immediate?: boolean;
+  preserveAudioOutputResume?: boolean;
   preserveNativeResume?: boolean;
 }
 
