@@ -388,6 +388,61 @@ def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rate
     ]
 
 
+def test_summarize_tidal_audio_quality_batches_sibling_album_probes(
+    tmp_path, monkeypatch
+):
+    artist_dir = tmp_path / "Terror"
+    album_dirs = [artist_dir / "Album One", artist_dir / "Album Two"]
+    tracks = []
+    for album_dir in album_dirs:
+        album_dir.mkdir(parents=True)
+        track = album_dir / "01 - Track.flac"
+        track.write_bytes(b"audio")
+        tracks.append(track)
+
+    unrelated_track = artist_dir / "Existing Album" / "01 - Existing.flac"
+    unrelated_track.parent.mkdir()
+    unrelated_track.write_bytes(b"audio")
+
+    quality_calls = []
+
+    def _run_quality(**kwargs):
+        quality_calls.append(kwargs)
+        return {
+            "tracks": [
+                {
+                    "path": str(track),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": 96000,
+                }
+                for track in [*tracks, unrelated_track]
+            ]
+        }
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", _run_quality)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda *_args, **_kwargs: pytest.fail("native probe should cover all tracks"),
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir)} for album_dir in album_dirs]
+    )
+
+    assert quality_calls == [
+        {
+            "directory": str(artist_dir),
+            "extensions": "aac,aif,aiff,alac,flac,m4a,mp3,ogg,opus,wav,wma",
+        }
+    ]
+    assert summary == {
+        "tracks_total": 2,
+        "tracks_probed": 2,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 2}],
+    }
+
+
 def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
     tmp_path, monkeypatch
 ):
@@ -554,9 +609,9 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
             "max",
             (
                 "warn",
-                "Tidal MAX was requested, but only 1/10 tracks met the 24-bit "
+                "Tidal MAX was requested, but only 1 of 10 tracks met the 24-bit "
                 "target (10/10 tracks inspected). Observed: 16-bit / 44100 Hz "
-                "(9 tracks), 24-bit / 96000 Hz (1 tracks)",
+                "(9 tracks), 24-bit / 96000 Hz (1 track)",
             ),
         ),
         (
@@ -584,9 +639,9 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
             "lossless",
             (
                 "warn",
-                "Tidal lossless was requested, but only 1/2 tracks met the 16-bit "
+                "Tidal lossless was requested, but only 1 of 2 tracks met the 16-bit "
                 "target (2/2 tracks inspected). Observed: 8-bit / 22050 Hz "
-                "(1 tracks), 16-bit / 44100 Hz (1 tracks)",
+                "(1 track), 16-bit / 44100 Hz (1 track)",
             ),
         ),
         (
@@ -598,9 +653,9 @@ def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
             "max",
             (
                 "warn",
-                "Tidal MAX was requested, but only 1/2 tracks met the 24-bit "
+                "Tidal MAX was requested, but only 1 of 2 tracks met the 24-bit "
                 "target (1/2 tracks inspected). Observed: 24-bit / 96000 Hz "
-                "(1 tracks)",
+                "(1 track)",
             ),
         ),
         (

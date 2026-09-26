@@ -92,6 +92,7 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
     profiles: Counter[tuple[int | None, int | None]] = Counter()
     tracks_total = 0
     tracks_probed = 0
+    album_groups: dict[Path, list[tuple[Path, list[Path]]]] = {}
     extensions = ",".join(
         sorted(extension.lstrip(".") for extension in DEFAULT_AUDIO_EXTENSIONS)
     )
@@ -104,12 +105,15 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
         tracks_total += len(audio_files)
         if not audio_files:
             continue
+        album_groups.setdefault(album_dir.parent, []).append((album_dir, audio_files))
 
+    for parent_dir, albums_in_group in album_groups.items():
+        scan_dir = parent_dir if len(albums_in_group) > 1 else albums_in_group[0][0]
         try:
-            result = run_quality(directory=str(album_dir), extensions=extensions)
+            result = run_quality(directory=str(scan_dir), extensions=extensions)
         except Exception:
             log.debug(
-                "Failed to inspect Tidal audio quality in %s", album_dir, exc_info=True
+                "Failed to inspect Tidal audio quality in %s", scan_dir, exc_info=True
             )
             result = None
 
@@ -127,42 +131,43 @@ def _summarize_tidal_audio_quality(albums: list[dict]) -> dict:
                 except (OSError, RuntimeError):
                     continue
 
-        records = []
-        for audio_file in audio_files:
-            try:
-                native_record = native_by_path.get(audio_file.resolve())
-            except (OSError, RuntimeError):
-                native_record = None
-            quality = dict(native_record) if native_record is not None else {}
-            if not quality.get("bit_depth") or not quality.get("sample_rate"):
+        for _album_dir, audio_files in albums_in_group:
+            records = []
+            for audio_file in audio_files:
                 try:
-                    fallback_quality = read_audio_quality(
-                        audio_file, use_native_probe=False
-                    )
-                except Exception:
-                    log.debug(
-                        "Failed to inspect Tidal audio quality for %s",
-                        audio_file,
-                        exc_info=True,
-                    )
-                    fallback_quality = None
-                if isinstance(fallback_quality, Mapping):
-                    for field in ("bit_depth", "sample_rate"):
-                        if not quality.get(field):
-                            quality[field] = fallback_quality.get(field)
-            if quality:
-                records.append(quality)
+                    native_record = native_by_path.get(audio_file.resolve())
+                except (OSError, RuntimeError):
+                    native_record = None
+                quality = dict(native_record) if native_record is not None else {}
+                if not quality.get("bit_depth") or not quality.get("sample_rate"):
+                    try:
+                        fallback_quality = read_audio_quality(
+                            audio_file, use_native_probe=False
+                        )
+                    except Exception:
+                        log.debug(
+                            "Failed to inspect Tidal audio quality for %s",
+                            audio_file,
+                            exc_info=True,
+                        )
+                        fallback_quality = None
+                    if isinstance(fallback_quality, Mapping):
+                        for field in ("bit_depth", "sample_rate"):
+                            if not quality.get(field):
+                                quality[field] = fallback_quality.get(field)
+                if quality:
+                    records.append(quality)
 
-        for track in records:
-            try:
-                bit_depth = int(track.get("bit_depth") or 0) or None
-                sample_rate = int(track.get("sample_rate") or 0) or None
-            except (TypeError, ValueError):
-                continue
-            if bit_depth is None and sample_rate is None:
-                continue
-            profiles[(bit_depth, sample_rate)] += 1
-            tracks_probed += 1
+            for track in records:
+                try:
+                    bit_depth = int(track.get("bit_depth") or 0) or None
+                    sample_rate = int(track.get("sample_rate") or 0) or None
+                except (TypeError, ValueError):
+                    continue
+                if bit_depth is None and sample_rate is None:
+                    continue
+                profiles[(bit_depth, sample_rate)] += 1
+                tracks_probed += 1
 
     return {
         "tracks_total": tracks_total,
@@ -188,7 +193,9 @@ def _tidal_audio_quality_event(
     profiles = audio_quality["profiles"]
     observed = ", ".join(
         f"{profile['bit_depth'] or '?'}-bit / "
-        f"{profile['sample_rate'] or '?'} Hz ({profile['tracks']} tracks)"
+        f"{profile['sample_rate'] or '?'} Hz "
+        f"({profile['tracks']} "
+        f"{'track' if profile['tracks'] == 1 else 'tracks'})"
         for profile in profiles
     )
     required_bit_depth = 24 if quality_key == "max" else 16
@@ -199,29 +206,29 @@ def _tidal_audio_quality_event(
     )
     tracks_total = audio_quality["tracks_total"]
     tracks_probed = audio_quality["tracks_probed"]
+    track_label = "track" if tracks_total == 1 else "tracks"
     if tracks_total > 0 and qualifying_tracks == tracks_total == tracks_probed:
         return (
             "info",
             f"Observed downloaded audio quality in "
-            f"{tracks_probed}/{tracks_total} "
-            f"tracks: {observed}",
+            f"{tracks_probed}/{tracks_total} {track_label}: {observed}",
         )
     if profiles:
         if qualifying_tracks:
             return (
                 "warn",
                 f"Tidal {quality_label} was requested, but only "
-                f"{qualifying_tracks}/{tracks_total} tracks met the "
+                f"{qualifying_tracks} of {tracks_total} {track_label} met the "
                 f"{required_bit_depth}-bit target "
-                f"({tracks_probed}/{tracks_total} tracks inspected). "
+                f"({tracks_probed}/{tracks_total} {track_label} inspected). "
                 f"Observed: {observed}",
             )
         return (
             "warn",
             f"Tidal {quality_label} was requested, but no {required_bit_depth}-bit "
             "audio was confirmed "
-            f"({tracks_probed}/{tracks_total} "
-            f"tracks inspected). Observed: {observed}",
+            f"({tracks_probed}/{tracks_total} {track_label} inspected). "
+            f"Observed: {observed}",
         )
     return (
         "warn",

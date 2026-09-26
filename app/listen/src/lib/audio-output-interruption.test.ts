@@ -69,6 +69,7 @@ describe("audio output interruption controller", () => {
   });
 
   it("does not resume after the user explicitly cancels the pending resume", async () => {
+    vi.useFakeTimers();
     const mediaDevices = new EventTarget() as MediaDevices;
     const audioContext = new FakeAudioContext();
     const pause = vi.fn();
@@ -93,10 +94,12 @@ describe("audio output interruption controller", () => {
 
     outputDeviceIds = ["default", "headphones"];
     mediaDevices.dispatchEvent(new Event("devicechange"));
+    await vi.advanceTimersByTimeAsync(300);
     await flushAsyncWork();
 
     expect(resume).not.toHaveBeenCalled();
     controller.dispose();
+    vi.useRealTimers();
   });
 
   it("does not reclassify an explicit pause as an output interruption", () => {
