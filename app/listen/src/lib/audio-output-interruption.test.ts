@@ -99,6 +99,29 @@ describe("audio output interruption controller", () => {
     controller.dispose();
   });
 
+  it("does not reclassify an explicit pause as an output interruption", () => {
+    const audioContext = new FakeAudioContext();
+    let isPlaying = true;
+    const pause = vi.fn();
+    const controller = createAudioOutputInterruptionController({
+      getAudioContext: () => audioContext as unknown as AudioContext,
+      isPlaying: () => isPlaying,
+      pause,
+      resume: vi.fn(),
+    });
+    controller.install();
+
+    cancelPendingAudioOutputResume();
+    isPlaying = false;
+    controller.observe();
+    audioContext.state = "suspended";
+    audioContext.dispatchEvent(new Event("statechange"));
+
+    expect(pause).not.toHaveBeenCalled();
+    expect(isAudioOutputInterruptionPending()).toBe(false);
+    controller.dispose();
+  });
+
   it("disposes the previous controller when a new one is installed", () => {
     const firstContext = new FakeAudioContext();
     const firstPause = vi.fn();
