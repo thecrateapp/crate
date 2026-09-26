@@ -313,6 +313,45 @@ def test_move_to_library_detailed_tracks_only_audio_files_for_quality_checks(
     ]
 
 
+def test_move_to_library_detailed_merges_audio_files_for_duplicate_album_targets(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    artist_dir = processing / "Artist"
+    staged_album = artist_dir / "Album"
+    library = tmp_path / "library"
+    staged_album.mkdir(parents=True)
+    (staged_album / "01 - Album Track.flac").write_bytes(b"album track")
+    (artist_dir / "02 - Loose Track.flac").write_bytes(b"loose track")
+
+    monkeypatch.setattr(
+        tidal,
+        "infer_album_identity",
+        lambda *_args, **_kwargs: ("Artist", "Album"),
+    )
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, Path(root) / artist / album, False),
+    )
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    target = library / "Artist" / "Album"
+    assert moved == [
+        {
+            "artist": "Artist",
+            "album": "Album",
+            "path": str(target),
+            "moved": 2,
+            "audio_files": [
+                str(target / "02 - Loose Track.flac"),
+                str(target / "01 - Album Track.flac"),
+            ],
+        }
+    ]
+
+
 def test_refresh_token_keeps_tiddl_cli_success_path(tmp_path, monkeypatch):
     auth_dir = tmp_path / ".tiddl"
     auth_dir.mkdir()

@@ -120,25 +120,32 @@ def run_scan(
 
 
 def run_quality(
-    directory: str | Sequence[str] = "",
-    file: str = "",
+    directory: str | os.PathLike[str] | Sequence[str | os.PathLike[str]] = "",
+    file: str | os.PathLike[str] = "",
     extensions: str = "flac,mp3,m4a,ogg,opus,wav",
     timeout: int | None = None,
-    files: str | Sequence[str] | None = None,
+    files: str | os.PathLike[str] | Sequence[str | os.PathLike[str]] | None = None,
 ) -> dict | None:
     """Probe technical audio metadata with Rust CLI. Returns QualityResult or None."""
     binary = find_binary()
     if not binary or not supports_command("quality"):
         return None
     args = [binary, "quality"]
-    target_files = [files] if isinstance(files, str) else list(files or [])
-    target_files = [target for target in target_files if target.strip()]
+    path_argument = (str, os.PathLike)
+    target_files = [files] if isinstance(files, path_argument) else list(files or [])
+    target_files = [target for target in target_files if str(target).strip()]
     if target_files:
         args.extend(["--file", *target_files])
     elif file:
         args.extend(["--file", file])
     elif directory:
-        directories = [directory] if isinstance(directory, str) else list(directory)
+        directories = (
+            [directory]
+            if isinstance(directory, path_argument)
+            else [path for path in directory if str(path).strip()]
+        )
+        if not directories:
+            return None
         args.extend(["--dir", *directories, "--extensions", extensions])
     else:
         return None

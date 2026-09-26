@@ -868,6 +868,34 @@ def move_to_library_detailed(
     dst = Path(library_path)
     imported_targets: dict[tuple[str, str, str], dict[str, object]] = {}
 
+    def record_imported_target(
+        artist_name: str,
+        album_name: str,
+        target_album_dir: Path,
+        moved: int,
+        moved_paths: list[Path],
+    ) -> None:
+        key = (artist_name, album_name, str(target_album_dir))
+        existing = imported_targets.get(key)
+        existing_moved = existing.get("moved", 0) if existing else 0
+        existing_audio_files = existing.get("audio_files", []) if existing else []
+        if not isinstance(existing_moved, int):
+            existing_moved = 0
+        if not isinstance(existing_audio_files, list):
+            existing_audio_files = []
+        audio_files = [
+            str(path)
+            for path in moved_paths
+            if path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+        ]
+        imported_targets[key] = {
+            "artist": artist_name,
+            "album": album_name,
+            "path": str(target_album_dir),
+            "moved": existing_moved + moved,
+            "audio_files": list(dict.fromkeys([*existing_audio_files, *audio_files])),
+        }
+
     if not src.exists():
         return []
 
@@ -911,18 +939,9 @@ def move_to_library_detailed(
                     dest_file,
                     exc_info=True,
                 )
-        key = (artist_name, album_name, str(target_album_dir))
-        imported_targets[key] = {
-            "artist": artist_name,
-            "album": album_name,
-            "path": str(target_album_dir),
-            "moved": moved,
-            "audio_files": [
-                str(path)
-                for path in moved_paths
-                if path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
-            ],
-        }
+        record_imported_target(
+            artist_name, album_name, target_album_dir, moved, moved_paths
+        )
 
     for item in sorted(src.iterdir()):
         if not item.is_dir():
@@ -948,18 +967,13 @@ def move_to_library_detailed(
                         replace_existing_audio=replace_existing_audio,
                         moved_paths=moved_paths,
                     )
-                    key = (artist_name, album_name, str(target_album_dir))
-                    imported_targets[key] = {
-                        "artist": artist_name,
-                        "album": album_name,
-                        "path": str(target_album_dir),
-                        "moved": int(moved),
-                        "audio_files": [
-                            str(path)
-                            for path in moved_paths
-                            if path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
-                        ],
-                    }
+                    record_imported_target(
+                        artist_name,
+                        album_name,
+                        target_album_dir,
+                        int(moved),
+                        moved_paths,
+                    )
                 except Exception:
                     log.warning(
                         "move_to_library: failed to import %s for %s / %s",
@@ -992,26 +1006,13 @@ def move_to_library_detailed(
                     if dest_file.exists():
                         dest_file.unlink()
                     shutil.move(str(album_item), str(dest_file))
-                    key = (artist_name, album_name, str(target_album_dir))
-                    existing = imported_targets.get(key)
-                    moved_count = (
-                        existing.get("moved", 0) if existing is not None else 0
+                    record_imported_target(
+                        artist_name,
+                        album_name,
+                        target_album_dir,
+                        1,
+                        [dest_file],
                     )
-                    imported_targets[key] = {
-                        "artist": artist_name,
-                        "album": album_name,
-                        "path": str(target_album_dir),
-                        "moved": (moved_count if isinstance(moved_count, int) else 0)
-                        + 1,
-                        "audio_files": [
-                            *(existing.get("audio_files", []) if existing else []),
-                            *(
-                                [str(dest_file)]
-                                if dest_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
-                                else []
-                            ),
-                        ],
-                    }
                 except Exception:
                     log.warning(
                         "move_to_library: failed to move file %s -> %s",
