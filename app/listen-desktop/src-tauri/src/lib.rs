@@ -17,16 +17,21 @@ use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 #[cfg(desktop)]
 use tauri::webview::PageLoadEvent;
+#[cfg(all(desktop, not(target_os = "linux")))]
+use tauri::LogicalSize;
 #[cfg(desktop)]
 use tauri::{
-    image::Image, Emitter, LogicalSize, Manager, Size, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder, Window,
+    image::Image, Emitter, Manager, Size, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Window,
 };
+#[cfg(all(desktop, target_os = "linux"))]
+use tauri::{PhysicalPosition, PhysicalSize};
 #[cfg(desktop)]
 use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(desktop)]
 use tauri_plugin_window_state::StateFlags;
 
+#[cfg(all(desktop, any(target_os = "linux", test)))]
+mod desktop_window_bounds;
 #[cfg(target_os = "linux")]
 mod linux_desktop_integration;
 #[cfg(target_os = "linux")]
@@ -648,37 +653,170 @@ fn hide_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
 
 #[cfg(desktop)]
 fn enforce_desktop_webview_window_size<R: tauri::Runtime>(window: &WebviewWindow<R>) {
-    let min_size = LogicalSize::new(DESKTOP_MIN_WIDTH, DESKTOP_MIN_HEIGHT);
-    let _ = window.set_min_size(Some(Size::Logical(min_size)));
-
-    if !should_restore_desktop_webview_window_size(window) {
-        return;
+    #[cfg(target_os = "linux")]
+    {
+        enforce_linux_desktop_window_bounds(&window.as_ref().window());
     }
 
-    let _ = window.set_size(Size::Logical(LogicalSize::new(
-        DESKTOP_DEFAULT_WIDTH,
-        DESKTOP_DEFAULT_HEIGHT,
-    )));
-    let _ = window.center();
+    #[cfg(not(target_os = "linux"))]
+    {
+        let min_size = LogicalSize::new(DESKTOP_MIN_WIDTH, DESKTOP_MIN_HEIGHT);
+        let _ = window.set_min_size(Some(Size::Logical(min_size)));
+
+        if !should_restore_desktop_webview_window_size(window) {
+            return;
+        }
+
+        let _ = window.set_size(Size::Logical(LogicalSize::new(
+            DESKTOP_DEFAULT_WIDTH,
+            DESKTOP_DEFAULT_HEIGHT,
+        )));
+        let _ = window.center();
+    }
 }
 
 #[cfg(desktop)]
 fn enforce_desktop_window_size<R: tauri::Runtime>(window: &Window<R>) {
-    let min_size = LogicalSize::new(DESKTOP_MIN_WIDTH, DESKTOP_MIN_HEIGHT);
-    let _ = window.set_min_size(Some(Size::Logical(min_size)));
+    #[cfg(target_os = "linux")]
+    {
+        enforce_linux_desktop_window_bounds(window);
+    }
 
-    if !should_restore_desktop_window_size(window) {
+    #[cfg(not(target_os = "linux"))]
+    {
+        let min_size = LogicalSize::new(DESKTOP_MIN_WIDTH, DESKTOP_MIN_HEIGHT);
+        let _ = window.set_min_size(Some(Size::Logical(min_size)));
+
+        if !should_restore_desktop_window_size(window) {
+            return;
+        }
+
+        let _ = window.set_size(Size::Logical(LogicalSize::new(
+            DESKTOP_DEFAULT_WIDTH,
+            DESKTOP_DEFAULT_HEIGHT,
+        )));
+        let _ = window.center();
+    }
+}
+
+#[cfg(all(desktop, target_os = "linux"))]
+fn enforce_linux_desktop_window_bounds<R: tauri::Runtime>(window: &Window<R>) {
+    use desktop_window_bounds::{
+        clamp_to_work_area, physical_minimum, select_work_area, WindowBounds, WorkArea,
+    };
+
+    let (Ok(inner_size), Ok(outer_size), Ok(outer_position), Ok(monitors)) = (
+        window.inner_size(),
+        window.outer_size(),
+        window.outer_position(),
+        window.available_monitors(),
+    ) else {
+        return;
+    };
+    if monitors.is_empty() {
         return;
     }
 
-    let _ = window.set_size(Size::Logical(LogicalSize::new(
-        DESKTOP_DEFAULT_WIDTH,
-        DESKTOP_DEFAULT_HEIGHT,
-    )));
-    let _ = window.center();
+    let current_bounds = WindowBounds {
+        x: outer_position.x,
+        y: outer_position.y,
+        width: outer_size.width,
+        height: outer_size.height,
+    };
+    let work_areas = monitors
+        .iter()
+        .map(|monitor| {
+            let work_area = monitor.work_area();
+            WorkArea {
+                bounds: WindowBounds {
+                    x: work_area.position.x,
+                    y: work_area.position.y,
+                    width: work_area.size.width,
+                    height: work_area.size.height,
+                },
+                scale_factor: monitor.scale_factor(),
+            }
+        })
+        .collect::<Vec<_>>();
+    let Some(work_area) = select_work_area(current_bounds, &work_areas) else {
+        return;
+    };
+
+    let horizontal_insets = outer_size.width.saturating_sub(inner_size.width);
+    let vertical_insets = outer_size.height.saturating_sub(inner_size.height);
+    let max_inner_width = work_area
+        .bounds
+        .width
+        .saturating_sub(horizontal_insets)
+        .max(1);
+    let max_inner_height = work_area
+        .bounds
+        .height
+        .saturating_sub(vertical_insets)
+        .max(1);
+    let min_inner_width =
+        physical_minimum(DESKTOP_MIN_WIDTH, work_area.scale_factor, max_inner_width);
+    let min_inner_height =
+        physical_minimum(DESKTOP_MIN_HEIGHT, work_area.scale_factor, max_inner_height);
+    let _ = window.set_min_size(Some(Size::Physical(PhysicalSize::new(
+        min_inner_width,
+        min_inner_height,
+    ))));
+
+    if window.is_maximized().unwrap_or_default() {
+        return;
+    }
+
+    let enough_room_for_configured_minimum = max_inner_width
+        >= (DESKTOP_MIN_WIDTH * work_area.scale_factor).ceil() as u32
+        && max_inner_height >= (DESKTOP_MIN_HEIGHT * work_area.scale_factor).ceil() as u32;
+    let restore_default_size = enough_room_for_configured_minimum
+        && (inner_size.width < min_inner_width || inner_size.height < min_inner_height);
+    let default_width =
+        ((DESKTOP_DEFAULT_WIDTH * work_area.scale_factor).ceil() as u32).min(max_inner_width);
+    let default_height =
+        ((DESKTOP_DEFAULT_HEIGHT * work_area.scale_factor).ceil() as u32).min(max_inner_height);
+    let desired_inner_width = if restore_default_size {
+        default_width
+    } else {
+        inner_size.width.min(max_inner_width)
+    };
+    let desired_inner_height = if restore_default_size {
+        default_height
+    } else {
+        inner_size.height.min(max_inner_height)
+    };
+    let desired_outer_bounds = WindowBounds {
+        x: outer_position.x,
+        y: outer_position.y,
+        width: desired_inner_width.saturating_add(horizontal_insets),
+        height: desired_inner_height.saturating_add(vertical_insets),
+    };
+    let corrected_bounds = clamp_to_work_area(desired_outer_bounds, work_area.bounds);
+    let corrected_inner_size = PhysicalSize::new(
+        corrected_bounds
+            .width
+            .saturating_sub(horizontal_insets)
+            .max(1),
+        corrected_bounds
+            .height
+            .saturating_sub(vertical_insets)
+            .max(1),
+    );
+
+    if corrected_inner_size != inner_size {
+        let _ = window.set_size(Size::Physical(corrected_inner_size));
+    }
+    if corrected_bounds.x != outer_position.x || corrected_bounds.y != outer_position.y {
+        let _ = window.set_position(PhysicalPosition::new(
+            corrected_bounds.x,
+            corrected_bounds.y,
+        ));
+    }
 }
 
 #[cfg(desktop)]
+#[cfg(not(target_os = "linux"))]
 fn should_restore_desktop_webview_window_size<R: tauri::Runtime>(
     window: &WebviewWindow<R>,
 ) -> bool {
@@ -692,6 +830,7 @@ fn should_restore_desktop_webview_window_size<R: tauri::Runtime>(
 }
 
 #[cfg(desktop)]
+#[cfg(not(target_os = "linux"))]
 fn should_restore_desktop_window_size<R: tauri::Runtime>(window: &Window<R>) -> bool {
     let Ok(size) = window.inner_size() else {
         return true;
@@ -774,9 +913,16 @@ fn handle_window_lifecycle_event<R: tauri::Runtime>(
         return;
     }
 
-    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-        api.prevent_close();
-        let _ = window.hide();
+    match event {
+        tauri::WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            let _ = window.hide();
+        }
+        #[cfg(target_os = "linux")]
+        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+            enforce_linux_desktop_window_bounds(window);
+        }
+        _ => {}
     }
 }
 
@@ -1002,7 +1148,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_window_state::Builder::new()
-                .with_state_flags(StateFlags::POSITION | StateFlags::MAXIMIZED)
+                .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
                 .build(),
         )
         .setup(|app| {

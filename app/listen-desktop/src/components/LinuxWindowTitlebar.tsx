@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minus, Square, X, type LucideIcon } from "lucide-react";
 
 type WindowControl = "minimize" | "maximize" | "close";
@@ -33,7 +33,10 @@ const WINDOW_CONTROLS: Record<
 };
 
 const WINDOW_BUTTON_LAYOUT_ATTRIBUTE = "data-crate-linux-window-button-layout";
-const RESTORED_WINDOW_SIZE = new LogicalSize(1280, 820);
+type WindowSizeActions = Pick<
+  ReturnType<typeof getCurrentWindow>,
+  "isMaximized" | "maximize" | "unmaximize"
+>;
 
 export function LinuxWindowTitlebar() {
   const currentWindow = useMemo(() => getCurrentWindow(), []);
@@ -45,15 +48,10 @@ export function LinuxWindowTitlebar() {
     windowActionInProgressRef.current = true;
 
     try {
-      if (await currentWindow.isMaximized()) {
-        await currentWindow.unmaximize();
-        setWindowMaximizedAttribute(false);
-        await currentWindow.setSize(RESTORED_WINDOW_SIZE);
-        await currentWindow.center();
-      } else {
-        await currentWindow.maximize();
-        setWindowMaximizedAttribute(true);
-      }
+      await toggleLinuxWindowSize(
+        currentWindow,
+        () => window.__crateTauriInvoke?.("ensure_desktop_window_size"),
+      );
     } catch {
       // The resize listener will restore the correct shape after a failed action.
     } finally {
@@ -139,6 +137,20 @@ export function LinuxWindowTitlebar() {
       />
     </div>
   );
+}
+
+export async function toggleLinuxWindowSize(
+  currentWindow: WindowSizeActions,
+  ensureWindowBounds: () => Promise<unknown> | undefined,
+): Promise<void> {
+  if (await currentWindow.isMaximized()) {
+    await currentWindow.unmaximize();
+    setWindowMaximizedAttribute(false);
+    await ensureWindowBounds();
+  } else {
+    await currentWindow.maximize();
+    setWindowMaximizedAttribute(true);
+  }
 }
 
 function WindowControls({

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   parseWindowControls,
   readWindowButtonLayout,
+  toggleLinuxWindowSize,
 } from "./LinuxWindowTitlebar";
 
 beforeEach(() => {
@@ -59,5 +60,39 @@ describe("readWindowButtonLayout", () => {
       left: ["close"],
       right: ["minimize"],
     });
+  });
+});
+
+describe("toggleLinuxWindowSize", () => {
+  it("restores the native saved bounds without replacing them", async () => {
+    const currentWindow = {
+      isMaximized: vi.fn().mockResolvedValue(true),
+      unmaximize: vi.fn().mockResolvedValue(undefined),
+      maximize: vi.fn().mockResolvedValue(undefined),
+      setSize: vi.fn().mockResolvedValue(undefined),
+      center: vi.fn().mockResolvedValue(undefined),
+    };
+    const ensureWindowBounds = vi.fn().mockResolvedValue(undefined);
+
+    await toggleLinuxWindowSize(currentWindow, ensureWindowBounds);
+
+    expect(currentWindow.unmaximize).toHaveBeenCalledOnce();
+    expect(currentWindow.setSize).not.toHaveBeenCalled();
+    expect(currentWindow.center).not.toHaveBeenCalled();
+    expect(ensureWindowBounds).toHaveBeenCalledOnce();
+  });
+
+  it("maximizes without running restore-bound correction", async () => {
+    const currentWindow = {
+      isMaximized: vi.fn().mockResolvedValue(false),
+      unmaximize: vi.fn().mockResolvedValue(undefined),
+      maximize: vi.fn().mockResolvedValue(undefined),
+    };
+    const ensureWindowBounds = vi.fn().mockResolvedValue(undefined);
+
+    await toggleLinuxWindowSize(currentWindow, ensureWindowBounds);
+
+    expect(currentWindow.maximize).toHaveBeenCalledOnce();
+    expect(ensureWindowBounds).not.toHaveBeenCalled();
   });
 });
