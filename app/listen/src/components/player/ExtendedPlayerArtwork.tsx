@@ -118,6 +118,7 @@ function ExtendedPlayerVisualizerCanvas({
       }
     >
       <canvas
+        key={state.visualizerQualityProfile}
         ref={refs.canvasRef}
         className=" size-full"
         data-viz-reference-size={

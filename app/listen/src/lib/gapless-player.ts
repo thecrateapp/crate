@@ -85,8 +85,10 @@ let currentAnalyser: AnalyserNode | null = null;
 // playback — the consumer (soft-interruption logic) can use this to
 // decide whether it's worth pausing on an offline event.
 let currentTrackFullyBuffered = false;
-let lastKnownPlaybackPosition: { trackPath: string; positionMs: number } | null =
-  null;
+let lastKnownPlaybackPosition: {
+  trackPath: string;
+  positionMs: number;
+} | null = null;
 export function getPlaybackLoadLimit(preferHtml5Audio: boolean): number {
   return preferHtml5Audio
     ? MOBILE_HTML5_TRACK_LIMIT
@@ -139,10 +141,7 @@ function setKnownPlaybackPosition(trackPath: string, positionMs: number): void {
   };
 }
 
-function rememberPlaybackPosition(
-  trackPath: string,
-  positionMs: number,
-): void {
+function rememberPlaybackPosition(trackPath: string, positionMs: number): void {
   if (!trackPath || !Number.isFinite(positionMs)) return;
   if (
     positionMs <= 0 &&
@@ -379,6 +378,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 }
 
 export function destroyPlayer(): void {
+  playerControls.cancelPendingRecovery();
   stopFade();
   resetEqualizer();
   setEqualizerHost(null);
@@ -417,14 +417,17 @@ export function loadQueue(
   if (!instance) return;
   const previousTracks = instance.getTracks();
   const previousTrackPath = instance.getTrack();
+  const queueChanged =
+    previousTracks.length !== urls.length ||
+    urls.some((url, index) => url !== previousTracks[index]);
+  if (queueChanged || options.restartIfSameIndex) {
+    playerControls.cancelPendingRecovery();
+  }
   loadQueueTracks(instance, urls, startIndex, options, () => {
     currentTrackFullyBuffered = false;
   });
   const trackPath = instance.getTrack();
   if (!trackPath) return;
-  const queueChanged =
-    previousTracks.length !== urls.length ||
-    urls.some((url, index) => url !== previousTracks[index]);
   if (
     options.restartIfSameIndex ||
     queueChanged ||
@@ -503,10 +506,9 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   const reportedPosition = previous.getPosition();
   const rememberedTrackMatches =
     lastKnownPlaybackPosition?.trackPath === previousTrackPath;
-  const position =
-    rememberedTrackMatches
-      ? (lastKnownPlaybackPosition?.positionMs ?? reportedPosition)
-      : reportedPosition;
+  const position = rememberedTrackMatches
+    ? lastKnownPlaybackPosition?.positionMs ?? reportedPosition
+    : reportedPosition;
   const loop = previous.loop;
   const singleMode = previous.singleMode;
   const crossfade = previous.crossfade;
@@ -583,12 +585,13 @@ export const stop = (): void => {
 };
 export const next = playerControls.next;
 export const prev = playerControls.prev;
-export const gotoTrack = (
+export const gotoTrack = async (
   indexOrUrl: number | string,
   forcePlay = false,
-): void => {
+): Promise<void> => {
   const previousTrackPath = instance?.getTrack();
-  playerControls.gotoTrack(indexOrUrl, forcePlay);
+  const result = await playerControls.gotoTrack(indexOrUrl, forcePlay);
+  if (result === "cancelled") return;
   const trackPath = instance?.getTrack();
   if (trackPath && (trackPath !== previousTrackPath || forcePlay)) {
     setKnownPlaybackPosition(trackPath, 0);

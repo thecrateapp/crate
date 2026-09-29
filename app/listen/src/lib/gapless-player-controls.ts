@@ -15,6 +15,8 @@ const PLAYBACK_RECOVERY_OPTIONS = {
   rebuildIfTauriOutputMayBeStale: true,
 } as const;
 
+export type PlaybackIntentResult = "applied" | "cancelled";
+
 export interface GaplessPlayerControlHost {
   audioRecovery: AudioRecoveryController;
   getAudioContext: () => AudioContext | null;
@@ -26,12 +28,15 @@ export interface GaplessPlayerControlHost {
 }
 
 export interface GaplessPlayerControls {
-  play: () => Promise<void>;
+  play: () => Promise<PlaybackIntentResult>;
   pause: () => void;
   stop: () => void;
-  next: () => void;
+  next: () => Promise<PlaybackIntentResult>;
   prev: () => void;
-  gotoTrack: (indexOrUrl: number | string, forcePlay?: boolean) => void;
+  gotoTrack: (
+    indexOrUrl: number | string,
+    forcePlay?: boolean,
+  ) => Promise<PlaybackIntentResult>;
   seekTo: (positionMs: number) => void;
   setVolume: (volume: number) => void;
   setPlaybackRate: (rate: number) => void;
@@ -44,8 +49,9 @@ export interface GaplessPlayerControls {
   setShuffle: (enabled: boolean) => void;
   updateCrossfade: () => void;
   setCrossfadeDuration: (durationMs: number) => void;
-  fadeOutAndPause: (durationMs?: number) => Promise<void>;
-  fadeInAndPlay: (durationMs?: number) => Promise<void>;
+  fadeOutAndPause: (durationMs?: number) => Promise<PlaybackIntentResult>;
+  fadeInAndPlay: (durationMs?: number) => Promise<PlaybackIntentResult>;
+  cancelPendingRecovery: () => void;
   restoreVolume: () => void;
   setLoop: (enabled: boolean) => void;
   setSingleMode: (enabled: boolean) => void;
@@ -54,10 +60,24 @@ export interface GaplessPlayerControls {
 export function createGaplessPlayerControls(
   host: GaplessPlayerControlHost,
 ): GaplessPlayerControls {
+  let intentGeneration = 0;
+  let pendingRecoveryIntent: number | null = null;
+
+  const beginIntent = (): number => {
+    intentGeneration += 1;
+    pendingRecoveryIntent = null;
+    stopFade();
+    return intentGeneration;
+  };
+
+  const isCurrentIntent = (intent: number): boolean =>
+    intent === intentGeneration;
+
   const startPlaybackWithRecovery = async (
     reason: string,
     startPlayback: () => void,
-  ): Promise<void> => {
+    intent: number,
+  ): Promise<PlaybackIntentResult> => {
     const shouldWaitForRecovery = host.audioRecovery.needsRecovery(
       PLAYBACK_RECOVERY_OPTIONS,
     );
@@ -65,13 +85,57 @@ export function createGaplessPlayerControls(
       reason,
       PLAYBACK_RECOVERY_OPTIONS,
     );
-    if (!shouldWaitForRecovery) startPlayback();
-    await recovery;
+    if (shouldWaitForRecovery) pendingRecoveryIntent = intent;
+    if (!shouldWaitForRecovery && isCurrentIntent(intent)) startPlayback();
+    try {
+      await recovery;
+    } catch (error) {
+      if (!isCurrentIntent(intent)) return "cancelled";
+      throw error;
+    } finally {
+      if (pendingRecoveryIntent === intent) pendingRecoveryIntent = null;
+    }
+    if (!isCurrentIntent(intent)) return "cancelled";
     if (shouldWaitForRecovery) startPlayback();
+    return "applied";
   };
 
-  const play = async (): Promise<void> => {
-    stopFade();
+  const runTransportWithRecovery = async (
+    reason: string,
+    applyTransport: () => boolean,
+  ): Promise<PlaybackIntentResult> => {
+    const intent = beginIntent();
+    const shouldWaitForRecovery = host.audioRecovery.needsRecovery(
+      PLAYBACK_RECOVERY_OPTIONS,
+    );
+    const recovery = host.audioRecovery.prepare(
+      reason,
+      PLAYBACK_RECOVERY_OPTIONS,
+    );
+    if (shouldWaitForRecovery) pendingRecoveryIntent = intent;
+    let appliedSynchronously = false;
+    if (!shouldWaitForRecovery && isCurrentIntent(intent)) {
+      appliedSynchronously = applyTransport();
+    }
+    try {
+      await recovery;
+    } catch (error) {
+      if (!isCurrentIntent(intent)) return "cancelled";
+      throw error;
+    } finally {
+      if (pendingRecoveryIntent === intent) pendingRecoveryIntent = null;
+    }
+    if (!isCurrentIntent(intent)) return "cancelled";
+    if (shouldWaitForRecovery) {
+      if (!applyTransport()) return "cancelled";
+    } else if (!appliedSynchronously) {
+      return "cancelled";
+    }
+    return "applied";
+  };
+
+  const play = async (): Promise<PlaybackIntentResult> => {
+    const intent = beginIntent();
     const shouldRampAfterResume =
       !host.isTauriDesktopRuntime() &&
       host.getAudioContext()?.state === "suspended";
@@ -86,49 +150,53 @@ export function createGaplessPlayerControls(
       }
       player?.play();
     };
-    await startPlaybackWithRecovery("play", startPlayback);
+    return startPlaybackWithRecovery("play", startPlayback, intent);
   };
 
   const pause = (): void => {
-    stopFade();
+    beginIntent();
     host.setPlaybackActive(false);
     host.getPlayer()?.pause();
   };
 
   const stop = (): void => {
-    stopFade();
+    beginIntent();
     host.setPlaybackActive(false);
     host.getPlayer()?.stop();
   };
 
-  const next = (): void => {
-    void host.audioRecovery
-      .prepare("next", {
-        rebuildIfTauriOutputMayBeStale: true,
-      })
-      .then(() => {
-        host.setPlaybackActive(true);
-        host.getPlayer()?.next(undefined, true, true);
-      });
-  };
+  const next = (): Promise<PlaybackIntentResult> =>
+    runTransportWithRecovery("next", () => {
+      const player = host.getPlayer();
+      if (!player) return false;
+      host.setPlaybackActive(true);
+      player.next(undefined, true, true);
+      return true;
+    });
 
   const prev = (): void => {
+    beginIntent();
     host.getPlayer()?.prev(undefined, false);
   };
 
-  const gotoTrack = (indexOrUrl: number | string, forcePlay = false): void => {
+  const gotoTrack = async (
+    indexOrUrl: number | string,
+    forcePlay = false,
+  ): Promise<PlaybackIntentResult> => {
     if (!forcePlay) {
-      host.getPlayer()?.gotoTrack(indexOrUrl, forcePlay);
-      return;
+      beginIntent();
+      const player = host.getPlayer();
+      if (!player) return "cancelled";
+      player.gotoTrack(indexOrUrl, forcePlay);
+      return "applied";
     }
-    void host.audioRecovery
-      .prepare("gotoTrack", {
-        rebuildIfTauriOutputMayBeStale: true,
-      })
-      .then(() => {
-        host.setPlaybackActive(true);
-        host.getPlayer()?.gotoTrack(indexOrUrl, forcePlay);
-      });
+    return runTransportWithRecovery("gotoTrack", () => {
+      const player = host.getPlayer();
+      if (!player) return false;
+      host.setPlaybackActive(true);
+      player.gotoTrack(indexOrUrl, forcePlay);
+      return true;
+    });
   };
 
   const seekTo = (positionMs: number): void => {
@@ -184,31 +252,53 @@ export function createGaplessPlayerControls(
     host.getPlayer()?.setCrossfade(Math.max(0, durationMs));
   };
 
-  const fadeOutAndPause = (durationMs = DEFAULT_FADE_MS): Promise<void> => {
-    if (!host.getPlayer()) return Promise.resolve();
+  const fadeOutAndPause = (
+    durationMs = DEFAULT_FADE_MS,
+  ): Promise<PlaybackIntentResult> => {
+    const intent = beginIntent();
+    if (!host.getPlayer()) return Promise.resolve("applied");
     const startVolume = getAppliedVolume();
     return new Promise((resolve) => {
       animateVolume(startVolume, 0, durationMs, () => {
+        if (!isCurrentIntent(intent)) {
+          resolve("cancelled");
+          return;
+        }
         host.getPlayer()?.pause();
         host.setPlaybackActive(false);
         applyVolume(getLastVolume());
-        resolve();
+        resolve("applied");
       });
     });
   };
 
-  const fadeInAndPlay = async (durationMs = DEFAULT_FADE_MS): Promise<void> => {
-    if (!host.getPlayer()) return Promise.resolve();
-    stopFade();
+  const fadeInAndPlay = async (
+    durationMs = DEFAULT_FADE_MS,
+  ): Promise<PlaybackIntentResult> => {
+    const intent = beginIntent();
+    if (!host.getPlayer()) return "applied";
     const startPlayback = (): void => {
       applyVolume(0);
       host.setPlaybackActive(true);
       host.getPlayer()?.play();
     };
-    await startPlaybackWithRecovery("fadeInAndPlay", startPlayback);
+    const result = await startPlaybackWithRecovery(
+      "fadeInAndPlay",
+      startPlayback,
+      intent,
+    );
+    if (result === "cancelled") return result;
     return new Promise((resolve) => {
-      animateVolume(0, getLastVolume(), durationMs, resolve);
+      animateVolume(0, getLastVolume(), durationMs, () => {
+        resolve(isCurrentIntent(intent) ? "applied" : "cancelled");
+      });
     });
+  };
+
+  const cancelPendingRecovery = (): void => {
+    if (pendingRecoveryIntent === null) return;
+    intentGeneration += 1;
+    pendingRecoveryIntent = null;
   };
 
   const restoreVolume = (): void => {
@@ -248,6 +338,7 @@ export function createGaplessPlayerControls(
     setCrossfadeDuration,
     fadeOutAndPause,
     fadeInAndPlay,
+    cancelPendingRecovery,
     restoreVolume,
     setLoop,
     setSingleMode,

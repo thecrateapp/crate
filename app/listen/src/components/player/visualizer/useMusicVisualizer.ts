@@ -22,13 +22,24 @@ export function useMusicVisualizer(
   const internalVizRef = useRef<MusicVisualizer | null>(null);
   const vizRef = externalVizRef ?? internalVizRef;
   const playbackStateRef = useRef(playbackState);
+  const rendererQualityProfileRef = useRef(qualityProfile);
 
   useEffect(() => {
     playbackStateRef.current = playbackState;
   }, [playbackState]);
 
   useEffect(() => {
+    if (rendererQualityProfileRef.current !== qualityProfile) {
+      const previous = vizRef.current;
+      if (previous) {
+        previous.destroy();
+        if (vizRef.current === previous) vizRef.current = null;
+      }
+      rendererQualityProfileRef.current = qualityProfile;
+    }
+
     if (!active || !canvasRef.current) {
+      vizRef.current?.stop();
       dbg(
         `off: active=${active} canvas=${!!canvasRef.current} analyser=${!!getAnalyserNode()}`,
       );
@@ -80,9 +91,8 @@ export function useMusicVisualizer(
       }
 
       if (vizRef.current) {
-        vizRef.current.setAnalyser(node);
-        vizRef.current.setMode(mode);
-        dbg(`updated analyser ${w}x${h}`);
+        vizRef.current.start();
+        dbg(`restarted ${w}x${h}`);
         return;
       }
 
@@ -128,14 +138,24 @@ export function useMusicVisualizer(
       }
       animationFrameIds.clear();
     };
-  }, [active, canvasRef, externalVizRef, mode, qualityProfile, trackKey]);
+  }, [active, canvasRef, externalVizRef, mode, qualityProfile]);
 
   useEffect(() => {
-    if (!active && vizRef.current) {
-      vizRef.current.stop();
-      vizRef.current = null;
-    }
-  }, [active, externalVizRef]);
+    if (!active || !vizRef.current) return;
+    const node = createAnalyserNode(2048);
+    if (node) vizRef.current.setAnalyser(node);
+    vizRef.current.setMode(mode);
+  }, [active, externalVizRef, mode, trackKey]);
+
+  useEffect(
+    () => () => {
+      const ownedVisualizer = vizRef.current;
+      if (!ownedVisualizer) return;
+      ownedVisualizer.destroy();
+      if (vizRef.current === ownedVisualizer) vizRef.current = null;
+    },
+    [vizRef],
+  );
 
   return vizRef;
 }

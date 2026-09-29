@@ -224,6 +224,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         volume,
         canvasRect,
         vizCfg,
+        visualizerQualityProfile,
         equalizerEnabled,
       }}
       refs={{
