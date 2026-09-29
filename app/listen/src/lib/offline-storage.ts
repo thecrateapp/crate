@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 
-import { isNative } from "@/lib/capacitor-runtime";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
 import {
   getOfflineTrackAssetAliases,
   getOfflineTrackAssetKey,
@@ -83,7 +83,9 @@ function isMissingNativeFileError(error: unknown): boolean {
     return true;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:does not exist|file not found)/i.test(message);
+  return /(?:does not exist|file not found|no such file or directory)/i.test(
+    message,
+  );
 }
 
 export function getOfflineItemKey(
@@ -490,7 +492,7 @@ export async function updateOfflineNativeAssetIndex(
     | Record<string, OfflineNativeAssetRecord>
     | Promise<Record<string, OfflineNativeAssetRecord>>,
 ): Promise<void> {
-  if (!isNative) {
+  if (!isOfflineNativeRuntime) {
     const next = await mutate(loadOfflineNativeAssetIndex(profileKey));
     await saveOfflineNativeAssetIndex(profileKey, next);
     return;
@@ -509,7 +511,7 @@ export async function updateOfflineNativeAssetIndex(
 export function loadOfflineNativeAssetIndex(
   profileKey: string,
 ): Record<string, OfflineNativeAssetRecord> {
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     return nativeAssetIndexCache.get(profileKey) ?? {};
   }
   if (typeof window === "undefined") return {};
@@ -527,7 +529,7 @@ export async function saveOfflineNativeAssetIndex(
   profileKey: string,
   assets: Record<string, OfflineNativeAssetRecord>,
 ): Promise<void> {
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     await enqueueNativeAssetIndexWrite(profileKey, async () => {
       await writeNativeJsonFile(
         getOfflineNativeAssetIndexPath(profileKey),
@@ -554,7 +556,7 @@ export function loadOfflineSnapshot(
   if (!profileKey || typeof window === "undefined") {
     return EMPTY_OFFLINE_SNAPSHOT;
   }
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     return nativeSnapshotCache.get(profileKey) ?? EMPTY_OFFLINE_SNAPSHOT;
   }
   try {
@@ -571,7 +573,7 @@ export function saveOfflineSnapshot(
 ): Promise<void> {
   if (!profileKey || typeof window === "undefined") return Promise.resolve();
   const normalized = normalizeOfflineSnapshot(snapshot);
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     nativeSnapshotCache.set(profileKey, normalized);
     // Callers don't have to await this (it's routinely fired from a
     // debounced coalescing writer), but it must still land on disk in the
@@ -597,7 +599,7 @@ export async function hydrateOfflineProfileState(
   profileKey: string | null,
 ): Promise<OfflineSnapshot> {
   if (!profileKey) return EMPTY_OFFLINE_SNAPSHOT;
-  if (!isNative) return loadOfflineSnapshot(profileKey);
+  if (!isOfflineNativeRuntime) return loadOfflineSnapshot(profileKey);
   const [snapshot] = await Promise.all([
     ensureOfflineSnapshotLoaded(profileKey),
     ensureOfflineNativeAssetIndexLoaded(profileKey),

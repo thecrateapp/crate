@@ -14,8 +14,8 @@ import type {
   OfflinePlaylistInput,
   OfflineTrackInput,
 } from "@/contexts/offline-context";
-import { isNative } from "@/lib/capacitor";
 import { getCurrentServer } from "@/lib/server-store";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
 import {
   type OfflineItemKind,
   type OfflineItemRecord,
@@ -125,7 +125,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
 
   const profileKey = useMemo(() => {
     if (!user?.id || !supported) return null;
-    const origin = isNative
+    const origin = isOfflineNativeRuntime
       ? getCurrentServer()?.url || window.location.origin
       : window.location.origin;
     return deriveOfflineProfileKey(user.id, origin);

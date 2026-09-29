@@ -2,12 +2,9 @@ import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 
 import { api, apiUrl, getApiAuthHeaders } from "@/lib/api";
-import {
-  isAndroidNative,
-  isIosNative,
-  isNative,
-} from "@/lib/capacitor-runtime";
+import { isAndroidNative, isIosNative } from "@/lib/capacitor-runtime";
 import { recordDevLog } from "@/lib/dev-logs";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
 import {
   excludeNativeOfflineAssetFromBackup,
   verifyNativeOfflineAssets,
@@ -43,7 +40,9 @@ function isMissingNativeFileError(error: unknown): boolean {
     return true;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:does not exist|file not found)/i.test(message);
+  return /(?:does not exist|file not found|no such file or directory)/i.test(
+    message,
+  );
 }
 
 function throwIfOfflineTransferAborted(signal?: AbortSignal): void {
@@ -286,7 +285,7 @@ export async function cacheNativeTrackAsset(
   track: OfflineManifestTrack,
   signal?: AbortSignal,
 ): Promise<void> {
-  if (!isNative) return;
+  if (!isOfflineNativeRuntime) return;
   throwIfOfflineTransferAborted(signal);
   const assetKey = getOfflineTrackAssetKey(track);
   if (!assetKey) {
@@ -390,7 +389,7 @@ export async function deleteNativeCachedTrackAsset(
   track: OfflineTrackIdentityInput,
   storageId?: string | null,
 ): Promise<void> {
-  if (!isNative) return;
+  if (!isOfflineNativeRuntime) return;
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return;
   let entry: OfflineNativeAssetRecord | undefined;
@@ -440,7 +439,7 @@ export async function deleteNativeCachedTrackAsset(
 export async function clearNativeOfflineAssets(
   profileKey: string,
 ): Promise<void> {
-  if (!isNative) return;
+  if (!isOfflineNativeRuntime) return;
   const failures: unknown[] = [];
   let markedAssets: Record<string, OfflineNativeAssetRecord> = {};
   await updateOfflineNativeAssetIndex(profileKey, (assets) => {
@@ -493,7 +492,7 @@ export function getNativeOfflinePlaybackUrl(
   storageId?: string | null,
   options: { target?: "webview" | "android-native" } = {},
 ): string | null {
-  if (!isNative) return null;
+  if (!isOfflineNativeRuntime) return null;
   const profileKey = getActiveOfflineProfileKey();
   if (!profileKey) return null;
   const assets = loadOfflineNativeAssetIndex(profileKey);

@@ -979,8 +979,10 @@ pub fn run() {
     builder
         .on_window_event(handle_window_lifecycle_event)
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_upload::init())
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(StateFlags::POSITION | StateFlags::MAXIMIZED)

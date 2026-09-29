@@ -230,6 +230,16 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     );
   });
 
+  it("treats Tauri no-such-file errors as missing metadata", async () => {
+    readFileMock.mockRejectedValueOnce(
+      new Error("failed to open file: No such file or directory (os error 2)"),
+    );
+
+    await expect(
+      ensureOfflineNativeAssetIndexLoaded("tauri-missing-profile"),
+    ).resolves.toEqual({});
+  });
+
   it("rebuilds runtime locators when the native container path changes", async () => {
     writtenFiles.set(
       "offline-meta/offline-assets-relocated-profile.json",

@@ -1,8 +1,7 @@
 import { getApiBase } from "@/lib/api";
 import { getStoredAuthUserId } from "@/lib/auth-user-storage";
-import { isNative } from "@/lib/capacitor-runtime";
-import { isTauriRuntime } from "@/lib/platform";
 import { encodeOfflineProfileIdentity } from "@/lib/offline-store";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
 import { getOfflineTrackAssetKey } from "@/lib/offline-track-identity";
 import {
   hydrateOfflineProfileState,
@@ -80,11 +79,9 @@ export function deriveOfflineProfileKeyFromStoredUser(
 export function isOfflineSupported(): boolean {
   if (typeof window === "undefined") return false;
   if (!("localStorage" in window)) return false;
-  // Tauri does not provide the Capacitor Filesystem plugin and deliberately
-  // does not register the web service worker. Do not expose a partial cache
-  // implementation as working offline storage.
-  if (isTauriRuntime) return false;
-  if (isNative) return true;
+  // Capacitor and Tauri both provide a persistent native filesystem adapter;
+  // browser runtimes need both Cache Storage and a service worker.
+  if (isOfflineNativeRuntime) return true;
   return (
     typeof navigator !== "undefined" &&
     "caches" in window &&
@@ -187,10 +184,9 @@ export async function syncOfflineProfileToServiceWorker(
 export async function primeOfflineRuntimeProfile(
   serverOrigin?: string,
 ): Promise<void> {
-  if (isTauriRuntime) return;
   const profileKey = deriveOfflineProfileKeyFromStoredUser(serverOrigin);
   setActiveOfflineProfileKey(profileKey);
-  if (isNative && profileKey) {
+  if (isOfflineNativeRuntime && profileKey) {
     await hydrateOfflineProfileState(profileKey);
   }
   await syncOfflineProfileToServiceWorker(profileKey);

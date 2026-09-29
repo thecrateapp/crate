@@ -14,7 +14,11 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-unmaximize",
     "deep-link:default",
+    "fs:allow-applocaldata-read-recursive",
+    "fs:allow-applocaldata-write-recursive",
+    "fs:allow-applocaldata-meta-recursive",
     "opener:default",
+    "upload:default",
     {
       "identifier": "http:default",
       "allow": [

@@ -14,7 +14,7 @@ vi.mock("@/lib/capacitor-runtime", () => ({
 import { isOfflineSupported } from "./offline";
 
 describe("Tauri offline runtime", () => {
-  it("does not advertise offline support without a desktop filesystem backend", () => {
+  it("advertises offline support when the desktop filesystem backend is present", () => {
     const originalCaches = globalThis.caches;
     const originalServiceWorker = navigator.serviceWorker;
 
@@ -28,7 +28,7 @@ describe("Tauri offline runtime", () => {
     });
 
     try {
-      expect(isOfflineSupported()).toBe(false);
+      expect(isOfflineSupported()).toBe(true);
     } finally {
       Object.defineProperty(globalThis, "caches", {
         configurable: true,
