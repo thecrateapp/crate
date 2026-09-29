@@ -12,6 +12,9 @@ const {
   getAuthTokenMock,
   navigateMock,
   primeOfflineRuntimeProfileMock,
+  getCurrentServerIdMock,
+  getCurrentServerMock,
+  revokeServerSessionMock,
   refreshAuthTokenMock,
   setActiveOfflineProfileKeyMock,
   setAuthTokenMock,
@@ -25,6 +28,9 @@ const {
   getAuthTokenMock: vi.fn<() => string | null>(() => null),
   navigateMock: vi.fn(),
   primeOfflineRuntimeProfileMock: vi.fn(),
+  getCurrentServerIdMock: vi.fn<() => string | null>(() => null),
+  getCurrentServerMock: vi.fn<() => unknown>(() => null),
+  revokeServerSessionMock: vi.fn(() => Promise.resolve()),
   refreshAuthTokenMock: vi.fn(() => Promise.resolve(false)),
   setActiveOfflineProfileKeyMock: vi.fn(),
   setAuthTokenMock: vi.fn(),
@@ -47,7 +53,14 @@ vi.mock("@/lib/api", () => ({
   getAuthToken: getAuthTokenMock,
   getAuthTokenExpiresAt: getAuthTokenExpiresAtMock,
   refreshAuthToken: refreshAuthTokenMock,
+  revokeServerSession: revokeServerSessionMock,
   setAuthToken: setAuthTokenMock,
+}));
+
+vi.mock("@/lib/server-store", () => ({
+  SERVER_STORE_EVENT: "crate-server-store-change",
+  getCurrentServer: getCurrentServerMock,
+  getCurrentServerId: getCurrentServerIdMock,
 }));
 
 vi.mock("@/lib/capacitor", () => ({
@@ -88,12 +101,18 @@ describe("AuthProvider", () => {
     consumePendingOAuthNextMock.mockReturnValue(null);
     getApiBaseMock.mockReset();
     getApiBaseMock.mockReturnValue("");
+    getCurrentServerIdMock.mockReset();
+    getCurrentServerIdMock.mockReturnValue(null);
+    getCurrentServerMock.mockReset();
+    getCurrentServerMock.mockReturnValue(null);
     getAuthTokenExpiresAtMock.mockReset();
     getAuthTokenExpiresAtMock.mockReturnValue(null);
     getAuthTokenMock.mockReset();
     getAuthTokenMock.mockReturnValue(null);
     navigateMock.mockReset();
     primeOfflineRuntimeProfileMock.mockReset();
+    revokeServerSessionMock.mockReset();
+    revokeServerSessionMock.mockResolvedValue(undefined);
     refreshAuthTokenMock.mockReset();
     refreshAuthTokenMock.mockResolvedValue(false);
     setActiveOfflineProfileKeyMock.mockReset();
@@ -331,6 +350,158 @@ describe("AuthProvider", () => {
     );
   });
 
+  it("resets the old server and ignores its late session response after a switch", async () => {
+    let resolveServerA!: (value: unknown) => void;
+    const serverAResponse = new Promise((resolve) => {
+      resolveServerA = resolve;
+    });
+    const serverA = {
+      id: "server-a",
+      url: "https://a.example.test",
+      token: "token-a",
+    };
+    const serverB = {
+      id: "server-b",
+      url: "https://b.example.test",
+      token: "token-b",
+    };
+    getCurrentServerIdMock.mockReturnValue("server-a");
+    getCurrentServerMock.mockReturnValue(serverA);
+    apiMock.mockReturnValueOnce(serverAResponse).mockResolvedValueOnce({
+      id: 42,
+      email: "b@example.test",
+      name: "Server B",
+      role: "user",
+    });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1));
+    const requestAOptions = apiMock.mock.calls[0]?.[3] as RequestInit;
+
+    getCurrentServerIdMock.mockReturnValue("server-b");
+    getCurrentServerMock.mockReturnValue(serverB);
+    act(() => {
+      window.dispatchEvent(new CustomEvent("crate-server-store-change"));
+    });
+
+    expect(requestAOptions.signal?.aborted).toBe(true);
+    expect(await screen.findByText("user:42")).toBeTruthy();
+    expect(apiMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveServerA({
+        id: 41,
+        email: "a@example.test",
+        name: "Server A",
+        role: "user",
+      });
+      await serverAResponse;
+    });
+
+    expect(screen.getByText("user:42")).toBeInTheDocument();
+    expect(screen.queryByText("user:41")).not.toBeInTheDocument();
+  });
+
+  it("clears the old user and routes to login when switching to a tokenless server", async () => {
+    const serverA = {
+      id: "server-a",
+      url: "https://a.example.test",
+      token: "token-a",
+    };
+    const serverB = {
+      id: "server-b",
+      url: "https://b.example.test",
+      token: null,
+    };
+    getCurrentServerIdMock.mockReturnValue("server-a");
+    getCurrentServerMock.mockReturnValue(serverA);
+    apiMock.mockResolvedValueOnce({
+      id: 41,
+      email: "a@example.test",
+      name: "Server A",
+      role: "user",
+    });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("user:41")).toBeTruthy();
+
+    getCurrentServerIdMock.mockReturnValue("server-b");
+    getCurrentServerMock.mockReturnValue(serverB);
+    act(() => {
+      window.dispatchEvent(new CustomEvent("crate-server-store-change"));
+    });
+
+    expect(screen.getByText("anon")).toBeInTheDocument();
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith("/login", { replace: true });
+  });
+
+  it("resets playback when two servers authenticate the same numeric user id", async () => {
+    const authReset = vi.fn();
+    const serverA = {
+      id: "server-a",
+      url: "https://a.example.test",
+      token: "token-a",
+    };
+    const serverB = {
+      id: "server-b",
+      url: "https://b.example.test",
+      token: "token-b",
+    };
+    getCurrentServerIdMock.mockReturnValue("server-a");
+    getCurrentServerMock.mockReturnValue(serverA);
+    apiMock
+      .mockResolvedValueOnce({
+        id: 42,
+        email: "same-id@example.test",
+        name: "Server A",
+        role: "user",
+      })
+      .mockResolvedValueOnce({
+        id: 42,
+        email: "same-id@example.test",
+        name: "Server B",
+        role: "user",
+      });
+    localStorage.setItem("listen-player-state", '{"queue":["server-a"]}');
+    window.addEventListener(AUTH_RUNTIME_RESET_EVENT, authReset);
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("user:42")).toBeTruthy();
+
+    getCurrentServerIdMock.mockReturnValue("server-b");
+    getCurrentServerMock.mockReturnValue(serverB);
+    act(() => {
+      window.dispatchEvent(new CustomEvent("crate-server-store-change"));
+    });
+
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    expect(localStorage.getItem("listen-player-state")).toBeNull();
+    expect(authReset).toHaveBeenCalledTimes(1);
+    expect((authReset.mock.calls[0]?.[0] as CustomEvent).detail.reason).toBe(
+      "user-change",
+    );
+    window.removeEventListener(AUTH_RUNTIME_RESET_EVENT, authReset);
+  });
+
   it("cleans session state and navigates to login on logout", async () => {
     const authReset = vi.fn();
     window.addEventListener(
@@ -366,6 +537,7 @@ describe("AuthProvider", () => {
     await waitFor(() => {
       expect(setAuthTokenMock).toHaveBeenCalledWith(null);
     });
+    expect(apiMock).toHaveBeenCalledWith("/api/auth/logout", "POST");
     expect(localStorage.getItem("listen-player-state")).toBeNull();
     expect(localStorage.getItem("listen-recently-played")).toBeNull();
     expect(localStorage.getItem("listen-player-state:v1")).toBeNull();

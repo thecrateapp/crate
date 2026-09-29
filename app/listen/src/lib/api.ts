@@ -9,6 +9,7 @@ import {
   getServerById,
   migrateLegacyToken,
   seedDefaultServer,
+  type ServerConfig,
 } from "@/lib/server-store";
 import {
   AUTH_TOKEN_EVENT,
@@ -215,6 +216,26 @@ export function apiForServer<T = unknown>(
     return Promise.reject(new Error("The OAuth server is no longer available"));
   }
   return serverScopedApi<T>(`${server.url}${path}`, method, body);
+}
+
+/** Revoke the captured server session without consulting mutable active-server state. */
+export async function revokeServerSession(
+  server: Pick<ServerConfig, "url" | "token">,
+): Promise<void> {
+  if (!server.token) return;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    await fetch(`${server.url.replace(/\/+$/, "")}/api/auth/logout`, {
+      method: "POST",
+      credentials: "omit",
+      headers: { Authorization: `Bearer ${server.token}` },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 const apiAuthTransport = createApiAuthTransport({

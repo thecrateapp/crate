@@ -3,13 +3,20 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router";
 
-import { api, setAuthToken } from "@/lib/api";
+import { api, revokeServerSession, setAuthToken } from "@/lib/api";
 import { AuthContext } from "@/contexts/auth-context";
 import { clearAuthRuntime } from "@/contexts/auth-runtime";
+import { usesConfigurableServer } from "@/lib/platform";
+import {
+  getCurrentServer,
+  getCurrentServerId,
+  SERVER_STORE_EVENT,
+} from "@/lib/server-store";
 import { useAuthHeartbeat } from "@/contexts/use-auth-heartbeat";
 import { useAuthOAuthSync } from "@/contexts/use-auth-oauth-sync";
 import { useAuthSession } from "@/contexts/use-auth-session";
@@ -27,8 +34,40 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const { user, loading, sessionUnavailable, refetch, setUser } =
-    useAuthSession();
+  const {
+    user,
+    loading,
+    sessionUnavailable,
+    refetch,
+    resetForServerTransition,
+  } = useAuthSession();
+  const currentServerIdRef = useRef(getCurrentServerId());
+
+  useEffect(() => {
+    const handleServerChange = () => {
+      const nextServerId = getCurrentServerId();
+      if (nextServerId === currentServerIdRef.current) return;
+      currentServerIdRef.current = nextServerId;
+
+      const nextServer = getCurrentServer();
+      clearAuthRuntime({
+        clearStoredUser: false,
+        reason: "user-change",
+      });
+      resetForServerTransition(Boolean(nextServerId && nextServer?.token));
+
+      if (!nextServerId) return;
+      if (nextServer?.token) {
+        void refetch();
+      } else {
+        navigate("/login", { replace: true });
+      }
+    };
+
+    window.addEventListener(SERVER_STORE_EVENT, handleServerChange);
+    return () =>
+      window.removeEventListener(SERVER_STORE_EVENT, handleServerChange);
+  }, [navigate, refetch, resetForServerTransition]);
 
   useEffect(() => {
     setSentryUser(user?.id ?? null);
@@ -40,16 +79,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useListenWarmup(user);
 
   const logout = useCallback(async () => {
-    try {
-      await api("/api/auth/logout", "POST");
-    } catch {
-      // ignore logout errors
-    }
+    const server = getCurrentServer();
+    const revocation = usesConfigurableServer
+      ? server
+        ? revokeServerSession(server)
+        : Promise.resolve()
+      : api("/api/auth/logout", "POST").then(() => undefined);
     clearAuthRuntime({ reason: "logout" });
     setAuthToken(null);
-    setUser(null);
+    resetForServerTransition(false);
     navigate("/login");
-  }, [navigate, setUser]);
+    void revocation.catch(() => {
+      // Local logout must complete even if the server cannot be reached.
+    });
+  }, [navigate, resetForServerTransition]);
 
   const value = useMemo(
     () => ({ user, loading, sessionUnavailable, refetch, logout }),

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type AuthUser } from "@/contexts/auth-context";
 import { applyAuthenticatedUser } from "@/contexts/auth-runtime";
 import { api } from "@/lib/api";
+import { getCurrentServerId } from "@/lib/server-store";
 import { ApiError } from "../../../shared/web/api";
 
 const AUTH_RETRY_BASE_DELAY_MS = 1_500;
@@ -26,6 +27,7 @@ export function useAuthSession() {
   const [sessionUnavailable, setSessionUnavailable] = useState(false);
   const userRef = useRef<AuthUser | null>(null);
   const authRequestRef = useRef<AbortController | null>(null);
+  const authGenerationRef = useRef(0);
   const retryTimerRef = useRef<number | null>(null);
   const retryAttemptRef = useRef(0);
 
@@ -40,6 +42,8 @@ export function useAuthSession() {
       retryTimerRef.current = null;
     }
     authRequestRef.current?.abort();
+    const generation = ++authGenerationRef.current;
+    const serverId = getCurrentServerId();
     const controller = new AbortController();
     authRequestRef.current = controller;
     setLoading(true);
@@ -48,6 +52,12 @@ export function useAuthSession() {
       const data = await api<AuthUser>("/api/auth/me", "GET", undefined, {
         signal: controller.signal,
       });
+      if (
+        generation !== authGenerationRef.current ||
+        serverId !== getCurrentServerId()
+      ) {
+        return userRef.current;
+      }
       const nextUser = data && data.id ? data : null;
       setCurrentUser(nextUser);
       retryAttemptRef.current = 0;
@@ -55,7 +65,12 @@ export function useAuthSession() {
       applyAuthenticatedUser(nextUser);
       return nextUser;
     } catch (error) {
-      if (controller.signal.aborted || (error as Error).name === "AbortError") {
+      if (
+        generation !== authGenerationRef.current ||
+        serverId !== getCurrentServerId() ||
+        controller.signal.aborted ||
+        (error as Error).name === "AbortError"
+      ) {
         return userRef.current;
       }
       const isRejectedSession =
@@ -100,9 +115,28 @@ export function useAuthSession() {
     return fetchSession();
   }, [fetchSession]);
 
+  const resetForServerTransition = useCallback(
+    (hasSession: boolean) => {
+      authGenerationRef.current += 1;
+      authRequestRef.current?.abort();
+      authRequestRef.current = null;
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      retryAttemptRef.current = 0;
+      setCurrentUser(null);
+      setSessionUnavailable(false);
+      // A token-bearing destination will immediately start a fresh session check.
+      setLoading(hasSession);
+    },
+    [setCurrentUser],
+  );
+
   useEffect(() => {
     void refetch();
     return () => {
+      authGenerationRef.current += 1;
       authRequestRef.current?.abort();
       authRequestRef.current = null;
       if (retryTimerRef.current !== null) {
@@ -117,6 +151,6 @@ export function useAuthSession() {
     loading,
     sessionUnavailable,
     refetch,
-    setUser: setCurrentUser,
+    resetForServerTransition,
   };
 }

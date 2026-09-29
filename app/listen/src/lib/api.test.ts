@@ -52,6 +52,7 @@ import {
   shouldRedirectToLoginOnUnauthorized,
   ensureFreshAuthToken,
   refreshAuthToken,
+  revokeServerSession,
   apiFetch,
   api,
   AUTH_TOKEN_EVENT,
@@ -113,6 +114,40 @@ describe("apiUrl", () => {
 
   it("preserves query params", () => {
     expect(apiUrl("/api/search?q=test")).toBe("/api/search?q=test");
+  });
+});
+
+describe("revokeServerSession", () => {
+  it("uses the captured server URL and bearer token with a bounded request", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(mockFetchResponse(204));
+
+    await revokeServerSession({
+      url: "https://a.example.test/",
+      token: "token-a",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://a.example.test/api/auth/logout",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "omit",
+        headers: { Authorization: "Bearer token-a" },
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("does not issue a request when the captured server has no token", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await revokeServerSession({
+      url: "https://a.example.test",
+      token: null,
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
