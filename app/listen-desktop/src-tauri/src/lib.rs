@@ -122,6 +122,32 @@ impl DeepLinkBuffer {
 #[derive(Default)]
 struct DeepLinkState(Mutex<DeepLinkBuffer>);
 
+#[cfg(desktop)]
+#[derive(Debug, Default, PartialEq, Eq)]
+struct ActivationArgs {
+    show_window: bool,
+    urls: Vec<String>,
+    commands: Vec<String>,
+}
+
+#[cfg(desktop)]
+fn classify_activation_args(args: impl IntoIterator<Item = String>) -> ActivationArgs {
+    let mut activation = ActivationArgs::default();
+
+    for arg in args {
+        if arg.starts_with("cratemusic://") {
+            activation.urls.push(arg);
+        } else if let Some(command) = arg.strip_prefix("--crate-command=") {
+            if is_supported_activation_command(command) {
+                activation.commands.push(command.to_string());
+            }
+        }
+    }
+
+    activation.show_window = !activation.urls.is_empty() || activation.commands.is_empty();
+    activation
+}
+
 /// Every command a tray/dock menu item, a media key, or a CLI activation
 /// arg can trigger. `Play`/`Pause`/`PlayPause`/`Previous`/`Next` are also
 /// the only ones forwarded to the frontend, as the string payload of a
@@ -776,28 +802,18 @@ fn handle_activation_args<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     argv: impl IntoIterator<Item = String>,
 ) {
-    let mut urls = Vec::new();
-    let mut commands = Vec::new();
-
-    for arg in argv {
-        if arg.starts_with("cratemusic://") {
-            urls.push(arg);
-        } else if let Some(command) = arg.strip_prefix("--crate-command=") {
-            if is_supported_activation_command(command) {
-                commands.push(command.to_string());
-            }
-        }
+    let activation = classify_activation_args(argv);
+    if activation.show_window {
+        show_main_window(app);
     }
 
-    if !urls.is_empty() {
+    if !activation.urls.is_empty() {
         if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-            dispatch_deep_link_urls(&window, urls);
+            dispatch_deep_link_urls(&window, activation.urls);
         }
     }
 
-    for command in commands {
+    for command in activation.commands {
         handle_playback_menu_event(app, &command);
     }
 }
@@ -1082,8 +1098,9 @@ fn remove_legacy_http_cookie_jar_file(path: &std::path::Path) -> std::io::Result
 #[cfg(all(test, desktop))]
 mod tests {
     use super::{
-        is_bandcamp_capture_url, is_supported_activation_command, play_pause_command_for_state,
-        remove_legacy_http_cookie_jar_file, DeepLinkBuffer, PlaybackCommand,
+        classify_activation_args, is_bandcamp_capture_url, is_supported_activation_command,
+        play_pause_command_for_state, remove_legacy_http_cookie_jar_file, DeepLinkBuffer,
+        PlaybackCommand,
     };
 
     #[cfg(not(target_os = "linux"))]
@@ -1215,6 +1232,40 @@ mod tests {
     fn quit_is_a_valid_menu_command_but_not_an_activation_arg() {
         assert!(PlaybackCommand::parse("quit").is_some());
         assert!(!is_supported_activation_command("quit"));
+    }
+
+    #[test]
+    fn normal_or_unknown_activation_args_request_window_focus() {
+        for args in [
+            vec![],
+            vec!["crate-desktop".into()],
+            vec!["--unknown".into()],
+        ] {
+            assert!(classify_activation_args(args).show_window);
+        }
+    }
+
+    #[test]
+    fn deep_link_activation_requests_window_focus_and_preserves_url() {
+        let activation = classify_activation_args([
+            "crate-desktop".into(),
+            "cratemusic://oauth/callback?code=opaque".into(),
+        ]);
+
+        assert!(activation.show_window);
+        assert_eq!(
+            activation.urls,
+            vec!["cratemusic://oauth/callback?code=opaque"]
+        );
+    }
+
+    #[test]
+    fn media_command_activation_does_not_request_window_focus() {
+        let activation =
+            classify_activation_args(["crate-desktop".into(), "--crate-command=next".into()]);
+
+        assert!(!activation.show_window);
+        assert_eq!(activation.commands, vec!["next"]);
     }
 
     #[test]
