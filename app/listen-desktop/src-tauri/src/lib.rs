@@ -992,6 +992,13 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                if let Err(error) = remove_legacy_http_cookie_jar(app) {
+                    eprintln!(
+                        "failed to remove legacy HTTP cookie jar ({:?})",
+                        error.kind()
+                    );
+                }
+
                 let menu_state = setup_tray(app)?;
                 app.manage(menu_state);
                 register_deep_links(app);
@@ -1055,11 +1062,23 @@ pub fn run() {
         .run(handle_run_event);
 }
 
+fn remove_legacy_http_cookie_jar(app: &tauri::App) -> std::io::Result<()> {
+    let cache_dir = app.path().app_cache_dir().map_err(std::io::Error::other)?;
+    remove_legacy_http_cookie_jar_file(&cache_dir.join(".cookies"))
+}
+
+fn remove_legacy_http_cookie_jar_file(path: &std::path::Path) -> std::io::Result<()> {
+    match std::fs::remove_file(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        result => result,
+    }
+}
+
 #[cfg(all(test, desktop))]
 mod tests {
     use super::{
         is_bandcamp_capture_url, is_supported_activation_command, play_pause_command_for_state,
-        DeepLinkBuffer, PlaybackCommand,
+        remove_legacy_http_cookie_jar_file, DeepLinkBuffer, PlaybackCommand,
     };
 
     #[cfg(not(target_os = "linux"))]
@@ -1067,6 +1086,24 @@ mod tests {
         cache_native_desktop_artwork, is_native_desktop_artwork_path,
         prune_native_desktop_artwork_cache,
     };
+
+    #[test]
+    fn removes_the_legacy_http_cookie_jar_idempotently() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "crate-desktop-cookie-jar-test-{}-{nonce}",
+            std::process::id()
+        ));
+
+        std::fs::write(&path, "legacy-cookie-data").unwrap();
+        remove_legacy_http_cookie_jar_file(&path).unwrap();
+
+        assert!(!path.exists());
+        remove_legacy_http_cookie_jar_file(&path).unwrap();
+    }
 
     #[cfg(not(target_os = "linux"))]
     #[test]

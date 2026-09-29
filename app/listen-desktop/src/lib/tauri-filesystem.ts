@@ -10,6 +10,7 @@ import {
 } from "@tauri-apps/plugin-fs";
 
 const appLocalDataBase = BaseDirectory.AppLocalData;
+const FILE_NOT_FOUND_CODE = "OS-PLUG-FILE-0008";
 
 interface PathOptions {
   directory?: string;
@@ -34,14 +35,44 @@ async function absolutePath(path: string): Promise<string> {
   return join(await appLocalDataDir(), relativePath(path));
 }
 
+function normalizeFileSystemError(error: unknown): unknown {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === FILE_NOT_FOUND_CODE
+  ) {
+    return error;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  if (!/\bos error (?:2|3)\b/i.test(message)) return error;
+
+  return Object.assign(new Error("File not found"), {
+    code: FILE_NOT_FOUND_CODE,
+  });
+}
+
+async function withNormalizedFileSystemError<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    throw normalizeFileSystemError(error);
+  }
+}
+
 export async function mkdir(
   path: string,
   options: PathOptions & { recursive?: boolean } = {},
 ): Promise<void> {
-  await tauriMkdir(relativePath(path), {
-    baseDir: baseDir(options.directory),
-    recursive: options.recursive,
-  });
+  await withNormalizedFileSystemError(() =>
+    tauriMkdir(relativePath(path), {
+      baseDir: baseDir(options.directory),
+      recursive: options.recursive,
+    }),
+  );
 }
 
 export async function readFile(
@@ -49,9 +80,11 @@ export async function readFile(
   options: PathOptions = {},
 ): Promise<{ data: string }> {
   return {
-    data: await readTextFile(relativePath(path), {
-      baseDir: baseDir(options.directory),
-    }),
+    data: await withNormalizedFileSystemError(() =>
+      readTextFile(relativePath(path), {
+        baseDir: baseDir(options.directory),
+      }),
+    ),
   };
 }
 
@@ -60,9 +93,11 @@ export async function writeFile(
   data: string,
   options: PathOptions & { recursive?: boolean } = {},
 ): Promise<void> {
-  await writeTextFile(relativePath(path), data, {
-    baseDir: baseDir(options.directory),
-  });
+  await withNormalizedFileSystemError(() =>
+    writeTextFile(relativePath(path), data, {
+      baseDir: baseDir(options.directory),
+    }),
+  );
 }
 
 export async function stat(
@@ -70,9 +105,11 @@ export async function stat(
   options: PathOptions = {},
 ): Promise<{ size: number; uri: string }> {
   const normalized = relativePath(path);
-  const info = await tauriStat(normalized, {
-    baseDir: baseDir(options.directory),
-  });
+  const info = await withNormalizedFileSystemError(() =>
+    tauriStat(normalized, {
+      baseDir: baseDir(options.directory),
+    }),
+  );
   return { size: info.size, uri: await absolutePath(normalized) };
 }
 
@@ -87,9 +124,11 @@ export async function remove(
   path: string,
   options: PathOptions = {},
 ): Promise<void> {
-  await tauriRemove(relativePath(path), {
-    baseDir: baseDir(options.directory),
-  });
+  await withNormalizedFileSystemError(() =>
+    tauriRemove(relativePath(path), {
+      baseDir: baseDir(options.directory),
+    }),
+  );
 }
 
 export async function rename(
@@ -97,10 +136,12 @@ export async function rename(
   to: string,
   options: PathOptions & { toDirectory?: string } = {},
 ): Promise<void> {
-  await tauriRename(relativePath(from), relativePath(to), {
-    oldPathBaseDir: baseDir(options.directory),
-    newPathBaseDir: baseDir(options.toDirectory ?? options.directory),
-  });
+  await withNormalizedFileSystemError(() =>
+    tauriRename(relativePath(from), relativePath(to), {
+      oldPathBaseDir: baseDir(options.directory),
+      newPathBaseDir: baseDir(options.toDirectory ?? options.directory),
+    }),
+  );
 }
 
 export async function downloadFile(
@@ -114,10 +155,12 @@ export async function downloadFile(
     throw new Error("Invalid Tauri offline media path");
   }
 
-  const target = await invoke<string>("download_offline_media", {
-    url,
-    path: normalized,
-    headers: headers ?? {},
-  });
+  const target = await withNormalizedFileSystemError(() =>
+    invoke<string>("download_offline_media", {
+      url,
+      path: normalized,
+      headers: headers ?? {},
+    }),
+  );
   return { path: target };
 }

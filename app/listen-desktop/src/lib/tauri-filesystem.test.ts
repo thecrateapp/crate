@@ -136,4 +136,24 @@ describe("Tauri filesystem adapter", () => {
       "Invalid Tauri offline path",
     );
   });
+
+  it.each([
+    "The system cannot find the file specified. (os error 2)",
+    "The system cannot find the path specified. (os error 3)",
+  ])("normalizes Windows missing-file error %s", async (message) => {
+    fsMocks.readTextFile.mockRejectedValue(new Error(message));
+
+    await expect(readFile("offline-meta/index.json")).rejects.toMatchObject({
+      code: "OS-PLUG-FILE-0008",
+      message: "File not found",
+    });
+  });
+
+  it("preserves non-missing filesystem errors", async () => {
+    fsMocks.readTextFile.mockRejectedValue(new Error("Permission denied"));
+
+    await expect(readFile("offline-meta/index.json")).rejects.toThrow(
+      "Permission denied",
+    );
+  });
 });

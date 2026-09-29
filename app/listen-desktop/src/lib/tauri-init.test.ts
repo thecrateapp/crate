@@ -39,10 +39,13 @@ describe("shouldUseTauriHttpPlugin", () => {
     "https://api.example.com/api/catalog/tracks/track-1/stream",
     "https://api.example.com/api/playback/variants/variant-1/stream",
     "https://api.example.com/rest/stream.view?id=track-1",
-  ])("uses WebView fetch for media streams from a packaged Tauri origin: %s", (url) => {
-    vi.stubGlobal("window", { location: { origin: "tauri://localhost" } });
-    expect(shouldUseTauriHttpPlugin(url)).toBe(false);
-  });
+  ])(
+    "uses WebView fetch for media streams from a packaged Tauri origin: %s",
+    (url) => {
+      vi.stubGlobal("window", { location: { origin: "tauri://localhost" } });
+      expect(shouldUseTauriHttpPlugin(url)).toBe(false);
+    },
+  );
 
   it("keeps media streams on the privileged client from the Vite dev origin", () => {
     vi.stubGlobal("window", {
@@ -98,6 +101,25 @@ describe("shouldUseTauriHttpPlugin", () => {
         "http://[\\:\\:1]:*",
       ]),
     );
+  });
+});
+
+describe("production asset protocol policy", () => {
+  it("allows offline asset URLs to be fetched by WebAudio", () => {
+    const config = JSON.parse(
+      readFileSync(
+        new URL("../../src-tauri/tauri.conf.json", import.meta.url),
+        "utf8",
+      ),
+    ) as { app: { security: { csp: string } } };
+
+    const connectSrc = config.app.security.csp
+      .split(";")
+      .map((directive) => directive.trim())
+      .find((directive) => directive.startsWith("connect-src "));
+
+    expect(connectSrc).toContain("asset:");
+    expect(connectSrc).toContain("http://asset.localhost");
   });
 });
 
