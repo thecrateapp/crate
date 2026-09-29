@@ -1,5 +1,6 @@
 import {
   consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthLinkCallback,
   retryPendingNativeOAuthCallback,
 } from "@/lib/capacitor-oauth";
 import { recordDevLog } from "@/lib/dev-logs";
@@ -187,8 +188,40 @@ export function mergeInitialDeepLinkUrls(
 }
 
 async function retryDeferredOAuth(): Promise<void> {
-  const result = await retryPendingNativeOAuthCallback();
+  const loginResult = await retryPendingNativeOAuthCallback();
+  dispatchOAuthCallbackResult(loginResult);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const linkResult = await retryPendingNativeOAuthLinkCallback();
+    if (!linkResult.handled) return;
+    dispatchOAuthCallbackResult(linkResult);
+  }
+}
+
+export function dispatchOAuthCallbackResult(result: {
+  handled: boolean;
+  next: string;
+  operation?: "link";
+  provider?: string;
+  userId?: number;
+  error?: true;
+}): void {
   if (!result.handled) return;
+  if (result.operation === "link") {
+    const eventName = result.error
+      ? "crate:oauth-link-failed"
+      : "crate:oauth-link-completed";
+    recordTauriAuthDiagnostic(
+      result.error
+        ? "Native OAuth account link failed"
+        : "Native OAuth account linked",
+    );
+    window.dispatchEvent(
+      new CustomEvent(eventName, {
+        detail: { provider: result.provider, userId: result.userId },
+      }),
+    );
+    return;
+  }
   recordTauriAuthDiagnostic("OAuth token stored", result.next);
   window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
 }
@@ -238,9 +271,7 @@ async function handleDeepLinkUrls(urls: string[]): Promise<void> {
       );
       continue;
     }
-    recordTauriAuthDiagnostic("OAuth token stored", result.next);
-    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
-    return;
+    dispatchOAuthCallbackResult(result);
   }
 }
 

@@ -3,15 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../shared/web/api";
 
 const mocks = vi.hoisted(() => ({
+  apiMock: vi.fn(),
   apiForServerMock: vi.fn(),
+  openExternalUrlMock: vi.fn(),
   setAuthTokensForServer: vi.fn(() => true),
   getCurrentServerId: vi.fn<() => string | null>(() => null),
-  getServers: vi.fn<() => Array<{ id: string }>>(() => []),
+  getServers: vi.fn<() => Array<{ id: string; token?: string | null }>>(
+    () => [],
+  ),
   setCurrentServerId: vi.fn(),
   waitForPendingSecureSessionWrites: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
+  api: mocks.apiMock,
   apiForServer: mocks.apiForServerMock,
   setAuthTokensForServer: mocks.setAuthTokensForServer,
   setAuthTokens: vi.fn(),
@@ -23,11 +28,20 @@ vi.mock("@/lib/native-secure-session", () => ({
   removeSecureSessionValue: vi.fn(),
 }));
 
+vi.mock("@/lib/auth-session", () => ({
+  AUTH_TOKEN_EVENT: "crate:auth-token-updated",
+}));
+
 vi.mock("@/lib/platform", () => ({
   isTauriRuntime: true,
 }));
 
+vi.mock("@/lib/external-links", () => ({
+  openExternalUrl: mocks.openExternalUrlMock,
+}));
+
 vi.mock("@/lib/server-store", () => ({
+  SERVER_STORE_EVENT: "crate-server-store-change",
   waitForPendingSecureSessionWrites: mocks.waitForPendingSecureSessionWrites,
   getCurrentServerId: mocks.getCurrentServerId,
   getServers: mocks.getServers,
@@ -36,9 +50,25 @@ vi.mock("@/lib/server-store", () => ({
 
 import {
   beginNativeOAuth,
+  beginNativeOAuthLink,
   consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthLinkCallback,
   retryPendingNativeOAuthCallback,
 } from "@/lib/capacitor-oauth";
+
+function tokenFor(userId: number, sessionId: string, expiresAt = 1): string {
+  const payload = btoa(
+    JSON.stringify({ user_id: userId, sid: sessionId, exp: expiresAt }),
+  )
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return `header.${payload}.signature`;
+}
+
+function currentServer(token = tokenFor(42, "session-a")) {
+  return { id: "server-a", token };
+}
 
 // Tauri desktop has no OS-backed secure session plugin, so its PKCE
 // verifier record is kept in localStorage instead — otherwise it's the
@@ -47,10 +77,12 @@ import {
 describe("desktop (Tauri) native OAuth via localStorage", () => {
   beforeEach(() => {
     localStorage.clear();
+    mocks.apiMock.mockReset();
     mocks.apiForServerMock.mockReset();
+    mocks.openExternalUrlMock.mockReset().mockResolvedValue(undefined);
     mocks.setAuthTokensForServer.mockReset().mockReturnValue(true);
     mocks.getCurrentServerId.mockReset().mockReturnValue("server-a");
-    mocks.getServers.mockReset().mockReturnValue([{ id: "server-a" }]);
+    mocks.getServers.mockReset().mockReturnValue([currentServer()]);
     mocks.setCurrentServerId.mockReset();
     mocks.waitForPendingSecureSessionWrites
       .mockReset()
@@ -484,5 +516,288 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     await expect(first).resolves.toEqual({ handled: true, next: "/library" });
 
     expect(mocks.apiForServerMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts account linking with the active session and keeps its verifier local", async () => {
+    mocks.apiMock.mockResolvedValue({
+      login_url: "https://accounts.example/authorize",
+    });
+
+    await beginNativeOAuthLink("google", 42);
+
+    expect(mocks.apiMock).toHaveBeenCalledWith(
+      "/api/auth/oauth/google/native-link/start",
+      "POST",
+      expect.objectContaining({
+        native_code_challenge: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+        native_state: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      }),
+    );
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    const record = JSON.parse(
+      localStorage.getItem(`crate.oauth.link.${state}`) ?? "null",
+    ) as Record<string, unknown>;
+    expect(record).toMatchObject({
+      serverId: "server-a",
+      userId: 42,
+      sessionId: "session-a",
+      provider: "google",
+    });
+    expect(record.verifier).toEqual(
+      expect.stringMatching(/^[A-Za-z0-9_-]{86}$/),
+    );
+    expect(JSON.stringify(record)).not.toContain("signature");
+    expect(mocks.openExternalUrlMock).toHaveBeenCalledWith(
+      "https://accounts.example/authorize",
+    );
+    expect(mocks.apiForServerMock).not.toHaveBeenCalled();
+  });
+
+  it("does not open the provider if the account changes during the start request", async () => {
+    let resolveStart: ((value: { login_url: string }) => void) | undefined;
+    mocks.apiMock.mockReturnValue(
+      new Promise<{ login_url: string }>((resolve) => {
+        resolveStart = resolve;
+      }),
+    );
+
+    const starting = beginNativeOAuthLink("google", 42);
+    await vi.waitFor(() => expect(mocks.apiMock).toHaveBeenCalledTimes(1));
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    mocks.getServers.mockReturnValue([
+      currentServer(tokenFor(42, "new-session")),
+    ]);
+    window.dispatchEvent(new CustomEvent("crate:auth-token-updated"));
+    resolveStart?.({ login_url: "https://accounts.example/authorize" });
+
+    await expect(starting).rejects.toThrow(/active account or server changed/);
+    expect(mocks.openExternalUrlMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
+  });
+
+  it("completes a link callback with only the opaque handoff proof", async () => {
+    mocks.apiMock.mockResolvedValueOnce({
+      login_url: "https://accounts.example/authorize",
+    });
+    await beginNativeOAuthLink("apple", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    mocks.apiMock.mockResolvedValueOnce({ status: "linked" });
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/link-callback?code=${"c".repeat(
+          43,
+        )}&state=${state}`,
+      ),
+    ).resolves.toEqual({
+      handled: true,
+      next: "/settings",
+      operation: "link",
+      provider: "apple",
+      userId: 42,
+    });
+    expect(mocks.apiMock).toHaveBeenLastCalledWith(
+      "/api/auth/oauth/native-link/complete",
+      "POST",
+      {
+        code: "c".repeat(43),
+        code_verifier: expect.stringMatching(/^[A-Za-z0-9_-]{86}$/),
+        state,
+      },
+    );
+    expect(JSON.stringify(mocks.apiMock.mock.calls[1]?.[2])).not.toContain(
+      "session-a",
+    );
+    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
+    expect(mocks.setAuthTokensForServer).not.toHaveBeenCalled();
+  });
+
+  it("exchanges a duplicate native link callback only once", async () => {
+    mocks.apiMock.mockResolvedValueOnce({
+      login_url: "https://accounts.example/authorize",
+    });
+    await beginNativeOAuthLink("google", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    let resolveCompletion: ((value: { ok: boolean }) => void) | undefined;
+    mocks.apiMock.mockReturnValueOnce(
+      new Promise<{ ok: boolean }>((resolve) => {
+        resolveCompletion = resolve;
+      }),
+    );
+    const callback = `cratemusic://oauth/link-callback?code=${"j".repeat(
+      43,
+    )}&state=${state}`;
+    const first = consumeOAuthCallbackUrl(callback);
+    await vi.waitFor(() => expect(mocks.apiMock).toHaveBeenCalledTimes(2));
+
+    await expect(consumeOAuthCallbackUrl(callback)).resolves.toEqual({
+      handled: false,
+      next: "/",
+    });
+    resolveCompletion?.({ ok: true });
+
+    await expect(first).resolves.toMatchObject({
+      handled: true,
+      operation: "link",
+      userId: 42,
+    });
+    expect(mocks.apiMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not complete a pending link after switching the active server", async () => {
+    mocks.apiMock.mockResolvedValue({
+      login_url: "https://accounts.example/authorize",
+    });
+    await beginNativeOAuthLink("google", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    mocks.getCurrentServerId.mockReturnValue("server-b");
+    mocks.getServers.mockReturnValue([
+      currentServer(),
+      { id: "server-b", token: tokenFor(84, "session-b") },
+    ]);
+    window.dispatchEvent(new CustomEvent("crate-server-store-change"));
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/link-callback?code=${"d".repeat(
+          43,
+        )}&state=${state}`,
+      ),
+    ).resolves.toMatchObject({
+      handled: true,
+      operation: "link",
+      provider: "google",
+      userId: 42,
+      error: true,
+    });
+    expect(mocks.apiMock).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
+  });
+
+  it("allows completion after an access token refresh with the same session ID", async () => {
+    mocks.apiMock.mockResolvedValueOnce({
+      login_url: "https://accounts.example/authorize",
+    });
+    await beginNativeOAuthLink("google", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    mocks.getServers.mockReturnValue([
+      currentServer(tokenFor(42, "session-a", 2)),
+    ]);
+    window.dispatchEvent(new CustomEvent("crate:auth-token-updated"));
+    mocks.apiMock.mockResolvedValueOnce({ status: "linked" });
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/link-callback?code=${"e".repeat(
+          43,
+        )}&state=${state}`,
+      ),
+    ).resolves.toMatchObject({ handled: true, operation: "link" });
+    expect(mocks.apiMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a transient native link completion without merging it into login callbacks", async () => {
+    mocks.apiMock
+      .mockResolvedValueOnce({
+        login_url: "https://accounts.example/authorize",
+      })
+      .mockRejectedValueOnce(new ApiError(503, "link service unavailable"));
+    await beginNativeOAuthLink("google", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/link-callback?code=${"f".repeat(
+          43,
+        )}&state=${state}`,
+      ),
+    ).resolves.toEqual({ handled: false, next: "/", retryable: true });
+    expect(localStorage.getItem("crate.oauth.link.pending-callback")).toContain(
+      state,
+    );
+    expect(localStorage.getItem("crate.oauth.pending-callback")).toBeNull();
+
+    mocks.apiMock.mockResolvedValueOnce({ status: "linked" });
+    await expect(retryPendingNativeOAuthLinkCallback()).resolves.toMatchObject({
+      handled: true,
+      operation: "link",
+      userId: 42,
+    });
+    expect(mocks.apiMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects a pending link after logout and a new session for the same user", async () => {
+    mocks.apiMock.mockResolvedValue({
+      login_url: "https://accounts.example/authorize",
+    });
+    await beginNativeOAuthLink("google", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+    mocks.getServers.mockReturnValue([
+      currentServer(tokenFor(42, "session-after-login")),
+    ]);
+    window.dispatchEvent(new CustomEvent("crate:auth-token-updated"));
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/link-callback?code=${"g".repeat(
+          43,
+        )}&state=${state}`,
+      ),
+    ).resolves.toMatchObject({
+      handled: true,
+      operation: "link",
+      userId: 42,
+      error: true,
+    });
+    expect(mocks.apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a permanent account conflict instead of retrying it", async () => {
+    mocks.apiMock
+      .mockResolvedValueOnce({
+        login_url: "https://accounts.example/authorize",
+      })
+      .mockRejectedValueOnce(new ApiError(409, "identity already linked"));
+    await beginNativeOAuthLink("google", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/link-callback?code=${"h".repeat(
+          43,
+        )}&state=${state}`,
+      ),
+    ).resolves.toMatchObject({
+      handled: true,
+      operation: "link",
+      provider: "google",
+      userId: 42,
+      error: true,
+    });
+    expect(
+      localStorage.getItem("crate.oauth.link.pending-callback"),
+    ).toBeNull();
+  });
+
+  it("clears the pending flow when the provider returns an authorization denial", async () => {
+    mocks.apiMock.mockResolvedValue({
+      login_url: "https://accounts.example/authorize",
+    });
+    await beginNativeOAuthLink("google", 42);
+    const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/link-callback?state=${state}&error=cancelled`,
+      ),
+    ).resolves.toMatchObject({
+      handled: true,
+      operation: "link",
+      provider: "google",
+      userId: 42,
+      error: true,
+    });
+    expect(mocks.apiMock).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
   });
 });

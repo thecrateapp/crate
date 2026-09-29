@@ -61,6 +61,7 @@ vi.mock("@/lib/server-store", () => ({
   SERVER_STORE_EVENT: "crate-server-store-change",
   getCurrentServer: () => runtimeState.currentServer,
   getCurrentServerId: () => runtimeState.currentServer?.id ?? null,
+  getServers: () => [runtimeState.currentServer].filter(Boolean),
   migrateLegacyToken: vi.fn(),
   seedDefaultServer: vi.fn(),
 }));

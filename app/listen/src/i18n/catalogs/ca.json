@@ -1357,6 +1357,8 @@
   "settings.account.toasts.passwordChanged": "Contrasenya canviada",
   "settings.account.toasts.passwordChangeFailed": "No s'ha pogut canviar la contrasenya. Comprova la contrasenya actual.",
   "settings.account.toasts.linkFailed": "No s'ha pogut iniciar la vinculació amb {provider}",
+  "settings.account.toasts.linkSucceeded": "El compte de {provider} s'ha vinculat correctament",
+  "settings.account.toasts.linkCompletionFailed": "No s'ha pogut completar la vinculació de {provider}",
   "settings.account.toasts.unlinked": "Compte de {provider} desvinculat",
   "settings.account.toasts.unlinkFailed": "No s'ha pogut desvincular {provider}",
   "settings.bandcamp.toasts.cookieRequired": "Enganxa primer la cookie identity de Bandcamp",

@@ -2,12 +2,62 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import {
+  dispatchOAuthCallbackResult,
   mergeInitialDeepLinkUrls,
   shouldUseTauriHttpPlugin,
 } from "./tauri-init";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("dispatchOAuthCallbackResult", () => {
+  it("keeps a successful account link separate from login token events", () => {
+    const completed = vi.fn();
+    const authReceived = vi.fn();
+    vi.stubGlobal("window", new EventTarget());
+    window.addEventListener("crate:oauth-link-completed", completed);
+    window.addEventListener("crate:auth-token-received", authReceived);
+
+    dispatchOAuthCallbackResult({
+      handled: true,
+      next: "/settings",
+      operation: "link",
+      provider: "google",
+      userId: 42,
+    });
+
+    expect(completed).toHaveBeenCalledTimes(1);
+    expect(completed.mock.calls[0]?.[0]).toMatchObject({
+      detail: { provider: "google", userId: 42 },
+    });
+    expect(authReceived).not.toHaveBeenCalled();
+
+    window.removeEventListener("crate:oauth-link-completed", completed);
+    window.removeEventListener("crate:auth-token-received", authReceived);
+  });
+
+  it("reports link failures to the linking settings view", () => {
+    const failed = vi.fn();
+    vi.stubGlobal("window", new EventTarget());
+    window.addEventListener("crate:oauth-link-failed", failed);
+
+    dispatchOAuthCallbackResult({
+      handled: true,
+      next: "/settings",
+      operation: "link",
+      provider: "apple",
+      userId: 42,
+      error: true,
+    });
+
+    expect(failed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: { provider: "apple", userId: 42 },
+      }),
+    );
+    window.removeEventListener("crate:oauth-link-failed", failed);
+  });
 });
 
 describe("mergeInitialDeepLinkUrls", () => {

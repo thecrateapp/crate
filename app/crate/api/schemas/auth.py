@@ -52,6 +52,17 @@ class NativeOAuthExchangeRequest(BaseModel):
     state: str = Field(min_length=16, max_length=256)
 
 
+class NativeOAuthLinkStartRequest(BaseModel):
+    native_code_challenge: str = Field(min_length=43, max_length=43)
+    native_state: str = Field(min_length=16, max_length=256)
+
+
+class NativeOAuthLinkCompleteRequest(BaseModel):
+    code: str = Field(min_length=16, max_length=256)
+    code_verifier: str = Field(min_length=43, max_length=128)
+    state: str = Field(min_length=16, max_length=256)
+
+
 class ProviderToggleRequest(BaseModel):
     enabled: bool
 

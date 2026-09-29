@@ -1357,6 +1357,8 @@
   "settings.account.toasts.passwordChanged": "Mot de passe modifié",
   "settings.account.toasts.passwordChangeFailed": "Impossible de modifier le mot de passe. Vérifie ton mot de passe actuel.",
   "settings.account.toasts.linkFailed": "Impossible de lancer la liaison {provider}",
+  "settings.account.toasts.linkSucceeded": "Le compte {provider} a été associé avec succès",
+  "settings.account.toasts.linkCompletionFailed": "Impossible de terminer l’association du compte {provider}",
   "settings.account.toasts.unlinked": "Compte {provider} dissocié",
   "settings.account.toasts.unlinkFailed": "Impossible de dissocier {provider}",
   "settings.bandcamp.toasts.cookieRequired": "Colle d'abord le cookie identity de Bandcamp",

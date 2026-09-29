@@ -1357,6 +1357,8 @@
   "settings.account.toasts.passwordChanged": "Password modificata",
   "settings.account.toasts.passwordChangeFailed": "Impossibile modificare la password. Controlla la password attuale.",
   "settings.account.toasts.linkFailed": "Impossibile avviare il collegamento con {provider}",
+  "settings.account.toasts.linkSucceeded": "L'account {provider} è stato collegato correttamente",
+  "settings.account.toasts.linkCompletionFailed": "Impossibile completare il collegamento di {provider}",
   "settings.account.toasts.unlinked": "Account {provider} scollegato",
   "settings.account.toasts.unlinkFailed": "Impossibile scollegare {provider}",
   "settings.bandcamp.toasts.cookieRequired": "Incolla prima il cookie identity di Bandcamp",

@@ -1379,6 +1379,8 @@
   "settings.account.toasts.passwordChanged": "Contraseña cambiada",
   "settings.account.toasts.passwordChangeFailed": "No se pudo cambiar la contraseña. Comprueba tu contraseña actual.",
   "settings.account.toasts.linkFailed": "No se pudo iniciar la vinculación de {provider}",
+  "settings.account.toasts.linkSucceeded": "Se ha vinculado correctamente la cuenta de {provider}",
+  "settings.account.toasts.linkCompletionFailed": "No se pudo completar la vinculación de {provider}",
   "settings.account.toasts.unlinked": "Cuenta de {provider} desvinculada",
   "settings.account.toasts.unlinkFailed": "No se pudo desvincular {provider}",
   "settings.bandcamp.toasts.cookieRequired": "Pega primero la cookie identity de Bandcamp",

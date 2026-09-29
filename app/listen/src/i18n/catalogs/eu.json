@@ -1357,6 +1357,8 @@
   "settings.account.toasts.passwordChanged": "Pasahitza aldatu da",
   "settings.account.toasts.passwordChangeFailed": "Ezin izan da pasahitza aldatu. Egiaztatu uneko pasahitza.",
   "settings.account.toasts.linkFailed": "Ezin izan da {provider} lotura-fluxua hasi",
+  "settings.account.toasts.linkSucceeded": "{provider} kontua behar bezala estekatu da",
+  "settings.account.toasts.linkCompletionFailed": "Ezin izan da {provider} estekatzea osatu",
   "settings.account.toasts.unlinked": "{provider} kontua deslotu da",
   "settings.account.toasts.unlinkFailed": "Ezin izan da {provider} deslotu",
   "settings.bandcamp.toasts.cookieRequired": "Itsatsi lehenik Bandcamp identity cookiea",

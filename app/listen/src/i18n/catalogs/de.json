@@ -1357,6 +1357,8 @@
   "settings.account.toasts.passwordChanged": "Passwort geändert",
   "settings.account.toasts.passwordChangeFailed": "Passwort konnte nicht geändert werden. Prüfe dein aktuelles Passwort.",
   "settings.account.toasts.linkFailed": "Verknüpfung mit {provider} konnte nicht gestartet werden",
+  "settings.account.toasts.linkSucceeded": "Das {provider}-Konto wurde erfolgreich verknüpft",
+  "settings.account.toasts.linkCompletionFailed": "Die Verknüpfung von {provider} konnte nicht abgeschlossen werden",
   "settings.account.toasts.unlinked": "{provider}-Konto getrennt",
   "settings.account.toasts.unlinkFailed": "{provider} konnte nicht getrennt werden",
   "settings.bandcamp.toasts.cookieRequired": "Füge zuerst das Bandcamp-identity-Cookie ein",

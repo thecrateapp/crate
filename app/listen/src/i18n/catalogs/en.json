@@ -1379,6 +1379,8 @@
   "settings.account.toasts.passwordChanged": "Password changed",
   "settings.account.toasts.passwordChangeFailed": "Failed to change password. Check your current password.",
   "settings.account.toasts.linkFailed": "Failed to start {provider} link flow",
+  "settings.account.toasts.linkSucceeded": "The {provider} account was linked successfully",
+  "settings.account.toasts.linkCompletionFailed": "Could not complete the {provider} link",
   "settings.account.toasts.unlinked": "{provider} account unlinked",
   "settings.account.toasts.unlinkFailed": "Failed to unlink {provider}",
   "settings.bandcamp.toasts.cookieRequired": "Paste the Bandcamp identity cookie first",

@@ -1,5 +1,12 @@
 import { ApiError } from "../../../shared/web/api";
-import { apiForServer, setAuthTokens, setAuthTokensForServer } from "@/lib/api";
+import {
+  api,
+  apiForServer,
+  setAuthTokens,
+  setAuthTokensForServer,
+} from "@/lib/api";
+import { AUTH_TOKEN_EVENT } from "@/lib/auth-session";
+import { openExternalUrl } from "@/lib/external-links";
 import {
   getSecureSessionValue,
   removeSecureSessionValue,
@@ -7,6 +14,7 @@ import {
 } from "@/lib/native-secure-session";
 import { isTauriRuntime } from "@/lib/platform";
 import {
+  SERVER_STORE_EVENT,
   getCurrentServerId,
   getServers,
   setCurrentServerId,
@@ -15,9 +23,15 @@ import {
 
 const OAUTH_NEXT_KEY = "crate-oauth-next";
 const NATIVE_OAUTH_PENDING_CALLBACK_KEY = "crate.oauth.pending-callback";
+const NATIVE_OAUTH_LINK_PENDING_CALLBACK_KEY =
+  "crate.oauth.link.pending-callback";
+const NATIVE_OAUTH_LINK_GENERATION_KEY = "crate.oauth.link.generation";
 const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
+const NATIVE_LINK_VALUE_RE = /^[A-Za-z0-9_-]{16,256}$/;
+const NATIVE_LINK_VERIFIER_RE = /^[A-Za-z0-9._~-]{43,128}$/;
 const activeOAuthStates = new Set<string>();
+const activeNativeOAuthLinkStates = new Set<string>();
 
 type OAuthProvider = "google" | "apple";
 
@@ -26,6 +40,16 @@ interface NativeOAuthRecord {
   next: string;
   createdAt: number;
   serverId: string;
+}
+
+interface NativeOAuthLinkRecord {
+  verifier: string;
+  createdAt: number;
+  serverId: string;
+  userId: number;
+  sessionId: string;
+  generation: number;
+  provider: OAuthProvider;
 }
 
 interface NativeOAuthLoginResponse {
@@ -38,6 +62,10 @@ interface OAuthCallbackResult {
   handled: boolean;
   next: string;
   retryable?: true;
+  operation?: "link";
+  provider?: OAuthProvider;
+  userId?: number;
+  error?: true;
 }
 
 interface NativeOAuthPendingCallback {
@@ -52,6 +80,78 @@ interface NativeOAuthPendingCallbacks {
 }
 
 let pendingCallbackMutation: Promise<void> = Promise.resolve();
+
+function decodeOAuthSession(token: string | null): {
+  userId: number;
+  sessionId: string;
+} | null {
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
+    const decoded = JSON.parse(atob(padded)) as {
+      user_id?: unknown;
+      sid?: unknown;
+    };
+    const userId = Number(decoded.user_id);
+    if (
+      !Number.isSafeInteger(userId) ||
+      typeof decoded.sid !== "string" ||
+      !decoded.sid
+    ) {
+      return null;
+    }
+    return { userId, sessionId: decoded.sid };
+  } catch {
+    return null;
+  }
+}
+
+function readCurrentOAuthIdentity(): string {
+  const serverId = getCurrentServerId();
+  const server = getServers().find((item) => item.id === serverId);
+  const session = decodeOAuthSession(server?.token ?? null);
+  return session && serverId
+    ? JSON.stringify([serverId, session.userId, session.sessionId])
+    : "";
+}
+
+function readOAuthLinkGeneration(): number {
+  try {
+    const value = Number(
+      localStorage.getItem(NATIVE_OAUTH_LINK_GENERATION_KEY),
+    );
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function observeOAuthIdentityChange(): void {
+  const current = readCurrentOAuthIdentity();
+  if (current === observedOAuthIdentity) return;
+  observedOAuthIdentity = current;
+  try {
+    localStorage.setItem(
+      NATIVE_OAUTH_LINK_GENERATION_KEY,
+      String(readOAuthLinkGeneration() + 1),
+    );
+  } catch {
+    // A missing generation record still cannot bypass user/session checks.
+  }
+}
+
+let observedOAuthIdentity = readCurrentOAuthIdentity();
+
+if (typeof window !== "undefined") {
+  window.addEventListener(AUTH_TOKEN_EVENT, observeOAuthIdentityChange);
+  window.addEventListener(SERVER_STORE_EVENT, observeOAuthIdentityChange);
+}
 
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -161,22 +261,20 @@ function mutatePendingNativeOAuthCallbacks(
   mutate: (
     callbacks: NativeOAuthPendingCallback[],
   ) => NativeOAuthPendingCallback[],
+  storageKey = NATIVE_OAUTH_PENDING_CALLBACK_KEY,
 ): Promise<void> {
   const operation = pendingCallbackMutation.then(async () => {
-    const raw = await readNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
+    const raw = await readNativeOAuthRecord(storageKey);
     const callbacks = mutate(parsePendingNativeOAuthCallbacks(raw));
     if (callbacks.length === 0) {
-      await removeNativeOAuthRecord(NATIVE_OAUTH_PENDING_CALLBACK_KEY);
+      await removeNativeOAuthRecord(storageKey);
       return;
     }
     const pending: NativeOAuthPendingCallbacks = {
       version: 1,
       callbacks,
     };
-    await writeNativeOAuthRecord(
-      NATIVE_OAUTH_PENDING_CALLBACK_KEY,
-      JSON.stringify(pending),
-    );
+    await writeNativeOAuthRecord(storageKey, JSON.stringify(pending));
   });
   pendingCallbackMutation = operation.catch(() => {});
   return operation;
@@ -184,16 +282,24 @@ function mutatePendingNativeOAuthCallbacks(
 
 async function writePendingNativeOAuthCallback(
   callback: NativeOAuthPendingCallback,
+  storageKey = NATIVE_OAUTH_PENDING_CALLBACK_KEY,
 ): Promise<void> {
-  await mutatePendingNativeOAuthCallbacks((callbacks) => [
-    ...callbacks.filter((entry) => entry.state !== callback.state),
-    callback,
-  ]);
+  await mutatePendingNativeOAuthCallbacks(
+    (callbacks) => [
+      ...callbacks.filter((entry) => entry.state !== callback.state),
+      callback,
+    ],
+    storageKey,
+  );
 }
 
-async function removePendingNativeOAuthCallback(state: string): Promise<void> {
-  await mutatePendingNativeOAuthCallbacks((callbacks) =>
-    callbacks.filter((callback) => callback.state !== state),
+async function removePendingNativeOAuthCallback(
+  state: string,
+  storageKey = NATIVE_OAUTH_PENDING_CALLBACK_KEY,
+): Promise<void> {
+  await mutatePendingNativeOAuthCallbacks(
+    (callbacks) => callbacks.filter((callback) => callback.state !== state),
+    storageKey,
   );
 }
 
@@ -235,6 +341,101 @@ export async function beginNativeOAuth(
   } catch (error) {
     await removeNativeOAuthRecord(recordKey);
     throw error;
+  }
+}
+
+export async function beginNativeOAuthLink(
+  provider: OAuthProvider,
+  userId: number,
+): Promise<void> {
+  if (!isTauriRuntime) {
+    throw new Error("Native account linking is only available in Tauri");
+  }
+  observeOAuthIdentityChange();
+  const serverId = getCurrentServerId();
+  const server = getServers().find((item) => item.id === serverId);
+  const session = decodeOAuthSession(server?.token ?? null);
+  if (!serverId || !server || !session) {
+    throw new Error("Sign in to a Crate server before linking an account");
+  }
+  if (session.userId !== userId) {
+    throw new Error("The active account changed before linking could start");
+  }
+
+  const verifier = randomBase64Url(64);
+  const state = randomBase64Url(32);
+  const challenge = await challengeForVerifier(verifier);
+  const record: NativeOAuthLinkRecord = {
+    verifier,
+    createdAt: Date.now(),
+    serverId,
+    userId,
+    sessionId: session.sessionId,
+    generation: readOAuthLinkGeneration(),
+    provider,
+  };
+  const recordKey = `crate.oauth.link.${state}`;
+  if (!isCurrentNativeOAuthLink(record)) {
+    throw new Error("The active account changed before linking could start");
+  }
+  localStorage.setItem(recordKey, JSON.stringify(record));
+  try {
+    const response = await api<{ login_url: string }>(
+      `/api/auth/oauth/${provider}/native-link/start`,
+      "POST",
+      {
+        native_code_challenge: challenge,
+        native_state: state,
+      },
+    );
+    if (!isCurrentNativeOAuthLink(record)) {
+      throw new Error("The active account or server changed during linking");
+    }
+    await openExternalUrl(response.login_url);
+  } catch (error) {
+    await removeNativeOAuthRecord(recordKey);
+    throw error;
+  }
+}
+
+function isCurrentNativeOAuthLink(record: NativeOAuthLinkRecord): boolean {
+  observeOAuthIdentityChange();
+  const serverId = getCurrentServerId();
+  const server = getServers().find((item) => item.id === serverId);
+  const session = decodeOAuthSession(server?.token ?? null);
+  return (
+    serverId === record.serverId &&
+    session?.userId === record.userId &&
+    session.sessionId === record.sessionId &&
+    readOAuthLinkGeneration() === record.generation
+  );
+}
+
+async function readNativeOAuthLinkRecord(
+  state: string,
+): Promise<NativeOAuthLinkRecord | null> {
+  const raw = await readNativeOAuthRecord(`crate.oauth.link.${state}`);
+  if (!raw) return null;
+  try {
+    const record = JSON.parse(raw) as Partial<NativeOAuthLinkRecord>;
+    if (
+      typeof record.verifier !== "string" ||
+      !NATIVE_LINK_VERIFIER_RE.test(record.verifier) ||
+      typeof record.createdAt !== "number" ||
+      typeof record.serverId !== "string" ||
+      typeof record.userId !== "number" ||
+      !Number.isSafeInteger(record.userId) ||
+      typeof record.sessionId !== "string" ||
+      !record.sessionId ||
+      typeof record.generation !== "number" ||
+      !Number.isSafeInteger(record.generation) ||
+      (record.provider !== "google" && record.provider !== "apple")
+    ) {
+      return null;
+    }
+    return record as NativeOAuthLinkRecord;
+  } catch {
+    return null;
   }
 }
 
@@ -300,20 +501,40 @@ export async function consumeOAuthCallbackUrl(
 ): Promise<OAuthCallbackResult> {
   try {
     const parsed = new URL(url);
-    const isCustomSchemeCallback =
+    const isNativeLinkCallback =
+      isTauriRuntime &&
+      parsed.protocol === "cratemusic:" &&
+      parsed.hostname === "oauth" &&
+      parsed.pathname === "/link-callback";
+    const isNativeLoginCallback =
       parsed.protocol === "cratemusic:" &&
       parsed.hostname === "oauth" &&
       parsed.pathname === "/callback";
 
-    if (!isCustomSchemeCallback) {
+    if (!isNativeLinkCallback && !isNativeLoginCallback) {
       return { handled: false, next: "/" };
     }
 
     const code = parsed.searchParams.get("code");
     const state = parsed.searchParams.get("state");
-    if (!code || !state) {
+    const callbackError = parsed.searchParams.get("error");
+    if (!state || !NATIVE_LINK_VALUE_RE.test(state)) {
       return { handled: false, next: "/" };
     }
+    if (isNativeLinkCallback) {
+      if (callbackError === "cancelled") {
+        return exchangeNativeOAuthLinkCallback("", state, true);
+      }
+      if (!code || !NATIVE_LINK_VALUE_RE.test(code)) {
+        return { handled: false, next: "/" };
+      }
+      await writePendingNativeOAuthCallback(
+        { code, state, createdAt: Date.now() },
+        NATIVE_OAUTH_LINK_PENDING_CALLBACK_KEY,
+      );
+      return exchangeNativeOAuthLinkCallback(code, state);
+    }
+    if (!code) return { handled: false, next: "/" };
     await writePendingNativeOAuthCallback({
       code,
       state,
@@ -357,6 +578,106 @@ export async function retryPendingNativeOAuthCallback(): Promise<OAuthCallbackRe
     return retryableResult ?? { handled: false, next: "/" };
   } catch {
     return { handled: false, next: "/" };
+  }
+}
+
+export async function retryPendingNativeOAuthLinkCallback(): Promise<OAuthCallbackResult> {
+  try {
+    await pendingCallbackMutation;
+    const raw = await readNativeOAuthRecord(
+      NATIVE_OAUTH_LINK_PENDING_CALLBACK_KEY,
+    );
+    if (!raw) return { handled: false, next: "/" };
+    const pendingCallbacks = parsePendingNativeOAuthCallbacks(raw).sort(
+      (left, right) => left.createdAt - right.createdAt,
+    );
+    if (pendingCallbacks.length === 0) {
+      await removeNativeOAuthRecord(NATIVE_OAUTH_LINK_PENDING_CALLBACK_KEY);
+      return { handled: false, next: "/" };
+    }
+    let retryableResult: OAuthCallbackResult | undefined;
+    for (const pending of pendingCallbacks) {
+      const result = await exchangeNativeOAuthLinkCallback(
+        pending.code,
+        pending.state,
+      );
+      if (result.handled) return result;
+      if (result.retryable) retryableResult = result;
+    }
+    return retryableResult ?? { handled: false, next: "/" };
+  } catch {
+    return { handled: false, next: "/" };
+  }
+}
+
+async function exchangeNativeOAuthLinkCallback(
+  code: string,
+  state: string,
+  cancelled = false,
+): Promise<OAuthCallbackResult> {
+  if (activeNativeOAuthLinkStates.has(state)) {
+    return { handled: false, next: "/" };
+  }
+  activeNativeOAuthLinkStates.add(state);
+  const recordKey = `crate.oauth.link.${state}`;
+  let removeRecord = true;
+  let linkRecord: NativeOAuthLinkRecord | null = null;
+  const linkResult = (error = false): OAuthCallbackResult => ({
+    handled: true,
+    next: "/settings",
+    operation: "link",
+    provider: linkRecord?.provider,
+    userId: linkRecord?.userId,
+    ...(error ? { error: true as const } : {}),
+  });
+
+  try {
+    linkRecord = await readNativeOAuthLinkRecord(state);
+    if (!linkRecord) return { handled: false, next: "/" };
+    if (Date.now() - linkRecord.createdAt > OAUTH_RECORD_MAX_AGE_MS) {
+      return linkResult(true);
+    }
+    if (cancelled) return linkResult(true);
+    if (!isCurrentNativeOAuthLink(linkRecord)) return linkResult(true);
+
+    try {
+      await api<{ ok?: boolean }>(
+        "/api/auth/oauth/native-link/complete",
+        "POST",
+        {
+          code,
+          code_verifier: linkRecord.verifier,
+          state,
+        },
+      );
+      return linkResult();
+    } catch (error) {
+      if (isRetryableOAuthExchangeError(error)) {
+        removeRecord = false;
+        return { handled: false, next: "/", retryable: true };
+      }
+      return linkResult(true);
+    }
+  } catch (error) {
+    if (isRetryableOAuthExchangeError(error)) {
+      removeRecord = false;
+      return { handled: false, next: "/", retryable: true };
+    }
+    return linkRecord ? linkResult(true) : { handled: false, next: "/" };
+  } finally {
+    try {
+      if (removeRecord) {
+        await Promise.allSettled([
+          removeNativeOAuthRecord(recordKey),
+          removePendingNativeOAuthCallback(
+            state,
+            NATIVE_OAUTH_LINK_PENDING_CALLBACK_KEY,
+          ),
+        ]);
+      }
+    } finally {
+      activeNativeOAuthLinkStates.delete(state);
+    }
   }
 }
 
