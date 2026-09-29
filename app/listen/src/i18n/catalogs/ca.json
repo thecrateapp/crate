@@ -1554,5 +1554,13 @@
   "jam.room.autoDjModeHelp": "La música continua sense l'amfitrió amb gèneres, similitud i BPM.",
   "jam.room.autoDjQueueSubtitle": "Auto DJ manté la cua en moviment; els membres poden votar les pistes següents.",
   "jam.room.autoDjSuggestions": "Suggeriments següents",
-  "jam.room.autoDjSuggestionsHelp": "Auto DJ està avaluant aquestes pistes per als propers llocs."
+  "jam.room.autoDjSuggestionsHelp": "Auto DJ està avaluant aquestes pistes per als propers llocs.",
+  "offline.access.status": "Mode fora de línia",
+  "offline.access.title": "Música baixada",
+  "offline.access.subtitle": "Només està disponible la música desada en aquest dispositiu.",
+  "offline.access.empty": "No hi ha baixades reproduïbles.",
+  "offline.access.playAll": "Reprodueix-ho tot",
+  "offline.access.previous": "Pista anterior",
+  "offline.access.next": "Pista següent",
+  "offline.access.seek": "Posició de reproducció"
 }

@@ -58,6 +58,10 @@ import {
   AUTH_TOKEN_EVENT,
   ApiError,
 } from "@/lib/api";
+import {
+  getOfflineIdentityForServer,
+  persistVerifiedOfflineIdentity,
+} from "@/lib/offline-identity";
 
 function mockFetchResponse(status: number, body?: unknown): Response {
   const ok = status >= 200 && status < 300;
@@ -148,6 +152,27 @@ describe("revokeServerSession", () => {
     });
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("authoritative refresh rejection", () => {
+  it("tombstones the local offline identity after the refresh endpoint rejects it", async () => {
+    persistVerifiedOfflineIdentity({
+      serverId: "web",
+      serverUrl: window.location.origin,
+      userId: 42,
+      profileKey: "web-profile-42",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as Response);
+
+    await expect(refreshAuthToken()).resolves.toBe(false);
+
+    expect(
+      getOfflineIdentityForServer("web", window.location.origin),
+    ).toBeNull();
   });
 });
 

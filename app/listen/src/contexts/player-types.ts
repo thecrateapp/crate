@@ -53,6 +53,7 @@ export interface Track {
   isSuggested?: boolean;
   suggestionSource?: "playlist";
   origin?: TrackOrigin;
+  offlineOnly?: boolean;
   remote?: RemoteTrackRef;
 }
 

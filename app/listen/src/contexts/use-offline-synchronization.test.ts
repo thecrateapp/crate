@@ -28,6 +28,7 @@ function renderSynchronization(abort: () => void) {
   const transferAbortRef = { current: { abort } as unknown as AbortController };
   renderHook(() =>
     useOfflineSynchronization({
+      enabled: true,
       enqueue: (fn) => fn(),
       profileKey: "user-1",
       snapshot: EMPTY_OFFLINE_SNAPSHOT,
@@ -80,6 +81,7 @@ describe("useOfflineSynchronization background abort", () => {
     };
     const { result } = renderHook(() =>
       useOfflineSynchronization({
+        enabled: true,
         enqueue,
         profileKey: "user-1",
         snapshot: EMPTY_OFFLINE_SNAPSHOT,
@@ -120,6 +122,7 @@ describe("useOfflineSynchronization background abort", () => {
     const { rerender } = renderHook(
       ({ profileKey }: { profileKey: string | null }) =>
         useOfflineSynchronization({
+          enabled: true,
           enqueue,
           profileKey,
           snapshot,
@@ -141,5 +144,46 @@ describe("useOfflineSynchronization background abort", () => {
     });
 
     expect(enqueueCalls).toBe(2);
+  });
+
+  it("does not resume or enqueue synchronization in read-only offline mode", async () => {
+    isOfflineBusyMock.mockReturnValue(true);
+    let enqueueCalls = 0;
+    const enqueue = <T>(fn: () => Promise<T>): Promise<T> => {
+      enqueueCalls += 1;
+      return fn();
+    };
+    const syncManifestIntoItem = vi.fn(async () => {});
+    const snapshot = {
+      items: {
+        "album:1": {
+          key: "album:1",
+          kind: "album" as const,
+          entityId: "1",
+          title: "Album",
+          state: "downloading" as const,
+          trackCount: 1,
+          readyTrackCount: 0,
+          tracks: [],
+        },
+      },
+    };
+    const { result } = renderHook(() =>
+      useOfflineSynchronization({
+        enabled: false,
+        enqueue,
+        profileKey: "user-1",
+        snapshot,
+        snapshotRef: { current: snapshot },
+        supported: true,
+        syncManifestIntoItem,
+        transferAbortRef: { current: null },
+      }),
+    );
+
+    await act(async () => result.current.syncAll());
+
+    expect(enqueueCalls).toBe(0);
+    expect(syncManifestIntoItem).not.toHaveBeenCalled();
   });
 });

@@ -1554,5 +1554,13 @@
   "jam.room.autoDjModeHelp": "Die Musik läuft ohne Gastgeber mit Genres, Ähnlichkeit und BPM weiter.",
   "jam.room.autoDjQueueSubtitle": "Auto DJ hält die Warteschlange am Laufen; Mitglieder können kommende Titel wählen.",
   "jam.room.autoDjSuggestions": "Nächste Vorschläge",
-  "jam.room.autoDjSuggestionsHelp": "Auto DJ prüft diese Titel für die nächsten Plätze."
+  "jam.room.autoDjSuggestionsHelp": "Auto DJ prüft diese Titel für die nächsten Plätze.",
+  "offline.access.status": "Offline-Modus",
+  "offline.access.title": "Heruntergeladene Musik",
+  "offline.access.subtitle": "Nur auf diesem Gerät gespeicherte Musik ist verfügbar.",
+  "offline.access.empty": "Keine abspielbaren Downloads verfügbar.",
+  "offline.access.playAll": "Alles abspielen",
+  "offline.access.previous": "Vorheriger Titel",
+  "offline.access.next": "Nächster Titel",
+  "offline.access.seek": "Wiedergabeposition"
 }

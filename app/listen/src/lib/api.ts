@@ -1,6 +1,7 @@
 import { ApiError, createApiClient } from "../../../shared/web/api";
 
 export { ApiError };
+export const AUTH_SESSION_REJECTED_EVENT = "crate:auth-session-rejected";
 import { shouldRedirectToLoginOnUnauthorized } from "@/lib/auth-route-policy";
 import { isTauriRuntime, usesConfigurableServer } from "@/lib/platform";
 import {
@@ -36,6 +37,7 @@ import {
 import { createApiUrlResolver } from "@/lib/api-url-resolver";
 import { createApiAuthTransport } from "@/lib/api-auth-transport";
 import { captureApiError } from "@/lib/sentry";
+import { revokeOfflineIdentityForServer } from "@/lib/offline-identity";
 
 export {
   AUTH_TOKEN_EVENT,
@@ -256,6 +258,15 @@ const apiAuthTransport = createApiAuthTransport({
   setAuthToken,
   setAuthTokens,
   setAuthTokensForServer,
+  onSessionRejected: (serverId) => {
+    if (typeof window === "undefined") return;
+    revokeOfflineIdentityForServer(serverId ?? "web");
+    window.dispatchEvent(
+      new CustomEvent(AUTH_SESSION_REJECTED_EVENT, {
+        detail: { serverId },
+      }),
+    );
+  },
   usesConfigurableServer,
 });
 

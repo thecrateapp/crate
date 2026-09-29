@@ -15,6 +15,12 @@ const {
   getCurrentServerIdMock,
   getCurrentServerMock,
   revokeServerSessionMock,
+  deriveOfflineProfileKeyMock,
+  hasOfflinePlaybackContentMock,
+  isOfflineSupportedMock,
+  getOfflineIdentityForServerMock,
+  persistVerifiedOfflineIdentityMock,
+  revokeOfflineIdentityForServerMock,
   refreshAuthTokenMock,
   setActiveOfflineProfileKeyMock,
   setAuthTokenMock,
@@ -31,6 +37,26 @@ const {
   getCurrentServerIdMock: vi.fn<() => string | null>(() => null),
   getCurrentServerMock: vi.fn<() => unknown>(() => null),
   revokeServerSessionMock: vi.fn(() => Promise.resolve()),
+  deriveOfflineProfileKeyMock: vi.fn(
+    (userId: number, serverUrl: string) => `${serverUrl}|${userId}`,
+  ),
+  hasOfflinePlaybackContentMock: vi.fn(async () => false),
+  isOfflineSupportedMock: vi.fn(() => false),
+  getOfflineIdentityForServerMock: vi.fn<
+    (
+      serverId: string,
+      serverUrl: string,
+    ) => {
+      schemaVersion: 1;
+      serverId: string;
+      serverUrl: string;
+      userId: number;
+      profileKey: string;
+      generation: number;
+    } | null
+  >(() => null),
+  persistVerifiedOfflineIdentityMock: vi.fn(() => null),
+  revokeOfflineIdentityForServerMock: vi.fn(() => true),
   refreshAuthTokenMock: vi.fn(() => Promise.resolve(false)),
   setActiveOfflineProfileKeyMock: vi.fn(),
   setAuthTokenMock: vi.fn(),
@@ -48,6 +74,7 @@ vi.mock("react-router", async () => {
 
 vi.mock("@/lib/api", () => ({
   AUTH_TOKEN_EVENT: "crate:auth-token-updated",
+  AUTH_SESSION_REJECTED_EVENT: "crate:auth-session-rejected",
   api: apiMock,
   getApiBase: getApiBaseMock,
   getAuthToken: getAuthTokenMock,
@@ -68,9 +95,18 @@ vi.mock("@/lib/capacitor", () => ({
 }));
 
 vi.mock("@/lib/offline", () => ({
+  deriveOfflineProfileKey: deriveOfflineProfileKeyMock,
+  hasOfflinePlaybackContent: hasOfflinePlaybackContentMock,
+  isOfflineSupported: isOfflineSupportedMock,
   primeOfflineRuntimeProfile: primeOfflineRuntimeProfileMock,
   setActiveOfflineProfileKey: setActiveOfflineProfileKeyMock,
   syncOfflineProfileToServiceWorker: syncOfflineProfileToServiceWorkerMock,
+}));
+
+vi.mock("@/lib/offline-identity", () => ({
+  getOfflineIdentityForServer: getOfflineIdentityForServerMock,
+  persistVerifiedOfflineIdentity: persistVerifiedOfflineIdentityMock,
+  revokeOfflineIdentityForServer: revokeOfflineIdentityForServerMock,
 }));
 
 vi.mock("@/lib/play-event-queue", () => ({
@@ -82,10 +118,12 @@ import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
 import { ApiError } from "../../../shared/web/api";
 
 function AuthProbe() {
-  const { user, loading, logout, refetch, sessionUnavailable } = useAuth();
+  const { user, loading, logout, refetch, sessionUnavailable, accessMode } =
+    useAuth();
   return (
     <div>
       <div>{loading ? "loading" : user ? `user:${user.id}` : "anon"}</div>
+      <div>mode:{accessMode}</div>
       {sessionUnavailable ? <div>session-unavailable</div> : null}
       <button onClick={() => void refetch()}>refetch</button>
       <button onClick={() => void logout()}>logout</button>
@@ -105,6 +143,20 @@ describe("AuthProvider", () => {
     getCurrentServerIdMock.mockReturnValue(null);
     getCurrentServerMock.mockReset();
     getCurrentServerMock.mockReturnValue(null);
+    deriveOfflineProfileKeyMock.mockReset();
+    deriveOfflineProfileKeyMock.mockImplementation(
+      (userId, serverUrl) => `${serverUrl}|${userId}`,
+    );
+    hasOfflinePlaybackContentMock.mockReset();
+    hasOfflinePlaybackContentMock.mockResolvedValue(false);
+    isOfflineSupportedMock.mockReset();
+    isOfflineSupportedMock.mockReturnValue(false);
+    getOfflineIdentityForServerMock.mockReset();
+    getOfflineIdentityForServerMock.mockReturnValue(null);
+    persistVerifiedOfflineIdentityMock.mockReset();
+    persistVerifiedOfflineIdentityMock.mockReturnValue(null);
+    revokeOfflineIdentityForServerMock.mockReset();
+    revokeOfflineIdentityForServerMock.mockReturnValue(true);
     getAuthTokenExpiresAtMock.mockReset();
     getAuthTokenExpiresAtMock.mockReturnValue(null);
     getAuthTokenMock.mockReset();
@@ -146,6 +198,80 @@ describe("AuthProvider", () => {
     expect(await screen.findByText("user:7")).toBeTruthy();
     expect(localStorage.getItem("listen-auth-user-id")).toBe("7");
     expect(primeOfflineRuntimeProfileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists an offline identity only after the server verifies the user", async () => {
+    const server = {
+      id: "server-a",
+      url: "https://a.example.test",
+      token: "token-a",
+    };
+    isOfflineSupportedMock.mockReturnValue(true);
+    getCurrentServerIdMock.mockReturnValue(server.id);
+    getCurrentServerMock.mockReturnValue(server);
+    apiMock.mockResolvedValueOnce({
+      id: 42,
+      email: "verified@example.test",
+      name: "Verified",
+      role: "user",
+    });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("user:42")).toBeTruthy();
+    expect(persistVerifiedOfflineIdentityMock).toHaveBeenCalledWith({
+      serverId: server.id,
+      serverUrl: server.url,
+      userId: 42,
+      profileKey: `${server.url}|42`,
+    });
+    expect(screen.getByText("mode:authenticated")).toBeInTheDocument();
+  });
+
+  it("enters local mode after a transport failure only with verified identity and cached media", async () => {
+    const server = {
+      id: "server-a",
+      url: "https://a.example.test",
+      token: "token-a",
+    };
+    const identity = {
+      schemaVersion: 1 as const,
+      serverId: server.id,
+      serverUrl: server.url,
+      userId: 42,
+      profileKey: "profile-a-42",
+      generation: 3,
+    };
+    isOfflineSupportedMock.mockReturnValue(true);
+    getCurrentServerIdMock.mockReturnValue(server.id);
+    getCurrentServerMock.mockReturnValue(server);
+    getOfflineIdentityForServerMock.mockReturnValue(identity);
+    hasOfflinePlaybackContentMock.mockResolvedValue(true);
+    apiMock.mockRejectedValueOnce(new Error("network unavailable"));
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("mode:offline")).toBeInTheDocument();
+    expect(screen.getByText("anon")).toBeInTheDocument();
+    expect(getOfflineIdentityForServerMock).toHaveBeenCalledWith(
+      server.id,
+      server.url,
+    );
+    expect(hasOfflinePlaybackContentMock).toHaveBeenCalledWith(
+      identity.profileKey,
+    );
   });
 
   it("clears derived runtime state when boot hydration ends unauthenticated", async () => {
@@ -246,6 +372,7 @@ describe("AuthProvider", () => {
       expect(await screen.findByText("anon")).toBeTruthy();
       expect(screen.queryByText("session-unavailable")).not.toBeInTheDocument();
       expect(syncOfflineProfileToServiceWorkerMock).toHaveBeenCalledWith(null);
+      expect(revokeOfflineIdentityForServerMock).toHaveBeenCalledWith("web");
     },
   );
 
@@ -502,6 +629,50 @@ describe("AuthProvider", () => {
     window.removeEventListener(AUTH_RUNTIME_RESET_EVENT, authReset);
   });
 
+  it("expires only the active session after an authoritative refresh rejection", async () => {
+    const server = {
+      id: "server-a",
+      url: "https://a.example.test",
+      token: "token-a",
+    };
+    getCurrentServerIdMock.mockReturnValue(server.id);
+    getCurrentServerMock.mockReturnValue(server);
+    apiMock.mockResolvedValueOnce({
+      id: 42,
+      email: "listener@example.test",
+      name: "Listener",
+      role: "user",
+    });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("user:42")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("crate:auth-session-rejected", {
+          detail: { serverId: "server-b" },
+        }),
+      );
+    });
+    expect(screen.getByText("user:42")).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("crate:auth-session-rejected", {
+          detail: { serverId: server.id },
+        }),
+      );
+    });
+    expect(screen.getByText("anon")).toBeInTheDocument();
+    expect(screen.getByText("mode:unauthenticated")).toBeInTheDocument();
+  });
+
   it("cleans session state and navigates to login on logout", async () => {
     const authReset = vi.fn();
     window.addEventListener(
@@ -537,6 +708,7 @@ describe("AuthProvider", () => {
     await waitFor(() => {
       expect(setAuthTokenMock).toHaveBeenCalledWith(null);
     });
+    expect(revokeOfflineIdentityForServerMock).toHaveBeenCalledWith("web");
     expect(apiMock).toHaveBeenCalledWith("/api/auth/logout", "POST");
     expect(localStorage.getItem("listen-player-state")).toBeNull();
     expect(localStorage.getItem("listen-recently-played")).toBeNull();

@@ -28,7 +28,9 @@ export interface OfflinePlaylistInput {
 
 export interface OfflineContextValue {
   supported: boolean;
+  readOnly: boolean;
   syncing: boolean;
+  items: OfflineItemRecord[];
   summary: OfflineSummary;
   getTrackState: (ref?: string | OfflineTrackInput | null) => OfflineItemState;
   getAlbumState: (albumId?: number | null) => OfflineItemState;

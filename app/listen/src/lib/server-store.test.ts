@@ -19,6 +19,10 @@ import {
   setServerAuthTokens,
   updateServerLabel,
 } from "./server-store";
+import {
+  getOfflineIdentityForServer,
+  persistVerifiedOfflineIdentity,
+} from "./offline-identity";
 
 beforeEach(() => {
   localStorage.clear();
@@ -107,9 +111,16 @@ describe("removeServer", () => {
   it("removes a server and clears current if it was active", () => {
     const s = addServer("https://crate.local");
     setCurrentServerId(s.id);
+    persistVerifiedOfflineIdentity({
+      serverId: s.id,
+      serverUrl: s.url,
+      userId: 42,
+      profileKey: "profile-42",
+    });
     removeServer(s.id);
     expect(getServers()).toHaveLength(0);
     expect(getCurrentServer()).toBeNull();
+    expect(getOfflineIdentityForServer(s.id, s.url)).toBeNull();
   });
 });
 

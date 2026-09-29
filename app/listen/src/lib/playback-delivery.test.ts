@@ -130,6 +130,19 @@ describe("preparePlaybackDelivery", () => {
     expect(apiFetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not send offline-only tracks to the online prepare endpoint", () => {
+    const offlineTrack: Track = {
+      ...makeTrack(45),
+      offlineOnly: true,
+    };
+
+    preparePlaybackDelivery([offlineTrack], 0, "balanced", {
+      immediate: true,
+    });
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
   it("prepares global tracks when their selected source is local", () => {
     apiFetchMock.mockResolvedValueOnce({});
     const globalLocalTrack: Track = {

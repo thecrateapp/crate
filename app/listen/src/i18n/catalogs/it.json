@@ -1554,5 +1554,13 @@
   "jam.room.autoDjModeHelp": "La musica continua senza il proprietario usando generi, somiglianza e BPM.",
   "jam.room.autoDjQueueSubtitle": "Auto DJ mantiene attiva la coda; i membri possono votare i brani successivi.",
   "jam.room.autoDjSuggestions": "Prossimi suggerimenti",
-  "jam.room.autoDjSuggestionsHelp": "Auto DJ sta valutando queste tracce per i prossimi posti."
+  "jam.room.autoDjSuggestionsHelp": "Auto DJ sta valutando queste tracce per i prossimi posti.",
+  "offline.access.status": "Modalità offline",
+  "offline.access.title": "Musica scaricata",
+  "offline.access.subtitle": "È disponibile solo la musica salvata su questo dispositivo.",
+  "offline.access.empty": "Nessun download riproducibile disponibile.",
+  "offline.access.playAll": "Riproduci tutto",
+  "offline.access.previous": "Brano precedente",
+  "offline.access.next": "Brano successivo",
+  "offline.access.seek": "Posizione di riproduzione"
 }

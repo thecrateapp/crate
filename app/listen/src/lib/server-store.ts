@@ -26,6 +26,7 @@ import {
   setRuntimeServerSecret,
   type ServerSecret,
 } from "@/lib/server-store-secrets";
+import { revokeOfflineIdentityForServer } from "@/lib/offline-identity";
 import { isCapacitorRuntime, usesConfigurableServer } from "@/lib/platform";
 
 export { waitForPendingSecureSessionWrites } from "@/lib/server-store-secrets";
@@ -246,6 +247,7 @@ export function addServer(url: string, label?: string): ServerConfig {
 }
 
 export function removeServer(id: string): void {
+  revokeOfflineIdentityForServer(id);
   const servers = getServers().filter((s) => s.id !== id);
   writeServers(servers);
   if (getCurrentServerId() === id) {

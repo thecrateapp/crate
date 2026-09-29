@@ -34,6 +34,7 @@ export interface ApiAuthTransportDependencies {
     refreshToken?: string | null,
     accessExpiresAt?: string | null,
   ) => boolean;
+  onSessionRejected?: (serverId: string | null) => void;
   usesConfigurableServer: boolean;
 }
 
@@ -150,10 +151,17 @@ export function createApiAuthTransport(
   const clearRejectedSession = async (scope: AuthScope): Promise<void> => {
     if (!hasCurrentCredentials(scope)) return;
     if (scope.serverId) {
-      dependencies.setAuthTokensForServer(scope.serverId, null, null, null);
+      const cleared = dependencies.setAuthTokensForServer(
+        scope.serverId,
+        null,
+        null,
+        null,
+      );
+      if (cleared) dependencies.onSessionRejected?.(scope.serverId);
       return;
     }
     dependencies.setAuthToken(null);
+    dependencies.onSessionRejected?.(null);
     await clearRejectedWebSession();
   };
 

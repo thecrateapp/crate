@@ -11,6 +11,7 @@ import { useNavigate } from "react-router";
 import { api, revokeServerSession, setAuthToken } from "@/lib/api";
 import { AuthContext } from "@/contexts/auth-context";
 import { clearAuthRuntime } from "@/contexts/auth-runtime";
+import { revokeOfflineIdentityForServer } from "@/lib/offline-identity";
 import { usesConfigurableServer } from "@/lib/platform";
 import {
   getCurrentServer,
@@ -38,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     sessionUnavailable,
+    accessMode,
+    offlineIdentity,
     refetch,
     resetForServerTransition,
   } = useAuthSession();
@@ -78,8 +81,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useAuthHeartbeat(user);
   useListenWarmup(user);
 
+  useEffect(() => {
+    if (accessMode !== "offline") return;
+    const revalidate = () => void refetch();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") revalidate();
+    };
+    window.addEventListener("online", revalidate);
+    window.addEventListener("focus", revalidate);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("online", revalidate);
+      window.removeEventListener("focus", revalidate);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [accessMode, refetch]);
+
   const logout = useCallback(async () => {
     const server = getCurrentServer();
+    revokeOfflineIdentityForServer(getCurrentServerId() ?? "web");
     const revocation = usesConfigurableServer
       ? server
         ? revokeServerSession(server)
@@ -95,8 +115,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate, resetForServerTransition]);
 
   const value = useMemo(
-    () => ({ user, loading, sessionUnavailable, refetch, logout }),
-    [user, loading, sessionUnavailable, refetch, logout],
+    () => ({
+      user,
+      loading,
+      sessionUnavailable,
+      accessMode,
+      offlineIdentity,
+      refetch,
+      logout,
+    }),
+    [
+      user,
+      loading,
+      sessionUnavailable,
+      accessMode,
+      offlineIdentity,
+      refetch,
+      logout,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

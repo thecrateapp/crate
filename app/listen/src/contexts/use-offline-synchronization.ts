@@ -24,6 +24,7 @@ type SyncManifestIntoItem = (
 ) => Promise<void>;
 
 interface UseOfflineSynchronizationOptions {
+  enabled: boolean;
   enqueue: Enqueue;
   profileKey: string | null;
   snapshot: OfflineSnapshot;
@@ -34,6 +35,7 @@ interface UseOfflineSynchronizationOptions {
 }
 
 export function useOfflineSynchronization({
+  enabled,
   enqueue,
   profileKey,
   snapshot,
@@ -46,7 +48,7 @@ export function useOfflineSynchronization({
   const resumedProfileRef = useRef<string | null>(null);
 
   const performSyncAll = useCallback(async () => {
-    if (!profileKey || !supported) return;
+    if (!enabled || !profileKey || !supported) return;
     const items = Object.values(snapshotRef.current.items);
     if (!items.length) return;
     setSyncing(true);
@@ -97,11 +99,11 @@ export function useOfflineSynchronization({
     } finally {
       setSyncing(false);
     }
-  }, [profileKey, snapshotRef, supported, syncManifestIntoItem]);
+  }, [enabled, profileKey, snapshotRef, supported, syncManifestIntoItem]);
 
   const syncAll = useCallback(
-    () => enqueue(performSyncAll),
-    [enqueue, performSyncAll],
+    () => (enabled ? enqueue(performSyncAll) : Promise.resolve()),
+    [enabled, enqueue, performSyncAll],
   );
 
   const enqueueSync = useCallback(() => {
@@ -109,7 +111,7 @@ export function useOfflineSynchronization({
   }, [syncAll]);
 
   useEffect(() => {
-    if (!profileKey || !supported) {
+    if (!enabled || !profileKey || !supported) {
       resumedProfileRef.current = null;
       return;
     }
@@ -123,10 +125,10 @@ export function useOfflineSynchronization({
     // invoking it here is the synchronization side effect, not parent data.
     // react-doctor-disable-next-line no-pass-data-to-parent
     enqueueSync();
-  }, [enqueueSync, profileKey, snapshot.items, supported]);
+  }, [enabled, enqueueSync, profileKey, snapshot.items, supported]);
 
   useEffect(() => {
-    if (!profileKey || !supported) return;
+    if (!enabled || !profileKey || !supported) return;
     const handleOnline = () => {
       enqueueSync();
     };
@@ -169,7 +171,7 @@ export function useOfflineSynchronization({
       clearHiddenAbortTimer();
       disposeResume();
     };
-  }, [enqueueSync, profileKey, supported, transferAbortRef]);
+  }, [enabled, enqueueSync, profileKey, supported, transferAbortRef]);
 
   return { syncing, syncAll };
 }

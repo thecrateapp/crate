@@ -1554,5 +1554,13 @@
   "jam.room.autoDjModeHelp": "La musique continue sans hôte grâce aux genres, à la similarité et au BPM.",
   "jam.room.autoDjQueueSubtitle": "Auto DJ maintient la file active ; les membres peuvent voter pour les prochains titres.",
   "jam.room.autoDjSuggestions": "Suggestions suivantes",
-  "jam.room.autoDjSuggestionsHelp": "Auto DJ évalue ces morceaux pour les prochains emplacements."
+  "jam.room.autoDjSuggestionsHelp": "Auto DJ évalue ces morceaux pour les prochains emplacements.",
+  "offline.access.status": "Mode hors ligne",
+  "offline.access.title": "Musique téléchargée",
+  "offline.access.subtitle": "Seule la musique enregistrée sur cet appareil est disponible.",
+  "offline.access.empty": "Aucun téléchargement lisible n’est disponible.",
+  "offline.access.playAll": "Tout lire",
+  "offline.access.previous": "Morceau précédent",
+  "offline.access.next": "Morceau suivant",
+  "offline.access.seek": "Position de lecture"
 }

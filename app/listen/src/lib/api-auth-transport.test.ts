@@ -149,6 +149,44 @@ describe("createApiAuthTransport configurable-server refresh", () => {
     expect(setAuthTokensForServer).not.toHaveBeenCalled();
   });
 
+  it("reports authoritative refresh rejection for the server whose token was rejected", async () => {
+    const onSessionRejected = vi.fn();
+    const setAuthTokensForServer = vi.fn(() => true);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 403,
+    } as Response);
+    const transport = createApiAuthTransport({
+      apiBase: () => "https://a.example.com",
+      apiClient: vi.fn(),
+      apiCredentials: () => "omit",
+      getApiAuthHeaders: () => ({ Authorization: "Bearer access-a" }),
+      getAuthToken: () => "access-a",
+      getAuthTokenExpiresAt: () => null,
+      getCurrentServerId: () => "server-a",
+      getRefreshToken: () => "refresh-a",
+      getServerAuthTokens: () => ({
+        token: "access-a",
+        refreshToken: "refresh-a",
+      }),
+      setAuthToken: vi.fn(),
+      setAuthTokens: vi.fn(),
+      setAuthTokensForServer,
+      onSessionRejected,
+      usesConfigurableServer: true,
+    });
+
+    await expect(transport.refreshAuthToken()).resolves.toBe(false);
+
+    expect(setAuthTokensForServer).toHaveBeenCalledWith(
+      "server-a",
+      null,
+      null,
+      null,
+    );
+    expect(onSessionRejected).toHaveBeenCalledWith("server-a");
+  });
+
   it("isolates concurrent refreshes when the active server changes", async () => {
     let currentServerId = "server-a";
     const servers: Record<

@@ -4,6 +4,7 @@ import { encodeOfflineProfileIdentity } from "@/lib/offline-store";
 import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
 import { isWebRuntime } from "@/lib/platform";
 import { getOfflineTrackAssetKey } from "@/lib/offline-track-identity";
+import { hasCachedTrackAssets } from "@/lib/offline-assets";
 import {
   hydrateOfflineProfileState,
   setActiveOfflineProfileKey,
@@ -88,6 +89,27 @@ export function isOfflineSupported(): boolean {
     "caches" in window &&
     "serviceWorker" in navigator
   );
+}
+
+export async function hasOfflinePlaybackContent(
+  profileKey: string,
+): Promise<boolean> {
+  const snapshot = await hydrateOfflineProfileState(profileKey);
+  const candidates = Object.values(snapshot.items).flatMap((item) => {
+    const readyKeys = new Set(item.readyAssetKeys ?? []);
+    return item.tracks.filter((track) => {
+      const assetKey = getOfflineTrackAssetKey(track);
+      if (!assetKey) return false;
+      if (item.readyAssetKeys) return readyKeys.has(assetKey);
+      return item.state === "ready";
+    });
+  });
+
+  for (let offset = 0; offset < candidates.length; offset += 16) {
+    const batch = candidates.slice(offset, offset + 16);
+    if ((await hasCachedTrackAssets(profileKey, batch)).size > 0) return true;
+  }
+  return false;
 }
 
 export function buildAssetUsage(

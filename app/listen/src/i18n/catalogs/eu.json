@@ -1554,5 +1554,13 @@
   "jam.room.autoDjModeHelp": "Musikak anfitrioirik gabe jarraitzen du, genero, antzekotasun eta BPM bidez.",
   "jam.room.autoDjQueueSubtitle": "Auto DJ-k ilara martxan mantentzen du; kideek hurrengo pistak bozka ditzakete.",
   "jam.room.autoDjSuggestions": "Hurrengo iradokizunak",
-  "jam.room.autoDjSuggestionsHelp": "Auto DJ pista hauek ebaluatzen ari da hurrengo tokietarako."
+  "jam.room.autoDjSuggestionsHelp": "Auto DJ pista hauek ebaluatzen ari da hurrengo tokietarako.",
+  "offline.access.status": "Lineaz kanpoko modua",
+  "offline.access.title": "Deskargatutako musika",
+  "offline.access.subtitle": "Gailu honetan gordetako musika soilik dago erabilgarri.",
+  "offline.access.empty": "Ez dago erreproduzitzeko deskargarik.",
+  "offline.access.playAll": "Erreproduzitu dena",
+  "offline.access.previous": "Aurreko pista",
+  "offline.access.next": "Hurrengo pista",
+  "offline.access.seek": "Erreprodukzio-posizioa"
 }
