@@ -43,6 +43,8 @@ vi.mock("@/lib/gapless-player", () => ({
 
 import { useMusicVisualizer } from "./useMusicVisualizer";
 
+let visibilityDescriptor: PropertyDescriptor | undefined;
+
 function VisualizerHarness({
   children,
   active = true,
@@ -78,6 +80,10 @@ function VisualizerHarness({
 
 describe("useMusicVisualizer", () => {
   beforeEach(() => {
+    visibilityDescriptor = Object.getOwnPropertyDescriptor(
+      document,
+      "visibilityState",
+    );
     vi.useFakeTimers();
     createAnalyserNodeMock.mockReturnValue(analyser);
     getAnalyserNodeMock.mockReturnValue(analyser);
@@ -86,6 +92,12 @@ describe("useMusicVisualizer", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    if (visibilityDescriptor) {
+      Object.defineProperty(document, "visibilityState", visibilityDescriptor);
+    } else {
+      Reflect.deleteProperty(document, "visibilityState");
+    }
+    visibilityDescriptor = undefined;
   });
 
   it("cancels delayed visualizer work when the canvas unmounts", () => {
@@ -193,5 +205,30 @@ describe("useMusicVisualizer", () => {
 
     unmount();
     expect(visualizer.destroy).toHaveBeenCalledTimes(2);
+  });
+
+  it("suspends the render loop while hidden and resumes when visible", () => {
+    let visibility: DocumentVisibilityState = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => visibility,
+    });
+    const { unmount } = render(createElement(VisualizerHarness));
+    const canvas = document.querySelector("canvas")!;
+    Object.defineProperties(canvas, {
+      clientWidth: { configurable: true, value: 320 },
+      clientHeight: { configurable: true, value: 180 },
+    });
+    vi.advanceTimersByTime(50);
+
+    visibility = "hidden";
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(visualizer.stop).toHaveBeenCalledTimes(1);
+
+    visibility = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(visualizer.start).toHaveBeenCalledTimes(2);
+
+    unmount();
   });
 });

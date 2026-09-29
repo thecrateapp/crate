@@ -51,6 +51,7 @@ export function useMusicVisualizer(
     let attempts = 0;
     const timeoutIds = new Set<number>();
     const animationFrameIds = new Set<number>();
+    let tryInit = () => {};
 
     const scheduleTimeout = (callback: () => void, delay: number) => {
       const id = window.setTimeout(() => {
@@ -70,8 +71,25 @@ export function useMusicVisualizer(
       return id;
     };
 
-    const tryInit = () => {
+    const syncRenderActivity = () => {
+      const shouldRender =
+        active &&
+        document.visibilityState !== "hidden" &&
+        canvas.clientWidth > 0 &&
+        canvas.clientHeight > 0;
+      const visualizer = vizRef.current;
+      if (!shouldRender) {
+        visualizer?.stop();
+      } else if (visualizer) {
+        visualizer.start();
+      } else {
+        tryInit();
+      }
+    };
+
+    tryInit = () => {
       if (cancelled) return;
+      if (document.visibilityState === "hidden") return;
       attempts++;
 
       const w = canvas.clientWidth;
@@ -91,7 +109,7 @@ export function useMusicVisualizer(
       }
 
       if (vizRef.current) {
-        vizRef.current.start();
+        syncRenderActivity();
         dbg(`restarted ${w}x${h}`);
         return;
       }
@@ -118,7 +136,7 @@ export function useMusicVisualizer(
           qualityProfile,
         );
         vizRef.current = viz;
-        viz.start();
+        syncRenderActivity();
         scheduleTimeout(() => forceResize(viz), 100);
         dbg(`created ${w}x${h}`);
       } catch (e) {
@@ -128,9 +146,17 @@ export function useMusicVisualizer(
 
     // Small delay to let the DOM settle after display:none → visible
     scheduleTimeout(tryInit, 50);
+    document.addEventListener("visibilitychange", syncRenderActivity);
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(syncRenderActivity);
+    resizeObserver?.observe(canvas);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", syncRenderActivity);
+      resizeObserver?.disconnect();
       for (const id of timeoutIds) window.clearTimeout(id);
       timeoutIds.clear();
       for (const id of animationFrameIds) {

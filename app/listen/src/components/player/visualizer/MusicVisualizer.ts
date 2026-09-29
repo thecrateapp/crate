@@ -13,6 +13,7 @@ import { renderVisualizerSpheres } from "./visualizer-spheres-renderer";
 import { VisualizerWebGLResources } from "./visualizer-webgl-resources";
 import {
   VISUALIZER_QUALITY_PROFILES,
+  getVisualizerRenderSize,
   type VisualizerQualityProfile,
   type VisualizerQualityProfileName,
 } from "./visualizer-quality";
@@ -109,15 +110,14 @@ export class MusicVisualizer {
     this.mode = mode;
     this.quality = VISUALIZER_QUALITY_PROFILES[qualityProfile];
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.width = Math.min(
-      Math.floor(canvas.clientWidth * dpr),
+    const initialSize = getVisualizerRenderSize(
+      canvas.clientWidth,
+      canvas.clientHeight,
+      window.devicePixelRatio,
       this.quality.maxRenderDimension,
     );
-    this.height = Math.min(
-      Math.floor(canvas.clientHeight * dpr),
-      this.quality.maxRenderDimension,
-    );
+    this.width = initialSize.width;
+    this.height = initialSize.height;
     canvas.width = this.width;
     canvas.height = this.height;
     this.updateViewportScaleCompensation();
@@ -335,14 +335,21 @@ export class MusicVisualizer {
     });
   }
 
-  setSize(w: number, h: number) {
-    if (w === this.width && h === this.height) return;
-    this.width = w;
-    this.height = h;
-    this.canvas.width = w;
-    this.canvas.height = h;
+  setSize(cssWidth: number, cssHeight: number) {
+    if (cssWidth <= 0 || cssHeight <= 0) return;
+    const { width, height } = getVisualizerRenderSize(
+      cssWidth,
+      cssHeight,
+      window.devicePixelRatio,
+      this.quality.maxRenderDimension,
+    );
+    if (width === this.width && height === this.height) return;
+    this.width = width;
+    this.height = height;
+    this.canvas.width = width;
+    this.canvas.height = height;
     this.updateViewportScaleCompensation();
-    this.resources.resize(w, h);
+    this.resources.resize(width, height);
   }
 
   start() {
@@ -365,18 +372,19 @@ export class MusicVisualizer {
     const g = this.resources.glCtx;
     this.time++;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.min(
-      Math.floor(this.canvas.clientWidth * dpr),
-      this.quality.maxRenderDimension,
-    );
-    const h = Math.min(
-      Math.floor(this.canvas.clientHeight * dpr),
+    if (this.canvas.clientWidth <= 0 || this.canvas.clientHeight <= 0) {
+      this.stop();
+      return;
+    }
+    const { width, height } = getVisualizerRenderSize(
+      this.canvas.clientWidth,
+      this.canvas.clientHeight,
+      window.devicePixelRatio,
       this.quality.maxRenderDimension,
     );
     this.updateViewportScaleCompensation();
-    if (w > 0 && h > 0 && (w !== this.width || h !== this.height)) {
-      this.setSize(w, h);
+    if (width !== this.width || height !== this.height) {
+      this.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
     }
 
     this.updateTrackMorph();
