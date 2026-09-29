@@ -1,10 +1,12 @@
 #[cfg(desktop)]
+use sha2::{Digest, Sha256};
+#[cfg(all(desktop, target_os = "linux"))]
+use std::env;
+#[cfg(desktop)]
 use std::sync::{Arc, Mutex};
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 use std::{
-    collections::hash_map::DefaultHasher,
     fs::{self, OpenOptions},
-    hash::{Hash, Hasher},
     io::{self, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -81,9 +83,28 @@ pub(crate) struct DesktopMediaSessionPayload {
     artist: Option<String>,
     album: Option<String>,
     artwork: Option<String>,
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    media_id: Option<String>,
     is_playing: bool,
     position: f64,
     duration: f64,
+}
+
+#[cfg(desktop)]
+#[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopMediaPlaybackState {
+    is_playing: bool,
+}
+
+#[cfg(desktop)]
+#[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopMediaPosition {
+    position: f64,
+    duration: f64,
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
+    playback_rate: f64,
 }
 
 #[cfg(desktop)]
@@ -258,28 +279,49 @@ fn update_desktop_media_session(payload: DesktopMediaSessionPayload) -> Result<(
 
 #[cfg(desktop)]
 #[tauri::command]
+fn update_desktop_media_playback_state(payload: DesktopMediaPlaybackState) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    macos_media_controls::update_playback_state(payload.is_playing);
+    #[cfg(target_os = "linux")]
+    linux_media_controls::update_playback_state(payload.is_playing);
+    #[cfg(target_os = "windows")]
+    windows_media_controls::update_playback_state(payload.is_playing);
+
+    Ok(())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn update_desktop_media_position(payload: DesktopMediaPosition) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    macos_media_controls::update_position(&payload);
+    #[cfg(target_os = "linux")]
+    linux_media_controls::update_position(&payload);
+    #[cfg(target_os = "windows")]
+    windows_media_controls::update_position(&payload);
+
+    Ok(())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
 fn cache_desktop_media_artwork(
     cache_key: String,
     bytes: Vec<u8>,
     mime_type: Option<String>,
 ) -> Result<Option<DesktopArtworkCacheResult>, String> {
     #[cfg(target_os = "linux")]
-    {
-        linux_media_controls::cache_artwork(&cache_key, &bytes, mime_type.as_deref())
-            .map(|url| {
-                url.map(|url| DesktopArtworkCacheResult {
-                    url,
-                    evicted_urls: Vec::new(),
-                })
-            })
-            .map_err(|err| err.to_string())
-    }
-
+    let active_artwork = linux_media_controls::active_artwork_path();
     #[cfg(not(target_os = "linux"))]
-    {
-        cache_native_desktop_artwork(&cache_key, &bytes, mime_type.as_deref())
-            .map_err(|err| err.to_string())
-    }
+    let active_artwork: Option<PathBuf> = None;
+
+    cache_native_desktop_artwork(
+        &cache_key,
+        &bytes,
+        mime_type.as_deref(),
+        active_artwork.as_deref(),
+    )
+    .map_err(|err| err.to_string())
 }
 
 #[cfg(desktop)]
@@ -290,14 +332,45 @@ struct DesktopArtworkCacheResult {
     evicted_urls: Vec<String>,
 }
 
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 const MAX_NATIVE_DESKTOP_ARTWORK_BYTES: usize = 8 * 1024 * 1024;
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 const MAX_NATIVE_DESKTOP_ARTWORK_CACHE_BYTES: u64 = 128 * 1024 * 1024;
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 const MAX_NATIVE_DESKTOP_ARTWORK_CACHE_ENTRIES: usize = 128;
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 const MAX_NATIVE_DESKTOP_ARTWORK_TEMP_AGE_SECS: u64 = 60 * 60;
+
+#[cfg(all(desktop, target_os = "linux"))]
+fn native_desktop_artwork_cache_root() -> PathBuf {
+    linux_artwork_cache_root(
+        env::var_os("XDG_CACHE_HOME")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .as_deref(),
+        env::var_os("HOME")
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .as_deref(),
+        &env::temp_dir(),
+    )
+}
+
+#[cfg(all(desktop, target_os = "linux"))]
+fn linux_artwork_cache_root(
+    xdg_cache_home: Option<&Path>,
+    home: Option<&Path>,
+    temp_dir: &Path,
+) -> PathBuf {
+    if let Some(cache_home) = xdg_cache_home.filter(|path| path.is_absolute()) {
+        return cache_home.join("crate").join("mpris-artwork");
+    }
+    home.filter(|path| path.is_absolute())
+        .unwrap_or(temp_dir)
+        .join(".cache")
+        .join("crate")
+        .join("mpris-artwork")
+}
 
 #[cfg(all(desktop, not(target_os = "linux")))]
 fn native_desktop_artwork_cache_root() -> PathBuf {
@@ -306,13 +379,29 @@ fn native_desktop_artwork_cache_root() -> PathBuf {
         .join("media-artwork-v1")
 }
 
-#[cfg(all(desktop, not(target_os = "linux")))]
-pub(crate) fn is_native_desktop_artwork_path(path: &Path) -> bool {
-    path.parent() == Some(native_desktop_artwork_cache_root().as_path())
+#[cfg(desktop)]
+fn is_artwork_path_in_cache(cache_root: &Path, path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let Some((digest, extension)) = name.rsplit_once('.') else {
+        return false;
+    };
+    let known_digest =
+        matches!(digest.len(), 16 | 64) && digest.bytes().all(|byte| byte.is_ascii_hexdigit());
+    let known_extension = matches!(extension, "jpg" | "png" | "webp" | "gif");
+    path.parent() == Some(cache_root)
+        && known_digest
+        && known_extension
         && fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_file())
 }
 
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(all(desktop, any(target_os = "linux", target_os = "macos")))]
+pub(crate) fn is_native_desktop_artwork_path(path: &Path) -> bool {
+    is_artwork_path_in_cache(&native_desktop_artwork_cache_root(), path)
+}
+
+#[cfg(desktop)]
 fn native_desktop_artwork_extension(mime_type: Option<&str>, source: &str) -> &'static str {
     let mime = mime_type
         .and_then(|value| value.split(';').next())
@@ -343,17 +432,17 @@ fn native_desktop_artwork_extension(mime_type: Option<&str>, source: &str) -> &'
     }
 }
 
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 fn native_desktop_artwork_url(path: &Path) -> io::Result<String> {
     tauri::Url::from_file_path(path)
         .map(|url| url.to_string())
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid artwork path"))
 }
 
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 fn prune_native_desktop_artwork_cache(
     cache_root: &Path,
-    preserve: &Path,
+    preserve: &[PathBuf],
     max_entries: usize,
     max_bytes: u64,
 ) -> io::Result<Vec<PathBuf>> {
@@ -397,7 +486,7 @@ fn prune_native_desktop_artwork_cache(
         if retained_entries <= max_entries && retained_bytes <= max_bytes {
             break;
         }
-        if path == preserve {
+        if preserve.iter().any(|preserved| preserved == &path) {
             continue;
         }
         match fs::remove_file(&path) {
@@ -412,7 +501,7 @@ fn prune_native_desktop_artwork_cache(
     Ok(removed)
 }
 
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 fn native_desktop_artwork_cache_result(
     destination: &Path,
     evicted: Vec<PathBuf>,
@@ -426,38 +515,51 @@ fn native_desktop_artwork_cache_result(
     })
 }
 
-#[cfg(all(desktop, not(target_os = "linux")))]
+#[cfg(desktop)]
 fn cache_native_desktop_artwork(
     cache_key: &str,
     bytes: &[u8],
     mime_type: Option<&str>,
+    active_artwork: Option<&Path>,
+) -> io::Result<Option<DesktopArtworkCacheResult>> {
+    cache_native_desktop_artwork_at(
+        &native_desktop_artwork_cache_root(),
+        cache_key,
+        bytes,
+        mime_type,
+        active_artwork,
+    )
+}
+
+#[cfg(desktop)]
+fn cache_native_desktop_artwork_at(
+    cache_root: &Path,
+    cache_key: &str,
+    bytes: &[u8],
+    mime_type: Option<&str>,
+    active_artwork: Option<&Path>,
 ) -> io::Result<Option<DesktopArtworkCacheResult>> {
     if bytes.is_empty() || bytes.len() > MAX_NATIVE_DESKTOP_ARTWORK_BYTES {
         return Ok(None);
     }
 
-    let mut hasher = DefaultHasher::new();
-    cache_key.hash(&mut hasher);
-    bytes.hash(&mut hasher);
-    let cache_id = format!("{:016x}", hasher.finish());
-    let cache_root = native_desktop_artwork_cache_root();
-    fs::create_dir_all(&cache_root)?;
+    let cache_id = format!("{:x}", Sha256::digest(bytes));
+    fs::create_dir_all(cache_root)?;
     let destination = cache_root.join(format!(
         "{}.{}",
         cache_id,
         native_desktop_artwork_extension(mime_type, cache_key)
     ));
-    if is_native_desktop_artwork_path(&destination) {
+    if is_artwork_path_in_cache(cache_root, &destination) {
         if let Ok(file) = OpenOptions::new().write(true).open(&destination) {
             let _ = file.set_modified(SystemTime::now());
         }
         let evicted = prune_native_desktop_artwork_cache(
-            &cache_root,
-            &destination,
+            cache_root,
+            &preserved_artwork_paths(&destination, active_artwork),
             MAX_NATIVE_DESKTOP_ARTWORK_CACHE_ENTRIES,
             MAX_NATIVE_DESKTOP_ARTWORK_CACHE_BYTES,
-        )
-        .unwrap_or_default();
+        )?;
         return native_desktop_artwork_cache_result(&destination, evicted).map(Some);
     }
 
@@ -483,13 +585,21 @@ fn cache_native_desktop_artwork(
     }
     write_result?;
     let evicted = prune_native_desktop_artwork_cache(
-        &cache_root,
-        &destination,
+        cache_root,
+        &preserved_artwork_paths(&destination, active_artwork),
         MAX_NATIVE_DESKTOP_ARTWORK_CACHE_ENTRIES,
         MAX_NATIVE_DESKTOP_ARTWORK_CACHE_BYTES,
-    )
-    .unwrap_or_default();
+    )?;
     native_desktop_artwork_cache_result(&destination, evicted).map(Some)
+}
+
+#[cfg(desktop)]
+fn preserved_artwork_paths(destination: &Path, active_artwork: Option<&Path>) -> Vec<PathBuf> {
+    let mut preserved = vec![destination.to_path_buf()];
+    if let Some(active_artwork) = active_artwork.filter(|path| *path != destination) {
+        preserved.push(active_artwork.to_path_buf());
+    }
+    preserved
 }
 
 #[cfg(desktop)]
@@ -1212,6 +1322,8 @@ pub fn run() {
             ping,
             update_now_playing,
             update_desktop_media_session,
+            update_desktop_media_playback_state,
+            update_desktop_media_position,
             cache_desktop_media_artwork,
             ensure_desktop_window_size,
             open_bandcamp_cookie_interceptor,
@@ -1249,9 +1361,10 @@ mod tests {
         PlaybackCommand,
     };
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "linux")]
+    use super::linux_artwork_cache_root;
     use super::{
-        cache_native_desktop_artwork, is_native_desktop_artwork_path,
+        cache_native_desktop_artwork_at, is_artwork_path_in_cache,
         prune_native_desktop_artwork_cache,
     };
 
@@ -1273,7 +1386,6 @@ mod tests {
         remove_legacy_http_cookie_jar_file(&path).unwrap();
     }
 
-    #[cfg(not(target_os = "linux"))]
     #[test]
     fn native_artwork_cache_prunes_old_entries_within_budgets() {
         let nonce = std::time::SystemTime::now()
@@ -1285,12 +1397,21 @@ mod tests {
             std::process::id()
         ));
         std::fs::create_dir_all(&root).unwrap();
-        let preserve = root.join("preserve.webp");
-        for name in ["a.webp", "b.webp", "c.webp", "preserve.webp"] {
+        let active = root.join("active.webp");
+        let destination = root.join("destination.webp");
+        for name in [
+            "a.webp",
+            "b.webp",
+            "c.webp",
+            "active.webp",
+            "destination.webp",
+        ] {
             std::fs::write(root.join(name), b"data").unwrap();
         }
 
-        let removed = prune_native_desktop_artwork_cache(&root, &preserve, 2, 7).unwrap();
+        let removed =
+            prune_native_desktop_artwork_cache(&root, &[active.clone(), destination.clone()], 2, 8)
+                .unwrap();
 
         let retained = std::fs::read_dir(&root)
             .unwrap()
@@ -1302,33 +1423,124 @@ mod tests {
             .filter_map(|entry| entry.metadata().ok())
             .map(|metadata| metadata.len())
             .sum::<u64>();
-        assert!(preserve.is_file());
+        assert!(active.is_file());
+        assert!(destination.is_file());
         assert!(retained.len() <= 2);
-        assert!(retained_bytes <= 7);
+        assert!(retained_bytes <= 8);
         assert!(!removed.is_empty());
         assert!(removed.iter().all(|path| !path.exists()));
 
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    #[cfg(not(target_os = "linux"))]
     #[test]
     fn native_artwork_cache_materializes_bounded_regular_files() {
-        let url = cache_native_desktop_artwork(
-            "data:image/png;base64,Y292ZXI=",
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "crate-desktop-artwork-cache-test-{}-{nonce}",
+            std::process::id()
+        ));
+        let url = cache_native_desktop_artwork_at(
+            &root,
+            "https://example.test/cover.png?ticket=old",
             b"native-cover",
             Some("image/png"),
+            None,
         )
         .unwrap()
         .unwrap();
         let path = tauri::Url::parse(&url.url).unwrap().to_file_path().unwrap();
 
-        assert!(is_native_desktop_artwork_path(&path));
+        assert!(is_artwork_path_in_cache(&root, &path));
         assert_eq!(std::fs::read(path).unwrap(), b"native-cover");
-        assert!(
-            cache_native_desktop_artwork("oversized", &vec![0; 8 * 1024 * 1024 + 1], None)
-                .unwrap()
-                .is_none()
+        let refreshed = cache_native_desktop_artwork_at(
+            &root,
+            "https://example.test/cover.png?ticket=refreshed",
+            b"native-cover",
+            Some("image/png"),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(refreshed.url, url.url);
+        assert!(cache_native_desktop_artwork_at(
+            &root,
+            "oversized",
+            &vec![0; 8 * 1024 * 1024 + 1],
+            None,
+            None,
+        )
+        .unwrap()
+        .is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_artwork_cache_returns_evictions_and_preserves_active_artwork() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "crate-desktop-artwork-eviction-test-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let active = root.join(format!("{:064x}.jpg", 1));
+        for index in 0..128 {
+            std::fs::write(root.join(format!("{index:064x}.jpg")), b"old artwork").unwrap();
+        }
+
+        let result = cache_native_desktop_artwork_at(
+            &root,
+            "https://example.test/new.jpg?ticket=short-lived",
+            b"new artwork",
+            Some("image/jpeg"),
+            Some(&active),
+        )
+        .unwrap()
+        .unwrap();
+        let result_path = tauri::Url::parse(&result.url)
+            .unwrap()
+            .to_file_path()
+            .unwrap();
+
+        let retained_count = std::fs::read_dir(&root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+            .count();
+        assert!(active.is_file());
+        assert!(result_path.is_file());
+        assert!(retained_count <= 128);
+        assert_eq!(result.evicted_urls.len(), 1);
+        assert!(!result.evicted_urls[0].is_empty());
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_artwork_cache_reuses_the_legacy_mpris_directory() {
+        let temp_dir = std::path::Path::new("/tmp");
+        assert_eq!(
+            linux_artwork_cache_root(
+                Some(std::path::Path::new("/cache")),
+                Some(std::path::Path::new("/home/diego")),
+                temp_dir,
+            ),
+            std::path::PathBuf::from("/cache/crate/mpris-artwork")
+        );
+        assert_eq!(
+            linux_artwork_cache_root(
+                Some(std::path::Path::new("relative")),
+                Some(std::path::Path::new("/home/diego")),
+                temp_dir,
+            ),
+            std::path::PathBuf::from("/home/diego/.cache/crate/mpris-artwork")
         );
     }
 

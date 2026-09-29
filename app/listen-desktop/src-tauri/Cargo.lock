@@ -793,6 +793,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-deep-link",
@@ -803,7 +804,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "tokio",
  "webkit2gtk",
- "windows 0.61.3",
+ "windows 0.62.2",
  "zbus",
 ]
 

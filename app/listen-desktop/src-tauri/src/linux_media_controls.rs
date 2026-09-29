@@ -1,11 +1,8 @@
 use std::{
-    collections::hash_map::DefaultHasher,
-    collections::HashMap,
-    env, fs, future,
+    collections::{hash_map::DefaultHasher, HashMap},
+    future,
     hash::{Hash, Hasher},
-    io,
-    os::unix::ffi::OsStrExt,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex, OnceLock},
     thread,
 };
@@ -17,14 +14,13 @@ use crate::DesktopMediaSessionPayload;
 
 const MPRIS_BUS_NAME: &str = "org.mpris.MediaPlayer2.crate";
 const MPRIS_PATH: &str = "/org/mpris/MediaPlayer2";
-const TRACK_PATH: &str = "/org/mpris/MediaPlayer2/track/0";
-const MAX_ARTWORK_BYTES: usize = 8 * 1024 * 1024;
 
 static MPRIS_STATE: OnceLock<Arc<Mutex<MprisState>>> = OnceLock::new();
 static MPRIS_CONNECTION: OnceLock<zbus::Connection> = OnceLock::new();
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct MprisState {
+    media_id: Option<String>,
     title: Option<String>,
     artist: Option<String>,
     album: Option<String>,
@@ -34,9 +30,17 @@ struct MprisState {
     duration: f64,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct MprisChanges {
+    metadata: bool,
+    playback_status: bool,
+    position: bool,
+}
+
 impl MprisState {
     fn from_payload(payload: &DesktopMediaSessionPayload) -> Self {
         Self {
+            media_id: clean_optional(payload.media_id.as_deref()),
             title: clean_optional(payload.title.as_deref()),
             artist: clean_optional(payload.artist.as_deref()),
             album: clean_optional(payload.album.as_deref()),
@@ -59,7 +63,10 @@ impl MprisState {
 
     fn metadata(&self) -> HashMap<String, OwnedValue> {
         let mut metadata = HashMap::new();
-        metadata.insert("mpris:trackid".into(), object_path_value(TRACK_PATH));
+        metadata.insert(
+            "mpris:trackid".into(),
+            object_path_value(&mpris_track_path(self.media_id.as_deref())),
+        );
 
         if let Some(title) = self.title.as_deref() {
             metadata.insert("xesam:title".into(), string_value(title));
@@ -84,6 +91,21 @@ impl MprisState {
         }
 
         metadata
+    }
+
+    fn apply(&mut self, updated: Self) -> MprisChanges {
+        let changes = MprisChanges {
+            metadata: self.media_id != updated.media_id
+                || self.title != updated.title
+                || self.artist != updated.artist
+                || self.album != updated.album
+                || self.artwork != updated.artwork
+                || self.duration != updated.duration,
+            playback_status: self.is_playing != updated.is_playing,
+            position: self.position != updated.position,
+        };
+        *self = updated;
+        changes
     }
 }
 
@@ -313,33 +335,59 @@ pub fn update_now_playing(payload: &DesktopMediaSessionPayload) {
     let state = MPRIS_STATE
         .get_or_init(|| Arc::new(Mutex::new(MprisState::default())))
         .clone();
-    if let Ok(mut state) = state.lock() {
-        *state = MprisState::from_payload(payload);
-    }
-    emit_player_properties_changed();
+    let updated = MprisState::from_payload(payload);
+    let changes = if let Ok(mut state) = state.lock() {
+        state.apply(updated)
+    } else {
+        MprisChanges {
+            metadata: true,
+            playback_status: true,
+            position: true,
+        }
+    };
+    emit_player_properties_changed(changes.metadata, changes.playback_status, changes.position);
 }
 
-pub fn cache_artwork(
-    cache_key: &str,
-    bytes: &[u8],
-    mime_type: Option<&str>,
-) -> io::Result<Option<String>> {
-    if bytes.is_empty() || bytes.len() > MAX_ARTWORK_BYTES {
-        return Ok(None);
-    }
-
-    let Some(cache_home) = xdg_cache_home() else {
-        return Ok(None);
+pub fn update_playback_state(is_playing: bool) {
+    let state = MPRIS_STATE
+        .get_or_init(|| Arc::new(Mutex::new(MprisState::default())))
+        .clone();
+    let changed = if let Ok(mut state) = state.lock() {
+        let changed = state.is_playing != is_playing;
+        state.is_playing = is_playing;
+        changed
+    } else {
+        false
     };
-    let extension = artwork_extension(mime_type, cache_key);
-    let cache_path = cache_home.join("crate").join("mpris-artwork").join(format!(
-        "{}.{}",
-        artwork_cache_id(cache_key, bytes),
-        extension
-    ));
+    if changed {
+        emit_player_properties_changed(false, true, false);
+    }
+}
 
-    write_if_changed(&cache_path, bytes)?;
-    Ok(Some(file_uri_for_path(&cache_path)))
+pub fn update_position(payload: &crate::DesktopMediaPosition) {
+    let state = MPRIS_STATE
+        .get_or_init(|| Arc::new(Mutex::new(MprisState::default())))
+        .clone();
+    let (duration_changed, position_changed) = if let Ok(mut state) = state.lock() {
+        let duration_changed = state.duration != payload.duration;
+        let position_changed = state.position != payload.position;
+        state.duration = payload.duration;
+        state.position = payload.position;
+        (duration_changed, position_changed)
+    } else {
+        (false, false)
+    };
+    if duration_changed || position_changed {
+        emit_player_properties_changed(duration_changed, false, position_changed);
+    }
+}
+
+pub fn active_artwork_path() -> Option<PathBuf> {
+    let state = MPRIS_STATE.get()?.lock().ok()?;
+    let artwork = state.artwork.as_deref()?;
+    let parsed = tauri::Url::parse(artwork).ok()?;
+    let path = parsed.to_file_path().ok()?;
+    crate::is_native_desktop_artwork_path(&path).then_some(path)
 }
 
 async fn run_mpris_server(
@@ -358,7 +406,11 @@ async fn run_mpris_server(
     Ok(())
 }
 
-fn emit_player_properties_changed() {
+fn emit_player_properties_changed(
+    metadata_changed: bool,
+    playback_status_changed: bool,
+    position_changed: bool,
+) {
     let Some(connection) = MPRIS_CONNECTION.get().cloned() else {
         return;
     };
@@ -376,13 +428,28 @@ fn emit_player_properties_changed() {
                     return;
                 };
                 let player = iface.get().await;
-                let _ = player.playback_status_changed(iface.signal_emitter()).await;
-                let _ = player.metadata_changed(iface.signal_emitter()).await;
-                let _ = player.position_changed(iface.signal_emitter()).await;
+                if playback_status_changed {
+                    let _ = player.playback_status_changed(iface.signal_emitter()).await;
+                }
+                if metadata_changed {
+                    let _ = player.metadata_changed(iface.signal_emitter()).await;
+                }
+                if position_changed {
+                    let _ = player.position_changed(iface.signal_emitter()).await;
+                }
             },
             "crate_mpris_properties_changed",
         )
         .detach();
+}
+
+fn mpris_track_path(media_id: Option<&str>) -> String {
+    let Some(media_id) = media_id else {
+        return "/org/mpris/MediaPlayer2/track/0".into();
+    };
+    let mut hasher = DefaultHasher::new();
+    media_id.hash(&mut hasher);
+    format!("/org/mpris/MediaPlayer2/track/{:016x}", hasher.finish())
 }
 
 fn clean_optional(value: Option<&str>) -> Option<String> {
@@ -403,93 +470,6 @@ fn safe_artwork_url(value: &str) -> Option<String> {
     } else {
         None
     }
-}
-
-fn xdg_cache_home() -> Option<PathBuf> {
-    if let Some(value) = env::var_os("XDG_CACHE_HOME").filter(|value| !value.is_empty()) {
-        return Some(PathBuf::from(value));
-    }
-
-    env::var_os("HOME")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .map(|home| home.join(".cache"))
-}
-
-fn artwork_cache_id(cache_key: &str, bytes: &[u8]) -> String {
-    let mut hasher = DefaultHasher::new();
-    cache_key.hash(&mut hasher);
-    bytes.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
-
-fn artwork_extension(mime_type: Option<&str>, source: &str) -> &'static str {
-    let mime = mime_type
-        .and_then(|value| value.split(';').next())
-        .map(str::trim)
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-
-    match mime.as_str() {
-        "image/jpeg" | "image/jpg" => return "jpg",
-        "image/png" => return "png",
-        "image/webp" => return "webp",
-        "image/gif" => return "gif",
-        _ => {}
-    }
-
-    let source_without_query = source
-        .split_once('?')
-        .map(|(path, _)| path)
-        .unwrap_or(source);
-    let source_without_query = source_without_query
-        .split_once('#')
-        .map(|(path, _)| path)
-        .unwrap_or(source_without_query);
-    let extension = Path::new(source_without_query)
-        .extension()
-        .and_then(|value| value.to_str())
-        .map(str::to_ascii_lowercase);
-
-    match extension.as_deref() {
-        Some("jpg" | "jpeg") => "jpg",
-        Some("png") => "png",
-        Some("webp") => "webp",
-        Some("gif") => "gif",
-        _ => "jpg",
-    }
-}
-
-fn file_uri_for_path(path: &Path) -> String {
-    let path = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("/"))
-            .join(path)
-    };
-    let mut uri = String::from("file://");
-    for byte in path.as_os_str().as_bytes() {
-        match *byte {
-            b'/' => uri.push('/'),
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
-                uri.push(*byte as char)
-            }
-            value => uri.push_str(&format!("%{value:02X}")),
-        }
-    }
-    uri
-}
-
-fn write_if_changed(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    if fs::read(path).is_ok_and(|existing| existing == bytes) {
-        return Ok(());
-    }
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(path, bytes)
 }
 
 fn seconds_to_microseconds(seconds: f64) -> i64 {
@@ -520,7 +500,9 @@ fn object_path_value(value: &str) -> OwnedValue {
 
 #[cfg(test)]
 mod tests {
-    use super::{artwork_extension, file_uri_for_path, safe_artwork_url, seconds_to_microseconds};
+    use super::{
+        mpris_track_path, safe_artwork_url, seconds_to_microseconds, MprisChanges, MprisState,
+    };
 
     #[test]
     fn artwork_urls_do_not_leak_tokens_over_dbus() {
@@ -540,25 +522,62 @@ mod tests {
     }
 
     #[test]
-    fn artwork_cache_paths_are_file_uris() {
+    fn playback_and_position_updates_only_change_their_mpris_properties() {
+        let mut state = MprisState {
+            media_id: Some("server:track-1".into()),
+            title: Some("Song".into()),
+            is_playing: true,
+            position: 10.0,
+            duration: 180.0,
+            ..MprisState::default()
+        };
+
+        let changes = state.apply(MprisState {
+            is_playing: false,
+            position: 11.0,
+            ..state.clone()
+        });
+
         assert_eq!(
-            file_uri_for_path(std::path::Path::new("/tmp/crate cover.png")),
-            "file:///tmp/crate%20cover.png",
+            changes,
+            MprisChanges {
+                metadata: false,
+                playback_status: true,
+                position: true,
+            }
         );
     }
 
     #[test]
-    fn artwork_extension_prefers_mime_type_without_tokens() {
+    fn a_track_change_updates_metadata_without_marking_playback_changed() {
+        let state = MprisState {
+            media_id: Some("server:track-1".into()),
+            title: Some("Song".into()),
+            is_playing: true,
+            position: 10.0,
+            duration: 180.0,
+            ..MprisState::default()
+        };
+        let mut updated = state.clone();
+        updated.media_id = Some("server:track-2".into());
+        updated.title = Some("Next song".into());
+        updated.position = 0.0;
+
+        let mut state = state;
         assert_eq!(
-            artwork_extension(
-                Some("image/png; charset=binary"),
-                "https://api.example/cover.jpg?token=secret",
-            ),
-            "png",
+            state.apply(updated),
+            MprisChanges {
+                metadata: true,
+                playback_status: false,
+                position: true,
+            }
         );
-        assert_eq!(
-            artwork_extension(None, "https://api.example/cover.webp?token=secret"),
-            "webp",
-        );
+    }
+
+    #[test]
+    fn mpris_track_ids_are_stable_and_distinct_per_media_identity() {
+        let first = mpris_track_path(Some("server:track-1"));
+        assert_eq!(first, mpris_track_path(Some("server:track-1")));
+        assert_ne!(first, mpris_track_path(Some("server:track-2")));
     }
 }

@@ -55,6 +55,7 @@ describe("syncDesktopMediaSession", () => {
       artist: "A",
       album: "Album",
       artwork: null,
+      mediaId: "media-no-bridge",
       isPlaying: true,
       position: 0,
       duration: 180,
@@ -70,6 +71,7 @@ describe("syncDesktopMediaSession", () => {
       artist: "A",
       album: "Album",
       artwork: null,
+      mediaId: "media-invoke",
       isPlaying: true,
       position: 0,
       duration: 180,
@@ -113,6 +115,7 @@ describe("syncDesktopMediaSession", () => {
         artist: "Artist",
         album: "Album",
         artwork,
+        mediaId: `media-${artwork}`,
         isPlaying: true,
         position: 0,
         duration: 180,
@@ -166,6 +169,7 @@ describe("syncDesktopMediaSession", () => {
       artist: "Artist",
       album: "Album",
       artwork,
+      mediaId: artwork,
       isPlaying: true,
       position: 0,
       duration: 180,
@@ -234,6 +238,7 @@ describe("syncDesktopMediaSession", () => {
       artist: "Artist",
       album: "Album",
       artwork,
+      mediaId: artwork,
       isPlaying: true,
       position: 0,
       duration: 180,
@@ -301,6 +306,7 @@ describe("syncDesktopMediaSession", () => {
       artist: "Artist",
       album: "Album",
       artwork,
+      mediaId: artwork,
       isPlaying: true,
       position: 0,
       duration: 180,
@@ -327,5 +333,117 @@ describe("syncDesktopMediaSession", () => {
         payload: { ...payload(artworkA), artwork: fileA },
       }),
     );
+  });
+
+  it("publishes metadata once across position and playback updates", () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    (window as any).__crateTauriInvoke = invoke;
+    const metadata = {
+      title: "Song",
+      artist: "Artist",
+      album: "Album",
+      artwork: "https://images.example/cover.jpg",
+      mediaId: "server-a:track-1",
+      duration: 180,
+    };
+
+    for (let position = 0; position < 60; position += 1) {
+      syncDesktopMediaSession({
+        ...metadata,
+        isPlaying: position < 30,
+        position,
+      });
+    }
+
+    expect(
+      invoke.mock.calls.filter(
+        ([command]) => command === "update_desktop_media_session",
+      ),
+    ).toHaveLength(1);
+    expect(
+      invoke.mock.calls.filter(
+        ([command]) => command === "update_desktop_media_playback_state",
+      ),
+    ).toHaveLength(1);
+    expect(
+      invoke.mock.calls.filter(
+        ([command]) => command === "update_desktop_media_position",
+      ),
+    ).toHaveLength(59);
+  });
+
+  it("keeps artwork completion current across position and playback updates", async () => {
+    const artwork = "data:image/png;base64,cG9zaXRpb24tY292ZXI=";
+    let resolveArtwork: (value: unknown) => void = () => undefined;
+    const artworkResult = new Promise((resolve) => {
+      resolveArtwork = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        }),
+      ),
+    );
+    const invoke = vi.fn((command: string) =>
+      command === "cache_desktop_media_artwork"
+        ? artworkResult
+        : Promise.resolve(undefined),
+    );
+    (window as any).__crateTauriInvoke = invoke;
+    const payload: DesktopMediaSessionPayload = {
+      title: "Song",
+      artist: "Artist",
+      album: "Album",
+      artwork,
+      mediaId: "media-position-tick",
+      isPlaying: true,
+      position: 1,
+      duration: 180,
+    };
+
+    syncDesktopMediaSession(payload);
+    syncDesktopMediaSession({ ...payload, isPlaying: false, position: 2 });
+    expect(invoke).toHaveBeenCalledWith("update_desktop_media_position", {
+      payload: { position: 2, duration: 180, playbackRate: 0 },
+    });
+    resolveArtwork("file:///tmp/crate-current-cover.png");
+
+    await vi.waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+        payload: {
+          ...payload,
+          isPlaying: false,
+          position: 2,
+          artwork: "file:///tmp/crate-current-cover.png",
+        },
+      });
+    });
+  });
+
+  it("treats a server or track identity change as new metadata", () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    (window as any).__crateTauriInvoke = invoke;
+    const payload: DesktopMediaSessionPayload = {
+      title: "Same title",
+      artist: "Same artist",
+      album: "Same album",
+      artwork: null,
+      mediaId: "server-a:track-1",
+      isPlaying: true,
+      position: 0,
+      duration: 180,
+    };
+
+    syncDesktopMediaSession(payload);
+    syncDesktopMediaSession({ ...payload, mediaId: "server-b:track-1" });
+
+    expect(
+      invoke.mock.calls.filter(
+        ([command]) => command === "update_desktop_media_session",
+      ),
+    ).toHaveLength(2);
   });
 });
