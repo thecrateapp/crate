@@ -963,12 +963,12 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder =
-            builder
-                .manage(DeepLinkState::default())
-                .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-                    handle_activation_args(app, argv);
-                }));
+        builder = builder
+            .manage(DeepLinkState::default())
+            .manage(offline_storage::OfflineTransferRegistry::default())
+            .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+                handle_activation_args(app, argv);
+            }));
     }
 
     #[cfg(target_os = "macos")]
@@ -1055,6 +1055,11 @@ pub fn run() {
             open_bandcamp_cookie_interceptor,
             linux_desktop_theme_snapshot,
             register_deep_link_listener,
+            offline_storage::register_offline_transfer,
+            offline_storage::cancel_offline_transfer,
+            offline_storage::unregister_offline_transfer,
+            offline_storage::reconcile_offline_media,
+            offline_storage::verify_offline_media_assets,
             offline_storage::download_offline_media
         ])
         .build(tauri::generate_context!())

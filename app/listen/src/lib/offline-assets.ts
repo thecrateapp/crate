@@ -16,6 +16,7 @@ import {
   clearNativeOfflineAssets,
   deleteNativeCachedTrackAsset,
   estimateNativeOfflineBytes,
+  getNativeOfflineAssetsNeedingRefresh,
   getNativeOfflinePlaybackUrl,
   hasCachedNativeTrackAssets,
   offlineTrackFromIdentity,
@@ -64,6 +65,14 @@ export async function hasCachedTrackAssets(
   return new Set(
     cachedKeys.filter((assetKey): assetKey is string => Boolean(assetKey)),
   );
+}
+
+export async function getOfflineAssetsNeedingRefresh(
+  profileKey: string,
+  tracks: OfflineManifestTrack[],
+): Promise<Set<string>> {
+  if (!isOfflineNativeRuntime || !tracks.length) return new Set();
+  return getNativeOfflineAssetsNeedingRefresh(profileKey, tracks);
 }
 
 function expectedTrackBytes(track: OfflineManifestTrack): number {

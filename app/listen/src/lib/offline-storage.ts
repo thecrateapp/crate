@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 
 import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
+import { isTauriRuntime } from "@/lib/platform";
 import {
   getOfflineTrackAssetAliases,
   getOfflineTrackAssetKey,
@@ -72,6 +73,83 @@ function createKeyedWriteChain(): (
 
 const enqueueNativeAssetIndexWrite = createKeyedWriteChain();
 const enqueueNativeSnapshotWrite = createKeyedWriteChain();
+const NATIVE_ASSET_INDEX_BATCH_DELAY_MS = 0;
+
+interface PendingAssetIndexMutation {
+  mutate: (
+    current: Record<string, OfflineNativeAssetRecord>,
+  ) =>
+    | Record<string, OfflineNativeAssetRecord>
+    | Promise<Record<string, OfflineNativeAssetRecord>>;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}
+
+const pendingAssetIndexMutations = new Map<
+  string,
+  PendingAssetIndexMutation[]
+>();
+const pendingAssetIndexTimers = new Map<
+  string,
+  ReturnType<typeof setTimeout>
+>();
+
+function scheduleNativeAssetIndexFlush(profileKey: string): void {
+  if (pendingAssetIndexTimers.has(profileKey)) return;
+  const timer = setTimeout(() => {
+    pendingAssetIndexTimers.delete(profileKey);
+    void flushNativeAssetIndexMutations(profileKey);
+  }, NATIVE_ASSET_INDEX_BATCH_DELAY_MS);
+  pendingAssetIndexTimers.set(profileKey, timer);
+}
+
+async function flushNativeAssetIndexMutations(
+  profileKey: string,
+): Promise<void> {
+  const mutations = pendingAssetIndexMutations.get(profileKey) ?? [];
+  if (!mutations.length) return;
+  pendingAssetIndexMutations.delete(profileKey);
+  const settled = new Set<PendingAssetIndexMutation>();
+  try {
+    await enqueueNativeAssetIndexWrite(profileKey, async () => {
+      const current = await ensureOfflineNativeAssetIndexLoaded(profileKey);
+      let next = current;
+      let changed = false;
+      for (const mutation of mutations) {
+        try {
+          const updated = await mutation.mutate(next);
+          if (updated !== next) changed = true;
+          next = updated;
+        } catch (error) {
+          mutation.reject(error);
+          settled.add(mutation);
+        }
+      }
+      if (changed) {
+        await writeNativeJsonFile(
+          getOfflineNativeAssetIndexPath(profileKey),
+          portableNativeAssetIndex(next),
+        );
+      }
+      nativeAssetIndexCache.set(profileKey, next);
+    });
+    for (const mutation of mutations) {
+      if (settled.has(mutation)) continue;
+      settled.add(mutation);
+      mutation.resolve();
+    }
+  } catch (error) {
+    for (const mutation of mutations) {
+      if (settled.has(mutation)) continue;
+      settled.add(mutation);
+      mutation.reject(error);
+    }
+  } finally {
+    if (pendingAssetIndexMutations.get(profileKey)?.length) {
+      scheduleNativeAssetIndexFlush(profileKey);
+    }
+  }
+}
 
 function isMissingNativeFileError(error: unknown): boolean {
   if (
@@ -465,6 +543,14 @@ export async function ensureOfflineNativeAssetIndexLoaded(
       }
     }
     const hydrated = await hydrateNativeAssetLocators(assets);
+    if (isTauriRuntime && window.__crateTauriInvoke) {
+      await window
+        .__crateTauriInvoke("reconcile_offline_media", {
+          profileKey,
+          referencedPaths: Object.values(hydrated).map((asset) => asset.path),
+        })
+        .catch(() => undefined);
+    }
     nativeAssetIndexCache.set(profileKey, hydrated);
     return hydrated;
   })();
@@ -497,14 +583,11 @@ export async function updateOfflineNativeAssetIndex(
     await saveOfflineNativeAssetIndex(profileKey, next);
     return;
   }
-  await enqueueNativeAssetIndexWrite(profileKey, async () => {
-    const current = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-    const next = await mutate(current);
-    await writeNativeJsonFile(
-      getOfflineNativeAssetIndexPath(profileKey),
-      portableNativeAssetIndex(next),
-    );
-    nativeAssetIndexCache.set(profileKey, next);
+  await new Promise<void>((resolve, reject) => {
+    const mutations = pendingAssetIndexMutations.get(profileKey) ?? [];
+    mutations.push({ mutate, resolve, reject });
+    pendingAssetIndexMutations.set(profileKey, mutations);
+    scheduleNativeAssetIndexFlush(profileKey);
   });
 }
 

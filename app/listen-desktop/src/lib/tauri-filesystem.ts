@@ -1,5 +1,4 @@
 import { appLocalDataDir, BaseDirectory, join } from "@tauri-apps/api/path";
-import { invoke } from "@tauri-apps/api/core";
 import {
   mkdir as tauriMkdir,
   readTextFile,
@@ -11,6 +10,7 @@ import {
 
 const appLocalDataBase = BaseDirectory.AppLocalData;
 const FILE_NOT_FOUND_CODE = "OS-PLUG-FILE-0008";
+let appLocalDataDirPromise: Promise<string> | null = null;
 
 interface PathOptions {
   directory?: string;
@@ -32,7 +32,13 @@ function baseDir(_directory?: string): BaseDirectory {
 }
 
 async function absolutePath(path: string): Promise<string> {
-  return join(await appLocalDataDir(), relativePath(path));
+  if (!appLocalDataDirPromise) {
+    appLocalDataDirPromise = appLocalDataDir().catch((error) => {
+      appLocalDataDirPromise = null;
+      throw error;
+    });
+  }
+  return join(await appLocalDataDirPromise, relativePath(path));
 }
 
 function normalizeFileSystemError(error: unknown): unknown {
@@ -145,22 +151,10 @@ export async function rename(
 }
 
 export async function downloadFile(
-  url: string,
-  path: string,
-  headers?: Record<string, string>,
+  _url: string,
+  _path: string,
+  _headers?: Record<string, string>,
   _options: PathOptions = {},
 ): Promise<{ path: string }> {
-  const normalized = relativePath(path);
-  if (!normalized.startsWith("offline-media/")) {
-    throw new Error("Invalid Tauri offline media path");
-  }
-
-  const target = await withNormalizedFileSystemError(() =>
-    invoke<string>("download_offline_media", {
-      url,
-      path: normalized,
-      headers: headers ?? {},
-    }),
-  );
-  return { path: target };
+  throw new Error("Tauri offline downloads require a scoped transfer");
 }

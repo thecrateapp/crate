@@ -20,6 +20,7 @@ export {
   clearOfflineAssets,
   deleteCachedTrackAsset,
   ensureOfflineStorageBudget,
+  getOfflineAssetsNeedingRefresh,
   hasCachedTrackAsset,
   hasCachedTrackAssets,
   getOfflineNativePlaybackUrl,

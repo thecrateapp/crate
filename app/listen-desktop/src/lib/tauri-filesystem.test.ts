@@ -1,23 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { appLocalDataDirMock, fsMocks, invokeMock, joinMock } = vi.hoisted(
-  () => ({
-    appLocalDataDirMock: vi.fn(),
-    invokeMock: vi.fn(),
-    joinMock: vi.fn(),
-    fsMocks: {
-      mkdir: vi.fn(),
-      readTextFile: vi.fn(),
-      remove: vi.fn(),
-      rename: vi.fn(),
-      stat: vi.fn(),
-      writeTextFile: vi.fn(),
-    },
-  }),
-);
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: invokeMock,
+const { appLocalDataDirMock, fsMocks, joinMock } = vi.hoisted(() => ({
+  appLocalDataDirMock: vi.fn(),
+  joinMock: vi.fn(),
+  fsMocks: {
+    mkdir: vi.fn(),
+    readTextFile: vi.fn(),
+    remove: vi.fn(),
+    rename: vi.fn(),
+    stat: vi.fn(),
+    writeTextFile: vi.fn(),
+  },
 }));
 
 vi.mock("@tauri-apps/api/path", () => ({
@@ -52,9 +45,6 @@ describe("Tauri filesystem adapter", () => {
     appLocalDataDirMock.mockResolvedValue("/app/local-data");
     joinMock.mockImplementation(async (...parts: string[]) => parts.join("/"));
     fsMocks.stat.mockResolvedValue({ size: 42 });
-    invokeMock.mockResolvedValue(
-      "/app/local-data/offline-media/profile/song.m4a",
-    );
   });
 
   it("maps Capacitor Data operations to Tauri AppLocalData", async () => {
@@ -104,31 +94,33 @@ describe("Tauri filesystem adapter", () => {
       size: 42,
       uri: "/app/local-data/offline-media/profile/song.m4a",
     });
+    expect(appLocalDataDirMock).toHaveBeenCalledOnce();
   });
 
-  it("downloads with auth headers through the scoped native command", async () => {
+  it("retries resolving AppLocalData after a failed lookup", async () => {
+    vi.resetModules();
+    appLocalDataDirMock
+      .mockRejectedValueOnce(new Error("profile unavailable"))
+      .mockResolvedValueOnce("/app/local-data");
+    const filesystem = await import("./tauri-filesystem");
+
+    await expect(
+      filesystem.getFileUri("offline-media/profile/song.m4a"),
+    ).rejects.toThrow("profile unavailable");
+    await expect(
+      filesystem.getFileUri("offline-media/profile/song.m4a"),
+    ).resolves.toBe("/app/local-data/offline-media/profile/song.m4a");
+    expect(appLocalDataDirMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects unscoped downloads so callers use the transfer registry", async () => {
     await expect(
       downloadFile(
-        "https://crate.test/api/tracks/1/stream",
+        "https://crate.test/stream",
         "offline-media/profile/song.m4a",
         { Authorization: "Bearer token" },
       ),
-    ).resolves.toEqual({
-      path: "/app/local-data/offline-media/profile/song.m4a",
-    });
-
-    expect(invokeMock).toHaveBeenCalledWith("download_offline_media", {
-      url: "https://crate.test/api/tracks/1/stream",
-      path: "offline-media/profile/song.m4a",
-      headers: { Authorization: "Bearer token" },
-    });
-  });
-
-  it("rejects downloads outside the offline media directory", async () => {
-    await expect(
-      downloadFile("https://crate.test/stream", "offline-meta/index.json"),
-    ).rejects.toThrow("Invalid Tauri offline media path");
-    expect(invokeMock).not.toHaveBeenCalled();
+    ).rejects.toThrow("require a scoped transfer");
   });
 
   it("rejects paths that escape app-local storage", async () => {
