@@ -324,7 +324,7 @@ export function buildPlaylistActions({
 
   async function handleCopyInviteLink() {
     if (!inviteData || typeof window === "undefined") return;
-    const inviteLink = `${window.location.origin}${inviteData.join_url}`;
+    const inviteLink = publicShareUrl(inviteData.join_url);
     try {
       await navigator.clipboard.writeText(inviteLink);
       toast.success(t("playlist.toasts.inviteCopied"));

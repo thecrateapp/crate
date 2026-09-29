@@ -24,6 +24,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.public_urls import public_share_url
 from crate.api.redis_sse import close_pubsub, get_async_redis, open_pubsub
 from crate.api.schemas.jam import (
     JamInviteCreateRequest,
@@ -796,10 +797,11 @@ def create_room_invite(request: Request, room_id: str, body: JamInviteCreateRequ
         expires_in_hours=body.expires_in_hours,
         max_uses=body.max_uses,
     )
+    join_url = public_share_url(f"/jam/invite/{invite['token']}")
     return {
         **invite,
-        "join_url": f"/jam/invite/{invite['token']}",
-        "qr_value": f"/jam/invite/{invite['token']}",
+        "join_url": join_url,
+        "qr_value": join_url,
     }
 
 
