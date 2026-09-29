@@ -374,6 +374,7 @@ export class MusicVisualizer {
       Math.floor(this.canvas.clientHeight * dpr),
       this.quality.maxRenderDimension,
     );
+    this.updateViewportScaleCompensation();
     if (w > 0 && h > 0 && (w !== this.width || h !== this.height)) {
       this.setSize(w, h);
     }

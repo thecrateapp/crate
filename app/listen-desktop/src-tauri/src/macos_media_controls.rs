@@ -519,14 +519,14 @@ unsafe fn load_modern_artwork(image: *mut AnyObject) -> Option<LoadedArtwork> {
         block2::RcBlock::new(move |_size: CGSize| -> *mut AnyObject { image_for_block });
     let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
     if artwork_alloc.is_null() {
-        let _: () = msg_send![image, release];
+        // The caller owns the image until either the legacy fallback consumes
+        // it or the successful modern artwork retains it in the cache.
         return None;
     }
     let artwork: *mut AnyObject =
         msg_send![artwork_alloc, initWithBoundsSize: size, requestHandler: &*request_handler];
 
     if artwork.is_null() {
-        let _: () = msg_send![image, release];
         None
     } else {
         Some(LoadedArtwork {

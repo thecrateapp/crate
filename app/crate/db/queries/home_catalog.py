@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.tx import read_scope
+from crate.db.tx import optional_scope, read_scope
 
 
 def get_recent_global_artist_rows(limit: int = 10) -> list[dict]:
@@ -339,12 +339,14 @@ def get_library_artist_by_id(artist_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def get_followed_artist_genre_names(names: list[str], limit: int) -> list[str]:
+def get_followed_artist_genre_names(
+    names: list[str], limit: int, *, session=None
+) -> list[str]:
     if not names:
         return []
-    with read_scope() as session:
+    with optional_scope(session) as s:
         rows = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT g.name, COUNT(*) AS cnt

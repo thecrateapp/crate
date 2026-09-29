@@ -55,3 +55,29 @@ def test_home_context_preserves_global_identity(monkeypatch):
 
     assert context["top_artists"][0]["global_artist_uid"] == "global-high-vis"
     assert context["top_artists"][0]["artist_name"] == "High Vis"
+
+
+def test_home_context_reuses_caller_session_for_fallback_genres(monkeypatch):
+    session = object()
+    calls: dict[str, object] = {}
+
+    def fake_load_rows(*_args, **kwargs):
+        calls["rows_session"] = kwargs["session"]
+        return {
+            "followed": [{"artist_name": "Artist"}],
+            "saved_albums": [],
+            "top_artists": [],
+            "top_albums": [],
+            "top_genres": [],
+        }
+
+    def fake_genres(_names, _limit, *, session=None):
+        calls["genres_session"] = session
+        return ["rock"]
+
+    monkeypatch.setattr(home_context, "_load_home_context_rows", fake_load_rows)
+    monkeypatch.setattr(home_context, "get_followed_artist_genre_names", fake_genres)
+
+    home_context.get_home_context(7, session=session)
+
+    assert calls == {"rows_session": session, "genres_session": session}

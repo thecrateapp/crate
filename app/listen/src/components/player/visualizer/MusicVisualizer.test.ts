@@ -943,6 +943,38 @@ describe("MusicVisualizer", () => {
       flushRafFrame();
       viz.stop();
     });
+
+    it("refreshes viewport compensation when both render dimensions stay capped", () => {
+      canvas = createTestCanvas(1200, 1200);
+      canvas.dataset.vizReferenceSize = "1000";
+      const viz = new MusicVisualizer(
+        canvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+
+      viz.start();
+      const initialCompensation = (
+        viz as unknown as { viewportScaleCompensation: number }
+      ).viewportScaleCompensation;
+
+      Object.defineProperty(canvas, "clientWidth", {
+        value: 1600,
+        writable: true,
+      });
+      Object.defineProperty(canvas, "clientHeight", {
+        value: 1600,
+        writable: true,
+      });
+      flushRafFrame();
+
+      const resizedCompensation = (
+        viz as unknown as { viewportScaleCompensation: number }
+      ).viewportScaleCompensation;
+      expect(initialCompensation).toBeCloseTo(1000 / 1200);
+      expect(resizedCompensation).toBeCloseTo(0.7);
+      viz.stop();
+    });
   });
 
   // -------------------------------------------------------------------

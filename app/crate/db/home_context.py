@@ -7,7 +7,7 @@ from sqlalchemy import text
 from crate.db.home_cache import _get_or_compute_home_cache
 from crate.db.queries.home import get_followed_artist_genre_names
 from crate.db.releases import get_new_releases
-from crate.db.tx import read_scope
+from crate.db.tx import optional_scope
 from crate.genre_taxonomy import choose_mix_seed_genres, summarize_taste_genres
 
 
@@ -76,10 +76,11 @@ def _load_home_context_rows(
     top_artist_limit: int,
     top_album_limit: int,
     top_genre_limit: int,
+    session=None,
 ) -> dict[str, list[dict]]:
-    with read_scope() as session:
+    with optional_scope(session) as s:
         row = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 WITH followed AS (
@@ -215,12 +216,14 @@ def get_home_context(
     top_artist_limit: int = 28,
     top_album_limit: int = 12,
     top_genre_limit: int = 8,
+    session=None,
 ) -> dict:
     rows = _load_home_context_rows(
         user_id,
         top_artist_limit=top_artist_limit,
         top_album_limit=top_album_limit,
         top_genre_limit=top_genre_limit,
+        session=session,
     )
     followed = rows["followed"]
     saved_albums = rows["saved_albums"]
@@ -249,7 +252,7 @@ def get_home_context(
     )
     if not top_genres_lower and not mix_seed_genres and followed_names_lower:
         fallback_genre_names = get_followed_artist_genre_names(
-            followed_names_lower, top_genre_limit
+            followed_names_lower, top_genre_limit, session=session
         )
         top_genres_lower, mix_seed_genres = _derive_home_genres(
             top_genres, fallback_genre_names, top_genre_limit
@@ -276,7 +279,16 @@ def get_cached_home_context(
     top_artist_limit: int = 28,
     top_album_limit: int = 12,
     top_genre_limit: int = 8,
+    session=None,
 ) -> dict:
+    if session is not None:
+        return get_home_context(
+            user_id,
+            top_artist_limit=top_artist_limit,
+            top_album_limit=top_album_limit,
+            top_genre_limit=top_genre_limit,
+            session=session,
+        )
     cache_key = (
         f"home:context:{_HOME_CONTEXT_CACHE_VERSION}:{_home_context_cache_mode()}:"
         f"{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"

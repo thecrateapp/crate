@@ -28,6 +28,50 @@ function refreshResponse(token: string, refreshToken: string): Response {
 }
 
 describe("createApiAuthTransport configurable-server refresh", () => {
+  it("keeps unauthorized redirects inside the Tauri hash router", async () => {
+    const originalHash = window.location.hash;
+    const originalRuntime = document.documentElement.dataset.listenRuntime;
+    document.documentElement.dataset.listenRuntime = "tauri";
+    window.location.hash = "#/library";
+
+    const apiClient = vi.fn().mockRejectedValue(new ApiError(401, "expired"));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as Response);
+
+    const transport = createApiAuthTransport({
+      apiBase: () => "https://a.example.com",
+      apiClient,
+      apiCredentials: () => "omit",
+      getApiAuthHeaders: () => ({ Authorization: "Bearer access-a" }),
+      getAuthToken: () => "access-a",
+      getAuthTokenExpiresAt: () => null,
+      getCurrentServerId: () => "server-a",
+      getRefreshToken: () => "refresh-a",
+      getServerAuthTokens: () => ({
+        token: "access-a",
+        refreshToken: "refresh-a",
+      }),
+      setAuthToken: vi.fn(),
+      setAuthTokens: vi.fn(),
+      setAuthTokensForServer: vi.fn(() => true),
+      usesConfigurableServer: true,
+    });
+
+    try {
+      await expect(transport.api("/api/library")).rejects.toThrow("expired");
+      expect(window.location.hash).toBe("#/login");
+    } finally {
+      window.location.hash = originalHash;
+      if (originalRuntime === undefined) {
+        delete document.documentElement.dataset.listenRuntime;
+      } else {
+        document.documentElement.dataset.listenRuntime = originalRuntime;
+      }
+    }
+  });
+
   it("does not let a stale refresh overwrite a newer session on the same server", async () => {
     const session = {
       token: "access-a",

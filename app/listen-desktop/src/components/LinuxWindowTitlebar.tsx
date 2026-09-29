@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Minus, Square, X, type LucideIcon } from "lucide-react";
 
@@ -16,22 +16,19 @@ const DEFAULT_BUTTON_LAYOUT: WindowButtonLayout = {
 
 const WINDOW_CONTROLS: Record<
   WindowControl,
-  { label: string; Icon: LucideIcon; colorClass: string }
+  { label: string; Icon: LucideIcon }
 > = {
   minimize: {
     label: "Minimize window",
     Icon: Minus,
-    colorClass: "bg-[#febc2e]",
   },
   maximize: {
     label: "Maximize or restore window",
     Icon: Square,
-    colorClass: "bg-[#28c840]",
   },
   close: {
     label: "Close window",
     Icon: X,
-    colorClass: "bg-[#ff5f57]",
   },
 };
 
@@ -39,7 +36,7 @@ const WINDOW_BUTTON_LAYOUT_ATTRIBUTE = "data-crate-linux-window-button-layout";
 const RESTORED_WINDOW_SIZE = new LogicalSize(1280, 820);
 
 export function LinuxWindowTitlebar() {
-  const currentWindow = getCurrentWindow();
+  const currentWindow = useMemo(() => getCurrentWindow(), []);
   const [layout, setLayout] = useState(readWindowButtonLayout);
   const windowActionInProgressRef = useRef(false);
 
@@ -86,13 +83,15 @@ export function LinuxWindowTitlebar() {
     };
 
     void updateMaximizedState();
-    void currentWindow.onResized(scheduleMaximizedStateUpdate).then((unlisten) => {
-      if (disposed) {
-        unlisten();
-      } else {
-        unlistenResize = unlisten;
-      }
-    });
+    void currentWindow
+      .onResized(scheduleMaximizedStateUpdate)
+      .then((unlisten) => {
+        if (disposed) {
+          unlisten();
+        } else {
+          unlistenResize = unlisten;
+        }
+      });
 
     const observer = new MutationObserver(() => {
       setLayout(readWindowButtonLayout());
@@ -108,10 +107,10 @@ export function LinuxWindowTitlebar() {
       observer.disconnect();
       delete document.documentElement.dataset.crateLinuxWindowMaximized;
     };
-  }, []);
+  }, [currentWindow]);
 
   return (
-    <div className="listen-desktop-window-titlebar fixed inset-x-0 top-0 z-[100] flex h-9 shrink-0 items-center border-b border-border-quiet bg-surface-canvas/82 text-text-secondary backdrop-blur-sm">
+    <div className="listen-desktop-window-titlebar fixed inset-x-0 top-0 flex h-9 shrink-0 items-center border-b border-border-quiet bg-surface-canvas/82 text-text-secondary backdrop-blur-sm">
       <WindowControls
         controls={layout.left}
         window={currentWindow}
@@ -156,7 +155,7 @@ function WindowControls({
   return (
     <div className="relative z-10 flex h-full shrink-0 items-center px-1">
       {controls.map((control) => {
-        const { label, Icon, colorClass } = WINDOW_CONTROLS[control];
+        const { label, Icon } = WINDOW_CONTROLS[control];
         const runAction = {
           minimize: () => window.minimize(),
           maximize: onToggleMaximize,
@@ -173,7 +172,8 @@ function WindowControls({
             type="button"
           >
             <span
-              className={`relative grid size-[13px] place-items-center rounded-full shadow-[inset_0_0_0_1px_rgb(0_0_0_/_0.2)] ${colorClass}`}
+              className="listen-desktop-window-control-dot relative grid size-[13px] place-items-center rounded-full"
+              data-window-control={control}
             >
               <Icon
                 aria-hidden="true"
@@ -196,7 +196,7 @@ function setWindowMaximizedAttribute(maximized: boolean) {
   }
 }
 
-function readWindowButtonLayout(): WindowButtonLayout {
+export function readWindowButtonLayout(): WindowButtonLayout {
   const value = document.documentElement.dataset.crateLinuxWindowButtonLayout;
   if (!value) return DEFAULT_BUTTON_LAYOUT;
 
@@ -213,7 +213,7 @@ function readWindowButtonLayout(): WindowButtonLayout {
   return { left, right };
 }
 
-function parseWindowControls(value: string): WindowControl[] {
+export function parseWindowControls(value: string): WindowControl[] {
   return value
     .split(",")
     .map((control) => control.trim().toLowerCase())

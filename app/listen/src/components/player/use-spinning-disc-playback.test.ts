@@ -65,4 +65,29 @@ describe("useSpinningDiscPlayback", () => {
     expect(cancelAnimationFrame).not.toHaveBeenCalled();
     expect(requestAnimationFrame).toHaveBeenCalledTimes(scheduledFrames);
   });
+
+  it("uses the latest playback time when motion resumes", () => {
+    const requestAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    setVisibilityState("hidden");
+
+    const rotor = document.createElement("div");
+    const { result, rerender } = renderHook(
+      ({ currentTime }) =>
+        useSpinningDiscPlayback({ ...createOptions(), currentTime }),
+      { initialProps: { currentTime: 5 } },
+    );
+    result.current.rotorRef.current = rotor;
+
+    rerender({ currentTime: 12 });
+
+    setVisibilityState("visible");
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(rotor.style.transform).toContain("rotate(1440deg)");
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+  });
 });

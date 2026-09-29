@@ -110,9 +110,29 @@ export function createApiAuthTransport(
     !path.includes("/api/auth/refresh") &&
     !path.includes("/api/auth/logout");
 
+  const currentRoutePathname = (): string => {
+    const hash =
+      typeof window.location.hash === "string" ? window.location.hash : "";
+    if (!hash.startsWith("#/")) return window.location.pathname;
+    try {
+      return new URL(hash.slice(1), window.location.origin).pathname;
+    } catch {
+      return window.location.pathname;
+    }
+  };
+
   const redirectAfterUnauthorized = (): void => {
-    redirectToLoginOnUnauthorized(window.location.pathname, (path) => {
-      window.location.href = path;
+    redirectToLoginOnUnauthorized(currentRoutePathname(), (path) => {
+      const isTauri =
+        document.documentElement.dataset.listenRuntime === "tauri";
+      const hasHashRoute =
+        typeof window.location.hash === "string" &&
+        window.location.hash.startsWith("#/");
+      if (isTauri || hasHashRoute) {
+        window.location.hash = path;
+      } else {
+        window.location.href = path;
+      }
     });
   };
 

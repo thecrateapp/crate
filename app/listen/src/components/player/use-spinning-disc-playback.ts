@@ -32,12 +32,14 @@ export function useSpinningDiscPlayback({
   const animationFrameRef = useRef<number | null>(null);
   const playbackAnchorRef = useRef({ time: currentTime, timestamp: 0 });
   const currentTimeRef = useRef(currentTime);
-  currentTimeRef.current = currentTime;
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
 
   const setRotorRotation = useCallback((rotation: number) => {
     if (!rotorRef.current) return;
-    rotorRef.current.style.transform =
-      `translate3d(0, 0, 0) rotate(${rotation}deg)`;
+    rotorRef.current.style.transform = `translate3d(0, 0, 0) rotate(${rotation}deg)`;
   }, []);
 
   const setPlaybackAnchor = useCallback((time: number) => {
