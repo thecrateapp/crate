@@ -819,8 +819,8 @@ dependencies = [
  "tauri-plugin-http",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
- "tauri-plugin-upload",
  "tauri-plugin-window-state",
+ "tokio",
  "webkit2gtk",
  "windows 0.61.3",
  "zbus",
@@ -1335,21 +1335,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "futures"
-version = "0.3.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b147ee9d1f6d097cef9ce628cd2ee62288d963e16fb287bd9286455b241382d"
-dependencies = [
- "futures-channel",
- "futures-core",
- "futures-executor",
- "futures-io",
- "futures-sink",
- "futures-task",
- "futures-util",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1424,7 +1409,6 @@ version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "389ca41296e6190b48053de0321d02a77f32f8a5d2461dd38762c0593805c6d6"
 dependencies = [
- "futures-channel",
  "futures-core",
  "futures-io",
  "futures-macro",
@@ -3307,17 +3291,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
-name = "read-progress-stream"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6435842fc2fea44b528719eb8c32203bbc1bb2f5b619fbe0c0a3d8350fd8d2a8"
-dependencies = [
- "bytes",
- "futures",
- "pin-project-lite",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4480,25 +4453,6 @@ dependencies = [
  "tracing",
  "windows-sys 0.60.2",
  "zbus",
-]
-
-[[package]]
-name = "tauri-plugin-upload"
-version = "2.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de0a1fd063c08950a13bb30115a1d483179e26d1b857aaf1430d5cd27b76c74b"
-dependencies = [
- "futures-util",
- "log",
- "read-progress-stream",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]

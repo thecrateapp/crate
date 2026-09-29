@@ -14,11 +14,22 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-unmaximize",
     "deep-link:default",
-    "fs:allow-applocaldata-read-recursive",
-    "fs:allow-applocaldata-write-recursive",
-    "fs:allow-applocaldata-meta-recursive",
+    "fs:allow-mkdir",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-stat",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "$APPLOCALDATA/offline-meta",
+        "$APPLOCALDATA/offline-meta/**",
+        "$APPLOCALDATA/offline-media",
+        "$APPLOCALDATA/offline-media/**"
+      ]
+    },
     "opener:default",
-    "upload:default",
     {
       "identifier": "http:default",
       "allow": [

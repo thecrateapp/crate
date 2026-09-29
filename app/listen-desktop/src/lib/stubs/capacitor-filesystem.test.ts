@@ -20,7 +20,6 @@ vi.mock("@tauri-apps/api/path", () => ({
 }));
 
 vi.mock("@tauri-apps/plugin-fs", () => fsMocks);
-vi.mock("@tauri-apps/plugin-upload", () => ({ download: vi.fn() }));
 
 import { Directory, Filesystem } from "./capacitor-filesystem";
 

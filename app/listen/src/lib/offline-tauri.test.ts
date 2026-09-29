@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/platform", () => ({
   isTauriRuntime: true,
+  isWebRuntime: false,
   usesConfigurableServer: true,
   usesNativeFilesystem: true,
 }));
@@ -11,7 +12,7 @@ vi.mock("@/lib/capacitor-runtime", () => ({
   isNative: false,
 }));
 
-import { isOfflineSupported } from "./offline";
+import { isOfflineSupported, primeOfflineRuntimeProfile } from "./offline";
 
 describe("Tauri offline runtime", () => {
   it("advertises offline support when the desktop filesystem backend is present", () => {
@@ -34,6 +35,30 @@ describe("Tauri offline runtime", () => {
         configurable: true,
         value: originalCaches,
       });
+      Object.defineProperty(navigator, "serviceWorker", {
+        configurable: true,
+        value: originalServiceWorker,
+      });
+    }
+  });
+
+  it("does not wait for a service worker that Tauri never registers", async () => {
+    const originalServiceWorker = navigator.serviceWorker;
+    const readyMock = vi.fn(() => Promise.resolve({ active: null }));
+    const serviceWorker = Object.defineProperty({}, "ready", {
+      configurable: true,
+      get: readyMock,
+    });
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: serviceWorker,
+    });
+
+    try {
+      await primeOfflineRuntimeProfile();
+
+      expect(readyMock).not.toHaveBeenCalled();
+    } finally {
       Object.defineProperty(navigator, "serviceWorker", {
         configurable: true,
         value: originalServiceWorker,

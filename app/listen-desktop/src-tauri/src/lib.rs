@@ -40,6 +40,8 @@ mod macos_dock_menu;
 #[cfg(target_os = "macos")]
 mod macos_media_controls;
 mod observability;
+#[cfg(desktop)]
+mod offline_storage;
 #[cfg(target_os = "windows")]
 mod windows_media_controls;
 
@@ -982,7 +984,6 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_upload::init())
         .plugin(
             tauri_plugin_window_state::Builder::new()
                 .with_state_flags(StateFlags::POSITION | StateFlags::MAXIMIZED)
@@ -1046,7 +1047,8 @@ pub fn run() {
             ensure_desktop_window_size,
             open_bandcamp_cookie_interceptor,
             linux_desktop_theme_snapshot,
-            register_deep_link_listener
+            register_deep_link_listener,
+            offline_storage::download_offline_media
         ])
         .build(tauri::generate_context!())
         .expect("error while building Crate desktop")

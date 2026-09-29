@@ -2,6 +2,7 @@ import { getApiBase } from "@/lib/api";
 import { getStoredAuthUserId } from "@/lib/auth-user-storage";
 import { encodeOfflineProfileIdentity } from "@/lib/offline-store";
 import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
+import { isWebRuntime } from "@/lib/platform";
 import { getOfflineTrackAssetKey } from "@/lib/offline-track-identity";
 import {
   hydrateOfflineProfileState,
@@ -168,7 +169,11 @@ export function getOfflineActionLabel(state: OfflineItemState): string {
 export async function syncOfflineProfileToServiceWorker(
   profileKey: string | null,
 ): Promise<void> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator))
+  if (
+    !isWebRuntime ||
+    typeof navigator === "undefined" ||
+    !("serviceWorker" in navigator)
+  )
     return;
 
   const payload = { type: "crate:set-offline-profile", profileKey };

@@ -1,4 +1,5 @@
 import { appLocalDataDir, BaseDirectory, join } from "@tauri-apps/api/path";
+import { invoke } from "@tauri-apps/api/core";
 import {
   mkdir as tauriMkdir,
   readTextFile,
@@ -7,7 +8,6 @@ import {
   stat as tauriStat,
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
-import { download as tauriDownload } from "@tauri-apps/plugin-upload";
 
 const appLocalDataBase = BaseDirectory.AppLocalData;
 
@@ -109,8 +109,15 @@ export async function downloadFile(
   headers?: Record<string, string>,
   _options: PathOptions = {},
 ): Promise<{ path: string }> {
-  const target = await absolutePath(path);
-  const headerMap = headers ? new Map(Object.entries(headers)) : undefined;
-  await tauriDownload(url, target, undefined, headerMap);
+  const normalized = relativePath(path);
+  if (!normalized.startsWith("offline-media/")) {
+    throw new Error("Invalid Tauri offline media path");
+  }
+
+  const target = await invoke<string>("download_offline_media", {
+    url,
+    path: normalized,
+    headers: headers ?? {},
+  });
   return { path: target };
 }

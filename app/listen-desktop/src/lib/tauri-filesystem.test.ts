@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { appLocalDataDirMock, downloadMock, fsMocks, joinMock } = vi.hoisted(
+const { appLocalDataDirMock, fsMocks, invokeMock, joinMock } = vi.hoisted(
   () => ({
     appLocalDataDirMock: vi.fn(),
-    downloadMock: vi.fn(),
+    invokeMock: vi.fn(),
     joinMock: vi.fn(),
     fsMocks: {
       mkdir: vi.fn(),
@@ -15,6 +15,10 @@ const { appLocalDataDirMock, downloadMock, fsMocks, joinMock } = vi.hoisted(
     },
   }),
 );
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: invokeMock,
+}));
 
 vi.mock("@tauri-apps/api/path", () => ({
   BaseDirectory: { AppLocalData: "APP_LOCAL_DATA" },
@@ -29,10 +33,6 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   rename: fsMocks.rename,
   stat: fsMocks.stat,
   writeTextFile: fsMocks.writeTextFile,
-}));
-
-vi.mock("@tauri-apps/plugin-upload", () => ({
-  download: downloadMock,
 }));
 
 import {
@@ -52,6 +52,9 @@ describe("Tauri filesystem adapter", () => {
     appLocalDataDirMock.mockResolvedValue("/app/local-data");
     joinMock.mockImplementation(async (...parts: string[]) => parts.join("/"));
     fsMocks.stat.mockResolvedValue({ size: 42 });
+    invokeMock.mockResolvedValue(
+      "/app/local-data/offline-media/profile/song.m4a",
+    );
   });
 
   it("maps Capacitor Data operations to Tauri AppLocalData", async () => {
@@ -103,19 +106,29 @@ describe("Tauri filesystem adapter", () => {
     });
   });
 
-  it("downloads with auth headers to an absolute app-local path", async () => {
-    await downloadFile(
-      "https://crate.test/api/tracks/1/stream",
-      "offline-media/profile/song.m4a",
-      { Authorization: "Bearer token" },
-    );
+  it("downloads with auth headers through the scoped native command", async () => {
+    await expect(
+      downloadFile(
+        "https://crate.test/api/tracks/1/stream",
+        "offline-media/profile/song.m4a",
+        { Authorization: "Bearer token" },
+      ),
+    ).resolves.toEqual({
+      path: "/app/local-data/offline-media/profile/song.m4a",
+    });
 
-    expect(downloadMock).toHaveBeenCalledWith(
-      "https://crate.test/api/tracks/1/stream",
-      "/app/local-data/offline-media/profile/song.m4a",
-      undefined,
-      new Map([["Authorization", "Bearer token"]]),
-    );
+    expect(invokeMock).toHaveBeenCalledWith("download_offline_media", {
+      url: "https://crate.test/api/tracks/1/stream",
+      path: "offline-media/profile/song.m4a",
+      headers: { Authorization: "Bearer token" },
+    });
+  });
+
+  it("rejects downloads outside the offline media directory", async () => {
+    await expect(
+      downloadFile("https://crate.test/stream", "offline-meta/index.json"),
+    ).rejects.toThrow("Invalid Tauri offline media path");
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
   it("rejects paths that escape app-local storage", async () => {
