@@ -180,8 +180,9 @@ describe("ExtendedPlayer", () => {
       artist: "Crate",
     });
 
+    const onClose = vi.fn();
     renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      <ExtendedPlayer open={false} onClose={onClose} />,
       {
         playerActions: createMockPlayerActions({
           currentTrack: track,
@@ -196,6 +197,7 @@ describe("ExtendedPlayer", () => {
       .click(screen.getByRole("button", { name: "Open artist" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/artists/crate");
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("hides the desktop Equalizer access when it is globally disabled", () => {

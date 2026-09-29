@@ -185,6 +185,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
 
   function goToArtist() {
     if (!resolvedArtist?.id && !resolvedArtist?.globalArtistUid) return;
+    onClose();
     navigate(
       resolvedArtist.globalArtistUid
         ? artistPagePath({
