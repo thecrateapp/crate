@@ -4,11 +4,34 @@ html[data-crate-linux-theme="true"] {
   --active-dot: var(--crate-linux-accent, #3584e4);
 }
 
+html[data-crate-linux-window-chrome="true"] {
+  --crate-window-chrome-height: 2.25rem;
+  --crate-window-corner-radius: 12px;
+  background: transparent;
+}
+
+html[data-crate-linux-window-chrome="true"][data-crate-linux-window-maximized="true"] {
+  --crate-window-corner-radius: 0px;
+}
+
+html[data-crate-linux-window-chrome="true"] .min-h-dvh {
+  min-height: calc(var(--listen-viewport-height) - var(--crate-window-chrome-height));
+}
+
+html[data-crate-linux-window-chrome="true"] .listen-desktop-sidebar,
+html[data-crate-linux-window-chrome="true"] .listen-desktop-header {
+  top: var(--crate-window-chrome-height);
+}
+
+html[data-crate-linux-window-chrome="true"] .listen-glass-panel--dock {
+  top: var(--crate-window-chrome-height);
+}
+
 html[data-crate-linux-desktop="true"],
 html[data-crate-linux-desktop="true"] body,
 html[data-crate-linux-desktop="true"] #root {
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
   scrollbar-color: transparent transparent !important;
   scrollbar-width: none !important;
 }
@@ -113,4 +136,28 @@ html[data-crate-linux-theme="true"][data-crate-linux-scheme="light"] {
 html[data-crate-linux-theme="true"] body,
 html[data-crate-linux-theme="true"] #root {
   background: var(--surface-app);
+}
+
+html[data-crate-linux-window-chrome="true"],
+html[data-crate-linux-window-chrome="true"] body {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html[data-crate-linux-window-chrome="true"] #root {
+  position: fixed;
+  inset: 0;
+  height: 100%;
+  min-height: 0;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--crate-window-corner-radius);
+  clip-path: inset(0 round var(--crate-window-corner-radius));
+  background: var(--surface-app);
+}
+
+html[data-crate-linux-window-chrome="true"] body {
+  background: transparent;
 }

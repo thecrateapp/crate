@@ -31,10 +31,13 @@ export function useSpinningDiscPlayback({
   const rotorRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const playbackAnchorRef = useRef({ time: currentTime, timestamp: 0 });
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
 
   const setRotorRotation = useCallback((rotation: number) => {
     if (!rotorRef.current) return;
-    rotorRef.current.style.transform = `rotate(${rotation}deg)`;
+    rotorRef.current.style.transform =
+      `translate3d(0, 0, 0) rotate(${rotation}deg)`;
   }, []);
 
   const setPlaybackAnchor = useCallback((time: number) => {
@@ -103,8 +106,9 @@ export function useSpinningDiscPlayback({
     }
 
     if (!isPlaying || isBuffering) {
-      setPlaybackAnchor(currentTime);
-      setRotorRotation(currentTime * DISC_DEGREES_PER_SECOND);
+      const latestTime = currentTimeRef.current;
+      setPlaybackAnchor(latestTime);
+      setRotorRotation(latestTime * DISC_DEGREES_PER_SECOND);
       return;
     }
 
@@ -120,10 +124,14 @@ export function useSpinningDiscPlayback({
         animationFrameRef.current = null;
       }
       if (isMotionBlocked()) {
-        setPlaybackAnchor(currentTime);
-        setRotorRotation(currentTime * DISC_DEGREES_PER_SECOND);
+        const latestTime = currentTimeRef.current;
+        setPlaybackAnchor(latestTime);
+        setRotorRotation(latestTime * DISC_DEGREES_PER_SECOND);
         return;
       }
+      const latestTime = currentTimeRef.current;
+      setPlaybackAnchor(latestTime);
+      setRotorRotation(latestTime * DISC_DEGREES_PER_SECOND);
       animationFrameRef.current = window.requestAnimationFrame(tick);
     };
 
@@ -138,7 +146,6 @@ export function useSpinningDiscPlayback({
       }
     };
   }, [
-    currentTime,
     dragRotation,
     isBuffering,
     isPlaying,

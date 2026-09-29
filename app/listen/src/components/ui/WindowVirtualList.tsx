@@ -5,11 +5,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
   CONTENT_DENSITY_METRICS,
   useContentDensity,
 } from "@/lib/content-density";
+import {
+  getListenViewportScrollElement,
+  getListenViewportScrollTop,
+  usesListenRootScrollContainer,
+} from "@/lib/viewport-scroll";
 
 interface WindowVirtualListProps<T> {
   items: T[];
@@ -38,13 +43,26 @@ export function WindowVirtualList<T>({
     },
     [itemKey, items],
   );
-  const virtualizer = useWindowVirtualizer({
-    count: items.length,
+  const usesRootScrollContainer = usesListenRootScrollContainer();
+  const windowVirtualizer = useWindowVirtualizer({
+    count: usesRootScrollContainer ? 0 : items.length,
     estimateSize: () => resolvedEstimateSize,
     overscan,
     scrollMargin,
     getItemKey,
   });
+  const rootVirtualizer = useVirtualizer({
+    count: usesRootScrollContainer ? items.length : 0,
+    estimateSize: () => resolvedEstimateSize,
+    overscan,
+    scrollMargin,
+    getItemKey,
+    getScrollElement: getListenViewportScrollElement,
+    initialOffset: getListenViewportScrollTop,
+  });
+  const virtualizer = usesRootScrollContainer
+    ? rootVirtualizer
+    : windowVirtualizer;
 
   useLayoutEffect(() => {
     virtualizer.measure();
@@ -55,7 +73,9 @@ export function WindowVirtualList<T>({
     if (!node) return;
 
     const measure = () => {
-      setScrollMargin(node.getBoundingClientRect().top + window.scrollY);
+      setScrollMargin(
+        node.getBoundingClientRect().top + getListenViewportScrollTop(),
+      );
     };
     measure();
 

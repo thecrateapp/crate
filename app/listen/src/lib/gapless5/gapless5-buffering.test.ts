@@ -4,6 +4,7 @@ import {
   Gapless5,
   getBufferedAheadSeconds,
   getLoadableTrackIndices,
+  getStartOffsetMs,
 } from "@/lib/gapless5/gapless5";
 
 afterEach(() => {
@@ -67,6 +68,20 @@ describe("getLoadableTrackIndices", () => {
 
   it("keeps the unlimited mode bounded to real source indices", () => {
     expect(getLoadableTrackIndices(0, 3, -1)).toEqual([0, 1, 2]);
+  });
+});
+
+describe("getStartOffsetMs", () => {
+  it("keeps the restored WebAudio offset when HTML5 is paused at zero", () => {
+    expect(getStartOffsetMs(true, 0, false, 53_760, 0.02, 7)).toBe(53_760);
+  });
+
+  it("syncs to the HTML5 clock while that element is actively playing", () => {
+    expect(getStartOffsetMs(true, 12.5, true, 0, 0.02, 7)).toBe(12_527);
+  });
+
+  it("uses the internal offset if the active HTML5 clock is still at zero", () => {
+    expect(getStartOffsetMs(true, 0, true, 420, 0.02, 7)).toBe(420);
   });
 });
 
@@ -314,6 +329,122 @@ describe("Gapless5 mobile background auto-advance", () => {
 });
 
 describe("Gapless5 WebAudio promotion", () => {
+  it("starts a queued WebAudio resume from the restored paused position", async () => {
+    let resolveDecode: ((buffer: { duration: number }) => void) | undefined;
+    const decodePromise = new Promise<{ duration: number }>((resolve) => {
+      resolveDecode = resolve;
+    });
+    const instances: FakeAudio[] = [];
+    const startedSources: Array<{ start: ReturnType<typeof vi.fn> }> = [];
+
+    class FakeAudio extends EventTarget {
+      buffered = ranges([]);
+      controls = false;
+      crossOrigin: string | null = null;
+      currentTime = 0;
+      duration = Number.NaN;
+      error: MediaError | null = null;
+      loop = false;
+      networkState = 1;
+      paused = true;
+      playbackRate = 1;
+      preload = "auto";
+      preservesPitch = true;
+      readyState = 0;
+      seekable = ranges([]);
+      src = "";
+      srcObject: MediaProvider | null = null;
+      volume = 1;
+
+      constructor() {
+        super();
+        instances.push(this);
+      }
+
+      load() {}
+
+      pause() {
+        this.paused = true;
+      }
+
+      play() {
+        // The constructor's unlock probe calls play() without handling a
+        // rejection; keep the fake media element inert for that probe.
+        return Promise.resolve();
+      }
+    }
+
+    const node = () => ({
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    });
+    const context = {
+      baseLatency: 0,
+      currentTime: 0,
+      destination: node(),
+      state: "running",
+      createBufferSource: vi.fn(() => {
+        const source = {
+          ...node(),
+          buffer: null,
+          loop: false,
+          playbackRate: { value: 1 },
+          start: vi.fn(),
+          stop: vi.fn(),
+        };
+        startedSources.push(source);
+        return source;
+      }),
+      createGain: vi.fn(() => ({
+        ...node(),
+        gain: {
+          value: 1,
+          linearRampToValueAtTime: vi.fn(),
+        },
+      })),
+      decodeAudioData: vi.fn(() => decodePromise),
+      resume: vi.fn(() => Promise.resolve()),
+    };
+
+    vi.stubGlobal("Audio", FakeAudio);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => new ArrayBuffer(8),
+      })),
+    );
+    Object.defineProperty(window, "gapless5AudioContext", {
+      configurable: true,
+      writable: true,
+      value: context,
+    });
+
+    const player = new Gapless5({
+      tracks: ["one"],
+      useHTML5Audio: true,
+      useWebAudio: true,
+    });
+    expect(instances[0]?.paused).toBe(true);
+
+    // Match Tauri recovery: set the saved position and queue play while the
+    // WebAudio buffer is still decoding and HTML5 cannot play the FLAC.
+    player.setPosition(53_760);
+    player.play();
+    for (let index = 0; index < 6; index += 1) await Promise.resolve();
+    expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+
+    resolveDecode?.({ duration: 180 });
+    for (let index = 0; index < 8; index += 1) await Promise.resolve();
+
+    expect(startedSources).toHaveLength(1);
+    expect(startedSources[0]!.start).toHaveBeenCalledWith(0, 53.76);
+
+    player.removeAllTracks();
+    Reflect.deleteProperty(window, "gapless5AudioContext");
+  });
+
   it("promotes an active HTML5 source when its WebAudio buffer finishes decoding", async () => {
     vi.useFakeTimers();
     let resolveDecode: ((buffer: { duration: number }) => void) | undefined;

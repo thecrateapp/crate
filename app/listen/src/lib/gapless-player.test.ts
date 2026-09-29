@@ -246,6 +246,30 @@ describe("initPlayer", () => {
     expect(isCurrentTrackFullyBuffered()).toBe(true);
   });
 
+  it("keeps a decoded current-track buffer available when decode finishes while paused", () => {
+    mock.getTrack.mockReturnValue("/tracks/1/stream");
+    initPlayer();
+
+    const onLoad = (mock as unknown as Record<string, unknown>).onload as
+      | ((path: string, fullyLoaded: boolean) => void)
+      | undefined;
+    onLoad?.("/tracks/1/stream", true);
+
+    expect(isCurrentTrackFullyBuffered()).toBe(true);
+  });
+
+  it("does not mark a decoded adjacent track as the current buffer", () => {
+    mock.getTrack.mockReturnValue("/tracks/1/stream");
+    initPlayer();
+
+    const onLoad = (mock as unknown as Record<string, unknown>).onload as
+      | ((path: string, fullyLoaded: boolean) => void)
+      | undefined;
+    onLoad?.("/tracks/2/stream", true);
+
+    expect(isCurrentTrackFullyBuffered()).toBe(false);
+  });
+
   it("wires onpause to callbacks", () => {
     const onPause = vi.fn();
     initPlayer({ onPause });

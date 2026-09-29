@@ -2,6 +2,7 @@ type LinuxDesktopThemeSnapshot = {
   scheme?: "dark" | "light" | string | null;
   accent?: string | null;
   gtkTheme?: string | null;
+  windowButtonLayout?: string | null;
   iconTheme?: string | null;
   cursorTheme?: string | null;
   fontName?: string | null;
@@ -55,6 +56,7 @@ function applyLinuxDesktopTheme(
   if (!snapshot || !hasThemeSignal(snapshot)) {
     delete root.dataset.crateLinuxTheme;
     delete root.dataset.crateLinuxScheme;
+    delete root.dataset.crateLinuxWindowButtonLayout;
     root.style.removeProperty("--crate-linux-accent");
     root.style.removeProperty("--crate-linux-font-family");
     return;
@@ -73,6 +75,15 @@ function applyLinuxDesktopTheme(
 
   setCssProperty(root, "--crate-linux-accent", accent);
   setCssProperty(root, "--crate-linux-font-family", fontFamily);
+
+  const windowButtonLayout = normalizeWindowButtonLayout(
+    snapshot.windowButtonLayout,
+  );
+  if (windowButtonLayout) {
+    root.dataset.crateLinuxWindowButtonLayout = windowButtonLayout;
+  } else {
+    delete root.dataset.crateLinuxWindowButtonLayout;
+  }
 }
 
 function hasThemeSignal(snapshot: LinuxDesktopThemeSnapshot): boolean {
@@ -80,11 +91,18 @@ function hasThemeSignal(snapshot: LinuxDesktopThemeSnapshot): boolean {
     snapshot.scheme ||
       snapshot.accent ||
       snapshot.gtkTheme ||
+      snapshot.windowButtonLayout ||
       snapshot.iconTheme ||
       snapshot.cursorTheme ||
       snapshot.fontName ||
       snapshot.textScale,
   );
+}
+
+function normalizeWindowButtonLayout(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  if (!normalized || normalized.length > 128) return null;
+  return normalized;
 }
 
 function normalizeScheme(

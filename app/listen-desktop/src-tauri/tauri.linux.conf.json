@@ -1,0 +1,19 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Crate",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1280,
+        "minHeight": 820,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
+        "backgroundColor": "#00000000"
+      }
+    ]
+  }
+}

@@ -1,8 +1,13 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, useWindowVirtualizer } from "@tanstack/react-virtual";
 
 import { TrackRow } from "@/components/cards/TrackRow";
 import { useContentDensity } from "@/lib/content-density";
+import {
+  getListenViewportScrollElement,
+  getListenViewportScrollTop,
+  usesListenRootScrollContainer,
+} from "@/lib/viewport-scroll";
 import { CONTENT_DENSITY_METRICS } from "@crate/ui/lib/content-density";
 import { toTrackRowData } from "@/lib/track-row-data";
 import type {
@@ -44,13 +49,26 @@ function VirtualizedCuratedTrackList(props: CuratedTrackListProps) {
   const density = useContentDensity();
   const listRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
-  const rowVirtualizer = useWindowVirtualizer({
-    count: props.tracks.length,
+  const usesRootScrollContainer = usesListenRootScrollContainer();
+  const windowVirtualizer = useWindowVirtualizer({
+    count: usesRootScrollContainer ? 0 : props.tracks.length,
     estimateSize: () => CONTENT_DENSITY_METRICS[density].rowEstimate,
     getItemKey: (index) => props.tracks[index]?.id ?? index,
     overscan: 12,
     scrollMargin,
   });
+  const rootVirtualizer = useVirtualizer({
+    count: usesRootScrollContainer ? props.tracks.length : 0,
+    estimateSize: () => CONTENT_DENSITY_METRICS[density].rowEstimate,
+    getItemKey: (index) => props.tracks[index]?.id ?? index,
+    overscan: 12,
+    scrollMargin,
+    getScrollElement: getListenViewportScrollElement,
+    initialOffset: getListenViewportScrollTop,
+  });
+  const rowVirtualizer = usesRootScrollContainer
+    ? rootVirtualizer
+    : windowVirtualizer;
 
   useLayoutEffect(() => {
     rowVirtualizer.measure();
@@ -61,7 +79,9 @@ function VirtualizedCuratedTrackList(props: CuratedTrackListProps) {
     if (!node) return;
 
     const measure = () => {
-      setScrollMargin(node.getBoundingClientRect().top + window.scrollY);
+      setScrollMargin(
+        node.getBoundingClientRect().top + getListenViewportScrollTop(),
+      );
     };
     measure();
 

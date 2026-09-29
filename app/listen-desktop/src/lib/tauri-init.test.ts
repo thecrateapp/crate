@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import {
   mergeInitialDeepLinkUrls,
   shouldUseTauriHttpPlugin,
 } from "./tauri-init";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("mergeInitialDeepLinkUrls", () => {
   it("preserves buffered callbacks and deduplicates launch URLs", () => {
@@ -28,6 +32,27 @@ describe("shouldUseTauriHttpPlugin", () => {
     expect(shouldUseTauriHttpPlugin("https://api.example.com/health")).toBe(
       true,
     );
+  });
+
+  it.each([
+    "https://api.example.com/api/tracks/by-entity/track-1/stream?media_ticket=ticket",
+    "https://api.example.com/api/catalog/tracks/track-1/stream",
+    "https://api.example.com/api/playback/variants/variant-1/stream",
+    "https://api.example.com/rest/stream.view?id=track-1",
+  ])("uses WebView fetch for media streams from a packaged Tauri origin: %s", (url) => {
+    vi.stubGlobal("window", { location: { origin: "tauri://localhost" } });
+    expect(shouldUseTauriHttpPlugin(url)).toBe(false);
+  });
+
+  it("keeps media streams on the privileged client from the Vite dev origin", () => {
+    vi.stubGlobal("window", {
+      location: { origin: "http://127.0.0.1:5178" },
+    });
+    expect(
+      shouldUseTauriHttpPlugin(
+        "https://api.example.com/api/tracks/by-entity/track-1/stream",
+      ),
+    ).toBe(true);
   });
 
   it.each([
@@ -70,7 +95,7 @@ describe("shouldUseTauriHttpPlugin", () => {
         "https://*:*",
         "http://localhost:*",
         "http://127.0.0.1:*",
-        "http://[::1]:*",
+        "http://[\\:\\:1]:*",
       ]),
     );
   });

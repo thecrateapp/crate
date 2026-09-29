@@ -72,6 +72,11 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const vizSettingsRef = useRef<HTMLDivElement>(null);
   const vizSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const vizRef = useRef<MusicVisualizer | null>(null);
+  const visualizerQualityProfile =
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.crateLinuxWindowChrome === "true"
+      ? "tauri-linux"
+      : "default";
   const playbackState = useMemo(
     () => ({ isPlaying, volume }),
     [isPlaying, volume],
@@ -100,6 +105,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     playbackState,
     "spheres",
     vizRef,
+    visualizerQualityProfile,
   );
 
   // Measure cover position relative to the left panel and give the WebGL

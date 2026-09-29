@@ -24,6 +24,7 @@ function createOptions() {
 afterEach(() => {
   setVisibilityState("visible");
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("useSpinningDiscPlayback", () => {
@@ -43,5 +44,25 @@ describe("useSpinningDiscPlayback", () => {
     });
 
     expect(requestAnimationFrame).toHaveBeenCalledOnce();
+  });
+
+  it("keeps its animation frame running across playback progress updates", () => {
+    const requestAnimationFrame = vi.fn(() => 1);
+    const cancelAnimationFrame = vi.fn();
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+    vi.spyOn(performance, "now").mockReturnValue(1000);
+
+    const { rerender } = renderHook(
+      ({ currentTime }) =>
+        useSpinningDiscPlayback({ ...createOptions(), currentTime }),
+      { initialProps: { currentTime: 5 } },
+    );
+    const scheduledFrames = requestAnimationFrame.mock.calls.length;
+
+    rerender({ currentTime: 5.2 });
+
+    expect(cancelAnimationFrame).not.toHaveBeenCalled();
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(scheduledFrames);
   });
 });

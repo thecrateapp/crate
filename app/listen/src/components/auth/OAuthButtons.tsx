@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api, getApiBase } from "@/lib/api";
 import { beginNativeOAuth, isNative } from "@/lib/capacitor";
 import { isTauriRuntime } from "@/lib/platform";
+import { recordTauriAuthDiagnostic } from "@/lib/tauri-auth-diagnostic";
 import { OAuthButtons as OAuthButtonsBase } from "@crate/ui/domain/auth/OAuthButtons";
 
 interface OAuthButtonsProps {
@@ -12,13 +13,38 @@ interface OAuthButtonsProps {
   inviteToken?: string;
 }
 
-const fetchProviders = () =>
-  api<
-    Record<
-      string,
-      { enabled: boolean; configured: boolean; login_url: string | null }
-    >
-  >("/api/auth/providers");
+const fetchProviders = async () => {
+  try {
+    const providers = await api<
+      Record<
+        string,
+        { enabled: boolean; configured: boolean; login_url: string | null }
+      >
+    >("/api/auth/providers");
+
+    if (isTauriRuntime) {
+      const google = providers.google;
+      const enabled = google?.enabled ?? "missing";
+      const configured = google?.configured ?? "missing";
+      recordTauriAuthDiagnostic(
+        google?.enabled && google?.configured
+          ? "Google OAuth available"
+          : "Google OAuth unavailable",
+        `enabled=${enabled}, configured=${configured}`,
+      );
+    }
+
+    return providers;
+  } catch (error) {
+    if (isTauriRuntime) {
+      recordTauriAuthDiagnostic(
+        "OAuth providers request failed",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    throw error;
+  }
+};
 
 function oauthProvider(loginUrl: string): "google" | "apple" {
   return /(?:^|[/?])apple(?:[/?]|$)/i.test(loginUrl) ? "apple" : "google";

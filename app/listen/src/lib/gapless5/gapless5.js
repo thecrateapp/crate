@@ -89,6 +89,28 @@ function getLoadableTrackIndices(trackNumber, totalTracks, loadLimit) {
   return Array.from({ length: limit }, (_value, index) => start + index);
 }
 
+function getStartOffsetMs(
+  syncPosition,
+  audioCurrentTime,
+  audioIsPlaying,
+  position,
+  syncLatencySec,
+  avgTickMs,
+) {
+  // Only use the HTML5 clock while it is actively driving playback. During
+  // resume/recovery the element can be paused (and often stays at 0 for FLAC
+  // on WebKitGTK), while `position` contains the restored WebAudio offset.
+  if (
+    syncPosition &&
+    audioIsPlaying &&
+    Number.isFinite(audioCurrentTime) &&
+    audioCurrentTime > 0
+  ) {
+    return (audioCurrentTime + syncLatencySec) * 1000 + avgTickMs;
+  }
+  return position;
+}
+
 const devLog = (scope, message, detail, level = "info") => {
   try {
     globalThis.__crateDevLog?.(scope, message, detail, level);
@@ -462,13 +484,14 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   };
 
   const getStartOffsetMS = (syncPosition, syncLatencySec) => {
-    if (syncPosition && audio) {
-      // offset will fall behind by a tick, factor this in when syncing position
-      return audio.currentTime
-        ? (audio.currentTime + syncLatencySec) * 1000 + player.avgTickMS
-        : 0;
-    }
-    return position;
+    return getStartOffsetMs(
+      syncPosition,
+      audio?.currentTime ?? 0,
+      audio !== null && !audio.paused,
+      position,
+      syncLatencySec,
+      player.avgTickMS,
+    );
   };
 
   const playAudioFile = (syncPosition, webAudioSwitched) => {
@@ -507,8 +530,26 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             source.connect(gainNode);
           }
 
-          const offsetSec =
-            getStartOffsetMS(syncPosition, player.context.baseLatency) / 1000;
+          const startOffsetMs = getStartOffsetMS(
+            syncPosition,
+            player.context.baseLatency,
+          );
+          if (syncPosition || position > 0) {
+            devLog(
+              "gapless5",
+              "webaudio start offset",
+              {
+                trackIndex: player.getIndex(),
+                syncPosition,
+                internalPositionMs: position,
+                html5CurrentTimeMs: audio ? audio.currentTime * 1000 : null,
+                html5Paused: audio ? audio.paused : null,
+                startOffsetMs,
+              },
+              "info",
+            );
+          }
+          const offsetSec = startOffsetMs / 1000;
           log.debug(
             `Playing WebAudio${looped ? " (looped)" : ""}: ${
               this.audioPath
@@ -2491,4 +2532,5 @@ export {
   CrossfadeShape,
   getBufferedAheadSeconds,
   getLoadableTrackIndices,
+  getStartOffsetMs,
 };

@@ -3,6 +3,7 @@ import { MusicVisualizer } from "./MusicVisualizer";
 import { createAnalyserNode } from "@/hooks/use-audio-visualizer";
 import { getAnalyserNode } from "@/lib/gapless-player";
 import type { VisualizerMode } from "@/lib/player-visualizer-prefs";
+import type { VisualizerQualityProfileName } from "./visualizer-quality";
 
 function dbg(msg: string) {
   const d = document.getElementById("viz-debug");
@@ -16,6 +17,7 @@ export function useMusicVisualizer(
   playbackState: { volume: number; isPlaying: boolean },
   mode: VisualizerMode = "spheres",
   externalVizRef?: MutableRefObject<MusicVisualizer | null>,
+  qualityProfile: VisualizerQualityProfileName = "default",
 ) {
   const internalVizRef = useRef<MusicVisualizer | null>(null);
   const vizRef = externalVizRef ?? internalVizRef;
@@ -103,6 +105,7 @@ export function useMusicVisualizer(
           node,
           () => playbackStateRef.current,
           mode,
+          qualityProfile,
         );
         vizRef.current = viz;
         viz.start();
@@ -125,7 +128,7 @@ export function useMusicVisualizer(
       }
       animationFrameIds.clear();
     };
-  }, [active, canvasRef, externalVizRef, mode, trackKey]);
+  }, [active, canvasRef, externalVizRef, mode, qualityProfile, trackKey]);
 
   useEffect(() => {
     if (!active && vizRef.current) {

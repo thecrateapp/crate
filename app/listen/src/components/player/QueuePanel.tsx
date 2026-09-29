@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { CRATE_ICON_SIZE, Disc3, X } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
@@ -142,7 +142,10 @@ function QueuePanelRow({
   );
 }
 
-export function QueuePanel({ open, onClose }: QueuePanelProps) {
+export const QueuePanel = memo(function QueuePanel({
+  open,
+  onClose,
+}: QueuePanelProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const { isPlaying } = usePlayerState();
@@ -226,7 +229,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
       )}
 
       {/* Upcoming */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overscroll-contain">
         {upcoming.length > 0 && (
           <div className="px-4 pt-3">
             <p className="mb-2 text-xs font-bold uppercase tracking-wider text-text-muted">
@@ -291,4 +294,4 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
       {content}
     </div>
   );
-}
+});

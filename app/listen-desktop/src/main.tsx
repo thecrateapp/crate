@@ -11,6 +11,7 @@ import { App } from "@/App";
 import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
 import { I18nProvider } from "@/i18n";
 import { primeOfflineRuntimeProfile } from "@/lib/offline";
+import { isTauriRuntime } from "@/lib/platform";
 import { initSentry } from "@/lib/sentry";
 import {
   getAppliedThemeSkin,
@@ -19,6 +20,16 @@ import {
 } from "@crate/ui/lib/theme-skin";
 
 import { initTauriRuntime } from "./lib/tauri-init";
+import { LinuxWindowTitlebar } from "./components/LinuxWindowTitlebar";
+
+const hasLinuxWindowTitlebar =
+  isTauriRuntime &&
+  typeof navigator !== "undefined" &&
+  /\bLinux\b/i.test(navigator.userAgent);
+
+if (hasLinuxWindowTitlebar) {
+  document.documentElement.dataset.crateLinuxWindowChrome = "true";
+}
 
 initTauriRuntime();
 initSentry();
@@ -38,10 +49,14 @@ function ThemeAwareToaster() {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <HashRouter>
-    <I18nProvider>
-      <App />
-    </I18nProvider>
-    <ThemeAwareToaster />
-  </HashRouter>,
+  <>
+    {hasLinuxWindowTitlebar && <LinuxWindowTitlebar />}
+    {hasLinuxWindowTitlebar && <div aria-hidden="true" className="h-9" />}
+    <HashRouter>
+      <I18nProvider>
+        <App />
+      </I18nProvider>
+      <ThemeAwareToaster />
+    </HashRouter>
+  </>,
 );

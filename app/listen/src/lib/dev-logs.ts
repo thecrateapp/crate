@@ -13,6 +13,11 @@ export const DEV_LOG_EVENT = "crate:dev-log";
 const DEV_LOG_STORAGE_KEY = "crate-dev-logs";
 const DEV_LOG_FORCE_KEY = "crate-dev-logs-enabled";
 const MAX_LOGS = 200;
+const SENSITIVE_QUERY_PARAM = /([?&](?:token|media_ticket)=)[^&#\s"'<>]+/gi;
+
+function redactSensitiveQueryParams(value: string): string {
+  return value.replace(SENSITIVE_QUERY_PARAM, "$1redacted");
+}
 
 function devLogsEnabled(): boolean {
   if (import.meta.env.DEV) return true;
@@ -25,11 +30,30 @@ function devLogsEnabled(): boolean {
 
 function readLogs(): DevLogEntry[] {
   if (typeof window === "undefined") return [];
-  if (window.__crateDevLogs) return window.__crateDevLogs;
+  const sanitize = (logs: DevLogEntry[]): boolean => {
+    let changed = false;
+    logs.forEach((entry, index) => {
+      const message = redactSensitiveQueryParams(entry.message);
+      const detail = entry.detail
+        ? redactSensitiveQueryParams(entry.detail)
+        : undefined;
+      if (message !== entry.message || detail !== entry.detail) {
+        logs[index] = { ...entry, message, detail };
+        changed = true;
+      }
+    });
+    return changed;
+  };
+
+  if (window.__crateDevLogs) {
+    if (sanitize(window.__crateDevLogs)) persistLogs(window.__crateDevLogs);
+    return window.__crateDevLogs;
+  }
   try {
     const raw = window.localStorage.getItem(DEV_LOG_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     window.__crateDevLogs = Array.isArray(parsed) ? parsed : [];
+    if (sanitize(window.__crateDevLogs)) persistLogs(window.__crateDevLogs);
     return window.__crateDevLogs;
   } catch {
     window.__crateDevLogs = [];
@@ -63,12 +87,14 @@ function dispatchRecordedLogEvent(entry: DevLogEntry): void {
 export function redactUrl(value: string): string {
   try {
     const url = new URL(value);
-    if (url.searchParams.has("token")) {
-      url.searchParams.set("token", "redacted");
+    for (const key of url.searchParams.keys()) {
+      if (key.toLowerCase() === "token" || key.toLowerCase() === "media_ticket") {
+        url.searchParams.set(key, "redacted");
+      }
     }
-    return url.toString();
+    return redactSensitiveQueryParams(url.toString());
   } catch {
-    return value.replace(/([?&]token=)[^&]+/g, "$1redacted");
+    return redactSensitiveQueryParams(value);
   }
 }
 
@@ -86,13 +112,14 @@ export function recordDevLog(
     timestamp: Date.now(),
     level,
     scope,
-    message,
-    detail:
+    message: redactSensitiveQueryParams(message),
+    detail: redactSensitiveQueryParams(
       typeof detail === "string"
         ? detail
         : detail == null
-          ? undefined
+          ? ""
           : JSON.stringify(detail),
+    ) || undefined,
   };
   const next = [...logs, entry].slice(-MAX_LOGS);
   window.__crateDevLogs = next;

@@ -1005,6 +1005,18 @@ pub fn run() {
                 if let Some(window) = handle.get_webview_window("main") {
                     set_desktop_window_icon(&window);
                     enforce_desktop_webview_window_size(&window);
+                    #[cfg(target_os = "linux")]
+                    if let Err(err) = window.with_webview(|webview| {
+                        use webkit2gtk::{HardwareAccelerationPolicy, SettingsExt, WebViewExt};
+
+                        if let Some(settings) = webview.inner().settings() {
+                            settings.set_hardware_acceleration_policy(
+                                HardwareAccelerationPolicy::Always,
+                            );
+                        }
+                    }) {
+                        eprintln!("failed to request WebKitGTK hardware acceleration: {err}");
+                    }
                 }
                 handle_activation_args(&handle, std::env::args());
                 app.deep_link().on_open_url(move |event| {

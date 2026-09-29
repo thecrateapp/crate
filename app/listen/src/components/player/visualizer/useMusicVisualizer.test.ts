@@ -42,12 +42,18 @@ vi.mock("@/lib/gapless-player", () => ({
 
 import { useMusicVisualizer } from "./useMusicVisualizer";
 
-function VisualizerHarness({ children }: { children?: ReactNode }) {
+function VisualizerHarness({
+  children,
+  qualityProfile = "default",
+}: {
+  children?: ReactNode;
+  qualityProfile?: "default" | "tauri-linux";
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useMusicVisualizer(canvasRef, "track-1", true, {
     volume: 1,
     isPlaying: true,
-  });
+  }, "spheres", undefined, qualityProfile);
 
   return createElement(
     Fragment,
@@ -85,5 +91,28 @@ describe("useMusicVisualizer", () => {
     unmount();
 
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("forwards the Linux Tauri quality profile to the renderer", () => {
+    const { unmount } = render(
+      createElement(VisualizerHarness, { qualityProfile: "tauri-linux" }),
+    );
+    const canvas = document.querySelector("canvas")!;
+    Object.defineProperties(canvas, {
+      clientWidth: { configurable: true, value: 320 },
+      clientHeight: { configurable: true, value: 180 },
+    });
+
+    vi.advanceTimersByTime(50);
+
+    expect(musicVisualizerMock).toHaveBeenCalledWith(
+      canvas,
+      analyser,
+      expect.any(Function),
+      "spheres",
+      "tauri-linux",
+    );
+
+    unmount();
   });
 });

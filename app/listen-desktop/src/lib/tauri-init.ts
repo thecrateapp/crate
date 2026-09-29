@@ -77,6 +77,11 @@ export function shouldUseTauriHttpPlugin(input: RequestInfo | URL): boolean {
           ? input.href
           : input.url;
     const url = new URL(value);
+    // Packaged Tauri origins are allowed by the API's CORS policy. Use
+    // WebKit's native streaming fetch there; the HTTP plugin proxies large
+    // audio response bodies through Tauri resource IDs. The Vite dev origin
+    // is not in production CORS, so it must keep using the privileged client.
+    if (isMediaStreamPath(url.pathname) && isAllowedTauriOrigin()) return false;
     if (url.protocol === "https:") return true;
     return (
       url.protocol === "http:" &&
@@ -87,6 +92,31 @@ export function shouldUseTauriHttpPlugin(input: RequestInfo | URL): boolean {
   } catch {
     return false;
   }
+}
+
+function isAllowedTauriOrigin(): boolean {
+  if (typeof window === "undefined") return false;
+  return [
+    "tauri://localhost",
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+  ].includes(window.location.origin);
+}
+
+function isMediaStreamPath(pathname: string): boolean {
+  return (
+    pathname === "/rest/stream" ||
+    pathname === "/rest/stream.view" ||
+    /^\/api\/(?:tracks\/(?:by-(?:entity|storage)\/)?[^/]+\/stream|catalog\/tracks\/[^/]+\/stream|playback\/variants\/[^/]+\/stream|stream\/.+)$/.test(
+      pathname,
+    ) ||
+    /^\/api\/federation\/(?:remote\/streams|v1\/streams)\/[^/]+$/.test(
+      pathname,
+    ) ||
+    /^\/api\/cast\/(?:sessions\/[^/]+\/items\/[^/]+\/stream|stream\/[^/]+)$/.test(
+      pathname,
+    )
+  );
 }
 
 function isHttpRequest(

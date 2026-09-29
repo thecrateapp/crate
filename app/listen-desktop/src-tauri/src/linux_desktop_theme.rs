@@ -14,6 +14,7 @@ pub struct LinuxDesktopThemeSnapshot {
     pub scheme: Option<String>,
     pub accent: Option<String>,
     pub gtk_theme: Option<String>,
+    pub window_button_layout: Option<String>,
     pub icon_theme: Option<String>,
     pub cursor_theme: Option<String>,
     pub font_name: Option<String>,
@@ -125,6 +126,11 @@ fn apply_gsettings(snapshot: &mut LinuxDesktopThemeSnapshot) {
         snapshot.gtk_theme = gsettings_value("org.gnome.desktop.interface", "gtk-theme");
         used_gsettings = used_gsettings || snapshot.gtk_theme.is_some();
     }
+    if snapshot.window_button_layout.is_none() && is_gnome_desktop() {
+        snapshot.window_button_layout =
+            gsettings_value("org.gnome.desktop.wm.preferences", "button-layout");
+        used_gsettings = used_gsettings || snapshot.window_button_layout.is_some();
+    }
     if snapshot.icon_theme.is_none() {
         snapshot.icon_theme = gsettings_value("org.gnome.desktop.interface", "icon-theme");
         used_gsettings = used_gsettings || snapshot.icon_theme.is_some();
@@ -147,6 +153,16 @@ fn apply_gsettings(snapshot: &mut LinuxDesktopThemeSnapshot) {
     if used_gsettings {
         snapshot.source.push("gsettings".into());
     }
+}
+
+fn is_gnome_desktop() -> bool {
+    std::env::var("XDG_CURRENT_DESKTOP")
+        .map(|desktop| {
+            desktop
+                .split(':')
+                .any(|name| name.eq_ignore_ascii_case("gnome"))
+        })
+        .unwrap_or(false)
 }
 
 fn gsettings_value(schema: &str, key: &str) -> Option<String> {

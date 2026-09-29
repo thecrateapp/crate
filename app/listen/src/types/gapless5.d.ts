@@ -125,6 +125,14 @@ declare module "@/lib/gapless5/gapless5" {
     totalTracks: number,
     loadLimit: number,
   ): number[];
+  export function getStartOffsetMs(
+    syncPosition: boolean,
+    audioCurrentTime: number,
+    audioIsPlaying: boolean,
+    position: number,
+    syncLatencySec: number,
+    avgTickMs: number,
+  ): number;
 
   export { Gapless5 };
 }
