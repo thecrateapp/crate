@@ -1,12 +1,20 @@
-use std::process::Command;
+use std::{
+    future::Future,
+    process::{Child, Command, Output, Stdio},
+    time::{Duration, Instant},
+};
 
 use zbus::zvariant::{OwnedValue, Value};
-use zbus::{block_on, Proxy};
+use zbus::Proxy;
 
 const PORTAL_BUS_NAME: &str = "org.freedesktop.portal.Desktop";
 const PORTAL_PATH: &str = "/org/freedesktop/portal/desktop";
 const PORTAL_SETTINGS_INTERFACE: &str = "org.freedesktop.portal.Settings";
 const PORTAL_APPEARANCE_NAMESPACE: &str = "org.freedesktop.appearance";
+const PORTAL_TIMEOUT: Duration = Duration::from_millis(400);
+const GSETTINGS_TOTAL_TIMEOUT: Duration = Duration::from_millis(1_000);
+const GSETTINGS_COMMAND_TIMEOUT: Duration = Duration::from_millis(200);
+const COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Debug, Default, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,11 +30,23 @@ pub struct LinuxDesktopThemeSnapshot {
     pub source: Vec<String>,
 }
 
-pub fn snapshot() -> LinuxDesktopThemeSnapshot {
+pub async fn snapshot() -> LinuxDesktopThemeSnapshot {
     let mut snapshot = LinuxDesktopThemeSnapshot::default();
 
-    apply_portal_settings(&mut snapshot);
-    apply_gsettings(&mut snapshot);
+    if let Some(Ok(portal)) = with_timeout(read_portal_settings(), PORTAL_TIMEOUT).await {
+        apply_portal_settings(&mut snapshot, portal);
+    }
+
+    let gsettings_deadline = Instant::now() + GSETTINGS_TOTAL_TIMEOUT;
+    let portal_snapshot = snapshot.clone();
+    let gsettings = tokio::task::spawn_blocking(move || {
+        let mut snapshot = portal_snapshot;
+        apply_gsettings(&mut snapshot, gsettings_deadline);
+        snapshot
+    })
+    .await
+    .unwrap_or_else(|_| snapshot.clone());
+    snapshot = gsettings;
 
     if snapshot.scheme.is_none() {
         snapshot.scheme = snapshot
@@ -41,11 +61,7 @@ pub fn snapshot() -> LinuxDesktopThemeSnapshot {
     snapshot
 }
 
-fn apply_portal_settings(snapshot: &mut LinuxDesktopThemeSnapshot) {
-    let Ok(portal) = block_on(read_portal_settings()) else {
-        return;
-    };
-
+fn apply_portal_settings(snapshot: &mut LinuxDesktopThemeSnapshot, portal: PortalSettings) {
     let mut used_portal = false;
     if snapshot.scheme.is_none() {
         snapshot.scheme = portal.scheme;
@@ -83,6 +99,10 @@ async fn read_portal_settings() -> zbus::Result<PortalSettings> {
     Ok(PortalSettings { scheme, accent })
 }
 
+async fn with_timeout<T>(future: impl Future<Output = T>, timeout: Duration) -> Option<T> {
+    tokio::time::timeout(timeout, future).await.ok()
+}
+
 async fn read_portal_owned(proxy: &Proxy<'_>, key: &str) -> zbus::Result<OwnedValue> {
     proxy
         .call("Read", &(PORTAL_APPEARANCE_NAMESPACE, key))
@@ -105,48 +125,61 @@ fn portal_accent_from_value(value: OwnedValue) -> Option<String> {
     rgb_to_hex(red, green, blue)
 }
 
-fn apply_gsettings(snapshot: &mut LinuxDesktopThemeSnapshot) {
+fn apply_gsettings(snapshot: &mut LinuxDesktopThemeSnapshot, deadline: Instant) {
     let mut used_gsettings = false;
 
     if snapshot.scheme.is_none() {
-        if let Some(value) = gsettings_value("org.gnome.desktop.interface", "color-scheme") {
+        if let Some(value) =
+            gsettings_value("org.gnome.desktop.interface", "color-scheme", deadline)
+        {
             snapshot.scheme = scheme_from_gsettings_color_scheme(&value).map(str::to_string);
             used_gsettings = used_gsettings || snapshot.scheme.is_some();
         }
     }
 
     if snapshot.accent.is_none() {
-        if let Some(value) = gsettings_value("org.gnome.desktop.interface", "accent-color") {
+        if let Some(value) =
+            gsettings_value("org.gnome.desktop.interface", "accent-color", deadline)
+        {
             snapshot.accent = accent_from_gsettings_name(&value).map(str::to_string);
             used_gsettings = used_gsettings || snapshot.accent.is_some();
         }
     }
 
     if snapshot.gtk_theme.is_none() {
-        snapshot.gtk_theme = gsettings_value("org.gnome.desktop.interface", "gtk-theme");
+        snapshot.gtk_theme = gsettings_value("org.gnome.desktop.interface", "gtk-theme", deadline);
         used_gsettings = used_gsettings || snapshot.gtk_theme.is_some();
     }
     if snapshot.window_button_layout.is_none() && is_gnome_desktop() {
-        snapshot.window_button_layout =
-            gsettings_value("org.gnome.desktop.wm.preferences", "button-layout");
+        snapshot.window_button_layout = gsettings_value(
+            "org.gnome.desktop.wm.preferences",
+            "button-layout",
+            deadline,
+        );
         used_gsettings = used_gsettings || snapshot.window_button_layout.is_some();
     }
     if snapshot.icon_theme.is_none() {
-        snapshot.icon_theme = gsettings_value("org.gnome.desktop.interface", "icon-theme");
+        snapshot.icon_theme =
+            gsettings_value("org.gnome.desktop.interface", "icon-theme", deadline);
         used_gsettings = used_gsettings || snapshot.icon_theme.is_some();
     }
     if snapshot.cursor_theme.is_none() {
-        snapshot.cursor_theme = gsettings_value("org.gnome.desktop.interface", "cursor-theme");
+        snapshot.cursor_theme =
+            gsettings_value("org.gnome.desktop.interface", "cursor-theme", deadline);
         used_gsettings = used_gsettings || snapshot.cursor_theme.is_some();
     }
     if snapshot.font_name.is_none() {
-        snapshot.font_name = gsettings_value("org.gnome.desktop.interface", "font-name");
+        snapshot.font_name = gsettings_value("org.gnome.desktop.interface", "font-name", deadline);
         used_gsettings = used_gsettings || snapshot.font_name.is_some();
     }
     if snapshot.text_scale.is_none() {
-        snapshot.text_scale = gsettings_value("org.gnome.desktop.interface", "text-scaling-factor")
-            .and_then(|value| value.parse::<f64>().ok())
-            .filter(|value| value.is_finite() && *value > 0.0);
+        snapshot.text_scale = gsettings_value(
+            "org.gnome.desktop.interface",
+            "text-scaling-factor",
+            deadline,
+        )
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite() && *value > 0.0);
         used_gsettings = used_gsettings || snapshot.text_scale.is_some();
     }
 
@@ -165,17 +198,53 @@ fn is_gnome_desktop() -> bool {
         .unwrap_or(false)
 }
 
-fn gsettings_value(schema: &str, key: &str) -> Option<String> {
-    let output = Command::new("gsettings")
-        .args(["get", schema, key])
-        .output()
-        .ok()?;
-    if !output.status.success() {
+fn gsettings_value(schema: &str, key: &str, deadline: Instant) -> Option<String> {
+    let timeout = deadline
+        .saturating_duration_since(Instant::now())
+        .min(GSETTINGS_COMMAND_TIMEOUT);
+    if timeout.is_zero() {
         return None;
     }
 
+    let mut command = Command::new("gsettings");
+    command.args(["get", schema, key]);
+    let output = command_output_with_timeout(command, timeout)?;
     let raw = String::from_utf8(output.stdout).ok()?;
     clean_gsettings_value(&raw)
+}
+
+fn command_output_with_timeout(mut command: Command, timeout: Duration) -> Option<Output> {
+    command.stdout(Stdio::piped()).stderr(Stdio::null());
+    let mut child = command.spawn().ok()?;
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return None;
+                }
+                return child.wait_with_output().ok();
+            }
+            Ok(None) => {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    kill_and_reap(&mut child);
+                    return None;
+                }
+                std::thread::sleep(COMMAND_POLL_INTERVAL.min(remaining));
+            }
+            Err(_) => {
+                kill_and_reap(&mut child);
+                return None;
+            }
+        }
+    }
+}
+
+fn kill_and_reap(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 fn clean_gsettings_value(raw: &str) -> Option<String> {
@@ -264,9 +333,10 @@ struct PortalSettings {
 #[cfg(test)]
 mod tests {
     use super::{
-        accent_from_gsettings_name, clean_gsettings_value, rgb_to_hex,
-        scheme_from_gsettings_color_scheme, scheme_from_theme_name,
+        accent_from_gsettings_name, clean_gsettings_value, command_output_with_timeout, rgb_to_hex,
+        scheme_from_gsettings_color_scheme, scheme_from_theme_name, with_timeout,
     };
+    use std::{process::Command, time::Duration, time::Instant};
 
     #[test]
     fn gsettings_values_are_unquoted() {
@@ -296,5 +366,31 @@ mod tests {
         assert_eq!(accent_from_gsettings_name("purple"), Some("#9141ac"));
         assert_eq!(rgb_to_hex(0.0, 0.5, 1.0).as_deref(), Some("#0080ff"));
         assert_eq!(rgb_to_hex(0.0, 128.0, 255.0).as_deref(), Some("#0080ff"));
+    }
+
+    #[tokio::test]
+    async fn stalled_portal_future_is_dropped_at_its_deadline() {
+        let started = Instant::now();
+        let result = with_timeout(std::future::pending::<()>(), Duration::from_millis(25)).await;
+
+        assert_eq!(result, None);
+        assert!(started.elapsed() < Duration::from_millis(500));
+    }
+
+    #[test]
+    fn stalled_gsettings_process_is_killed_and_reaped() {
+        let mut command = Command::new("sleep");
+        command.arg("5");
+        let started = Instant::now();
+
+        assert!(command_output_with_timeout(command, Duration::from_millis(40)).is_none());
+        assert!(started.elapsed() < Duration::from_millis(500));
+    }
+
+    #[test]
+    fn missing_gsettings_binary_uses_the_optional_theme_fallback() {
+        let command = Command::new("crate-gsettings-binary-not-installed");
+
+        assert!(command_output_with_timeout(command, Duration::from_millis(40)).is_none());
     }
 }

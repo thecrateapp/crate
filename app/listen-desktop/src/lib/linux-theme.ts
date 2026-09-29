@@ -13,8 +13,13 @@ type LinuxDesktopThemeSnapshot = {
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 const GTK_FONT_SIZE_SUFFIX_RE = /\s+\d+(?:\.\d+)?$/;
 const CSS_STRING_ESCAPE_RE = /["\\]/g;
+const MIN_REFRESH_INTERVAL_MS = 1_000;
 
 let initialized = false;
+let refreshInFlight: Promise<void> | null = null;
+let lastRefreshAt: number | null = null;
+let lastKnownSnapshot: LinuxDesktopThemeSnapshot | null = null;
+let lastAppliedSnapshotKey: string | null = null;
 
 export function initLinuxDesktopTheme(): void {
   if (initialized || typeof window === "undefined" || !isLinuxWebView()) return;
@@ -35,37 +40,61 @@ function isLinuxWebView(): boolean {
   );
 }
 
-async function refreshLinuxDesktopTheme(): Promise<void> {
-  try {
-    const snapshot =
-      await window.__crateTauriInvoke?.<LinuxDesktopThemeSnapshot | null>(
-        "linux_desktop_theme_snapshot",
-      );
-    applyLinuxDesktopTheme(snapshot ?? null);
-  } catch (err) {
-    console.warn("[tauri] linux theme bridge failed", err);
+function refreshLinuxDesktopTheme(): Promise<void> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const now = Date.now();
+  if (lastRefreshAt !== null && now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) {
+    return Promise.resolve();
   }
+  lastRefreshAt = now;
+
+  const refresh = (async () => {
+    try {
+      const snapshot =
+        await window.__crateTauriInvoke?.<LinuxDesktopThemeSnapshot | null>(
+          "linux_desktop_theme_snapshot",
+        );
+      if (!snapshot || !hasThemeSignal(snapshot)) {
+        if (lastKnownSnapshot) applyLinuxDesktopTheme(lastKnownSnapshot);
+        return;
+      }
+
+      lastKnownSnapshot = mergeThemeSnapshot(lastKnownSnapshot, snapshot);
+      applyLinuxDesktopTheme(lastKnownSnapshot);
+    } catch {
+      console.warn("[tauri] Linux desktop theme refresh failed");
+      if (lastKnownSnapshot) applyLinuxDesktopTheme(lastKnownSnapshot);
+    }
+  })();
+
+  refreshInFlight = refresh;
+  void refresh.finally(() => {
+    if (refreshInFlight === refresh) refreshInFlight = null;
+  });
+  return refresh;
 }
 
-function applyLinuxDesktopTheme(
-  snapshot: LinuxDesktopThemeSnapshot | null,
-): void {
+function applyLinuxDesktopTheme(snapshot: LinuxDesktopThemeSnapshot): void {
   if (typeof document === "undefined") return;
-
-  const root = document.documentElement;
-  if (!snapshot || !hasThemeSignal(snapshot)) {
-    delete root.dataset.crateLinuxTheme;
-    delete root.dataset.crateLinuxScheme;
-    delete root.dataset.crateLinuxWindowButtonLayout;
-    root.style.removeProperty("--crate-linux-accent");
-    root.style.removeProperty("--crate-linux-font-family");
-    return;
-  }
 
   const scheme = normalizeScheme(snapshot.scheme);
   const accent = normalizeHexColor(snapshot.accent);
   const fontFamily = fontFamilyFromGtkFont(snapshot.fontName);
+  const windowButtonLayout = normalizeWindowButtonLayout(
+    snapshot.windowButtonLayout,
+  );
 
+  const snapshotKey = JSON.stringify({
+    scheme,
+    accent,
+    fontFamily,
+    windowButtonLayout,
+  });
+  if (snapshotKey === lastAppliedSnapshotKey) return;
+  lastAppliedSnapshotKey = snapshotKey;
+
+  const root = document.documentElement;
   root.dataset.crateLinuxTheme = "true";
   if (scheme) {
     root.dataset.crateLinuxScheme = scheme;
@@ -76,14 +105,28 @@ function applyLinuxDesktopTheme(
   setCssProperty(root, "--crate-linux-accent", accent);
   setCssProperty(root, "--crate-linux-font-family", fontFamily);
 
-  const windowButtonLayout = normalizeWindowButtonLayout(
-    snapshot.windowButtonLayout,
-  );
   if (windowButtonLayout) {
     root.dataset.crateLinuxWindowButtonLayout = windowButtonLayout;
   } else {
     delete root.dataset.crateLinuxWindowButtonLayout;
   }
+}
+
+function mergeThemeSnapshot(
+  previous: LinuxDesktopThemeSnapshot | null,
+  next: LinuxDesktopThemeSnapshot,
+): LinuxDesktopThemeSnapshot {
+  return {
+    scheme: next.scheme ?? previous?.scheme,
+    accent: next.accent ?? previous?.accent,
+    gtkTheme: next.gtkTheme ?? previous?.gtkTheme,
+    windowButtonLayout: next.windowButtonLayout ?? previous?.windowButtonLayout,
+    iconTheme: next.iconTheme ?? previous?.iconTheme,
+    cursorTheme: next.cursorTheme ?? previous?.cursorTheme,
+    fontName: next.fontName ?? previous?.fontName,
+    textScale: next.textScale ?? previous?.textScale,
+    source: next.source?.length ? next.source : previous?.source,
+  };
 }
 
 function hasThemeSignal(snapshot: LinuxDesktopThemeSnapshot): boolean {
@@ -99,7 +142,9 @@ function hasThemeSignal(snapshot: LinuxDesktopThemeSnapshot): boolean {
   );
 }
 
-function normalizeWindowButtonLayout(value: string | null | undefined): string | null {
+function normalizeWindowButtonLayout(
+  value: string | null | undefined,
+): string | null {
   const normalized = value?.trim();
   if (!normalized || normalized.length > 128) return null;
   return normalized;

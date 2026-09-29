@@ -540,10 +540,10 @@ fn open_bandcamp_cookie_interceptor(app: tauri::AppHandle) -> Result<(), String>
 
 #[cfg(desktop)]
 #[tauri::command]
-fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, String> {
+async fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, String> {
     #[cfg(target_os = "linux")]
     {
-        serde_json::to_value(linux_desktop_theme::snapshot())
+        serde_json::to_value(linux_desktop_theme::snapshot().await)
             .map(Some)
             .map_err(|err| err.to_string())
     }
