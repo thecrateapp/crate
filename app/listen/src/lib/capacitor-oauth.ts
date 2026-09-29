@@ -52,6 +52,13 @@ interface NativeOAuthLinkRecord {
   provider: OAuthProvider;
 }
 
+export interface NativeOAuthLinkIdentity {
+  serverId: string;
+  userId: number;
+  sessionId: string;
+  generation: number;
+}
+
 interface NativeOAuthLoginResponse {
   token?: string;
   refresh_token?: string | null;
@@ -151,6 +158,41 @@ let observedOAuthIdentity = readCurrentOAuthIdentity();
 if (typeof window !== "undefined") {
   window.addEventListener(AUTH_TOKEN_EVENT, observeOAuthIdentityChange);
   window.addEventListener(SERVER_STORE_EVENT, observeOAuthIdentityChange);
+}
+
+export function captureNativeOAuthLinkIdentity(
+  userId?: number,
+): NativeOAuthLinkIdentity | null {
+  observeOAuthIdentityChange();
+  const serverId = getCurrentServerId();
+  const server = getServers().find((item) => item.id === serverId);
+  const session = decodeOAuthSession(server?.token ?? null);
+  if (
+    !serverId ||
+    !session ||
+    (userId !== undefined && session.userId !== userId)
+  ) {
+    return null;
+  }
+  return {
+    serverId,
+    userId: session.userId,
+    sessionId: session.sessionId,
+    generation: readOAuthLinkGeneration(),
+  };
+}
+
+export function isCurrentNativeOAuthLinkIdentity(
+  identity: NativeOAuthLinkIdentity,
+): boolean {
+  observeOAuthIdentityChange();
+  const current = captureNativeOAuthLinkIdentity();
+  return (
+    current?.serverId === identity.serverId &&
+    current.userId === identity.userId &&
+    current.sessionId === identity.sessionId &&
+    current.generation === identity.generation
+  );
 }
 
 function base64Url(bytes: Uint8Array): string {

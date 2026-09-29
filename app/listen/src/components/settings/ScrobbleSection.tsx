@@ -3,7 +3,17 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { Section, ToggleRow } from "@/components/settings/SettingsPrimitives";
+import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { AUTH_TOKEN_EVENT } from "@/lib/auth-session";
+import {
+  beginNativeLastfmLink,
+  cancelNativeLastfmLink,
+  completeNativeLastfmLink,
+  hasPendingNativeLastfmLink,
+} from "@/lib/native-lastfm-oauth";
+import { isTauriRuntime } from "@/lib/platform";
+import { SERVER_STORE_EVENT } from "@/lib/server-store";
 
 interface ScrobbleProviderStatus {
   connected: boolean;
@@ -14,11 +24,28 @@ type ScrobbleStatus = Record<string, ScrobbleProviderStatus>;
 
 export function ScrobbleSection() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [status, setStatus] = useState<ScrobbleStatus>({});
   const [lbToken, setLbToken] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
   const [remoteScrobblingEnabled, setRemoteScrobblingEnabled] = useState(false);
   const [savingRemotePreference, setSavingRemotePreference] = useState(false);
+  const [nativeLastfmPending, setNativeLastfmPending] = useState(false);
+
+  useEffect(() => {
+    const refreshPending = () => {
+      setNativeLastfmPending(
+        isTauriRuntime && hasPendingNativeLastfmLink(user?.id),
+      );
+    };
+    refreshPending();
+    window.addEventListener(AUTH_TOKEN_EVENT, refreshPending);
+    window.addEventListener(SERVER_STORE_EVENT, refreshPending);
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_EVENT, refreshPending);
+      window.removeEventListener(SERVER_STORE_EVENT, refreshPending);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     void Promise.allSettled([
@@ -53,6 +80,14 @@ export function ScrobbleSection() {
   const handleLastfmConnect = async () => {
     setConnecting("lastfm");
     try {
+      if (isTauriRuntime) {
+        if (!user) throw new Error("Sign in before linking Last.fm");
+        await beginNativeLastfmLink(user.id);
+        setNativeLastfmPending(true);
+        setConnecting(null);
+        toast.info(t("settings.scrobbling.nativeAuthOpened"));
+        return;
+      }
       const { api_key } = await api<{ api_key: string }>(
         "/api/me/scrobble/lastfm/auth-url",
       );
@@ -61,9 +96,37 @@ export function ScrobbleSection() {
       );
       window.location.href = `https://www.last.fm/api/auth/?api_key=${api_key}&cb=${cb}`;
     } catch {
-      toast.error(t("settings.scrobbling.toasts.lastfmNotConfigured"));
+      toast.error(
+        t(
+          isTauriRuntime
+            ? "settings.scrobbling.toasts.lastfmConnectFailed"
+            : "settings.scrobbling.toasts.lastfmNotConfigured",
+        ),
+      );
       setConnecting(null);
     }
+  };
+
+  const handleNativeLastfmComplete = async () => {
+    if (!user) return;
+    setConnecting("lastfm");
+    try {
+      await completeNativeLastfmLink(user.id);
+      setNativeLastfmPending(false);
+      toast.success(t("settings.scrobbling.toasts.lastfmConnected"));
+      void api<ScrobbleStatus>("/api/me/scrobble/status")
+        .then(setStatus)
+        .catch(() => {});
+    } catch {
+      toast.error(t("settings.scrobbling.toasts.lastfmConnectFailed"));
+    } finally {
+      setConnecting(null);
+    }
+  };
+
+  const handleNativeLastfmCancel = async () => {
+    await cancelNativeLastfmLink(user?.id);
+    setNativeLastfmPending(false);
   };
 
   const handleLastfmCallback = useCallback(
@@ -125,6 +188,7 @@ export function ScrobbleSection() {
   };
 
   useEffect(() => {
+    if (isTauriRuntime) return;
     const params = new URLSearchParams(window.location.search);
     const lastfmToken = params.get("token");
     if (params.get("lastfm") === "callback" && lastfmToken) {
@@ -174,6 +238,25 @@ export function ScrobbleSection() {
           >
             {t("common.disconnect")}
           </button>
+        ) : isTauriRuntime && nativeLastfmPending ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void handleNativeLastfmComplete()}
+              disabled={connecting === "lastfm"}
+              className="rounded-full bg-accent-action/15 px-4 py-2 text-xs font-medium text-accent-action transition-colors hover:bg-accent-action/25 disabled:opacity-50"
+            >
+              {connecting === "lastfm"
+                ? t("common.connecting")
+                : t("settings.scrobbling.finishConnection")}
+            </button>
+            <button
+              onClick={() => void handleNativeLastfmCancel()}
+              disabled={connecting === "lastfm"}
+              className="rounded-full bg-text-primary/5 px-4 py-2 text-xs font-medium text-text-muted transition-colors hover:bg-text-primary/10 disabled:opacity-50"
+            >
+              {t("settings.scrobbling.cancelConnection")}
+            </button>
+          </div>
         ) : (
           <button
             onClick={handleLastfmConnect}
@@ -186,6 +269,12 @@ export function ScrobbleSection() {
           </button>
         )}
       </div>
+
+      {isTauriRuntime && nativeLastfmPending ? (
+        <p className="text-xs text-text-muted" aria-live="polite">
+          {t("settings.scrobbling.nativeAuthPending")}
+        </p>
+      ) : null}
 
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">

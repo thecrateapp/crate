@@ -232,6 +232,26 @@ class LastfmAuthUrlResponse(BaseModel):
     api_key: str
 
 
+class NativeLastfmLinkStartRequest(BaseModel):
+    code_challenge: str = Field(min_length=43, max_length=43)
+    state: str = Field(min_length=16, max_length=256)
+
+
+class NativeLastfmLinkStartResponse(BaseModel):
+    flow_id: str
+    authorization_url: str
+
+
+class NativeLastfmLinkCompleteRequest(BaseModel):
+    flow_id: str = Field(min_length=43, max_length=43)
+    state: str = Field(min_length=16, max_length=256)
+    code_verifier: str = Field(min_length=43, max_length=128)
+
+
+class NativeLastfmLinkCompleteResponse(OkResponse):
+    username: str
+
+
 class GeolocationResponse(BaseModel):
     city: str
     country: str

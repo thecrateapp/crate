@@ -1,4 +1,5 @@
 from sqlalchemy.exc import IntegrityError
+import pytest
 
 
 def test_lastfm_get_session_returns_key_and_username(monkeypatch):
@@ -37,6 +38,99 @@ def test_lastfm_get_session_returns_key_and_username(monkeypatch):
     assert captured["params"]["method"] == "auth.getSession"
     assert captured["params"]["format"] == "json"
     assert captured["params"]["api_sig"]
+
+
+def test_lastfm_get_auth_token_returns_token_and_signs_request(monkeypatch):
+    from crate.scrobble import lastfm_get_auth_token
+
+    captured = {}
+
+    class Response:
+        status_code = 200
+        content = b'{"token":"a"}'
+
+        def json(self):
+            return {"token": "a" * 32}
+
+    def fake_get(url, *, params, timeout):
+        captured["url"] = url
+        captured["params"] = params
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr("crate.scrobble.requests.get", fake_get)
+
+    token = lastfm_get_auth_token("api-key", "api-secret")
+
+    assert token == "a" * 32
+    assert captured["url"] == "https://ws.audioscrobbler.com/2.0/"
+    assert captured["params"]["method"] == "auth.getToken"
+    assert captured["params"]["api_key"] == "api-key"
+    assert captured["params"]["format"] == "json"
+    assert captured["params"]["api_sig"]
+
+
+def test_lastfm_get_auth_token_rejects_malformed_response(monkeypatch):
+    from crate.scrobble import lastfm_get_auth_token
+
+    class Response:
+        status_code = 200
+        content = b'{"token":"invalid"}'
+
+        def json(self):
+            return {"token": "invalid"}
+
+    monkeypatch.setattr(
+        "crate.scrobble.requests.get", lambda *_args, **_kwargs: Response()
+    )
+
+    assert lastfm_get_auth_token("api-key", "api-secret") is None
+
+
+@pytest.mark.parametrize(
+    ("error_code", "retryable"),
+    [(14, True), (15, False), (29, True)],
+)
+def test_lastfm_get_session_strict_classifies_provider_errors(
+    monkeypatch, error_code, retryable
+):
+    from crate.scrobble import (
+        LastfmAuthenticationError,
+        lastfm_get_session_strict,
+    )
+
+    class Response:
+        status_code = 200
+        content = b"{}"
+
+        def json(self):
+            return {"error": error_code, "message": "provider response"}
+
+    monkeypatch.setattr(
+        "crate.scrobble.requests.get",
+        lambda *_args, **_kwargs: Response(),
+    )
+
+    with pytest.raises(LastfmAuthenticationError) as exc_info:
+        lastfm_get_session_strict("api-key", "api-secret", "auth-token")
+
+    assert exc_info.value.retryable is retryable
+
+
+def test_lastfm_get_session_strict_treats_network_errors_as_retryable(monkeypatch):
+    import requests
+
+    from crate.scrobble import LastfmAuthenticationError, lastfm_get_session_strict
+
+    def fail(*_args, **_kwargs):
+        raise requests.ConnectionError("offline")
+
+    monkeypatch.setattr("crate.scrobble.requests.get", fail)
+
+    with pytest.raises(LastfmAuthenticationError) as exc_info:
+        lastfm_get_session_strict("api-key", "api-secret", "auth-token")
+
+    assert exc_info.value.retryable is True
 
 
 def test_connect_lastfm_stores_username_not_blank_or_session_prefix(
