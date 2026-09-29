@@ -23,6 +23,7 @@ export function initTauriRuntime(): void {
   recordTauriAuthDiagnostic("OAuth bridge initializing");
   recordDevLog("tauri", "runtime init");
   installTauriInvokeBridge();
+  installTauriExternalOpenerBridge();
   initLinuxScrollBehavior();
   initLinuxDesktopTheme();
   ensureDesktopWindowSize();
@@ -50,6 +51,17 @@ function installTauriInvokeBridge(): void {
   window.__crateTauriInvoke = async (command, args) => {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke(command, args);
+  };
+}
+
+export function installTauriExternalOpenerBridge(): void {
+  if (typeof window === "undefined") return;
+  const tauriWindow = window as Window & {
+    __crateOpenExternalUrl?: (url: string) => Promise<void>;
+  };
+  tauriWindow.__crateOpenExternalUrl = async (url) => {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
   };
 }
 

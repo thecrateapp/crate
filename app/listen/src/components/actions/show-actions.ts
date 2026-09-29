@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Mic2, Music2, Ticket } from "@crate/ui/icons";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import { action } from "@/components/actions/shared";
 import { artistPagePath } from "@/lib/library-routes";
+import { openExternalUrl } from "@/lib/external-links";
 import type { UpcomingItem } from "@/components/upcoming/upcoming-model";
 
 interface UseShowActionEntriesInput {
@@ -63,7 +65,9 @@ export function useShowActionEntries(
         disabled: !input.item.url,
         onSelect: () => {
           if (!input.item.url) return;
-          window.open(input.item.url, "_blank", "noopener,noreferrer");
+          void openExternalUrl(input.item.url).catch(() =>
+            toast.error(t("common.toasts.openExternalFailed")),
+          );
         },
       }),
     ],

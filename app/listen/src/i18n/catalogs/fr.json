@@ -1299,6 +1299,7 @@
   "common.connecting": "Connexion en cours...",
   "common.disconnect": "Déconnecter",
   "common.toasts.disconnectFailed": "Échec de la déconnexion",
+  "common.toasts.openExternalFailed": "Impossible d’ouvrir le lien externe",
   "common.toasts.saveFailed": "Échec de l’enregistrement",
   "settings.playback.delivery.balanced": "Équilibré",
   "settings.playback.delivery.balancedDescription": "AAC 192 quand c'est utile",

@@ -1299,6 +1299,7 @@
   "common.connecting": "Konektatzen...",
   "common.disconnect": "Deskonektatu",
   "common.toasts.disconnectFailed": "Ezin izan da deskonektatu",
+  "common.toasts.openExternalFailed": "Ezin izan da kanpoko esteka ireki",
   "common.toasts.saveFailed": "Ezin izan da gorde",
   "settings.playback.delivery.balanced": "Orekatua",
   "settings.playback.delivery.balancedDescription": "AAC 192 erabilgarria denean",

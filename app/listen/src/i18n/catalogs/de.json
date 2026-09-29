@@ -1299,6 +1299,7 @@
   "common.connecting": "Verbinden...",
   "common.disconnect": "Trennen",
   "common.toasts.disconnectFailed": "Trennen fehlgeschlagen",
+  "common.toasts.openExternalFailed": "Externer Link konnte nicht geöffnet werden",
   "common.toasts.saveFailed": "Speichern fehlgeschlagen",
   "settings.playback.delivery.balanced": "Ausgewogen",
   "settings.playback.delivery.balancedDescription": "AAC 192 bei Bedarf",

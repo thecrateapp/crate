@@ -1299,6 +1299,7 @@
   "common.connecting": "Connectant...",
   "common.disconnect": "Desconnecta",
   "common.toasts.disconnectFailed": "No s’ha pogut desconnectar",
+  "common.toasts.openExternalFailed": "No s’ha pogut obrir l’enllaç extern",
   "common.toasts.saveFailed": "No s’ha pogut desar",
   "settings.playback.delivery.balanced": "Equilibrat",
   "settings.playback.delivery.balancedDescription": "AAC 192 quan sigui útil",

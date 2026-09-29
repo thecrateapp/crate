@@ -1321,6 +1321,7 @@
   "common.connecting": "Conectando...",
   "common.disconnect": "Desconectar",
   "common.toasts.disconnectFailed": "No se pudo desconectar",
+  "common.toasts.openExternalFailed": "No se pudo abrir el enlace externo",
   "common.toasts.saveFailed": "No se pudo guardar",
   "settings.playback.delivery.balanced": "Equilibrado",
   "settings.playback.delivery.balancedDescription": "AAC 192 cuando convenga",

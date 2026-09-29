@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import {
@@ -27,6 +29,7 @@ export function ArtistBioModal({
   onClose,
 }: ArtistBioModalProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const bio = artistInfo?.bio ?? "";
   const [bioExpanded, setBioExpanded] = useState(true);
   const enrichment = useArtistBioEnrichment(open, artist.id);
@@ -105,7 +108,11 @@ export function ArtistBioModal({
           );
           onClose();
         }}
-        onExternalLink={(url) => void openExternalUrl(url)}
+        onExternalLink={(url) =>
+          void openExternalUrl(url).catch(() =>
+            toast.error(t("common.toasts.openExternalFailed")),
+          )
+        }
       />
     </AppModal>
   );
