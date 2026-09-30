@@ -55,13 +55,23 @@ export function CrateComposerProvider({ children }: { children: ReactNode }) {
           description: payload.description,
           is_collaborative: false,
         });
+
+        let albumAddFailed = false;
         if (initialAlbum) {
-          await api(`/api/crates/${created.id}/albums`, "POST", {
-            global_album_uid: initialAlbum.globalAlbumUid,
-          });
+          try {
+            await api(`/api/crates/${created.id}/albums`, "POST", {
+              global_album_uid: initialAlbum.globalAlbumUid,
+            });
+          } catch {
+            albumAddFailed = true;
+          }
         }
+
         setOpen(false);
         toast.success(t("library.crates.created"));
+        if (albumAddFailed) {
+          toast.error(t("album.toasts.addToCrateFailed"));
+        }
         navigate(`/crate/${created.id}`);
       } catch {
         toast.error(t("library.crates.createFailed"));

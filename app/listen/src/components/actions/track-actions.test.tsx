@@ -3,6 +3,10 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigateMock = vi.hoisted(() => vi.fn());
+const toast = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
+}));
 
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
@@ -40,6 +44,8 @@ vi.mock("@/lib/radio", () => ({
   fetchTrackRadio: vi.fn(),
 }));
 
+vi.mock("sonner", () => ({ toast }));
+
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";
 import { fetchTrackRadio } from "@/lib/radio";
@@ -55,6 +61,8 @@ describe("useTrackActionEntries", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     vi.mocked(fetchTrackRadio).mockReset();
+    toast.error.mockReset();
+    toast.success.mockReset();
   });
 
   it("shares tracks through Crate's share sheet with the public preview URL", async () => {
@@ -223,5 +231,46 @@ describe("useTrackActionEntries", () => {
         "Añadir a Favorites",
       ]),
     );
+  });
+
+  it("shows an error when adding a track to a playlist fails", async () => {
+    const onAddToPlaylist = vi
+      .fn()
+      .mockRejectedValue(new Error("playlist unavailable"));
+    const { result } = renderHook(
+      () =>
+        useTrackActionEntries({
+          track: {
+            id: 12,
+            entity_uid: "track-entity-12",
+            title: "Talk for Hours",
+            artist: "High Vis",
+          },
+          playlistOptions: [{ id: 1, name: "Favorites" }],
+          onAddToPlaylist,
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+
+    const addAction = result.current.find(
+      (entry) => entry.key === "playlist-1",
+    );
+    if (
+      !addAction ||
+      addAction.type === "divider" ||
+      addAction.type === "label" ||
+      addAction.type === "disclosure"
+    ) {
+      throw new Error("Playlist action missing");
+    }
+
+    await act(async () => {
+      await addAction.onSelect();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "No se pudo añadir la canción a la playlist",
+    );
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

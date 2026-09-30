@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigate = vi.hoisted(() => vi.fn());
 const api = vi.hoisted(() => vi.fn());
+const toast = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
+}));
 
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
@@ -11,6 +15,7 @@ vi.mock("react-router", async (importOriginal) => {
 });
 
 vi.mock("@/lib/api", () => ({ api }));
+vi.mock("sonner", () => ({ toast }));
 
 import {
   CrateComposerProvider,
@@ -42,6 +47,8 @@ describe("CrateComposerProvider", () => {
   beforeEach(() => {
     navigate.mockReset();
     api.mockReset();
+    toast.error.mockReset();
+    toast.success.mockReset();
     api.mockImplementation(async (url: string) =>
       url === "/api/crates" ? { id: "crate-1" } : undefined,
     );
@@ -80,5 +87,39 @@ describe("CrateComposerProvider", () => {
       );
       expect(navigate).toHaveBeenCalledWith("/crate/crate-1");
     });
+  });
+
+  it("keeps the created Crate when adding the source album fails", async () => {
+    api.mockImplementation(async (url: string) => {
+      if (url === "/api/crates") return { id: "crate-1" };
+      throw new Error("album association failed");
+    });
+
+    render(
+      <MemoryRouter>
+        <I18nProvider initialLocale="es">
+          <CrateComposerProvider>
+            <Harness />
+          </CrateComposerProvider>
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open crate composer" }),
+    );
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: "Best of 2026" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Crear Crate" }));
+
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith("/crate/crate-1");
+      expect(toast.success).toHaveBeenCalledWith("Crate creado");
+      expect(toast.error).toHaveBeenCalledWith(
+        "No se pudo añadir el álbum a Crate",
+      );
+    });
+    expect(api).toHaveBeenCalledTimes(2);
   });
 });
