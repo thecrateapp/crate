@@ -1,6 +1,7 @@
 """Contract tests for the Crates schema DDL source."""
 
 from importlib import import_module
+from pathlib import Path
 
 from alembic.script import ScriptDirectory
 
@@ -28,7 +29,10 @@ def test_crate_migration_uses_the_bootstrap_schema_definition(monkeypatch) -> No
 
 
 def test_crate_migration_follows_the_current_main_head() -> None:
-    scripts = ScriptDirectory("app/crate/db/migrations")
+    migrations_path = (
+        Path(__file__).resolve().parents[1] / "crate" / "db" / "migrations"
+    )
+    scripts = ScriptDirectory(str(migrations_path))
 
     assert scripts.get_revision("098").down_revision == "097"
     assert scripts.get_revision("099").down_revision == "098"
