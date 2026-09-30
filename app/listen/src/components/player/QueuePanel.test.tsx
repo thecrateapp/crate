@@ -1,5 +1,13 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const useApi = vi.hoisted(() =>
+  vi.fn((url: string | null) => ({
+    data: url === "/api/playlists" ? [{ id: 7, name: "Favorites" }] : null,
+  })),
+);
+
+vi.mock("@/hooks/use-api", () => ({ useApi }));
 
 import { QueuePanel } from "@/components/player/QueuePanel";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -117,5 +125,25 @@ describe("QueuePanel", () => {
     );
     expect(screen.getByText("Next")).toHaveClass("text-text-primary");
     expect(nextRow?.className).not.toContain("white/");
+  });
+
+  it("loads existing playlists when a queue track menu opens", async () => {
+    renderWithListenProviders(<QueuePanel open onClose={vi.fn()} />, {
+      locale: "es",
+      playerActions: {
+        currentTrack,
+        queue: [currentTrack, nextTrack],
+        currentIndex: 0,
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    await waitFor(() => {
+      expect(useApi).toHaveBeenCalledWith("/api/playlists");
+      expect(
+        screen.getByRole("menuitem", { name: "Añadir a Favorites" }),
+      ).toBeInTheDocument();
+    });
   });
 });

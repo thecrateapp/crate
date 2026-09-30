@@ -3,6 +3,19 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const openCreateCrate = vi.hoisted(() => vi.fn());
+const openCrateComposerForAlbum = vi.hoisted(() =>
+  vi.fn(
+    (
+      composer: { openCreateCrate: (options: { album: unknown }) => void },
+      album: unknown,
+    ) => {
+      composer.openCreateCrate({ album });
+      return true;
+    },
+  ),
+);
+
 vi.mock("@/contexts/PlayerContext", () => ({
   usePlayerActions: () => ({
     playAll: vi.fn(),
@@ -18,8 +31,9 @@ vi.mock("@/contexts/SavedAlbumsContext", () => ({
 
 vi.mock("@/contexts/CrateComposerContext", () => ({
   useOptionalCrateComposer: () => ({
-    openCreateCrate: vi.fn(),
+    openCreateCrate,
   }),
+  openCrateComposerForAlbum,
 }));
 
 vi.mock("@/contexts/ArtistFollowsContext", () => ({
@@ -97,6 +111,8 @@ describe("action hooks i18n", () => {
   beforeEach(() => {
     vi.mocked(fetchAlbumRadio).mockReset();
     vi.mocked(fetchArtistRadio).mockReset();
+    openCreateCrate.mockReset();
+    openCrateComposerForAlbum.mockClear();
   });
 
   it("localizes album, artist, playlist, and show action labels", () => {
@@ -299,6 +315,60 @@ describe("action hooks i18n", () => {
 
     expect(api).toHaveBeenCalledWith("/api/crates/crate-1/albums", "POST", {
       global_album_uid: "global-blending",
+    });
+  });
+
+  it("opens the Crate composer with the selected album", async () => {
+    const { result } = renderHook(
+      () =>
+        useAlbumActionEntries({
+          globalAlbumUid: "global-blending",
+          artist: "High Vis",
+          album: "Blending",
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+
+    const crateMenu = result.current.find((entry) => entry.key === "crate");
+    if (!crateMenu || crateMenu.type !== "disclosure") {
+      throw new Error("Crate menu missing");
+    }
+
+    act(() => {
+      crateMenu.onToggle();
+    });
+    const expandedCrateMenu = result.current.find(
+      (entry) => entry.key === "crate",
+    );
+    if (!expandedCrateMenu || expandedCrateMenu.type !== "disclosure") {
+      throw new Error("Crate menu missing after expansion");
+    }
+
+    const createCrateItem = expandedCrateMenu.items.find(
+      (item) => item.key === "crate-create",
+    );
+    if (!createCrateItem || !("onSelect" in createCrateItem)) {
+      throw new Error("Create Crate option missing");
+    }
+
+    await act(async () => {
+      await createCrateItem.onSelect?.();
+    });
+
+    expect(openCrateComposerForAlbum).toHaveBeenCalledWith(
+      { openCreateCrate },
+      {
+        globalAlbumUid: "global-blending",
+        name: "Blending",
+        artistName: "High Vis",
+      },
+    );
+    expect(openCreateCrate).toHaveBeenCalledWith({
+      album: {
+        globalAlbumUid: "global-blending",
+        name: "Blending",
+        artistName: "High Vis",
+      },
     });
   });
 });
