@@ -55,4 +55,24 @@ describe("Tauri offline asset verification", () => {
     expect(verifyAssetsMock).not.toHaveBeenCalled();
     expect(statMock).not.toHaveBeenCalled();
   });
+
+  it("falls back to Tauri filesystem without loading the Capacitor integrity plugin", async () => {
+    invokeMock.mockRejectedValue(new Error("command unavailable"));
+    statMock.mockResolvedValue({ size: 128 });
+
+    const result = await verifyNativeOfflineAssets([
+      { path: "offline-media/profile-a/one.m4a", expectedBytes: 128 },
+    ]);
+
+    expect(result).toEqual([
+      {
+        path: "offline-media/profile-a/one.m4a",
+        exists: true,
+        size: 128,
+        valid: true,
+      },
+    ]);
+    expect(verifyAssetsMock).not.toHaveBeenCalled();
+    expect(statMock).toHaveBeenCalledOnce();
+  });
 });

@@ -116,21 +116,24 @@ async function verifyWithFilesystem(
 async function verifyNativeOfflineAssetBatch(
   assets: NativeOfflineAssetExpectation[],
 ): Promise<NativeOfflineAssetVerification[]> {
-  if (isTauriRuntime && window.__crateTauriInvoke) {
-    const profileKeys = new Set(
-      assets.map(({ path }) => path.split("/")[1]).filter(Boolean),
-    );
-    if (profileKeys.size === 1) {
-      const profileKey = [...profileKeys][0]!;
-      try {
-        const response = await window.__crateTauriInvoke<
-          NativeOfflineAssetVerification[]
-        >("verify_offline_media_assets", { profileKey, assets });
-        if (response.length === assets.length) return response;
-      } catch {
-        // Older desktop shells fall back until the batched command is installed.
+  if (isTauriRuntime) {
+    if (window.__crateTauriInvoke) {
+      const profileKeys = new Set(
+        assets.map(({ path }) => path.split("/")[1]).filter(Boolean),
+      );
+      if (profileKeys.size === 1) {
+        const profileKey = [...profileKeys][0]!;
+        try {
+          const response = await window.__crateTauriInvoke<
+            NativeOfflineAssetVerification[]
+          >("verify_offline_media_assets", { profileKey, assets });
+          if (response.length === assets.length) return response;
+        } catch {
+          // Older desktop shells fall back to the scoped filesystem adapter.
+        }
       }
     }
+    return verifyWithFilesystem(assets);
   }
   try {
     const response = await NATIVE_BATCH_VERIFICATION_SLOTS.run(() =>

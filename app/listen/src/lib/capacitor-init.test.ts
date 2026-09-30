@@ -7,6 +7,8 @@ const {
   networkAddListener,
   retryPendingNativeOAuthCallback,
   statusBarSetStyle,
+  pluginImports,
+  runtime,
 } = vi.hoisted(() => ({
   appAddListener: vi.fn(),
   appGetLaunchUrl: vi.fn(),
@@ -14,42 +16,56 @@ const {
   networkAddListener: vi.fn(),
   retryPendingNativeOAuthCallback: vi.fn(),
   statusBarSetStyle: vi.fn(),
+  pluginImports: { app: 0, keyboard: 0, network: 0, statusBar: 0 },
+  runtime: { isIosRuntime: false, isNative: true, platform: "android" },
 }));
 
-vi.mock("@capacitor/app", () => ({
-  App: {
-    addListener: appAddListener,
-    getLaunchUrl: appGetLaunchUrl,
-    exitApp: vi.fn(),
-  },
-}));
+vi.mock("@capacitor/app", () => {
+  pluginImports.app += 1;
+  return {
+    App: {
+      addListener: appAddListener,
+      getLaunchUrl: appGetLaunchUrl,
+      exitApp: vi.fn(),
+    },
+  };
+});
 
-vi.mock("@capacitor/keyboard", () => ({
-  Keyboard: {
-    setStyle: vi.fn(),
-    setResizeMode: vi.fn(),
-    setAccessoryBarVisible: vi.fn(),
-    setScroll: vi.fn(),
-    addListener: vi.fn(),
-  },
-  KeyboardResize: { Body: "body" },
-  KeyboardStyle: { Dark: "dark" },
-}));
+vi.mock("@capacitor/keyboard", () => {
+  pluginImports.keyboard += 1;
+  return {
+    Keyboard: {
+      setStyle: vi.fn(),
+      setResizeMode: vi.fn(),
+      setAccessoryBarVisible: vi.fn(),
+      setScroll: vi.fn(),
+      addListener: vi.fn(),
+    },
+    KeyboardResize: { Body: "body" },
+    KeyboardStyle: { Dark: "dark" },
+  };
+});
 
-vi.mock("@capacitor/network", () => ({
-  Network: {
-    addListener: networkAddListener,
-  },
-}));
+vi.mock("@capacitor/network", () => {
+  pluginImports.network += 1;
+  return {
+    Network: {
+      addListener: networkAddListener,
+    },
+  };
+});
 
-vi.mock("@capacitor/status-bar", () => ({
-  StatusBar: {
-    setStyle: statusBarSetStyle,
-    setOverlaysWebView: vi.fn(),
-    setBackgroundColor: vi.fn(),
-  },
-  Style: { Dark: "dark", Light: "light" },
-}));
+vi.mock("@capacitor/status-bar", () => {
+  pluginImports.statusBar += 1;
+  return {
+    StatusBar: {
+      setStyle: statusBarSetStyle,
+      setOverlaysWebView: vi.fn(),
+      setBackgroundColor: vi.fn(),
+    },
+    Style: { Dark: "dark", Light: "light" },
+  };
+});
 
 vi.mock("@/lib/capacitor-oauth", () => ({
   consumeOAuthCallbackUrl,
@@ -57,14 +73,27 @@ vi.mock("@/lib/capacitor-oauth", () => ({
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
-  isIosRuntime: false,
-  isNative: true,
-  platform: "android",
+  get isIosRuntime() {
+    return runtime.isIosRuntime;
+  },
+  get isNative() {
+    return runtime.isNative;
+  },
+  get platform() {
+    return runtime.platform;
+  },
 }));
 
 describe("Capacitor initialization", () => {
   beforeEach(() => {
     vi.resetModules();
+    runtime.isIosRuntime = false;
+    runtime.isNative = true;
+    runtime.platform = "android";
+    pluginImports.app = 0;
+    pluginImports.keyboard = 0;
+    pluginImports.network = 0;
+    pluginImports.statusBar = 0;
     appAddListener.mockReset();
     appGetLaunchUrl.mockReset().mockResolvedValue(null);
     consumeOAuthCallbackUrl
@@ -117,5 +146,22 @@ describe("Capacitor initialization", () => {
     await applyNativeColorMode("light");
 
     expect(statusBarSetStyle).toHaveBeenCalledWith({ style: "light" });
+  });
+
+  it("does not load Capacitor plugins in Tauri", async () => {
+    runtime.isNative = false;
+    runtime.platform = "web";
+    const { initCapacitor } = await import("./capacitor-init");
+
+    await initCapacitor();
+
+    expect(pluginImports).toEqual({
+      app: 0,
+      keyboard: 0,
+      network: 0,
+      statusBar: 0,
+    });
+    expect(appAddListener).not.toHaveBeenCalled();
+    expect(networkAddListener).not.toHaveBeenCalled();
   });
 });

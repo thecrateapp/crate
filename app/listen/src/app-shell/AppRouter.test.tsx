@@ -52,6 +52,7 @@ vi.mock("@/lib/cache", () => ({
 vi.mock("@/lib/platform", () => ({
   getListenAppId: () => "listen-web",
   isTauriRuntime: false,
+  usesNativeFilesystem: false,
   get usesConfigurableServer() {
     return runtimeState.usesConfigurableServer;
   },

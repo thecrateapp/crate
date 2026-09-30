@@ -1,8 +1,3 @@
-import { App } from "@capacitor/app";
-import { Keyboard, KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
-import { Network } from "@capacitor/network";
-import { StatusBar, Style } from "@capacitor/status-bar";
-
 import {
   consumeOAuthCallbackUrl,
   retryPendingNativeOAuthCallback,
@@ -72,6 +67,9 @@ function scrollFocusedInputIntoView() {
 async function initKeyboardHandling() {
   if (keyboardInitialized || platform !== "ios") return;
   keyboardInitialized = true;
+  const { Keyboard, KeyboardResize, KeyboardStyle } = await import(
+    "@capacitor/keyboard"
+  );
 
   try {
     await Keyboard.setStyle({ style: KeyboardStyle.Dark });
@@ -95,6 +93,11 @@ async function initKeyboardHandling() {
 async function initializeCapacitor(): Promise<string | null> {
   initViewportHeightFallback();
   if (!isNative) return null;
+  const [{ App }, { Network }, { StatusBar }] = await Promise.all([
+    import("@capacitor/app"),
+    import("@capacitor/network"),
+    import("@capacitor/status-bar"),
+  ]);
   await initKeyboardHandling();
 
   try {
@@ -186,6 +189,7 @@ export async function applyNativeColorMode(
   if (!isNative) return;
 
   try {
+    const { StatusBar, Style } = await import("@capacitor/status-bar");
     await StatusBar.setStyle({
       style: mode === "dark" ? Style.Dark : Style.Light,
     });
