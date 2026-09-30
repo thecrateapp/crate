@@ -13,6 +13,8 @@ import {
   PlaylistCreateModal,
   type PlaylistComposerTrack,
 } from "@/components/playlists/PlaylistCreateModal";
+import type { PlaylistOption } from "@/hooks/use-lazy-playlist-options";
+import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import {
   hasTrackReference,
@@ -29,6 +31,8 @@ interface OpenPlaylistComposerOptions {
 
 interface PlaylistComposerContextValue {
   openCreatePlaylist: (options?: OpenPlaylistComposerOptions) => void;
+  playlistOptions: PlaylistOption[];
+  ensurePlaylistOptionsLoaded: () => void;
 }
 
 const PlaylistComposerContext = createContext<
@@ -52,6 +56,14 @@ export function PlaylistComposerProvider({
   const [initialTracks, setInitialTracks] = useState<PlaylistComposerTrack[]>(
     [],
   );
+  const [playlistOptionsEnabled, setPlaylistOptionsEnabled] = useState(false);
+  const { data: playlistData } = useApi<PlaylistOption[]>(
+    playlistOptionsEnabled ? "/api/playlists" : null,
+  );
+  const playlistOptions = useMemo(() => playlistData ?? [], [playlistData]);
+  const ensurePlaylistOptionsLoaded = useCallback(() => {
+    setPlaylistOptionsEnabled(true);
+  }, []);
 
   const openCreatePlaylist = useCallback(
     (options?: OpenPlaylistComposerOptions) => {
@@ -121,8 +133,12 @@ export function PlaylistComposerProvider({
   }, [submitting]);
 
   const contextValue = useMemo(
-    () => ({ openCreatePlaylist }),
-    [openCreatePlaylist],
+    () => ({
+      openCreatePlaylist,
+      playlistOptions,
+      ensurePlaylistOptionsLoaded,
+    }),
+    [ensurePlaylistOptionsLoaded, openCreatePlaylist, playlistOptions],
   );
 
   return (

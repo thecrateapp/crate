@@ -17,6 +17,7 @@ vi.mock("@/contexts/LikedTracksContext", () => ({
 }));
 
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
+import { PlaylistComposerProvider } from "@/contexts/PlaylistComposerContext";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 describe("PlayerTrackMenu", () => {
@@ -26,17 +27,20 @@ describe("PlayerTrackMenu", () => {
 
   it("loads existing playlists when the track menu opens", async () => {
     renderWithListenProviders(
-      <PlayerTrackMenu
-        currentTrack={{
-          id: "track-1",
-          title: "Talk For Hours",
-          artist: "High Vis",
-          album: "Blending",
-        }}
-      />,
+      <PlaylistComposerProvider>
+        <PlayerTrackMenu
+          currentTrack={{
+            id: "track-1",
+            title: "Talk For Hours",
+            artist: "High Vis",
+            album: "Blending",
+          }}
+        />
+      </PlaylistComposerProvider>,
       { locale: "es" },
     );
 
+    expect(useApi).not.toHaveBeenCalledWith("/api/playlists");
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
     await waitFor(() => {

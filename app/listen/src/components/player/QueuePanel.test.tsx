@@ -10,6 +10,7 @@ const useApi = vi.hoisted(() =>
 vi.mock("@/hooks/use-api", () => ({ useApi }));
 
 import { QueuePanel } from "@/components/player/QueuePanel";
+import { PlaylistComposerProvider } from "@/contexts/PlaylistComposerContext";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import type { Track } from "@/contexts/PlayerContext";
 
@@ -44,6 +45,7 @@ const nextTrack: Track = {
 describe("QueuePanel", () => {
   beforeEach(() => {
     isDesktop = false;
+    useApi.mockClear();
   });
 
   it("renders as a mobile bottom sheet on non-desktop viewports", () => {
@@ -128,15 +130,21 @@ describe("QueuePanel", () => {
   });
 
   it("loads existing playlists when a queue track menu opens", async () => {
-    renderWithListenProviders(<QueuePanel open onClose={vi.fn()} />, {
-      locale: "es",
-      playerActions: {
-        currentTrack,
-        queue: [currentTrack, nextTrack],
-        currentIndex: 0,
+    renderWithListenProviders(
+      <PlaylistComposerProvider>
+        <QueuePanel open onClose={vi.fn()} />
+      </PlaylistComposerProvider>,
+      {
+        locale: "es",
+        playerActions: {
+          currentTrack,
+          queue: [currentTrack, nextTrack],
+          currentIndex: 0,
+        },
       },
-    });
+    );
 
+    expect(useApi).not.toHaveBeenCalledWith("/api/playlists");
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
     await waitFor(() => {

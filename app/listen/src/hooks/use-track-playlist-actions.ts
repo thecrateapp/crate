@@ -2,10 +2,11 @@ import { useCallback } from "react";
 
 import type { PlaylistComposerTrack } from "@/components/playlists/PlaylistCreateModal";
 import { useOptionalPlaylistComposer } from "@/contexts/PlaylistComposerContext";
-import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import type { TrackMenuData } from "@/components/actions/shared";
 import { api } from "@/lib/api";
 import { toTrackReferencePayload } from "@/lib/track-reference";
+
+const noop = () => {};
 
 function toPlaylistComposerTrack(track: TrackMenuData): PlaylistComposerTrack {
   return {
@@ -24,8 +25,9 @@ function toPlaylistComposerTrack(track: TrackMenuData): PlaylistComposerTrack {
 
 export function useTrackPlaylistActions() {
   const playlistComposer = useOptionalPlaylistComposer();
-  const { playlistOptions, ensurePlaylistOptionsLoaded } =
-    useLazyPlaylistOptions();
+  const playlistOptions = playlistComposer?.playlistOptions ?? [];
+  const ensurePlaylistOptionsLoaded =
+    playlistComposer?.ensurePlaylistOptionsLoaded ?? noop;
 
   const onCreatePlaylist = useCallback(
     (track: TrackMenuData) => {
