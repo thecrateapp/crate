@@ -66,6 +66,12 @@ cancellation. To test minimize/restore and HiDPI changes, minimize/restore the
 native window or change display scaling while it runs; record whether
 `visibilityState` changed and the before/after render sizes.
 
+The page instantiates `MusicVisualizer` directly; it does not mount the React
+`useMusicVisualizer` hook or exercise real audio. The hook's visibility
+lifecycle is covered by its automated tests. Native minimize/restore here
+checks WebView visibility and RAF suspension/resumption; verify hook integration
+separately in the installed player.
+
 This probe runs through Tauri's development WebView. Its WebGL workload is the
 same renderer code but the JavaScript is served by Vite, so use the results for
 within-host comparisons only. For process CPU/RSS, sample the isolated

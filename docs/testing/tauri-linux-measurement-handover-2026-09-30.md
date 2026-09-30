@@ -83,13 +83,16 @@ done > /tmp/tauri-visualizer-linux-processes.txt
 Record CPU and RSS for the Tauri process, WebKit web process, and GPU process
 separately. Report the process-group sum only as an additional figure. Use the
 desktop window controls to minimize and restore the benchmark window while it
-runs; confirm `visibilityState` changes and the production hook stops and
-restarts rendering. Resize the window and, if possible, move it between displays
-with different scaling. Record each DPR and buffer size. The probe measures
-JavaScript frame scheduling and synchronous GL submission; it does not measure
-GPU completion time or per-process energy. Keep the probe results as dev-WebView
-measurements, then separately exercise the same visualizer in the installed
-player.
+runs; confirm `visibilityState` changes and that frame callbacks pause and
+resume. This page instantiates `MusicVisualizer` directly, not the React
+`useMusicVisualizer` hook; the hook's visibility lifecycle is covered by its
+automated tests. The probe does not exercise the real audio player. Verify that
+hook integration separately in the installed player. Resize the window and, if
+possible, move it between displays with different scaling. Record each DPR and
+buffer size. The probe measures JavaScript frame scheduling and synchronous GL
+submission; it does not measure GPU completion time or per-process energy. Keep
+the probe results as dev-WebView measurements, then separately exercise the
+same visualizer in the installed player.
 
 ## R08 — Decoded audio RSS
 
