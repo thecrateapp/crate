@@ -40,7 +40,7 @@ const fetchProviders = async () => {
     if (isTauriRuntime) {
       recordTauriAuthDiagnostic(
         "OAuth providers request failed",
-        error instanceof Error ? error.message : String(error),
+        error instanceof Error ? error.name : "UnknownError",
       );
     }
     throw error;

@@ -13,10 +13,21 @@ export const DEV_LOG_EVENT = "crate:dev-log";
 const DEV_LOG_STORAGE_KEY = "crate-dev-logs";
 const DEV_LOG_FORCE_KEY = "crate-dev-logs-enabled";
 const MAX_LOGS = 200;
-const SENSITIVE_QUERY_PARAM = /([?&](?:token|media_ticket)=)[^&#\s"'<>]+/gi;
+const SENSITIVE_ASSIGNMENT =
+  /\b(authorization|set-cookie|cookie|password|passwd|secret|access[_ -]?token|refresh[_ -]?token|id[_ -]?token|token|media_ticket|session[_ -]?key|verifier|oauth[_ -]?code|code|state)(\s*[:=]\s*)(["']?)[^\s,;&"'<>]+/gi;
+const QUERY_STRING = /\?(?!\[Filtered query\])[^#\s"'<>]+/g;
+const BEARER_CREDENTIAL = /\b(?:Bearer|Basic)\s+[^\s,;]+/gi;
+const DEEP_LINK = /\b(?:tauri|cratemusic):\/\/[^\s"'<>]*/gi;
+const PERSONAL_PATH = /(?:\/Users\/|\/home\/)[^\s"'<>]*/g;
 
 function redactSensitiveQueryParams(value: string): string {
-  return value.replace(SENSITIVE_QUERY_PARAM, "$1redacted");
+  return value
+    .replace(BEARER_CREDENTIAL, "[Filtered credential]")
+    .replace(SENSITIVE_ASSIGNMENT, "$1$2[Filtered]")
+    .replace(QUERY_STRING, "?[Filtered query]")
+    .replace(DEEP_LINK, "[Filtered deep link]")
+    .replace(PERSONAL_PATH, "[Filtered path]")
+    .replace(/\b[A-Z]:\\Users\\[^\s"'<>]*/gi, "[Filtered path]");
 }
 
 function devLogsEnabled(): boolean {
@@ -88,7 +99,10 @@ export function redactUrl(value: string): string {
   try {
     const url = new URL(value);
     for (const key of url.searchParams.keys()) {
-      if (key.toLowerCase() === "token" || key.toLowerCase() === "media_ticket") {
+      if (
+        key.toLowerCase() === "token" ||
+        key.toLowerCase() === "media_ticket"
+      ) {
         url.searchParams.set(key, "redacted");
       }
     }
@@ -113,13 +127,14 @@ export function recordDevLog(
     level,
     scope,
     message: redactSensitiveQueryParams(message),
-    detail: redactSensitiveQueryParams(
-      typeof detail === "string"
-        ? detail
-        : detail == null
-          ? ""
-          : JSON.stringify(detail),
-    ) || undefined,
+    detail:
+      redactSensitiveQueryParams(
+        typeof detail === "string"
+          ? detail
+          : detail == null
+            ? ""
+            : JSON.stringify(detail),
+      ) || undefined,
   };
   const next = [...logs, entry].slice(-MAX_LOGS);
   window.__crateDevLogs = next;
@@ -134,7 +149,7 @@ export function recordDevLog(
         : level === "error"
           ? "error"
           : "info";
-  console[consoleMethod](`[${scope}] ${message}`, entry.detail ?? "");
+  console[consoleMethod](`[${scope}] ${entry.message}`, entry.detail ?? "");
 }
 
 export function getDevLogs(): DevLogEntry[] {

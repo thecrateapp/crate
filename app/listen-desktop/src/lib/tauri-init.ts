@@ -177,12 +177,9 @@ async function initDeepLinks(): Promise<void> {
       recordTauriAuthDiagnostic("OAuth bridge ready");
     }
     await retryDeferredOAuth();
-  } catch (err) {
-    recordTauriAuthDiagnostic(
-      "OAuth bridge failed",
-      err instanceof Error ? err.message : String(err),
-    );
-    console.warn("[tauri] deep-link init failed", err);
+  } catch {
+    recordTauriAuthDiagnostic("OAuth bridge failed");
+    console.warn("[tauri] deep-link init failed");
   }
 }
 
@@ -228,7 +225,7 @@ export function dispatchOAuthCallbackResult(result: {
     );
     return;
   }
-  recordTauriAuthDiagnostic("OAuth token stored", result.next);
+  recordTauriAuthDiagnostic("OAuth token stored");
   window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
 }
 
@@ -240,12 +237,7 @@ async function initTrayBridge(): Promise<void> {
       dispatchDesktopTrayCommand(event.payload);
     });
   } catch (err) {
-    recordDevLog(
-      "tauri",
-      "tray bridge failed",
-      err instanceof Error ? err.message : String(err),
-      "warn",
-    );
+    recordDevLog("tauri", "tray bridge failed", safeErrorCategory(err), "warn");
   }
 }
 
@@ -261,10 +253,20 @@ async function initBandcampCookieBridge(): Promise<void> {
     recordDevLog(
       "tauri",
       "Bandcamp cookie bridge failed",
-      err instanceof Error ? err.message : String(err),
+      safeErrorCategory(err),
       "warn",
     );
   }
+}
+
+function safeErrorCategory(error: unknown): string {
+  const name =
+    error instanceof Error
+      ? error.name
+      : error instanceof DOMException
+        ? error.name
+        : "UnknownError";
+  return /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/.test(name) ? name : "Error";
 }
 
 async function handleDeepLinkUrls(urls: string[]): Promise<void> {

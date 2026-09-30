@@ -13,24 +13,24 @@ beforeEach(() => {
 });
 
 describe("redactUrl", () => {
-  it("redacts token query param in a URL", () => {
+  it("redacts the complete query string in a URL", () => {
     expect(redactUrl("https://example.com/api?token=secret123")).toBe(
-      "https://example.com/api?token=redacted",
+      "https://example.com/api?[Filtered query]",
     );
   });
 
-  it("redacts token in raw string via regex", () => {
+  it("redacts query strings in relative URLs", () => {
     expect(redactUrl("/api/foo?token=abc&other=1")).toBe(
-      "/api/foo?token=redacted&other=1",
+      "/api/foo?[Filtered query]",
     );
   });
 
-  it("redacts media tickets from complete and raw URLs", () => {
+  it("redacts media tickets and unrelated query fields together", () => {
     expect(
       redactUrl("https://example.com/stream?media_ticket=secret123&other=1"),
-    ).toBe("https://example.com/stream?media_ticket=redacted&other=1");
+    ).toBe("https://example.com/stream?[Filtered query]");
     expect(redactUrl("/stream?media_ticket=secret123&other=1")).toBe(
-      "/stream?media_ticket=redacted&other=1",
+      "/stream?[Filtered query]",
     );
   });
 
@@ -49,6 +49,43 @@ describe("recordDevLog / getDevLogs / clearDevLogs", () => {
     expect(logs[0]!.scope).toBe("test");
     expect(logs[0]!.message).toBe("hello");
     expect(logs[0]!.level).toBe("info");
+  });
+
+  it("uses redacted text for stored and console diagnostics", () => {
+    const output = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    recordDevLog(
+      "auth",
+      "Authorization: Bearer secret-token",
+      [
+        "Cookie: sid=secret-cookie",
+        "password=secret-password",
+        "refresh_token=secret-refresh",
+        "https://api.example.test/callback?code=secret-code&sig=secret-signature",
+        "tauri://localhost/callback?verifier=secret-verifier",
+        "session_key=secret-session",
+        "/Users/diego/private",
+      ].join(" "),
+      "warn",
+    );
+
+    const serialized = JSON.stringify({
+      logs: getDevLogs(),
+      output: output.mock.calls,
+    });
+    for (const secret of [
+      "secret-token",
+      "secret-cookie",
+      "secret-password",
+      "secret-refresh",
+      "secret-code",
+      "secret-signature",
+      "secret-verifier",
+      "secret-session",
+      "/Users/diego",
+    ]) {
+      expect(serialized).not.toContain(secret);
+    }
   });
 
   it("dispatches a custom event asynchronously", async () => {
@@ -78,7 +115,7 @@ describe("recordDevLog / getDevLogs / clearDevLogs", () => {
       path: "https://example.com/stream?media_ticket=secret123&token=secret456",
     });
     expect(getDevLogs()[0]!.detail).toBe(
-      '{"path":"https://example.com/stream?media_ticket=redacted&token=redacted"}',
+      '{"path":"https://example.com/stream?[Filtered query]"}',
     );
   });
 
@@ -103,7 +140,7 @@ describe("recordDevLog / getDevLogs / clearDevLogs", () => {
 
     expect(secondSnapshot).toBe(firstSnapshot);
     expect(firstSnapshot[0]!.detail).toBe(
-      "https://example.com/stream?media_ticket=redacted",
+      "https://example.com/stream?[Filtered query]",
     );
     expect(window.localStorage.getItem("crate-dev-logs")).not.toContain(
       "old-secret",

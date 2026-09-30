@@ -14,7 +14,7 @@ import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import { isTauriRuntime } from "@/lib/platform";
 import { migrateLegacyTauriLastfmRecord } from "@/lib/native-lastfm-oauth";
 import { migrateLegacyTauriOAuthRecords } from "@/lib/capacitor-oauth";
-import { initSentry } from "@/lib/sentry";
+import { captureRuntimeError, initSentry } from "@/lib/sentry";
 import { bootstrapNativeSessionStore } from "@/lib/server-store";
 import { renderSecureSessionError } from "@/lib/secure-session-error";
 import {
@@ -58,7 +58,8 @@ async function bootstrapDesktopApp(): Promise<void> {
     await bootstrapNativeSessionStore();
     await migrateLegacyTauriOAuthRecords();
     await migrateLegacyTauriLastfmRecord();
-  } catch {
+  } catch (error) {
+    void captureRuntimeError(error, "secure_session.bootstrap");
     renderSecureSessionError(root);
     return;
   }
