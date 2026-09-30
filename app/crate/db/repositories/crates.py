@@ -180,18 +180,6 @@ def add_crate_album(
     with optional_scope(session) as current:
         _lock_crate_for_write(current, crate_id, actor_id=added_by)
 
-        album_exists = current.execute(
-            text(
-                """
-                SELECT 1 FROM global_catalog_albums
-                WHERE global_album_uid = CAST(:uid AS uuid)
-                """
-            ),
-            {"uid": global_album_uid},
-        ).scalar_one_or_none()
-        if album_exists is None:
-            raise CrateAlbumNotFoundError(global_album_uid)
-
         position = current.execute(
             text(
                 """
@@ -209,10 +197,12 @@ def add_crate_album(
                     WITH inserted AS (
                         INSERT INTO crate_albums (
                             crate_id, global_album_uid, position, added_by
-                        ) VALUES (
-                            CAST(:crate_id AS uuid), CAST(:album_uid AS uuid),
-                            :position, :added_by
                         )
+                        SELECT
+                            CAST(:crate_id AS uuid), album.global_album_uid,
+                            :position, :added_by
+                        FROM global_catalog_albums album
+                        WHERE album.global_album_uid = CAST(:album_uid AS uuid)
                         ON CONFLICT (crate_id, global_album_uid) DO NOTHING
                         RETURNING global_album_uid, position
                     )
@@ -240,7 +230,20 @@ def add_crate_album(
             .first()
         )
         if added is None:
-            raise CrateAlbumAlreadyExistsError(global_album_uid)
+            already_added = current.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM crate_albums
+                    WHERE crate_id = CAST(:crate_id AS uuid)
+                      AND global_album_uid = CAST(:album_uid AS uuid)
+                    """
+                ),
+                {"crate_id": crate_id, "album_uid": global_album_uid},
+            ).scalar_one_or_none()
+            if already_added is not None:
+                raise CrateAlbumAlreadyExistsError(global_album_uid)
+            raise CrateAlbumNotFoundError(global_album_uid)
 
         current.execute(
             text("UPDATE crates SET updated_at = NOW() WHERE id = CAST(:id AS uuid)"),

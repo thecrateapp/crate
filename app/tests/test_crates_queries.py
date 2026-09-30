@@ -3,7 +3,7 @@
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import event, text
 
 from tests.conftest import PG_AVAILABLE
 
@@ -277,6 +277,49 @@ def test_albums_are_added_once_in_order_and_unknown_catalog_ids_are_rejected(pg_
         add_crate_album(crate_id, first_album, added_by=1)
     with pytest.raises(CrateAlbumNotFoundError):
         add_crate_album(crate_id, str(uuid4()), added_by=1)
+
+
+def test_adding_album_has_no_catalog_check_to_insert_race(pg_db):
+    from crate.db.engine import get_engine, get_session_factory
+    from crate.db.repositories.crates import add_crate_album, create_crate
+
+    crate_id = create_crate(owner_id=1, name="Concurrent catalog change")
+    album_uid = _seed_global_album("Catalog race album")
+    concurrent_session = get_session_factory()()
+    catalog_deleted_during_precheck = False
+
+    def delete_catalog_album_after_precheck(
+        _connection, _cursor, statement, _parameters, _context, _executemany
+    ):
+        nonlocal catalog_deleted_during_precheck
+        normalized = " ".join(statement.lower().split())
+        if "select 1 from global_catalog_albums" not in normalized:
+            return
+
+        concurrent_session.execute(
+            text(
+                """
+                DELETE FROM global_catalog_albums
+                WHERE global_album_uid = CAST(:album_uid AS uuid)
+                """
+            ),
+            {"album_uid": album_uid},
+        )
+        concurrent_session.commit()
+        catalog_deleted_during_precheck = True
+
+    engine = get_engine()
+    event.listen(engine, "before_cursor_execute", delete_catalog_album_after_precheck)
+    try:
+        added = add_crate_album(crate_id, album_uid, added_by=1)
+    finally:
+        event.remove(
+            engine, "before_cursor_execute", delete_catalog_album_after_precheck
+        )
+        concurrent_session.close()
+
+    assert added["global_album_uid"] == album_uid
+    assert not catalog_deleted_during_precheck
 
 
 def test_removing_and_reordering_albums_preserves_a_contiguous_manual_order(pg_db):
