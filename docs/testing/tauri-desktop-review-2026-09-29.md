@@ -264,7 +264,7 @@ Estas recomendaciones se distinguen de los fallos anteriores; no se han medido m
 
 3. **Persistencia offline incremental.** Cada pista serializa y rota el índice JSON entero. El coste acumulado crece cuadráticamente con el número de pistas añadidas. Primero agrupar escrituras manteniendo publicación atómica; considerar almacenamiento incremental solo si el tamaño real lo justifica.
 
-4. **Media session por diferencias.** Separar metadata/artwork de posición/estado. Actualmente cada segundo se repite el payload completo; Windows vuelve a ClearAll/SetThumbnail/Update y Linux emite señales aunque solo cambie posición.
+4. **Media session por diferencias.** Separar metadata/artwork de posición/estado. En la revisión, el hook enviaba el snapshot completo cada segundo; el puente de Tauri ya filtra metadatos repetidos y usa comandos de posición/estado, así que Windows no vuelve a cargar la carátula y Linux no emite metadata por cada tick. Seguimiento y pruebas: [`R06`](tauri-hardening-validation-2026-09-30.md#r06-media-session-por-diferencias).
 
 5. **Visualizador y batería.** Resolver F08 primero. powerPreference=high-performance está fijado para todos los perfiles; la calidad Linux y default es idéntica. Hacer la preferencia explícita por perfil y medir frame time/consumo. setSize tampoco conserva el límite/DPR aplicado por el constructor: centralizar el cálculo de resolución. El límite de dos pistas decodificadas en WebAudio evita decodificar toda la cola, pero conviene un presupuesto por bytes/duración para pistas largas.
 
