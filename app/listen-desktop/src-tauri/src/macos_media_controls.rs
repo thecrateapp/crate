@@ -782,12 +782,14 @@ mod tests {
 
     use super::{
         artwork_request_handler, fetch_artwork_bytes_with_timeout, playback_state_value,
-        read_bounded, ArtworkFetchQueue, ArtworkRequest, ArtworkRequestState, CGSize,
+        read_bounded, set_now_playing_playback_state, ArtworkFetchQueue, ArtworkRequest,
+        ArtworkRequestState, CGSize,
     };
     use objc2::{
         class, msg_send,
         rc::{Retained, Weak},
         runtime::AnyObject,
+        sel,
     };
 
     #[test]
@@ -843,6 +845,42 @@ mod tests {
     fn now_playing_playback_state_maps_to_macos_values() {
         assert_eq!(playback_state_value(true), 1);
         assert_eq!(playback_state_value(false), 2);
+    }
+
+    #[test]
+    fn now_playing_playback_state_updates_native_center() {
+        let center: *mut AnyObject =
+            unsafe { msg_send![class!(MPNowPlayingInfoCenter), defaultCenter] };
+        assert!(!center.is_null());
+
+        let supports_playback_state: bool =
+            unsafe { msg_send![center, respondsToSelector: sel!(setPlaybackState:)] };
+        assert!(supports_playback_state);
+
+        let initial_state: isize = unsafe { msg_send![center, playbackState] };
+        let _restore = PlaybackStateRestore {
+            center,
+            state: initial_state,
+        };
+
+        for (state, expected) in [(1, 1), (2, 2), (3, 3)] {
+            unsafe { set_now_playing_playback_state(state) };
+            let actual: isize = unsafe { msg_send![center, playbackState] };
+            assert_eq!(actual, expected);
+        }
+    }
+
+    struct PlaybackStateRestore {
+        center: *mut AnyObject,
+        state: isize,
+    }
+
+    impl Drop for PlaybackStateRestore {
+        fn drop(&mut self) {
+            unsafe {
+                let _: () = msg_send![self.center, setPlaybackState: self.state];
+            }
+        }
     }
 
     #[test]
