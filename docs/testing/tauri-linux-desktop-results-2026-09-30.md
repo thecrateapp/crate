@@ -4,7 +4,7 @@
 
 - Branch: `feat/tauri-desktop-app`
 - Baseline revision: `00c988e9539269d105dddd5c65fcd8ee8dcdb252`
-- The R03–R05 follow-up ran against the working-tree path optimization on the same branch; it is not committed yet.
+- The R03–R05 follow-up first ran against the working-tree path optimization, which is included in commit `7f79f2ed`.
 - The checkout had no product changes before the initial acceptance run. Generated formatting changes in vendored Tauri permission files were reverted after both runs.
 - Session: real logged-in CachyOS desktop on GNOME Wayland, not a VM, container, or Xvfb.
 - Scope: release AppImage smoke, native loopback probes, MPRIS Play/Pause, and process memory sampling. The follow-up below also includes a Tauri filesystem path-resolution optimization and a rerun of R03–R05.
