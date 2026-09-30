@@ -7,10 +7,8 @@ output_dir="${3:-desktop-artifacts}"
 runner_os="${RUNNER_OS:-$(uname -s)}"
 if [[ -n "${CRATE_DESKTOP_VERSION:-}" ]]; then
   version="$CRATE_DESKTOP_VERSION"
-elif [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
-  version="$GITHUB_REF_NAME"
 else
-  version="$(node -p "require('./app/listen-desktop/src-tauri/tauri.conf.json').version")"
+  version="$(node app/listen-desktop/scripts/desktop-version.mjs)"
 fi
 
 mkdir -p "$output_dir"

@@ -232,8 +232,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve desktop version
+        run: node app/listen-desktop/scripts/desktop-version.mjs
+
+      - name: Test desktop version resolver
+        run: npm run --workspace=app/listen-desktop test:version
+
       - name: Test desktop native layer
         run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
+
+      - name: Clear stale desktop bundles
+        if: runner.os != 'macOS'
+        run: rm -rf app/listen-desktop/src-tauri/target/release/bundle
 
       - name: Build macOS tester bundles
         if: runner.os == 'macOS'
@@ -251,10 +261,7 @@ jobs:
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
           VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
-          version="$(node -p "require('./app/listen-desktop/src-tauri/tauri.conf.json').version")"
-          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
-            version="${GITHUB_REF_NAME}"
-          fi
+          version="$CRATE_DESKTOP_VERSION"
           make tauri-build-macos-testers \
             TAURI_RELEASE_VERSION="$version" \
             TAURI_MACOS_OUTPUT_DIR=desktop-artifacts
@@ -274,7 +281,20 @@ jobs:
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
           VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
-        run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" && "$CRATE_DESKTOP_MSI_COMPATIBLE" != "true" ]]; then
+            npm run --workspace=app/listen-desktop tauri:build:windows:nsis
+          else
+            npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
+          fi
+
+      - name: Verify desktop artifact versions
+        if: runner.os != 'macOS'
+        run: >-
+          node app/listen-desktop/scripts/verify-desktop-artifact-version.mjs
+          app/listen-desktop/src-tauri/target/release/bundle
+          "$CRATE_DESKTOP_VERSION"
+          "$CRATE_DESKTOP_MSI_COMPATIBLE"
 
       - name: Generate macOS dSYMs
         if: runner.os == 'macOS' && github.event_name == 'push'

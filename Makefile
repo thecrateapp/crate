@@ -1022,7 +1022,7 @@ cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact releas
 # ===========================================================================
 
 TAURI_DIR := app/listen-desktop
-TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || gh release view --json tagName --jq .tagName 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
+TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
 TAURI_MACOS_OUTPUT_DIR ?= desktop-artifacts/$(TAURI_RELEASE_VERSION)-macos-testers
 TAURI_MACOS_ARM_APP := $(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app
 TAURI_MACOS_INTEL_APP := $(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Crate.app
@@ -1049,10 +1049,13 @@ tauri-build-macos-testers: ## Build ARM + Intel macOS .app ZIPs for manual teste
 		echo "$(RED)macOS tester builds must run on macOS.$(NC)"; \
 		exit 1; \
 	fi
+	@rm -rf "$(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle" "$(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle"
 	@echo "$(YELLOW)Building Crate macOS ARM bundle ($(TAURI_RELEASE_VERSION))$(NC)"
-	@npm run --workspace=$(TAURI_DIR) tauri -- build --target aarch64-apple-darwin --bundles app
+	@CRATE_DESKTOP_VERSION="$(TAURI_RELEASE_VERSION)" npm run --workspace=$(TAURI_DIR) tauri -- build --target aarch64-apple-darwin --bundles app
+	@node $(TAURI_DIR)/scripts/verify-desktop-artifact-version.mjs "$(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos" "$(TAURI_RELEASE_VERSION)"
 	@echo "$(YELLOW)Building Crate macOS Intel bundle ($(TAURI_RELEASE_VERSION))$(NC)"
-	@npm run --workspace=$(TAURI_DIR) tauri -- build --target x86_64-apple-darwin --bundles app
+	@CRATE_DESKTOP_VERSION="$(TAURI_RELEASE_VERSION)" npm run --workspace=$(TAURI_DIR) tauri -- build --target x86_64-apple-darwin --bundles app
+	@node $(TAURI_DIR)/scripts/verify-desktop-artifact-version.mjs "$(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle/macos" "$(TAURI_RELEASE_VERSION)"
 	@mkdir -p "$(TAURI_MACOS_OUTPUT_DIR)"
 	@arm_binary="$(TAURI_MACOS_ARM_APP)/Contents/MacOS/crate-desktop"; \
 	intel_binary="$(TAURI_MACOS_INTEL_APP)/Contents/MacOS/crate-desktop"; \
