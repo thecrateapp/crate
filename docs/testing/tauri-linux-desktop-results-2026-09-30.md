@@ -23,18 +23,18 @@
 
 ## Gate summary
 
-| Gate | Result | Evidence / limitation |
-| --- | --- | --- |
-| R01 HTTP client pool | **Inconclusive** | Full benchmark completed, but shared-client requests show a repeatable ~41 ms local delay that appears tied to the fixture's TCP behavior. Do not treat this as a production/API comparison. |
-| R03 hydration and file verification | **Pass after follow-up fix** | Three 5,000-entry hydration passes completed in 71–95 ms; three file-verification runs validated all 5,000 files. |
-| R04 concurrent verification callers | **Pass** | Two simultaneous 1,000-file callers returned all 2,000 valid results. Median was 68 ms concurrent and 78 ms sequential in this synthetic probe. |
-| R05 durable index writes | **Pass** | Coalesced writes persisted all tested 100/1,000/5,000-entry indexes; paired 1,000-mutation runs also persisted all entries. |
-| R07 visualizer frames, CPU/RSS, visibility and DPR | **Partial** | Three visible runs and RAF stop check completed. Hide/restore, resize, scaling changes, and the installed player's renderer remain untested. |
-| R08 decoded audio RSS | **Partial** | One- and two-track synthetic runs completed, including 90-second holds and at least 90 seconds after release. No real library track, crossfade, track-change race, or 60–120-minute fixture was available. |
-| AppImage launch | **Partial** | Isolated release AppImage started in the normal desktop session and registered on D-Bus. In-app visual/version diagnostics could not be inspected. |
-| MPRIS Play/Pause | **Pass, limited** | Status changed to Playing, position advanced 38→42 seconds, and Pause returned Paused at 42 seconds. A later SIGINT-driven app relaunch reported position 0, so persisted-position behavior is inconclusive. Next/previous, seek, metadata/artwork, and actual minimize/restore were not tested. |
-| Auth persistence, offline download/cancel/reconcile, upgrade | **Pending** | Requires interactive app/provider access and user-library actions; no such flows were exercised. |
-| WebKitGTK 2.40, X11, N−1 upgrade, other OSes | **Pending** | This host has WebKitGTK 2.52.6 and Wayland only. |
+| Gate                                                         | Result                       | Evidence / limitation                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R01 HTTP client pool                                         | **Inconclusive**             | Full benchmark completed, but shared-client requests show a repeatable ~41 ms local delay that appears tied to the fixture's TCP behavior. Do not treat this as a production/API comparison.                                                                                                                                               |
+| R03 hydration and file verification                          | **Pass after follow-up fix** | Three 5,000-entry hydration passes completed in 71–95 ms; three file-verification runs validated all 5,000 files.                                                                                                                                                                                                                          |
+| R04 concurrent verification callers                          | **Pass**                     | Two simultaneous 1,000-file callers returned all 2,000 valid results. Median was 68 ms concurrent and 78 ms sequential in this synthetic probe.                                                                                                                                                                                            |
+| R05 durable index writes                                     | **Pass**                     | Coalesced writes persisted all tested 100/1,000/5,000-entry indexes; paired 1,000-mutation runs also persisted all entries.                                                                                                                                                                                                                |
+| R07 visualizer frames, CPU/RSS, visibility and DPR           | **Partial**                  | Three visible runs and RAF stop check completed. The probe measured 23–24 ms median frame intervals; the user reports the visualizer is still sluggish on an i9 Wayland desktop. Tauri Linux hides the visualizer until frame pacing is fixed. Hide/restore, resize, scaling changes, and the installed player's renderer remain untested. |
+| R08 decoded audio RSS                                        | **Partial**                  | One- and two-track synthetic runs completed, including 90-second holds and at least 90 seconds after release. No real library track, crossfade, track-change race, or 60–120-minute fixture was available.                                                                                                                                 |
+| AppImage launch                                              | **Partial**                  | Isolated release AppImage started in the normal desktop session and registered on D-Bus. In-app visual/version diagnostics could not be inspected.                                                                                                                                                                                         |
+| MPRIS Play/Pause                                             | **Pass, limited**            | Status changed to Playing, position advanced 38→42 seconds, and Pause returned Paused at 42 seconds. A later SIGINT-driven app relaunch reported position 0, so persisted-position behavior is inconclusive. Next/previous, seek, metadata/artwork, and actual minimize/restore were not tested.                                           |
+| Auth persistence, offline download/cancel/reconcile, upgrade | **Pending**                  | Requires interactive app/provider access and user-library actions; no such flows were exercised.                                                                                                                                                                                                                                           |
+| WebKitGTK 2.40, X11, N−1 upgrade, other OSes                 | **Pending**                  | This host has WebKitGTK 2.52.6 and Wayland only.                                                                                                                                                                                                                                                                                           |
 
 ## AppImage smoke
 
@@ -52,14 +52,14 @@ The isolated app shared the hard-coded `org.mpris.MediaPlayer2.crate` name with 
 
 Command: `cargo run --release --example http_pool_bench` from `app/listen-desktop/src-tauri`. The loopback HTTP/1.1 fixture returns 16 KiB per response. Timings are total / p50 / p95; connection counts exclude the shared client's warmup request.
 
-| Concurrency | Requests | Fresh client | Shared client | Connections: fresh / shared |
-| ---: | ---: | ---: | ---: | ---: |
-| 1 | 100 | 11 ms / 79 µs / 100 µs | 4,122 ms / 40,998 µs / 42,016 µs | 100 / 0 |
-| 1 | 1,000 | 57 ms / 40 µs / 46 µs | 41,279 ms / 41,007 µs / 42,031 µs | 1,000 / 0 |
-| 1 | 5,000 | 286 ms / 39 µs / 47 µs | 206,332 ms / 41,002 µs / 42,021 µs | 5,000 / 0 |
-| 8 | 100 | 6 ms / 265 µs / 690 µs | 532 ms / 217 µs / 40,968 µs | 100 / 7 |
-| 8 | 1,000 | 54 ms / 268 µs / 332 µs | 5,157 ms / 239 µs / 41,030 µs | 1,000 / 7 |
-| 8 | 5,000 | 268 ms / 261 µs / 330 µs | 25,792 ms / 222 µs / 41,021 µs | 5,000 / 7 |
+| Concurrency | Requests |             Fresh client |                      Shared client | Connections: fresh / shared |
+| ----------: | -------: | -----------------------: | ---------------------------------: | --------------------------: |
+|           1 |      100 |   11 ms / 79 µs / 100 µs |   4,122 ms / 40,998 µs / 42,016 µs |                     100 / 0 |
+|           1 |    1,000 |    57 ms / 40 µs / 46 µs |  41,279 ms / 41,007 µs / 42,031 µs |                   1,000 / 0 |
+|           1 |    5,000 |   286 ms / 39 µs / 47 µs | 206,332 ms / 41,002 µs / 42,021 µs |                   5,000 / 0 |
+|           8 |      100 |   6 ms / 265 µs / 690 µs |        532 ms / 217 µs / 40,968 µs |                     100 / 7 |
+|           8 |    1,000 |  54 ms / 268 µs / 332 µs |      5,157 ms / 239 µs / 41,030 µs |                   1,000 / 7 |
+|           8 |    5,000 | 268 ms / 261 µs / 330 µs |     25,792 ms / 222 µs / 41,021 µs |                   5,000 / 7 |
 
 The ~41 ms tail repeats across request counts. The fixture writes response headers and body in separate writes and does not set `TCP_NODELAY`; that local server behavior is a likely contributor, but this run did not isolate it. The same benchmark looked materially different in the macOS handover. Treat R01 as inconclusive until the fixture is corrected or its delayed-ACK behavior is ruled out. Raw captured output: `/tmp/tauri-http-pool-bench-00c988e9.txt`.
 
@@ -69,11 +69,11 @@ The initial run stalled at 5,000 entries because the Tauri filesystem adapter ca
 
 The updated probe ran in a dedicated Tauri app identifier and isolated app-local storage on the same CachyOS GNOME Wayland host. Hydration first-pass times (three repetitions) were:
 
-| Assets | Median | Range | Warm median |
-| ---: | ---: | ---: | ---: |
-| 100 | 7 ms | 5–30 ms | 0 ms |
-| 1,000 | 20 ms | 19–37 ms | 0 ms |
-| 5,000 | 86 ms | 71–95 ms | 0 ms |
+| Assets | Median |    Range | Warm median |
+| -----: | -----: | -------: | ----------: |
+|    100 |   7 ms |  5–30 ms |        0 ms |
+|  1,000 |  20 ms | 19–37 ms |        0 ms |
+|  5,000 |  86 ms | 71–95 ms |        0 ms |
 
 All three 5,000-file verification runs validated all 5,000 files, with a median of 161 ms. Two concurrent callers each verified 1,000 files and returned 2,000 valid results; median elapsed time was 68 ms versus 78 ms sequential. Coalesced index writes persisted all 100, 1,000, and 5,000 entries (median 13, 44, and 870 ms). The paired 1,000-mutation case persisted all entries, with a 10 ms p95 commit latency.
 
@@ -83,11 +83,11 @@ This confirms the hydration stall is fixed on this Linux host and clears R03–R
 
 Three automatic visible runs each lasted 30 seconds. The canvas was 720×720 CSS pixels at DPR 2 and rendered at 1,024×1,024 pixels, consistent with the configured buffer cap. All runs reported WebGL 2.0. Frame intervals were:
 
-| Run | Frame count | p50 | p95 | Max | Synchronous tick p95 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| visible-1 | 1,156 | 24 ms | 39 ms | 62 ms | 1 ms |
-| visible-2 | 1,200 | 24 ms | 38 ms | 45 ms | 1 ms |
-| visible-3 | 1,202 | 23 ms | 37 ms | 45 ms | 1 ms |
+| Run       | Frame count |   p50 |   p95 |   Max | Synchronous tick p95 |
+| --------- | ----------: | ----: | ----: | ----: | -------------------: |
+| visible-1 |       1,156 | 24 ms | 39 ms | 62 ms |                 1 ms |
+| visible-2 |       1,200 | 24 ms | 38 ms | 45 ms |                 1 ms |
+| visible-3 |       1,202 | 23 ms | 37 ms | 45 ms |                 1 ms |
 
 The sample median was 16% CPU for the Tauri/WebKit process group (p95 28%, max 44%). Median/max RSS by process: Tauri 136.7/137.5 MiB, WebKit Web 173.4/175.6 MiB, and WebKit Network 49.0/51.1 MiB. The sampled summed RSS median/p95/max was 359.1/364.1/364.2 MiB; RSS sums can double-count shared pages. Synchronous renderer tick p95 stayed at 1 ms, while RAF intervals centered around 24 ms, so this probe sees frame scheduling below 60 Hz but does not identify GPU completion time as the bottleneck.
 
@@ -99,11 +99,11 @@ Raw outputs: `/tmp/tauri-visualizer-linux.jsonl`, `/tmp/tauri-visualizer-linux-p
 
 Two local stereo FLAC tone fixtures were generated in `/tmp`; no library audio was copied or uploaded. They were decoded sequentially with a fresh Tauri process and `AudioContext.sampleRate=44,100 Hz`:
 
-| Fixture | Duration | Encoded bytes | Decoded PCM bytes |
-| --- | ---: | ---: | ---: |
-| track20 | 1,220.4 s (20:20.4) | 17,937,876 | 430,557,120 |
-| track16 | 991.8 s (16:31.8) | 14,789,860 | 349,907,040 |
-| Both retained | 2,212.2 s | 32,727,736 | 780,464,160 (744.1 MiB) |
+| Fixture       |            Duration | Encoded bytes |       Decoded PCM bytes |
+| ------------- | ------------------: | ------------: | ----------------------: |
+| track20       | 1,220.4 s (20:20.4) |    17,937,876 |             430,557,120 |
+| track16       |   991.8 s (16:31.8) |    14,789,860 |             349,907,040 |
+| Both retained |           2,212.2 s |    32,727,736 | 780,464,160 (744.1 MiB) |
 
 Both buffers were held for 90 seconds, cleared, and followed for about 109 seconds. The continuous 250 ms sampler began after both buffers were decoded, so it did not capture pre-decode baseline or the earliest peak. It measured a maximum process-group 1,195 MiB RSS / 1,037 MiB PSS; about 109 seconds after release it still measured roughly 1,162 MiB RSS / 1,002 MiB PSS. This is observed retention, not proof of a leak.
 

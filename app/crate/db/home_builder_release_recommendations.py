@@ -113,18 +113,33 @@ def build_recommended_tracks(
     limit: int,
     fallback_tracks: list[dict] | None = None,
 ) -> list[dict]:
+    fresh_releases = filter_interesting_releases(
+        recent_releases,
+        interest_artists_lower=set(interest_artists_lower),
+        saved_album_ids=set(),
+        days=7,
+    )
+    recent_release_rows = filter_interesting_releases(
+        recent_releases,
+        interest_artists_lower=set(interest_artists_lower),
+        saved_album_ids=set(),
+    )
     fresh_release_album_ids = [
+        row["album_id"] for row in fresh_releases if row.get("album_id") is not None
+    ]
+    recent_release_album_ids = [
         row["album_id"]
-        for row in filter_interesting_releases(
-            recent_releases,
-            interest_artists_lower=set(interest_artists_lower),
-            saved_album_ids=set(),
-            days=7,
-        )
+        for row in recent_release_rows
         if row.get("album_id") is not None
     ]
-    if not fresh_release_album_ids:
-        fresh_release_album_ids = [
+    release_album_ids = list(dict.fromkeys(fresh_release_album_ids))
+    release_album_ids.extend(
+        album_id
+        for album_id in recent_release_album_ids
+        if album_id not in release_album_ids
+    )
+    if not release_album_ids:
+        release_album_ids = [
             row["album_id"]
             for row in recent_releases[:24]
             if row.get("album_id") is not None
@@ -132,7 +147,15 @@ def build_recommended_tracks(
 
     candidate_limit = max(limit * 6, 120)
     recommended_track_rows = track_candidates_for_album_ids(
-        user_id, fresh_release_album_ids[:24], limit=candidate_limit
+        user_id, release_album_ids[:24], limit=candidate_limit
+    )
+    release_album_rank = {
+        album_id: index for index, album_id in enumerate(release_album_ids)
+    }
+    recommended_track_rows.sort(
+        key=lambda row: release_album_rank.get(
+            row.get("album_id"), len(release_album_rank)
+        )
     )
     recommended_track_rows = [
         row

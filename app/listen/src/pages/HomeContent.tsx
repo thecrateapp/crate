@@ -59,11 +59,22 @@ function HomeHero({ page }: HomeSectionProps) {
 }
 
 function HomeCommonRails({ page }: HomeSectionProps) {
-  const { currentDiscovery, upcomingPreview, upcoming, homeInsights } =
-    page.view;
+  const {
+    currentDiscovery,
+    recentGlobalArtists,
+    globalArtistsLoading,
+    upcomingPreview,
+    upcoming,
+    homeInsights,
+  } = page.view;
 
   return (
     <>
+      <JustLandedSection
+        artists={recentGlobalArtists}
+        loading={globalArtistsLoading}
+        onOpenExplore={() => page.navigate("/explore")}
+      />
       <SuggestedAlbumsSection
         albums={currentDiscovery.suggested_albums || []}
         onViewAll={page.openHomeSection}
@@ -89,18 +100,7 @@ function HomeCommonRails({ page }: HomeSectionProps) {
 }
 
 function HomeMobileRails({ page }: HomeSectionProps) {
-  const { recentGlobalArtists, globalArtistsLoading } = page.view;
-
-  return (
-    <>
-      <JustLandedSection
-        artists={recentGlobalArtists}
-        loading={globalArtistsLoading}
-        onOpenExplore={() => page.navigate("/explore")}
-      />
-      <HomeCommonRails page={page} />
-    </>
-  );
+  return <HomeCommonRails page={page} />;
 }
 
 function HomeDesktopRails({ page }: HomeSectionProps) {

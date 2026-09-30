@@ -20,6 +20,7 @@ from crate.db.queries.global_catalog import (
     get_global_artist_page_by_public_slug,
     get_global_track_info,
 )
+from crate.db.queries.crates import get_crate_for_user
 from crate.db.repositories.library_album_reads import (
     get_library_album_by_entity_uid,
     get_library_album_by_id,
@@ -464,6 +465,40 @@ def share_track(
             else _track_app_path(track, album, artist)
         ),
         og_type="music.song",
+    )
+
+
+@router.get("/share/crate/{crate_id}", include_in_schema=False)
+def share_crate(request: Request, crate_id: uuid.UUID) -> HTMLResponse:
+    crate_ref = str(crate_id)
+    crate, access = get_crate_for_user(crate_ref, None)
+    if access != "public" or crate is None:
+        raise HTTPException(status_code=404, detail="Crate not found")
+
+    albums = crate.get("albums") or []
+    first_album = albums[0] if albums else None
+    owner_name = str(
+        crate.get("owner_name") or crate.get("owner_username") or "a Crate listener"
+    )
+    description = str(crate.get("description") or "").strip()
+    if not description:
+        album_label = "album" if len(albums) == 1 else "albums"
+        description = f"{len(albums)} {album_label} curated by {owner_name} on Crate."
+
+    image_path = "/icons/icon-512.png"
+    if first_album and first_album.get("has_cover"):
+        album_uid = first_album.get("global_album_uid")
+        if album_uid:
+            image_path = f"/api/catalog/albums/{_encode(album_uid)}/cover"
+
+    return _render_preview(
+        request,
+        title=str(crate.get("name") or "Crate"),
+        eyebrow=f"Crate by {owner_name}",
+        description=description,
+        image_path=image_path,
+        app_path=f"/crate/{crate_ref}",
+        og_type="website",
     )
 
 

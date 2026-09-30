@@ -12,6 +12,7 @@ import {
   Collection,
   CRATE_ICON_SIZE,
   Disc,
+  Disc3,
   Heart,
   Home,
   ListMusic,
@@ -38,6 +39,11 @@ const COLLECTION_SECTIONS = [
     to: "/collection/artists",
     icon: Users,
     labelKey: "nav.collection.artists",
+  },
+  {
+    to: "/collection/crates",
+    icon: Disc3,
+    labelKey: "nav.collection.crates",
   },
   { to: "/collection/albums", icon: Disc, labelKey: "nav.collection.albums" },
   {

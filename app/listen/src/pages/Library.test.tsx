@@ -68,6 +68,7 @@ vi.mock("@/hooks/use-api", () => ({
           saved_albums: 3,
           liked_tracks: 4,
           playlists: 1,
+          crates: 2,
         },
         loading: false,
         error: null,
@@ -184,6 +185,35 @@ describe("Library", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens Crates from its collection deep link and shows the empty state", () => {
+    renderLibrary("/collection/crates", "/collection/:section");
+
+    expect(
+      screen.getByRole("heading", { name: "Crates", level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
+    expect(screen.getByText("Your collection starts here")).toBeVisible();
+  });
+
+  it("switches to Crates from the desktop collection tabs", () => {
+    isDesktop = true;
+
+    renderLibrary();
+
+    fireEvent.click(screen.getByRole("button", { name: "Crates" }));
+
+    expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
+  });
+
+  it("switches collection section deep links when another desktop tab is chosen", () => {
+    isDesktop = true;
+
+    renderLibrary("/collection/artists", "/collection/:section");
+    fireEvent.click(screen.getByRole("button", { name: "Crates" }));
+
+    expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
+  });
+
   it("renders dedicated mobile artist section with sort options", () => {
     renderLibrary("/collection/artists", "/collection/:section");
 
@@ -256,6 +286,16 @@ describe("Library", () => {
     expect(
       screen.getByRole("button", { name: /Contributions/i }),
     ).toBeVisible();
+  });
+
+  it("shows the Crates count in the desktop library stats", () => {
+    isDesktop = true;
+
+    renderLibrary();
+
+    const cratesLabel = screen.getAllByText("Crates")[0]!;
+    expect(cratesLabel).toBeVisible();
+    expect(cratesLabel.parentElement).toHaveTextContent("2");
   });
 });
 

@@ -71,6 +71,11 @@ also carries the task broker and durable streams.
 | `dnsmasq`    | Local wildcard DNS                         | `http://admin.<domain>`                                                              |
 | `ports`      | A single machine or LAN port-forwarding    | `http://localhost:8580`, `http://localhost:8581`, `http://localhost:8585/api/status` |
 
+Invite links use `CRATE_LISTEN_PUBLIC_BASE_URL` as their canonical Listen
+origin. The home Compose profile derives it as `https://listen.<domain>` for
+domain-based installs; override it with the actual reachable Listen URL for a
+local or port-based installation.
+
 The Admin app creates the first administrator and starts a library scan. Use
 Listen for playback and user-facing library features. Files received by uploads
 or owned-purchase import are staged and published by workers; the API never

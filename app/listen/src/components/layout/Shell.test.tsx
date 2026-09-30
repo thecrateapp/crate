@@ -79,6 +79,7 @@ describe("Shell", () => {
     expect(screen.getByRole("menuitem", { name: /Playlists/i })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: /Artists/i })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: /Albums/i })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /Crates/i })).toBeVisible();
     expect(
       screen.getByRole("menuitem", { name: /Liked tracks/i }),
     ).toBeVisible();
@@ -89,6 +90,15 @@ describe("Shell", () => {
     expect(
       screen.getByRole("menuitem", { name: /Playlists/i }),
     ).not.toHaveClass("rounded-2xl");
+  });
+
+  it("keeps Crates in the desktop Collection menu", () => {
+    viewportState.isDesktop = true;
+
+    renderWithListenProviders(<Shell />);
+    fireEvent.click(screen.getByRole("button", { name: "Collection" }));
+
+    expect(screen.getByRole("button", { name: /Crates/i })).toBeVisible();
   });
 
   it("uses the overlay mobile header on public genre pages", () => {

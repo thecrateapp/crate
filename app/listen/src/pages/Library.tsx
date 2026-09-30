@@ -1,7 +1,7 @@
 import { type ComponentType, useCallback, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Heart, Users, Disc, ListMusic } from "@crate/ui/icons";
+import { Plus, Heart, Users, Disc, Disc3, ListMusic } from "@crate/ui/icons";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
@@ -17,6 +17,7 @@ import {
 import { LibraryContributionsTab } from "./LibraryContributionsTab";
 import { LibraryPlaylistsTab } from "./LibraryPlaylistsTab";
 import { StatBox } from "./LibraryPrimitives";
+import { Crates } from "@/pages/Crates";
 
 type Tab =
   | "playlists"
@@ -24,6 +25,7 @@ type Tab =
   | "albums"
   | "liked"
   | "bandcamp"
+  | "crates"
   | "contributions";
 
 type TabIcon = ComponentType<{ size?: number; className?: string }>;
@@ -33,6 +35,7 @@ interface MeStats {
   saved_albums: number;
   liked_tracks: number;
   playlists: number;
+  crates: number;
 }
 
 const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
@@ -41,6 +44,7 @@ const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
   { key: "albums", labelKey: "nav.collection.albums", icon: Disc },
   { key: "liked", labelKey: "library.tabs.liked", icon: Heart },
   { key: "bandcamp", labelKey: "nav.collection.bandcamp", icon: BandcampLogo },
+  { key: "crates", labelKey: "nav.collection.crates", icon: Disc3 },
   {
     key: "contributions",
     labelKey: "nav.collection.contributions",
@@ -54,6 +58,7 @@ const tabTitleKeys: Record<Tab, string> = {
   albums: "nav.collection.albums",
   liked: "nav.collection.likedTracks",
   bandcamp: "nav.collection.bandcamp",
+  crates: "nav.collection.crates",
   contributions: "nav.collection.contributions",
 };
 
@@ -63,6 +68,7 @@ function parseTab(value: string | null): Tab {
     value === "albums" ||
     value === "liked" ||
     value === "bandcamp" ||
+    value === "crates" ||
     value === "contributions"
   )
     return value;
@@ -71,6 +77,7 @@ function parseTab(value: string | null): Tab {
 
 export function Library() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { section } = useParams<{ section?: string }>();
   const isDesktop = useIsDesktop();
@@ -92,6 +99,10 @@ export function Library() {
   } = usePullToRefresh(onRefresh);
 
   function setTab(tab: Tab) {
+    if (section) {
+      navigate(`/collection/${tab}`);
+      return;
+    }
     setSearchParams({ tab });
   }
 
@@ -120,6 +131,10 @@ export function Library() {
           <StatBox
             value={stats.playlists}
             label={t("nav.collection.playlists")}
+          />
+          <StatBox
+            value={stats.crates ?? 0}
+            label={t("nav.collection.crates")}
           />
         </div>
       )}
@@ -152,6 +167,7 @@ export function Library() {
       {tab === "albums" && <LibraryAlbumsTab key={refreshKey} />}
       {tab === "liked" && <LibraryLikedTab key={refreshKey} />}
       {tab === "bandcamp" && <LibraryBandcampTab key={refreshKey} />}
+      {tab === "crates" && <Crates key={refreshKey} />}
       {tab === "contributions" && <LibraryContributionsTab key={refreshKey} />}
     </div>
   );

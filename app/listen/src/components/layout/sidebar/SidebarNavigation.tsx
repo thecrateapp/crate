@@ -9,6 +9,7 @@ import {
   Collection,
   CRATE_ICON_SIZE,
   Disc,
+  Disc3,
   Heart,
   ListMusic,
   Music,
@@ -44,6 +45,11 @@ const COLLECTION_ITEMS = [
     to: "/library?tab=artists",
     icon: Users,
     labelKey: "nav.collection.artists",
+  },
+  {
+    to: "/library?tab=crates",
+    icon: Disc3,
+    labelKey: "nav.collection.crates",
   },
   {
     to: "/bandcamp",

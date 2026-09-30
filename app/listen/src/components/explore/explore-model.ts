@@ -4,6 +4,7 @@ import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwor
 import type { UpcomingItem } from "@/components/upcoming/upcoming-model";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
+import type { GlobalArtist } from "@/components/home/home-model";
 
 export interface SearchArtist {
   id?: number;
@@ -91,6 +92,7 @@ export interface ExplorePageData {
   filters: BrowseFilters;
   playlists: SystemPlaylist[];
   moods: MoodPreset[];
+  recent_global_artists?: GlobalArtist[];
 }
 
 interface PlaylistDetailTrack {
