@@ -25,7 +25,10 @@ import {
 import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
-import { useOptionalCrateComposer } from "@/contexts/CrateComposerContext";
+import {
+  openCrateComposerForAlbum,
+  useOptionalCrateComposer,
+} from "@/contexts/CrateComposerContext";
 import { useLazyCrateOptions } from "@/hooks/use-lazy-crate-options";
 import { api } from "@/lib/api";
 import {
@@ -154,14 +157,13 @@ export function useAlbumActionEntries(
                   key: "crate-create",
                   label: t("library.crates.create"),
                   onSelect: () => {
-                    setCratePickerOpen(false);
-                    crateComposer?.openCreateCrate({
-                      album: {
-                        globalAlbumUid: input.globalAlbumUid!,
-                        name: input.album,
-                        artistName: input.artist,
-                      },
+                    const opened = openCrateComposerForAlbum(crateComposer, {
+                      globalAlbumUid: input.globalAlbumUid,
+                      name: input.album,
+                      artistName: input.artist,
                     });
+                    if (!opened) return;
+                    setCratePickerOpen(false);
                   },
                 },
                 ...crateOptions.map((crate) => ({

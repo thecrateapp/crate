@@ -2,7 +2,10 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useContextMenuController } from "@crate/ui/domain/actions";
-import { useOptionalCrateComposer } from "@/contexts/CrateComposerContext";
+import {
+  openCrateComposerForAlbum,
+  useOptionalCrateComposer,
+} from "@/contexts/CrateComposerContext";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { useLazyCrateOptions } from "@/hooks/use-lazy-crate-options";
@@ -96,11 +99,13 @@ export function useAlbumPageController() {
   }
 
   function handleCreateCrate() {
-    if (!globalAlbumUid) return;
-    closeAlbumMenu();
-    crateComposer?.openCreateCrate({
-      album: { globalAlbumUid, name: displayName, artistName },
+    const opened = openCrateComposerForAlbum(crateComposer, {
+      globalAlbumUid,
+      name: displayName,
+      artistName,
     });
+    if (!opened) return;
+    closeAlbumMenu();
   }
 
   const {

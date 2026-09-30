@@ -19,6 +19,7 @@ vi.mock("sonner", () => ({ toast }));
 
 import {
   CrateComposerProvider,
+  openCrateComposerForAlbum,
   useCrateComposer,
 } from "@/contexts/CrateComposerContext";
 import { I18nProvider } from "@/i18n";
@@ -52,6 +53,36 @@ describe("CrateComposerProvider", () => {
     api.mockImplementation(async (url: string) =>
       url === "/api/crates" ? { id: "crate-1" } : undefined,
     );
+  });
+
+  it("does not open the composer without a global album UID", () => {
+    const openCreateCrate = vi.fn();
+
+    expect(
+      openCrateComposerForAlbum(
+        { openCreateCrate },
+        { globalAlbumUid: undefined, name: "Blending", artistName: "High Vis" },
+      ),
+    ).toBe(false);
+    expect(openCreateCrate).not.toHaveBeenCalled();
+  });
+
+  it("opens the composer with the normalized album payload", () => {
+    const openCreateCrate = vi.fn();
+
+    expect(
+      openCrateComposerForAlbum(
+        { openCreateCrate },
+        { globalAlbumUid: "album-1", name: "Blending", artistName: "High Vis" },
+      ),
+    ).toBe(true);
+    expect(openCreateCrate).toHaveBeenCalledWith({
+      album: {
+        globalAlbumUid: "album-1",
+        name: "Blending",
+        artistName: "High Vis",
+      },
+    });
   });
 
   it("creates a Crate and carries the source album into it", async () => {

@@ -24,12 +24,37 @@ interface CrateComposerContextValue {
   openCreateCrate: (options?: OpenCrateComposerOptions) => void;
 }
 
+export interface CrateComposerAlbumInput {
+  globalAlbumUid?: string | null;
+  name: string;
+  artistName: string;
+}
+
 const CrateComposerContext = createContext<
   CrateComposerContextValue | undefined
 >(undefined);
 
 interface CreateCrateResponse {
   id: string;
+}
+
+export function openCrateComposerForAlbum(
+  composer:
+    | Pick<CrateComposerContextValue, "openCreateCrate">
+    | null
+    | undefined,
+  album: CrateComposerAlbumInput,
+): boolean {
+  if (!composer || !album.globalAlbumUid) return false;
+
+  composer.openCreateCrate({
+    album: {
+      globalAlbumUid: album.globalAlbumUid,
+      name: album.name,
+      artistName: album.artistName,
+    },
+  });
+  return true;
 }
 
 export function CrateComposerProvider({ children }: { children: ReactNode }) {
