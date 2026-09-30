@@ -45,7 +45,7 @@ jobs:
             artifact_suffix: macos
             build_script: tauri:build:macos
           - name: Linux
-            runner: ubuntu-24.04
+            runner: ubuntu-22.04
             artifact_suffix: linux
             build_script: tauri:build:linux
           - name: Windows
@@ -238,6 +238,10 @@ jobs:
       - name: Test desktop version resolver
         run: npm run --workspace=app/listen-desktop test:version
 
+      - name: Test Linux glibc compatibility verifier
+        if: runner.os == 'Linux'
+        run: npm run --workspace=app/listen-desktop test:glibc
+
       - name: Test desktop native layer
         run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
 
@@ -287,6 +291,10 @@ jobs:
           else
             npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
           fi
+
+      - name: Verify Linux glibc compatibility
+        if: runner.os == 'Linux'
+        run: node app/listen-desktop/scripts/verify-linux-glibc.mjs app/listen-desktop/src-tauri/target/release/crate-desktop 2.36
 
       - name: Verify desktop artifact versions
         if: runner.os != 'macOS'

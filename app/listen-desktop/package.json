@@ -16,6 +16,7 @@
     "tauri:build:windows": "node scripts/tauri-cli.mjs build --bundles nsis,msi",
     "tauri:build:windows:nsis": "node scripts/tauri-cli.mjs build --bundles nsis",
     "tauri:build:all": "node scripts/tauri-cli.mjs build",
+    "test:glibc": "node --test scripts/verify-linux-glibc.node-test.mjs",
     "test:version": "node --test scripts/desktop-version.node-test.mjs",
     "test": "vitest run --config vite.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

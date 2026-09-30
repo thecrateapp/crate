@@ -164,6 +164,12 @@ It decoded the same fixtures at 44,100 Hz and retained 744.1 MiB PCM for 90 seco
 
 Unlike macOS, the Linux WebContent RSS remained near 899 MiB more than 100 seconds after release. It is an observed high-water/retention result, not proof of a leak. This package used a measurement-only window and synthetic audio, so it does not establish memory use in the real player or normal desktop environment.
 
+## Linux release artifact compatibility regression — 2026-09-30
+
+The GitHub Linux artifacts from run `36720616713` at `95c9f5395927fcce27c7846204bdc64d86a65c23` were built on `ubuntu-24.04`. I downloaded its `crate-linux-0.1.0.deb` and installed it in an isolated Debian 12 amd64 container with WebKitGTK 2.50.6. Launch failed before a window appeared: `/lib/x86_64-linux-gnu/libc.so.6` did not provide `GLIBC_2.39`, which the packaged binary requires. The package metadata did not declare a matching libc minimum, so installation succeeded despite the incompatible binary.
+
+The new `verify-linux-glibc.mjs` gate rejects this artifact against the supported GLIBC 2.36 ceiling with `Binary requires GLIBC_2.39; maximum supported is GLIBC_2.36`. The Linux build runner is pinned to Ubuntu 22.04, whose WebKitGTK 4.1 package is newer than the declared 2.40 minimum. CI must complete the package build and glibc check on the updated branch before this regression is considered closed. Ubuntu 22.04 runner use is transitional; move Linux builds into a Debian 12 based environment before those hosted runners retire.
+
 ## Other native gates still pending
 
 The installed release matrix remains open for macOS 11 and Intel, Windows 10 1803/WebView2, and Linux/WebKitGTK 2.40. Windows still needs process RSS captures and installed-app smoke. Linux has development and release WebKitGTK datapoints inside Debian/OrbStack under Xvfb, but still needs a normal desktop session and installed-app acceptance. Provider credentials, media-system behavior, upgrade from N−1, signed artifacts, and the remaining native acceptance scenarios are not covered by this report. A green local build or cross-compile does not substitute for those runs.
