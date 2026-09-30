@@ -1,0 +1,7 @@
+{
+  "productName": "Crate Visualizer Bench",
+  "identifier": "app.cratemusic.crate.desktop.visualizer-bench20260930",
+  "build": {
+    "devUrl": "http://127.0.0.1:5178/scripts/native-perf/visualizer.html"
+  }
+}

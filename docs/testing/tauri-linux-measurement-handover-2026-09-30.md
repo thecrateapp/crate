@@ -1,0 +1,195 @@
+# Tauri Linux measurement and acceptance handover
+
+## Objective
+
+Run the Linux native measurements and installed-app checks that are still open
+for the Tauri hardening work. Use the pushed `feat/tauri-desktop-app` branch
+from this handover and record the exact commit SHA in the results. Do not change
+audio fallback policy or visualizer quality from one machine's measurements.
+
+The branch declares Linux support with WebKitGTK 2.40 or newer. A prior Debian
+12 ARM64 run used WebKitGTK 2.50.6 in an OrbStack VM under Xvfb with software
+rendering. A packaged release opened there, but that run did not test a normal
+desktop session, an accelerated GPU, or the 2.40 floor. Its RSS data is in
+[`tauri-hardening-validation-2026-09-30.md`](tauri-hardening-validation-2026-09-30.md).
+
+## Record the host first
+
+Use a normal logged-in desktop session, not Xvfb, for acceptance. Record:
+
+- Commit SHA, distribution and release, kernel, architecture, RAM, and power
+  source.
+- `XDG_SESSION_TYPE` (Wayland or X11), desktop/compositor, audio server, GPU,
+  driver, and whether WebKit uses hardware acceleration.
+- WebKitGTK version (`pkg-config --modversion webkit2gtk-4.1`), GTK version,
+  and installed package type (deb, rpm, or AppImage).
+
+Useful read-only commands:
+
+```bash
+git rev-parse HEAD
+cat /etc/os-release
+uname -a
+printf 'session=%s\n' "$XDG_SESSION_TYPE"
+pkg-config --modversion webkit2gtk-4.1
+ps -eo pid,ppid,%cpu,rss,etime,comm,args | rg 'crate-desktop|WebKit'
+```
+
+If available, also save `glxinfo -B` or the equivalent GPU diagnostic. Keep the
+normal desktop's session bus and compositor active for MPRIS and minimize/
+restore checks.
+
+## R07 — Visualizer frames, GPU and suspension
+
+The isolated page uses the production `MusicVisualizer` and its real WebGL
+renderer with a deterministic synthetic analyser. It does not play audio, call
+the Crate API, or use a user profile. The 720 × 720 CSS canvas matches the
+square visualizer in the player. The branch also preserves aspect ratio when
+the DPR-scaled buffer reaches its 1,024-pixel cap.
+
+Start a loopback receiver and launch the probe from the repository root:
+
+```bash
+python3 -c 'from pathlib import Path; Path("/tmp/tauri-native-perf-empty").write_bytes(b"x")'
+python3 app/listen-desktop/scripts/audio-rss/fixture_server.py \
+  --track placeholder=/tmp/tauri-native-perf-empty \
+  --port 18766 \
+  --report-file=/tmp/tauri-visualizer-linux.jsonl
+
+npm run --workspace=app/listen-desktop tauri:dev -- \
+  --config scripts/native-perf/visualizer.config.json
+```
+
+The page starts three 30-second visible runs automatically. It posts frame
+interval p50/p95/max, synchronous renderer tick p50/p95/max, DPR, canvas CSS
+and render sizes, visibility transitions, WebGL renderer, and context
+attributes to the JSONL file. At the end it stops the renderer and checks that
+the animation-frame callback count stays unchanged for two seconds. The Tauri
+window uses a dedicated benchmark identifier.
+
+During the three runs, sample the app and its WebKit renderer/GPU processes at
+one-second or finer intervals. Keep processes separate; Linux RSS sums can
+double-count shared pages. A basic sampler is:
+
+```bash
+while true; do
+  date -Is
+  ps -eo pid,ppid,%cpu,rss,etime,comm,args \
+    | rg 'crate-desktop|WebKitWebProcess|WebKitGPUProcess|WebKitNetworkProcess'
+  sleep 0.25
+done > /tmp/tauri-visualizer-linux-processes.txt
+```
+
+Record CPU and RSS for the Tauri process, WebKit web process, and GPU process
+separately. Report the process-group sum only as an additional figure. Use the
+desktop window controls to minimize and restore the benchmark window while it
+runs; confirm `visibilityState` changes and the production hook stops and
+restarts rendering. Resize the window and, if possible, move it between displays
+with different scaling. Record each DPR and buffer size. The probe measures
+JavaScript frame scheduling and synchronous GL submission; it does not measure
+GPU completion time or per-process energy. Keep the probe results as dev-WebView
+measurements, then separately exercise the same visualizer in the installed
+player.
+
+## R08 — Decoded audio RSS
+
+Use local FLAC fixtures with known durations and channel/sample-rate metadata.
+Do not commit or upload music files. Run each measurement in a fresh Tauri
+process; measure one long track, two long tracks together, and a 60–120 minute
+track if one is available. Include a real library track near 20 minutes when
+permitted. Exercise crossfade, seek, a quick track change during decode, then
+unload and wait at least 90 seconds.
+
+The fixture server's default port for this probe is 18765. For example:
+
+```bash
+python3 app/listen-desktop/scripts/audio-rss/fixture_server.py \
+  --track track20=/absolute/path/to/long-track.flac \
+  --track track16=/absolute/path/to/second-track.flac \
+  --port 18765 \
+  --report-file=/tmp/tauri-audio-rss-linux.jsonl
+
+npm run --workspace=app/listen-desktop tauri:dev -- \
+  --config scripts/audio-rss/tauri.config.json
+```
+
+Use `?tracks=track20` for a single fixture and `&releaseAfterMs=90000` to keep
+decoded buffers for 90 seconds before release. Record source duration, channels,
+source sample rate, `AudioContext.sampleRate`, decoded PCM bytes, and peak/hold/
+post-release memory. Sample the Tauri, WebKit web, GPU, and networking processes
+separately, preferably with both RSS and `/proc/<pid>/smaps_rollup` PSS. Note
+whether RSS falls after release; allocator retention is not proof of a leak.
+Linux results complement the existing container measurements and do not set a
+cross-platform fallback threshold. Windows measurements and equivalent real
+player runs are still required before changing behavior.
+
+## R01, R03–R05 — Native performance probes
+
+Read `app/listen-desktop/scripts/native-perf/README.md` for the exact probe
+commands and scope. The loopback probes make no Crate API calls and use only
+synthetic metadata and disposable local files.
+
+- **R01:** run `cargo run --release --example http_pool_bench` from
+  `app/listen-desktop/src-tauri`, once in a fresh process. It measures shared
+  versus fresh Reqwest clients against a local HTTP/1.1 fixture, not TLS or the
+  production API. Record duration, p50/p95, connection count, and host.
+- **R03:** measure hydration and native verification at 100, 1,000, and 5,000
+  files. The OS page cache is not cold unless explicitly cleared by a controlled
+  test; label process-cache and OS-cache conditions separately.
+- **R04:** compare two 1,000-file verification callers run sequentially and in
+  parallel. Confirm all files pass and record the peak concurrent native IPC
+  calls.
+- **R05:** record sequential full-snapshot writes, same-turn coalescing, and
+  1,000 mutations committed in pairs. Report write count, bytes, p50/p95 commit
+  latency, final JSON size, and peak CPU/RSS. Do not infer real download cadence
+  from same-turn stress bursts.
+
+The native probe cleans its dedicated `offline-media` and `offline-meta` test
+directories. Verify its isolated app identifier before launch and leave the
+installed Crate app and its data untouched.
+
+## Installed Linux acceptance
+
+Build and test the package available on the host in a normal desktop session.
+Confirm the package metadata declares the supported WebKitGTK minimum and that
+the actual runtime satisfies it. Record whether the package is deb, rpm, or
+AppImage; do not treat a container or cross-build as installed acceptance.
+
+Exercise and record:
+
+- Fresh launch, login/OAuth callback where credentials and provider access are
+  available, relaunch with a persisted session, logout, and close/reopen.
+- Remote playback, seek, pause/resume, queue changes, gapless/crossfade, EQ,
+  visualizer, and output-device change. Include suspend/resume if the host can
+  perform it.
+- Offline download, cancellation, restart/reconciliation, and playback from
+  offline files. Confirm the UI does not silently claim offline availability
+  before verification.
+- MPRIS registration and controls through the desktop session bus. Test status,
+  metadata/artwork, play/pause, next/previous, and seek where supported using
+  `playerctl` or equivalent. Check both X11 and Wayland only if both sessions
+  are available.
+- Window resize, hide/minimize and restore, HiDPI buffer changes, WebGL context
+  cleanup on player close, and background CPU after rendering stops.
+- Upgrade from the previous packaged version when that artifact is available;
+  verify the user's library/configuration remains readable.
+
+Do not mark unavailable provider credentials, the exact WebKitGTK 2.40 floor,
+the alternate display server, or an N−1 package as passed. State which host or
+artifact would be needed to close each one.
+
+## Results to return
+
+Append results to the hardening validation report or return a short report with
+the exact SHA, host facts, command lines, logs, and these outcomes:
+
+| Gate                                           | Result  | Evidence / limitation |
+| ---------------------------------------------- | ------- | --------------------- |
+| R01 loopback client pool                       | Pending |                       |
+| R03 hydration and verification                 | Pending |                       |
+| R04 parallel callers                           | Pending |                       |
+| R05 durable writes                             | Pending |                       |
+| R07 frames, CPU/RSS, hide/restore, DPR         | Pending |                       |
+| R08 real audio RSS and release                 | Pending |                       |
+| Installed package launch and WebKitGTK version | Pending |                       |
+| Playback, offline, MPRIS, upgrade              | Pending |                       |

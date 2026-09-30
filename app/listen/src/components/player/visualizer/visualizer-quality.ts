@@ -23,9 +23,15 @@ export function getVisualizerRenderSize(
     Number.isFinite(maxRenderDimension) && maxRenderDimension > 0
       ? Math.floor(maxRenderDimension)
       : 0;
+  const width = Math.max(0, Math.floor(cssWidth * dpr));
+  const height = Math.max(0, Math.floor(cssHeight * dpr));
+  const longestDimension = Math.max(width, height);
+  const scale =
+    cap > 0 && longestDimension > 0 ? Math.min(1, cap / longestDimension) : 0;
+
   return {
-    width: Math.min(Math.max(0, Math.floor(cssWidth * dpr)), cap),
-    height: Math.min(Math.max(0, Math.floor(cssHeight * dpr)), cap),
+    width: Math.floor(width * scale),
+    height: Math.floor(height * scale),
   };
 }
 

@@ -1,0 +1,6 @@
+{
+  "identifier": "app.cratemusic.crate.desktop.audio-rss-bench",
+  "build": {
+    "devUrl": "http://127.0.0.1:5178/scripts/audio-rss/probe.html"
+  }
+}

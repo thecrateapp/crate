@@ -284,7 +284,7 @@ describe("MusicVisualizer", () => {
         2000,
         1500,
       );
-      expect([retinaCanvas.width, retinaCanvas.height]).toEqual([1024, 1024]);
+      expect([retinaCanvas.width, retinaCanvas.height]).toEqual([1024, 768]);
       viz.destroy();
     });
 
