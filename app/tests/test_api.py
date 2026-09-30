@@ -3004,6 +3004,7 @@ class TestSocialProfilePage:
             patch(
                 "crate.api.social.get_public_playlists_for_user", return_value=playlists
             ),
+            patch("crate.api.social.get_public_crates_for_user", return_value=[]),
             patch("crate.api.social.get_relationship_state", return_value=relation),
             patch("crate.api.social.get_affinity", return_value=affinity),
             patch("crate.api.social.get_profile_card_summary", return_value=summary),
@@ -3020,6 +3021,7 @@ class TestSocialProfilePage:
         data = resp.json()
         assert data["display_name"] == "Jane"
         assert data["public_playlists"][0]["name"] == "Public Mix"
+        assert data["public_crates"] == []
         assert data["followers_preview"][0]["username"] == "sam"
         assert data["following_preview"][0]["username"] == "lee"
         assert data["affinity_score"] == 87
