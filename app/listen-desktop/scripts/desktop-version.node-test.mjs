@@ -110,6 +110,20 @@ test("frontend, Cargo, and Tauri default versions must agree", () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+test("Tauri bundle metadata matches supported desktop runtime minimums", () => {
+  const configPath = new URL("../src-tauri/tauri.conf.json", import.meta.url);
+  const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+
+  assert.equal(config.bundle.macOS.minimumSystemVersion, "11.0");
+  assert.equal(config.bundle.windows.minimumWebview2Version, "111.0.1661.34");
+  assert.deepEqual(config.bundle.linux.deb.depends, [
+    "libwebkit2gtk-4.1-0 (>= 2.40.0)",
+  ]);
+  assert.deepEqual(config.bundle.linux.rpm.depends, [
+    "webkit2gtk4.1 >= 2.40.0",
+  ]);
+});
+
 test("GitHub environment records normalized app and MSI compatibility metadata", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "crate-version-env-"));
   const envFile = path.join(root, "github-env");

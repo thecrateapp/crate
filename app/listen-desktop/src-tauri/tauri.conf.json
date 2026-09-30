@@ -59,10 +59,14 @@
       "icons/icon.png"
     ],
     "windows": {
+      "minimumWebview2Version": "111.0.1661.34",
       "webviewInstallMode": {
         "type": "downloadBootstrapper",
         "silent": true
       }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
     },
     "linux": {
       "appimage": {
@@ -70,9 +74,11 @@
       },
       "deb": {
         "section": "sound",
+        "depends": ["libwebkit2gtk-4.1-0 (>= 2.40.0)"],
         "desktopTemplate": "linux/desktop-template.desktop"
       },
       "rpm": {
+        "depends": ["webkit2gtk4.1 >= 2.40.0"],
         "desktopTemplate": "linux/desktop-template.desktop"
       }
     }
