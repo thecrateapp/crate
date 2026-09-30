@@ -68,6 +68,7 @@ vi.mock("@/hooks/use-api", () => ({
           saved_albums: 3,
           liked_tracks: 4,
           playlists: 1,
+          crates: 2,
         },
         loading: false,
         error: null,
@@ -285,6 +286,16 @@ describe("Library", () => {
     expect(
       screen.getByRole("button", { name: /Contributions/i }),
     ).toBeVisible();
+  });
+
+  it("shows the Crates count in the desktop library stats", () => {
+    isDesktop = true;
+
+    renderLibrary();
+
+    const cratesLabel = screen.getAllByText("Crates")[0]!;
+    expect(cratesLabel).toBeVisible();
+    expect(cratesLabel.parentElement).toHaveTextContent("2");
   });
 });
 

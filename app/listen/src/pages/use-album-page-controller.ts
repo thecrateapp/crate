@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useContextMenuController } from "@crate/ui/domain/actions";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
+import { useLazyCrateOptions } from "@/hooks/use-lazy-crate-options";
 import type { AlbumData } from "@/pages/album-types";
 import {
   useAlbumHeroMeasurement,
@@ -14,6 +15,8 @@ import { useAlbumPlaybackActions } from "@/pages/use-album-playback-actions";
 import { useAlbumPlaylistActions } from "@/pages/use-album-playlist-actions";
 import { useAlbumPresentation } from "@/pages/use-album-presentation";
 import { useAlbumSelection } from "@/pages/use-album-selection";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 export function useAlbumPageController() {
   const { t } = useTranslation();
@@ -38,6 +41,7 @@ export function useAlbumPageController() {
     sharedTrackUid,
   } = useAlbumData();
   const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
+  const [cratePickerOpen, setCratePickerOpen] = useState(false);
   const albumHeroInfoRef = useRef<HTMLDivElement>(null);
   const albumPrimaryActionsRef = useRef<HTMLDivElement>(null);
   const [mobileHeroInfoOffset, setMobileHeroInfoOffset] = useState(0);
@@ -47,6 +51,8 @@ export function useAlbumPageController() {
   const selectionMenuController = useContextMenuController<HTMLButtonElement>();
   const { playlistOptions: playlists, ensurePlaylistOptionsLoaded } =
     useLazyPlaylistOptions();
+  const { crateOptions: crates, ensureCrateOptionsLoaded } =
+    useLazyCrateOptions();
   const {
     clearTrackSelection,
     handleCloseSelectionMenu,
@@ -71,6 +77,20 @@ export function useAlbumPageController() {
   function closeAlbumMenu() {
     albumMenuController.close();
     setPlaylistPickerOpen(false);
+    setCratePickerOpen(false);
+  }
+
+  async function handleAddToCrate(crateId: string) {
+    if (!globalAlbumUid) return;
+    try {
+      await api(`/api/crates/${crateId}/albums`, "POST", {
+        global_album_uid: globalAlbumUid,
+      });
+      toast.success(t("album.toasts.addedToCrate"));
+      closeAlbumMenu();
+    } catch {
+      toast.error(t("album.toasts.addToCrateFailed"));
+    }
   }
 
   const {
@@ -120,6 +140,8 @@ export function useAlbumPageController() {
     albumId,
     albumMenuController,
     artistName,
+    cratePickerOpen,
+    crates,
     data,
     displayName,
     ensurePlaylistOptionsLoaded,
@@ -129,12 +151,14 @@ export function useAlbumPageController() {
     handleAddSelectedToPlaylist,
     handleAddSelectedToQueue,
     handleAddToPlaylist,
+    handleAddToCrate,
     handleCreatePlaylistFromAlbum,
     handleCreatePlaylistFromSelection,
     handlePlay,
     handlePlayNextAlbum,
     handlePlaySelectedNext,
     handleToggleSelectionMenuPlaylist,
+    ensureCrateOptionsLoaded,
     mobileHeroInfoOffset,
     navigate,
     playlistPickerOpen,
@@ -142,12 +166,14 @@ export function useAlbumPageController() {
     selectedAlbumTracks,
     selectionMenuPlaylistOpen,
     setPlaylistPickerOpen,
+    setCratePickerOpen,
     sharedTrackUid,
     t,
   });
 
   useDismissibleLayer({
-    active: playlistPickerOpen || selectionPlaylistPickerOpen,
+    active:
+      playlistPickerOpen || cratePickerOpen || selectionPlaylistPickerOpen,
     refs: [
       albumMenuController.menuRef,
       selectionBarRef,
@@ -216,6 +242,7 @@ export function useAlbumPageController() {
     selectionPlaylistPickerOpen,
     selectionMenuPlaylistOpen,
     ensurePlaylistOptionsLoaded,
+    ensureCrateOptionsLoaded,
     t,
   };
 }

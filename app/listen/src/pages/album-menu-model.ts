@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowDownToLine,
   ArrowDownToLineBold,
+  Disc3,
   Heart,
   ListPlus,
   Loader2,
@@ -14,22 +15,28 @@ import {
 
 import type { ContextMenuEntry } from "@/components/actions/ItemActionMenu";
 import type { PlaylistOption } from "@/hooks/use-lazy-playlist-options";
+import type { CrateOption } from "@/hooks/use-lazy-crate-options";
 import type { OfflineItemState } from "@/lib/offline";
 
 interface AlbumMenuActions {
   playlistPickerOpen: boolean;
+  cratePickerOpen: boolean;
   canPersistAlbum: boolean;
+  canAddToCrate: boolean;
   canSaveAlbum: boolean;
   saved: boolean;
   offlineSupported: boolean;
   offlineState: OfflineItemState;
   offlineButtonLabel: string;
   playlists: PlaylistOption[];
+  crates: CrateOption[];
   onPlay: () => void;
   onPlayNext: () => void;
   onTogglePlaylistPicker: () => void;
+  onToggleCratePicker: () => void;
   onCreatePlaylist: () => void;
   onAddToPlaylist: (playlistId: number) => void | Promise<void>;
+  onAddToCrate: (crateId: string) => void | Promise<void>;
   onToggleSaved: () => void | Promise<void>;
   onToggleOffline: () => void | Promise<void>;
   onGoToArtist: () => void;
@@ -53,6 +60,23 @@ export function buildAlbumMenuItems(
       icon: ListPlus,
       onSelect: options.onPlayNext,
     },
+    ...(options.canAddToCrate
+      ? [
+          {
+            type: "disclosure" as const,
+            key: "crate",
+            label: t("album.actions.addToCrate"),
+            icon: Disc3,
+            expanded: options.cratePickerOpen,
+            onToggle: options.onToggleCratePicker,
+            items: options.crates.map((crate) => ({
+              key: `crate-${crate.id}`,
+              label: crate.name,
+              onSelect: () => options.onAddToCrate(crate.id),
+            })),
+          },
+        ]
+      : []),
     ...(options.canPersistAlbum
       ? [
           {

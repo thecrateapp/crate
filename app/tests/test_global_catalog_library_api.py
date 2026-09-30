@@ -141,6 +141,7 @@ def test_me_library_counts_always_use_global_refs(test_app):
         "saved_albums": 4,
         "liked_tracks": 5,
         "playlists": 2,
+        "crates": 0,
     }
 
     with (

@@ -12,6 +12,7 @@ import type { UseContextMenuControllerReturn } from "@crate/ui/domain/actions";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import type { PlaylistOption } from "@/hooks/use-lazy-playlist-options";
+import type { CrateOption } from "@/hooks/use-lazy-crate-options";
 import { openShareSheet } from "@/lib/social-share";
 import { artistPagePath } from "@/lib/library-routes";
 import {
@@ -38,15 +39,19 @@ export function useAlbumPresentation({
   albumId,
   albumMenuController,
   artistName,
+  cratePickerOpen,
+  crates,
   data,
   displayName,
   ensurePlaylistOptionsLoaded,
+  ensureCrateOptionsLoaded,
   globalAlbumUid,
   globalArtistUid,
   handleAddSelectedToCollection,
   handleAddSelectedToPlaylist,
   handleAddSelectedToQueue,
   handleAddToPlaylist,
+  handleAddToCrate,
   handleCreatePlaylistFromAlbum,
   handleCreatePlaylistFromSelection,
   handlePlay,
@@ -60,6 +65,7 @@ export function useAlbumPresentation({
   selectionMenuPlaylistOpen,
   selectedAlbumTracks,
   setPlaylistPickerOpen,
+  setCratePickerOpen,
   sharedTrackUid,
   t,
 }: {
@@ -69,12 +75,14 @@ export function useAlbumPresentation({
   data: AlbumData | null;
   displayName: string;
   ensurePlaylistOptionsLoaded: () => void;
+  ensureCrateOptionsLoaded: () => void;
   globalAlbumUid: string | null;
   globalArtistUid: string | null;
   handleAddSelectedToCollection: () => void | Promise<void>;
   handleAddSelectedToPlaylist: (playlistId: number) => void | Promise<void>;
   handleAddSelectedToQueue: () => void;
   handleAddToPlaylist: (playlistId: number) => void | Promise<void>;
+  handleAddToCrate: (crateId: string) => void | Promise<void>;
   handleCreatePlaylistFromAlbum: () => void;
   handleCreatePlaylistFromSelection: () => void;
   handlePlay: () => void;
@@ -85,9 +93,12 @@ export function useAlbumPresentation({
   navigate: NavigateFunction;
   playlists: PlaylistOption[];
   playlistPickerOpen: boolean;
+  cratePickerOpen: boolean;
+  crates: CrateOption[];
   selectionMenuPlaylistOpen: boolean;
   selectedAlbumTracks: AlbumTrack[];
   setPlaylistPickerOpen: Dispatch<SetStateAction<boolean>>;
+  setCratePickerOpen: Dispatch<SetStateAction<boolean>>;
   sharedTrackUid: string | null;
   t: TFunction;
 }) {
@@ -131,6 +142,7 @@ export function useAlbumPresentation({
     visibleContributor,
     year,
   } = presentationState;
+  const canAddToCrate = Boolean(globalAlbumUid);
 
   function sharedTrackClass(track: AlbumTrack) {
     return sharedTrackUid && track.entity_uid === sharedTrackUid
@@ -193,6 +205,11 @@ export function useAlbumPresentation({
     setPlaylistPickerOpen((open) => !open);
   }
 
+  function handleToggleCratePicker() {
+    ensureCrateOptionsLoaded();
+    setCratePickerOpen((open) => !open);
+  }
+
   function handleToggleAlbumMenu(event: MouseEvent<HTMLButtonElement>) {
     albumMenuController.openFromTrigger(event);
   }
@@ -217,6 +234,8 @@ export function useAlbumPresentation({
   const albumMenuItems = buildAlbumMenuItems(
     {
       playlistPickerOpen,
+      cratePickerOpen,
+      canAddToCrate,
       canPersistAlbum,
       canSaveAlbum,
       saved,
@@ -224,11 +243,14 @@ export function useAlbumPresentation({
       offlineState,
       offlineButtonLabel,
       playlists,
+      crates,
       onPlay: handlePlay,
       onPlayNext: handlePlayNextAlbum,
       onTogglePlaylistPicker: handleTogglePlaylistPicker,
+      onToggleCratePicker: handleToggleCratePicker,
       onCreatePlaylist: handleCreatePlaylistFromAlbum,
       onAddToPlaylist: handleAddToPlaylist,
+      onAddToCrate: handleAddToCrate,
       onToggleSaved: handleToggleSaved,
       onToggleOffline: handleToggleOffline,
       onGoToArtist: handleGoToArtist,

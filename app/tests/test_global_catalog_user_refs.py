@@ -651,6 +651,7 @@ def test_legacy_library_writes_project_canonical_refs_without_waiting_for_backfi
         "saved_albums": 1,
         "liked_tracks": 0,
         "playlists": 0,
+        "crates": 0,
     }
 
 

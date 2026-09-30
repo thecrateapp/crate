@@ -188,6 +188,7 @@ class UserLibraryCountsResponse(BaseModel):
     saved_albums: int
     liked_tracks: int
     playlists: int
+    crates: int
 
 
 class ShowAttendanceAddResponse(OkResponse):

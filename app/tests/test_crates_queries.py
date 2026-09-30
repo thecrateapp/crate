@@ -185,6 +185,36 @@ def test_new_crates_are_private_and_only_listed_for_the_owner(pg_db):
     assert get_crate_access(crate_id, 2) == "none"
 
 
+def test_library_counts_include_owned_and_collaborative_crates(pg_db):
+    from crate.db.repositories.crates import create_crate
+    from crate.db.repositories.global_user_library import get_user_global_library_counts
+    from crate.db.tx import transaction_scope
+
+    collaborator_id = _create_user(f"crate-count-{uuid4()}@example.test")
+    owned_id = create_crate(owner_id=1, name="Owned count")
+    shared_id = create_crate(
+        owner_id=collaborator_id,
+        name="Shared count",
+        is_collaborative=True,
+    )
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO crate_members (crate_id, user_id, invited_by)
+                VALUES (CAST(:crate_id AS uuid), :user_id, :invited_by)
+                """
+            ),
+            {"crate_id": shared_id, "user_id": 1, "invited_by": collaborator_id},
+        )
+
+    counts = get_user_global_library_counts(1)
+
+    assert owned_id != shared_id
+    assert counts["crates"] == 2
+
+
 def test_collaborators_can_list_private_crates_but_public_profile_is_owner_only(
     pg_db,
 ):
