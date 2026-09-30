@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: true,
+  usesSecureSessionStore: false,
   isCapacitorRuntime: false,
 }));
 

@@ -3,6 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../shared/web/api";
 
 const mocks = vi.hoisted(() => ({
+  secureSessionValues: new Map<string, string>(),
+  getSecureSessionValue: vi.fn(
+    async (key: string) => mocks.secureSessionValues.get(key) ?? null,
+  ),
+  setSecureSessionValue: vi.fn(async (key: string, value: string) => {
+    mocks.secureSessionValues.set(key, value);
+  }),
+  removeSecureSessionValue: vi.fn(async (key: string) => {
+    mocks.secureSessionValues.delete(key);
+  }),
   apiMock: vi.fn(),
   apiForServerMock: vi.fn(),
   openExternalUrlMock: vi.fn(),
@@ -23,9 +33,9 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/native-secure-session", () => ({
-  getSecureSessionValue: vi.fn(),
-  setSecureSessionValue: vi.fn(),
-  removeSecureSessionValue: vi.fn(),
+  getSecureSessionValue: mocks.getSecureSessionValue,
+  setSecureSessionValue: mocks.setSecureSessionValue,
+  removeSecureSessionValue: mocks.removeSecureSessionValue,
 }));
 
 vi.mock("@/lib/auth-session", () => ({
@@ -52,6 +62,7 @@ import {
   beginNativeOAuth,
   beginNativeOAuthLink,
   consumeOAuthCallbackUrl,
+  migrateLegacyTauriOAuthRecords,
   retryPendingNativeOAuthLinkCallback,
   retryPendingNativeOAuthCallback,
 } from "@/lib/capacitor-oauth";
@@ -70,13 +81,21 @@ function currentServer(token = tokenFor(42, "session-a")) {
   return { id: "server-a", token };
 }
 
-// Tauri desktop has no OS-backed secure session plugin, so its PKCE
-// verifier record is kept in localStorage instead — otherwise it's the
-// exact same beginNativeOAuth/exchangeNativeOAuthCallback flow mobile
-// uses (capacitor.test.ts covers the Capacitor/secure-session side).
-describe("desktop (Tauri) native OAuth via localStorage", () => {
+function seedSecureRecord(key: string, value: string): void {
+  mocks.secureSessionValues.set(key, value);
+}
+
+function secureRecord(key: string): string | null {
+  return mocks.secureSessionValues.get(key) ?? null;
+}
+
+describe("desktop (Tauri) native OAuth via secure storage", () => {
   beforeEach(() => {
     localStorage.clear();
+    mocks.secureSessionValues.clear();
+    mocks.getSecureSessionValue.mockClear();
+    mocks.setSecureSessionValue.mockClear();
+    mocks.removeSecureSessionValue.mockClear();
     mocks.apiMock.mockReset();
     mocks.apiForServerMock.mockReset();
     mocks.openExternalUrlMock.mockReset().mockResolvedValue(undefined);
@@ -89,7 +108,90 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       .mockResolvedValue(undefined);
   });
 
-  it("starts native OAuth and persists the PKCE verifier to localStorage", async () => {
+  it("migrates legacy desktop OAuth records only after secure verification", async () => {
+    const key = `crate.oauth.${"m".repeat(32)}`;
+    const value = JSON.stringify({
+      verifier: "v".repeat(43),
+      next: "/library",
+      createdAt: Date.now(),
+      serverId: "server-a",
+    });
+    localStorage.setItem(key, value);
+    localStorage.setItem("crate.oauth.link.generation", "4");
+
+    await migrateLegacyTauriOAuthRecords();
+
+    expect(secureRecord(key)).toBe(value);
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(localStorage.getItem("crate.oauth.link.generation")).toBe("4");
+  });
+
+  it("keeps legacy OAuth records when secure migration fails", async () => {
+    const key = `crate.oauth.${"n".repeat(32)}`;
+    const value = JSON.stringify({
+      verifier: "v".repeat(43),
+      next: "/library",
+      createdAt: Date.now(),
+      serverId: "server-a",
+    });
+    localStorage.setItem(key, value);
+    mocks.setSecureSessionValue.mockRejectedValueOnce(
+      new Error("secure store locked"),
+    );
+
+    await expect(migrateLegacyTauriOAuthRecords()).rejects.toThrow(
+      "Native OAuth migration failed",
+    );
+
+    expect(localStorage.getItem(key)).toBe(value);
+  });
+
+  it("keeps a newer secure OAuth record when stale plaintext remains", async () => {
+    const key = `crate.oauth.${"o".repeat(32)}`;
+    const stale = JSON.stringify({ verifier: "old", createdAt: 1 });
+    const current = JSON.stringify({ verifier: "new", createdAt: 2 });
+    localStorage.setItem(key, stale);
+    seedSecureRecord(key, current);
+
+    await migrateLegacyTauriOAuthRecords();
+
+    expect(secureRecord(key)).toBe(current);
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(mocks.setSecureSessionValue).not.toHaveBeenCalled();
+  });
+
+  it("keeps both verified secure data and plaintext if removing the old copy fails", async () => {
+    const key = `crate.oauth.${"p".repeat(32)}`;
+    const value = JSON.stringify({
+      verifier: "v".repeat(43),
+      next: "/library",
+      createdAt: Date.now(),
+      serverId: "server-a",
+    });
+    localStorage.setItem(key, value);
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+    const removeItem = vi
+      .spyOn(localStorage, "removeItem")
+      .mockImplementation((candidate) => {
+        if (candidate === key) throw new Error("storage unavailable");
+        originalRemoveItem(candidate);
+      });
+
+    await expect(migrateLegacyTauriOAuthRecords()).rejects.toThrow(
+      "Native OAuth migration failed",
+    );
+
+    expect(secureRecord(key)).toBe(value);
+    expect(localStorage.getItem(key)).toBe(value);
+    removeItem.mockRestore();
+
+    await migrateLegacyTauriOAuthRecords();
+
+    expect(localStorage.getItem(key)).toBeNull();
+    expect(secureRecord(key)).toBe(value);
+  });
+
+  it("starts native OAuth and persists the PKCE verifier to secure storage", async () => {
     mocks.apiForServerMock.mockResolvedValue({
       provider: "google",
       login_url: "https://accounts.example/authorize",
@@ -111,9 +213,10 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
     const stateArg = mocks.apiForServerMock.mock.calls[0]?.[3]
       .native_state as string;
-    expect(localStorage.getItem(`crate.oauth.${stateArg}`)).toContain(
+    expect(secureRecord(`crate.oauth.${stateArg}`)).toContain(
       '"next":"/library"',
     );
+    expect(localStorage.getItem(`crate.oauth.${stateArg}`)).toBeNull();
   });
 
   it("rolls back the stored verifier if the start request fails", async () => {
@@ -128,7 +231,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
   it("exchanges the one-time code from the cratemusic:// deep link", async () => {
     const state = "s".repeat(32);
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${state}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -165,13 +268,13 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       "2030-01-01T00:00:00Z",
     );
     // The one-time verifier record must not survive a successful exchange.
-    expect(localStorage.getItem(`crate.oauth.${state}`)).toBeNull();
+    expect(secureRecord(`crate.oauth.${state}`)).toBeNull();
   });
 
   it("keeps the PKCE verifier when exchange fails transiently", async () => {
     const state = "s".repeat(32);
     const recordKey = `crate.oauth.${state}`;
-    localStorage.setItem(
+    seedSecureRecord(
       recordKey,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -189,7 +292,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
 
     expect(result).toEqual({ handled: false, next: "/", retryable: true });
-    expect(localStorage.getItem(recordKey)).not.toBeNull();
+    expect(secureRecord(recordKey)).not.toBeNull();
 
     mocks.apiForServerMock.mockResolvedValue({ token: "access-token" });
     await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
@@ -202,7 +305,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
   it("keeps the callback retryable when secure session persistence fails", async () => {
     const state = "s".repeat(32);
     const recordKey = `crate.oauth.${state}`;
-    localStorage.setItem(
+    seedSecureRecord(
       recordKey,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -221,7 +324,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
         `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
       ),
     ).resolves.toEqual({ handled: false, next: "/", retryable: true });
-    expect(localStorage.getItem(recordKey)).not.toBeNull();
+    expect(secureRecord(recordKey)).not.toBeNull();
 
     await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
       handled: true,
@@ -232,7 +335,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
   it("keeps a retryable callback when an unrelated stale deep link arrives", async () => {
     const retryableState = "a".repeat(32);
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${retryableState}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -277,7 +380,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     const firstState = "a".repeat(32);
     const secondState = "b".repeat(32);
     const now = Date.now();
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${firstState}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -286,7 +389,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
         serverId: "server-a",
       }),
     );
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${secondState}`,
       JSON.stringify({
         verifier: "w".repeat(43),
@@ -295,7 +398,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
         serverId: "server-b",
       }),
     );
-    localStorage.setItem(
+    seedSecureRecord(
       "crate.oauth.pending-callback",
       JSON.stringify({
         version: 1,
@@ -316,12 +419,10 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     });
 
     expect(mocks.apiForServerMock).toHaveBeenCalledTimes(2);
-    expect(localStorage.getItem(`crate.oauth.${firstState}`)).not.toBeNull();
-    expect(localStorage.getItem(`crate.oauth.${secondState}`)).toBeNull();
-    expect(localStorage.getItem("crate.oauth.pending-callback")).toContain(
-      firstState,
-    );
-    expect(localStorage.getItem("crate.oauth.pending-callback")).not.toContain(
+    expect(secureRecord(`crate.oauth.${firstState}`)).not.toBeNull();
+    expect(secureRecord(`crate.oauth.${secondState}`)).toBeNull();
+    expect(secureRecord("crate.oauth.pending-callback")).toContain(firstState);
+    expect(secureRecord("crate.oauth.pending-callback")).not.toContain(
       secondState,
     );
   });
@@ -329,7 +430,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
   it("removes the PKCE verifier when exchange rejects the handoff", async () => {
     const state = "s".repeat(32);
     const recordKey = `crate.oauth.${state}`;
-    localStorage.setItem(
+    seedSecureRecord(
       recordKey,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -347,20 +448,20 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
 
     expect(result).toEqual({ handled: false, next: "/" });
-    expect(localStorage.getItem(recordKey)).toBeNull();
+    expect(secureRecord(recordKey)).toBeNull();
   });
 
   it("discards a corrupt PKCE record instead of retrying it forever", async () => {
     const state = "s".repeat(32);
     const recordKey = `crate.oauth.${state}`;
-    localStorage.setItem(recordKey, "{not-json");
+    seedSecureRecord(recordKey, "{not-json");
 
     const result = await consumeOAuthCallbackUrl(
       `cratemusic://oauth/callback?code=one-time-code&state=${state}`,
     );
 
     expect(result).toEqual({ handled: false, next: "/" });
-    expect(localStorage.getItem(recordKey)).toBeNull();
+    expect(secureRecord(recordKey)).toBeNull();
     expect(mocks.apiForServerMock).not.toHaveBeenCalled();
     await expect(retryPendingNativeOAuthCallback()).resolves.toEqual({
       handled: false,
@@ -379,7 +480,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
   it("restores the server the flow was started against if the user switched servers meanwhile", async () => {
     const state = "s".repeat(32);
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${state}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -414,7 +515,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
   it("rejects the callback if the originating server was removed while the flow was in flight", async () => {
     const state = "s".repeat(32);
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${state}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -437,7 +538,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
   it("does not persist a token if the originating server disappears during exchange", async () => {
     const state = "s".repeat(32);
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${state}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -467,7 +568,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
   it("does not reactivate a server removed while its token is being persisted", async () => {
     const state = "s".repeat(32);
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${state}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -492,7 +593,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
   it("exchanges a duplicated deep link only once", async () => {
     const state = "s".repeat(32);
-    localStorage.setItem(
+    seedSecureRecord(
       `crate.oauth.${state}`,
       JSON.stringify({
         verifier: "v".repeat(43),
@@ -535,7 +636,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     );
     const state = mocks.apiMock.mock.calls[0]?.[2].native_state as string;
     const record = JSON.parse(
-      localStorage.getItem(`crate.oauth.link.${state}`) ?? "null",
+      secureRecord(`crate.oauth.link.${state}`) ?? "null",
     ) as Record<string, unknown>;
     expect(record).toMatchObject({
       serverId: "server-a",
@@ -572,7 +673,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
 
     await expect(starting).rejects.toThrow(/active account or server changed/);
     expect(mocks.openExternalUrlMock).not.toHaveBeenCalled();
-    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
+    expect(secureRecord(`crate.oauth.link.${state}`)).toBeNull();
   });
 
   it("completes a link callback with only the opaque handoff proof", async () => {
@@ -608,7 +709,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
     expect(JSON.stringify(mocks.apiMock.mock.calls[1]?.[2])).not.toContain(
       "session-a",
     );
-    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
+    expect(secureRecord(`crate.oauth.link.${state}`)).toBeNull();
     expect(mocks.setAuthTokensForServer).not.toHaveBeenCalled();
   });
 
@@ -671,7 +772,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       error: true,
     });
     expect(mocks.apiMock).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
+    expect(secureRecord(`crate.oauth.link.${state}`)).toBeNull();
   });
 
   it("allows completion after an access token refresh with the same session ID", async () => {
@@ -712,10 +813,8 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
         )}&state=${state}`,
       ),
     ).resolves.toEqual({ handled: false, next: "/", retryable: true });
-    expect(localStorage.getItem("crate.oauth.link.pending-callback")).toContain(
-      state,
-    );
-    expect(localStorage.getItem("crate.oauth.pending-callback")).toBeNull();
+    expect(secureRecord("crate.oauth.link.pending-callback")).toContain(state);
+    expect(secureRecord("crate.oauth.pending-callback")).toBeNull();
 
     mocks.apiMock.mockResolvedValueOnce({ status: "linked" });
     await expect(retryPendingNativeOAuthLinkCallback()).resolves.toMatchObject({
@@ -774,9 +873,7 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       userId: 42,
       error: true,
     });
-    expect(
-      localStorage.getItem("crate.oauth.link.pending-callback"),
-    ).toBeNull();
+    expect(secureRecord("crate.oauth.link.pending-callback")).toBeNull();
   });
 
   it("clears the pending flow when the provider returns an authorization denial", async () => {
@@ -798,6 +895,6 @@ describe("desktop (Tauri) native OAuth via localStorage", () => {
       error: true,
     });
     expect(mocks.apiMock).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem(`crate.oauth.link.${state}`)).toBeNull();
+    expect(secureRecord(`crate.oauth.link.${state}`)).toBeNull();
   });
 });

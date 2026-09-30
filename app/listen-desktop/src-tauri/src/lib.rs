@@ -49,6 +49,8 @@ mod macos_media_controls;
 mod observability;
 #[cfg(desktop)]
 mod offline_storage;
+#[cfg(desktop)]
+mod secure_session;
 #[cfg(target_os = "windows")]
 mod windows_media_controls;
 
@@ -1334,7 +1336,10 @@ pub fn run() {
             offline_storage::unregister_offline_transfer,
             offline_storage::reconcile_offline_media,
             offline_storage::verify_offline_media_assets,
-            offline_storage::download_offline_media
+            offline_storage::download_offline_media,
+            secure_session::secure_session_get,
+            secure_session::secure_session_set,
+            secure_session::secure_session_remove
         ])
         .build(tauri::generate_context!())
         .expect("error while building Crate desktop")

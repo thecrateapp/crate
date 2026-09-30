@@ -222,45 +222,54 @@ function oauthRecordKey(state: string): string {
   return `crate.oauth.${state}`;
 }
 
-// Mobile (Capacitor) has an OS-backed Keychain/Keystore secure session
-// plugin; Tauri desktop doesn't, so the PKCE verifier record for desktop
-// lives in localStorage instead — the same trust tier the desktop app
-// already uses elsewhere (e.g. the pending-next redirect below). Both
-// platforms otherwise share the exact same PKCE + one-time-code exchange
-// flow, since Tauri already registers the `cratemusic://` scheme as an
-// OS-level deep link, same as mobile.
 async function writeNativeOAuthRecord(
   key: string,
   value: string,
 ): Promise<void> {
-  if (isTauriRuntime) {
-    localStorage.setItem(key, value);
-    return;
-  }
   await setSecureSessionValue(key, value);
 }
 
 async function readNativeOAuthRecord(key: string): Promise<string | null> {
-  if (isTauriRuntime) {
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  }
   return getSecureSessionValue(key);
 }
 
 async function removeNativeOAuthRecord(key: string): Promise<void> {
-  if (isTauriRuntime) {
-    try {
+  await removeSecureSessionValue(key);
+}
+
+export async function migrateLegacyTauriOAuthRecords(): Promise<void> {
+  if (!isTauriRuntime) return;
+  try {
+    const keys = Array.from({ length: localStorage.length }, (_, index) =>
+      localStorage.key(index),
+    ).filter(
+      (key): key is string =>
+        key !== null &&
+        key.startsWith("crate.oauth.") &&
+        key !== NATIVE_OAUTH_LINK_GENERATION_KEY,
+    );
+
+    for (const key of keys) {
+      const legacyValue = localStorage.getItem(key);
+      if (legacyValue === null) continue;
+      const secureValue = await getSecureSessionValue(key);
+      if (secureValue !== null) {
+        JSON.parse(secureValue);
+      } else {
+        JSON.parse(legacyValue);
+        await setSecureSessionValue(key, legacyValue);
+        const verified = await getSecureSessionValue(key);
+        if (verified !== legacyValue) {
+          throw new Error("Secure OAuth migration verification failed");
+        }
+      }
       localStorage.removeItem(key);
-    } catch {
-      // best-effort
     }
-    return;
+  } catch (error) {
+    const wrapped = new Error("Native OAuth migration failed");
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
-  await removeSecureSessionValue(key).catch(() => {});
 }
 
 function parsePendingNativeOAuthCallbacks(
@@ -420,7 +429,7 @@ export async function beginNativeOAuthLink(
   if (!isCurrentNativeOAuthLink(record)) {
     throw new Error("The active account changed before linking could start");
   }
-  localStorage.setItem(recordKey, JSON.stringify(record));
+  await writeNativeOAuthRecord(recordKey, JSON.stringify(record));
   try {
     const response = await api<{ login_url: string }>(
       `/api/auth/oauth/${provider}/native-link/start`,

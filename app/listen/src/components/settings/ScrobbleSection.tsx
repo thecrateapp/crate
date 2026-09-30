@@ -33,17 +33,24 @@ export function ScrobbleSection() {
   const [nativeLastfmPending, setNativeLastfmPending] = useState(false);
 
   useEffect(() => {
-    const refreshPending = () => {
-      setNativeLastfmPending(
-        isTauriRuntime && hasPendingNativeLastfmLink(user?.id),
-      );
+    let active = true;
+    const refreshPending = async () => {
+      try {
+        const pending =
+          isTauriRuntime && (await hasPendingNativeLastfmLink(user?.id));
+        if (active) setNativeLastfmPending(pending);
+      } catch {
+        if (active) setNativeLastfmPending(false);
+      }
     };
-    refreshPending();
-    window.addEventListener(AUTH_TOKEN_EVENT, refreshPending);
-    window.addEventListener(SERVER_STORE_EVENT, refreshPending);
+    void refreshPending();
+    const refreshOnSessionChange = () => void refreshPending();
+    window.addEventListener(AUTH_TOKEN_EVENT, refreshOnSessionChange);
+    window.addEventListener(SERVER_STORE_EVENT, refreshOnSessionChange);
     return () => {
-      window.removeEventListener(AUTH_TOKEN_EVENT, refreshPending);
-      window.removeEventListener(SERVER_STORE_EVENT, refreshPending);
+      active = false;
+      window.removeEventListener(AUTH_TOKEN_EVENT, refreshOnSessionChange);
+      window.removeEventListener(SERVER_STORE_EVENT, refreshOnSessionChange);
     };
   }, [user?.id]);
 

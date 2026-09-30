@@ -186,4 +186,31 @@ describe("desktop appearance bootstrap", () => {
     expect(source).toContain("<ThemeAwareToaster />");
     expect(source).not.toContain('<Toaster theme="dark"');
   });
+
+  it("waits for secure session and OAuth migration before enabling auth or rendering", () => {
+    const mainSource = readFileSync(
+      new URL("../main.tsx", import.meta.url),
+      "utf8",
+    );
+    const initSource = readFileSync(
+      new URL("./tauri-init.ts", import.meta.url),
+      "utf8",
+    );
+    const orderedSteps = [
+      "await bootstrapNativeSessionStore();",
+      "await migrateLegacyTauriOAuthRecords();",
+      "await migrateLegacyTauriLastfmRecord();",
+      "startTauriOAuthRuntime();",
+      "createRoot(root).render(",
+    ].map((step) => mainSource.indexOf(step));
+
+    expect(orderedSteps.every((index) => index >= 0)).toBe(true);
+    expect(orderedSteps).toEqual(
+      [...orderedSteps].sort((left, right) => left - right),
+    );
+    expect(initSource).toContain("export function startTauriOAuthRuntime");
+    expect(
+      initSource.split("export function startTauriOAuthRuntime")[0],
+    ).not.toContain("initDeepLinks()");
+  });
 });

@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  secureValues: new Map<string, string>(),
+  secureGet: vi.fn(async (key: string) => mocks.secureValues.get(key) ?? null),
+  secureSet: vi.fn(async (key: string, value: string) => {
+    mocks.secureValues.set(key, value);
+  }),
+  secureRemove: vi.fn(async (key: string) => {
+    mocks.secureValues.delete(key);
+  }),
   api: vi.fn(),
   captureIdentity: vi.fn(),
   isCurrentIdentity: vi.fn(),
@@ -24,13 +32,25 @@ vi.mock("@/lib/external-links", () => ({
   openExternalUrl: mocks.openExternalUrl,
 }));
 vi.mock("@/lib/platform", () => ({ isTauriRuntime: mocks.isTauriRuntime }));
+vi.mock("@/lib/native-secure-session", () => ({
+  getSecureSessionValue: mocks.secureGet,
+  setSecureSessionValue: mocks.secureSet,
+  removeSecureSessionValue: mocks.secureRemove,
+}));
 
 import {
   beginNativeLastfmLink,
   cancelNativeLastfmLink,
   completeNativeLastfmLink,
   hasPendingNativeLastfmLink,
+  migrateLegacyTauriLastfmRecord,
 } from "@/lib/native-lastfm-oauth";
+
+const SECURE_PENDING_KEY = "crate.oauth.lastfm-native-link.pending";
+
+function securePendingRecord(): string | null {
+  return mocks.secureValues.get(SECURE_PENDING_KEY) ?? null;
+}
 
 const identity = {
   serverId: "server-a",
@@ -42,6 +62,10 @@ const identity = {
 describe("native Last.fm linking", () => {
   beforeEach(() => {
     localStorage.clear();
+    mocks.secureValues.clear();
+    mocks.secureGet.mockClear();
+    mocks.secureSet.mockClear();
+    mocks.secureRemove.mockClear();
     mocks.api.mockReset().mockImplementation((path: string) => {
       if (path.endsWith("/native/start")) {
         return Promise.resolve({
@@ -78,10 +102,9 @@ describe("native Last.fm linking", () => {
     expect(mocks.openExternalUrl).toHaveBeenCalledWith(
       "https://www.last.fm/api/auth/?token=provider",
     );
-    expect(hasPendingNativeLastfmLink(42)).toBe(true);
-    expect(
-      localStorage.getItem("crate.lastfm.native-link.pending"),
-    ).not.toContain("provider");
+    expect(await hasPendingNativeLastfmLink(42)).toBe(true);
+    expect(securePendingRecord()).not.toContain("provider");
+    expect(localStorage.getItem("crate.lastfm.native-link.pending")).toBeNull();
   });
 
   it("completes with the saved flow and clears it after success", async () => {
@@ -100,7 +123,7 @@ describe("native Last.fm linking", () => {
       state: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
       code_verifier: expect.stringMatching(/^[A-Za-z0-9_-]{86}$/),
     });
-    expect(hasPendingNativeLastfmLink(42)).toBe(false);
+    expect(await hasPendingNativeLastfmLink(42)).toBe(false);
   });
 
   it("keeps the pending flow after a retryable server failure", async () => {
@@ -110,15 +133,15 @@ describe("native Last.fm linking", () => {
     await expect(completeNativeLastfmLink(42)).rejects.toThrow(
       "network unavailable",
     );
-    expect(hasPendingNativeLastfmLink(42)).toBe(true);
+    expect(await hasPendingNativeLastfmLink(42)).toBe(true);
   });
 
   it("discards a flow after the active server or session changes", async () => {
     await beginNativeLastfmLink(42);
     mocks.isCurrentIdentity.mockReturnValue(false);
 
-    expect(hasPendingNativeLastfmLink(42)).toBe(false);
-    expect(localStorage.getItem("crate.lastfm.native-link.pending")).toBeNull();
+    expect(await hasPendingNativeLastfmLink(42)).toBe(false);
+    expect(securePendingRecord()).toBeNull();
     await expect(completeNativeLastfmLink(42)).rejects.toThrow(
       "There is no pending Last.fm connection",
     );
@@ -137,7 +160,7 @@ describe("native Last.fm linking", () => {
         code_verifier: expect.stringMatching(/^[A-Za-z0-9_-]{86}$/),
       },
     );
-    expect(hasPendingNativeLastfmLink(42)).toBe(false);
+    expect(await hasPendingNativeLastfmLink(42)).toBe(false);
   });
 
   it("expires the local handoff before Last.fm's one-hour token limit", async () => {
@@ -147,7 +170,43 @@ describe("native Last.fm linking", () => {
 
     vi.advanceTimersByTime(55 * 60 * 1000 + 1);
 
-    expect(hasPendingNativeLastfmLink(42)).toBe(false);
+    expect(await hasPendingNativeLastfmLink(42)).toBe(false);
+    expect(securePendingRecord()).toBeNull();
+  });
+
+  it("migrates the legacy Last.fm handoff only after secure verification", async () => {
+    const value = JSON.stringify({
+      ...identity,
+      flowId: "f".repeat(43),
+      verifier: "v".repeat(43),
+      state: "s".repeat(43),
+      createdAt: Date.now(),
+    });
+    localStorage.setItem("crate.lastfm.native-link.pending", value);
+
+    await migrateLegacyTauriLastfmRecord();
+
+    expect(securePendingRecord()).toBe(value);
     expect(localStorage.getItem("crate.lastfm.native-link.pending")).toBeNull();
+  });
+
+  it("preserves a legacy Last.fm handoff when the secure store is unavailable", async () => {
+    const value = JSON.stringify({
+      ...identity,
+      flowId: "f".repeat(43),
+      verifier: "v".repeat(43),
+      state: "s".repeat(43),
+      createdAt: Date.now(),
+    });
+    localStorage.setItem("crate.lastfm.native-link.pending", value);
+    mocks.secureSet.mockRejectedValueOnce(new Error("secure store locked"));
+
+    await expect(migrateLegacyTauriLastfmRecord()).rejects.toThrow(
+      "Native Last.fm migration failed",
+    );
+
+    expect(localStorage.getItem("crate.lastfm.native-link.pending")).toBe(
+      value,
+    );
   });
 });

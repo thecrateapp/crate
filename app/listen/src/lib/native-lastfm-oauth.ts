@@ -5,9 +5,15 @@ import {
   type NativeOAuthLinkIdentity,
 } from "@/lib/capacitor-oauth";
 import { openExternalUrl } from "@/lib/external-links";
+import {
+  getSecureSessionValue,
+  removeSecureSessionValue,
+  setSecureSessionValue,
+} from "@/lib/native-secure-session";
 import { isTauriRuntime } from "@/lib/platform";
 
-const PENDING_KEY = "crate.lastfm.native-link.pending";
+const LEGACY_PENDING_KEY = "crate.lastfm.native-link.pending";
+const PENDING_KEY = "crate.oauth.lastfm-native-link.pending";
 const FLOW_TTL_MS = 55 * 60 * 1000;
 const FLOW_ID_RE = /^[A-Za-z0-9_-]{43}$/;
 const VERIFIER_RE = /^[A-Za-z0-9._~-]{43,128}$/;
@@ -53,15 +59,11 @@ async function challengeForVerifier(verifier: string): Promise<string> {
   return base64Url(new Uint8Array(digest));
 }
 
-function readPendingRecord(userId?: number): NativeLastfmLinkRecord | null {
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(PENDING_KEY);
-  } catch {
-    return null;
-  }
+async function readPendingRecord(
+  userId?: number,
+): Promise<NativeLastfmLinkRecord | null> {
+  const raw = await getSecureSessionValue(PENDING_KEY);
   if (!raw) return null;
-
   try {
     const record = JSON.parse(raw) as Partial<NativeLastfmLinkRecord>;
     if (
@@ -84,30 +86,48 @@ function readPendingRecord(userId?: number): NativeLastfmLinkRecord | null {
       (userId !== undefined && userId !== record.userId) ||
       !isCurrentNativeOAuthLinkIdentity(record as NativeOAuthLinkIdentity)
     ) {
-      localStorage.removeItem(PENDING_KEY);
+      await clearPendingRecord();
       return null;
     }
     return record as NativeLastfmLinkRecord;
-  } catch {
-    try {
-      localStorage.removeItem(PENDING_KEY);
-    } catch {
-      // The expired or malformed record is ignored when storage is unavailable.
-    }
-    return null;
+  } catch (error) {
+    await clearPendingRecord();
+    if (error instanceof SyntaxError) return null;
+    throw error;
   }
 }
 
-function clearPendingRecord(): void {
+async function clearPendingRecord(): Promise<void> {
+  await removeSecureSessionValue(PENDING_KEY);
+}
+
+export async function migrateLegacyTauriLastfmRecord(): Promise<void> {
+  if (!isTauriRuntime) return;
   try {
-    localStorage.removeItem(PENDING_KEY);
-  } catch {
-    // A local cleanup failure cannot make the backend apply a different session.
+    const legacyValue = localStorage.getItem(LEGACY_PENDING_KEY);
+    if (legacyValue === null) return;
+    const secureValue = await getSecureSessionValue(PENDING_KEY);
+    if (secureValue !== null) {
+      JSON.parse(secureValue);
+    } else {
+      JSON.parse(legacyValue);
+      await setSecureSessionValue(PENDING_KEY, legacyValue);
+      if ((await getSecureSessionValue(PENDING_KEY)) !== legacyValue) {
+        throw new Error("Secure Last.fm migration verification failed");
+      }
+    }
+    localStorage.removeItem(LEGACY_PENDING_KEY);
+  } catch (error) {
+    const wrapped = new Error("Native Last.fm migration failed");
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
 }
 
-export function hasPendingNativeLastfmLink(userId?: number): boolean {
-  return isTauriRuntime && readPendingRecord(userId) !== null;
+export async function hasPendingNativeLastfmLink(
+  userId?: number,
+): Promise<boolean> {
+  return isTauriRuntime && (await readPendingRecord(userId)) !== null;
 }
 
 export async function beginNativeLastfmLink(userId: number): Promise<void> {
@@ -141,11 +161,11 @@ export async function beginNativeLastfmLink(userId: number): Promise<void> {
     state,
     createdAt: Date.now(),
   };
-  localStorage.setItem(PENDING_KEY, JSON.stringify(record));
+  await setSecureSessionValue(PENDING_KEY, JSON.stringify(record));
   try {
     await openExternalUrl(response.authorization_url);
   } catch (error) {
-    clearPendingRecord();
+    await clearPendingRecord();
     throw error;
   }
 }
@@ -156,7 +176,7 @@ export async function completeNativeLastfmLink(
   if (!isTauriRuntime) {
     throw new Error("Native Last.fm linking is only available in Tauri");
   }
-  const record = readPendingRecord(userId);
+  const record = await readPendingRecord(userId);
   if (!record) {
     throw new Error("There is no pending Last.fm connection for this session");
   }
@@ -174,21 +194,21 @@ export async function completeNativeLastfmLink(
     if (!isCurrentNativeOAuthLinkIdentity(record)) {
       throw new Error("The active account or server changed during linking");
     }
-    clearPendingRecord();
+    await clearPendingRecord();
     return result;
   } catch (error) {
     if (
       error instanceof ApiError &&
       [400, 401, 403, 404, 409, 410].includes(error.status)
     ) {
-      clearPendingRecord();
+      await clearPendingRecord();
     }
     throw error;
   }
 }
 
 export async function cancelNativeLastfmLink(userId?: number): Promise<void> {
-  const record = readPendingRecord(userId);
+  const record = await readPendingRecord(userId);
   if (!record) return;
   try {
     await api("/api/me/scrobble/lastfm/native/cancel", "POST", {
@@ -199,6 +219,6 @@ export async function cancelNativeLastfmLink(userId?: number): Promise<void> {
   } catch {
     // The server-side flow still expires even when cancellation cannot reach it.
   } finally {
-    clearPendingRecord();
+    await clearPendingRecord();
   }
 }

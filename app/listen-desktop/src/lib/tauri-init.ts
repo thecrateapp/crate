@@ -14,6 +14,7 @@ import { initLinuxScrollBehavior } from "./linux-scroll";
 import { initLinuxDesktopTheme } from "./linux-theme";
 
 let tauriRuntimeInitialized = false;
+let tauriOAuthRuntimeStarted = false;
 
 export function initTauriRuntime(): void {
   if (typeof document === "undefined") return;
@@ -31,6 +32,11 @@ export function initTauriRuntime(): void {
   installNativeHttpFetch();
   void initTrayBridge();
   void initBandcampCookieBridge();
+}
+
+export function startTauriOAuthRuntime(): void {
+  if (typeof window === "undefined" || tauriOAuthRuntimeStarted) return;
+  tauriOAuthRuntimeStarted = true;
   void initDeepLinks();
   window.addEventListener("online", () => {
     void retryDeferredOAuth();

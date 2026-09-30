@@ -58,7 +58,7 @@ describe("ScrobbleSection native Last.fm flow", () => {
       username: "diego",
     });
     mocks.cancelNativeLastfmLink.mockReset();
-    mocks.hasPendingNativeLastfmLink.mockReset().mockReturnValue(false);
+    mocks.hasPendingNativeLastfmLink.mockReset().mockResolvedValue(false);
     mocks.toastInfo.mockReset();
     mocks.toastSuccess.mockReset();
     mocks.toastError.mockReset();
@@ -95,7 +95,7 @@ describe("ScrobbleSection native Last.fm flow", () => {
   });
 
   it("finishes the pending link and refreshes status", async () => {
-    mocks.hasPendingNativeLastfmLink.mockReturnValue(true);
+    mocks.hasPendingNativeLastfmLink.mockResolvedValue(true);
     const user = userEvent.setup();
     renderWithListenProviders(<ScrobbleSection />, {
       locale: "en",
@@ -113,7 +113,7 @@ describe("ScrobbleSection native Last.fm flow", () => {
   });
 
   it("lets the user cancel the waiting native flow", async () => {
-    mocks.hasPendingNativeLastfmLink.mockReturnValue(true);
+    mocks.hasPendingNativeLastfmLink.mockResolvedValue(true);
     const user = userEvent.setup();
     renderWithListenProviders(<ScrobbleSection />, {
       locale: "en",

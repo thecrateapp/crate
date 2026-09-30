@@ -21,6 +21,7 @@ vi.mock("@/lib/auth-route-policy", async (importOriginal) => {
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: false,
+  usesSecureSessionStore: false,
   isTauriRuntime: false,
   getListenAppId: () => "listen-web",
 }));
@@ -936,9 +937,15 @@ describe("native (configurable server) mode", () => {
     vi.resetModules();
     vi.doMock("@/lib/platform", () => ({
       usesConfigurableServer: true,
+      usesSecureSessionStore: true,
       isTauriRuntime: false,
       isCapacitorRuntime: true,
       getListenAppId: () => "listen-capacitor",
+    }));
+    vi.doMock("@/lib/native-secure-session", () => ({
+      getSecureSessionValue: vi.fn(async () => null),
+      setSecureSessionValue: vi.fn(async () => undefined),
+      removeSecureSessionValue: vi.fn(async () => undefined),
     }));
     vi.doMock("@/lib/listen-device", () => ({
       getListenDeviceFingerprint: () => "fp-native",
