@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus } from "@crate/ui/icons";
 
@@ -9,6 +10,7 @@ import type { CrateSummary } from "@/pages/crates-types";
 
 export function Crates() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const {
     data: crates,
     loading,
@@ -69,7 +71,8 @@ export function Crates() {
             <CrateCard
               key={crate.id}
               crate={crate}
-              onOpen={() => setSelectedCrateId(crate.id)}
+              onOpen={() => navigate(`/crate/${crate.id}`)}
+              onEdit={() => setSelectedCrateId(crate.id)}
             />
           ))}
         </div>

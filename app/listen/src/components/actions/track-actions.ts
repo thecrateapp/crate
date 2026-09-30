@@ -287,8 +287,12 @@ export function useTrackActionEntries(
             label: t("actions.track.addToPlaylist", { name: playlist.name }),
             icon: ListMusic,
             onSelect: async () => {
-              await input.onAddToPlaylist?.(playlist.id, input.track);
-              toast.success(t("actions.track.toasts.addedToPlaylist"));
+              try {
+                await input.onAddToPlaylist?.(playlist.id, input.track);
+                toast.success(t("actions.track.toasts.addedToPlaylist"));
+              } catch {
+                toast.error(t("playlist.toasts.trackAddFailed"));
+              }
             },
           }),
         );

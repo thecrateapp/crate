@@ -10,6 +10,7 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import type { Track } from "@/contexts/PlayerContext";
 
@@ -30,10 +31,12 @@ export function QueueTabRow({
 }) {
   const { t } = useTranslation();
   const menuTrack = useMemo(() => trackToMenuData(track), [track]);
+  const playlistActions = useTrackPlaylistActions();
   const baseActions = useTrackActionEntries({
     track: menuTrack,
     albumCover: track.albumCover,
     onPlayNowOverride: onJump,
+    ...playlistActions,
   });
   const actions = useMemo<ItemActionMenuEntry[]>(() => {
     if (locked) return [];
@@ -53,7 +56,9 @@ export function QueueTabRow({
       },
     ];
   }, [baseActions, indexLabel, locked, onRemove, t, track.id]);
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(actions, {
+    onOpenChange: playlistActions.onOpenChange,
+  });
 
   return (
     <div

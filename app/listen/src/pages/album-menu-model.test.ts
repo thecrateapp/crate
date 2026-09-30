@@ -25,6 +25,7 @@ describe("buildAlbumMenuItems", () => {
         onTogglePlaylistPicker: vi.fn(),
         onToggleCratePicker: vi.fn(),
         onCreatePlaylist: vi.fn(),
+        onCreateCrate: vi.fn(),
         onAddToPlaylist: vi.fn(),
         onAddToCrate,
         onToggleSaved: vi.fn(),
@@ -43,8 +44,13 @@ describe("buildAlbumMenuItems", () => {
     }
 
     expect(crateMenu.label).toBe("album.actions.addToCrate");
-    expect(crateMenu.items).toHaveLength(1);
-    const crateItem = crateMenu.items[0];
+    expect(crateMenu.items).toHaveLength(2);
+    const createCrateItem = crateMenu.items[0];
+    if (!createCrateItem || !("label" in createCrateItem)) {
+      throw new Error("Create Crate option missing");
+    }
+    expect(createCrateItem.label).toBe("library.crates.create");
+    const crateItem = crateMenu.items[1];
     if (!crateItem || !("label" in crateItem) || !("onSelect" in crateItem)) {
       throw new Error("Crate option missing");
     }
@@ -73,6 +79,7 @@ describe("buildAlbumMenuItems", () => {
         onTogglePlaylistPicker: vi.fn(),
         onToggleCratePicker: vi.fn(),
         onCreatePlaylist: vi.fn(),
+        onCreateCrate: vi.fn(),
         onAddToPlaylist: vi.fn(),
         onAddToCrate: vi.fn(),
         onToggleSaved: vi.fn(),
@@ -86,7 +93,51 @@ describe("buildAlbumMenuItems", () => {
     expect(items.some((item) => item.key === "crate")).toBe(false);
   });
 
-  it("keeps the playlist picker when Crates are unavailable", () => {
+  it("keeps the playlist picker when no Crates exist yet", () => {
+    const items = buildAlbumMenuItems(
+      {
+        playlistPickerOpen: false,
+        cratePickerOpen: false,
+        canPersistAlbum: true,
+        canAddToCrate: true,
+        canSaveAlbum: true,
+        saved: false,
+        offlineSupported: true,
+        offlineState: "idle",
+        offlineButtonLabel: "Offline",
+        playlists: [],
+        crates: [],
+        onPlay: vi.fn(),
+        onPlayNext: vi.fn(),
+        onTogglePlaylistPicker: vi.fn(),
+        onToggleCratePicker: vi.fn(),
+        onCreatePlaylist: vi.fn(),
+        onCreateCrate: vi.fn(),
+        onAddToPlaylist: vi.fn(),
+        onAddToCrate: vi.fn(),
+        onToggleSaved: vi.fn(),
+        onToggleOffline: vi.fn(),
+        onGoToArtist: vi.fn(),
+        onShare: vi.fn(),
+      },
+      t,
+    );
+
+    expect(items.some((item) => item.key === "crate")).toBe(true);
+    const crateMenu = items.find((item) => item.key === "crate");
+    if (crateMenu?.type !== "disclosure") {
+      throw new Error("Crate menu missing");
+    }
+    expect(crateMenu.items).toHaveLength(1);
+    const createCrateItem = crateMenu.items[0];
+    if (!createCrateItem || !("label" in createCrateItem)) {
+      throw new Error("Create Crate option missing");
+    }
+    expect(createCrateItem.label).toBe("library.crates.create");
+    expect(items.some((item) => item.key === "playlist")).toBe(true);
+  });
+
+  it("hides the Crate picker when the album cannot be added to a Crate", () => {
     const items = buildAlbumMenuItems(
       {
         playlistPickerOpen: false,
@@ -105,6 +156,7 @@ describe("buildAlbumMenuItems", () => {
         onTogglePlaylistPicker: vi.fn(),
         onToggleCratePicker: vi.fn(),
         onCreatePlaylist: vi.fn(),
+        onCreateCrate: vi.fn(),
         onAddToPlaylist: vi.fn(),
         onAddToCrate: vi.fn(),
         onToggleSaved: vi.fn(),

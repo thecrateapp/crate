@@ -13,6 +13,8 @@ import {
   PlaylistCreateModal,
   type PlaylistComposerTrack,
 } from "@/components/playlists/PlaylistCreateModal";
+import type { PlaylistOption } from "@/hooks/use-lazy-playlist-options";
+import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import {
   hasTrackReference,
@@ -29,6 +31,9 @@ interface OpenPlaylistComposerOptions {
 
 interface PlaylistComposerContextValue {
   openCreatePlaylist: (options?: OpenPlaylistComposerOptions) => void;
+  playlistOptions: PlaylistOption[];
+  ensurePlaylistOptionsLoaded: () => void;
+  refreshPlaylistOptions: () => void;
 }
 
 const PlaylistComposerContext = createContext<
@@ -52,6 +57,21 @@ export function PlaylistComposerProvider({
   const [initialTracks, setInitialTracks] = useState<PlaylistComposerTrack[]>(
     [],
   );
+  const [playlistOptionsEnabled, setPlaylistOptionsEnabled] = useState(false);
+  const { data: playlistData, refetch: refetchPlaylistOptions } = useApi<
+    PlaylistOption[]
+  >(playlistOptionsEnabled ? "/api/playlists" : null);
+  const playlistOptions = useMemo(() => playlistData ?? [], [playlistData]);
+  const ensurePlaylistOptionsLoaded = useCallback(() => {
+    setPlaylistOptionsEnabled(true);
+  }, []);
+  const refreshPlaylistOptions = useCallback(() => {
+    if (!playlistOptionsEnabled) {
+      setPlaylistOptionsEnabled(true);
+      return;
+    }
+    refetchPlaylistOptions();
+  }, [playlistOptionsEnabled, refetchPlaylistOptions]);
 
   const openCreatePlaylist = useCallback(
     (options?: OpenPlaylistComposerOptions) => {
@@ -104,6 +124,7 @@ export function PlaylistComposerProvider({
           });
         }
 
+        refreshPlaylistOptions();
         setOpen(false);
         toast.success("Playlist created");
         navigate(`/playlist/${created.id}`);
@@ -113,7 +134,7 @@ export function PlaylistComposerProvider({
         setSubmitting(false);
       }
     },
-    [navigate],
+    [navigate, refreshPlaylistOptions],
   );
 
   const handleClose = useCallback(() => {
@@ -121,8 +142,18 @@ export function PlaylistComposerProvider({
   }, [submitting]);
 
   const contextValue = useMemo(
-    () => ({ openCreatePlaylist }),
-    [openCreatePlaylist],
+    () => ({
+      openCreatePlaylist,
+      playlistOptions,
+      ensurePlaylistOptionsLoaded,
+      refreshPlaylistOptions,
+    }),
+    [
+      ensurePlaylistOptionsLoaded,
+      openCreatePlaylist,
+      playlistOptions,
+      refreshPlaylistOptions,
+    ],
   );
 
   return (
@@ -144,11 +175,15 @@ export function PlaylistComposerProvider({
 }
 
 export function usePlaylistComposer() {
-  const value = useContext(PlaylistComposerContext);
+  const value = useOptionalPlaylistComposer();
   if (!value) {
     throw new Error(
       "usePlaylistComposer must be used within PlaylistComposerProvider",
     );
   }
   return value;
+}
+
+export function useOptionalPlaylistComposer() {
+  return useContext(PlaylistComposerContext);
 }

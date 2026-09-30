@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { ArtistFollowsProvider } from "@/contexts/ArtistFollowsContext";
+import { CrateComposerProvider } from "@/contexts/CrateComposerContext";
 import { LikedTracksProvider } from "@/contexts/LikedTracksContext";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { PlayerProvider } from "@/contexts/PlayerContext";
@@ -14,7 +15,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <LikedTracksProvider>
           <OfflineProvider>
             <SavedAlbumsProvider>
-              <PlaylistComposerProvider>{children}</PlaylistComposerProvider>
+              <PlaylistComposerProvider>
+                <CrateComposerProvider>{children}</CrateComposerProvider>
+              </PlaylistComposerProvider>
             </SavedAlbumsProvider>
           </OfflineProvider>
         </LikedTracksProvider>

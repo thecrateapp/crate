@@ -2,6 +2,10 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useContextMenuController } from "@crate/ui/domain/actions";
+import {
+  openCrateComposerForAlbum,
+  useOptionalCrateComposer,
+} from "@/contexts/CrateComposerContext";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { useLazyCrateOptions } from "@/hooks/use-lazy-crate-options";
@@ -53,6 +57,7 @@ export function useAlbumPageController() {
     useLazyPlaylistOptions();
   const { crateOptions: crates, ensureCrateOptionsLoaded } =
     useLazyCrateOptions();
+  const crateComposer = useOptionalCrateComposer();
   const {
     clearTrackSelection,
     handleCloseSelectionMenu,
@@ -91,6 +96,16 @@ export function useAlbumPageController() {
     } catch {
       toast.error(t("album.toasts.addToCrateFailed"));
     }
+  }
+
+  function handleCreateCrate() {
+    const opened = openCrateComposerForAlbum(crateComposer, {
+      globalAlbumUid,
+      name: displayName,
+      artistName,
+    });
+    if (!opened) return;
+    closeAlbumMenu();
   }
 
   const {
@@ -152,6 +167,7 @@ export function useAlbumPageController() {
     handleAddSelectedToQueue,
     handleAddToPlaylist,
     handleAddToCrate,
+    handleCreateCrate,
     handleCreatePlaylistFromAlbum,
     handleCreatePlaylistFromSelection,
     handlePlay,

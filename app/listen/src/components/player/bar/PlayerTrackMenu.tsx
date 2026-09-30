@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Disc3 } from "@crate/ui/icons";
 
 import {
@@ -8,6 +8,7 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import type { Track } from "@/contexts/PlayerContext";
 
 interface PlayerTrackMenuProps {
@@ -27,12 +28,21 @@ export function PlayerTrackMenu({
     () => trackToMenuData(currentTrack),
     [currentTrack],
   );
+  const playlistActions = useTrackPlaylistActions();
   const actions = useTrackActionEntries({
     track: menuTrack,
     albumCover: currentTrack.albumCover,
+    ...playlistActions,
   });
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      playlistActions.onOpenChange(open);
+      onOverlayChange?.(open);
+    },
+    [onOverlayChange, playlistActions.onOpenChange],
+  );
   const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: onOverlayChange,
+    onOpenChange: handleOpenChange,
   });
 
   return (

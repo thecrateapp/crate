@@ -8,6 +8,7 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 
 import type { ReplayTrack } from "./home-model";
@@ -54,12 +55,16 @@ export function HomeReplayRowAction({
     }),
     [item],
   );
+  const playlistActions = useTrackPlaylistActions();
   const actions = useTrackActionEntries({
     track: menuTrack,
     albumCover: cover,
     onPlayNowOverride: onPlay,
+    ...playlistActions,
   });
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(actions, {
+    onOpenChange: playlistActions.onOpenChange,
+  });
 
   return (
     <div
