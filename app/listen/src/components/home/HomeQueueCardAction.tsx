@@ -10,6 +10,7 @@ import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 
 export function HomeQueueCardAction({
   track,
@@ -19,12 +20,18 @@ export function HomeQueueCardAction({
   onPlay: () => void;
 }) {
   const menuTrack = useMemo(() => trackToMenuData(track), [track]);
+  const playlistActions = useTrackPlaylistActions();
   const actions = useTrackActionEntries({
     track: menuTrack,
     albumCover: track.albumCover,
     onPlayNowOverride: onPlay,
+    ...playlistActions,
   });
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(actions, {
+    onOpenChange: (open) => {
+      if (open) playlistActions.ensurePlaylistOptionsLoaded();
+    },
+  });
 
   return (
     <div

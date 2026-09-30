@@ -35,6 +35,7 @@ interface AlbumMenuActions {
   onTogglePlaylistPicker: () => void;
   onToggleCratePicker: () => void;
   onCreatePlaylist: () => void;
+  onCreateCrate: () => void;
   onAddToPlaylist: (playlistId: number) => void | Promise<void>;
   onAddToCrate: (crateId: string) => void | Promise<void>;
   onToggleSaved: () => void | Promise<void>;
@@ -69,11 +70,18 @@ export function buildAlbumMenuItems(
             icon: Disc3,
             expanded: options.cratePickerOpen,
             onToggle: options.onToggleCratePicker,
-            items: options.crates.map((crate) => ({
-              key: `crate-${crate.id}`,
-              label: crate.name,
-              onSelect: () => options.onAddToCrate(crate.id),
-            })),
+            items: [
+              {
+                key: "crate-create",
+                label: t("library.crates.create"),
+                onSelect: options.onCreateCrate,
+              },
+              ...options.crates.map((crate) => ({
+                key: `crate-${crate.id}`,
+                label: crate.name,
+                onSelect: () => options.onAddToCrate(crate.id),
+              })),
+            ],
           },
         ]
       : []),

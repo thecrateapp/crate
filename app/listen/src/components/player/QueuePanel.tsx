@@ -12,6 +12,7 @@ import {
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import type { Track } from "@/contexts/PlayerContext";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -38,11 +39,13 @@ function QueuePanelRow({
   locked?: boolean;
 }) {
   const menuTrack = useMemo(() => trackToMenuData(track), [track]);
+  const playlistActions = useTrackPlaylistActions();
   const baseActions = useTrackActionEntries({
     track: menuTrack,
     albumCover: track.albumCover,
     // In a queue context "Play now" must jump to this position, not reset the queue.
     onPlayNowOverride: onJump,
+    ...playlistActions,
   });
   const actions = useMemo<ItemActionMenuEntry[]>(() => {
     if (locked) return [];
@@ -62,7 +65,11 @@ function QueuePanelRow({
       },
     ];
   }, [baseActions, indexLabel, locked, onRemove, track.id]);
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(actions, {
+    onOpenChange: (open) => {
+      if (open) playlistActions.ensurePlaylistOptionsLoaded();
+    },
+  });
 
   return (
     <div

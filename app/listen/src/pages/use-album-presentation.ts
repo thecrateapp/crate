@@ -52,6 +52,7 @@ export function useAlbumPresentation({
   handleAddSelectedToQueue,
   handleAddToPlaylist,
   handleAddToCrate,
+  handleCreateCrate,
   handleCreatePlaylistFromAlbum,
   handleCreatePlaylistFromSelection,
   handlePlay,
@@ -83,6 +84,7 @@ export function useAlbumPresentation({
   handleAddSelectedToQueue: () => void;
   handleAddToPlaylist: (playlistId: number) => void | Promise<void>;
   handleAddToCrate: (crateId: string) => void | Promise<void>;
+  handleCreateCrate: () => void;
   handleCreatePlaylistFromAlbum: () => void;
   handleCreatePlaylistFromSelection: () => void;
   handlePlay: () => void;
@@ -248,6 +250,7 @@ export function useAlbumPresentation({
       onPlayNext: handlePlayNextAlbum,
       onTogglePlaylistPicker: handleTogglePlaylistPicker,
       onToggleCratePicker: handleToggleCratePicker,
+      onCreateCrate: handleCreateCrate,
       onCreatePlaylist: handleCreatePlaylistFromAlbum,
       onAddToPlaylist: handleAddToPlaylist,
       onAddToCrate: handleAddToCrate,

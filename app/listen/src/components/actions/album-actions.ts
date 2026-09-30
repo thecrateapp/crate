@@ -25,6 +25,7 @@ import {
 import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
+import { useOptionalCrateComposer } from "@/contexts/CrateComposerContext";
 import { useLazyCrateOptions } from "@/hooks/use-lazy-crate-options";
 import { api } from "@/lib/api";
 import {
@@ -58,6 +59,7 @@ export function useAlbumActionEntries(
     toggleAlbumOffline,
   } = useOffline();
   const saved = isSaved(input.albumId, input.globalAlbumUid);
+  const crateComposer = useOptionalCrateComposer();
   const [cratePickerOpen, setCratePickerOpen] = useState(false);
   const { crateOptions, ensureCrateOptionsLoaded } = useLazyCrateOptions();
   const offlineState = getAlbumState(input.albumId);
@@ -147,21 +149,37 @@ export function useAlbumActionEntries(
                 ensureCrateOptionsLoaded();
                 setCratePickerOpen((open) => !open);
               },
-              items: crateOptions.map((crate) => ({
-                key: `crate-${crate.id}`,
-                label: crate.name,
-                onSelect: async () => {
-                  try {
-                    await api(`/api/crates/${crate.id}/albums`, "POST", {
-                      global_album_uid: input.globalAlbumUid,
-                    });
+              items: [
+                {
+                  key: "crate-create",
+                  label: t("library.crates.create"),
+                  onSelect: () => {
                     setCratePickerOpen(false);
-                    toast.success(t("album.toasts.addedToCrate"));
-                  } catch {
-                    toast.error(t("album.toasts.addToCrateFailed"));
-                  }
+                    crateComposer?.openCreateCrate({
+                      album: {
+                        globalAlbumUid: input.globalAlbumUid!,
+                        name: input.album,
+                        artistName: input.artist,
+                      },
+                    });
+                  },
                 },
-              })),
+                ...crateOptions.map((crate) => ({
+                  key: `crate-${crate.id}`,
+                  label: crate.name,
+                  onSelect: async () => {
+                    try {
+                      await api(`/api/crates/${crate.id}/albums`, "POST", {
+                        global_album_uid: input.globalAlbumUid,
+                      });
+                      setCratePickerOpen(false);
+                      toast.success(t("album.toasts.addedToCrate"));
+                    } catch {
+                      toast.error(t("album.toasts.addToCrateFailed"));
+                    }
+                  },
+                })),
+              ],
             },
           ]
         : []),
@@ -266,6 +284,7 @@ export function useAlbumActionEntries(
     cratePickerOpen,
     crateOptions,
     ensureCrateOptionsLoaded,
+    crateComposer,
     offlineActionLabel,
     offlineState,
     offlineSupported,

@@ -16,6 +16,12 @@ vi.mock("@/contexts/SavedAlbumsContext", () => ({
   }),
 }));
 
+vi.mock("@/contexts/CrateComposerContext", () => ({
+  useOptionalCrateComposer: () => ({
+    openCreateCrate: vi.fn(),
+  }),
+}));
+
 vi.mock("@/contexts/ArtistFollowsContext", () => ({
   useArtistFollows: () => ({
     isFollowing: () => false,
@@ -281,7 +287,9 @@ describe("action hooks i18n", () => {
     if (!expandedCrateMenu || expandedCrateMenu.type !== "disclosure") {
       throw new Error("Crate menu missing after expansion");
     }
-    const crateItem = expandedCrateMenu.items[0];
+    const crateItem = expandedCrateMenu.items.find(
+      (item) => item.key === "crate-crate-1",
+    );
     if (!crateItem || !("onSelect" in crateItem)) {
       throw new Error("Crate option missing");
     }

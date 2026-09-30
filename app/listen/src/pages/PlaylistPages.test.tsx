@@ -25,6 +25,9 @@ vi.mock("@/contexts/PlaylistComposerContext", () => ({
   usePlaylistComposer: () => ({
     openCreatePlaylist: vi.fn(),
   }),
+  useOptionalPlaylistComposer: () => ({
+    openCreatePlaylist: vi.fn(),
+  }),
 }));
 
 vi.mock("@/components/ui/WindowVirtualList", () => ({

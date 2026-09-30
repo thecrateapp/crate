@@ -174,6 +174,25 @@ describe("TrackRow playback behavior", () => {
     expect(playAll).not.toHaveBeenCalled();
   });
 
+  it("includes playlist actions when the row does not provide playlist callbacks", async () => {
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(<TrackRow track={track} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: "Add to new playlist" }),
+    ).toBeVisible();
+  });
+
   it("opens the normal track menu on right click without selecting the row", () => {
     const onSelect = vi.fn();
     const track: TrackRowData = {

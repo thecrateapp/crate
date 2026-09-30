@@ -6,6 +6,7 @@ import { buildTrackMenuPlayerTrack } from "@/components/actions/shared";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import {
   hasPlayableTrackReference,
   resolvePlayableTrackId,
@@ -166,6 +167,7 @@ export function useTrackRowModel({
 >) {
   const { isLiked } = useLikedTracks();
   const { getTrackState } = useOffline();
+  const defaultPlaylistActions = useTrackPlaylistActions();
   const resolved = resolveTrackRowState(track, albumCover);
   const hasTrackRef = hasPlayableTrackReference(track);
   const liked = hasTrackRef
@@ -183,16 +185,27 @@ export function useTrackRowModel({
   const offlineLabel = resolved.showLocalActions
     ? getOfflineStateLabel(offlineState)
     : "";
+  const resolvedPlaylistOptions =
+    playlistOptions ?? defaultPlaylistActions.playlistOptions;
+  const resolvedOnAddToPlaylist =
+    onAddToPlaylist ?? defaultPlaylistActions.onAddToPlaylist;
+  const resolvedOnCreatePlaylist =
+    onCreatePlaylist ?? defaultPlaylistActions.onCreatePlaylist;
   const actions = useTrackActionEntries({
     track,
     albumCover: resolved.cover,
-    playlistOptions,
-    onAddToPlaylist,
-    onCreatePlaylist,
+    playlistOptions: resolvedPlaylistOptions,
+    onAddToPlaylist: resolvedOnAddToPlaylist,
+    onCreatePlaylist: resolvedOnCreatePlaylist,
     onPlayNowOverride: onPlayOverride,
   });
   const actionMenu = useItemActionMenu(actions, {
     placement: "bottom-end",
+    onOpenChange: (open) => {
+      if (open && playlistOptions === undefined) {
+        defaultPlaylistActions.ensurePlaylistOptionsLoaded();
+      }
+    },
   });
 
   return {

@@ -144,11 +144,15 @@ export function PlaylistComposerProvider({
 }
 
 export function usePlaylistComposer() {
-  const value = useContext(PlaylistComposerContext);
+  const value = useOptionalPlaylistComposer();
   if (!value) {
     throw new Error(
       "usePlaylistComposer must be used within PlaylistComposerProvider",
     );
   }
   return value;
+}
+
+export function useOptionalPlaylistComposer() {
+  return useContext(PlaylistComposerContext);
 }

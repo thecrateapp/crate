@@ -8,6 +8,7 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { FullscreenPlayerArtwork } from "@/components/player/FullscreenPlayerArtwork";
 import { FullscreenPlayerControls } from "@/components/player/FullscreenPlayerControls";
@@ -48,12 +49,18 @@ function FullscreenQueueRow({
   onJump: () => void;
 }) {
   const menuTrack = useMemo(() => trackToMenuData(track), [track]);
+  const playlistActions = useTrackPlaylistActions();
   const actions = useTrackActionEntries({
     track: menuTrack,
     albumCover: track.albumCover,
     onPlayNowOverride: onJump,
+    ...playlistActions,
   });
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(actions, {
+    onOpenChange: (open) => {
+      if (open) playlistActions.ensurePlaylistOptionsLoaded();
+    },
+  });
 
   const jumpWithFeedback = () => {
     triggerHaptic("selection");

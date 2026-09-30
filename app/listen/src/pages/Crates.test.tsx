@@ -19,6 +19,7 @@ vi.mock("@crate/ui/lib/use-breakpoint", () => ({ useIsDesktop: () => false }));
 
 vi.mock("@/contexts/PlaylistComposerContext", () => ({
   usePlaylistComposer: () => ({ openCreatePlaylist: vi.fn() }),
+  useOptionalPlaylistComposer: () => ({ openCreatePlaylist: vi.fn() }),
 }));
 
 import { Library } from "@/pages/Library";
@@ -27,6 +28,12 @@ import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 
 const crateId = "7ee76303-7aa6-4317-a5d3-18c2e1360b1c";
+const navigate = vi.hoisted(() => vi.fn());
+
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return { ...actual, useNavigate: () => navigate };
+});
 
 function ownedCrate(name: string, access: "owner" | "collaborator") {
   return {
@@ -53,11 +60,17 @@ function renderCrates() {
   });
 }
 
+function openCrateEditor() {
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Edit Crate" }));
+}
+
 describe("Collection Crates", () => {
   beforeEach(() => {
     mocks.crates = [];
     mocks.detail = null;
     mocks.api.mockReset();
+    navigate.mockReset();
     mocks.api.mockResolvedValue({ id: crateId });
     mocks.useApi.mockImplementation((url: string | null) => ({
       data:
@@ -88,6 +101,17 @@ describe("Collection Crates", () => {
     expect(screen.getByText("Tour picks")).toBeVisible();
   });
 
+  it("opens the Crate detail page from the collection card", () => {
+    mocks.crates = [ownedCrate("Year-end records", "owner")];
+
+    renderCrates();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open Year-end records" }),
+    );
+
+    expect(navigate).toHaveBeenCalledWith(`/crate/${crateId}`);
+  });
+
   it("creates a private Crate with an empty album list", async () => {
     renderCrates();
 
@@ -115,9 +139,7 @@ describe("Collection Crates", () => {
     };
 
     renderCrates();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open Year-end records" }),
-    );
+    openCrateEditor();
 
     expect(screen.getByLabelText("Visibility")).toBeVisible();
     expect(
@@ -133,7 +155,7 @@ describe("Collection Crates", () => {
     };
 
     renderCrates();
-    fireEvent.click(screen.getByRole("button", { name: "Open Tour picks" }));
+    openCrateEditor();
 
     expect(screen.queryByLabelText("Visibility")).not.toBeInTheDocument();
     expect(
@@ -176,9 +198,7 @@ describe("Collection Crates", () => {
     });
 
     renderCrates();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open Year-end records" }),
-    );
+    openCrateEditor();
     fireEvent.change(screen.getByRole("searchbox", { name: "Search albums" }), {
       target: { value: "Jane Doe" },
     });
@@ -214,9 +234,7 @@ describe("Collection Crates", () => {
     });
 
     renderCrates();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open Year-end records" }),
-    );
+    openCrateEditor();
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Allow collaboration" }),
     );
@@ -267,9 +285,7 @@ describe("Collection Crates", () => {
     };
 
     renderCrates();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open Year-end records" }),
-    );
+    openCrateEditor();
     fireEvent.click(screen.getByRole("button", { name: "Move Jane Doe down" }));
 
     await waitFor(() => {
