@@ -113,6 +113,45 @@ def get_crate_playback_tracks(
         return _impl(current)
 
 
+def get_crate_for_user(
+    crate_id: str,
+    user_id: int | None,
+    *,
+    session: Session | None = None,
+) -> tuple[dict | None, CrateAccess]:
+    """Return a Crate and its access level using one read transaction."""
+
+    def _impl(current: Session) -> tuple[dict | None, CrateAccess]:
+        access = get_crate_access(crate_id, user_id, session=current)
+        if access == "none":
+            return None, access
+        return get_crate(crate_id, session=current), access
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def get_crate_playback_tracks_for_user(
+    crate_id: str,
+    user_id: int,
+    *,
+    session: Session | None = None,
+) -> list[dict] | None:
+    """Return playback tracks only when the user can access the Crate."""
+
+    def _impl(current: Session) -> list[dict] | None:
+        if get_crate_access(crate_id, user_id, session=current) == "none":
+            return None
+        return get_crate_playback_tracks(crate_id, session=current)
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 def _list_crates(
     user_id: int,
     *,
@@ -358,7 +397,9 @@ __all__ = [
     "CrateAccess",
     "get_crate",
     "get_crate_access",
+    "get_crate_for_user",
     "get_crate_playback_tracks",
+    "get_crate_playback_tracks_for_user",
     "get_crates_for_user",
     "get_crate_invite",
     "get_crate_members",

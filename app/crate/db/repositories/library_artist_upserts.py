@@ -78,7 +78,7 @@ def _select_existing_artist(
 def _update_existing_artist(
     session: Session,
     *,
-    artist_id: int,
+    artist_id: int | None,
     canonical_name: str,
     existing_slug: str | None,
     existing_storage_id,
@@ -185,7 +185,7 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             ) = existing
             return _update_existing_artist(
                 s,
-                artist_id=int(artist_id),
+                artist_id=artist_id,
                 canonical_name=canonical_name or requested_name,
                 existing_slug=existing_slug,
                 existing_storage_id=existing_storage_id,
@@ -281,7 +281,7 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             ) = existing
             return _update_existing_artist(
                 s,
-                artist_id=int(artist_id),
+                artist_id=artist_id,
                 canonical_name=canonical_name or requested_name,
                 existing_slug=existing_slug,
                 existing_storage_id=existing_storage_id,

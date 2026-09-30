@@ -30,11 +30,11 @@ from crate.api.schemas.crates import (
     UpdateCrateRequest,
 )
 from crate.db.queries.crates import (
-    get_crate,
     get_crate_access,
+    get_crate_for_user,
     get_crate_invite,
     get_crate_members,
-    get_crate_playback_tracks,
+    get_crate_playback_tracks_for_user,
     get_crates_for_user,
 )
 from crate.db.repositories.crates import (
@@ -56,7 +56,6 @@ from crate.db.repositories.crates import (
     revoke_crate_invite,
     update_crate,
 )
-from crate.db.tx import read_scope
 
 router = APIRouter(prefix="/api/crates", tags=["crates"])
 me_router = APIRouter(prefix="/api/me", tags=["crates"])
@@ -188,13 +187,9 @@ def accept_invite(request: Request, token: str):
 )
 def get_one(request: Request, crate_id: UUID):
     user = _require_auth(request)
-    with read_scope() as session:
-        access = get_crate_access(str(crate_id), user["id"], session=session)
-        if access == "none":
-            raise HTTPException(status_code=404, detail="Crate not found")
-        crate = get_crate(str(crate_id), session=session)
-        if crate is None:
-            raise HTTPException(status_code=404, detail="Crate not found")
+    crate, access = get_crate_for_user(str(crate_id), user["id"])
+    if crate is None:
+        raise HTTPException(status_code=404, detail="Crate not found")
     crate["access"] = access
     return crate
 
@@ -210,11 +205,10 @@ def get_one(request: Request, crate_id: UUID):
 )
 def playback(request: Request, crate_id: UUID):
     user = _require_auth(request)
-    with read_scope() as session:
-        access = get_crate_access(str(crate_id), user["id"], session=session)
-        if access == "none":
-            raise HTTPException(status_code=404, detail="Crate not found")
-        return get_crate_playback_tracks(str(crate_id), session=session)
+    tracks = get_crate_playback_tracks_for_user(str(crate_id), user["id"])
+    if tracks is None:
+        raise HTTPException(status_code=404, detail="Crate not found")
+    return tracks
 
 
 @router.put(
