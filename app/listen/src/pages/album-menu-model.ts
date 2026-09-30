@@ -14,7 +14,7 @@ import {
 } from "@crate/ui/icons";
 
 import type { ContextMenuEntry } from "@/components/actions/ItemActionMenu";
-import type { PlaylistOption } from "@/hooks/use-lazy-playlist-options";
+import type { PlaylistOption } from "@/contexts/PlaylistComposerContext";
 import type { CrateOption } from "@/hooks/use-lazy-crate-options";
 import type { OfflineItemState } from "@/lib/offline";
 

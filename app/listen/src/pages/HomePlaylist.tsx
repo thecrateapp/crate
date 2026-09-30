@@ -22,7 +22,6 @@ import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useApi } from "@/hooks/use-api";
-import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { api } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -68,7 +67,8 @@ export function HomePlaylist() {
   const { t } = useTranslation();
   const { playlistId } = useParams<{ playlistId: string }>();
   const { playAll } = usePlayerActions();
-  const { openCreatePlaylist } = usePlaylistComposer();
+  const { openCreatePlaylist, playlistOptions, ensurePlaylistOptionsLoaded } =
+    usePlaylistComposer();
   const [filterQuery, setFilterQuery] = useState("");
   const deferredFilterQuery = useDeferredValue(filterQuery);
   const { data, loading } = useApi<HomeGeneratedPlaylistDetail>(
@@ -79,8 +79,6 @@ export function HomePlaylist() {
     undefined,
     { safetyNetMs: 120_000 },
   );
-  const { playlistOptions, ensurePlaylistOptionsLoaded } =
-    useLazyPlaylistOptions();
   const releaseWindowLabel = useMemo(
     () => newArrivalsWindowLabel(data),
     [data],

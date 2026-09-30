@@ -13,13 +13,17 @@ import {
   PlaylistCreateModal,
   type PlaylistComposerTrack,
 } from "@/components/playlists/PlaylistCreateModal";
-import type { PlaylistOption } from "@/hooks/use-lazy-playlist-options";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import {
   hasTrackReference,
   toTrackReferencePayload,
 } from "@/lib/track-reference";
+
+export interface PlaylistOption {
+  id: number;
+  name: string;
+}
 
 interface OpenPlaylistComposerOptions {
   name?: string;

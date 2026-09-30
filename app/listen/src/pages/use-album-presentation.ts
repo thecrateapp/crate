@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import type { UseContextMenuControllerReturn } from "@crate/ui/domain/actions";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
-import type { PlaylistOption } from "@/hooks/use-lazy-playlist-options";
+import type { PlaylistOption } from "@/contexts/PlaylistComposerContext";
 import type { CrateOption } from "@/hooks/use-lazy-crate-options";
 import { openShareSheet } from "@/lib/social-share";
 import { artistPagePath } from "@/lib/library-routes";
