@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -147,14 +148,53 @@ function verifyLinuxBundles(bundleRoot, expected) {
       artifact,
     );
   }
-  for (const artifact of appImages) {
-    if (!path.basename(artifact).includes(expected)) {
-      throw new Error(
-        `AppImage filename does not include ${expected}: ${artifact}`,
-      );
-    }
-  }
+  for (const artifact of appImages) verifyAppImage(artifact, expected);
   return debs.length + rpms.length + appImages.length;
+}
+
+export function assertAppImagePayload(root) {
+  const executable = path.join(root, "usr/bin/crate-desktop");
+  if (!fs.existsSync(executable) || !fs.statSync(executable).isFile()) {
+    throw new Error(`AppImage payload is missing executable: ${executable}`);
+  }
+  if (process.platform !== "win32" && !(fs.statSync(executable).mode & 0o111)) {
+    throw new Error(
+      `AppImage payload executable is not runnable: ${executable}`,
+    );
+  }
+
+  const desktopEntries = findArtifacts(
+    path.join(root, "usr/share/applications"),
+    ".desktop",
+  );
+  const hasLaunchableEntry = desktopEntries.some((desktopEntry) =>
+    /^Exec=crate-desktop(?:\s|$)/m.test(fs.readFileSync(desktopEntry, "utf8")),
+  );
+  if (!hasLaunchableEntry) {
+    throw new Error("AppImage payload has no launchable desktop entry");
+  }
+}
+
+function verifyAppImage(artifact, expected) {
+  if (!path.basename(artifact).includes(expected)) {
+    throw new Error(
+      `AppImage filename does not include ${expected}: ${artifact}`,
+    );
+  }
+
+  const extractionDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "crate-appimage-verify-"),
+  );
+  try {
+    execFileSync(artifact, ["--appimage-extract"], {
+      cwd: extractionDirectory,
+      stdio: "ignore",
+      timeout: 120_000,
+    });
+    assertAppImagePayload(path.join(extractionDirectory, "squashfs-root"));
+  } finally {
+    fs.rmSync(extractionDirectory, { recursive: true, force: true });
+  }
 }
 
 export function verifyDesktopArtifacts({

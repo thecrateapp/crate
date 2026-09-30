@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { assertArtifactVersion } from "./verify-desktop-artifact-version.mjs";
+import {
+  assertAppImagePayload,
+  assertArtifactVersion,
+} from "./verify-desktop-artifact-version.mjs";
 import {
   parseDesktopVersion,
   readDesktopVersionSources,
@@ -174,4 +177,34 @@ test("artifact version checks accept canonical SemVer and Windows build suffix",
     () => assertArtifactVersion("2.7.3", "2.7.4", "DEB package"),
     /expected 2\.7\.4/,
   );
+});
+
+test("AppImage payload contains its executable and a launchable desktop entry", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "crate-appimage-test-"));
+  const binary = path.join(root, "usr/bin/crate-desktop");
+  const desktop = path.join(root, "usr/share/applications/Crate.desktop");
+  fs.mkdirSync(path.dirname(binary), { recursive: true });
+  fs.mkdirSync(path.dirname(desktop), { recursive: true });
+  fs.writeFileSync(binary, "test binary");
+  fs.chmodSync(binary, 0o755);
+  fs.writeFileSync(
+    desktop,
+    "[Desktop Entry]\nType=Application\nName=Crate\nExec=crate-desktop %u\n",
+  );
+
+  try {
+    assert.doesNotThrow(() => assertAppImagePayload(root));
+    fs.rmSync(binary);
+    assert.throws(() => assertAppImagePayload(root), /missing executable/);
+
+    fs.writeFileSync(binary, "test binary");
+    fs.chmodSync(binary, 0o755);
+    fs.writeFileSync(desktop, "[Desktop Entry]\nName=Crate\n");
+    assert.throws(
+      () => assertAppImagePayload(root),
+      /launchable desktop entry/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
