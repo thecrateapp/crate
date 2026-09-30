@@ -3,9 +3,9 @@ import logging
 import math
 import re
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timezone
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
 import requests
 from requests import RequestException
@@ -16,8 +16,29 @@ log = logging.getLogger(__name__)
 
 SETLISTFM_BASE = "https://api.setlist.fm/rest/1.0"
 _PROBABLE_TTL_SECONDS = 7 * 86400
+_PROBABLE_CACHE_VERSION = 2
+_ACTIVE_TOUR_WINDOW_DAYS = 120
+_ACTIVE_TOUR_MAX_SHOWS = 12
+_RECENCY_HALF_LIFE_DAYS = 21.0
 _PENDING_TTL_SECONDS = 15 * 60
 _NEGATIVE_TTL_SECONDS = 6 * 3600
+
+
+class RawSetlist(TypedDict):
+    date: str
+    venue: str
+    city: str
+    tour: str
+    songs: list[str]
+
+
+class ProbableSetlistContext(TypedDict):
+    model_version: int
+    mode: str
+    source_show_count: int
+    source_date_from: str | None
+    source_date_to: str | None
+    tour_name: NotRequired[str]
 
 
 class SetlistProviderUnavailable(RuntimeError):
@@ -35,7 +56,10 @@ def _normalized_artist_name(name: str) -> str:
 
 
 def _probable_cache_key(name: str) -> str:
-    return f"setlistfm:probable:{_normalized_artist_name(name).casefold()}"
+    return (
+        f"setlistfm:probable:v{_PROBABLE_CACHE_VERSION}:"
+        f"{_normalized_artist_name(name).casefold()}"
+    )
 
 
 def _probable_status_key(name: str) -> str:
@@ -202,6 +226,33 @@ def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
+def _parse_setlist_date(value: object) -> date | None:
+    raw_date = _clean_text(value)
+    if not raw_date:
+        return None
+    for date_format in ("%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw_date, date_format).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _normalized_tour_name(value: object) -> str:
+    return re.sub(r"\s+", " ", _clean_text(value) or "").casefold()
+
+
+def _unique_show_songs(show: RawSetlist) -> list[str]:
+    songs: list[str] = []
+    seen: set[str] = set()
+    for raw_title in show.get("songs", []):
+        title = _clean_text(raw_title)
+        if title and title not in seen:
+            songs.append(title)
+            seen.add(title)
+    return songs
+
+
 def _coordinate(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
@@ -323,6 +374,48 @@ def get_cached_probable_setlist(artist_name: str) -> list[dict] | None:
     return _normalize_cached_songs(cached)
 
 
+def get_cached_probable_setlist_context(
+    artist_name: str,
+) -> ProbableSetlistContext | None:
+    """Return metadata for the versioned probable-setlist cache entry."""
+    cached = get_cache(
+        _probable_cache_key(artist_name), max_age_seconds=_PROBABLE_TTL_SECONDS
+    )
+    if not isinstance(cached, Mapping):
+        return None
+    raw_context = cached.get("context")
+    if not isinstance(raw_context, Mapping):
+        return None
+    model_version = raw_context.get("model_version")
+    mode = _clean_text(raw_context.get("mode"))
+    source_show_count = raw_context.get("source_show_count")
+    source_date_from = raw_context.get("source_date_from")
+    source_date_to = raw_context.get("source_date_to")
+    if (
+        not isinstance(model_version, int)
+        or isinstance(model_version, bool)
+        or model_version != _PROBABLE_CACHE_VERSION
+        or not mode
+        or not isinstance(source_show_count, int)
+        or isinstance(source_show_count, bool)
+        or source_show_count < 1
+        or (source_date_from is not None and not isinstance(source_date_from, str))
+        or (source_date_to is not None and not isinstance(source_date_to, str))
+    ):
+        return None
+    context: ProbableSetlistContext = {
+        "model_version": model_version,
+        "mode": mode,
+        "source_show_count": source_show_count,
+        "source_date_from": source_date_from,
+        "source_date_to": source_date_to,
+    }
+    tour_name = _clean_text(raw_context.get("tour_name"))
+    if tour_name:
+        context["tour_name"] = tour_name
+    return context
+
+
 def queue_probable_setlist_refresh(
     artist_name: str, *, force: bool = False
 ) -> str | None:
@@ -423,21 +516,27 @@ def get_probable_setlist(
     if not raw_setlists:
         return None
 
-    # Predict setlist using position-weighted frequency from recent shows
-    result = _predict_setlist(raw_setlists)
+    result, context = _predict_setlist_with_context(raw_setlists)
 
-    if result:
+    if result and context:
+        cache_ttl = (
+            24 * 60 * 60 if context["mode"] == "active_tour" else _PROBABLE_TTL_SECONDS
+        )
         set_cache(
             _probable_cache_key(artist_name),
-            {"songs": result},
-            ttl=_PROBABLE_TTL_SECONDS,
+            {
+                "model_version": _PROBABLE_CACHE_VERSION,
+                "context": context,
+                "songs": result,
+            },
+            ttl=cache_ttl,
         )
     return result
 
 
-def _fetch_raw_setlists(mbid: str, num_setlists: int) -> list[dict]:
+def _fetch_raw_setlists(mbid: str, num_setlists: int) -> list[RawSetlist]:
     """Fetch raw setlist data from setlist.fm API."""
-    setlists = []
+    setlists: list[RawSetlist] = []
     pages_needed = (num_setlists + 19) // 20
 
     for page in range(1, pages_needed + 1):
@@ -448,27 +547,30 @@ def _fetch_raw_setlists(mbid: str, num_setlists: int) -> list[dict]:
         if not page_setlists:
             break
         for sl in page_setlists:
-            if not isinstance(sl, dict):
+            if not isinstance(sl, Mapping):
                 continue
             if len(setlists) >= num_setlists:
                 break
             songs = []
             raw_sets = sl.get("sets")
-            sets = raw_sets if isinstance(raw_sets, dict) else {}
+            sets = _mapping(raw_sets)
             for s in _as_list(sets.get("set")):
-                if not isinstance(s, dict):
+                if not isinstance(s, Mapping):
                     continue
                 for song in _as_list(s.get("song")):
                     title = _song_title(song)
                     if title:
                         songs.append(title)
             if songs:
+                venue = _mapping(sl.get("venue"))
+                city = _mapping(venue.get("city"))
+                tour = _mapping(sl.get("tour"))
                 setlists.append(
                     {
-                        "date": sl.get("eventDate", ""),
-                        "venue": sl.get("venue", {}).get("name", ""),
-                        "city": sl.get("venue", {}).get("city", {}).get("name", ""),
-                        "tour": sl.get("tour", {}).get("name", ""),
+                        "date": _clean_text(sl.get("eventDate")) or "",
+                        "venue": _clean_text(venue.get("name")) or "",
+                        "city": _clean_text(city.get("name")) or "",
+                        "tour": _clean_text(tour.get("name")) or "",
                         "songs": songs,
                     }
                 )
@@ -476,90 +578,206 @@ def _fetch_raw_setlists(mbid: str, num_setlists: int) -> list[dict]:
     return setlists
 
 
-def _predict_setlist(setlists: list[dict]) -> list[dict] | None:
-    """Predict a probable setlist using position-weighted frequency.
+def _select_prediction_setlists(
+    setlists: Sequence[RawSetlist],
+    *,
+    today: date,
+) -> tuple[list[RawSetlist], str, str, date | None]:
+    ordered = sorted(
+        setlists,
+        key=lambda show: _parse_setlist_date(show.get("date")) or date.min,
+        reverse=True,
+    )
+    dated = [
+        (show, parsed_date)
+        for show in ordered
+        if (parsed_date := _parse_setlist_date(show.get("date"))) is not None
+    ]
+    if not dated:
+        return ordered, "historical_weighted", "", None
 
-    Uses the last N shows with data. For each position, picks the most
-    frequently played song at that slot. Songs already placed are skipped
-    so the result has no duplicates. Remaining frequent songs that didn't
-    win a position slot are appended at the end.
-    """
+    latest_date = dated[0][1]
+    latest_tour = _clean_text(dated[0][0].get("tour")) or ""
+    latest_age = max(0, (today - latest_date).days)
+    recent = [
+        show
+        for show, parsed_date in dated
+        if 0 <= (latest_date - parsed_date).days <= _ACTIVE_TOUR_WINDOW_DAYS
+    ]
+
+    if latest_age <= _ACTIVE_TOUR_WINDOW_DAYS and recent:
+        if latest_tour:
+            normalized_latest_tour = _normalized_tour_name(latest_tour)
+            matching_tour = [
+                show
+                for show in recent
+                if _normalized_tour_name(show.get("tour")) == normalized_latest_tour
+            ]
+            unlabeled = [
+                show for show in recent if not _normalized_tour_name(show.get("tour"))
+            ]
+            if len(matching_tour) >= 2:
+                return (
+                    matching_tour[:_ACTIVE_TOUR_MAX_SHOWS],
+                    "active_tour",
+                    latest_tour,
+                    latest_date,
+                )
+            if len(matching_tour) + len(unlabeled) >= 2:
+                return (
+                    (matching_tour + unlabeled)[:_ACTIVE_TOUR_MAX_SHOWS],
+                    "active_tour",
+                    latest_tour,
+                    latest_date,
+                )
+            if matching_tour:
+                return matching_tour, "recent_shows", latest_tour, latest_date
+            if unlabeled:
+                return unlabeled, "recent_shows", latest_tour, latest_date
+        elif len(recent) >= 2:
+            return (
+                recent[:_ACTIVE_TOUR_MAX_SHOWS],
+                "active_tour",
+                "",
+                latest_date,
+            )
+        else:
+            return recent, "recent_shows", "", latest_date
+
+    return ordered, "historical_weighted", latest_tour, latest_date
+
+
+def _recency_weight(show_date: date | None, latest_date: date | None) -> float:
+    if show_date is None or latest_date is None:
+        return 1.0
+    age_days = max(0, (latest_date - show_date).days)
+    return 0.5 ** (age_days / _RECENCY_HALF_LIFE_DAYS)
+
+
+def _predict_setlist_with_context(
+    setlists: Sequence[RawSetlist],
+    *,
+    today: date | None = None,
+) -> tuple[list[dict] | None, ProbableSetlistContext | None]:
     if not setlists:
-        return None
+        return None, None
 
-    from datetime import datetime
+    reference_date = today or datetime.now(timezone.utc).date()
+    selected, mode, tour_name, latest_date = _select_prediction_setlists(
+        setlists, today=reference_date
+    )
+    if not selected:
+        return None, None
 
-    # Track global frequency and last played date
-    global_counts: Counter = Counter()
+    global_counts: Counter[str] = Counter()
+    weighted_counts: dict[str, float] = {}
     last_played: dict[str, str] = {}
-    for sl in setlists:
-        event_date = sl.get("date", "")
-        for title in sl.get("songs", []):
+    last_played_dates: dict[str, date | None] = {}
+    position_songs: dict[int, dict[str, float]] = {}
+    total_show_weight = 0.0
+
+    for show in selected:
+        songs = _unique_show_songs(show)
+        show_date = _parse_setlist_date(show.get("date"))
+        weight = _recency_weight(show_date, latest_date)
+        total_show_weight += weight
+        for title in songs:
             global_counts[title] += 1
-            if title not in last_played or event_date > last_played[title]:
-                last_played[title] = event_date
+            weighted_counts[title] = weighted_counts.get(title, 0.0) + weight
+            previous_date = last_played_dates.get(title)
+            if title not in last_played or (
+                show_date is not None
+                and (previous_date is None or show_date > previous_date)
+            ):
+                last_played[title] = _clean_text(show.get("date")) or ""
+                last_played_dates[title] = show_date
+
+        seen_positions: set[str] = set()
+        for position, title in enumerate(songs):
+            if title in seen_positions:
+                continue
+            seen_positions.add(title)
+            position_scores = position_songs.setdefault(position, {})
+            position_scores[title] = position_scores.get(title, 0.0) + weight
 
     if not global_counts:
-        return None
+        return None, None
 
-    total_shows = len(setlists)
+    def song_frequency(title: str) -> float:
+        return round(weighted_counts[title] / total_show_weight, 3)
 
-    # Build position-frequency map from all shows
-    max_len = max(len(s["songs"]) for s in setlists)
-    position_songs: dict[int, Counter] = {}
-    for show in setlists:
-        for pos, title in enumerate(show["songs"]):
-            if pos not in position_songs:
-                position_songs[pos] = Counter()
-            position_songs[pos][title] += 1
+    def add_song(title: str, *, position: int | None = None) -> dict:
+        song = {
+            "title": title,
+            "frequency": song_frequency(title),
+            "play_count": global_counts[title],
+            "last_played": last_played.get(title, ""),
+        }
+        if position is not None:
+            song["position"] = position + 1
+        return song
 
-    # Pass 1: pick the most common song per position
     predicted: list[dict] = []
     used_songs: set[str] = set()
-
-    for pos in range(max_len):
-        if pos not in position_songs:
-            break
-        for title, count in position_songs[pos].most_common():
+    for position in range(max(position_songs, default=-1) + 1):
+        scores = position_songs.get(position)
+        if scores is None:
+            continue
+        score_map = scores
+        ranked_titles = sorted(
+            score_map,
+            key=lambda title: (
+                -score_map[title],
+                -weighted_counts[title],
+                -global_counts[title],
+            ),
+        )
+        for title in ranked_titles:
             if title not in used_songs:
-                predicted.append(
-                    {
-                        "title": title,
-                        "frequency": round(global_counts[title] / total_shows, 3),
-                        "play_count": global_counts[title],
-                        "last_played": last_played.get(title, ""),
-                        "position": pos + 1,
-                    }
-                )
+                predicted.append(add_song(title, position=position))
                 used_songs.add(title)
                 break
 
-    # Pass 2: append remaining frequent songs that didn't win a position
-    for title, count in global_counts.most_common():
-        if title not in used_songs and count >= 2:
-            predicted.append(
-                {
-                    "title": title,
-                    "frequency": round(count / total_shows, 3),
-                    "play_count": count,
-                    "last_played": last_played.get(title, ""),
-                }
-            )
+    remaining_titles = sorted(
+        global_counts,
+        key=lambda title: (
+            -weighted_counts[title],
+            -global_counts[title],
+            -(last_played_dates.get(title) or date.min).toordinal(),
+        ),
+    )
+    for title in remaining_titles:
+        if title not in used_songs and global_counts[title] >= 2:
+            predicted.append(add_song(title))
             used_songs.add(title)
 
-    # Detect if there's an active tour
-    latest_date = setlists[0].get("date", "")
-    tour_name = setlists[0].get("tour", "")
-    try:
-        latest = datetime.strptime(latest_date, "%d-%m-%Y")
-        days_ago = (datetime.now() - latest).days
-    except (ValueError, TypeError):
-        days_ago = 999
+    source_dates = [
+        parsed_date
+        for show in selected
+        if (parsed_date := _parse_setlist_date(show.get("date"))) is not None
+    ]
+    context: ProbableSetlistContext = {
+        "model_version": _PROBABLE_CACHE_VERSION,
+        "mode": mode,
+        "source_show_count": len(selected),
+        "source_date_from": min(source_dates).isoformat() if source_dates else None,
+        "source_date_to": max(source_dates).isoformat() if source_dates else None,
+    }
+    if tour_name:
+        context["tour_name"] = tour_name
 
-    # Add metadata about tour status
+    is_recent = latest_date is not None and (reference_date - latest_date).days <= 180
     for song in predicted:
-        song["on_tour"] = days_ago <= 180
+        song["on_tour"] = is_recent
         if tour_name:
             song["tour_name"] = tour_name
 
-    return predicted if predicted else None
+    return (predicted or None), context
+
+
+def _predict_setlist(
+    setlists: Sequence[RawSetlist], *, today: date | None = None
+) -> list[dict] | None:
+    """Predict a setlist, prioritizing an active tour when recent data exists."""
+    result, _context = _predict_setlist_with_context(setlists, today=today)
+    return result
