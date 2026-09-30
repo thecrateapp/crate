@@ -415,8 +415,8 @@ class TestOAuthStart:
             )
 
         query = parse_qs(urlparse(result["login_url"]).query)
-        assert query["access_type"] == ["offline"]
         assert "prompt" not in query
+        assert "access_type" not in query
 
     @pytest.mark.parametrize(
         ("app_id", "return_to"),

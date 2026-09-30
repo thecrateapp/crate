@@ -62,6 +62,8 @@ class TestNativeOAuthLinkApi:
         }
 
     def test_start_binds_native_link_state_to_user_and_session(self):
+        from urllib.parse import parse_qs, urlparse
+
         from crate.api.auth import native_oauth_link_start
         from crate.api.schemas.auth import NativeOAuthLinkStartRequest
 
@@ -98,6 +100,9 @@ class TestNativeOAuthLinkApi:
         assert response["login_url"].startswith(
             "https://accounts.google.com/o/oauth2/v2/auth?"
         )
+        query = parse_qs(urlparse(response["login_url"]).query)
+        assert query["prompt"] == ["select_account"]
+        assert "access_type" not in query
         assert captured_state["mode"] == "native_link"
         assert captured_state["user_id"] == 7
         assert captured_state["session_id"] == "session-7"
