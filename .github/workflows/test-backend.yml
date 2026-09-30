@@ -44,12 +44,19 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          mapfile -t changed_files < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- app/crate | grep -E '\.py$' || true)
-          if (( ${#changed_files[@]} == 0 )); then
-            mapfile -t changed_files < <(git ls-files app/crate | grep -E '\.py$')
+          if [[ -n "$BASE_SHA" && "$BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            scan_base="$BASE_SHA"
+          else
+            git fetch --no-tags origin main
+            scan_base="$(git merge-base origin/main "$GITHUB_SHA")"
           fi
-          python -m bandit -q --exit-zero -f json -o bandit-changed-python.json "${changed_files[@]}"
-          python -m bandit -q --severity-level medium --confidence-level high "${changed_files[@]}"
+          mapfile -t changed_files < <(git diff --name-only "$scan_base" "$GITHUB_SHA" -- app/crate | grep -E '\.py$' || true)
+          if (( ${#changed_files[@]} == 0 )); then
+            echo "No changed backend Python files to scan."
+          else
+            python -m bandit -q --exit-zero -f json -o bandit-changed-python.json "${changed_files[@]}"
+            python -m bandit -q --severity-level medium --confidence-level high "${changed_files[@]}"
+          fi
 
       - name: Upload Bandit report
         if: always()

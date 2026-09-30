@@ -243,10 +243,13 @@ def claim_link_handoff(
         if status == 1:
             restore_link_handoff(code=code, handoff=handoff)
         raise InvalidNativeOAuthLink("Native OAuth link binding is invalid")
-    state_name = {1: "claimed", 2: "in_progress", 3: "completed"}.get(status)
-    if state_name is None:
-        raise InvalidNativeOAuthLink("Native OAuth link is invalid or expired")
-    return state_name, handoff
+    if status == 1:
+        return "claimed", handoff
+    if status == 2:
+        return "in_progress", handoff
+    if status == 3:
+        return "completed", handoff
+    raise InvalidNativeOAuthLink("Native OAuth link is invalid or expired")
 
 
 def restore_link_handoff(*, code: str, handoff: NativeOAuthLinkHandoff) -> None:

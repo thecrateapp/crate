@@ -84,7 +84,7 @@ export function OfflineLibrary() {
                   onClick={() =>
                     playAll(group.tracks, 0, sourceForGroup(group))
                   }
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-semibold text-accent-action-foreground transition hover:brightness-110"
                 >
                   <Play size={15} aria-hidden="true" />
                   {t("offline.access.playAll")}
@@ -148,7 +148,7 @@ export function OfflineLibrary() {
               type="button"
               aria-label={isPlaying ? t("player.pause") : t("player.play")}
               onClick={() => (isPlaying ? pause() : resume())}
-              className="rounded-full bg-accent-action p-2.5 text-white"
+              className="rounded-full bg-accent-action p-2.5 text-accent-action-foreground"
             >
               {isPlaying ? (
                 <Pause size={18} aria-hidden="true" />

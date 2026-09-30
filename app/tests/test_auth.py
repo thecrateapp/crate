@@ -986,6 +986,58 @@ class TestOAuthCallback:
         update_last_login.assert_not_called()
         create_session.assert_not_called()
 
+    @pytest.mark.parametrize("user_id", [None, "not-a-number", True])
+    def test_native_link_callback_rejects_invalid_target_user_id(self, user_id):
+        from fastapi import HTTPException
+
+        from crate.api.auth import oauth_callback
+
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "native_link",
+                    "verifier": "provider-verifier",
+                    "app_id": "listen-macos",
+                    "native_code_challenge": "c" * 43,
+                    "native_state": "s" * 43,
+                    "user_id": user_id,
+                    "session_id": "session-1",
+                },
+            ),
+            patch("crate.api.auth._validate_native_oauth_link_start"),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-native",
+                    "email": "native@test.com",
+                    "name": "Native User",
+                },
+            ),
+            patch("crate.api.auth.get_user_by_id", return_value={"id": 1}),
+            patch("crate.api.auth._ensure_user_active"),
+            patch(
+                "crate.api.auth._native_oauth_link_session_is_valid",
+                return_value=True,
+            ),
+            patch(
+                "crate.api.auth.issue_native_oauth_link_handoff",
+                return_value="link-code",
+            ),
+            patch.dict(
+                "os.environ",
+                {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+                clear=False,
+            ),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            _run(oauth_callback(self._request(), "google", code="code", state="state"))
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Missing user for native account linking"
+
     def test_google_callback_identity_conflict_returns_409(self):
         from fastapi import HTTPException
         from sqlalchemy.exc import IntegrityError

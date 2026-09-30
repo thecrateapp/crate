@@ -97,7 +97,7 @@ def test_lastfm_get_auth_token_rejects_malformed_response(monkeypatch):
 
 @pytest.mark.parametrize(
     ("error_code", "retryable"),
-    [(14, True), (15, False), (29, True)],
+    [(14, True), (15, False), (29, True), (None, False), ("unknown", False)],
 )
 def test_lastfm_get_session_strict_classifies_provider_errors(
     monkeypatch, error_code, retryable

@@ -2369,9 +2369,17 @@ def oauth_callback(
             challenge=parsed_state.get("native_code_challenge"),
             state=parsed_state.get("native_state"),
         )
+        raw_target_user_id = parsed_state.get("user_id")
+        if isinstance(raw_target_user_id, bool) or not isinstance(
+            raw_target_user_id, (int, str)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Missing user for native account linking",
+            )
         try:
-            target_user_id = int(parsed_state.get("user_id"))
-        except (TypeError, ValueError) as exc:
+            target_user_id = int(raw_target_user_id)
+        except ValueError as exc:
             raise HTTPException(
                 status_code=400,
                 detail="Missing user for native account linking",

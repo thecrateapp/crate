@@ -2591,6 +2591,26 @@ class TestLibraryCRUD:
         assert artist["album_count"] == 2
         assert artist["track_count"] == 15
 
+    def test_upsert_artist_with_missing_numeric_id_updates_only_matching_name(
+        self, pg_db
+    ):
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Artist Without ID"})
+        pg_db.upsert_artist({"name": "Other Artist Without ID", "album_count": 55})
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_artists SET id = NULL WHERE name IN (:first, :second)"
+                ),
+                {"first": "Artist Without ID", "second": "Other Artist Without ID"},
+            )
+
+        pg_db.upsert_artist({"name": "Artist Without ID", "album_count": 7})
+
+        assert pg_db.get_library_artist("Artist Without ID")["album_count"] == 7
+        assert pg_db.get_library_artist("Other Artist Without ID")["album_count"] == 55
+
     def test_manual_artist_metadata_locks_enrichment_fields(self, pg_db):
         from crate.db.repositories.field_locks import list_locked_fields
         from crate.db.repositories.library_enrichment_writes import (

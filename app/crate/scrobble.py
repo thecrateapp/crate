@@ -199,11 +199,16 @@ def lastfm_get_session_strict(
                 if str(session.get("subscriber", "")).isdigit()
                 else None,
             )
-        error_code = data.get("error")
-        try:
-            error_code = int(error_code)
-        except (TypeError, ValueError):
+        raw_error_code = data.get("error")
+        if isinstance(raw_error_code, bool) or not isinstance(
+            raw_error_code, (int, str)
+        ):
             error_code = None
+        else:
+            try:
+                error_code = int(raw_error_code)
+            except ValueError:
+                error_code = None
         retryable = resp.status_code >= 500 or error_code in {11, 14, 16, 29}
         raise LastfmAuthenticationError(retryable=retryable)
     except LastfmAuthenticationError:
