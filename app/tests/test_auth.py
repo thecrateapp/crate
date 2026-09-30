@@ -877,6 +877,67 @@ class TestOAuthCallback:
             }
         )
 
+    def test_google_userinfo_does_not_expose_provider_refresh_token(self):
+        from crate.api.auth import (
+            GOOGLE_TOKEN_URL,
+            GOOGLE_USERINFO_URL,
+            _google_userinfo,
+        )
+
+        token_response = MagicMock(status_code=200)
+        token_response.json.return_value = {
+            "access_token": "google-access-token",
+            "refresh_token": "google-refresh-token",
+        }
+        userinfo_response = MagicMock(status_code=200)
+        userinfo = {
+            "id": "google-sub-123",
+            "email": "listener@example.com",
+            "name": "Listener",
+        }
+        userinfo_response.json.return_value = userinfo
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "GOOGLE_CLIENT_ID": "google-client",
+                    "GOOGLE_CLIENT_SECRET": "google-secret",
+                },
+            ),
+            patch(
+                "crate.api.auth.requests.post", return_value=token_response
+            ) as exchange_code,
+            patch(
+                "crate.api.auth.requests.get", return_value=userinfo_response
+            ) as fetch_userinfo,
+        ):
+            result = _google_userinfo(
+                "authorization-code",
+                "https://listen.example.com/api/auth/oauth/google/callback",
+                "pkce-verifier",
+            )
+
+        assert result == userinfo
+        assert "refresh_token" not in result
+        exchange_code.assert_called_once_with(
+            GOOGLE_TOKEN_URL,
+            data={
+                "client_id": "google-client",
+                "client_secret": "google-secret",
+                "code": "authorization-code",
+                "grant_type": "authorization_code",
+                "redirect_uri": "https://listen.example.com/api/auth/oauth/google/callback",
+                "code_verifier": "pkce-verifier",
+            },
+            timeout=10,
+        )
+        fetch_userinfo.assert_called_once_with(
+            GOOGLE_USERINFO_URL,
+            headers={"Authorization": "Bearer google-access-token"},
+            timeout=10,
+        )
+
     def test_google_callback_reuses_legacy_google_id_user(self):
         from crate.api.auth import oauth_callback
 
@@ -922,7 +983,15 @@ class TestOAuthCallback:
             )
 
         assert response.headers["location"] == "/"
-        mock_upsert.assert_called_once()
+        mock_upsert.assert_called_once_with(
+            legacy_user["id"],
+            "google",
+            external_user_id="google-sub-123",
+            external_username="legacy@test.com",
+            status="linked",
+            last_error=None,
+            metadata={"email": "legacy@test.com"},
+        )
         mock_last_login.assert_called_once_with(legacy_user["id"])
 
     def test_native_callback_without_pkce_never_issues_tokens_for_spoofed_web_app(
