@@ -339,7 +339,9 @@ class TestOAuthStart:
             }
         )
 
-    def test_public_oauth_start_uses_login_mode_even_with_authenticated_request(self):
+    def test_public_google_login_uses_identity_scopes_without_offline_access(self):
+        from urllib.parse import parse_qs, urlparse
+
         from crate.api.auth import oauth_start
         from crate.api.schemas.auth import OAuthStartRequest
 
@@ -375,6 +377,10 @@ class TestOAuthStart:
         assert result["provider"] == "google"
         assert captured_state["mode"] == "login"
         assert captured_state["user_id"] is None
+        query = parse_qs(urlparse(result["login_url"]).query)
+        assert query["scope"] == ["openid email profile"]
+        assert "prompt" not in query
+        assert "access_type" not in query
 
     def test_google_oauth_start_does_not_force_consent_for_existing_grants(self):
         from urllib.parse import parse_qs, urlparse
