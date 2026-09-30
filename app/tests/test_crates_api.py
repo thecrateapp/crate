@@ -177,68 +177,41 @@ def test_create_defaults_private_and_requires_authentication(pg_db, crate_api_cl
     )
 
 
-def test_crate_detail_reuses_one_read_scope_for_access_and_metadata(monkeypatch):
+def test_crate_detail_uses_accessible_crate_query(monkeypatch):
     from crate.api import crates as crate_routes
 
-    scope = object()
-    sessions: list[object] = []
-
-    class ReadScope:
-        def __enter__(self):
-            return scope
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            return False
-
-    monkeypatch.setattr(crate_routes, "read_scope", lambda: ReadScope())
+    calls: list[tuple[str, int]] = []
     monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
     monkeypatch.setattr(
         crate_routes,
-        "get_crate_access",
-        lambda _crate_id, _user_id, *, session: sessions.append(session) or "owner",
-    )
-    monkeypatch.setattr(
-        crate_routes,
-        "get_crate",
-        lambda _crate_id, *, session: (
-            sessions.append(session) or {"id": "crate-id", "albums": []}
+        "get_crate_for_user",
+        lambda crate_id, user_id: (
+            calls.append((crate_id, user_id))
+            or ({"id": "crate-id", "albums": []}, "owner")
         ),
     )
 
-    result = crate_routes.get_one(None, uuid4())
+    crate_id = uuid4()
+    result = crate_routes.get_one(None, crate_id)
 
     assert result["access"] == "owner"
-    assert sessions == [scope, scope]
+    assert calls == [(str(crate_id), 1)]
 
 
-def test_crate_playback_reuses_one_read_scope_for_access_and_tracks(monkeypatch):
+def test_crate_playback_uses_accessible_tracks_query(monkeypatch):
     from crate.api import crates as crate_routes
 
-    scope = object()
-    sessions: list[object] = []
-
-    class ReadScope:
-        def __enter__(self):
-            return scope
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            return False
-
-    monkeypatch.setattr(crate_routes, "read_scope", lambda: ReadScope())
     monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
+    calls: list[tuple[str, int]] = []
     monkeypatch.setattr(
         crate_routes,
-        "get_crate_access",
-        lambda _crate_id, _user_id, *, session: sessions.append(session) or "owner",
-    )
-    monkeypatch.setattr(
-        crate_routes,
-        "get_crate_playback_tracks",
-        lambda _crate_id, *, session: sessions.append(session) or [],
+        "get_crate_playback_tracks_for_user",
+        lambda crate_id, user_id: calls.append((crate_id, user_id)) or [],
     )
 
-    assert crate_routes.playback(None, uuid4()) == []
-    assert sessions == [scope, scope]
+    crate_id = uuid4()
+    assert crate_routes.playback(None, crate_id) == []
+    assert calls == [(str(crate_id), 1)]
 
 
 def test_private_crates_are_hidden_and_collaborators_cannot_manage_owner_settings(

@@ -9,18 +9,6 @@ TRACK_UID = "33333333-3333-4333-8333-333333333333"
 CRATE_ID = "77777777-7777-4777-8777-777777777777"
 
 
-class _ReadScope:
-    def __enter__(self):
-        return object()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        return False
-
-
-def _patch_crate_read_scope(monkeypatch, share):
-    monkeypatch.setattr(share, "read_scope", lambda: _ReadScope())
-
-
 def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
     test_app, monkeypatch
 ):
@@ -40,13 +28,11 @@ def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
             }
         ],
     }
-    _patch_crate_read_scope(monkeypatch, share)
     monkeypatch.setattr(
         share,
-        "get_crate_access",
-        lambda _crate_id, _user_id, *, session: "public",
+        "get_crate_for_user",
+        lambda _crate_id, _user_id: (crate, "public"),
     )
-    monkeypatch.setattr(share, "get_crate", lambda _crate_id, *, session: crate)
 
     response = test_app.get(
         f"/share/crate/{CRATE_ID}",
@@ -67,37 +53,30 @@ def test_public_crate_preview_uses_first_album_cover_and_links_to_listen(
     assert f'href="https://listen.example.test/crate/{CRATE_ID}"' in response.text
 
 
-def test_public_crate_preview_reuses_one_read_scope(monkeypatch):
+def test_public_crate_preview_uses_accessible_crate_query(monkeypatch):
     from crate.api import share
 
-    scope = object()
-    sessions: list[object] = []
-
-    class ReadScope:
-        def __enter__(self):
-            return scope
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            return False
-
-    monkeypatch.setattr(share, "read_scope", lambda: ReadScope(), raising=False)
+    calls: list[tuple[str, None]] = []
     monkeypatch.setattr(
         share,
-        "get_crate_access",
-        lambda _crate_id, _user_id, *, session: sessions.append(session) or "public",
-    )
-    monkeypatch.setattr(
-        share,
-        "get_crate",
-        lambda _crate_id, *, session: (
-            sessions.append(session)
-            or {"name": "Crate", "owner_name": "Owner", "description": "", "albums": []}
+        "get_crate_for_user",
+        lambda crate_id, user_id: (
+            calls.append((crate_id, user_id))
+            or (
+                {
+                    "name": "Crate",
+                    "owner_name": "Owner",
+                    "description": "",
+                    "albums": [],
+                },
+                "public",
+            )
         ),
     )
     monkeypatch.setattr(share, "_render_preview", lambda *args, **kwargs: "preview")
 
     assert share.share_crate(None, UUID(CRATE_ID)) == "preview"
-    assert sessions == [scope, scope]
+    assert calls == [(CRATE_ID, None)]
 
 
 def test_public_crate_preview_uses_brand_image_without_album_art(test_app, monkeypatch):
@@ -110,13 +89,11 @@ def test_public_crate_preview_uses_brand_image_without_album_art(test_app, monke
         "owner_name": "Jane Doe",
         "albums": [],
     }
-    _patch_crate_read_scope(monkeypatch, share)
     monkeypatch.setattr(
         share,
-        "get_crate_access",
-        lambda _crate_id, _user_id, *, session: "public",
+        "get_crate_for_user",
+        lambda _crate_id, _user_id: (crate, "public"),
     )
-    monkeypatch.setattr(share, "get_crate", lambda _crate_id, *, session: crate)
 
     response = test_app.get(
         f"/share/crate/{CRATE_ID}",
@@ -139,18 +116,10 @@ def test_private_crate_preview_is_not_found_without_loading_private_metadata(
 ):
     from crate.api import share
 
-    _patch_crate_read_scope(monkeypatch, share)
     monkeypatch.setattr(
         share,
-        "get_crate_access",
-        lambda _crate_id, _user_id, *, session: "none",
-    )
-    monkeypatch.setattr(
-        share,
-        "get_crate",
-        lambda _crate_id, *, session: (_ for _ in ()).throw(
-            AssertionError("must not load")
-        ),
+        "get_crate_for_user",
+        lambda _crate_id, _user_id: (None, "none"),
     )
 
     response = test_app.get(f"/share/crate/{CRATE_ID}")
