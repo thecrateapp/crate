@@ -47,7 +47,9 @@ def lastfm_get_auth_token(api_key: str, api_secret: str) -> str | None:
 
     params = {"method": "auth.getToken", "api_key": api_key}
     sig_str = "".join(f"{key}{value}" for key, value in sorted(params.items()))
-    params["api_sig"] = hashlib.md5(f"{sig_str}{api_secret}".encode()).hexdigest()
+    params["api_sig"] = hashlib.md5(
+        f"{sig_str}{api_secret}".encode(), usedforsecurity=False
+    ).hexdigest()
     params["format"] = "json"
 
     try:
@@ -95,7 +97,9 @@ def lastfm_scrobble(
 
     # Generate API signature: md5 of sorted params + secret
     sig_str = "".join(f"{k}{v}" for k, v in sorted(params.items())) + api_secret
-    params["api_sig"] = hashlib.md5(sig_str.encode("utf-8")).hexdigest()
+    params["api_sig"] = hashlib.md5(
+        sig_str.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
     params["format"] = "json"
 
     try:
@@ -139,7 +143,9 @@ def lastfm_now_playing(
         params["album"] = album
 
     sig_str = "".join(f"{k}{v}" for k, v in sorted(params.items())) + api_secret
-    params["api_sig"] = hashlib.md5(sig_str.encode("utf-8")).hexdigest()
+    params["api_sig"] = hashlib.md5(
+        sig_str.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
     params["format"] = "json"
 
     try:
@@ -176,7 +182,9 @@ def lastfm_get_session_strict(
         "token": auth_token,
     }
     sig_str = "".join(f"{k}{v}" for k, v in sorted(params.items())) + api_secret
-    params["api_sig"] = hashlib.md5(sig_str.encode("utf-8")).hexdigest()
+    params["api_sig"] = hashlib.md5(
+        sig_str.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
     params["format"] = "json"
 
     try:

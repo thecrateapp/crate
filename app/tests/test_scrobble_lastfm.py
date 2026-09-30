@@ -1,5 +1,7 @@
-from sqlalchemy.exc import IntegrityError
+import hashlib
+
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 
 def test_lastfm_get_session_returns_key_and_username(monkeypatch):
@@ -37,7 +39,10 @@ def test_lastfm_get_session_returns_key_and_username(monkeypatch):
     assert captured["url"] == "https://ws.audioscrobbler.com/2.0/"
     assert captured["params"]["method"] == "auth.getSession"
     assert captured["params"]["format"] == "json"
-    assert captured["params"]["api_sig"]
+    expected_signature = hashlib.md5(
+        b"api_keyapi-keymethodauth.getSessiontokenauth-tokenapi-secret"
+    ).hexdigest()
+    assert captured["params"]["api_sig"] == expected_signature
 
 
 def test_lastfm_get_auth_token_returns_token_and_signs_request(monkeypatch):
@@ -67,7 +72,10 @@ def test_lastfm_get_auth_token_returns_token_and_signs_request(monkeypatch):
     assert captured["params"]["method"] == "auth.getToken"
     assert captured["params"]["api_key"] == "api-key"
     assert captured["params"]["format"] == "json"
-    assert captured["params"]["api_sig"]
+    expected_signature = hashlib.md5(
+        b"api_keyapi-keymethodauth.getTokenapi-secret"
+    ).hexdigest()
+    assert captured["params"]["api_sig"] == expected_signature
 
 
 def test_lastfm_get_auth_token_rejects_malformed_response(monkeypatch):
@@ -119,7 +127,6 @@ def test_lastfm_get_session_strict_classifies_provider_errors(
 
 def test_lastfm_get_session_strict_treats_network_errors_as_retryable(monkeypatch):
     import requests
-
     from crate.scrobble import LastfmAuthenticationError, lastfm_get_session_strict
 
     def fail(*_args, **_kwargs):

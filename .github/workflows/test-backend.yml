@@ -21,6 +21,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  security:
+    name: security scan (changed Python)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Bandit
+        run: pip install bandit==1.9.4
+
+      - name: Scan changed backend files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          mapfile -t changed_files < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- app/crate | grep -E '\.py$' || true)
+          if (( ${#changed_files[@]} == 0 )); then
+            mapfile -t changed_files < <(git ls-files app/crate | grep -E '\.py$')
+          fi
+          python -m bandit -q --exit-zero -f json -o bandit-changed-python.json "${changed_files[@]}"
+          python -m bandit -q --severity-level medium --confidence-level high "${changed_files[@]}"
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-changed-python
+          path: bandit-changed-python.json
+          if-no-files-found: warn
+          retention-days: 30
+
   quality:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     name: quality
