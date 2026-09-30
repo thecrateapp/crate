@@ -209,7 +209,22 @@ def lastfm_get_session_strict(
                 error_code = int(raw_error_code)
             except ValueError:
                 error_code = None
-        retryable = resp.status_code >= 500 or error_code in {11, 14, 16, 29}
+        retryable_http_status = (
+            resp.status_code in {408, 429} or resp.status_code >= 500
+        )
+        unclassified_success = 200 <= resp.status_code < 300 and error_code is None
+        retryable = (
+            retryable_http_status
+            or unclassified_success
+            or error_code
+            in {
+                8,
+                11,
+                14,
+                16,
+                29,
+            }
+        )
         raise LastfmAuthenticationError(retryable=retryable)
     except LastfmAuthenticationError:
         raise

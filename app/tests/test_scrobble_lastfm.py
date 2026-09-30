@@ -97,7 +97,14 @@ def test_lastfm_get_auth_token_rejects_malformed_response(monkeypatch):
 
 @pytest.mark.parametrize(
     ("error_code", "retryable"),
-    [(14, True), (15, False), (29, True), (None, False), ("unknown", False)],
+    [
+        (8, True),
+        (14, True),
+        (15, False),
+        (29, True),
+        (None, True),
+        ("unknown", True),
+    ],
 )
 def test_lastfm_get_session_strict_classifies_provider_errors(
     monkeypatch, error_code, retryable
@@ -123,6 +130,55 @@ def test_lastfm_get_session_strict_classifies_provider_errors(
         lastfm_get_session_strict("api-key", "api-secret", "auth-token")
 
     assert exc_info.value.retryable is retryable
+
+
+@pytest.mark.parametrize("status_code", [408, 429])
+def test_lastfm_get_session_strict_retries_transient_http_statuses(
+    monkeypatch, status_code
+):
+    from crate.scrobble import LastfmAuthenticationError, lastfm_get_session_strict
+
+    class Response:
+        content = b'{"error":15,"message":"authorization pending"}'
+
+        def __init__(self):
+            self.status_code = status_code
+
+        def json(self):
+            return {"error": 15, "message": "authorization pending"}
+
+    monkeypatch.setattr(
+        "crate.scrobble.requests.get",
+        lambda *_args, **_kwargs: Response(),
+    )
+
+    with pytest.raises(LastfmAuthenticationError) as exc_info:
+        lastfm_get_session_strict("api-key", "api-secret", "auth-token")
+
+    assert exc_info.value.retryable is True
+
+
+def test_lastfm_get_session_strict_retries_success_without_session_or_error(
+    monkeypatch,
+):
+    from crate.scrobble import LastfmAuthenticationError, lastfm_get_session_strict
+
+    class Response:
+        status_code = 200
+        content = b'{"message":"temporary provider failure"}'
+
+        def json(self):
+            return {"message": "temporary provider failure"}
+
+    monkeypatch.setattr(
+        "crate.scrobble.requests.get",
+        lambda *_args, **_kwargs: Response(),
+    )
+
+    with pytest.raises(LastfmAuthenticationError) as exc_info:
+        lastfm_get_session_strict("api-key", "api-secret", "auth-token")
+
+    assert exc_info.value.retryable is True
 
 
 def test_lastfm_get_session_strict_treats_network_errors_as_retryable(monkeypatch):
