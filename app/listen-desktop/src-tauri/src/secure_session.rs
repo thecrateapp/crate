@@ -1,8 +1,15 @@
 use keyring::v1::{Entry, Error as KeyringError};
 
-const KEYRING_SERVICE: &str = "app.cratemusic.crate.desktop";
 const MAX_KEY_BYTES: usize = 255;
 const MAX_VALUE_BYTES: usize = 64 * 1024;
+
+fn keyring_service_name(identifier: &str, is_dev: bool) -> String {
+    if is_dev {
+        format!("{identifier}.dev")
+    } else {
+        identifier.to_owned()
+    }
+}
 
 fn validate_secure_session_key(key: &str) -> Result<(), String> {
     let Some(suffix) = key
@@ -29,13 +36,13 @@ fn validate_secure_session_value(value: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn secure_entry(key: &str) -> Result<Entry, String> {
+fn secure_entry(service: &str, key: &str) -> Result<Entry, String> {
     validate_secure_session_key(key)?;
-    Entry::new(KEYRING_SERVICE, key).map_err(|_| "secure session store unavailable".into())
+    Entry::new(service, key).map_err(|_| "secure session store unavailable".into())
 }
 
-fn read_secure_session(key: &str) -> Result<Option<String>, String> {
-    let entry = secure_entry(key)?;
+fn read_secure_session(service: &str, key: &str) -> Result<Option<String>, String> {
+    let entry = secure_entry(service, key)?;
     match entry.get_password() {
         Ok(value) if value.len() <= MAX_VALUE_BYTES => Ok(Some(value)),
         Ok(_) => Err("invalid secure session value".into()),
@@ -44,44 +51,66 @@ fn read_secure_session(key: &str) -> Result<Option<String>, String> {
     }
 }
 
-fn write_secure_session(key: &str, value: &str) -> Result<(), String> {
+fn write_secure_session(service: &str, key: &str, value: &str) -> Result<(), String> {
     validate_secure_session_value(value)?;
-    secure_entry(key)?
+    secure_entry(service, key)?
         .set_password(value)
         .map_err(|_| "secure session store unavailable".into())
 }
 
-fn remove_secure_session(key: &str) -> Result<(), String> {
-    match secure_entry(key)?.delete_credential() {
+fn remove_secure_session(service: &str, key: &str) -> Result<(), String> {
+    match secure_entry(service, key)?.delete_credential() {
         Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
         Err(_) => Err("secure session store unavailable".into()),
     }
 }
 
 #[tauri::command]
-pub async fn secure_session_get(key: String) -> Result<Option<String>, String> {
-    tauri::async_runtime::spawn_blocking(move || read_secure_session(&key))
+pub async fn secure_session_get(
+    app: tauri::AppHandle,
+    key: String,
+) -> Result<Option<String>, String> {
+    let service = keyring_service_name(&app.config().identifier, cfg!(debug_assertions));
+    tauri::async_runtime::spawn_blocking(move || read_secure_session(&service, &key))
         .await
         .map_err(|_| "secure session command failed".to_string())?
 }
 
 #[tauri::command]
-pub async fn secure_session_set(key: String, value: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || write_secure_session(&key, &value))
+pub async fn secure_session_set(
+    app: tauri::AppHandle,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    let service = keyring_service_name(&app.config().identifier, cfg!(debug_assertions));
+    tauri::async_runtime::spawn_blocking(move || write_secure_session(&service, &key, &value))
         .await
         .map_err(|_| "secure session command failed".to_string())?
 }
 
 #[tauri::command]
-pub async fn secure_session_remove(key: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || remove_secure_session(&key))
+pub async fn secure_session_remove(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    let service = keyring_service_name(&app.config().identifier, cfg!(debug_assertions));
+    tauri::async_runtime::spawn_blocking(move || remove_secure_session(&service, &key))
         .await
         .map_err(|_| "secure session command failed".to_string())?
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_secure_session_key, validate_secure_session_value};
+    use super::{keyring_service_name, validate_secure_session_key, validate_secure_session_value};
+
+    #[test]
+    fn isolates_development_keyring_entries_from_release_entries() {
+        assert_eq!(
+            keyring_service_name("app.cratemusic.crate.desktop", true),
+            "app.cratemusic.crate.desktop.dev"
+        );
+        assert_eq!(
+            keyring_service_name("app.cratemusic.crate.desktop", false),
+            "app.cratemusic.crate.desktop"
+        );
+    }
 
     #[test]
     fn accepts_only_namespaced_session_and_oauth_keys() {
