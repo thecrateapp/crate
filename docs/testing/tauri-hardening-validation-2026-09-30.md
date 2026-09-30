@@ -184,6 +184,12 @@ On macOS 27.0.1 arm64, the artwork ownership path was audited and tested against
 
 On source commit `5c0072ee32140f262c2fb6d2cbf0a49d3a8bfbe1`, `cargo test --manifest-path app/listen-desktop/src-tauri/Cargo.toml --lib` passed 48/48 and `cargo clippy --manifest-path app/listen-desktop/src-tauri/Cargo.toml --all-targets -- -D warnings` passed. Apple documents the request-handler initializer and callback size contract in [`MPMediaItemArtwork.initWithBoundsSize:requestHandler:`](https://developer.apple.com/documentation/mediaplayer/mpmediaitemartwork/init%28boundssize%3Arequesthandler%3A%29?language=objc). C07's object-lifetime regression is covered; the installed Now Playing smoke remains open with C03.
 
+## macOS Now Playing playback state — C03
+
+On the same macOS 27.0.1 arm64 host, a native MediaPlayer probe set `MPNowPlayingInfoCenter.playbackState` to playing, paused, and stopped and read back raw values 1, 2, and 3. A Rust regression test now calls `set_now_playing_playback_state` for those three states and reads the value back from the native center; it restores the test process's initial state on exit. Apple documents that macOS apps must update this property whenever playback begins or halts in [`MPNowPlayingInfoCenter.playbackState`](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter/playbackstate?language=objc).
+
+On source commit `7bae0cbc05c91f2a744c32bd89da15e702acf414`, Rust tests passed 49/49, Clippy passed with `-D warnings`, and rustfmt check passed. This validates the app's native state setter and mapping. It does not validate remote-command delivery, competing media apps, or controls during real playback, backgrounding, headset changes, and sleep/wake; the installed-app C03 smoke remains pending.
+
 ## Other native gates still pending
 
 The installed release matrix remains open for macOS 11 and Intel, Windows 10 1803/WebView2, and Linux/WebKitGTK 2.40. Windows still needs process RSS captures and installed-app smoke. Linux has development and release WebKitGTK datapoints inside Debian/OrbStack under Xvfb, but still needs a normal desktop session and installed-app acceptance. Provider credentials, media-system behavior, upgrade from N−1, signed artifacts, and the remaining native acceptance scenarios are not covered by this report. A green local build or cross-compile does not substitute for those runs.
