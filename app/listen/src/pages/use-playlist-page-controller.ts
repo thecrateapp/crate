@@ -9,7 +9,6 @@ import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useApi } from "@/hooks/use-api";
-import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { isOfflineBusy } from "@/lib/offline";
 import {
   buildPlaylistEditableTracks,
@@ -78,10 +77,9 @@ export function usePlaylistPageController(): PlaylistPageController {
     { safetyNetMs: 120_000 },
   );
   const resolvedData = data ?? undefined;
-  const { playlistOptions, ensurePlaylistOptionsLoaded } =
-    useLazyPlaylistOptions();
   const { playAll } = usePlayerActions();
-  const { openCreatePlaylist } = usePlaylistComposer();
+  const { openCreatePlaylist, playlistOptions, ensurePlaylistOptionsLoaded } =
+    usePlaylistComposer();
   const {
     supported: offlineSupported,
     getPlaylistState,

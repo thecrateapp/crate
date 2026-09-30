@@ -6,8 +6,8 @@ import {
   openCrateComposerForAlbum,
   useOptionalCrateComposer,
 } from "@/contexts/CrateComposerContext";
+import { useOptionalPlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { useLazyCrateOptions } from "@/hooks/use-lazy-crate-options";
 import type { AlbumData } from "@/pages/album-types";
 import {
@@ -53,8 +53,10 @@ export function useAlbumPageController() {
     placement: "bottom-end",
   });
   const selectionMenuController = useContextMenuController<HTMLButtonElement>();
-  const { playlistOptions: playlists, ensurePlaylistOptionsLoaded } =
-    useLazyPlaylistOptions();
+  const playlistComposer = useOptionalPlaylistComposer();
+  const playlists = playlistComposer?.playlistOptions ?? [];
+  const ensurePlaylistOptionsLoaded =
+    playlistComposer?.ensurePlaylistOptionsLoaded ?? (() => {});
   const { crateOptions: crates, ensureCrateOptionsLoaded } =
     useLazyCrateOptions();
   const crateComposer = useOptionalCrateComposer();

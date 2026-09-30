@@ -7,15 +7,13 @@ import { fetchAlbumRadio } from "@/lib/radio";
 
 import { Album } from "./Album";
 
-vi.mock("@/hooks/use-api", () => ({
-  useApi: vi.fn(),
+const openCrateComposerForAlbum = vi.hoisted(() => vi.fn(() => true));
+const crateComposer = vi.hoisted(() => ({
+  openCreateCrate: vi.fn(),
 }));
 
-vi.mock("@/hooks/use-lazy-playlist-options", () => ({
-  useLazyPlaylistOptions: () => ({
-    playlistOptions: [],
-    ensurePlaylistOptionsLoaded: vi.fn(),
-  }),
+vi.mock("@/hooks/use-api", () => ({
+  useApi: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-lazy-crate-options", () => ({
@@ -44,10 +42,19 @@ vi.mock("@/components/bandcamp/BandcampSupportButton", () => ({
 vi.mock("@/contexts/PlaylistComposerContext", () => ({
   usePlaylistComposer: () => ({
     openCreatePlaylist: vi.fn(),
+    playlistOptions: [],
+    ensurePlaylistOptionsLoaded: vi.fn(),
   }),
   useOptionalPlaylistComposer: () => ({
     openCreatePlaylist: vi.fn(),
+    playlistOptions: [],
+    ensurePlaylistOptionsLoaded: vi.fn(),
   }),
+}));
+
+vi.mock("@/contexts/CrateComposerContext", () => ({
+  openCrateComposerForAlbum,
+  useOptionalCrateComposer: () => crateComposer,
 }));
 
 vi.mock("@/contexts/SavedAlbumsContext", () => ({
@@ -588,6 +595,35 @@ describe("Album page", () => {
 
     const menuItem = await screen.findByRole("menuitem", { name: "Play now" });
     expect(menuItem.closest(".overflow-x-auto")).toBeNull();
+  });
+
+  it("opens the Crate composer from the album menu and closes the menu", async () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: { ...ALBUM_DATA, global_album_uid: "global-morir" },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Add to Crate" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Create Crate" }),
+    );
+
+    expect(openCrateComposerForAlbum).toHaveBeenCalledWith(crateComposer, {
+      globalAlbumUid: "global-morir",
+      name: "MORIR",
+      artistName: "Crossed",
+    });
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("uses frameless labelled secondary actions on mobile album pages", async () => {

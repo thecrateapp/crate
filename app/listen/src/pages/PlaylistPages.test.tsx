@@ -14,19 +14,16 @@ vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
 }));
 
-vi.mock("@/hooks/use-lazy-playlist-options", () => ({
-  useLazyPlaylistOptions: () => ({
-    playlistOptions: [],
-    ensurePlaylistOptionsLoaded: vi.fn(),
-  }),
-}));
-
 vi.mock("@/contexts/PlaylistComposerContext", () => ({
   usePlaylistComposer: () => ({
     openCreatePlaylist: vi.fn(),
+    playlistOptions: [],
+    ensurePlaylistOptionsLoaded: vi.fn(),
   }),
   useOptionalPlaylistComposer: () => ({
     openCreatePlaylist: vi.fn(),
+    playlistOptions: [],
+    ensurePlaylistOptionsLoaded: vi.fn(),
   }),
 }));
 

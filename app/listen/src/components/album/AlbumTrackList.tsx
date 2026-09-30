@@ -9,7 +9,7 @@ import {
   type ContextMenuEntry,
 } from "@/components/actions/ItemActionMenu";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
-import { type PlaylistOption } from "@/hooks/use-lazy-playlist-options";
+import type { PlaylistOption } from "@/contexts/PlaylistComposerContext";
 import type { UseContextMenuControllerReturn } from "@crate/ui/domain/actions";
 
 import type { AlbumData, AlbumTrack } from "@/pages/album-types";
