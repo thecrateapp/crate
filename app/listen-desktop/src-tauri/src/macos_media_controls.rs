@@ -784,25 +784,59 @@ mod tests {
         artwork_request_handler, fetch_artwork_bytes_with_timeout, playback_state_value,
         read_bounded, ArtworkFetchQueue, ArtworkRequest, ArtworkRequestState, CGSize,
     };
-    use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+    use objc2::{
+        class, msg_send,
+        rc::{Retained, Weak},
+        runtime::AnyObject,
+    };
 
     #[test]
-    fn retained_artwork_request_block_owns_its_image() {
-        let image: *mut AnyObject = unsafe { msg_send![class!(NSObject), new] };
-        let image = unsafe { Retained::from_raw(image) }.unwrap();
-        let image_pointer = Retained::as_ptr(&image);
-        let request_handler = artwork_request_handler(image.clone());
-        drop(image);
+    fn retained_artwork_request_block_survives_artwork_replacement() {
+        let (previous_artwork, previous_image_weak) = new_test_media_artwork();
+        let (_current_artwork, current_image_weak) = new_test_media_artwork();
+        let previous_image = previous_image_weak.load().unwrap();
+        let current_image = current_image_weak.load().unwrap();
+        assert_ne!(
+            Retained::as_ptr(&previous_image),
+            Retained::as_ptr(&current_image)
+        );
+        let previous_artwork_ptr = Retained::as_ptr(&previous_artwork);
+        let requested_image: *mut AnyObject = unsafe {
+            msg_send![previous_artwork_ptr, imageWithSize: CGSize {
+                width: 32.0,
+                height: 32.0,
+            }]
+        };
 
-        let requested_image = request_handler.call((CGSize {
-            width: 1.0,
-            height: 1.0,
-        },));
-        let is_object_alive: bool =
-            unsafe { msg_send![requested_image, isKindOfClass: class!(NSObject)] };
+        assert_eq!(
+            requested_image as *const AnyObject,
+            Retained::as_ptr(&previous_image)
+        );
+    }
 
-        assert_eq!(requested_image as *const AnyObject, image_pointer);
-        assert!(is_object_alive);
+    fn new_test_media_artwork() -> (Retained<AnyObject>, Weak<AnyObject>) {
+        unsafe {
+            let size = CGSize {
+                width: 64.0,
+                height: 64.0,
+            };
+            let image_alloc: *mut AnyObject = msg_send![class!(NSImage), alloc];
+            let image: *mut AnyObject = msg_send![image_alloc, initWithSize: size];
+            let image = Retained::from_raw(image).unwrap();
+            let image_weak = Weak::from_retained(&image);
+            let request_handler = artwork_request_handler(image.clone());
+            let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
+            let artwork: *mut AnyObject = msg_send![
+                artwork_alloc,
+                initWithBoundsSize: size,
+                requestHandler: &*request_handler
+            ];
+            let artwork = Retained::from_raw(artwork).unwrap();
+            drop(request_handler);
+            drop(image);
+
+            (artwork, image_weak)
+        }
     }
 
     #[test]
