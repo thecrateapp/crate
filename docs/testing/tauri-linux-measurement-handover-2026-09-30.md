@@ -39,6 +39,33 @@ If available, also save `glxinfo -B` or the equivalent GPU diagnostic. Keep the
 normal desktop's session bus and compositor active for MPRIS and minimize/
 restore checks.
 
+## R02 — Packaged HTTP resource cleanup
+
+The plugin's Rust and frontend cleanup tests pass, and macOS has both a live
+development-WebView soak and a release-mode packaged soak. Linux still needs a
+runtime check against the vendored `tauri-plugin-http` patch. Use a disposable
+measurement build with its own bundle identifier and window; do not replace or
+reuse the installed Crate profile.
+
+Expose a temporary Tauri command that returns
+`webview.resources_table().names().count()`. Drive requests through the same
+frontend wrapper used by the app (`fetch` from
+`@tauri-apps/plugin-http`) against a loopback fixture. Match the packaged
+macOS scenarios: consumed HTTP 200, consumed HTTP 500, connection refused,
+bodyless HTTP 204, abort while a request is pending, and cancel after the first
+streamed body chunk. Run 25 cycles per scenario (150 requests total), record
+the count before and after each settled request, and require it to return to
+the isolated window's baseline every time. Also record the final count and
+any rejected or timed-out scenario.
+
+Build and launch the release bundle/package on the normal desktop session.
+Record the source SHA, bundle identifier, package type and SHA-256, vendored
+plugin revision, WebKitGTK version, host facts, and raw scenario results. Sample
+the Tauri and WebKit process RSS separately during the soak; RSS alone does not
+prove resource cleanup. Keep the probe command/page out of the production
+bundle. If the temporary Vite multi-page input or Rust command is needed,
+restore those harness-only edits after the capture and verify `git status`.
+
 ## R07 — Visualizer frames, GPU and suspension
 
 The isolated page uses the production `MusicVisualizer` and its real WebGL
@@ -188,6 +215,7 @@ the exact SHA, host facts, command lines, logs, and these outcomes:
 
 | Gate                                           | Result  | Evidence / limitation |
 | ---------------------------------------------- | ------- | --------------------- |
+| R02 packaged HTTP resource cleanup             | Pending |                       |
 | R01 loopback client pool                       | Pending |                       |
 | R03 hydration and verification                 | Pending |                       |
 | R04 parallel callers                           | Pending |                       |
