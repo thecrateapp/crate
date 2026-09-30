@@ -145,6 +145,41 @@ describe("Explore", () => {
     expect(screen.queryByText("12 artists indexed")).toBeNull();
   });
 
+  it("renders the Just landed rail from the Explore payload", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        playlists: [],
+        moods: [],
+        recent_global_artists: [
+          {
+            id: 12,
+            name: "Rival Schools",
+            album_count: 2,
+            track_count: 20,
+            has_photo: false,
+          },
+        ],
+        filters: {
+          genres: [],
+          decades: [],
+          formats: [],
+          moods: [],
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore",
+      path: "/explore",
+    });
+
+    expect(screen.getByText("Just landed")).toBeInTheDocument();
+    expect(screen.getAllByText("Rival Schools")).not.toHaveLength(0);
+  });
+
   it("localizes the Explore landing sections", () => {
     vi.mocked(useApi).mockReturnValue({
       data: {

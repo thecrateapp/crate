@@ -52,6 +52,7 @@ class BrowseExplorePageResponse(BaseModel):
     filters: BrowseFiltersResponse
     playlists: list[CuratedPlaylistSummaryResponse] = Field(default_factory=list)
     moods: list[MoodPresetResponse] = Field(default_factory=list)
+    recent_global_artists: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class GenreProfileResponse(BaseModel):

@@ -200,7 +200,7 @@ export function JustLandedSection({
 }: {
   artists?: GlobalArtist[];
   loading: boolean;
-  onOpenExplore: () => void;
+  onOpenExplore?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -208,7 +208,7 @@ export function JustLandedSection({
       <SectionHeader
         title={t("home.library.justLanded.title")}
         subtitle={t("home.library.justLanded.subtitle")}
-        actionLabel={t("nav.explore")}
+        actionLabel={onOpenExplore ? t("nav.explore") : undefined}
         onAction={onOpenExplore}
       />
       {loading ? (
