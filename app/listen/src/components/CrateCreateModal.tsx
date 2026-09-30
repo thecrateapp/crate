@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "@crate/ui/icons";
 import {
@@ -33,12 +33,6 @@ export function CrateCreateModal({
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    setName("");
-    setDescription("");
-  }, [open, initialAlbum]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,7 +72,6 @@ export function CrateCreateModal({
             {t("common.name")}
             <input
               aria-label={t("common.name")}
-              autoFocus
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={120}

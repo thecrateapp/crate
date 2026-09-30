@@ -113,6 +113,9 @@ export function CrateComposerProvider({ children }: { children: ReactNode }) {
     <CrateComposerContext.Provider value={contextValue}>
       {children}
       <CrateCreateModal
+        key={`${open ? "open" : "closed"}-${
+          initialAlbum?.globalAlbumUid ?? "new"
+        }`}
         open={open}
         initialAlbum={initialAlbum}
         submitting={submitting}
