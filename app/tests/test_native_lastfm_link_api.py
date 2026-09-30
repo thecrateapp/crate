@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import re
 
 import pytest
 from fastapi import HTTPException, Request
@@ -49,11 +50,7 @@ def isolated_store(monkeypatch):
     monkeypatch.setenv("LASTFM_APIKEY", "api-key")
     monkeypatch.setenv("LASTFM_API_SECRET", "api-secret")
     monkeypatch.setattr(
-        "crate.api.auth._native_oauth_link_session_is_valid",
-        lambda _user_id, _session_id: True,
-    )
-    monkeypatch.setattr(
-        "crate.api.me._native_oauth_link_session_is_valid",
+        "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
         lambda _user_id, _session_id: True,
     )
     yield
@@ -78,7 +75,7 @@ def test_start_returns_browser_authorization_url_and_opaque_flow_id(monkeypatch)
     assert response["authorization_url"].startswith("https://www.last.fm/api/auth/?")
     assert "api_key=api-key" in response["authorization_url"]
     assert "token=" + "a" * 32 in response["authorization_url"]
-    assert len(response["flow_id"]) >= 40
+    assert re.fullmatch(r"[A-Za-z0-9_-]{43}", response["flow_id"])
     assert "provider_token" not in response
 
 
@@ -99,7 +96,7 @@ def test_start_rejects_missing_feature_flag_or_session(monkeypatch):
 
     monkeypatch.setenv("NATIVE_OAUTH_EXCHANGE_ENABLED", "1")
     monkeypatch.setattr(
-        "crate.api.auth._native_oauth_link_session_is_valid",
+        "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
         lambda _user_id, _session_id: False,
     )
     with pytest.raises(HTTPException) as expired:
@@ -317,7 +314,7 @@ def test_complete_rejects_revoked_session_without_mutating_identity(monkeypatch)
         provider_token="a" * 32,
     )
     monkeypatch.setattr(
-        "crate.api.auth._native_oauth_link_session_is_valid",
+        "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
         lambda _user_id, _session_id: False,
     )
     monkeypatch.setattr(

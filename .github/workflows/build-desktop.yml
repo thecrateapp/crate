@@ -77,6 +77,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/listen-desktop/src-tauri -> target
+          # Keep native build-script artifacts isolated by runner image/ABI.
+          shared-key: ${{ matrix.runner }}
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'

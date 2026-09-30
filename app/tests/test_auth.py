@@ -657,7 +657,10 @@ class TestOAuthStart:
     def test_validate_native_oauth_start_accepts_tauri_app_id(self):
         from crate.api.auth import _validate_native_oauth_start
 
-        with patch("crate.api.auth._native_oauth_exchange_enabled", return_value=True):
+        with patch(
+            "crate.api.native_oauth_auth.native_oauth_exchange_enabled",
+            return_value=True,
+        ):
             assert (
                 _validate_native_oauth_start(
                     app_id="listen-tauri",
@@ -673,7 +676,10 @@ class TestOAuthStart:
         from crate.api.auth import _validate_native_oauth_start
 
         with (
-            patch("crate.api.auth._native_oauth_exchange_enabled", return_value=True),
+            patch(
+                "crate.api.native_oauth_auth.native_oauth_exchange_enabled",
+                return_value=True,
+            ),
             pytest.raises(Exception) as exc_info,
         ):
             _validate_native_oauth_start(
@@ -919,7 +925,21 @@ class TestOAuthCallback:
         assert exc_info.value.status_code == 426
         create_session.assert_not_called()
 
-    def test_native_callback_redirects_with_code_only(self):
+    @pytest.mark.parametrize(
+        ("app_id", "expected_location"),
+        [
+            (
+                "listen-android",
+                f"cratemusic://oauth/callback?code=one-time-code&state={'s' * 43}",
+            ),
+            (
+                "listen-tauri",
+                "https://listen.lespedants.org/auth/callback?desktop=tauri"
+                f"&code=one-time-code&state={'s' * 43}",
+            ),
+        ],
+    )
+    def test_native_callback_redirects_with_code_only(self, app_id, expected_location):
         from crate.api.auth import oauth_callback
 
         user = {
@@ -938,7 +958,7 @@ class TestOAuthCallback:
                     "return_to": "cratemusic://oauth/callback",
                     "mode": "login",
                     "verifier": "provider-verifier",
-                    "app_id": "listen-android",
+                    "app_id": app_id,
                     "native_code_challenge": "c" * 43,
                     "native_state": "s" * 43,
                 },
@@ -963,7 +983,10 @@ class TestOAuthCallback:
             patch("crate.api.auth._create_login_session") as create_session,
             patch.dict(
                 "os.environ",
-                {"NATIVE_OAUTH_EXCHANGE_ENABLED": "true"},
+                {
+                    "NATIVE_OAUTH_EXCHANGE_ENABLED": "true",
+                    "DOMAIN": "lespedants.org",
+                },
                 clear=False,
             ),
         ):
@@ -971,15 +994,12 @@ class TestOAuthCallback:
                 oauth_callback(self._request(), "google", code="code", state="state")
             )
 
-        assert (
-            response.headers["location"]
-            == f"cratemusic://oauth/callback?code=one-time-code&state={'s' * 43}"
-        )
+        assert response.headers["location"] == expected_location
         assert "token=" not in response.headers["location"]
         assert "refresh_token=" not in response.headers["location"]
         issue_handoff.assert_called_once_with(
             user_id=42,
-            app_id="listen-android",
+            app_id=app_id,
             state="s" * 43,
             challenge="c" * 43,
         )
@@ -1019,7 +1039,7 @@ class TestOAuthCallback:
             patch("crate.api.auth.get_user_by_id", return_value={"id": 1}),
             patch("crate.api.auth._ensure_user_active"),
             patch(
-                "crate.api.auth._native_oauth_link_session_is_valid",
+                "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
                 return_value=True,
             ),
             patch(

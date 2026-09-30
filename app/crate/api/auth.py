@@ -2,7 +2,6 @@ import base64
 import hashlib
 import logging
 import os
-import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
@@ -17,6 +16,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from crate.api import native_oauth_auth
+from crate.api.auth_dependencies import require_auth as _require_auth
 from crate.api.native_oauth import (
     InvalidNativeOAuthHandoff,
     NativeOAuthCompletionUnknown,
@@ -372,14 +373,7 @@ def _is_listen_app_id(app_id: str | None) -> bool:
     return (app_id or "").strip().lower().startswith("listen")
 
 
-def _is_native_listen_app_id(app_id: str | None) -> bool:
-    normalized = (app_id or "").strip().lower()
-    return normalized in {
-        "listen-android",
-        "listen-ios",
-        "listen-native",
-        "listen-tauri",
-    }
+_is_native_listen_app_id = native_oauth_auth.is_native_listen_app_id
 
 
 def _is_mobile_native_listen_app_id(app_id: str | None) -> bool:
@@ -387,113 +381,27 @@ def _is_mobile_native_listen_app_id(app_id: str | None) -> bool:
     return normalized in {"listen-android", "listen-ios", "listen-native"}
 
 
-def _env_enabled(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
+# Compatibility aliases for existing auth callers. New cross-router code imports
+# the shared helpers from native_oauth_auth directly.
 def _native_oauth_exchange_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", True)
+    return native_oauth_auth.native_oauth_exchange_enabled()
 
 
-_NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
-_NATIVE_LINK_CALLBACK_URL = "cratemusic://oauth/link-callback"
-_NATIVE_CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
-_NATIVE_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
-_NATIVE_VERIFIER_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
-
-
-def _validate_native_oauth_start(
-    *,
-    app_id: str | None,
-    mode: str,
-    return_to: str | None,
-    challenge: str | None,
-    state: str | None,
-) -> bool:
-    native_callback = (return_to or "").startswith("cratemusic://")
-    if native_callback and return_to != _NATIVE_CALLBACK_URL:
-        raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
-    requested = challenge is not None or state is not None
-    if not requested:
-        if native_callback or _is_native_listen_app_id(app_id):
-            raise HTTPException(
-                status_code=426,
-                detail="Native app upgrade required",
-            )
-        return False
-    if not _native_oauth_exchange_enabled():
-        raise HTTPException(
-            status_code=503,
-            detail="Native OAuth exchange is not enabled",
-        )
-    if mode != "login" or not _is_native_listen_app_id(app_id):
-        raise HTTPException(status_code=400, detail="Invalid native OAuth client")
-    if return_to != _NATIVE_CALLBACK_URL:
-        raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
-    if not challenge or not state:
-        raise HTTPException(status_code=400, detail="Incomplete native OAuth binding")
-    if not _NATIVE_CHALLENGE_RE.fullmatch(challenge):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid native OAuth code challenge",
-        )
-    if not _NATIVE_STATE_RE.fullmatch(state):
-        raise HTTPException(status_code=400, detail="Invalid native OAuth state")
-    return True
-
-
-def _validate_native_oauth_link_start(
-    *,
-    app_id: str | None,
-    return_to: str | None,
-    challenge: str | None,
-    state: str | None,
-) -> None:
-    if (app_id or "").strip().lower() != "listen-tauri":
-        raise HTTPException(status_code=400, detail="Invalid native OAuth link client")
-    if not _native_oauth_exchange_enabled():
-        raise HTTPException(
-            status_code=503,
-            detail="Native OAuth exchange is not enabled",
-        )
-    if return_to != _NATIVE_LINK_CALLBACK_URL:
-        raise HTTPException(
-            status_code=400, detail="Invalid native OAuth link callback"
-        )
-    if not challenge or not _NATIVE_CHALLENGE_RE.fullmatch(challenge):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid native OAuth link code challenge",
-        )
-    if not state or not _NATIVE_STATE_RE.fullmatch(state):
-        raise HTTPException(status_code=400, detail="Invalid native OAuth link state")
+_NATIVE_CALLBACK_URL = native_oauth_auth.NATIVE_OAUTH_CALLBACK_URL
+_NATIVE_LINK_CALLBACK_URL = native_oauth_auth.NATIVE_OAUTH_LINK_CALLBACK_URL
+_NATIVE_CHALLENGE_RE = native_oauth_auth.NATIVE_OAUTH_CHALLENGE_RE
+_NATIVE_STATE_RE = native_oauth_auth.NATIVE_OAUTH_STATE_RE
+_NATIVE_VERIFIER_RE = native_oauth_auth.NATIVE_OAUTH_VERIFIER_RE
+_validate_native_oauth_start = native_oauth_auth.validate_native_oauth_start
+_validate_native_oauth_link_start = native_oauth_auth.validate_native_oauth_link_start
 
 
 def _native_oauth_link_session_is_valid(user_id: int, session_id: str) -> bool:
-    session = get_session(session_id)
-    if not session or int(session.get("user_id") or 0) != user_id:
-        return False
-    if session.get("revoked_at") is not None:
-        return False
-    expires_at = _coerce_aware_datetime(session.get("expires_at"))
-    return expires_at is not None and expires_at > datetime.now(timezone.utc)
+    return native_oauth_auth.native_oauth_link_session_is_valid(user_id, session_id)
 
 
 def _require_native_oauth_link_auth(request: Request) -> tuple[dict, str]:
-    if not request.headers.get("authorization", "").startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Bearer authentication required")
-    if (request.headers.get("x-crate-app") or "").strip().lower() != "listen-tauri":
-        raise HTTPException(status_code=400, detail="Invalid native OAuth link client")
-    user = _require_auth(request)
-    session_id = str(user.get("session_id") or "")
-    if not session_id or not _native_oauth_link_session_is_valid(
-        int(user["id"]), session_id
-    ):
-        raise HTTPException(status_code=401, detail="Native OAuth link session expired")
-    return user, session_id
+    return native_oauth_auth.require_native_oauth_link_auth(request)
 
 
 def _is_listen_return_to(return_to: str | None) -> bool:
@@ -1034,6 +942,20 @@ def _append_query_param(url: str, key: str, value: str) -> str:
     ]
     params.append((key, value))
     return urlunparse(parsed._replace(query=urlencode(params)))
+
+
+def _native_oauth_completion_redirect_url(
+    *, app_id: str | None, code: str, state: str
+) -> str:
+    if (app_id or "").strip().lower() == "listen-tauri":
+        redirect_url = (
+            f"{_callback_origin(_NATIVE_CALLBACK_URL, app_id=app_id)}/auth/callback"
+        )
+        redirect_url = _append_query_param(redirect_url, "desktop", "tauri")
+    else:
+        redirect_url = _NATIVE_CALLBACK_URL
+    redirect_url = _append_query_param(redirect_url, "code", code)
+    return _append_query_param(redirect_url, "state", state)
 
 
 def _post_auth_redirect_url(return_to: str, token: str) -> str:
@@ -1579,13 +1501,6 @@ class AuthMiddleware:
         scope.setdefault("state", {})
         scope["state"]["user"] = await self.resolve_user(request)
         await self.app(scope, receive, send)
-
-
-def _require_auth(request: Request) -> dict:
-    user = getattr(request.state, "user", None)
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
 
 
 def _require_admin(request: Request) -> dict:
@@ -2555,15 +2470,10 @@ def oauth_callback(
                 detail="Native OAuth exchange is temporarily unavailable",
             ) from exc
         _clear_failed_login(rate_key, request)
-        redirect_url = _append_query_param(
-            _NATIVE_CALLBACK_URL,
-            "code",
-            handoff_code,
-        )
-        redirect_url = _append_query_param(
-            redirect_url,
-            "state",
-            str(native_state),
+        redirect_url = _native_oauth_completion_redirect_url(
+            app_id=str(app_id) if app_id else None,
+            code=handoff_code,
+            state=str(native_state),
         )
         return RedirectResponse(url=redirect_url)
 
@@ -2895,6 +2805,11 @@ def native_oauth_link_complete(request: Request, body: NativeOAuthLinkCompleteRe
 
     if status == "completed":
         return {"ok": True}
+    if status == "in_progress":
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is already being completed",
+        )
 
     try:
         _apply_native_oauth_link(handoff)
@@ -2906,6 +2821,7 @@ def native_oauth_link_complete(request: Request, body: NativeOAuthLinkCompleteRe
             _restore_native_oauth_link_or_503(body.code, handoff)
         raise
     except NativeOAuthLinkUnavailable as exc:
+        _restore_native_oauth_link_or_503(body.code, handoff)
         raise HTTPException(
             status_code=503,
             detail="Native OAuth link is temporarily unavailable",

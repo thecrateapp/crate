@@ -69,7 +69,7 @@ class TestNativeOAuthLinkApi:
         request = self._request()
         with (
             patch(
-                "crate.api.auth._native_oauth_link_session_is_valid",
+                "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
                 return_value=True,
             ),
             patch("crate.api.auth._provider_available", return_value=True),
@@ -151,7 +151,7 @@ class TestNativeOAuthLinkApi:
                 },
             ),
             patch(
-                "crate.api.auth._native_oauth_link_session_is_valid",
+                "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
                 return_value=True,
             ),
             patch("crate.api.auth.get_user_by_id", return_value={"id": 7}),
@@ -211,7 +211,7 @@ class TestNativeOAuthLinkApi:
             patch("crate.api.auth._google_userinfo", return_value={"id": "g-7"}),
             patch("crate.api.auth.get_user_by_id", return_value={"id": 7}),
             patch(
-                "crate.api.auth._native_oauth_link_session_is_valid",
+                "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
                 return_value=False,
             ),
             patch("crate.api.auth.issue_native_oauth_link_handoff") as issue_handoff,
@@ -280,7 +280,7 @@ class TestNativeOAuthLinkApi:
         request = self._request(session_id="session-8")
         with (
             patch(
-                "crate.api.auth.get_session",
+                "crate.api.native_oauth_auth.get_session",
                 return_value=self._active_session("session-8"),
             ),
             patch("crate.api.auth._apply_native_oauth_link") as apply_link,
@@ -306,7 +306,7 @@ class TestNativeOAuthLinkApi:
         request = self._request()
         with (
             patch(
-                "crate.api.auth.get_session",
+                "crate.api.native_oauth_auth.get_session",
                 return_value={
                     **self._active_session(),
                     "revoked_at": datetime.now(timezone.utc),
@@ -352,7 +352,7 @@ class TestNativeOAuthLinkApi:
         )
         with (
             patch(
-                "crate.api.auth.get_session",
+                "crate.api.native_oauth_auth.get_session",
                 return_value=self._active_session(),
             ),
             patch(
@@ -385,6 +385,124 @@ class TestNativeOAuthLinkApi:
         )
         update_user.assert_called_once_with(7, google_id="google-subject-7")
 
+    def test_completion_restores_claim_after_temporary_store_failure(self):
+        from crate.api import native_oauth_link
+        from crate.api.auth import _pkce_challenge, native_oauth_link_complete
+        from crate.api.native_oauth_link import NativeOAuthLinkUnavailable
+        from crate.api.schemas.auth import NativeOAuthLinkCompleteRequest
+        from fastapi import HTTPException
+
+        verifier = "v" * 64
+        state = "s" * 43
+        code = native_oauth_link.issue_link_handoff(
+            user_id=7,
+            session_id="session-7",
+            provider="google",
+            external_user_id="google-subject-7",
+            external_username="linked@example.test",
+            app_id="listen-tauri",
+            state=state,
+            challenge=_pkce_challenge(verifier),
+        )
+        body = NativeOAuthLinkCompleteRequest(
+            code=code,
+            code_verifier=verifier,
+            state=state,
+        )
+        complete = native_oauth_link.complete_link_handoff
+        complete_attempts = 0
+
+        def fail_once(*, code: str, handoff):
+            nonlocal complete_attempts
+            complete_attempts += 1
+            if complete_attempts == 1:
+                raise NativeOAuthLinkUnavailable("Redis unavailable")
+            return complete(code=code, handoff=handoff)
+
+        with (
+            patch(
+                "crate.api.native_oauth_auth.get_session",
+                return_value=self._active_session(),
+            ),
+            patch("crate.api.auth._apply_native_oauth_link"),
+            patch(
+                "crate.api.auth.complete_native_oauth_link_handoff",
+                side_effect=fail_once,
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                native_oauth_link_complete(self._request(), body)
+
+            assert exc_info.value.status_code == 503
+
+            status, restored = native_oauth_link.claim_link_handoff(
+                code=code,
+                state=state,
+                verifier=verifier,
+                app_id="listen-tauri",
+                user_id=7,
+                session_id="session-7",
+            )
+            assert status == "claimed"
+            native_oauth_link.restore_link_handoff(code=code, handoff=restored)
+
+            assert native_oauth_link_complete(self._request(), body) == {"ok": True}
+
+        assert complete_attempts == 2
+
+    def test_completion_rejects_a_handoff_claimed_by_another_request(self):
+        from crate.api import native_oauth_link
+        from crate.api.auth import _pkce_challenge, native_oauth_link_complete
+        from crate.api.schemas.auth import NativeOAuthLinkCompleteRequest
+        from fastapi import HTTPException
+
+        verifier = "v" * 64
+        state = "s" * 43
+        code = native_oauth_link.issue_link_handoff(
+            user_id=7,
+            session_id="session-7",
+            provider="google",
+            external_user_id="google-subject-7",
+            external_username="linked@example.test",
+            app_id="listen-tauri",
+            state=state,
+            challenge=_pkce_challenge(verifier),
+        )
+        status, _handoff = native_oauth_link.claim_link_handoff(
+            code=code,
+            state=state,
+            verifier=verifier,
+            app_id="listen-tauri",
+            user_id=7,
+            session_id="session-7",
+        )
+        assert status == "claimed"
+
+        with (
+            patch(
+                "crate.api.native_oauth_auth.get_session",
+                return_value=self._active_session(),
+            ),
+            patch("crate.api.auth._apply_native_oauth_link") as apply_link,
+            patch(
+                "crate.api.auth.complete_native_oauth_link_handoff"
+            ) as complete_handoff,
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            native_oauth_link_complete(
+                self._request(),
+                NativeOAuthLinkCompleteRequest(
+                    code=code,
+                    code_verifier=verifier,
+                    state=state,
+                ),
+            )
+
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail == "Native OAuth link is already being completed"
+        apply_link.assert_not_called()
+        complete_handoff.assert_not_called()
+
     def test_link_conflict_never_autolinks_by_email_or_mutates_identity(self):
         from crate.api.auth import _apply_native_oauth_link
         from crate.api.native_oauth_link import NativeOAuthLinkHandoff
@@ -407,7 +525,7 @@ class TestNativeOAuthLinkApi:
                 return_value={"id": 7, "status": "active", "google_id": None},
             ),
             patch(
-                "crate.api.auth._native_oauth_link_session_is_valid",
+                "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
                 return_value=True,
             ),
             patch(
@@ -461,7 +579,7 @@ class TestNativeOAuthLinkApi:
         )
         with (
             patch(
-                "crate.api.auth.get_session",
+                "crate.api.native_oauth_auth.get_session",
                 return_value=self._active_session(),
             ),
             patch("crate.api.auth._apply_native_oauth_link", reject_link),
@@ -505,7 +623,7 @@ class TestNativeOAuthLinkApi:
         )
         with (
             patch(
-                "crate.api.auth.get_session",
+                "crate.api.native_oauth_auth.get_session",
                 return_value=self._active_session(),
             ),
             patch("crate.api.auth._apply_native_oauth_link", fail_link),

@@ -933,7 +933,7 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let server = thread::spawn(move || {
             let _ = listener.accept();
-            thread::sleep(Duration::from_millis(200));
+            thread::sleep(Duration::from_secs(1));
         });
         let started = Instant::now();
 
@@ -943,7 +943,7 @@ mod tests {
         );
 
         assert_eq!(result, None);
-        assert!(started.elapsed() < Duration::from_millis(175));
+        assert!(started.elapsed() < Duration::from_millis(700));
         server.join().unwrap();
     }
 

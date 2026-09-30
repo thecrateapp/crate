@@ -10,19 +10,12 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
+from crate.api import native_oauth_auth
+from crate.api.auth_dependencies import require_auth as _require_auth
 from crate.api._deps import (
     artist_name_from_id,
     coerce_date as _coerce_date,
     json_dumps,
-)
-from crate.api.auth import (
-    _NATIVE_CHALLENGE_RE,
-    _NATIVE_STATE_RE,
-    _NATIVE_VERIFIER_RE,
-    _native_oauth_exchange_enabled,
-    _native_oauth_link_session_is_valid,
-    _require_auth,
-    _require_native_oauth_link_auth,
 )
 from crate.api.native_lastfm_link import (
     InvalidNativeLastfmLink,
@@ -1788,15 +1781,15 @@ def lastfm_auth_url(request: Request):
 def native_lastfm_link_start(request: Request, body: NativeLastfmLinkStartRequest):
     import os
 
-    user, session_id = _require_native_oauth_link_auth(request)
-    if not _native_oauth_exchange_enabled():
+    user, session_id = native_oauth_auth.require_native_oauth_link_auth(request)
+    if not native_oauth_auth.native_oauth_exchange_enabled():
         raise HTTPException(
             status_code=503,
             detail="Native OAuth exchange is not enabled",
         )
-    if not _NATIVE_STATE_RE.fullmatch(body.state):
+    if not native_oauth_auth.NATIVE_OAUTH_STATE_RE.fullmatch(body.state):
         raise HTTPException(status_code=400, detail="Invalid native Last.fm state")
-    if not _NATIVE_CHALLENGE_RE.fullmatch(body.code_challenge):
+    if not native_oauth_auth.NATIVE_OAUTH_CHALLENGE_RE.fullmatch(body.code_challenge):
         raise HTTPException(
             status_code=400,
             detail="Invalid native Last.fm code challenge",
@@ -1816,7 +1809,9 @@ def native_lastfm_link_start(request: Request, body: NativeLastfmLinkStartReques
             detail="Could not start Last.fm authorization",
         )
 
-    current_user, current_session_id = _require_native_oauth_link_auth(request)
+    current_user, current_session_id = native_oauth_auth.require_native_oauth_link_auth(
+        request
+    )
     if int(current_user["id"]) != int(user["id"]) or current_session_id != session_id:
         raise HTTPException(status_code=401, detail="Native Last.fm session expired")
 
@@ -1841,7 +1836,7 @@ def native_lastfm_link_start(request: Request, body: NativeLastfmLinkStartReques
 
 
 def _apply_native_lastfm_link(*, user_id: int, session_id: str, handoff) -> None:
-    if not _native_oauth_link_session_is_valid(user_id, session_id):
+    if not native_oauth_auth.native_oauth_link_session_is_valid(user_id, session_id):
         raise HTTPException(status_code=401, detail="Native Last.fm session expired")
     username = (handoff.username or "").strip()
     if not handoff.session_key or not username:
@@ -1924,11 +1919,11 @@ def _restore_native_lastfm_link_or_503(flow_id: str, handoff) -> None:
     summary="Cancel a session-bound native Last.fm connection",
 )
 def native_lastfm_link_cancel(request: Request, body: NativeLastfmLinkCompleteRequest):
-    user, session_id = _require_native_oauth_link_auth(request)
+    user, session_id = native_oauth_auth.require_native_oauth_link_auth(request)
     if (
         not _NATIVE_LASTFM_FLOW_RE.fullmatch(body.flow_id)
-        or not _NATIVE_STATE_RE.fullmatch(body.state)
-        or not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier)
+        or not native_oauth_auth.NATIVE_OAUTH_STATE_RE.fullmatch(body.state)
+        or not native_oauth_auth.NATIVE_OAUTH_VERIFIER_RE.fullmatch(body.code_verifier)
     ):
         raise HTTPException(status_code=400, detail="Invalid native Last.fm flow")
 
@@ -1978,16 +1973,16 @@ def native_lastfm_link_complete(
 ):
     import os
 
-    user, session_id = _require_native_oauth_link_auth(request)
-    if not _native_oauth_exchange_enabled():
+    user, session_id = native_oauth_auth.require_native_oauth_link_auth(request)
+    if not native_oauth_auth.native_oauth_exchange_enabled():
         raise HTTPException(
             status_code=503,
             detail="Native OAuth exchange is not enabled",
         )
     if (
         not _NATIVE_LASTFM_FLOW_RE.fullmatch(body.flow_id)
-        or not _NATIVE_STATE_RE.fullmatch(body.state)
-        or not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier)
+        or not native_oauth_auth.NATIVE_OAUTH_STATE_RE.fullmatch(body.state)
+        or not native_oauth_auth.NATIVE_OAUTH_VERIFIER_RE.fullmatch(body.code_verifier)
     ):
         raise HTTPException(status_code=400, detail="Invalid native Last.fm flow")
 
@@ -2077,7 +2072,9 @@ def native_lastfm_link_complete(
                 status_code=401,
                 detail="Native Last.fm link is invalid or expired",
             )
-        current_user, current_session_id = _require_native_oauth_link_auth(request)
+        current_user, current_session_id = (
+            native_oauth_auth.require_native_oauth_link_auth(request)
+        )
         if (
             int(current_user["id"]) != resolved_handoff.user_id
             or current_session_id != resolved_handoff.session_id
