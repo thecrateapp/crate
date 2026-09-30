@@ -155,6 +155,7 @@ export function useAlbumActionEntries(
                     await api(`/api/crates/${crate.id}/albums`, "POST", {
                       global_album_uid: input.globalAlbumUid,
                     });
+                    setCratePickerOpen(false);
                     toast.success(t("album.toasts.addedToCrate"));
                   } catch {
                     toast.error(t("album.toasts.addToCrateFailed"));

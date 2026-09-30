@@ -132,7 +132,10 @@ export function Library() {
             value={stats.playlists}
             label={t("nav.collection.playlists")}
           />
-          <StatBox value={stats.crates} label={t("nav.collection.crates")} />
+          <StatBox
+            value={stats.crates ?? 0}
+            label={t("nav.collection.crates")}
+          />
         </div>
       )}
 

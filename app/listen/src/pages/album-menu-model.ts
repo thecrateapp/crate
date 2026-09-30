@@ -75,6 +75,10 @@ export function buildAlbumMenuItems(
               onSelect: () => options.onAddToCrate(crate.id),
             })),
           },
+        ]
+      : []),
+    ...(options.canPersistAlbum
+      ? [
           {
             type: "disclosure" as const,
             key: "playlist",
