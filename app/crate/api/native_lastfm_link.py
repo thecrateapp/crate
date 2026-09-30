@@ -13,6 +13,11 @@ from datetime import datetime, timedelta, timezone
 from threading import RLock
 from typing import Literal
 
+from crate.api.native_auth_store import (
+    local_memory_allowed as _local_memory_allowed,
+    purge_expired_memory_records,
+)
+
 NATIVE_LASTFM_LINK_TTL_SECONDS = 55 * 60
 _LINK_PREFIX = "crate:auth:native_lastfm_link"
 _CLAIM_SCRIPT = """
@@ -109,15 +114,6 @@ def _redis_client():
         return None
 
 
-def _local_memory_allowed() -> bool:
-    environment = os.environ.get("CRATE_ENV", "").strip().lower()
-    domain = os.environ.get("DOMAIN", "localhost").strip().lower()
-    return environment in {"dev", "development", "test"} or domain in {
-        "localhost",
-        "127.0.0.1",
-    }
-
-
 def _serialize(handoff: NativeLastfmLinkHandoff) -> str:
     payload = asdict(handoff)
     payload["expires_at"] = handoff.expires_at.isoformat()
@@ -212,6 +208,7 @@ def issue_link_handoff(
     if not _local_memory_allowed():
         raise NativeLastfmLinkUnavailable("Native Last.fm link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links)
         _memory_links[link_handoff_key(code)] = serialized
     return code
 
@@ -271,6 +268,7 @@ def claim_link_handoff(
         pending_key = _pending_key(code)
         result_key = _result_key(code)
         with _memory_lock:
+            purge_expired_memory_records(_memory_links)
             if result_key in _memory_links:
                 status, raw = 3, _memory_links[result_key]
             elif pending_key in _memory_links:
@@ -348,6 +346,7 @@ def save_resolved_session(
     if not _local_memory_allowed():
         raise NativeLastfmLinkUnavailable("Native Last.fm link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links)
         key = _pending_key(code)
         if key not in _memory_links:
             raise NativeLastfmLinkUnavailable(
@@ -383,6 +382,7 @@ def restore_link_handoff(*, code: str, handoff: NativeLastfmLinkHandoff) -> None
     if not _local_memory_allowed():
         raise NativeLastfmLinkUnavailable("Native Last.fm link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links)
         pending_key = _pending_key(code)
         result_key = _result_key(code)
         if pending_key not in _memory_links or result_key in _memory_links:
@@ -421,6 +421,7 @@ def complete_link_handoff(
     if not _local_memory_allowed():
         raise NativeLastfmLinkUnavailable("Native Last.fm link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links)
         _memory_links[_result_key(code)] = serialized
         _memory_links.pop(link_handoff_key(code), None)
         _memory_links.pop(_pending_key(code), None)
@@ -442,6 +443,7 @@ def discard_link_handoff(code: str) -> None:
     if not _local_memory_allowed():
         raise NativeLastfmLinkUnavailable("Native Last.fm link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links)
         _memory_links.pop(link_handoff_key(code), None)
         _memory_links.pop(_pending_key(code), None)
         _memory_links.pop(_result_key(code), None)

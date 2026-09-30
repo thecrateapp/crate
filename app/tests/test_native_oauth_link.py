@@ -47,6 +47,28 @@ def _claim(code: str, verifier: str, *, session_id: str = "session-7"):
     )
 
 
+def test_memory_fallback_fails_closed_in_production(monkeypatch) -> None:
+    from crate.api.native_oauth_link import (
+        NativeOAuthLinkUnavailable,
+        issue_link_handoff,
+    )
+
+    monkeypatch.setenv("CRATE_ENV", "production")
+    monkeypatch.setenv("DOMAIN", "localhost")
+
+    with pytest.raises(NativeOAuthLinkUnavailable):
+        issue_link_handoff(
+            user_id=7,
+            session_id="session-7",
+            provider="google",
+            external_user_id="provider-user-7",
+            external_username=None,
+            app_id="listen-tauri",
+            state="s" * 43,
+            challenge="c" * 43,
+        )
+
+
 def test_native_oauth_link_handoff_is_pkce_and_session_bound() -> None:
     code, verifier = _issue_link()
 

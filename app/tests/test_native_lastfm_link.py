@@ -41,6 +41,25 @@ def _issue():
     return code, state, verifier
 
 
+def test_memory_fallback_fails_closed_in_production(monkeypatch):
+    from crate.api.native_lastfm_link import (
+        NativeLastfmLinkUnavailable,
+        issue_link_handoff,
+    )
+
+    monkeypatch.setenv("CRATE_ENV", "production")
+    monkeypatch.setenv("DOMAIN", "localhost")
+
+    with pytest.raises(NativeLastfmLinkUnavailable):
+        issue_link_handoff(
+            user_id=7,
+            session_id="session-7",
+            state="s" * 43,
+            challenge="c" * 43,
+            provider_token="provider-token",
+        )
+
+
 def test_native_lastfm_handoff_stores_only_a_digest_of_the_opaque_code():
     from crate.api import native_lastfm_link
     from crate.api.native_lastfm_link import link_handoff_key

@@ -2129,7 +2129,6 @@ def _oauth_start_response(
             "client_id": os.environ["GOOGLE_CLIENT_ID"],
             "scope": "openid email profile",
             "access_type": "offline",
-            "prompt": "consent",
         }
         login_url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
     else:

@@ -14,6 +14,11 @@ from threading import RLock
 import time
 from typing import Literal
 
+from crate.api.native_auth_store import (
+    local_memory_allowed as _local_memory_allowed,
+    purge_expired_memory_records,
+)
+
 NATIVE_OAUTH_LINK_TTL_SECONDS = 15 * 60
 NATIVE_OAUTH_LINK_CLAIM_TTL_SECONDS = 90
 _LINK_PREFIX = "crate:auth:native_oauth_link"
@@ -109,15 +114,6 @@ def _redis_client():
         return None
 
 
-def _local_memory_allowed() -> bool:
-    environment = os.environ.get("CRATE_ENV", "").strip().lower()
-    domain = os.environ.get("DOMAIN", "localhost").strip().lower()
-    return environment in {"dev", "development", "test"} or domain in {
-        "localhost",
-        "127.0.0.1",
-    }
-
-
 def _serialize(handoff: NativeOAuthLinkHandoff) -> str:
     payload = asdict(handoff)
     payload["expires_at"] = handoff.expires_at.isoformat()
@@ -200,6 +196,7 @@ def issue_link_handoff(
     if not _local_memory_allowed():
         raise NativeOAuthLinkUnavailable("Native OAuth link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links, monotonic_now=_claim_now())
         _memory_links[link_handoff_key(code)] = serialized
     return code
 
@@ -238,6 +235,7 @@ def claim_link_handoff(
         pending_key = _pending_key(code)
         result_key = _result_key(code)
         with _memory_lock:
+            purge_expired_memory_records(_memory_links, monotonic_now=_claim_now())
             if result_key in _memory_links:
                 status, raw = 3, _memory_links[result_key]
             else:
@@ -305,6 +303,7 @@ def restore_link_handoff(*, code: str, handoff: NativeOAuthLinkHandoff) -> None:
     if not _local_memory_allowed():
         raise NativeOAuthLinkUnavailable("Native OAuth link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links, monotonic_now=_claim_now())
         result_key = _result_key(code)
         if result_key not in _memory_links:
             _memory_links.setdefault(link_handoff_key(code), serialized)
@@ -338,6 +337,7 @@ def complete_link_handoff(*, code: str, handoff: NativeOAuthLinkHandoff) -> None
     if not _local_memory_allowed():
         raise NativeOAuthLinkUnavailable("Native OAuth link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links, monotonic_now=_claim_now())
         _memory_links[_result_key(code)] = serialized
         _memory_links.pop(link_handoff_key(code), None)
         _memory_links.pop(_pending_key(code), None)
@@ -356,5 +356,6 @@ def discard_link_handoff(code: str) -> None:
     if not _local_memory_allowed():
         raise NativeOAuthLinkUnavailable("Native OAuth link store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_links, monotonic_now=_claim_now())
         _memory_links.pop(link_handoff_key(code), None)
         _memory_links.pop(_pending_key(code), None)

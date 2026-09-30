@@ -376,6 +376,48 @@ class TestOAuthStart:
         assert captured_state["mode"] == "login"
         assert captured_state["user_id"] is None
 
+    def test_google_oauth_start_does_not_force_consent_for_existing_grants(self):
+        from urllib.parse import parse_qs, urlparse
+
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        request = self._request(headers=[(b"x-crate-app", b"listen-tauri")])
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                return_value="state-token",
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="challenge"),
+            patch.dict(
+                "os.environ",
+                {
+                    "GOOGLE_CLIENT_ID": "google-client",
+                    "NATIVE_OAUTH_EXCHANGE_ENABLED": "true",
+                },
+            ),
+        ):
+            result = _run(
+                oauth_start(
+                    request,
+                    "google",
+                    OAuthStartRequest(
+                        return_to="cratemusic://oauth/callback",
+                        native_code_challenge="c" * 43,
+                        native_state="s" * 43,
+                    ),
+                )
+            )
+
+        query = parse_qs(urlparse(result["login_url"]).query)
+        assert query["access_type"] == ["offline"]
+        assert "prompt" not in query
+
     @pytest.mark.parametrize(
         ("app_id", "return_to"),
         [
