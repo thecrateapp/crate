@@ -224,6 +224,49 @@ class TestOAuthRedirectHelpers:
 
         assert url == "https://listen.example/auth/callback?next=%2Fmix&token=abc123"
 
+    @patch.dict("os.environ", {"DOMAIN": "lespedants.org"}, clear=False)
+    def test_native_oauth_completion_redirect_uses_tauri_fragment(self):
+        from urllib.parse import parse_qs, urlparse
+
+        from crate.api.auth import _native_oauth_completion_redirect_url
+
+        url = _native_oauth_completion_redirect_url(
+            app_id="listen-tauri",
+            code="one-time-code",
+            state="native-state",
+        )
+        parsed = urlparse(url)
+
+        assert parsed.scheme == "https"
+        assert parsed.netloc == "listen.lespedants.org"
+        assert parsed.path == "/auth/callback"
+        assert parsed.query == ""
+        assert parse_qs(parsed.fragment) == {
+            "desktop": ["tauri"],
+            "code": ["one-time-code"],
+            "state": ["native-state"],
+        }
+
+    def test_native_oauth_completion_redirect_keeps_mobile_deep_link_contract(self):
+        from urllib.parse import parse_qs, urlparse
+
+        from crate.api.auth import _native_oauth_completion_redirect_url
+
+        url = _native_oauth_completion_redirect_url(
+            app_id="listen-android",
+            code="one-time-code",
+            state="native-state",
+        )
+        parsed = urlparse(url)
+
+        assert parsed.scheme == "cratemusic"
+        assert parsed.netloc == "oauth"
+        assert parsed.path == "/callback"
+        assert parse_qs(parsed.query) == {
+            "code": ["one-time-code"],
+            "state": ["native-state"],
+        }
+
     def test_post_auth_redirect_url_adds_token_only_for_web_callback(self):
         from crate.api.auth import _post_auth_redirect_url
 

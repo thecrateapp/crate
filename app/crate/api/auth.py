@@ -2241,18 +2241,34 @@ def oauth_callback(
         _record_failed_login(rate_key, request)
         raise HTTPException(status_code=400, detail="OAuth provider mismatch")
     if error:
-        if parsed_state.get("mode") != "native_link":
+        mode = parsed_state.get("mode")
+        if mode == "native_link":
+            _validate_native_oauth_link_start(
+                app_id=parsed_state.get("app_id"),
+                return_to=parsed_state.get("return_to"),
+                challenge=parsed_state.get("native_code_challenge"),
+                state=parsed_state.get("native_state"),
+            )
+            callback_url = _NATIVE_LINK_CALLBACK_URL
+        elif mode == "login":
+            native_exchange = _validate_native_oauth_start(
+                app_id=parsed_state.get("app_id"),
+                mode=str(mode),
+                return_to=parsed_state.get("return_to"),
+                challenge=parsed_state.get("native_code_challenge"),
+                state=parsed_state.get("native_state"),
+            )
+            if not native_exchange:
+                raise HTTPException(
+                    status_code=400, detail="OAuth authorization was denied"
+                )
+            callback_url = _NATIVE_CALLBACK_URL
+        else:
             raise HTTPException(
                 status_code=400, detail="OAuth authorization was denied"
             )
-        _validate_native_oauth_link_start(
-            app_id=parsed_state.get("app_id"),
-            return_to=parsed_state.get("return_to"),
-            challenge=parsed_state.get("native_code_challenge"),
-            state=parsed_state.get("native_state"),
-        )
         redirect_url = _append_query_param(
-            _NATIVE_LINK_CALLBACK_URL,
+            callback_url,
             "state",
             str(parsed_state["native_state"]),
         )

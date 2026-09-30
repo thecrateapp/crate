@@ -58,6 +58,21 @@ describe("dispatchOAuthCallbackResult", () => {
     );
     window.removeEventListener("crate:oauth-link-failed", failed);
   });
+
+  it("does not announce a successful login when native OAuth was cancelled", () => {
+    const authReceived = vi.fn();
+    vi.stubGlobal("window", new EventTarget());
+    window.addEventListener("crate:auth-token-received", authReceived);
+
+    dispatchOAuthCallbackResult({
+      handled: true,
+      next: "/",
+      cancelled: true,
+    });
+
+    expect(authReceived).not.toHaveBeenCalled();
+    window.removeEventListener("crate:auth-token-received", authReceived);
+  });
 });
 
 describe("mergeInitialDeepLinkUrls", () => {

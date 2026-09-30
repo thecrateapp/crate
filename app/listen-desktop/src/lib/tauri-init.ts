@@ -206,9 +206,14 @@ export function dispatchOAuthCallbackResult(result: {
   operation?: "link";
   provider?: string;
   userId?: number;
+  cancelled?: true;
   error?: true;
 }): void {
   if (!result.handled) return;
+  if (result.cancelled) {
+    recordTauriAuthDiagnostic("Native OAuth login cancelled");
+    return;
+  }
   if (result.operation === "link") {
     const eventName = result.error
       ? "crate:oauth-link-failed"

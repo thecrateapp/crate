@@ -140,6 +140,30 @@ describe("Capacitor initialization", () => {
     await expect(initialized).resolves.toBeNull();
   });
 
+  it("does not announce an auth token after native OAuth cancellation", async () => {
+    consumeOAuthCallbackUrl.mockResolvedValue({
+      handled: true,
+      next: "/",
+      cancelled: true,
+    });
+    const authReceived = vi.fn();
+    window.addEventListener("crate:auth-token-received", authReceived);
+    const { initCapacitor } = await import("./capacitor-init");
+    await initCapacitor();
+
+    const urlOpen = appAddListener.mock.calls.find(
+      ([eventName]) => eventName === "appUrlOpen",
+    )?.[1];
+    urlOpen?.({ url: "cratemusic://oauth/callback?state=s&error=cancelled" });
+
+    await vi.waitFor(() =>
+      expect(consumeOAuthCallbackUrl).toHaveBeenCalledOnce(),
+    );
+    await Promise.resolve();
+    expect(authReceived).not.toHaveBeenCalled();
+    window.removeEventListener("crate:auth-token-received", authReceived);
+  });
+
   it("maps the resolved appearance mode to the native status bar", async () => {
     const { applyNativeColorMode } = await import("./capacitor-init");
 
