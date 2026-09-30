@@ -2859,6 +2859,42 @@ class TestLibraryCRUD:
         assert raw_artist["storage_id"] == storage_id
         assert {row["key_type"] for row in keys} >= {"name", "slug"}
 
+    def test_upsert_artist_updates_selected_row_by_id_after_concurrent_rename(
+        self, pg_db, monkeypatch
+    ):
+        from crate.db.repositories import library_artist_upserts
+        from crate.db.tx import transaction_scope
+
+        storage_id = str(uuid4())
+        pg_db.upsert_artist({"name": "Before Rename", "storage_id": storage_id})
+        update_existing = library_artist_upserts._update_existing_artist
+
+        def rename_before_update(session, **kwargs):
+            existing_id = kwargs["existing_id"]
+            with transaction_scope() as concurrent_session:
+                concurrent_session.execute(
+                    text("UPDATE library_artists SET name = :name WHERE id = :id"),
+                    {"name": "After Rename", "id": existing_id},
+                )
+            return update_existing(session, **kwargs)
+
+        monkeypatch.setattr(
+            library_artist_upserts, "_update_existing_artist", rename_before_update
+        )
+        with transaction_scope() as session:
+            library_artist_upserts.upsert_artist(
+                {
+                    "name": "New Scan Name",
+                    "storage_id": storage_id,
+                    "track_count": 17,
+                },
+                session=session,
+            )
+
+        artist = pg_db.get_library_artist("After Rename")
+        assert artist is not None
+        assert artist["track_count"] == 17
+
     def test_upsert_album(self, pg_db):
         pg_db.upsert_artist({"name": "Artist B"})
         album_id = pg_db.upsert_album(

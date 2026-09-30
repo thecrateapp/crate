@@ -60,6 +60,7 @@ def _select_existing_artist(
     )
     return session.execute(
         select(
+            LibraryArtist.id,
             LibraryArtist.name,
             LibraryArtist.slug,
             LibraryArtist.storage_id,
@@ -77,6 +78,7 @@ def _select_existing_artist(
 def _update_existing_artist(
     session: Session,
     *,
+    existing_id: int | None,
     canonical_name: str,
     existing_slug: str | None,
     existing_storage_id,
@@ -100,7 +102,11 @@ def _update_existing_artist(
     )
     session.execute(
         update(LibraryArtist)
-        .where(LibraryArtist.name == canonical_name)
+        .where(
+            LibraryArtist.id == existing_id
+            if existing_id is not None
+            else LibraryArtist.name == canonical_name
+        )
         .values(
             storage_id=existing_storage_id or requested_storage_id,
             entity_uid=entity_uid,
@@ -172,6 +178,7 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
         )
         if existing:
             (
+                existing_id,
                 canonical_name,
                 existing_slug,
                 existing_storage_id,
@@ -182,6 +189,7 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             ) = existing
             return _update_existing_artist(
                 s,
+                existing_id=existing_id,
                 canonical_name=canonical_name or requested_name,
                 existing_slug=existing_slug,
                 existing_storage_id=existing_storage_id,
@@ -266,6 +274,7 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             if not existing:
                 raise
             (
+                existing_id,
                 canonical_name,
                 existing_slug,
                 existing_storage_id,
@@ -276,6 +285,7 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             ) = existing
             return _update_existing_artist(
                 s,
+                existing_id=existing_id,
                 canonical_name=canonical_name or requested_name,
                 existing_slug=existing_slug,
                 existing_storage_id=existing_storage_id,

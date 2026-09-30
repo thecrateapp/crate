@@ -1897,6 +1897,26 @@ def _apply_native_lastfm_link(*, user_id: int, session_id: str, handoff) -> None
         ) from None
 
 
+def _discard_native_lastfm_link_or_503(flow_id: str) -> None:
+    try:
+        discard_native_lastfm_link_handoff(flow_id)
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+
+
+def _restore_native_lastfm_link_or_503(flow_id: str, handoff) -> None:
+    try:
+        restore_native_lastfm_link_handoff(code=flow_id, handoff=handoff)
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+
+
 @router.post(
     "/scrobble/lastfm/native/cancel",
     response_model=OkResponse,
@@ -1935,6 +1955,8 @@ def native_lastfm_link_cancel(request: Request, body: NativeLastfmLinkCompleteRe
             status_code=503,
             detail="Native Last.fm connection is already being completed",
         )
+    if claim_status == "completed":
+        return {"ok": True}
     try:
         discard_native_lastfm_link_handoff(body.flow_id)
     except NativeLastfmLinkUnavailable as exc:
@@ -2001,7 +2023,7 @@ def native_lastfm_link_complete(
         api_key = os.environ.get("LASTFM_APIKEY", "")
         api_secret = os.environ.get("LASTFM_API_SECRET", "")
         if not api_key or not api_secret or not handoff.provider_token:
-            discard_native_lastfm_link_handoff(body.flow_id)
+            _discard_native_lastfm_link_or_503(body.flow_id)
             raise HTTPException(
                 status_code=501,
                 detail="Last.fm API not fully configured",
@@ -2019,21 +2041,18 @@ def native_lastfm_link_complete(
             )
         except LastfmAuthenticationError as exc:
             if exc.retryable:
-                restore_native_lastfm_link_handoff(
-                    code=body.flow_id,
-                    handoff=handoff,
-                )
+                _restore_native_lastfm_link_or_503(body.flow_id, handoff)
                 raise HTTPException(
                     status_code=503,
                     detail="Last.fm authorization is not ready yet; retry shortly",
                 ) from exc
-            discard_native_lastfm_link_handoff(body.flow_id)
+            _discard_native_lastfm_link_or_503(body.flow_id)
             raise HTTPException(
                 status_code=400,
                 detail="Last.fm authorization was denied or expired",
             ) from exc
         if not lastfm_session.key or not lastfm_session.username:
-            discard_native_lastfm_link_handoff(body.flow_id)
+            _discard_native_lastfm_link_or_503(body.flow_id)
             raise HTTPException(
                 status_code=400,
                 detail="Last.fm authorization did not include a valid account",
@@ -2077,27 +2096,18 @@ def native_lastfm_link_complete(
         )
     except HTTPException as exc:
         if exc.status_code in {400, 401, 403, 404, 409}:
-            discard_native_lastfm_link_handoff(body.flow_id)
+            _discard_native_lastfm_link_or_503(body.flow_id)
         else:
-            restore_native_lastfm_link_handoff(
-                code=body.flow_id,
-                handoff=resolved_handoff,
-            )
+            _restore_native_lastfm_link_or_503(body.flow_id, resolved_handoff)
         raise
     except NativeLastfmLinkUnavailable as exc:
-        restore_native_lastfm_link_handoff(
-            code=body.flow_id,
-            handoff=resolved_handoff,
-        )
+        _restore_native_lastfm_link_or_503(body.flow_id, resolved_handoff)
         raise HTTPException(
             status_code=503,
             detail="Native Last.fm link is temporarily unavailable",
         ) from exc
     except Exception:
-        restore_native_lastfm_link_handoff(
-            code=body.flow_id,
-            handoff=resolved_handoff,
-        )
+        _restore_native_lastfm_link_or_503(body.flow_id, resolved_handoff)
         raise
     return {"ok": True, "username": completed.username}
 

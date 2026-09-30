@@ -2837,6 +2837,28 @@ def _apply_native_oauth_link(handoff: NativeOAuthLinkHandoff) -> None:
         _raise_oauth_identity_conflict(handoff.provider, exc)
 
 
+def _discard_native_oauth_link_or_503(code: str) -> None:
+    try:
+        discard_native_oauth_link_handoff(code)
+    except NativeOAuthLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is temporarily unavailable",
+        ) from exc
+
+
+def _restore_native_oauth_link_or_503(
+    code: str, handoff: NativeOAuthLinkHandoff
+) -> None:
+    try:
+        restore_native_oauth_link_handoff(code=code, handoff=handoff)
+    except NativeOAuthLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is temporarily unavailable",
+        ) from exc
+
+
 @router.post(
     "/oauth/native-link/complete",
     response_model=OkResponse,
@@ -2879,9 +2901,9 @@ def native_oauth_link_complete(request: Request, body: NativeOAuthLinkCompleteRe
         complete_native_oauth_link_handoff(code=body.code, handoff=handoff)
     except HTTPException as exc:
         if exc.status_code == 409 or exc.status_code in {401, 403, 404}:
-            discard_native_oauth_link_handoff(body.code)
+            _discard_native_oauth_link_or_503(body.code)
         else:
-            restore_native_oauth_link_handoff(code=body.code, handoff=handoff)
+            _restore_native_oauth_link_or_503(body.code, handoff)
         raise
     except NativeOAuthLinkUnavailable as exc:
         raise HTTPException(
@@ -2889,7 +2911,7 @@ def native_oauth_link_complete(request: Request, body: NativeOAuthLinkCompleteRe
             detail="Native OAuth link is temporarily unavailable",
         ) from exc
     except Exception:
-        restore_native_oauth_link_handoff(code=body.code, handoff=handoff)
+        _restore_native_oauth_link_or_503(body.code, handoff)
         raise
     return {"ok": True}
 

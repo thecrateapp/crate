@@ -427,3 +427,91 @@ class TestNativeOAuthLinkApi:
         find_legacy_identity.assert_not_called()
         find_email.assert_not_called()
         upsert_identity.assert_not_called()
+
+    def test_complete_maps_handoff_cleanup_failure_to_service_unavailable(self):
+        from crate.api import native_oauth_link
+        from crate.api.auth import native_oauth_link_complete
+        from crate.api.native_oauth_link import NativeOAuthLinkUnavailable
+        from crate.api.schemas.auth import NativeOAuthLinkCompleteRequest
+        from fastapi import HTTPException
+
+        verifier = "v" * 64
+        state = "s" * 43
+        code = native_oauth_link.issue_link_handoff(
+            user_id=7,
+            session_id="session-7",
+            provider="google",
+            external_user_id="google-subject-7",
+            external_username="linked@example.test",
+            app_id="listen-tauri",
+            state=state,
+            challenge=native_oauth_link._pkce_challenge(verifier),
+        )
+
+        def reject_link(_handoff):
+            raise HTTPException(status_code=409, detail="identity conflict")
+
+        def fail_cleanup(*_args, **_kwargs):
+            raise NativeOAuthLinkUnavailable("Redis unavailable")
+
+        body = NativeOAuthLinkCompleteRequest(
+            code=code,
+            code_verifier=verifier,
+            state=state,
+        )
+        with (
+            patch(
+                "crate.api.auth.get_session",
+                return_value=self._active_session(),
+            ),
+            patch("crate.api.auth._apply_native_oauth_link", reject_link),
+            patch("crate.api.auth.discard_native_oauth_link_handoff", fail_cleanup),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            native_oauth_link_complete(self._request(), body)
+
+        assert exc_info.value.status_code == 503
+
+    def test_complete_maps_handoff_restore_failure_to_service_unavailable(self):
+        from crate.api import native_oauth_link
+        from crate.api.auth import native_oauth_link_complete
+        from crate.api.native_oauth_link import NativeOAuthLinkUnavailable
+        from crate.api.schemas.auth import NativeOAuthLinkCompleteRequest
+        from fastapi import HTTPException
+
+        verifier = "v" * 64
+        state = "s" * 43
+        code = native_oauth_link.issue_link_handoff(
+            user_id=7,
+            session_id="session-7",
+            provider="google",
+            external_user_id="google-subject-7",
+            external_username="linked@example.test",
+            app_id="listen-tauri",
+            state=state,
+            challenge=native_oauth_link._pkce_challenge(verifier),
+        )
+
+        def fail_link(_handoff):
+            raise HTTPException(status_code=500, detail="database unavailable")
+
+        def fail_cleanup(*_args, **_kwargs):
+            raise NativeOAuthLinkUnavailable("Redis unavailable")
+
+        body = NativeOAuthLinkCompleteRequest(
+            code=code,
+            code_verifier=verifier,
+            state=state,
+        )
+        with (
+            patch(
+                "crate.api.auth.get_session",
+                return_value=self._active_session(),
+            ),
+            patch("crate.api.auth._apply_native_oauth_link", fail_link),
+            patch("crate.api.auth.restore_native_oauth_link_handoff", fail_cleanup),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            native_oauth_link_complete(self._request(), body)
+
+        assert exc_info.value.status_code == 503

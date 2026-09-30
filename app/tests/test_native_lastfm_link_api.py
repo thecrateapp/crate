@@ -486,3 +486,140 @@ def test_cancel_discards_only_the_matching_native_flow():
     with pytest.raises(HTTPException) as exc_info:
         native_lastfm_link_complete(_request(), body)
     assert exc_info.value.status_code == 401
+
+
+def test_cancel_after_completion_preserves_idempotent_result():
+    from crate.api.me import native_lastfm_link_cancel, native_lastfm_link_complete
+    from crate.api.native_lastfm_link import (
+        claim_link_handoff,
+        complete_link_handoff,
+        issue_link_handoff,
+        save_resolved_session,
+    )
+    from crate.api.schemas.me import NativeLastfmLinkCompleteRequest
+
+    verifier = "v" * 64
+    state = "s" * 43
+    code = issue_link_handoff(
+        user_id=7,
+        session_id="session-7",
+        state=state,
+        challenge=_challenge(verifier),
+        provider_token="a" * 32,
+    )
+    _status, handoff = claim_link_handoff(
+        code=code,
+        state=state,
+        verifier=verifier,
+        user_id=7,
+        session_id="session-7",
+    )
+    handoff = save_resolved_session(
+        code=code,
+        handoff=handoff,
+        session_key="lastfm-session-key",
+        username="diego",
+        subscriber=False,
+    )
+    complete_link_handoff(code=code, handoff=handoff)
+    body = NativeLastfmLinkCompleteRequest(
+        flow_id=code,
+        state=state,
+        code_verifier=verifier,
+    )
+
+    assert native_lastfm_link_cancel(_request(), body) == {"ok": True}
+    assert native_lastfm_link_complete(_request(), body) == {
+        "ok": True,
+        "username": "diego",
+    }
+
+
+def test_complete_maps_cleanup_store_failure_to_service_unavailable(monkeypatch):
+    from crate.api.me import native_lastfm_link_complete
+    from crate.api.native_lastfm_link import (
+        NativeLastfmLinkUnavailable,
+        issue_link_handoff,
+    )
+    from crate.api.schemas.me import NativeLastfmLinkCompleteRequest
+    from crate.scrobble import LastfmSession
+
+    verifier = "v" * 64
+    state = "s" * 43
+    code = issue_link_handoff(
+        user_id=7,
+        session_id="session-7",
+        state=state,
+        challenge=_challenge(verifier),
+        provider_token="a" * 32,
+    )
+    monkeypatch.setattr(
+        "crate.scrobble.lastfm_get_session_strict",
+        lambda *_args: LastfmSession(key="lastfm-session-key", username="diego"),
+    )
+
+    def reject_link(**_kwargs):
+        raise HTTPException(status_code=409, detail="identity conflict")
+
+    def fail_cleanup(*_args, **_kwargs):
+        raise NativeLastfmLinkUnavailable("Redis unavailable")
+
+    monkeypatch.setattr("crate.api.me._apply_native_lastfm_link", reject_link)
+    monkeypatch.setattr("crate.api.me.discard_native_lastfm_link_handoff", fail_cleanup)
+
+    with pytest.raises(HTTPException) as exc_info:
+        native_lastfm_link_complete(
+            _request(),
+            NativeLastfmLinkCompleteRequest(
+                flow_id=code,
+                state=state,
+                code_verifier=verifier,
+            ),
+        )
+
+    assert exc_info.value.status_code == 503
+
+
+def test_complete_maps_restore_store_failure_to_service_unavailable(monkeypatch):
+    from crate.api.me import native_lastfm_link_complete
+    from crate.api.native_lastfm_link import (
+        NativeLastfmLinkUnavailable,
+        issue_link_handoff,
+    )
+    from crate.api.schemas.me import NativeLastfmLinkCompleteRequest
+    from crate.scrobble import LastfmSession
+
+    verifier = "v" * 64
+    state = "s" * 43
+    code = issue_link_handoff(
+        user_id=7,
+        session_id="session-7",
+        state=state,
+        challenge=_challenge(verifier),
+        provider_token="a" * 32,
+    )
+    monkeypatch.setattr(
+        "crate.scrobble.lastfm_get_session_strict",
+        lambda *_args: LastfmSession(key="lastfm-session-key", username="diego"),
+    )
+
+    def fail_link(**_kwargs):
+        raise HTTPException(status_code=500, detail="database unavailable")
+
+    def fail_cleanup(*_args, **_kwargs):
+        raise NativeLastfmLinkUnavailable("Redis unavailable")
+
+    monkeypatch.setattr("crate.api.me._apply_native_lastfm_link", fail_link)
+    monkeypatch.setattr("crate.api.me.restore_native_lastfm_link_handoff", fail_cleanup)
+
+    with pytest.raises(HTTPException) as exc_info:
+        native_lastfm_link_complete(
+            _request(),
+            NativeLastfmLinkCompleteRequest(
+                flow_id=code,
+                state=state,
+                code_verifier=verifier,
+            ),
+        )
+
+    assert exc_info.value.status_code == 503
