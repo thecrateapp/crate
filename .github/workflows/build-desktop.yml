@@ -247,6 +247,9 @@ jobs:
       - name: Test desktop native layer
         run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
 
+      - name: Measure pooled HTTP reuse (diagnostic)
+        run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
+
       - name: Clear stale desktop bundles
         if: runner.os != 'macOS'
         run: rm -rf app/listen-desktop/src-tauri/target/release/bundle
