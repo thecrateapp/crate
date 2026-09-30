@@ -154,6 +154,7 @@ describe("AuthCallback", () => {
       "cratemusic://oauth/callback?code=one-time-code&state=oauth-state",
     );
     expect(window.location.search).toBe("");
+    expect(window.location.hash).toBe("");
     expect(mockSetAuthTokens).not.toHaveBeenCalled();
     expect(mockRefetch).not.toHaveBeenCalled();
   });

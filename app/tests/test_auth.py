@@ -527,6 +527,8 @@ class TestOAuthStart:
         assert captured_state["app_id"] == "listen-android"
 
     def test_oauth_link_uses_link_mode_for_current_user(self):
+        from urllib.parse import parse_qs, urlparse
+
         from crate.api.auth import oauth_link
         from crate.api.schemas.auth import OAuthStartRequest
 
@@ -560,6 +562,9 @@ class TestOAuthStart:
             )
 
         assert result["provider"] == "google"
+        query = parse_qs(urlparse(result["login_url"]).query)
+        assert query["prompt"] == ["select_account"]
+        assert "access_type" not in query
         assert captured_state["mode"] == "link"
         assert captured_state["user_id"] == 7
 

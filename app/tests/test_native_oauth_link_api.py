@@ -27,8 +27,9 @@ class TestNativeOAuthLinkApi:
         session_id: str = "session-7",
         user_id: int = 7,
         bearer: str | None = "access-token",
+        app_id: str = "listen-tauri",
     ) -> Request:
-        headers = [(b"x-crate-app", b"listen-tauri")]
+        headers = [(b"x-crate-app", app_id.encode())]
         if bearer is not None:
             headers.append((b"authorization", f"Bearer {bearer}".encode()))
         request = Request(
@@ -126,6 +127,42 @@ class TestNativeOAuthLinkApi:
             )
 
         assert exc_info.value.status_code == 401
+
+    def test_start_rejects_other_native_app_ids(self):
+        from fastapi import HTTPException
+
+        from crate.api.auth import native_oauth_link_start
+        from crate.api.schemas.auth import NativeOAuthLinkStartRequest
+
+        with pytest.raises(HTTPException) as exc_info:
+            native_oauth_link_start(
+                self._request(app_id="listen-android"),
+                "google",
+                NativeOAuthLinkStartRequest(
+                    native_code_challenge="c" * 43,
+                    native_state="s" * 43,
+                ),
+            )
+
+        assert exc_info.value.status_code == 400
+
+    def test_completion_rejects_other_native_app_ids(self):
+        from fastapi import HTTPException
+
+        from crate.api.auth import native_oauth_link_complete
+        from crate.api.schemas.auth import NativeOAuthLinkCompleteRequest
+
+        with pytest.raises(HTTPException) as exc_info:
+            native_oauth_link_complete(
+                self._request(app_id="listen-android"),
+                NativeOAuthLinkCompleteRequest(
+                    code="handoff-code-token",
+                    code_verifier="v" * 64,
+                    state="s" * 43,
+                ),
+            )
+
+        assert exc_info.value.status_code == 400
 
     def test_callback_stages_provider_identity_without_linking_it(self):
         from crate.api.auth import oauth_callback

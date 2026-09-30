@@ -54,6 +54,11 @@ export function AuthCallback() {
     const deepLink = buildDesktopDeepLink(desktopParams);
     if (deepLink) {
       setDesktopDeepLink(deepLink);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname,
+      );
       openDesktopDeepLink(deepLink);
       return;
     }

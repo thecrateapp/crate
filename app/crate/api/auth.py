@@ -2778,6 +2778,7 @@ def _restore_native_oauth_link_or_503(
 )
 def native_oauth_link_complete(request: Request, body: NativeOAuthLinkCompleteRequest):
     user, session_id = _require_native_oauth_link_auth(request)
+    app_id = (request.headers.get("x-crate-app") or "").strip().lower()
     if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
         raise HTTPException(
             status_code=400, detail="Invalid native OAuth code verifier"
@@ -2789,7 +2790,7 @@ def native_oauth_link_complete(request: Request, body: NativeOAuthLinkCompleteRe
             code=body.code,
             state=body.state,
             verifier=body.code_verifier,
-            app_id="listen-tauri",
+            app_id=app_id,
             user_id=int(user["id"]),
             session_id=session_id,
         )
