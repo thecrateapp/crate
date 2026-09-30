@@ -926,6 +926,50 @@ class TestOAuthCallback:
             }
         )
 
+    @patch.dict("os.environ", {"DOMAIN": "lespedants.org"}, clear=False)
+    def test_native_tauri_login_uses_https_fragment_completion_handoff(self):
+        from crate.api.auth import oauth_callback
+
+        state = {
+            "provider": "google",
+            "return_to": "cratemusic://oauth/callback",
+            "mode": "login",
+            "verifier": "provider-verifier",
+            "app_id": "listen-tauri",
+            "native_code_challenge": "c" * 43,
+            "native_state": "s" * 43,
+        }
+        user = {"id": 7, "status": "active"}
+        with (
+            patch("crate.api.auth._enforce_login_rate_limit"),
+            patch("crate.api.auth._clear_failed_login"),
+            patch("crate.api.auth._parse_oauth_state", return_value=state),
+            patch(
+                "crate.api.native_oauth_auth.native_oauth_exchange_enabled",
+                return_value=True,
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={"id": "google-user", "email": "user@example.test"},
+            ),
+            patch("crate.api.auth.get_user_by_external_identity", return_value=user),
+            patch(
+                "crate.api.auth.issue_native_oauth_handoff",
+                return_value="one-time-handoff-code",
+            ),
+        ):
+            response = oauth_callback(
+                self._request(),
+                "google",
+                code="provider-code",
+                state="signed-state",
+            )
+
+        assert response.headers["location"] == (
+            "https://listen.lespedants.org/auth/callback#desktop=tauri"
+            "&code=one-time-handoff-code&state=" + "s" * 43
+        )
+
     def test_google_userinfo_does_not_expose_provider_refresh_token(self):
         from crate.api.auth import (
             GOOGLE_TOKEN_URL,
