@@ -175,7 +175,7 @@ export function assertAppImagePayload(root) {
   }
 }
 
-function verifyAppImage(artifact, expected) {
+export function verifyAppImage(artifact, expected) {
   if (!path.basename(artifact).includes(expected)) {
     throw new Error(
       `AppImage filename does not include ${expected}: ${artifact}`,
@@ -186,7 +186,7 @@ function verifyAppImage(artifact, expected) {
     path.join(os.tmpdir(), "crate-appimage-verify-"),
   );
   try {
-    execFileSync(artifact, ["--appimage-extract"], {
+    execFileSync(path.resolve(artifact), ["--appimage-extract"], {
       cwd: extractionDirectory,
       stdio: "ignore",
       timeout: 120_000,

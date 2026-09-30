@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   assertAppImagePayload,
   assertArtifactVersion,
+  verifyAppImage,
 } from "./verify-desktop-artifact-version.mjs";
 import {
   parseDesktopVersion,
@@ -208,3 +209,35 @@ test("AppImage payload contains its executable and a launchable desktop entry", 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test(
+  "AppImage extraction resolves relative bundle paths before changing directories",
+  { skip: process.platform === "win32" },
+  () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "crate-appimage-cli-"));
+    const artifact = path.join(root, "Crate_0.1.0_amd64.AppImage");
+    fs.writeFileSync(
+      artifact,
+      [
+        "#!/bin/sh",
+        'mkdir -p "$PWD/squashfs-root/usr/bin" "$PWD/squashfs-root/usr/share/applications"',
+        'printf payload > "$PWD/squashfs-root/usr/bin/crate-desktop"',
+        'chmod +x "$PWD/squashfs-root/usr/bin/crate-desktop"',
+        'printf "[Desktop Entry]\\nExec=crate-desktop %%u\\n" > "$PWD/squashfs-root/usr/share/applications/Crate.desktop"',
+      ].join("\n"),
+    );
+    fs.chmodSync(artifact, 0o755);
+
+    const originalDirectory = process.cwd();
+    const filesystemRoot = path.parse(originalDirectory).root;
+    try {
+      process.chdir(filesystemRoot);
+      assert.doesNotThrow(() =>
+        verifyAppImage(path.relative(filesystemRoot, artifact), "0.1.0"),
+      );
+    } finally {
+      process.chdir(originalDirectory);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
