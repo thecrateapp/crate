@@ -316,6 +316,9 @@ jobs:
           VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
           version="$CRATE_DESKTOP_VERSION"
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+          fi
           make tauri-build-macos-testers \
             TAURI_RELEASE_VERSION="$version" \
             TAURI_MACOS_OUTPUT_DIR=desktop-artifacts
