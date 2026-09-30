@@ -4,7 +4,7 @@
 
 - Branch: `feat/tauri-desktop-app`
 - Baseline source revision for the original launch, R01–R05, and R08 captures: `df72643d229ad7b47908f183690f5a35294a8ddf`
-- Current branch revision for follow-up validation: `5d6ca6e2cd462cc469a9b81d95fbe2ec5f52687e` (R07 renderer code is from parent `00c988e9`)
+- Follow-up source revision for automated gates and the initial R07 capture: `5d6ca6e2cd462cc469a9b81d95fbe2ec5f52687e` (R07 renderer code is from parent `00c988e9`); the live macOS HTTP resource-table soak below used `3a851e3bca9634660ee6441a39c60b19f62a8943`.
 - Host: Mac17,2; macOS 27.0.1 (build 26A434), arm64, 16 GiB RAM; on AC power when checked after the run
 - Approved support floors: macOS 11+, Windows 10 version 1803+, and Linux with WebKitGTK 2.40+
 - Decision recorded: retain current audio behavior until native memory measurements exist for each OS; defer any long-track fallback decision.
@@ -68,7 +68,9 @@ The reproducible probes and exact commands are in [`app/listen-desktop/scripts/n
 
 The vendored `tauri-plugin-http` resource tests passed 2/2: the cleanup helper returns all three request resources to baseline, and cancellation signals the pending request while releasing those resources (including repeated cancellation). The frontend plugin wrapper tests passed 3/3 for bodyless `204` cleanup, cancellation of a partially consumed body, and abort-listener removal when response headers fail.
 
-These are Rust resource-table helper tests and frontend IPC mocks. They do not exercise a packaged app's live `ResourceTable` during a success/error/abort/partial-stream soak; that installed-app check remains open on macOS, Windows, and Linux.
+An isolated macOS Tauri development WebView on branch revision `3a851e3b` then exercised the plugin against a loopback fixture with a temporary command that read the live `ResourceTable` count. Twenty-five cycles each covered a consumed 200 response, consumed HTTP 500 response, connection-refused request, bodyless 204, abort during a delayed request, and cancellation after the first chunk of a stream: 150 requests total. The baseline was zero resources; the count returned to zero after every request, with no failed checks. The raw JSON result is `/tmp/tauri-http-resource-macos-20260930.json`. The probe page and counter were removed after the run.
+
+This closes the live development-WebView soak on macOS. The packaged-app soak and runtime checks on Windows and Linux remain open.
 
 ## macOS visualizer measurement — R07
 
