@@ -450,6 +450,71 @@ class TestNativeOAuthLinkApi:
 
         assert complete_attempts == 2
 
+    def test_completion_recovers_after_restore_also_fails(self, monkeypatch):
+        from crate.api import native_oauth_link
+        from crate.api.auth import _pkce_challenge, native_oauth_link_complete
+        from crate.api.native_oauth_link import NativeOAuthLinkUnavailable
+        from crate.api.schemas.auth import NativeOAuthLinkCompleteRequest
+        from fastapi import HTTPException
+
+        now = [100.0]
+        monkeypatch.setattr(native_oauth_link, "_claim_now", lambda: now[0])
+        verifier = "v" * 64
+        state = "s" * 43
+        code = native_oauth_link.issue_link_handoff(
+            user_id=7,
+            session_id="session-7",
+            provider="google",
+            external_user_id="google-subject-7",
+            external_username="linked@example.test",
+            app_id="listen-tauri",
+            state=state,
+            challenge=_pkce_challenge(verifier),
+        )
+        body = NativeOAuthLinkCompleteRequest(
+            code=code,
+            code_verifier=verifier,
+            state=state,
+        )
+        complete = native_oauth_link.complete_link_handoff
+        complete_attempts = 0
+
+        def fail_once(*, code: str, handoff):
+            nonlocal complete_attempts
+            complete_attempts += 1
+            if complete_attempts == 1:
+                raise NativeOAuthLinkUnavailable("Redis unavailable")
+            return complete(code=code, handoff=handoff)
+
+        with (
+            patch(
+                "crate.api.native_oauth_auth.get_session",
+                return_value=self._active_session(),
+            ),
+            patch("crate.api.auth._apply_native_oauth_link"),
+            patch(
+                "crate.api.auth.complete_native_oauth_link_handoff",
+                side_effect=fail_once,
+            ),
+            patch(
+                "crate.api.auth.restore_native_oauth_link_handoff",
+                side_effect=NativeOAuthLinkUnavailable("Redis unavailable"),
+            ),
+        ):
+            with pytest.raises(HTTPException) as first_error:
+                native_oauth_link_complete(self._request(), body)
+            assert first_error.value.status_code == 503
+
+            with pytest.raises(HTTPException) as pending_error:
+                native_oauth_link_complete(self._request(), body)
+            assert pending_error.value.status_code == 503
+            assert "already being completed" in pending_error.value.detail
+
+            now[0] += native_oauth_link.NATIVE_OAUTH_LINK_CLAIM_TTL_SECONDS + 1
+            assert native_oauth_link_complete(self._request(), body) == {"ok": True}
+
+        assert complete_attempts == 2
+
     def test_completion_rejects_a_handoff_claimed_by_another_request(self):
         from crate.api import native_oauth_link
         from crate.api.auth import _pkce_challenge, native_oauth_link_complete

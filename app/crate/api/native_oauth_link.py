@@ -11,9 +11,11 @@ import secrets
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from threading import RLock
+import time
 from typing import Literal
 
 NATIVE_OAUTH_LINK_TTL_SECONDS = 15 * 60
+NATIVE_OAUTH_LINK_CLAIM_TTL_SECONDS = 90
 _LINK_PREFIX = "crate:auth:native_oauth_link"
 _CLAIM_LINK_SCRIPT = """
 local completed = redis.call('GET', KEYS[3])
@@ -22,14 +24,28 @@ if completed then
 end
 local pending = redis.call('GET', KEYS[2])
 if pending then
+  local handoff = redis.call('GET', KEYS[1])
+  if handoff then
+    return {2, handoff}
+  end
+  local is_legacy_handoff = pcall(cjson.decode, pending)
+  if not is_legacy_handoff then
+    return {0}
+  end
+  local pending_ttl = redis.call('TTL', KEYS[2])
+  if pending_ttl > 0
+    and pending_ttl < tonumber(ARGV[2]) - tonumber(ARGV[1]) then
+    redis.call('SET', KEYS[1], pending, 'EX', pending_ttl)
+    redis.call('SET', KEYS[2], 'claimed', 'EX', ARGV[1])
+    return {1, pending}
+  end
   return {2, pending}
 end
 local handoff = redis.call('GET', KEYS[1])
 if not handoff then
   return {0}
 end
-redis.call('SET', KEYS[2], handoff, 'EX', ARGV[1])
-redis.call('DEL', KEYS[1])
+redis.call('SET', KEYS[2], 'claimed', 'EX', ARGV[1])
 return {1, handoff}
 """
 _memory_links: dict[str, str] = {}
@@ -59,6 +75,10 @@ class NativeOAuthLinkHandoff:
 
 def _digest(code: str) -> str:
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+def _claim_now() -> float:
+    return time.monotonic()
 
 
 def link_handoff_key(code: str) -> str:
@@ -202,6 +222,7 @@ def claim_link_handoff(
                 link_handoff_key(code),
                 _pending_key(code),
                 _result_key(code),
+                NATIVE_OAUTH_LINK_CLAIM_TTL_SECONDS,
                 NATIVE_OAUTH_LINK_TTL_SECONDS,
             )
         except Exception as exc:
@@ -219,13 +240,25 @@ def claim_link_handoff(
         with _memory_lock:
             if result_key in _memory_links:
                 status, raw = 3, _memory_links[result_key]
-            elif pending_key in _memory_links:
-                status, raw = 2, _memory_links[pending_key]
-            elif key in _memory_links:
-                status, raw = 1, _memory_links.pop(key)
-                _memory_links[pending_key] = raw
             else:
-                status, raw = 0, None
+                raw = _memory_links.get(key)
+                pending_until = _memory_links.get(pending_key)
+                try:
+                    claim_is_active = (
+                        pending_until is not None
+                        and float(pending_until) > _claim_now()
+                    )
+                except ValueError:
+                    claim_is_active = False
+                if raw is None:
+                    status = 0
+                elif claim_is_active:
+                    status = 2
+                else:
+                    status = 1
+                    _memory_links[pending_key] = str(
+                        _claim_now() + NATIVE_OAUTH_LINK_CLAIM_TTL_SECONDS
+                    )
 
     if status == 0 or raw is None:
         raise InvalidNativeOAuthLink("Native OAuth link is invalid or expired")
@@ -288,7 +321,7 @@ def complete_link_handoff(*, code: str, handoff: NativeOAuthLinkHandoff) -> None
                 serialized,
                 ex=NATIVE_OAUTH_LINK_TTL_SECONDS,
             )
-            redis_client.delete(_pending_key(code))
+            redis_client.delete(link_handoff_key(code), _pending_key(code))
             return
         except Exception as exc:
             try:

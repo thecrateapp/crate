@@ -79,6 +79,27 @@ def test_native_oauth_link_claim_is_single_use_but_completion_is_idempotent() ->
     assert completed_handoff == handoff
 
 
+def test_native_oauth_link_claim_can_retry_after_claim_lease_expires(
+    monkeypatch,
+) -> None:
+    from crate.api import native_oauth_link
+
+    now = [100.0]
+    monkeypatch.setattr(native_oauth_link, "_claim_now", lambda: now[0])
+    code, verifier = _issue_link()
+
+    first_status, handoff = _claim(code, verifier)
+    second_status, _pending_handoff = _claim(code, verifier)
+    assert first_status == "claimed"
+    assert second_status == "in_progress"
+
+    now[0] += native_oauth_link.NATIVE_OAUTH_LINK_CLAIM_TTL_SECONDS + 1
+    retry_status, retry_handoff = _claim(code, verifier)
+
+    assert retry_status == "claimed"
+    assert retry_handoff == handoff
+
+
 def test_invalid_native_oauth_link_proof_does_not_consume_valid_handoff() -> None:
     from crate.api import native_oauth_link
 

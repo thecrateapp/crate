@@ -202,6 +202,8 @@ On the temporary macOS test bundle built from source commit `013a2c63ce1b269fd9d
 
 After that smoke, the Tauri callback was changed to pass through Listen's `/auth/callback?desktop=tauri` completion page before opening the `cratemusic://` link. That route already displays the “Volver a Crate” confirmation and a fallback button, so Chrome should show that the handoff completed instead of retaining Google's confirmation screen. Backend tests verify the HTTPS redirect and one-time code; the updated browser handoff still needs a manual run against the changed API.
 
+Persistent review of commit `f194f674` then found that a failed handoff restore could leave OAuth account linking in progress until its 15-minute expiry. Claims now hold a 90-second lease while the canonical handoff remains available; another request can safely reclaim it after the lease expires. Redis can also migrate legacy pending entries after the same grace period. Unit and API tests cover lease expiry, an active concurrent claim, and recovery when both completion and restoration fail. The final post-fix CI run is pending.
+
 ## Other native gates still pending
 
 The installed release matrix remains open for macOS 11 and Intel, Windows 10 1803/WebView2, and Linux/WebKitGTK 2.40. Windows still needs process RSS captures and installed-app smoke. Linux has development and release WebKitGTK datapoints inside Debian/OrbStack under Xvfb, but still needs a normal desktop session and installed-app acceptance. Provider credentials, media-system behavior, upgrade from N−1, signed artifacts, and the remaining native acceptance scenarios are not covered by this report. A green local build or cross-compile does not substitute for those runs.
