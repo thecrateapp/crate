@@ -21,6 +21,10 @@ The `Crate Hardening Smoke` bundle above was not used for memory measurement. Se
 
 ## Same-revision automated gates
 
+### CI confirmation on latest source revision — `0e921f66586a149b05b97d47605706fc76a0cd6a`
+
+The exact-head [Build Desktop Apps workflow](https://github.com/thecrateapp/crate/actions/runs/36786733551) completed successfully on macOS, Windows, and Linux. The macOS job built and version-checked both ARM64 and Intel tester app bundles; Windows and Linux built their desktop bundles, and Linux passed the GLIBC 2.36 compatibility and artifact-version checks. The [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36786607204), [Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36786606943), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36786607134), and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36786603833) workflows also passed on this exact SHA. Build Android and Build iOS were skipped because PR #259 remains a draft. Focused local validation for the latest OAuth changes is recorded in the persistent-review follow-up below. This confirms C06 for `0e921f66`; it does not close installed OS/WebView, real-player, signing/notarization, minimum-version, or upgrade gates.
+
 On `df72643d229ad7b47908f183690f5a35294a8ddf`, Desktop Vitest passed 43/43; Listen passed 2,416 tests across 323 files with 4 existing skips; Rust macOS passed 48/48 and Clippy completed with `-D warnings`. Desktop and Listen typechecks, Listen ESLint, and both Vite production builds passed. The builds retain the existing 564.65 kB chunk warning; Node also prints its `module.register()` deprecation warning.
 
 Follow-up validation on branch revision `5d6ca6e2cd462cc469a9b81d95fbe2ec5f52687e` passed Desktop Vitest 43/43, Listen 2,416 passed with 4 existing skips, Rust 48/48, Clippy `-D warnings`, and Listen/Desktop typechecks. GitHub `Build Desktop Apps` passed all three jobs: Linux and Windows bundle/version checks, plus the macOS tester-bundle build. `Build Android` passed its typecheck, lint, contract tests, and Android tests. The signed APK/AAB steps were skipped because this was a manual non-release run. `PR Agent Review` completed successfully. These workflows are linked to the exact revision above; the PR remains draft.
@@ -265,6 +269,8 @@ The next review found that provider denial returned an HTTP 400 for native login
 
 The review then described the success and cancellation redirect paths as inconsistent. They take different initial routes by design: successful Tauri OAuth returns to the HTTPS `/auth/callback` fragment page so the one-time code is not sent in an HTTP query; that page strips the fragment and opens `cratemusic://oauth/callback?code=...&state=...`. A denial contains no code and goes straight to `cratemusic://oauth/callback?state=...&error=cancelled`. Tauri consumes both deep links with `consumeOAuthCallbackUrl`; tests now cover the backend success URL, the browser fragment-to-deep-link bridge, successful exchange, and cancellation cleanup. The inconsistency finding is therefore a false positive.
 
+On source revision `0e921f66`, the final OAuth regression suite passed: backend `test_auth.py` and `test_native_oauth_link_api.py` (10 tests for the added exact Tauri fragment contract), Listen AuthCallback/native OAuth suites (37 tests), and Tauri init tests (18 tests). The Last.fm retryability suites passed 29 tests. The complete exact-head Backend Tests and Frontend Tests workflows also passed above; the branch is clean and pushed at this revision.
+
 ## Linux desktop handover and merged branch validation — 2026-09-30
 
 The Linux agent's [desktop validation report](tauri-linux-desktop-results-2026-09-30.md) records a real GNOME Wayland run on CachyOS. R03–R05 pass for the synthetic offline workload after removing per-file path IPC. The previous R01 Linux measurement is invalidated by delayed-ACK behavior in its local HTTP fixture; rerun it with the corrected fixture above. R07 and R08 are partial; AppImage launch and MPRIS are partial; native UI automation and real-player/offline flows remain open.
@@ -306,7 +312,7 @@ The review documents identify C03, C06, and C07, but do not define C01, C02, C04
 | C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                    |
 | C04 | Native OAuth handoff                      | Google login succeeded on macOS; the updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                |
 | C05 | Linux package ABI/WebKit compatibility    | Partial: Debian 12 with GLIBC 2.36 and WebKitGTK 2.50.6 launched; exact WebKitGTK 2.40 floor and normal desktop install remain open.                   |
-| C06 | Desktop CI builds and artifact checks     | Pass on `a098d866` for macOS, Windows, and Linux in workflow 36781473125, including the cross-platform HTTP diagnostic.                                |
+| C06 | Desktop CI builds and artifact checks     | Pass on `0e921f66` for macOS ARM64/Intel tester bundles, Windows, and Linux in workflow 36786733551; Linux GLIBC and artifact checks passed.           |
 | C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                    |
 
 ## Other native gates still pending
