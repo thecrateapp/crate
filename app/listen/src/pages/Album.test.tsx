@@ -18,6 +18,13 @@ vi.mock("@/hooks/use-lazy-playlist-options", () => ({
   }),
 }));
 
+vi.mock("@/hooks/use-lazy-crate-options", () => ({
+  useLazyCrateOptions: () => ({
+    crateOptions: [],
+    ensureCrateOptionsLoaded: vi.fn(),
+  }),
+}));
+
 vi.mock("@/components/bandcamp/BandcampSupportButton", () => ({
   BandcampSupportButton: ({
     presentation,

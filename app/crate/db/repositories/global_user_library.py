@@ -590,10 +590,30 @@ def get_user_global_library_counts(user_id: int) -> dict[str, int]:
                             SELECT COUNT(*)
                             FROM playlists
                             WHERE user_id = :uid4
-                        ) AS playlists
+                        ) AS playlists,
+                        (
+                            SELECT COUNT(*)
+                            FROM crates c
+                            WHERE c.owner_id = :uid5
+                               OR (
+                                   c.is_collaborative IS TRUE
+                                   AND EXISTS (
+                                       SELECT 1
+                                       FROM crate_members member
+                                       WHERE member.crate_id = c.id
+                                         AND member.user_id = :uid5
+                                   )
+                               )
+                        ) AS crates
                     """
                 ),
-                {"uid1": user_id, "uid2": user_id, "uid3": user_id, "uid4": user_id},
+                {
+                    "uid1": user_id,
+                    "uid2": user_id,
+                    "uid3": user_id,
+                    "uid4": user_id,
+                    "uid5": user_id,
+                },
             )
             .mappings()
             .first()

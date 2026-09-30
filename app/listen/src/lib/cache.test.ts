@@ -171,6 +171,10 @@ describe("scopesForUrl", () => {
     expect(scopesForUrl("/api/me/crates")).toEqual(["crates"]);
   });
 
+  it("returns the Library scope for global library counts", () => {
+    expect(scopesForUrl("/api/me")).toEqual(["library"]);
+  });
+
   it("returns the Crates scope for a Crate", () => {
     const crateId = "7ee76303-7aa6-4317-a5d3-18c2e1360b1c";
     expect(scopesForUrl(`/api/crates/${crateId}`)).toEqual(["crates"]);

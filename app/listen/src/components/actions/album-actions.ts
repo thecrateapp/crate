@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
   ArrowDownToLineBold,
+  Disc3,
   Download,
   Heart,
   HeartBold,
@@ -24,6 +25,8 @@ import {
 import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
+import { useLazyCrateOptions } from "@/hooks/use-lazy-crate-options";
+import { api } from "@/lib/api";
 import {
   albumDownloadApiPath,
   albumPagePath,
@@ -55,6 +58,8 @@ export function useAlbumActionEntries(
     toggleAlbumOffline,
   } = useOffline();
   const saved = isSaved(input.albumId, input.globalAlbumUid);
+  const [cratePickerOpen, setCratePickerOpen] = useState(false);
+  const { crateOptions, ensureCrateOptionsLoaded } = useLazyCrateOptions();
   const offlineState = getAlbumState(input.albumId);
   const radioSeed = input.albumId ?? input.globalAlbumUid ?? null;
   const offlineActionLabel = (() => {
@@ -130,6 +135,35 @@ export function useAlbumActionEntries(
         },
       }),
       { type: "divider", key: "divider-album-main" },
+      ...(input.globalAlbumUid
+        ? [
+            {
+              type: "disclosure" as const,
+              key: "crate",
+              label: t("album.actions.addToCrate"),
+              icon: Disc3,
+              expanded: cratePickerOpen,
+              onToggle: () => {
+                ensureCrateOptionsLoaded();
+                setCratePickerOpen((open) => !open);
+              },
+              items: crateOptions.map((crate) => ({
+                key: `crate-${crate.id}`,
+                label: crate.name,
+                onSelect: async () => {
+                  try {
+                    await api(`/api/crates/${crate.id}/albums`, "POST", {
+                      global_album_uid: input.globalAlbumUid,
+                    });
+                    toast.success(t("album.toasts.addedToCrate"));
+                  } catch {
+                    toast.error(t("album.toasts.addToCrateFailed"));
+                  }
+                },
+              })),
+            },
+          ]
+        : []),
       action({
         key: "save",
         label: saved ? t("actions.album.unsave") : t("actions.album.save"),
@@ -228,6 +262,9 @@ export function useAlbumActionEntries(
     ];
   }, [
     input,
+    cratePickerOpen,
+    crateOptions,
+    ensureCrateOptionsLoaded,
     offlineActionLabel,
     offlineState,
     offlineSupported,

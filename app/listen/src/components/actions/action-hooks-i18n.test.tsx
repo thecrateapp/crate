@@ -39,12 +39,30 @@ vi.mock("@/lib/radio", () => ({
   fetchPlaylistRadio: vi.fn(),
 }));
 
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    api: vi.fn(async () => ({ ok: true })),
+  };
+});
+
+vi.mock("@/hooks/use-api", () => ({
+  useApi: vi.fn((url: string | null) => ({
+    data:
+      url === "/api/me/crates"
+        ? [{ id: "crate-1", name: "Year-end records" }]
+        : null,
+  })),
+}));
+
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { useShowActionEntries } from "@/components/actions/show-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";
 import { fetchAlbumRadio, fetchArtistRadio } from "@/lib/radio";
+import { api } from "@/lib/api";
 
 function i18nWrapper(locale: ListenLocale = "es") {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -234,6 +252,45 @@ describe("action hooks i18n", () => {
       albumId: "global-blending",
       artistName: "High Vis",
       albumName: "Blending",
+    });
+  });
+
+  it("adds an album to a selected Crate", async () => {
+    const { result } = renderHook(
+      () =>
+        useAlbumActionEntries({
+          globalAlbumUid: "global-blending",
+          artist: "High Vis",
+          album: "Blending",
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+
+    const crateMenu = result.current.find((entry) => entry.key === "crate");
+    if (!crateMenu || crateMenu.type !== "disclosure") {
+      throw new Error("Crate menu missing");
+    }
+
+    expect(crateMenu.label).toBe("Añadir a Crate");
+    act(() => {
+      crateMenu.onToggle();
+    });
+    const expandedCrateMenu = result.current.find(
+      (entry) => entry.key === "crate",
+    );
+    if (!expandedCrateMenu || expandedCrateMenu.type !== "disclosure") {
+      throw new Error("Crate menu missing after expansion");
+    }
+    const crateItem = expandedCrateMenu.items[0];
+    if (!crateItem || !("onSelect" in crateItem)) {
+      throw new Error("Crate option missing");
+    }
+    await act(async () => {
+      await crateItem.onSelect?.();
+    });
+
+    expect(api).toHaveBeenCalledWith("/api/crates/crate-1/albums", "POST", {
+      global_album_uid: "global-blending",
     });
   });
 });

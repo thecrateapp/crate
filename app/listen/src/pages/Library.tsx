@@ -35,6 +35,7 @@ interface MeStats {
   saved_albums: number;
   liked_tracks: number;
   playlists: number;
+  crates: number;
 }
 
 const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
@@ -131,6 +132,7 @@ export function Library() {
             value={stats.playlists}
             label={t("nav.collection.playlists")}
           />
+          <StatBox value={stats.crates} label={t("nav.collection.crates")} />
         </div>
       )}
 
