@@ -61,3 +61,6 @@ sentry = { version = "0.44.0", default-features = false, features = ["test"] }
 
 [profile.release]
 debug = "line-tables-only"
+
+[patch.crates-io]
+tauri-plugin-http = { path = "vendor/tauri-plugin-http" }
