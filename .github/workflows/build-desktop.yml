@@ -254,9 +254,54 @@ jobs:
         if: runner.os != 'macOS'
         run: rm -rf app/listen-desktop/src-tauri/target/release/bundle
 
+      - name: Import macOS Developer ID certificate for release
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -Eeuo pipefail
+          : "${APPLE_CERTIFICATE:?Missing APPLE_CERTIFICATE repository secret}"
+          : "${APPLE_CERTIFICATE_PASSWORD:?Missing APPLE_CERTIFICATE_PASSWORD repository secret}"
+          : "${APPLE_SIGNING_IDENTITY:?Missing APPLE_SIGNING_IDENTITY repository variable}"
+          : "${APPLE_ID:?Missing APPLE_ID repository secret}"
+          : "${APPLE_PASSWORD:?Missing APPLE_PASSWORD repository secret}"
+          : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID repository secret}"
+          : "${KEYCHAIN_PASSWORD:?Missing KEYCHAIN_PASSWORD repository secret}"
+          case "$APPLE_SIGNING_IDENTITY" in
+            "Developer ID Application:"*) ;;
+            *) echo 'APPLE_SIGNING_IDENTITY must name a Developer ID Application certificate' >&2; exit 1 ;;
+          esac
+
+          keychain_path="$RUNNER_TEMP/crate-signing.keychain-db"
+          certificate_path="$RUNNER_TEMP/crate-signing.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
+          test -s "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychains -d user -s \
+            "$keychain_path" "$HOME/Library/Keychains/login.keychain-db"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          printf '%s\n' "$identities" | grep -F "$APPLE_SIGNING_IDENTITY" >/dev/null
+
       - name: Build macOS tester bundles
         if: runner.os == 'macOS'
         env:
+          APPLE_SIGNING_IDENTITY: ${{ startsWith(github.ref, 'refs/tags/v') && vars.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_ID: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_TEAM_ID || '' }}
           SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-listen
@@ -274,6 +319,22 @@ jobs:
           make tauri-build-macos-testers \
             TAURI_RELEASE_VERSION="$version" \
             TAURI_MACOS_OUTPUT_DIR=desktop-artifacts
+
+      - name: Verify macOS release signature and notarization
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          for app in \
+            app/listen-desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app \
+            app/listen-desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Crate.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            signature="$(codesign -dv --verbose=2 "$app" 2>&1)"
+            printf '%s\n' "$signature" | grep -F "Authority=$APPLE_SIGNING_IDENTITY" >/dev/null
+            xcrun stapler validate "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+          done
 
       - name: Build desktop bundles
         if: runner.os != 'macOS'
@@ -347,6 +408,12 @@ jobs:
           path: desktop-artifacts/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Remove macOS release signing material
+        if: always() && runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          security delete-keychain "$RUNNER_TEMP/crate-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/crate-signing.p12"
 
       - name: Attach desktop artifacts to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
