@@ -24,7 +24,7 @@ npm run --workspace=app/listen-desktop tauri:dev -- \
   --config scripts/native-perf/tauri.config.json
 ```
 
-The probe seeds only its isolated `app.cratemusic.crate.desktop.native-perf-bench20260930` app-local directory, measures metadata hydration, checks 100/1,000/5,000 files through `verifyNativeOfflineAssets`, compares sequential and concurrent verification callers, and records durable index write counts/bytes for serial and coalesced mutations. It removes its `offline-media` and `offline-meta` directories when finished. The fixture server writes its JSON result to the path above.
+The probe seeds only its isolated `app.cratemusic.crate.desktop.native-perf-bench20260930` app-local directory, measures metadata hydration, checks 100/1,000/5,000 files through `verifyNativeOfflineAssets`, compares sequential and concurrent verification callers, and records durable index write counts/bytes for serial and coalesced mutations. It posts hydration phase progress events and a final results event to the JSONL path above. It removes its `offline-media` and `offline-meta` directories when finished.
 
 For index writes it also compares a single same-turn burst with 1,000 mutations arriving in pairs, matching the offline download scheduler's current concurrency of two. The burst is a stress ceiling; it does not represent the ordinary completion cadence of real network downloads.
 

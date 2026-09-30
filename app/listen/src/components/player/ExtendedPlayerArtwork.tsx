@@ -99,6 +99,8 @@ function ExtendedPlayerVisualizerCanvas({
   state,
 }: Pick<ExtendedPlayerArtworkProps, "refs" | "state">) {
   const isVisualizerMode = state.vizCfg.surfaceMode === "visualizer";
+  if (!state.visualizerAllowed) return null;
+
   return (
     <div
       className={cn(
@@ -118,7 +120,6 @@ function ExtendedPlayerVisualizerCanvas({
       }
     >
       <canvas
-        key={state.visualizerQualityProfile}
         ref={refs.canvasRef}
         className=" size-full"
         data-viz-reference-size={

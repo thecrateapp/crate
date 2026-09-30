@@ -53,16 +53,29 @@ export function resolveDesktopVersion({
   override,
   refType,
   refName,
-  localTag,
+  localVersion,
   defaultVersion,
 }) {
   const requested =
     (typeof override === "string" && override.trim()) ||
     (refType === "tag" ? refName : "") ||
-    (!refType ? localTag : "") ||
+    (!refType ? localVersion : "") ||
     defaultVersion;
   if (!requested) throw new Error("No desktop version was provided");
   return parseDesktopVersion(requested);
+}
+
+export function detectLocalDesktopVersion(repositoryRoot) {
+  const result = spawnSync(
+    "git",
+    ["describe", "--tags", "--dirty", "--match", "v[0-9]*"],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    },
+  );
+  return result.status === 0 ? result.stdout.trim() : "";
 }
 
 export function readDesktopVersionSources(repositoryRoot) {
@@ -129,7 +142,7 @@ export function writeGitHubEnvironment(version, environmentPath) {
 }
 
 export function withTauriVersionOverride(args, version) {
-  if (args[0] !== "build") return args;
+  if (args[0] !== "build" && args[0] !== "dev") return args;
   return [...args, "--config", JSON.stringify({ version })];
 }
 
@@ -167,15 +180,15 @@ function runCli() {
 
   const repositoryRoot = path.resolve(path.dirname(scriptPath), "../../..");
   const sources = readDesktopVersionSources(repositoryRoot);
-  const localTag = process.env.GITHUB_REF_TYPE
+  const localVersion = process.env.GITHUB_REF_TYPE
     ? ""
-    : detectExactLocalTag(repositoryRoot);
+    : detectLocalDesktopVersion(repositoryRoot);
   const resolved = resolveDesktopVersion({
     override:
       process.env.CRATE_DESKTOP_VERSION || process.env.TAURI_RELEASE_VERSION,
     refType: process.env.GITHUB_REF_TYPE,
     refName: process.env.GITHUB_REF_NAME,
-    localTag,
+    localVersion,
     defaultVersion: sources.tauri,
   });
   if (process.env.GITHUB_ENV) {
@@ -183,15 +196,6 @@ function runCli() {
   } else {
     process.stdout.write(`${resolved.version}\n`);
   }
-}
-
-function detectExactLocalTag(repositoryRoot) {
-  const result = spawnSync("git", ["describe", "--tags", "--exact-match"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  });
-  return result.status === 0 ? result.stdout.trim() : "";
 }
 
 runCli();

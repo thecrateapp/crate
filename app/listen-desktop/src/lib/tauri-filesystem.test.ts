@@ -95,6 +95,46 @@ describe("Tauri filesystem adapter", () => {
       uri: "/app/local-data/offline-media/profile/song.m4a",
     });
     expect(appLocalDataDirMock).toHaveBeenCalledOnce();
+    expect(joinMock).not.toHaveBeenCalled();
+  });
+
+  it("joins asset locators with native Windows separators without path IPC", async () => {
+    vi.resetModules();
+    appLocalDataDirMock.mockResolvedValue(
+      "C:\\Users\\crate\\AppData\\Roaming\\app.crate",
+    );
+    const filesystem = await import("./tauri-filesystem");
+
+    await expect(
+      filesystem.getFileUri("offline-media/profile/song.m4a"),
+    ).resolves.toBe(
+      "C:\\Users\\crate\\AppData\\Roaming\\app.crate\\offline-media\\profile\\song.m4a",
+    );
+    expect(joinMock).not.toHaveBeenCalled();
+  });
+
+  it("resolves a large locator set without per-asset path IPC", async () => {
+    vi.resetModules();
+    appLocalDataDirMock.mockResolvedValue("/app/local-data");
+    const filesystem = await import("./tauri-filesystem");
+    const paths = Array.from(
+      { length: 5_000 },
+      (_, index) => `offline-media/profile/asset-${index}.flac`,
+    );
+
+    const locators = await Promise.all(
+      paths.map((path) => filesystem.getFileUri(path)),
+    );
+
+    expect(locators).toHaveLength(5_000);
+    expect(locators[0]).toBe(
+      "/app/local-data/offline-media/profile/asset-0.flac",
+    );
+    expect(locators[locators.length - 1]).toBe(
+      "/app/local-data/offline-media/profile/asset-4999.flac",
+    );
+    expect(appLocalDataDirMock).toHaveBeenCalledOnce();
+    expect(joinMock).not.toHaveBeenCalled();
   });
 
   it("retries resolving AppLocalData after a failed lookup", async () => {

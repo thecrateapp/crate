@@ -72,11 +72,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const vizSettingsRef = useRef<HTMLDivElement>(null);
   const vizSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const vizRef = useRef<MusicVisualizer | null>(null);
-  const visualizerQualityProfile =
-    typeof document !== "undefined" &&
-    document.documentElement.dataset.crateLinuxWindowChrome === "true"
-      ? "tauri-linux"
-      : "default";
+  const visualizerAllowed =
+    typeof document === "undefined" ||
+    document.documentElement.dataset.crateLinuxWindowChrome !== "true";
   const playbackState = useMemo(
     () => ({ isPlaying, volume }),
     [isPlaying, volume],
@@ -86,6 +84,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     currentTrack,
     open && isDesktop,
     crossfadeTransition,
+    visualizerAllowed,
   );
   const isVisualizerMode = vizCfg.surfaceMode === "visualizer";
 
@@ -105,13 +104,12 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     playbackState,
     "spheres",
     vizRef,
-    visualizerQualityProfile,
   );
 
   // Measure cover position relative to the left panel and give the WebGL
   // canvas a bit more breathing room than the visualizer itself needs.
   useEffect(() => {
-    if (!open || !isDesktop) return;
+    if (!open || !isDesktop || !isVisualizerMode) return;
     const measure = () => {
       const cover = coverRef.current;
       const panel = panelRef.current;
@@ -138,7 +136,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
       resizeObs.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [open, isDesktop, showVizSettings, vizCfg.surfaceMode]);
+  }, [open, isDesktop, isVisualizerMode, showVizSettings]);
 
   useDismissibleLayer({
     active:
@@ -224,7 +222,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         volume,
         canvasRect,
         vizCfg,
-        visualizerQualityProfile,
+        visualizerAllowed,
         equalizerEnabled,
       }}
       refs={{

@@ -70,7 +70,7 @@ async function bootstrapDesktopApp(): Promise<void> {
     <>
       {hasLinuxWindowTitlebar && <LinuxWindowTitlebar />}
       {hasLinuxWindowTitlebar && <div aria-hidden="true" className="h-9" />}
-      <HashRouter>
+      <HashRouter useTransitions={hasLinuxWindowTitlebar ? false : undefined}>
         <I18nProvider>
           <App />
         </I18nProvider>

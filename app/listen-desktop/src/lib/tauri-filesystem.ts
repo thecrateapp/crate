@@ -1,4 +1,4 @@
-import { appLocalDataDir, BaseDirectory, join } from "@tauri-apps/api/path";
+import { appLocalDataDir, BaseDirectory } from "@tauri-apps/api/path";
 import {
   mkdir as tauriMkdir,
   readTextFile,
@@ -38,7 +38,12 @@ async function absolutePath(path: string): Promise<string> {
       throw error;
     });
   }
-  return join(await appLocalDataDirPromise, relativePath(path));
+  const root = await appLocalDataDirPromise;
+  const separator =
+    /^[a-z]:[\\/]/i.test(root) || root.includes("\\") ? "\\" : "/";
+  const base = root.replace(/[\\/]+$/, "");
+  const relative = relativePath(path).replace(/\//g, separator);
+  return `${base}${separator}${relative}`;
 }
 
 function normalizeFileSystemError(error: unknown): unknown {

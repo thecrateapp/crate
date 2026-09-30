@@ -113,7 +113,7 @@ function makeAssetRecords(profileKey, count) {
   );
 }
 
-async function measureHydration(storage) {
+async function measureHydration(storage, context) {
   const measurements = [];
   for (const count of [100, 1_000, 5_000]) {
     const samples = [];
@@ -129,6 +129,11 @@ async function measureHydration(storage) {
       );
 
       resetStats();
+      await reportProgress(context, "hydration", "started", {
+        assets: count,
+        repetition: repetition + 1,
+        repetitions: 3,
+      });
       let started = performance.now();
       await storage.hydrateOfflineProfileState(profileKey);
       const firstPassMs = performance.now() - started;
@@ -136,11 +141,23 @@ async function measureHydration(storage) {
         storage.loadOfflineNativeAssetIndex(profileKey),
       ).length;
       const firstPassStats = snapshotStats();
+      await reportProgress(context, "hydration", "first-pass-complete", {
+        assets: count,
+        repetition: repetition + 1,
+        elapsedMs: firstPassMs,
+        hydratedEntries,
+        stats: firstPassStats,
+      });
 
       resetStats();
       started = performance.now();
       await storage.hydrateOfflineProfileState(profileKey);
       const warmPassMs = performance.now() - started;
+      await reportProgress(context, "hydration", "warm-pass-complete", {
+        assets: count,
+        repetition: repetition + 1,
+        elapsedMs: warmPassMs,
+      });
       samples.push({
         firstPassMs,
         warmPassMs,
@@ -394,6 +411,20 @@ async function postReport(report) {
     throw new Error(`Report server returned HTTP ${response.status}`);
 }
 
+async function reportProgress(context, phase, status, details = {}) {
+  const progress = {
+    event: "native-performance-progress",
+    revision: context.revision,
+    phase,
+    status,
+    at: new Date().toISOString(),
+    ...details,
+  };
+  resultsElement.textContent = JSON.stringify(progress, null, 2);
+  document.title = `Tauri native performance probe: ${phase} ${status}`;
+  await postReport(progress);
+}
+
 async function cleanup() {
   await remove("offline-media", {
     baseDir: dataDirectory,
@@ -416,10 +447,11 @@ async function run() {
   try {
     await appLocalDataDir();
     const storage = await import("../../../listen/src/lib/offline-storage.ts");
-    const offlineNative = await import(
-      "../../../listen/src/lib/offline-native.ts"
-    );
-    report.hydration = await measureHydration(storage);
+    const offlineNative =
+      await import("../../../listen/src/lib/offline-native.ts");
+    report.hydration = await measureHydration(storage, {
+      revision: report.revision,
+    });
     const seeded = await seedVerificationFiles(5_000);
     report.verification = await measureVerification(
       offlineNative.verifyNativeOfflineAssets,

@@ -6,7 +6,6 @@ import type { VisualizerConfigState } from "@/components/player/visualizer/useVi
 import type { CrossfadeTransition } from "@/contexts/PlayerContext";
 import type { Track } from "@/contexts/player-types";
 import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
-import type { VisualizerQualityProfileName } from "@/components/player/visualizer/visualizer-quality";
 
 export type ExtendedPlayerTabId = "queue" | "suggested" | "lyrics" | "info";
 
@@ -26,7 +25,7 @@ export type ExtendedPlayerViewState = {
   volume: number;
   canvasRect: VisualizerCanvasRect | null;
   vizCfg: VisualizerConfigState;
-  visualizerQualityProfile: VisualizerQualityProfileName;
+  visualizerAllowed: boolean;
   equalizerEnabled: boolean;
 };
 

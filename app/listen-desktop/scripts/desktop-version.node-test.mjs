@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +11,7 @@ import {
   verifyAppImage,
 } from "./verify-desktop-artifact-version.mjs";
 import {
+  detectLocalDesktopVersion,
   parseDesktopVersion,
   readDesktopVersionSources,
   resolveDesktopVersion,
@@ -29,7 +31,7 @@ test("release tag overrides the package default and strips the v prefix", () => 
   assert.equal(resolved.msiCompatible, true);
 });
 
-test("manual and branch builds use the synchronized package version", () => {
+test("CI branch builds use the synchronized package version", () => {
   const resolved = resolveDesktopVersion({
     refType: "branch",
     refName: "feat/tauri-desktop-app",
@@ -39,13 +41,44 @@ test("manual and branch builds use the synchronized package version", () => {
   assert.equal(resolved.version, "0.1.0");
 });
 
-test("local builds at an exact release tag use that tag", () => {
+test("local builds use the Git describe version of their checkout", () => {
   const resolved = resolveDesktopVersion({
-    localTag: "v2.1.3",
+    localVersion: "v2.4.1-29-g00c988e9-dirty",
     defaultVersion: "0.1.0",
   });
 
-  assert.equal(resolved.version, "2.1.3");
+  assert.equal(resolved.version, "2.4.1-29-g00c988e9-dirty");
+  assert.equal(resolved.msiCompatible, false);
+});
+
+test("local version detection includes the nearest tag, distance, and dirty state", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "crate-version-git-"));
+  const git = (...args) => {
+    const result = spawnSync("git", args, {
+      cwd: root,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+
+  git("init", "--quiet");
+  git("config", "user.name", "Crate Version Test");
+  git("config", "user.email", "version-test@example.invalid");
+  fs.writeFileSync(path.join(root, "README.md"), "base\n");
+  git("add", "README.md");
+  git("commit", "--quiet", "-m", "base");
+  git("tag", "v2.4.1");
+  fs.appendFileSync(path.join(root, "README.md"), "next commit\n");
+  git("add", "README.md");
+  git("commit", "--quiet", "-m", "next");
+  fs.appendFileSync(path.join(root, "README.md"), "uncommitted\n");
+
+  assert.match(
+    detectLocalDesktopVersion(root),
+    /^v2\.4\.1-1-g[0-9a-f]+-dirty$/,
+  );
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test("explicit release version takes precedence over the GitHub ref", () => {
@@ -140,12 +173,17 @@ test("GitHub environment records normalized app and MSI compatibility metadata",
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test("Tauri builds receive the release version without changing source config", () => {
+test("Tauri build and dev commands receive the resolved version", () => {
   assert.deepEqual(
     withTauriVersionOverride(["build", "--bundles", "app"], "2.7.4"),
     ["build", "--bundles", "app", "--config", '{"version":"2.7.4"}'],
   );
-  assert.deepEqual(withTauriVersionOverride(["dev"], "2.7.4"), ["dev"]);
+  assert.deepEqual(withTauriVersionOverride(["dev"], "2.7.4"), [
+    "dev",
+    "--config",
+    '{"version":"2.7.4"}',
+  ]);
+  assert.deepEqual(withTauriVersionOverride(["info"], "2.7.4"), ["info"]);
 });
 
 test("Windows MSI selection works for spaced and inline Tauri flags", () => {

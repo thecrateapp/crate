@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
+  detectLocalDesktopVersion,
   readDesktopVersionSources,
   resolveDesktopVersion,
   windowsBuildRequiresMsi,
@@ -13,11 +14,15 @@ import {
 const scriptPath = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(scriptPath), "../../..");
 const sources = readDesktopVersionSources(repositoryRoot);
+const localVersion = process.env.GITHUB_REF_TYPE
+  ? ""
+  : detectLocalDesktopVersion(repositoryRoot);
 const version = resolveDesktopVersion({
   override:
     process.env.CRATE_DESKTOP_VERSION || process.env.TAURI_RELEASE_VERSION,
   refType: process.env.GITHUB_REF_TYPE,
   refName: process.env.GITHUB_REF_NAME,
+  localVersion,
   defaultVersion: sources.tauri,
 });
 const args = withTauriVersionOverride(process.argv.slice(2), version.version);

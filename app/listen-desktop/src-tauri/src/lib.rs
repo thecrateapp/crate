@@ -63,6 +63,46 @@ const DESKTOP_MIN_WIDTH: f64 = 1024.0;
 #[cfg(desktop)]
 const DESKTOP_MIN_HEIGHT: f64 = 700.0;
 
+#[cfg(all(desktop, target_os = "linux"))]
+#[derive(Default)]
+struct LinuxWindowBoundsUpdateState {
+    running: bool,
+    pending: bool,
+}
+
+#[cfg(all(desktop, target_os = "linux"))]
+impl LinuxWindowBoundsUpdateState {
+    fn request(&mut self) -> bool {
+        self.pending = true;
+        if self.running {
+            return false;
+        }
+
+        self.running = true;
+        true
+    }
+
+    fn begin_update(&mut self) {
+        self.pending = false;
+    }
+
+    fn finish_update(&mut self) -> bool {
+        if self.pending {
+            return true;
+        }
+
+        self.running = false;
+        false
+    }
+}
+
+#[cfg(all(desktop, target_os = "linux"))]
+static LINUX_WINDOW_BOUNDS_UPDATE_STATE: Mutex<LinuxWindowBoundsUpdateState> =
+    Mutex::new(LinuxWindowBoundsUpdateState {
+        running: false,
+        pending: false,
+    });
+
 #[tauri::command]
 fn ping() -> &'static str {
     "pong"
@@ -927,6 +967,51 @@ fn enforce_linux_desktop_window_bounds<R: tauri::Runtime>(window: &Window<R>) {
     }
 }
 
+#[cfg(all(desktop, target_os = "linux"))]
+fn schedule_linux_desktop_window_bounds<R: tauri::Runtime>(window: &Window<R>) {
+    // Window events run on Tauri's event loop; available_monitors synchronously
+    // routes through that loop, so querying it here would deadlock the window.
+    let should_start_worker = {
+        let mut state = LINUX_WINDOW_BOUNDS_UPDATE_STATE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.request()
+    };
+    if !should_start_worker {
+        return;
+    }
+
+    let window = window.clone();
+    let spawn_result = std::thread::Builder::new()
+        .name("linux-window-bounds".into())
+        .spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+
+            LINUX_WINDOW_BOUNDS_UPDATE_STATE
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .begin_update();
+            enforce_linux_desktop_window_bounds(&window);
+
+            let should_repeat = LINUX_WINDOW_BOUNDS_UPDATE_STATE
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .finish_update();
+            if !should_repeat {
+                break;
+            }
+        });
+
+    if let Err(error) = spawn_result {
+        let mut state = LINUX_WINDOW_BOUNDS_UPDATE_STATE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.running = false;
+        state.pending = false;
+        eprintln!("failed to schedule Linux window bounds update: {error}");
+    }
+}
+
 #[cfg(desktop)]
 #[cfg(not(target_os = "linux"))]
 fn should_restore_desktop_webview_window_size<R: tauri::Runtime>(
@@ -1032,7 +1117,7 @@ fn handle_window_lifecycle_event<R: tauri::Runtime>(
         }
         #[cfg(target_os = "linux")]
         tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-            enforce_linux_desktop_window_bounds(window);
+            schedule_linux_desktop_window_bounds(window);
         }
         _ => {}
     }
@@ -1225,6 +1310,9 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<DesktopMenuState> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    prefer_wayland_gdk_backend();
+
     let _sentry_guard = observability::init_sentry("listen-tauri-native");
 
     #[cfg(target_os = "linux")]
@@ -1346,6 +1434,69 @@ pub fn run() {
         .run(handle_run_event);
 }
 
+#[cfg(target_os = "linux")]
+fn prefer_wayland_gdk_backend() {
+    configure_appimage_media_environment();
+
+    let is_wayland_session = std::env::var("XDG_SESSION_TYPE")
+        .is_ok_and(|session_type| session_type.eq_ignore_ascii_case("wayland"))
+        && std::env::var_os("WAYLAND_DISPLAY").is_some();
+
+    if is_wayland_session {
+        // GUI launchers may inherit GDK_BACKEND=x11 from a terminal host even
+        // when the desktop session itself is Wayland. Prefer the native
+        // Wayland backend in that session to avoid routing WebKit through XWayland.
+        std::env::set_var("GDK_BACKEND", "wayland");
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn configure_appimage_media_environment() {
+    let Some(app_dir) = env::var_os("APPDIR").map(PathBuf::from) else {
+        return;
+    };
+
+    // linuxdeploy's GStreamer hook uses Ubuntu's helper path, while AppImages
+    // built on other distributions can place the helper directly under this
+    // directory. Point WebKit/GStreamer at the helper that was actually bundled.
+    let scanner = [
+        app_dir.join("usr/lib/gstreamer-1.0/gst-plugin-scanner"),
+        app_dir.join("usr/lib/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner"),
+    ]
+    .into_iter()
+    .find(|path| path.is_file());
+    if let Some(scanner) = scanner {
+        env::set_var("GST_PLUGIN_SCANNER_1_0", scanner);
+    }
+
+    let ptp_helper = [
+        app_dir.join("usr/lib/gstreamer-1.0/gst-ptp-helper"),
+        app_dir.join("usr/lib/gstreamer1.0/gstreamer-1.0/gst-ptp-helper"),
+    ]
+    .into_iter()
+    .find(|path| path.is_file());
+    if let Some(ptp_helper) = ptp_helper {
+        env::set_var("GST_PTP_HELPER_1_0", ptp_helper);
+    }
+
+    // AppRun exports PYTHONHOME pointing inside the AppImage, but no Python
+    // standard library is bundled there. That breaks GStreamer Python plugins
+    // during WebKit's media-plugin scan, so let them use the host Python setup.
+    let has_python_stdlib = env::var_os("PYTHONHOME")
+        .map(PathBuf::from)
+        .and_then(|python_home| fs::read_dir(python_home.join("lib")).ok())
+        .is_some_and(|entries| {
+            entries.flatten().any(|entry| {
+                entry.file_name().to_string_lossy().starts_with("python")
+                    && entry.path().join("encodings").is_dir()
+            })
+        });
+    if !has_python_stdlib {
+        env::remove_var("PYTHONHOME");
+        env::remove_var("PYTHONPATH");
+    }
+}
+
 fn remove_legacy_http_cookie_jar(app: &tauri::App) -> std::io::Result<()> {
     let cache_dir = app.path().app_cache_dir().map_err(std::io::Error::other)?;
     remove_legacy_http_cookie_jar_file(&cache_dir.join(".cookies"))
@@ -1366,12 +1517,27 @@ mod tests {
         PlaybackCommand,
     };
 
-    #[cfg(target_os = "linux")]
-    use super::linux_artwork_cache_root;
     use super::{
         cache_native_desktop_artwork_at, is_artwork_path_in_cache,
         prune_native_desktop_artwork_cache,
     };
+    #[cfg(target_os = "linux")]
+    use super::{linux_artwork_cache_root, LinuxWindowBoundsUpdateState};
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn coalesces_linux_window_bounds_updates_without_dropping_new_events() {
+        let mut state = LinuxWindowBoundsUpdateState::default();
+
+        assert!(state.request());
+        state.begin_update();
+        assert!(!state.request());
+        assert!(state.finish_update());
+
+        state.begin_update();
+        assert!(!state.finish_update());
+        assert!(state.request());
+    }
 
     #[test]
     fn removes_the_legacy_http_cookie_jar_idempotently() {
