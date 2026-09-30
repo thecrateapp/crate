@@ -3,12 +3,13 @@
 ## Scope and revision
 
 - Branch: `feat/tauri-desktop-app`
-- Source revision: `df72643d229ad7b47908f183690f5a35294a8ddf`
+- Baseline source revision for the original launch, R01–R05, and R08 captures: `df72643d229ad7b47908f183690f5a35294a8ddf`
+- Current branch revision for follow-up validation: `5d6ca6e2cd462cc469a9b81d95fbe2ec5f52687e` (R07 renderer code is from parent `00c988e9`)
 - Host: Mac17,2; macOS 27.0.1 (build 26A434), arm64, 16 GiB RAM; on AC power when checked after the run
 - Approved support floors: macOS 11+, Windows 10 version 1803+, and Linux with WebKitGTK 2.40+
 - Decision recorded: retain current audio behavior until native memory measurements exist for each OS; defer any long-track fallback decision.
 
-This is an interim validation record. It does not close the native acceptance matrix or R08.
+This is an interim validation record. Its capture groups use the revisions listed above; they do not close the native acceptance matrix or R08.
 
 ## macOS launch and window smoke
 
@@ -21,6 +22,8 @@ The `Crate Hardening Smoke` bundle above was not used for memory measurement. Se
 ## Same-revision automated gates
 
 On `df72643d229ad7b47908f183690f5a35294a8ddf`, Desktop Vitest passed 43/43; Listen passed 2,416 tests across 323 files with 4 existing skips; Rust macOS passed 48/48 and Clippy completed with `-D warnings`. Desktop and Listen typechecks, Listen ESLint, and both Vite production builds passed. The builds retain the existing 564.65 kB chunk warning; Node also prints its `module.register()` deprecation warning.
+
+Follow-up validation on branch revision `5d6ca6e2cd462cc469a9b81d95fbe2ec5f52687e` passed Desktop Vitest 43/43, Listen 2,416 passed with 4 existing skips, Rust 48/48, Clippy `-D warnings`, and Listen/Desktop typechecks. GitHub `Build Desktop Apps` passed all three jobs: Linux and Windows bundle/version checks, plus the macOS tester-bundle build. `Build Android` passed its typecheck, lint, contract tests, and Android tests. The signed APK/AAB steps were skipped because this was a manual non-release run. `PR Agent Review` completed successfully. These workflows are linked to the exact revision above; the PR remains draft.
 
 ## macOS native performance measurements — R01, R03–R05
 
@@ -61,6 +64,12 @@ The more representative two-at-a-time run applied 1,000 mutations in 500 durable
 
 The reproducible probes and exact commands are in [`app/listen-desktop/scripts/native-perf/`](../../app/listen-desktop/scripts/native-perf/README.md). R01 and R03–R05 remain open for Linux/Windows and real API/download workloads.
 
+### R02 — HTTP plugin resource cleanup revalidation — `5d6ca6e2`
+
+The vendored `tauri-plugin-http` resource tests passed 2/2: the cleanup helper returns all three request resources to baseline, and cancellation signals the pending request while releasing those resources (including repeated cancellation). The frontend plugin wrapper tests passed 3/3 for bodyless `204` cleanup, cancellation of a partially consumed body, and abort-listener removal when response headers fail.
+
+These are Rust resource-table helper tests and frontend IPC mocks. They do not exercise a packaged app's live `ResourceTable` during a success/error/abort/partial-stream soak; that installed-app check remains open on macOS, Windows, and Linux.
+
 ## macOS visualizer measurement — R07
 
 Three visible 30-second Tauri development WebView runs used the production `MusicVisualizer`, a deterministic synthetic analyser, and the Apple GPU (`WebGL 2.0`, `Apple Inc.`). With the initial wide probe canvas at 1,231 × 720 CSS pixels and DPR 1, the buffer was capped independently at 1,024 × 720. Each run reported frame-interval p50 17 ms and p95 18 ms; max intervals were 203, 31, and 25 ms. The first run included a brief hidden/visible transition; the two later runs stayed near 60 Hz. Synchronous renderer tick p95 was at or below the WebView's roughly 1 ms timer resolution. This records scheduling and CPU-side GL submission, not GPU completion time.
@@ -73,7 +82,15 @@ After that fix, three visible runs at the final 720 × 720 CSS size and DPR 1 re
 
 A 100-sample `top` delta capture at one-second intervals covered all three visible runs. Per-process CPU p50/p95/max was Tauri 4.5/5.5/6.7%, WebKit GPU 5.4/8.0/8.9%, WebContent 5.7/7.2/8.1%, and Networking 0/0.1/2.2%. A separate 0.5-second RSS capture across the same runs recorded median/p95/max MiB of Tauri 34.9/44.3/45.8, GPU 12.4/14.6/15.2, WebContent 17.5/21.5/24.4, and Networking 6.8/9.6/10.5. Keep process values separate; RSS can double-count shared pages, and these dev-WebView numbers do not measure energy or GPU completion.
 
-This harness instantiates the production `MusicVisualizer` directly with a synthetic analyser; it does not mount `useMusicVisualizer` or run real audio. The hook's visibility behavior has automated coverage, while native minimize/restore here verifies WebView visibility and RAF suspension/resumption. R07 remains open for native HiDPI, an installed-player smoke, and comparable release runs on macOS Intel, Windows, and a regular Linux desktop. Linux steps are in the [Linux measurement handover](tauri-linux-measurement-handover-2026-09-30.md).
+This harness instantiates the production `MusicVisualizer` directly with a synthetic analyser; it does not mount `useMusicVisualizer` or run real audio. The hook's visibility behavior has automated coverage, while native minimize/restore here verifies WebView visibility and RAF suspension/resumption. R07 remains open for repeatable HiDPI runs, an installed-player smoke, and comparable release runs on macOS Intel, Windows, and a regular Linux desktop. Linux steps are in the [Linux measurement handover](tauri-linux-measurement-handover-2026-09-30.md).
+
+### macOS HiDPI follow-up — 2026-09-30, branch revision `5d6ca6e2`
+
+The probe window was placed on the external 5K display (5,120 × 2,880 pixels, 2,560 × 1,440 logical points). The native WebView reported DPR 2. At 720 × 720 CSS pixels, the production renderer allocated a 1,024 × 1,024 canvas, confirming the configured buffer cap on a Retina display. WebGL reported `Apple GPU`.
+
+One uninterrupted visible 30-second run reported frame-interval p50/p95/max of 17/18/45 ms and synchronous tick p50/p95/max of 0/1/1 ms. The renderer stop check passed with an unchanged tick count over two seconds. Two later cycles recorded hidden/visible transitions and are not counted as clean visible runs; their frame maxima are not included here. The corresponding JSONL file is `/tmp/tauri-visualizer-macos-hidpi-20260930-r2.jsonl`.
+
+The process CPU/RSS samplers started after the clean cycle and overlapped those interrupted cycles, so this capture does not provide valid per-process CPU/RSS for the DPR-2 run. The earlier DPR-1 three-run capture remains the CPU/RSS evidence. An installed-player integration check and clean repeated HiDPI runs remain open.
 
 ## macOS development WebView memory measurement
 
