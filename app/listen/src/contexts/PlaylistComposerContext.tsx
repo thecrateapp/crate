@@ -33,6 +33,7 @@ interface PlaylistComposerContextValue {
   openCreatePlaylist: (options?: OpenPlaylistComposerOptions) => void;
   playlistOptions: PlaylistOption[];
   ensurePlaylistOptionsLoaded: () => void;
+  refreshPlaylistOptions: () => void;
 }
 
 const PlaylistComposerContext = createContext<
@@ -57,13 +58,20 @@ export function PlaylistComposerProvider({
     [],
   );
   const [playlistOptionsEnabled, setPlaylistOptionsEnabled] = useState(false);
-  const { data: playlistData } = useApi<PlaylistOption[]>(
-    playlistOptionsEnabled ? "/api/playlists" : null,
-  );
+  const { data: playlistData, refetch: refetchPlaylistOptions } = useApi<
+    PlaylistOption[]
+  >(playlistOptionsEnabled ? "/api/playlists" : null);
   const playlistOptions = useMemo(() => playlistData ?? [], [playlistData]);
   const ensurePlaylistOptionsLoaded = useCallback(() => {
     setPlaylistOptionsEnabled(true);
   }, []);
+  const refreshPlaylistOptions = useCallback(() => {
+    if (!playlistOptionsEnabled) {
+      setPlaylistOptionsEnabled(true);
+      return;
+    }
+    refetchPlaylistOptions();
+  }, [playlistOptionsEnabled, refetchPlaylistOptions]);
 
   const openCreatePlaylist = useCallback(
     (options?: OpenPlaylistComposerOptions) => {
@@ -116,6 +124,7 @@ export function PlaylistComposerProvider({
           });
         }
 
+        refreshPlaylistOptions();
         setOpen(false);
         toast.success("Playlist created");
         navigate(`/playlist/${created.id}`);
@@ -125,7 +134,7 @@ export function PlaylistComposerProvider({
         setSubmitting(false);
       }
     },
-    [navigate],
+    [navigate, refreshPlaylistOptions],
   );
 
   const handleClose = useCallback(() => {
@@ -137,8 +146,14 @@ export function PlaylistComposerProvider({
       openCreatePlaylist,
       playlistOptions,
       ensurePlaylistOptionsLoaded,
+      refreshPlaylistOptions,
     }),
-    [ensurePlaylistOptionsLoaded, openCreatePlaylist, playlistOptions],
+    [
+      ensurePlaylistOptionsLoaded,
+      openCreatePlaylist,
+      playlistOptions,
+      refreshPlaylistOptions,
+    ],
   );
 
   return (

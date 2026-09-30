@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Disc3 } from "@crate/ui/icons";
 
 import {
@@ -34,11 +34,15 @@ export function PlayerTrackMenu({
     albumCover: currentTrack.albumCover,
     ...playlistActions,
   });
-  const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: (open) => {
-      if (open) playlistActions.ensurePlaylistOptionsLoaded();
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      playlistActions.onOpenChange(open);
       onOverlayChange?.(open);
     },
+    [onOverlayChange, playlistActions.onOpenChange],
+  );
+  const actionMenu = useItemActionMenu(actions, {
+    onOpenChange: handleOpenChange,
   });
 
   return (

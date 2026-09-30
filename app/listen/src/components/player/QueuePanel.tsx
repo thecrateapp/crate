@@ -66,9 +66,7 @@ function QueuePanelRow({
     ];
   }, [baseActions, indexLabel, locked, onRemove, track.id]);
   const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: (open) => {
-      if (open) playlistActions.ensurePlaylistOptionsLoaded();
-    },
+    onOpenChange: playlistActions.onOpenChange,
   });
 
   return (

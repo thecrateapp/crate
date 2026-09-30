@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
+import { Textarea } from "@crate/ui/shadcn/textarea";
 import {
   AppModal,
   ModalBody,
@@ -70,45 +73,42 @@ export function CrateCreateModal({
         <ModalBody className="space-y-4 px-5 py-2">
           <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
             {t("common.name")}
-            <input
+            <Input
               aria-label={t("common.name")}
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={120}
               required
-              className="h-11 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none focus:border-accent-action/60"
+              className="h-11 rounded-lg bg-surface-canvas/25 px-3 text-sm"
             />
           </label>
           <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
             {t("library.crates.description")}
-            <textarea
+            <Textarea
               aria-label={t("library.crates.description")}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               maxLength={2000}
               rows={3}
-              className="rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 py-2 text-sm text-text-primary outline-none focus:border-accent-action/60"
+              className="min-h-0 rounded-lg bg-surface-canvas/25 px-3 py-2 text-sm"
             />
           </label>
         </ModalBody>
 
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
-          <button
+          <Button
             type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-text-muted transition-colors hover:bg-text-primary/5 hover:text-text-primary"
+            variant="ghost"
+            className="text-text-muted"
             onClick={onClose}
             disabled={submitting}
           >
             {t("common.cancel")}
-          </button>
-          <button
-            type="submit"
-            disabled={submitting || !name.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={submitting || !name.trim()}>
             {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
             {t("library.crates.create")}
-          </button>
+          </Button>
         </ModalFooter>
       </form>
     </AppModal>

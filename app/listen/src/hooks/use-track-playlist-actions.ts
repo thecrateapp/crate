@@ -28,6 +28,12 @@ export function useTrackPlaylistActions() {
   const playlistOptions = playlistComposer?.playlistOptions ?? [];
   const ensurePlaylistOptionsLoaded =
     playlistComposer?.ensurePlaylistOptionsLoaded ?? noop;
+  const onOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) ensurePlaylistOptionsLoaded();
+    },
+    [ensurePlaylistOptionsLoaded],
+  );
 
   const onCreatePlaylist = useCallback(
     (track: TrackMenuData) => {
@@ -50,6 +56,7 @@ export function useTrackPlaylistActions() {
   return {
     playlistOptions,
     ensurePlaylistOptionsLoaded,
+    onOpenChange,
     onCreatePlaylist,
     onAddToPlaylist,
   };

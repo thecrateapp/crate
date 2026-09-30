@@ -63,9 +63,7 @@ export function HomeReplayRowAction({
     ...playlistActions,
   });
   const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: (open) => {
-      if (open) playlistActions.ensurePlaylistOptionsLoaded();
-    },
+    onOpenChange: playlistActions.onOpenChange,
   });
 
   return (

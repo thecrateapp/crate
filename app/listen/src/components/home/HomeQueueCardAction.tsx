@@ -28,9 +28,7 @@ export function HomeQueueCardAction({
     ...playlistActions,
   });
   const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: (open) => {
-      if (open) playlistActions.ensurePlaylistOptionsLoaded();
-    },
+    onOpenChange: playlistActions.onOpenChange,
   });
 
   return (

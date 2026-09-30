@@ -3,13 +3,18 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const openCreatePlaylist = vi.hoisted(() => vi.fn());
+const ensurePlaylistOptionsLoaded = vi.hoisted(() => vi.fn());
 const api = vi.hoisted(() => vi.fn(async () => ({ ok: true })));
 const playlists = vi.hoisted(() => ({
   value: [] as Array<{ id: number; name: string }>,
 }));
 
 vi.mock("@/contexts/PlaylistComposerContext", () => ({
-  useOptionalPlaylistComposer: () => ({ openCreatePlaylist }),
+  useOptionalPlaylistComposer: () => ({
+    openCreatePlaylist,
+    playlistOptions: playlists.value,
+    ensurePlaylistOptionsLoaded,
+  }),
 }));
 
 vi.mock("@/lib/api", () => ({ api }));
@@ -41,6 +46,7 @@ const track = {
 describe("useTrackPlaylistActions", () => {
   beforeEach(() => {
     openCreatePlaylist.mockReset();
+    ensurePlaylistOptionsLoaded.mockReset();
     api.mockClear();
     playlists.value = [];
   });
@@ -89,5 +95,19 @@ describe("useTrackPlaylistActions", () => {
         },
       ],
     });
+  });
+
+  it("loads playlist options only when the track menu opens", () => {
+    const { result } = renderHook(() => useTrackPlaylistActions(), { wrapper });
+
+    act(() => {
+      result.current.onOpenChange(false);
+    });
+    expect(ensurePlaylistOptionsLoaded).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.onOpenChange(true);
+    });
+    expect(ensurePlaylistOptionsLoaded).toHaveBeenCalledOnce();
   });
 });

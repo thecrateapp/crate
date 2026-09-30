@@ -203,7 +203,7 @@ export function useTrackRowModel({
     placement: "bottom-end",
     onOpenChange: (open) => {
       if (open && playlistOptions === undefined) {
-        defaultPlaylistActions.ensurePlaylistOptionsLoaded();
+        defaultPlaylistActions.onOpenChange(open);
       }
     },
   });

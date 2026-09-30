@@ -57,9 +57,7 @@ export function QueueTabRow({
     ];
   }, [baseActions, indexLabel, locked, onRemove, t, track.id]);
   const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: (open) => {
-      if (open) playlistActions.ensurePlaylistOptionsLoaded();
-    },
+    onOpenChange: playlistActions.onOpenChange,
   });
 
   return (
