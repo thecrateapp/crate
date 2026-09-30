@@ -138,7 +138,8 @@ class TestSetlistfmProbableSetlist:
             assert len(result) > 0
             # "Everything In Its Right Place" appears most frequently
             assert result[0]["title"] == "Everything In Its Right Place"
-            assert result[0]["play_count"] == 3
+            # A song repeated in one show counts once for show frequency.
+            assert result[0]["play_count"] == 2
 
     def test_get_probable_setlist_accepts_setlistfm_object_shapes(self):
         setlist_data = {
@@ -201,6 +202,9 @@ class TestSetlistfmProbableSetlist:
         assert result[0]["title"] == "New Song"
         get_cache.assert_not_called()
         set_cache.assert_called_once()
+        cache_payload = set_cache.call_args.args[1]
+        assert cache_payload["model_version"] == 2
+        assert cache_payload["context"]["source_show_count"] == 1
 
     def test_get_probable_setlist_force_preserves_cached_value_when_provider_is_empty(
         self,

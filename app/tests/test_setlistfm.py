@@ -1,6 +1,9 @@
 from datetime import date
+from unittest.mock import patch
 
 from crate.setlistfm import (
+    _predict_setlist,
+    get_cached_probable_setlist_context,
     get_upcoming_shows,
     is_shows_sync_enabled,
     normalize_upcoming_show,
@@ -104,6 +107,134 @@ def test_normalize_upcoming_show_requires_id_artist_venue_and_date():
     assert (
         normalize_upcoming_show(_event(eventDate=""), today=date(2026, 8, 22)) is None
     )
+
+
+def test_setlist_prediction_prioritizes_the_active_tour_over_historical_shows():
+    predicted = _predict_setlist(
+        [
+            {
+                "date": "10-01-2025",
+                "tour": "Previous Tour",
+                "songs": ["Old Anthem", "Old Closer"],
+            },
+            {
+                "date": "09-01-2025",
+                "tour": "Previous Tour",
+                "songs": ["Old Anthem", "Old Closer"],
+            },
+            {
+                "date": "28-09-2026",
+                "tour": "30th Anniversary Tour",
+                "songs": ["New Intro", "New Single", "New Closer"],
+            },
+            {
+                "date": "27-09-2026",
+                "tour": "30th Anniversary Tour",
+                "songs": ["New Intro", "New Single", "New Closer"],
+            },
+        ],
+        today=date(2026, 9, 30),
+    )
+
+    assert predicted is not None
+    titles = [song["title"] for song in predicted]
+    assert titles[:3] == ["New Intro", "New Single", "New Closer"]
+    assert "Old Anthem" not in titles
+
+
+def test_setlist_prediction_sorts_dates_and_counts_each_song_once_per_show():
+    predicted = _predict_setlist(
+        [
+            {
+                "date": "27-09-2026",
+                "tour": "Current Tour",
+                "songs": ["Anchor", "Finale"],
+            },
+            {
+                "date": "28-09-2026",
+                "tour": "Current Tour",
+                "songs": ["Anchor", "Anchor", "Finale"],
+            },
+        ],
+        today=date(2026, 9, 30),
+    )
+
+    assert predicted is not None
+    anchor = next(song for song in predicted if song["title"] == "Anchor")
+    assert anchor["play_count"] == 2
+    assert anchor["last_played"] == "28-09-2026"
+    assert anchor["frequency"] == 1.0
+
+
+def test_setlist_prediction_does_not_mix_one_recent_show_with_old_history():
+    predicted = _predict_setlist(
+        [
+            {
+                "date": "10-01-2025",
+                "tour": "Previous Tour",
+                "songs": ["Old Anthem"],
+            },
+            {
+                "date": "28-09-2026",
+                "tour": "30th Anniversary Tour",
+                "songs": ["New Intro"],
+            },
+        ],
+        today=date(2026, 9, 30),
+    )
+
+    assert predicted is not None
+    assert [song["title"] for song in predicted] == ["New Intro"]
+
+
+def test_setlist_prediction_uses_recency_when_no_active_tour_is_detected():
+    predicted = _predict_setlist(
+        [
+            {
+                "date": "01-01-2026",
+                "tour": "Older Tour",
+                "songs": ["Recent Opening"],
+            },
+            {
+                "date": "30-06-2025",
+                "tour": "Older Tour",
+                "songs": ["Old Anthem"],
+            },
+            {
+                "date": "29-06-2025",
+                "tour": "Older Tour",
+                "songs": ["Old Anthem"],
+            },
+            {
+                "date": "28-06-2025",
+                "tour": "Older Tour",
+                "songs": ["Old Anthem"],
+            },
+        ],
+        today=date(2026, 9, 30),
+    )
+
+    assert predicted is not None
+    assert predicted[0]["title"] == "Recent Opening"
+
+
+def test_cached_probable_setlist_context_validates_the_model_version():
+    payload = {
+        "model_version": 2,
+        "context": {
+            "model_version": 2,
+            "mode": "active_tour",
+            "source_show_count": 4,
+            "source_date_from": "2026-09-20",
+            "source_date_to": "2026-09-28",
+            "tour_name": "30th Anniversary Tour",
+        },
+        "songs": [],
+    }
+    with patch("crate.setlistfm.get_cache", return_value=payload):
+        context = get_cached_probable_setlist_context("Placebo")
+
+    assert context == payload["context"]
 
 
 def test_normalize_upcoming_show_does_not_trust_invalid_coordinates():
