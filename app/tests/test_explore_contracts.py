@@ -89,6 +89,16 @@ class TestExploreFiltersContract:
             ),
             patch("crate.api.browse.curated_playlists", return_value=playlist_rows),
             patch(
+                "crate.api.browse._build_recent_global_artists",
+                return_value=[
+                    {
+                        "id": 12,
+                        "name": "Rival Schools",
+                        "has_photo": False,
+                    }
+                ],
+            ),
+            patch(
                 "crate.api.browse.api_browse_moods",
                 return_value=[
                     {
@@ -106,6 +116,9 @@ class TestExploreFiltersContract:
             assert len(data["playlists"]) == 8
             assert data["playlists"][0]["name"] == "Playlist 1"
             assert data["moods"][0]["name"] == "energetic"
+            assert data["recent_global_artists"] == [
+                {"id": 12, "name": "Rival Schools", "has_photo": False}
+            ]
 
     def test_explore_page_uses_global_genre_ranking_and_artwork_when_ready(
         self,

@@ -21,6 +21,7 @@ import {
   GenreExplorer,
   MoodBrowseSection,
 } from "./ExploreLandingSections";
+import { JustLandedSection } from "@/components/home/HomeLibrarySections";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { usePlayerActions } from "@/contexts/PlayerContext";
@@ -114,6 +115,11 @@ export function Explore() {
                 onClick={() => navigate("/paths")}
               />
             </div>
+
+            <JustLandedSection
+              artists={explorePage?.recent_global_artists}
+              loading={loading}
+            />
 
             <GenreExplorer
               genres={filters.genres}

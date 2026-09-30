@@ -5,7 +5,13 @@ import type { HomeUpcomingItem, HomeUpcomingResponse } from "./home-model";
 import { HomeUpcomingFeature } from "./HomeUpcomingFeatureCard";
 import { HomeUpcomingPreviewPanel } from "./HomeUpcomingPreviewPanel";
 
-function HomeUpcomingEmpty({ onOpenUpcoming }: { onOpenUpcoming: () => void }) {
+function HomeUpcomingEmpty({
+  onOpenUpcoming,
+  hasFollowedArtists,
+}: {
+  onOpenUpcoming: () => void;
+  hasFollowedArtists: boolean;
+}) {
   const { t } = useTranslation();
 
   return (
@@ -18,10 +24,18 @@ function HomeUpcomingEmpty({ onOpenUpcoming }: { onOpenUpcoming: () => void }) {
       />
       <div className="home-upcoming-empty-card rounded-[12px] p-5">
         <h2 className="text-lg font-bold text-text-primary">
-          {t("radar.empty.followTitle")}
+          {t(
+            hasFollowedArtists
+              ? "radar.empty.noSignalsTitle"
+              : "radar.empty.followTitle",
+          )}
         </h2>
         <p className="home-upcoming-empty-copy mt-1 max-w-2xl text-sm leading-6">
-          {t("radar.empty.followBody")}
+          {t(
+            hasFollowedArtists
+              ? "radar.empty.noSignalsBody"
+              : "radar.empty.followBody",
+          )}
         </p>
       </div>
     </section>
@@ -43,7 +57,12 @@ export function HomeUpcomingSection({
   const nextUpcoming = previewItems[0];
 
   if (!nextUpcoming) {
-    return <HomeUpcomingEmpty onOpenUpcoming={onOpenUpcoming} />;
+    return (
+      <HomeUpcomingEmpty
+        onOpenUpcoming={onOpenUpcoming}
+        hasFollowedArtists={(summary?.followed_artists ?? 0) > 0}
+      />
+    );
   }
 
   return (

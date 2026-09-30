@@ -1,7 +1,7 @@
 # Crate Custom Cast Receiver Design
 
-**Status:** Approved for implementation  
-**Date:** 2026-09-14  
+**Status:** Approved for implementation
+**Date:** 2026-09-14
 **Target branch:** `codex/listen-design-system`
 
 ## Goal

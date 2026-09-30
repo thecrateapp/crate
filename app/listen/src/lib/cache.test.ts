@@ -167,6 +167,15 @@ describe("scopesForUrl", () => {
     expect(scopesForUrl("/api/me/albums")).toEqual(["saved_albums"]);
   });
 
+  it("returns the Crates scope for the collection", () => {
+    expect(scopesForUrl("/api/me/crates")).toEqual(["crates"]);
+  });
+
+  it("returns the Crates scope for a Crate", () => {
+    const crateId = "7ee76303-7aa6-4317-a5d3-18c2e1360b1c";
+    expect(scopesForUrl(`/api/crates/${crateId}`)).toEqual(["crates"]);
+  });
+
   it("returns user catalog scopes", () => {
     expect(scopesForUrl("/api/catalog/me/follows")).toEqual([
       "follows",

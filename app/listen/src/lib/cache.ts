@@ -138,6 +138,7 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/me/likes")) scopes.push("likes");
   else if (url.startsWith("/api/me/follows")) scopes.push("follows");
   else if (url.startsWith("/api/me/albums")) scopes.push("saved_albums");
+  else if (url.startsWith("/api/me/crates")) scopes.push("crates");
   else if (url.startsWith("/api/catalog/me/follows"))
     scopes.push("follows", "library");
   else if (url.startsWith("/api/catalog/me/artists"))
@@ -160,6 +161,8 @@ export function scopesForUrl(url: string): string[] {
     const m = url.match(/^\/api\/playlists\/(\d+)/);
     if (m) scopes.push(`playlist:${m[1]}`);
   }
+  // Crate collection and detail queries share the broad invalidation scope.
+  else if (url.startsWith("/api/crates")) scopes.push("crates");
   // Curation
   else if (url.startsWith("/api/curation")) scopes.push("curation");
   // Artist detail — also invalidates on follows (follow button state)

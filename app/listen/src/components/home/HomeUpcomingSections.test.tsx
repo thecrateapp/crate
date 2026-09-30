@@ -98,6 +98,27 @@ describe("HomeUpcomingSection", () => {
       screen.getByText("Follow some artists to unlock Radar"),
     ).toBeInTheDocument();
   });
+
+  it("explains that Radar has no signals when followed artists have no events", () => {
+    renderWithRouter(
+      <HomeUpcomingSection
+        previewItems={[]}
+        summary={{
+          followed_artists: 100,
+          show_count: 0,
+          release_count: 0,
+          attending_count: 0,
+          insight_count: 0,
+        }}
+        onOpenUpcoming={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("No new Radar signals yet")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Follow some artists to unlock Radar"),
+    ).not.toBeInTheDocument();
+  });
 });
 
 function renderWithRouter(ui: ReactElement) {
