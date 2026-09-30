@@ -468,12 +468,47 @@ fn validate_offline_media_path(path: &str) -> Result<PathBuf, String> {
     if remaining.is_empty()
         || remaining
             .iter()
-            .any(|segment| segment.is_empty() || *segment == "." || *segment == "..")
+            .any(|segment| !is_valid_windows_path_segment(segment))
     {
         return Err("Invalid Tauri offline media path".to_string());
     }
 
     Ok(PathBuf::from(path))
+}
+
+fn is_valid_windows_path_segment(segment: &str) -> bool {
+    // Offline paths must remain materializable if a profile moves between OSes.
+    if segment.is_empty()
+        || segment == "."
+        || segment == ".."
+        || segment.ends_with([' ', '.'])
+        || segment.chars().any(|character| {
+            character <= '\u{1f}' || matches!(character, '<' | '>' | '"' | '|' | '?' | '*')
+        })
+    {
+        return false;
+    }
+
+    let device_name = segment
+        .split_once('.')
+        .map_or(segment, |(name, _)| name)
+        .trim_end_matches([' ', '.'])
+        .to_ascii_uppercase();
+    if matches!(
+        device_name.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) {
+        return false;
+    }
+
+    !["COM", "LPT"].iter().any(|prefix| {
+        device_name.strip_prefix(prefix).is_some_and(|suffix| {
+            matches!(
+                suffix,
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+            )
+        })
+    })
 }
 
 async fn resolve_target_path(root: &Path, path: &str) -> Result<PathBuf, String> {
@@ -834,8 +869,9 @@ pub async fn download_offline_media(
 mod tests {
     use super::{
         cleanup_unreferenced_media_files, download_to_temporary_file, inspect_offline_media_file,
-        promote_file_with, recover_interrupted_file_promotion, validate_offline_media_path,
-        OfflineMediaExpectation, OfflineTransfer, OfflineTransferScope,
+        promote_file_with, recover_interrupted_file_promotion, resolve_target_path,
+        validate_offline_media_path, OfflineMediaExpectation, OfflineTransfer,
+        OfflineTransferScope,
     };
     use std::{
         collections::HashSet,
@@ -906,6 +942,13 @@ mod tests {
             validate_offline_media_path("offline-media/profile/song.flac").unwrap(),
             PathBuf::from("offline-media/profile/song.flac")
         );
+        for path in [
+            "offline-media/profile/CONCERT.flac",
+            "offline-media/profile/COM10.flac",
+            "offline-media/profile/con-track/song.flac",
+        ] {
+            assert!(validate_offline_media_path(path).is_ok(), "rejected {path}");
+        }
     }
 
     #[test]
@@ -917,11 +960,55 @@ mod tests {
             "offline-media\\outside.flac",
             "offline-media//song.flac",
             "offline-media/profile/song:stream.flac",
+            "offline-media/profile/CON",
+            "offline-media/profile/NUL.txt",
+            "offline-media/profile/conin$.txt",
+            "offline-media/profile/COM1.mp3",
+            "offline-media/profile/LPT9",
+            "offline-media/profile/COM¹.mp3",
+            "offline-media/profile/song.",
+            "offline-media/profile/song ",
+            "offline-media/profile/bad<name>.mp3",
+            "offline-media/profile/bad\u{1f}name.mp3",
         ] {
             assert!(
                 validate_offline_media_path(path).is_err(),
                 "accepted invalid path: {path}"
             );
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn target_resolution_rejects_symlinked_media_directories_without_writing_outside() {
+        use std::os::unix::fs::symlink;
+
+        for (link, target_path) in [
+            (
+                PathBuf::from("offline-media"),
+                "offline-media/profile-a/song.m4a",
+            ),
+            (
+                PathBuf::from("offline-media/profile-a"),
+                "offline-media/profile-a/song.m4a",
+            ),
+            (
+                PathBuf::from("offline-media/profile-a/album"),
+                "offline-media/profile-a/album/song.m4a",
+            ),
+        ] {
+            let directory = test_directory();
+            let outside = directory.join("outside");
+            fs::create_dir(&outside).unwrap();
+            let link_path = directory.join(&link);
+            fs::create_dir_all(link_path.parent().unwrap()).unwrap();
+            symlink(&outside, &link_path).unwrap();
+
+            let result = resolve_target_path(&directory, target_path).await;
+
+            assert!(result.is_err(), "accepted symlinked directory: {link:?}");
+            assert!(!outside.join("song.m4a").exists());
+            fs::remove_dir_all(directory).unwrap();
         }
     }
 
