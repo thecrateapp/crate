@@ -951,9 +951,10 @@ def _native_oauth_completion_redirect_url(
         redirect_url = (
             f"{_callback_origin(_NATIVE_CALLBACK_URL, app_id=app_id)}/auth/callback"
         )
-        redirect_url = _append_query_param(redirect_url, "desktop", "tauri")
-    else:
-        redirect_url = _NATIVE_CALLBACK_URL
+        fragment = urlencode({"desktop": "tauri", "code": code, "state": state})
+        return f"{redirect_url}#{fragment}"
+
+    redirect_url = _NATIVE_CALLBACK_URL
     redirect_url = _append_query_param(redirect_url, "code", code)
     return _append_query_param(redirect_url, "state", state)
 

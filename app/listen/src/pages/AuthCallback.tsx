@@ -8,9 +8,19 @@ import {
   persistOAuthCallbackPayload,
 } from "@/lib/capacitor";
 
-function buildDesktopDeepLink(search: string): string | null {
-  const params = new URLSearchParams(search);
-  if (params.get("desktop") !== "tauri") return null;
+function getDesktopCallbackParams(
+  search: string,
+  hash: string,
+): URLSearchParams | null {
+  const queryParams = new URLSearchParams(search);
+  if (queryParams.get("desktop") === "tauri") return queryParams;
+
+  const fragmentParams = new URLSearchParams(hash.replace(/^#/, ""));
+  return fragmentParams.get("desktop") === "tauri" ? fragmentParams : null;
+}
+
+function buildDesktopDeepLink(params: URLSearchParams | null): string | null {
+  if (!params) return null;
   const code = params.get("code");
   const state = params.get("state");
   if (!code || !state) return null;
@@ -37,14 +47,17 @@ export function AuthCallback() {
   const awaitingAuthRef = useRef(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const deepLink = buildDesktopDeepLink(window.location.search);
+    const desktopParams = getDesktopCallbackParams(
+      window.location.search,
+      window.location.hash,
+    );
+    const deepLink = buildDesktopDeepLink(desktopParams);
     if (deepLink) {
       setDesktopDeepLink(deepLink);
       openDesktopDeepLink(deepLink);
       return;
     }
-    if (params.get("desktop") === "tauri") {
+    if (desktopParams) {
       clearPendingOAuthNext();
       navigate("/login", { replace: true });
       return;

@@ -976,7 +976,7 @@ class TestOAuthCallback:
             ),
             (
                 "listen-tauri",
-                "https://listen.lespedants.org/auth/callback?desktop=tauri"
+                "https://listen.lespedants.org/auth/callback#desktop=tauri"
                 f"&code=one-time-code&state={'s' * 43}",
             ),
         ],
