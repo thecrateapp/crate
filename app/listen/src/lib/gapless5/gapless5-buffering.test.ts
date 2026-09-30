@@ -329,6 +329,101 @@ describe("Gapless5 mobile background auto-advance", () => {
 });
 
 describe("Gapless5 WebAudio promotion", () => {
+  it("ignores decode results from an earlier load of the same source", async () => {
+    const pendingDecodes: Array<(buffer: { duration: number }) => void> = [];
+
+    class FakeAudio {
+      controls = false;
+      loop = false;
+      src = "";
+
+      load() {}
+
+      pause() {}
+
+      play() {
+        return Promise.resolve();
+      }
+    }
+
+    const node = () => ({
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    });
+    const context = {
+      currentTime: 0,
+      destination: node(),
+      createGain: vi.fn(() => ({
+        ...node(),
+        gain: { value: 1, linearRampToValueAtTime: vi.fn() },
+      })),
+      decodeAudioData: vi.fn(
+        () =>
+          new Promise<{ duration: number }>((resolve) => {
+            pendingDecodes.push(resolve);
+          }),
+      ),
+    };
+
+    vi.stubGlobal("Audio", FakeAudio);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => new ArrayBuffer(8),
+      })),
+    );
+    Object.defineProperty(window, "gapless5AudioContext", {
+      configurable: true,
+      writable: true,
+      value: context,
+    });
+
+    const player = new Gapless5({
+      tracks: ["one", "two"],
+      useHTML5Audio: false,
+      useWebAudio: true,
+      loadLimit: 1,
+    });
+    const onload = vi.fn();
+    player.onload = onload;
+    const flushMicrotasks = async () => {
+      for (let index = 0; index < 8; index += 1) {
+        await Promise.resolve();
+      }
+    };
+
+    await flushMicrotasks();
+    expect(pendingDecodes).toHaveLength(1);
+
+    player.gotoTrack(1);
+    await flushMicrotasks();
+    expect(pendingDecodes).toHaveLength(2);
+
+    player.gotoTrack(0);
+    await flushMicrotasks();
+    expect(pendingDecodes).toHaveLength(3);
+
+    pendingDecodes[0]!({ duration: 180 });
+    await flushMicrotasks();
+    expect(onload).not.toHaveBeenCalled();
+    expect(context.createGain).toHaveBeenCalledTimes(1);
+
+    pendingDecodes[2]!({ duration: 210 });
+    await flushMicrotasks();
+    expect(onload).toHaveBeenCalledTimes(1);
+    expect(onload).toHaveBeenCalledWith("one", true);
+    expect(context.createGain).toHaveBeenCalledTimes(2);
+
+    pendingDecodes[1]!({ duration: 180 });
+    await flushMicrotasks();
+    expect(onload).toHaveBeenCalledTimes(1);
+
+    player.removeAllTracks();
+    Reflect.deleteProperty(window, "gapless5AudioContext");
+  });
+
   it("starts a queued WebAudio resume from the restored paused position", async () => {
     let resolveDecode: ((buffer: { duration: number }) => void) | undefined;
     const decodePromise = new Promise<{ duration: number }>((resolve) => {
