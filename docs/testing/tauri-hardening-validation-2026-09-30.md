@@ -33,22 +33,22 @@ The Linux artifacts were downloaded from that run and inspected in a Debian 12 c
 
 ## macOS native performance measurements — R01, R03–R05
 
-All runs used this revision on the Mac17,2 ARM64 host above. The offline probes ran in an isolated Tauri development window with synthetic metadata and 1-byte files under a dedicated app identifier; the release HTTP microbenchmark used only a loopback HTTP/1.1 fixture. Timings are not production API or installed-player acceptance results.
+The offline probes used the recorded source revision on the Mac17,2 ARM64 host above. The corrected release HTTP microbenchmark used the same checkout based on `2903365a`, with only the benchmark fixture modified; it ran against a loopback HTTP/1.1 server. The offline probes ran in an isolated Tauri development window with synthetic metadata and 1-byte files under a dedicated app identifier. Timings are not production API or installed-player acceptance results.
 
 ### R01 — HTTP client reuse
 
-`cargo run --release --example http_pool_bench` compared a fresh reqwest client per request with one shared client. Each response contained 16 KiB. This was one run; the shared client's connection count excludes the warmup request because the benchmark resets its counter after warmup.
+`cargo run --release --locked --example http_pool_bench` compared a fresh reqwest client per request with one shared client. Each response contained 16 KiB. The fixture now sets `TCP_NODELAY` and writes headers plus body together; the earlier Linux run's roughly 41 ms delay came from the fixture's delayed-ACK behavior, not production HTTP latency. This corrected Mac run is one measurement; the shared client's connection count excludes the warmup request because the benchmark resets its counter after warmup.
 
 | Concurrency | Requests | Fresh client: total / p50 / p95 | Shared client: total / p50 / p95 | Accepted connections: fresh / shared |
 | ----------- | -------: | ------------------------------: | -------------------------------: | -----------------------------------: |
-| 1           |      100 |            30 ms / 172 / 249 µs |                7 ms / 73 / 86 µs |                              100 / 0 |
-| 1           |    1,000 |             141 ms / 75 / 88 µs |               29 ms / 24 / 31 µs |                            1,000 / 0 |
-| 1           |    5,000 |             704 ms / 75 / 83 µs |              147 ms / 24 / 30 µs |                            5,000 / 0 |
-| 8           |      100 |            11 ms / 218 / 255 µs |               1 ms / 96 / 174 µs |                              100 / 7 |
-| 8           |    1,000 |           107 ms / 205 / 235 µs |              15 ms / 99 / 108 µs |                            1,000 / 7 |
-| 8           |    5,000 |           648 ms / 312 / 393 µs |             91 ms / 102 / 167 µs |                            5,000 / 7 |
+| 1           |      100 |            59 ms / 196 / 801 µs |               9 ms / 61 / 188 µs |                              100 / 0 |
+| 1           |    1,000 |           323 ms / 133 / 267 µs |               46 ms / 32 / 92 µs |                            1,000 / 0 |
+| 1           |    5,000 |            975 ms / 77 / 182 µs |              183 ms / 27 / 75 µs |                            5,000 / 0 |
+| 8           |      100 |          55 ms / 676 / 2,151 µs |              4 ms / 272 / 420 µs |                              100 / 7 |
+| 8           |    1,000 |           181 ms / 348 / 670 µs |             18 ms / 109 / 207 µs |                            1,000 / 7 |
+| 8           |    5,000 |           852 ms / 287 / 666 µs |            119 ms / 110 / 302 µs |                            5,000 / 7 |
 
-The local fixture shows that pooling reuses keep-alive connections and lowers loopback latency in this run. It does not measure TLS, proxy behavior, Crate API routes, CPU/RSS, or cancellation; those R01 acceptance checks remain open.
+The corrected local fixture shows that pooling reuses keep-alive connections and lowers loopback latency in this run. It does not measure TLS, proxy behavior, Crate API routes, CPU/RSS, or cancellation; those R01 acceptance checks remain open. Linux needs a repeat with the corrected fixture, and Windows has not been measured.
 
 ### R03 — Offline index hydration and file verification
 
@@ -212,9 +212,15 @@ The review also flagged the one-time handoff code in the Tauri HTTPS callback qu
 
 The OAuth-focused backend tests (`141 passed, 12 skipped`), Listen `AuthCallback` tests (`7 passed`), and changed-file pre-commit hooks passed on the earlier working tree. The merged branch revision and its current CI results are recorded below.
 
+### Persistent review — Google offline access
+
+The review of `2903365a` says removing `access_type=offline` can silently stop the application receiving a Google refresh token. In the current product flow this is not a required credential: Google is used only for identity (`openid email profile`); [`_google_userinfo`](../../app/crate/api/auth.py) exchanges the code, uses the access token for Google's user-info endpoint, and returns only that profile. The callback persists the provider subject and email metadata, not provider tokens. The app's refresh token is a separate Crate session JWT. Google unlink removes the local external identity and does not call Google's token-revocation endpoint; there is no existing server-side Google grant to revoke or Google API sync that depends on a refresh token.
+
+The existing regression tests cover both sides of this contract: `test_google_userinfo_does_not_expose_provider_refresh_token` supplies a token response containing a refresh token and verifies only user info is returned, while `test_public_google_login_uses_identity_scopes_without_offline_access` and `test_google_oauth_start_does_not_force_consent_for_existing_grants` assert the identity request does not ask for offline access or forced consent. The finding is therefore not a regression in current behavior. If a future feature calls Google APIs after login, it must add explicit scopes, secure refresh-token storage/rotation, and unlink-time revocation together; requesting offline access during identity login alone would create an unused long-lived credential.
+
 ## Linux desktop handover and merged branch validation — 2026-09-30
 
-The Linux agent's [desktop validation report](tauri-linux-desktop-results-2026-09-30.md) records a real GNOME Wayland run on CachyOS. R03–R05 pass for the synthetic offline workload after removing per-file path IPC. R01 remains inconclusive because the local HTTP fixture adds a repeatable ~41 ms delay; R07 and R08 are partial; AppImage launch and MPRIS are partial; native UI automation and real-player/offline flows remain open.
+The Linux agent's [desktop validation report](tauri-linux-desktop-results-2026-09-30.md) records a real GNOME Wayland run on CachyOS. R03–R05 pass for the synthetic offline workload after removing per-file path IPC. The previous R01 Linux measurement is invalidated by delayed-ACK behavior in its local HTTP fixture; rerun it with the corrected fixture above. R07 and R08 are partial; AppImage launch and MPRIS are partial; native UI automation and real-player/offline flows remain open.
 
 The report measured visualizer RAF intervals around 23–24 ms. Diego also confirmed that it feels too slow on an i9 Wayland machine, so Tauri Linux now hides the visualizer until rendering can meet the required frame rate. The change is covered by `ExtendedPlayer.test.tsx`; web and Capacitor keep the existing visualizer.
 

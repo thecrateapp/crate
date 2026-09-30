@@ -55,6 +55,7 @@ async fn run_server() -> io::Result<(String, Arc<ServerMetrics>)> {
 }
 
 async fn serve_connection(stream: TcpStream) -> io::Result<()> {
+    stream.set_nodelay(true)?;
     let mut reader = BufReader::new(stream);
     loop {
         let mut line = String::new();
@@ -67,14 +68,12 @@ async fn serve_connection(stream: TcpStream) -> io::Result<()> {
                 return Ok(());
             }
         }
-        reader
-            .get_mut()
-            .write_all(
-                b"HTTP/1.1 200 OK\r\nContent-Length: 16384\r\nConnection: keep-alive\r\n\r\n",
-            )
-            .await?;
-        reader.get_mut().write_all(&[b'x'; 16 * 1024]).await?;
-        reader.get_mut().flush().await?;
+        let mut response = Vec::with_capacity(16 * 1024 + 80);
+        response.extend_from_slice(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 16384\r\nConnection: keep-alive\r\n\r\n",
+        );
+        response.extend_from_slice(&[b'x'; 16 * 1024]);
+        reader.get_mut().write_all(&response).await?;
     }
 }
 
