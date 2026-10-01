@@ -715,6 +715,7 @@ export function DownloadPage() {
                 <SelectItem value="max">Max (HiRes)</SelectItem>
                 <SelectItem value="high">High (FLAC)</SelectItem>
                 <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="atmos">Dolby Atmos</SelectItem>
               </SelectContent>
             </Select>
             <Button

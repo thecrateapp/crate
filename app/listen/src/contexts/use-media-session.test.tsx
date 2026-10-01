@@ -7,6 +7,7 @@ import type { Track } from "./player-types";
 import { useMediaSession } from "./use-media-session";
 
 const runtime = vi.hoisted(() => ({ isNative: false }));
+const gaplessPlayer = vi.hoisted(() => ({ isPlaying: true as boolean | null }));
 const nativeMediaSession = vi.hoisted(() => ({
   cancelPendingResume: vi.fn(async () => {}),
   controlListener: null as ((event: NativeMediaControlEvent) => void) | null,
@@ -49,6 +50,10 @@ vi.mock("@/lib/native-media-session", () => ({
 
 vi.mock("@/lib/platform", () => ({
   isTauriRuntime: false,
+}));
+
+vi.mock("@/lib/gapless-player", () => ({
+  isGaplessPlaybackActive: () => gaplessPlayer.isPlaying,
 }));
 
 const TRACK_A: Track = {
@@ -127,6 +132,7 @@ function getMediaSessionActionHandler(
 
 beforeEach(() => {
   runtime.isNative = false;
+  gaplessPlayer.isPlaying = true;
   nativeMediaSession.controlListener = null;
   nativeMediaSession.resumeAllowed = true;
   vi.clearAllMocks();
@@ -170,6 +176,32 @@ afterEach(() => {
 });
 
 describe("useMediaSession", () => {
+  it("honors Play when the audio engine stopped despite stale transport state", () => {
+    gaplessPlayer.isPlaying = false;
+    renderSession(TRACK_A, 0, true);
+
+    getMediaSessionActionHandler("play")({ action: "play" });
+
+    expect(controls.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors Play when engine state is unavailable despite stale transport state", () => {
+    gaplessPlayer.isPlaying = null;
+    renderSession(TRACK_A, 0, true);
+
+    getMediaSessionActionHandler("play")({ action: "play" });
+
+    expect(controls.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not restart playback when the browser repeats play for an active track", () => {
+    renderSession(TRACK_A, 0, true);
+
+    getMediaSessionActionHandler("play")({ action: "play" });
+
+    expect(controls.resume).not.toHaveBeenCalled();
+  });
+
   it("requests an immediate pause from the Web MediaSession handler", () => {
     renderSession();
 

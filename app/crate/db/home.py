@@ -4,7 +4,7 @@ This module keeps the public home API stable while the implementation is split
 across cache/context/surface modules.
 """
 
-from crate.db.home_cache import _get_or_compute_home_cache
+from crate.db.home_cache import get_or_compute_home_cache
 from crate.db.home_context import get_home_context
 from crate.db.home_discovery_surface import (
     get_cached_home_discovery,
@@ -35,6 +35,7 @@ from crate.db.queries.user_library import (
 
 
 _HOME_CONTEXT_CACHE_VERSION = "v3"
+_get_or_compute_home_cache = get_or_compute_home_cache
 
 
 def _get_home_context(
@@ -64,7 +65,7 @@ def _get_cached_home_context(
         f"home:context:{_HOME_CONTEXT_CACHE_VERSION}:{cache_mode}:"
         f"{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
     )
-    return _get_or_compute_home_cache(
+    return get_or_compute_home_cache(
         cache_key,
         max_age_seconds=600,
         ttl=600,
@@ -97,6 +98,7 @@ __all__ = [
     "get_home_recently_played",
     "get_home_section",
     "get_home_suggested_albums",
+    "get_or_compute_home_cache",
     "get_saved_albums",
     "get_top_albums",
     "get_top_artists",

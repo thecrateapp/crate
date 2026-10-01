@@ -45,6 +45,7 @@ import {
   getCurrentTrackUrl,
   getPlaybackLoadLimit,
   getPlayer,
+  isGaplessPlaybackActive,
   getPosition,
   getTrackIndex,
   getTracks,
@@ -94,6 +95,7 @@ type MockGapless5Instance = {
   getTrack: MockFn;
   getIndex: MockFn;
   getTracks: MockFn;
+  isPlaying: MockFn;
   addTrack: MockFn;
   insertTrack: MockFn;
   removeTrack: MockFn;
@@ -127,6 +129,7 @@ function mkMockInstance(
     getTrack: vi.fn().mockReturnValue(""),
     getIndex: vi.fn().mockReturnValue(0),
     getTracks: vi.fn().mockReturnValue([]),
+    isPlaying: vi.fn().mockReturnValue(false),
     addTrack: vi.fn(),
     insertTrack: vi.fn(),
     removeTrack: vi.fn(),
@@ -166,6 +169,19 @@ afterEach(() => {
 describe("isCurrentTrackFullyBuffered", () => {
   it("returns false by default", () => {
     expect(isCurrentTrackFullyBuffered()).toBe(false);
+  });
+});
+
+describe("isGaplessPlaybackActive", () => {
+  it("returns null before the player is initialized", () => {
+    expect(isGaplessPlaybackActive()).toBeNull();
+  });
+
+  it("reports the audio engine's playback state", () => {
+    initPlayer();
+    mock.isPlaying.mockReturnValue(true);
+
+    expect(isGaplessPlaybackActive()).toBe(true);
   });
 });
 

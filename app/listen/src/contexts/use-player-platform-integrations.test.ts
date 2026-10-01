@@ -8,9 +8,11 @@ import { usePlayerPlatformIntegrations } from "./use-player-platform-integration
 const {
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
+  useAudioOutputInterruption,
   useMediaSession,
   usePlayerShortcuts,
 } = vi.hoisted(() => ({
+  useAudioOutputInterruption: vi.fn(),
   useDesktopTrayCommands: vi.fn(),
   useDesktopTrayNowPlaying: vi.fn(),
   useMediaSession: vi.fn(),
@@ -20,6 +22,9 @@ const {
 vi.mock("./use-desktop-tray-commands", () => ({
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
+}));
+vi.mock("./use-audio-output-interruption", () => ({
+  useAudioOutputInterruption,
 }));
 vi.mock("./use-media-session", () => ({ useMediaSession }));
 vi.mock("./use-player-shortcuts", () => ({ usePlayerShortcuts }));
@@ -90,6 +95,13 @@ describe("usePlayerPlatformIntegrations", () => {
     expect(useDesktopTrayNowPlaying).toHaveBeenCalledWith({
       currentTrack,
       isPlaying: true,
+    });
+    expect(useAudioOutputInterruption).toHaveBeenCalledWith({
+      currentTrack,
+      isPlaying: true,
+      isPlayingRef,
+      pause: actions.pause,
+      resume: actions.resume,
     });
     expect(useMediaSession).toHaveBeenCalledWith({
       currentTime: 12,

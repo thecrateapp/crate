@@ -2,16 +2,39 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from crate import tidal
 from crate.m4a_fix import repair_tidal_artifacts
-from crate.worker_handlers.acquisition import _tidal_download_inner
+from crate.worker_handlers.acquisition import (
+    _summarize_tidal_audio_quality,
+    _tidal_audio_quality_event,
+    _tidal_download_inner,
+)
 
 
 def _write_mp4_header(path: Path) -> None:
     path.write_bytes(b"\x00\x00\x00\x18ftypisom" + b"\x00" * 64)
 
 
-def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("quality", "expected_tidal_quality", "expected_atmos_filter"),
+    [
+        ("normal", "normal", None),
+        ("low", "low", None),
+        ("high", "high", None),
+        ("max", "max", None),
+        ("lossless", "max", None),
+        ("atmos", "normal", "only"),
+    ],
+)
+def test_tidal_download_uses_collision_safe_output_template(
+    tmp_path,
+    monkeypatch,
+    quality,
+    expected_tidal_quality,
+    expected_atmos_filter,
+):
     captured: list[list[str]] = []
 
     class FakeProc:
@@ -41,13 +64,18 @@ def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatc
 
     result = tidal.download(
         "https://tidal.com/album/413046494",
-        quality="normal",
+        quality=quality,
         task_id="task-hood",
     )
 
     assert result["success"] is True
     assert result["audio_file_count"] == 1
     cmd = captured[0]
+    assert cmd[cmd.index("-q") + 1] == expected_tidal_quality
+    if expected_atmos_filter is None:
+        assert "--dolby-atmos" not in cmd
+    else:
+        assert cmd[cmd.index("--dolby-atmos") + 1] == expected_atmos_filter
     assert cmd[cmd.index("--output") + 1] == tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.number:02d}" in tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.title_version}" in tidal.TIDDL_OUTPUT_TEMPLATE
@@ -245,11 +273,122 @@ def test_move_to_library_detailed_imports_loose_tiddl_audio_root(tmp_path, monke
             "album": "Get to It & Regenerate",
             "path": str(library / "Quicksand" / "Get to It & Regenerate"),
             "moved": 1,
+            "audio_files": [
+                str(library / "Quicksand" / "Get to It & Regenerate" / loose_track.name)
+            ],
         }
     ]
     assert (
         library / "Quicksand" / "Get to It & Regenerate" / loose_track.name
     ).exists()
+
+
+def test_move_to_library_detailed_tracks_only_audio_files_for_quality_checks(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    staged_album = processing / "Artist" / "Album"
+    library = tmp_path / "library"
+    staged_album.mkdir(parents=True)
+    track = staged_album / "01 - New Track.flac"
+    track.write_bytes(b"fLaC" + b"\x00" * 128)
+    (staged_album / "cover.jpg").write_bytes(b"cover")
+
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, Path(root) / artist / album, False),
+    )
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    assert moved == [
+        {
+            "artist": "Artist",
+            "album": "Album",
+            "path": str(library / "Artist" / "Album"),
+            "moved": 2,
+            "audio_files": [str(library / "Artist" / "Album" / track.name)],
+        }
+    ]
+
+
+def test_move_to_library_detailed_merges_audio_files_for_duplicate_album_targets(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    artist_dir = processing / "Artist"
+    staged_album = artist_dir / "Album"
+    library = tmp_path / "library"
+    staged_album.mkdir(parents=True)
+    (staged_album / "01 - Album Track.flac").write_bytes(b"album track")
+    (artist_dir / "02 - Loose Track.flac").write_bytes(b"loose track")
+
+    monkeypatch.setattr(
+        tidal,
+        "infer_album_identity",
+        lambda *_args, **_kwargs: ("Artist", "Album"),
+    )
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, Path(root) / artist / album, False),
+    )
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    target = library / "Artist" / "Album"
+    assert moved == [
+        {
+            "artist": "Artist",
+            "album": "Album",
+            "path": str(target),
+            "moved": 2,
+            "audio_files": [
+                str(target / "02 - Loose Track.flac"),
+                str(target / "01 - Album Track.flac"),
+            ],
+        }
+    ]
+
+
+def test_move_to_library_detailed_records_audio_moved_before_album_failure(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    staged_album = processing / "Artist" / "Album"
+    library = tmp_path / "library"
+    staged_album.mkdir(parents=True)
+    (staged_album / "01 - Imported Track.flac").write_bytes(b"audio")
+    target = library / "Artist" / "Album"
+    imported_track = target / "01 - Imported Track.flac"
+
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, Path(root) / artist / album, False),
+    )
+
+    def move_then_fail(*_args, moved_paths, **_kwargs):
+        imported_track.parent.mkdir(parents=True, exist_ok=True)
+        imported_track.write_bytes(b"audio")
+        moved_paths.append(imported_track)
+        raise OSError("simulated failure after the first file moved")
+
+    monkeypatch.setattr(tidal, "move_album_tree", move_then_fail)
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    assert moved == [
+        {
+            "artist": "Artist",
+            "album": "Album",
+            "path": str(target),
+            "moved": 1,
+            "audio_files": [str(imported_track)],
+        }
+    ]
+    assert imported_track.is_file()
 
 
 def test_refresh_token_keeps_tiddl_cli_success_path(tmp_path, monkeypatch):
@@ -292,13 +431,16 @@ def test_repair_tidal_artifacts_recovers_raw_flac_and_deletes_temp(tmp_path):
     assert summary["unrecoverable"] == 0
 
 
-def test_repair_tidal_artifacts_normalizes_named_aac_to_m4a(tmp_path, monkeypatch):
+@pytest.mark.parametrize("codec", ["aac", "ac4"])
+def test_repair_tidal_artifacts_normalizes_supported_mp4_audio_to_m4a(
+    tmp_path, monkeypatch, codec
+):
     album_dir = tmp_path / "Terror" / "Still Suffer"
     album_dir.mkdir(parents=True)
     invalid_flac = album_dir / "Promised Only Lies.flac"
     _write_mp4_header(invalid_flac)
 
-    monkeypatch.setattr("crate.m4a_fix._probe_audio_codec", lambda _path: "aac")
+    monkeypatch.setattr("crate.m4a_fix._probe_audio_codec", lambda _path: codec)
 
     summary = repair_tidal_artifacts(tmp_path, allow_lossy_rename=True)
 
@@ -307,6 +449,597 @@ def test_repair_tidal_artifacts_normalizes_named_aac_to_m4a(tmp_path, monkeypatc
     assert not invalid_flac.exists()
     assert summary["lossy_files"] == ["Terror/Still Suffer/Promised Only Lies.flac"]
     assert summary["unrecoverable"] == 0
+
+
+def test_summarize_tidal_audio_quality_reports_actual_bit_depths_and_sample_rates(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - Track 1.flac").write_bytes(b"audio")
+    (album_dir / "02 - Track 2.flac").write_bytes(b"audio")
+    records = [
+        {
+            "path": str(album_dir / "01 - Track 1.flac"),
+            "ok": True,
+            "bit_depth": 24,
+            "sample_rate": 96000,
+        },
+        {
+            "path": str(album_dir / "02 - Track 2.flac"),
+            "ok": True,
+            "bit_depth": 16,
+            "sample_rate": 44100,
+        },
+    ]
+
+    quality_calls = []
+
+    def _run_quality(**kwargs):
+        quality_calls.append(kwargs)
+        return {"tracks": records}
+
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        _run_quality,
+    )
+    monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 45)
+
+    summary = _summarize_tidal_audio_quality(
+        [
+            {
+                "path": str(album_dir),
+                "audio_files": [
+                    str(album_dir / f"0{n} - Track {n}.flac") for n in (1, 2)
+                ],
+            }
+        ]
+    )
+
+    assert summary == {
+        "tracks_total": 2,
+        "tracks_probed": 2,
+        "profiles": [
+            {"bit_depth": 16, "sample_rate": 44100, "tracks": 1},
+            {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
+        ],
+    }
+    assert quality_calls == [
+        {
+            "files": [
+                str(album_dir / "01 - Track 1.flac"),
+                str(album_dir / "02 - Track 2.flac"),
+            ],
+            "timeout": 45,
+        }
+    ]
+
+
+def test_summarize_tidal_audio_quality_batches_only_imported_album_probes(
+    tmp_path, monkeypatch
+):
+    artist_dir = tmp_path / "Terror"
+    album_dirs = [artist_dir / "Album One", artist_dir / "Album Two"]
+    tracks = []
+    for album_dir in album_dirs:
+        album_dir.mkdir(parents=True)
+        track = album_dir / "01 - Track.flac"
+        track.write_bytes(b"audio")
+        tracks.append(track)
+    duplicate_track = album_dirs[1] / "02 - Same Track.flac"
+    duplicate_track.symlink_to(tracks[0])
+
+    unrelated_track = artist_dir / "Existing Album" / "01 - Existing.flac"
+    unrelated_track.parent.mkdir()
+    unrelated_track.write_bytes(b"audio")
+
+    quality_calls = []
+
+    def _run_quality(**kwargs):
+        quality_calls.append(kwargs)
+        return {
+            "tracks": [
+                {
+                    "path": str(track),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": 96000,
+                }
+                for track in tracks
+            ]
+        }
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", _run_quality)
+    monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 45)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda *_args, **_kwargs: pytest.fail("native probe should cover all tracks"),
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [
+            {"path": str(album_dirs[0]), "audio_files": [str(tracks[0])]},
+            {
+                "path": str(album_dirs[1]),
+                "audio_files": [str(tracks[1]), str(duplicate_track)],
+            },
+        ]
+    )
+
+    assert quality_calls == [
+        {
+            "files": [str(track) for track in tracks],
+            "timeout": 45,
+        }
+    ]
+    assert unrelated_track.exists()
+    assert summary == {
+        "tracks_total": 2,
+        "tracks_probed": 2,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 2}],
+    }
+
+
+def test_summarize_tidal_audio_quality_caps_timeout_and_ignores_preexisting_tracks(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    existing_track = album_dir / "01 - Existing.flac"
+    downloaded_track = album_dir / "02 - Downloaded.flac"
+    existing_track.write_bytes(b"audio")
+    downloaded_track.write_bytes(b"audio")
+    quality_calls = []
+
+    def _run_quality(**kwargs):
+        quality_calls.append(kwargs)
+        return {
+            "tracks": [
+                {
+                    "path": str(downloaded_track),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": 96000,
+                },
+                {
+                    "path": str(existing_track),
+                    "ok": True,
+                    "bit_depth": 16,
+                    "sample_rate": 44100,
+                },
+            ]
+        }
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", _run_quality)
+    monkeypatch.setattr("crate.crate_cli.quality_timeout_seconds", lambda: 300)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_audio_files",
+        lambda *_args, **_kwargs: pytest.fail(
+            "explicit imported audio files should avoid scanning the album directory"
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda *_args, **_kwargs: pytest.fail(
+            "native probe should cover imported track"
+        ),
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [
+            {
+                "path": str(album_dir),
+                "audio_files": [str(downloaded_track)],
+            }
+        ]
+    )
+
+    assert quality_calls == [{"files": [str(downloaded_track)], "timeout": 45}]
+    assert summary == {
+        "tracks_total": 1,
+        "tracks_probed": 1,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+    }
+
+
+def test_summarize_tidal_audio_quality_does_not_scan_preexisting_tracks_when_import_is_empty(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    track = album_dir / "01 - Existing.flac"
+    track.write_bytes(b"audio")
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: pytest.fail("an empty imported file list must not be probed"),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda *_args, **_kwargs: pytest.fail("pre-existing tracks must not be probed"),
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": []}]
+    )
+
+    assert summary == {
+        "tracks_total": 0,
+        "tracks_probed": 0,
+        "profiles": [],
+    }
+
+
+def test_summarize_tidal_audio_quality_does_not_scan_when_import_file_list_is_missing(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - Existing.flac").write_bytes(b"audio")
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_audio_files",
+        lambda *_args, **_kwargs: pytest.fail(
+            "quality summary must use imported paths"
+        ),
+    )
+
+    summary = _summarize_tidal_audio_quality([{"path": str(album_dir)}])
+
+    assert summary == {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
+
+
+def test_summarize_tidal_audio_quality_falls_back_for_unprobed_native_tracks(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    first_track = album_dir / "01 - Track 1.flac"
+    second_track = album_dir / "02 - Track 2.flac"
+    first_track.write_bytes(b"audio")
+    second_track.write_bytes(b"audio")
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: {
+            "tracks": [
+                {
+                    "path": str(first_track),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": None,
+                }
+            ]
+        },
+    )
+
+    fallback_calls = []
+
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
+        fallback_calls.append((audio_file, use_native_probe))
+        if audio_file == first_track:
+            return {"bit_depth": 24, "sample_rate": 96000}
+        return {"bit_depth": 16, "sample_rate": 44100}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(first_track), str(second_track)]}]
+    )
+
+    assert summary == {
+        "tracks_total": 2,
+        "tracks_probed": 2,
+        "profiles": [
+            {"bit_depth": 16, "sample_rate": 44100, "tracks": 1},
+            {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
+        ],
+    }
+    assert fallback_calls == [(first_track, False), (second_track, False)]
+
+
+def test_summarize_tidal_audio_quality_falls_back_when_native_probe_raises(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    track = album_dir / "01 - Track 1.flac"
+    track.write_bytes(b"audio")
+
+    def _raise_probe_error(**_kwargs):
+        raise RuntimeError("native probe unavailable")
+
+    monkeypatch.setattr("crate.crate_cli.run_quality", _raise_probe_error)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality",
+        lambda _path, *, use_native_probe=True: {
+            "bit_depth": 24,
+            "sample_rate": 96000,
+        },
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(track)]}]
+    )
+
+    assert summary == {
+        "tracks_total": 1,
+        "tracks_probed": 1,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+    }
+
+
+def test_summarize_tidal_audio_quality_caps_python_fallback_probes(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Long Album"
+    album_dir.mkdir(parents=True)
+    audio_files = [album_dir / f"{index:02d}.flac" for index in range(1, 9)]
+    for audio_file in audio_files:
+        audio_file.write_bytes(b"audio")
+
+    fallback_calls = []
+    monkeypatch.setattr("crate.crate_cli.run_quality", lambda **_kwargs: None)
+
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
+        fallback_calls.append(audio_file)
+        return {"bit_depth": 24, "sample_rate": 96000}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(path) for path in audio_files]}]
+    )
+
+    assert fallback_calls == audio_files[:5]
+    assert summary == {
+        "tracks_total": 8,
+        "tracks_probed": 5,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 5}],
+    }
+
+
+def test_summarize_tidal_audio_quality_keeps_partial_native_data_after_fallback_cap(
+    tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Partial Native Metadata"
+    album_dir.mkdir(parents=True)
+    audio_files = [album_dir / f"{index:02d}.flac" for index in range(1, 9)]
+    for audio_file in audio_files:
+        audio_file.write_bytes(b"audio")
+
+    fallback_calls = []
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: {
+            "tracks": [
+                {
+                    "path": str(audio_file),
+                    "ok": True,
+                    "bit_depth": 24,
+                    "sample_rate": None,
+                }
+                for audio_file in audio_files
+            ]
+        },
+    )
+
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
+        fallback_calls.append(audio_file)
+        return {"sample_rate": 96000}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(path) for path in audio_files]}]
+    )
+
+    assert fallback_calls == audio_files[:5]
+    assert summary == {
+        "tracks_total": 8,
+        "tracks_probed": 8,
+        "profiles": [
+            {"bit_depth": 24, "sample_rate": None, "tracks": 3},
+            {"bit_depth": 24, "sample_rate": 96000, "tracks": 5},
+        ],
+    }
+
+
+@pytest.mark.parametrize("native_tracks", [[], [{"ok": False, "error": "probe"}]])
+def test_summarize_tidal_audio_quality_skips_unreadable_fallback_tracks(
+    tmp_path, monkeypatch, native_tracks
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    audio_files = [album_dir / f"{index:02d}.flac" for index in range(1, 4)]
+    for audio_file in audio_files:
+        audio_file.write_bytes(b"audio")
+
+    monkeypatch.setattr(
+        "crate.crate_cli.run_quality",
+        lambda **_kwargs: {"tracks": native_tracks},
+    )
+
+    def _read_audio_quality(audio_file, *, use_native_probe=True):
+        if audio_file == audio_files[0]:
+            raise OSError("unreadable track")
+        if audio_file == audio_files[1]:
+            return None
+        return {"bit_depth": 24, "sample_rate": 96000}
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.read_audio_quality", _read_audio_quality
+    )
+
+    summary = _summarize_tidal_audio_quality(
+        [{"path": str(album_dir), "audio_files": [str(path) for path in audio_files]}]
+    )
+
+    assert summary == {
+        "tracks_total": 3,
+        "tracks_probed": 1,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+    }
+
+
+@pytest.mark.parametrize("path", [None, "", "   ", Path(), "."])
+def test_summarize_tidal_audio_quality_ignores_missing_album_paths(
+    tmp_path, monkeypatch, path
+):
+    (tmp_path / "01 - unrelated.flac").write_bytes(b"audio")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("crate.crate_cli.run_quality", lambda **_kwargs: {"tracks": []})
+
+    summary = _summarize_tidal_audio_quality([{"path": path}])
+
+    assert summary == {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
+
+
+@pytest.mark.parametrize(
+    ("audio_quality", "requested_quality", "expected_event"),
+    [
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 2}],
+            },
+            "max",
+            (
+                "info",
+                "Observed downloaded audio quality in 2/2 tracks: "
+                "24-bit / 96000 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 16, "sample_rate": 44100, "tracks": 2}],
+            },
+            "max",
+            (
+                "warn",
+                "Tidal MAX was requested, but no 24-bit audio was confirmed "
+                "(2/2 tracks inspected). Observed: 16-bit / 44100 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 10,
+                "tracks_probed": 10,
+                "profiles": [
+                    {"bit_depth": 16, "sample_rate": 44100, "tracks": 9},
+                    {"bit_depth": 24, "sample_rate": 96000, "tracks": 1},
+                ],
+            },
+            "max",
+            (
+                "warn",
+                "Tidal MAX was requested, but only 1 of 10 tracks met the 24-bit "
+                "target (10/10 tracks inspected). Observed: 16-bit / 44100 Hz "
+                "(9 tracks), 24-bit / 96000 Hz (1 track)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 16, "sample_rate": 44100, "tracks": 2}],
+            },
+            "lossless",
+            (
+                "info",
+                "Observed downloaded audio quality in 2/2 tracks: "
+                "16-bit / 44100 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [
+                    {"bit_depth": 8, "sample_rate": 22050, "tracks": 1},
+                    {"bit_depth": 16, "sample_rate": 44100, "tracks": 1},
+                ],
+            },
+            "lossless",
+            (
+                "warn",
+                "Tidal lossless was requested, but only 1 of 2 tracks met the 16-bit "
+                "target (2/2 tracks inspected). Observed: 8-bit / 22050 Hz "
+                "(1 track), 16-bit / 44100 Hz (1 track)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 1,
+                "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+            },
+            "max",
+            (
+                "warn",
+                "Tidal MAX was requested, but only 1/2 tracks were inspected. "
+                "Among inspected tracks, 1 met the 24-bit target; 1 track remains "
+                "uninspected, so overall compliance is unknown. Observed: "
+                "24-bit / 96000 Hz (1 track)",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 2,
+                "tracks_probed": 2,
+                "profiles": [{"bit_depth": 8, "sample_rate": 22050, "tracks": 2}],
+            },
+            "lossless",
+            (
+                "warn",
+                "Tidal lossless was requested, but no 16-bit audio was confirmed "
+                "(2/2 tracks inspected). Observed: 8-bit / 22050 Hz (2 tracks)",
+            ),
+        ),
+        (
+            {"tracks_total": 2, "tracks_probed": 0, "profiles": []},
+            "lossless",
+            (
+                "warn",
+                "Tidal lossless was requested, but Crate inspected 0/2 tracks. "
+                "Overall compliance is unknown because none of the downloaded "
+                "tracks could be verified.",
+            ),
+        ),
+        (
+            {
+                "tracks_total": 1,
+                "tracks_probed": 1,
+                "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 1}],
+            },
+            "atmos",
+            (
+                "warn",
+                "Crate cannot verify Tidal atmos quality from bit depth metadata",
+            ),
+        ),
+        (
+            {"tracks_total": 0, "tracks_probed": 0, "profiles": []},
+            "atmos",
+            (
+                "warn",
+                "Crate cannot verify Tidal atmos quality from bit depth metadata",
+            ),
+        ),
+    ],
+)
+def test_tidal_audio_quality_event_reports_detected_quality(
+    audio_quality, requested_quality, expected_event
+):
+    assert (
+        _tidal_audio_quality_event(audio_quality, requested_quality) == expected_event
+    )
 
 
 def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypatch):
@@ -324,13 +1057,68 @@ def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypat
     assert summary["lossy_files"] == ["Terror/Still Suffer/tmpcafebabe"]
 
 
-def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tree(
+def test_repair_tidal_artifacts_accepts_named_dolby_atmos_ac4_m4a(
     tmp_path, monkeypatch
+):
+    album_dir = tmp_path / "Terror" / "Still Suffer"
+    album_dir.mkdir(parents=True)
+    atmos_file = album_dir / "01 - Track.m4a"
+    _write_mp4_header(atmos_file)
+
+    monkeypatch.setattr("crate.m4a_fix._probe_audio_codec", lambda _path: "ac4")
+
+    summary = repair_tidal_artifacts(tmp_path, allow_lossy_rename=True)
+
+    assert atmos_file.exists()
+    assert summary["renamed_to_m4a"] == 0
+    assert summary["unrecoverable"] == 0
+    assert summary["lossy_files"] == []
+
+
+@pytest.mark.parametrize(
+    (
+        "requested_quality",
+        "expected_download_calls",
+        "expected_quality_inspections",
+        "album_dir_lookup_error",
+        "fallback_to_normal",
+        "quality_inspection_error",
+        "quality_inspection_empty",
+        "quality_inspection_partial",
+    ),
+    [
+        ("max", ["max", "max", "normal"], 0, False, True, False, False, False),
+        ("normal", ["normal"], 0, False, False, False, False, False),
+        ("atmos", ["atmos"], 0, False, False, False, False, False),
+        ("max", ["max", "max", "normal"], 0, True, True, False, False, False),
+        ("max", ["max"], 1, False, False, False, False, False),
+        ("max", ["max"], 1, False, False, True, False, False),
+        ("max", ["max"], 1, False, False, False, True, False),
+        ("max", ["max"], 1, False, False, False, False, True),
+    ],
+)
+def test_tidal_download_inner_inspects_only_successful_lossless_downloads(
+    tmp_path,
+    monkeypatch,
+    requested_quality,
+    expected_download_calls,
+    expected_quality_inspections,
+    album_dir_lookup_error,
+    fallback_to_normal,
+    quality_inspection_error,
+    quality_inspection_empty,
+    quality_inspection_partial,
 ):
     initial_dir = tmp_path / "initial" / "Terror" / "Still Suffer"
     initial_dir.mkdir(parents=True)
-    _write_mp4_header(initial_dir / "Promised Only Lies.flac")
-    (initial_dir / "tmpdeadbeef").write_bytes(b"")
+    if requested_quality == "max" and not fallback_to_normal:
+        for idx in range(10):
+            (initial_dir / f"{idx + 1:02d} - Track {idx + 1}.m4a").write_bytes(
+                b"fake-aac"
+            )
+    else:
+        _write_mp4_header(initial_dir / "Promised Only Lies.flac")
+        (initial_dir / "tmpdeadbeef").write_bytes(b"")
 
     fallback_dir = tmp_path / "fallback" / "Terror" / "Still Suffer"
     fallback_dir.mkdir(parents=True)
@@ -343,6 +1131,7 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         _url: str, quality: str = "max", task_id: str = "", progress_callback=None
     ):
         download_calls.append(quality)
+        incomplete_lossless = quality == "max" and fallback_to_normal
         path = (
             initial_dir.parent.parent
             if quality == "max"
@@ -351,8 +1140,8 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         return {
             "success": True,
             "path": str(path),
-            "file_count": 2 if quality == "max" else 10,
-            "audio_file_count": 0 if quality == "max" else 10,
+            "file_count": 2 if incomplete_lossless else 10,
+            "audio_file_count": 0 if incomplete_lossless else 10,
             "invalid_audio_files": [],
             "temp_artifact_files": [],
             "errors": [],
@@ -385,9 +1174,10 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         ],
     )
     monkeypatch.setattr("crate.library_sync.LibrarySync", _DummySync)
+    task_events = []
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.emit_task_event",
-        lambda *args, **kwargs: None,
+        lambda *args, **kwargs: task_events.append(args),
     )
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.emit_progress", lambda *args, **kwargs: None
@@ -419,6 +1209,51 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         lambda *args, **kwargs: ["Terror"],
     )
     monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
+    if album_dir_lookup_error:
+        from crate.worker_handlers import acquisition
+
+        original_existing_album_dir = acquisition._existing_album_dir
+        lookup_failed = False
+
+        def _raise_once(raw_path):
+            nonlocal lookup_failed
+            if not lookup_failed:
+                lookup_failed = True
+                raise OSError("temporary album path lookup failure")
+            return original_existing_album_dir(raw_path)
+
+        monkeypatch.setattr(
+            "crate.worker_handlers.acquisition._existing_album_dir", _raise_once
+        )
+    quality_inspections = []
+    observed_quality = {
+        "tracks_total": 10,
+        "tracks_probed": 10,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 10}],
+    }
+    empty_quality = {"tracks_total": 0, "tracks_probed": 0, "profiles": []}
+    partial_quality = {
+        "tracks_total": 10,
+        "tracks_probed": 9,
+        "profiles": [{"bit_depth": 24, "sample_rate": 96000, "tracks": 9}],
+    }
+
+    def _record_quality_inspection(albums):
+        quality_inspections.append(albums)
+        if quality_inspection_error:
+            raise OSError("temporary quality inspection failure")
+        if quality_inspection_empty:
+            return empty_quality
+        if quality_inspection_partial:
+            return partial_quality
+        if not fallback_to_normal and requested_quality == "max":
+            return observed_quality
+        return _summarize_tidal_audio_quality(albums)
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._summarize_tidal_audio_quality",
+        _record_quality_inspection,
+    )
     (tmp_path / "library" / "Terror" / "Still Suffer").mkdir(
         parents=True, exist_ok=True
     )
@@ -428,12 +1263,115 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
         {"artist": "Terror", "album": "Still Suffer", "content_type": "album"},
         {"library_path": str(tmp_path / "library")},
         "https://tidal.com/album/493246888",
-        "max",
+        requested_quality,
         38,
         tmp_path / "library",
     )
 
     assert result["success"] is True
     assert result["files"] == 10
-    assert result["quality"] == "normal"
-    assert download_calls == ["max", "max", "normal"]
+    assert result["quality"] == ("normal" if fallback_to_normal else requested_quality)
+    expected_audio_quality = None
+    if quality_inspection_empty:
+        expected_audio_quality = empty_quality
+    elif quality_inspection_partial:
+        expected_audio_quality = partial_quality
+    elif expected_quality_inspections and not quality_inspection_error:
+        expected_audio_quality = observed_quality
+    assert result["audio_quality"] == expected_audio_quality
+    if quality_inspection_error:
+        expected_quality_status = "failed"
+    elif quality_inspection_empty:
+        expected_quality_status = "unverified"
+    elif quality_inspection_partial:
+        expected_quality_status = "partial"
+    elif expected_quality_inspections:
+        expected_quality_status = "inspected"
+    elif requested_quality == "atmos" and not fallback_to_normal:
+        expected_quality_status = "not_verifiable"
+    else:
+        expected_quality_status = "not_applicable"
+    assert result["audio_quality_status"] == expected_quality_status
+    assert download_calls == expected_download_calls
+    assert len(quality_inspections) == expected_quality_inspections
+    if (
+        not quality_inspection_empty
+        and not quality_inspection_partial
+        and not quality_inspection_error
+    ):
+        assert not any(
+            len(event) > 2
+            and isinstance(event[2], dict)
+            and "Tidal MAX was requested" in event[2].get("message", "")
+            for event in task_events
+        )
+    if fallback_to_normal:
+        assert any(
+            len(event) > 2
+            and isinstance(event[2], dict)
+            and "retrying in normal quality" in event[2].get("message", "")
+            for event in task_events
+        )
+    else:
+        assert not any(
+            len(event) > 2
+            and isinstance(event[2], dict)
+            and "retrying in normal quality" in event[2].get("message", "")
+            for event in task_events
+        )
+    if (
+        expected_quality_inspections
+        and not quality_inspection_error
+        and not quality_inspection_empty
+        and not quality_inspection_partial
+    ):
+        assert any(
+            len(event) > 2
+            and event[1] == "info"
+            and isinstance(event[2], dict)
+            and "Observed downloaded audio quality in 10/10 tracks"
+            in event[2].get("message", "")
+            for event in task_events
+        )
+    if quality_inspection_partial:
+        assert any(
+            len(event) > 2
+            and event[1] == "warn"
+            and isinstance(event[2], dict)
+            and "Tidal MAX was requested" in event[2].get("message", "")
+            and "9/10 tracks were inspected" in event[2].get("message", "")
+            and "overall compliance is unknown" in event[2].get("message", "")
+            for event in task_events
+        )
+    if quality_inspection_empty:
+        assert any(
+            len(event) > 2
+            and event[1] == "warn"
+            and isinstance(event[2], dict)
+            and "could not verify the downloaded bit depth or sample rate"
+            in event[2].get("message", "")
+            for event in task_events
+        )
+    if requested_quality == "atmos" and not fallback_to_normal:
+        assert any(
+            len(event) > 2
+            and event[1] == "warn"
+            and isinstance(event[2], dict)
+            and "cannot verify Tidal atmos quality" in event[2].get("message", "")
+            for event in task_events
+        )
+    if quality_inspection_error:
+        assert not any(
+            len(event) > 2
+            and isinstance(event[2], dict)
+            and "Observed downloaded audio quality" in event[2].get("message", "")
+            for event in task_events
+        )
+        assert any(
+            len(event) > 2
+            and event[1] == "warn"
+            and isinstance(event[2], dict)
+            and "could not complete audio quality verification"
+            in event[2].get("message", "")
+            for event in task_events
+        )
