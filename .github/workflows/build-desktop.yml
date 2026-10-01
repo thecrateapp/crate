@@ -250,6 +250,9 @@ jobs:
         if: runner.os == 'Linux'
         run: npm run --workspace=app/listen-desktop test:glibc
 
+      - name: Build HTTP resource probe frontend
+        run: npm run --workspace=app/listen-desktop build:http-resource-probe
+
       - name: Test desktop native layer
         run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
 
@@ -516,10 +519,6 @@ jobs:
             throw "Process Monitor signature was not valid Microsoft code: $($signature.Status)"
           }
           "CRATE_PROCMON_PATH=$procmon" | Add-Content -LiteralPath $env:GITHUB_ENV
-
-      - name: Build Windows HTTP resource probe frontend
-        if: runner.os == 'Windows'
-        run: npm run --workspace=app/listen-desktop build:http-resource-probe
 
       - name: Build Windows HTTP resource probe app
         if: runner.os == 'Windows'
