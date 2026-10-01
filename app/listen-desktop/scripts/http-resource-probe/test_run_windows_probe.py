@@ -3,7 +3,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from run_windows_probe import build_probe_environment, launch_probe_process
+from run_windows_probe import (
+    build_probe_environment,
+    launch_probe_process,
+    unexpected_probe_document,
+)
 
 
 class ProbeEnvironmentTests(unittest.TestCase):
@@ -73,6 +77,29 @@ class ProbeProcessTests(unittest.TestCase):
 
         self.assertEqual(popen.call_args.kwargs["stdout"], subprocess.DEVNULL)
         self.assertEqual(popen.call_args.kwargs["stderr"], subprocess.DEVNULL)
+
+
+class ProbeDocumentDiagnosticsTests(unittest.TestCase):
+    def test_detects_when_the_main_app_frontend_was_loaded(self) -> None:
+        diagnostics = (
+            'document-state:{"title":"Crate","hasStatusElement":false}'
+        )
+
+        failure = unexpected_probe_document(diagnostics)
+
+        self.assertEqual(
+            failure,
+            "probe loaded an unexpected frontend document: "
+            "title='Crate', hasStatusElement=False",
+        )
+
+    def test_accepts_the_probe_frontend_document(self) -> None:
+        diagnostics = (
+            'document-state:{"title":"Crate HTTP resource probe",'
+            '"hasStatusElement":true}'
+        )
+
+        self.assertIsNone(unexpected_probe_document(diagnostics))
 
 
 if __name__ == "__main__":

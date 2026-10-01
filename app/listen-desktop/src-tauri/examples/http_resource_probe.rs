@@ -50,6 +50,7 @@ const DOCUMENT_DIAGNOSTICS: &str = r#"
     href: location.href,
     readyState: document.readyState,
     title: document.title,
+    hasStatusElement: document.querySelector('#status') !== null,
     status: document.querySelector('#status')?.textContent || null,
     scripts,
     resources: performance.getEntriesByType('resource').map((entry) => entry.name),
@@ -158,7 +159,7 @@ fn main() {
             finish_probe
         ])
         .run(tauri::generate_context!(
-            "tauri.http-resource-probe.conf.json"
+            "http-resource-probe/tauri.conf.json"
         ))
         .expect("failed to run the HTTP resource probe");
 }

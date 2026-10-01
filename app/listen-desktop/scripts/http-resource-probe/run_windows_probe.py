@@ -31,6 +31,7 @@ SCENARIOS = (
     "cancel-after-first-chunk",
 )
 ITERATIONS = 25
+EXPECTED_PROBE_TITLE = "Crate HTTP resource probe"
 
 
 def describe_exit_code(return_code: int) -> str:
@@ -43,6 +44,27 @@ def describe_exit_code(return_code: int) -> str:
     if status:
         description += f", {status}"
     return f"{description})"
+
+
+def unexpected_probe_document(diagnostics: str) -> str | None:
+    prefix = "document-state:"
+    for line in diagnostics.splitlines():
+        if not line.startswith(prefix):
+            continue
+        try:
+            document = json.loads(line.removeprefix(prefix))
+        except json.JSONDecodeError:
+            continue
+        if (
+            document.get("title") != EXPECTED_PROBE_TITLE
+            or document.get("hasStatusElement") is not True
+        ):
+            return (
+                "probe loaded an unexpected frontend document: "
+                f"title={document.get('title')!r}, "
+                f"hasStatusElement={document.get('hasStatusElement')!r}"
+            )
+    return None
 
 
 class FixtureState:
@@ -293,6 +315,14 @@ def main() -> int:
                 report = state.report.get(timeout=min(remaining, 0.5))
                 break
             except queue.Empty:
+                if diagnostics_path.is_file():
+                    diagnostic_text = diagnostics_path.read_text(
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+                    document_failure = unexpected_probe_document(diagnostic_text)
+                    if document_failure:
+                        raise RuntimeError(document_failure)
                 return_code = process.poll()
                 if return_code is not None:
                     raise RuntimeError(

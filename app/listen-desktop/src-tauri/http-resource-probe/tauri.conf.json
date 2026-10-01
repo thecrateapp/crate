@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "app.cratemusic.crate.desktop.http-resource-probe",
   "build": {
-    "frontendDist": "../scripts/http-resource-probe/dist"
+    "frontendDist": "../../scripts/http-resource-probe/dist"
   },
   "app": {
     "windows": [
@@ -16,10 +16,11 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'self'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:*; object-src 'none'; base-uri 'self'"
     }
   },
   "bundle": {
-    "active": false
+    "active": false,
+    "icon": ["../icons/icon.png"]
   }
 }
