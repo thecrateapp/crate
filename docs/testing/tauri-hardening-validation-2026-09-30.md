@@ -608,3 +608,24 @@ The percentile fix, its regression test, and the validation updates are committe
 - The PR-triggered desktop matrix, Android job, iOS simulator, backend quality, test shards, and coverage show **skipped** because PR #259 is still a draft; none of them are failed. The manual desktop and Android runs above exercised those platform build paths on this exact SHA. Backend quality and test shards did not run on this SHA, and no backend code changed in this follow-up.
 
 This closes the current desktop matrix and Windows synthetic R03–R05 workflow failures. It does not close real download cadence, installed-player acceptance, signed/notarized release, minimum-OS hosts, or the other release gates listed above.
+
+### Exact-head draft workflow revalidation — `7a42e029`
+
+PR #259 remains a draft. Its latest pull-request checks show Frontend Tests,
+React Doctor, changed-Python security, and PR Agent Review as passed. The
+Backend Tests quality/shards/coverage jobs, Android `build-apk`, iOS simulator,
+and desktop matrix are skipped by their explicit draft guards; they are not
+failed checks. To validate those paths without changing the PR state, the
+following workflows were manually dispatched on exact head
+`7a42e029cab81bb115df07c7cd55df0d730e7b03`:
+
+- [Backend Tests run `36939011439`](https://github.com/thecrateapp/crate/actions/runs/36939011439): quality, security scan, all eight test shards, and coverage passed.
+- [Build Android run `36939011453`](https://github.com/thecrateapp/crate/actions/runs/36939011453): `build-apk` passed.
+- [Build Desktop Apps run `36939011731`](https://github.com/thecrateapp/crate/actions/runs/36939011731): Linux, macOS, and Windows passed, including their configured artifact and native probe checks.
+
+This closes the exact-head automated workflow evidence for C06 and the backend,
+Android, and desktop CI paths. Manual dispatch does not change the skipped
+pull-request check conclusions. Exact minimum-OS installations, signed release
+upgrades, OAuth on the deployed callback and all three desktop OSes, installed
+Now Playing/artwork behavior, and real-player RSS/offline acceptance remain
+open.
