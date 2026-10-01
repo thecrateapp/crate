@@ -207,6 +207,21 @@ def build_probe_environment(
     return environment, removed_python_paths
 
 
+def launch_probe_process(
+    executable: Path,
+    environment: Mapping[str, str],
+) -> subprocess.Popen[str]:
+    # WebView2 child processes can inherit redirected standard handles. A PIPE
+    # keeps reads open after the probe process exits and can hang the timeout
+    # path, so this diagnostic process must not use captured stdout/stderr.
+    return subprocess.Popen(
+        [str(executable)],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable", required=True, type=Path)
@@ -266,13 +281,7 @@ def main() -> int:
         ]
         environment["CRATE_HTTP_RESOURCE_PROBE_DIAGNOSTICS"] = str(diagnostics_path)
         result["pythonPathEntriesRemoved"] = removed_python_paths
-        process = subprocess.Popen(
-            [str(executable)],
-            env=environment,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
+        process = launch_probe_process(executable, environment)
         deadline = time.monotonic() + args.timeout_seconds
         while True:
             remaining = deadline - time.monotonic()
@@ -331,8 +340,6 @@ def main() -> int:
         if state.failure:
             result["fixtureFailure"] = state.failure
             result["status"] = "failed"
-        if process.stdout:
-            result["applicationOutput"] = process.stdout.read()
         if result["status"] != "passed":
             raise RuntimeError(f"Windows resource probe failed: {result}")
         return 0
@@ -346,8 +353,6 @@ def main() -> int:
                 result["returnCode"] = process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 result["returnCode"] = None
-            if process.stdout:
-                result["applicationOutput"] = process.stdout.read()
         with state.condition:
             result["requestHits"] = dict(state.hits)
         return_code = 1

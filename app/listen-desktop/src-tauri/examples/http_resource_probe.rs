@@ -58,12 +58,20 @@ fn finish_probe(app: tauri::AppHandle, report: serde_json::Value) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
-        .on_page_load(|_webview, payload| {
+        .on_page_load(|webview, payload| {
             write_probe_diagnostic(&format!(
                 "page-load:{:?}:{}",
                 payload.event(),
                 payload.url()
             ));
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                let script = "window.__TAURI_INTERNALS__?.invoke('record_probe_diagnostic', { message: 'native-eval-bridge-available' }).catch(() => undefined);";
+                if let Err(error) = webview.eval(script) {
+                    write_probe_diagnostic(&format!("native-eval-failed:{error}"));
+                } else {
+                    write_probe_diagnostic("native-eval-submitted");
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             resource_count,

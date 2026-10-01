@@ -1,6 +1,9 @@
+import subprocess
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-from run_windows_probe import build_probe_environment
+from run_windows_probe import build_probe_environment, launch_probe_process
 
 
 class ProbeEnvironmentTests(unittest.TestCase):
@@ -61,6 +64,15 @@ class ProbeEnvironmentTests(unittest.TestCase):
         self.assertEqual(environment["PATH"], "system-bin")
         self.assertEqual(removed_paths, [])
         self.assertNotIn("PYTHONPATH", environment)
+
+
+class ProbeProcessTests(unittest.TestCase):
+    def test_does_not_capture_handles_inherited_by_webview_children(self) -> None:
+        with patch("run_windows_probe.subprocess.Popen") as popen:
+            launch_probe_process(Path("probe.exe"), {"PATH": "system-bin"})
+
+        self.assertEqual(popen.call_args.kwargs["stdout"], subprocess.DEVNULL)
+        self.assertEqual(popen.call_args.kwargs["stderr"], subprocess.DEVNULL)
 
 
 if __name__ == "__main__":
