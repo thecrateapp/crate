@@ -80,4 +80,70 @@ describe("PlaylistComposerProvider", () => {
 
     expect(refetchPlaylistOptions).toHaveBeenCalledOnce();
   });
+
+  it("adds the source tracks after creating a playlist", async () => {
+    api.mockResolvedValueOnce({ id: 12 }).mockResolvedValueOnce({});
+    const { result } = renderHook(() => usePlaylistComposer(), { wrapper });
+
+    act(() => {
+      result.current.openCreatePlaylist({
+        tracks: [
+          {
+            entityUid: "track-entity-12",
+            globalTrackUid: "global-track-12",
+            libraryTrackId: 12,
+            path: "/music/high-vis/talk-for-hours.flac",
+            title: "Talk For Hours",
+            artist: "High Vis",
+            album: "Blending",
+            duration: 299,
+          },
+        ],
+      });
+    });
+
+    await act(async () => {
+      await modal.props?.onSubmit({
+        name: "High Vis favourites",
+        description: "",
+        coverDataUrl: null,
+        visibility: "private",
+        isCollaborative: false,
+        tracks: [
+          {
+            entityUid: "track-entity-12",
+            globalTrackUid: "global-track-12",
+            libraryTrackId: 12,
+            path: "/music/high-vis/talk-for-hours.flac",
+            title: "Talk For Hours",
+            artist: "High Vis",
+            album: "Blending",
+            duration: 299,
+          },
+        ],
+      });
+    });
+
+    expect(api).toHaveBeenNthCalledWith(1, "/api/playlists", "POST", {
+      name: "High Vis favourites",
+      description: "",
+      cover_data_url: null,
+      visibility: "private",
+      is_collaborative: false,
+    });
+    expect(api).toHaveBeenNthCalledWith(2, "/api/playlists/12/tracks", "POST", {
+      tracks: [
+        {
+          track_id: 12,
+          global_track_uid: "global-track-12",
+          entity_uid: "track-entity-12",
+          path: "/music/high-vis/talk-for-hours.flac",
+          title: "Talk For Hours",
+          artist: "High Vis",
+          album: "Blending",
+          duration: 299,
+        },
+      ],
+    });
+  });
 });

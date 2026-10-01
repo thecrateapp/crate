@@ -15,6 +15,7 @@ import {
   resolveArtworkAuthHeaders,
   resolveCrateStoryComposition,
 } from "@/lib/social-share-story-builder";
+import { buildCrateStoryMetadata } from "@/lib/social-share-story-canvas";
 
 describe("resolveArtworkAuthHeaders", () => {
   afterEach(() => {
@@ -82,5 +83,24 @@ describe("resolveCrateStoryComposition", () => {
         crateIsOrdered: false,
       }),
     ).toBe("hero-editorial");
+  });
+});
+
+describe("buildCrateStoryMetadata", () => {
+  it("includes owner, album count and track count for editorial Crates", () => {
+    expect(
+      buildCrateStoryMetadata({
+        kind: "crate",
+        title: "Road trip records",
+        subtitle: "Diego",
+        url: "/crate/2",
+        crateAlbums: [
+          { imageUrl: null, name: "One", artistName: "Artist", position: 0 },
+          { imageUrl: null, name: "Two", artistName: "Artist", position: 1 },
+        ],
+        crateTrackCount: 18,
+        crateIsOrdered: false,
+      }),
+    ).toBe("Diego · 2 albums · 18 tracks");
   });
 });

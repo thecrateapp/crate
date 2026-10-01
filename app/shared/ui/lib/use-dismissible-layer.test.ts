@@ -73,6 +73,34 @@ describe("useDismissibleLayer", () => {
     document.body.removeChild(ref.current);
   });
 
+  it("does not call onDismiss for a portal submenu boundary", () => {
+    const onDismiss = vi.fn();
+    const ref = { current: document.createElement("div") };
+    const submenu = document.createElement("div");
+    submenu.dataset.dismissibleLayerBoundary = "true";
+    const item = document.createElement("button");
+    submenu.appendChild(item);
+    document.body.appendChild(ref.current);
+    document.body.appendChild(submenu);
+
+    renderHook(() =>
+      useDismissibleLayer({
+        active: true,
+        refs: [ref],
+        onDismiss,
+      }),
+    );
+
+    item.dispatchEvent(
+      new Event("pointerdown", { bubbles: true, cancelable: true }),
+    );
+
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    document.body.removeChild(ref.current);
+    document.body.removeChild(submenu);
+  });
+
   it("suppresses the synthetic click after an outside pointer dismiss", () => {
     const onDismiss = vi.fn();
     const onUnderlyingClick = vi.fn();

@@ -20,6 +20,16 @@ export function resolveCrateStoryComposition(
     : "hero-editorial";
 }
 
+export function buildCrateStoryMetadata(payload: SharePayload): string {
+  const albumCount = payload.crateAlbums?.length ?? 0;
+  const albumLabel = albumCount === 1 ? "1 album" : `${albumCount} albums`;
+  const trackLabel =
+    payload.crateTrackCount && payload.crateTrackCount > 0
+      ? ` · ${payload.crateTrackCount} tracks`
+      : "";
+  return `${buildInstagramStorySubtitle(payload)} · ${albumLabel}${trackLabel}`;
+}
+
 export function drawStoryArtworkBackground(
   ctx: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -130,7 +140,7 @@ export function drawCrateStoryCard(
   if (resolveCrateStoryComposition(payload) !== "ranked-stack") {
     drawEditorialStoryCard(
       ctx,
-      payload,
+      { ...payload, subtitle: buildCrateStoryMetadata(payload) },
       artworks[0]?.image ?? null,
       logo,
       colors,
