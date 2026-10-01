@@ -597,9 +597,11 @@ jobs:
                 $events = Import-Csv -LiteralPath $csv |
                   Where-Object {
                     $_.'Process Name' -in @('crate-desktop.exe', 'http_resource_probe.exe')
-                  }
+                  } |
+                  Select-Object 'Time of Day', 'Process Name', PID, Operation, Path, Result
                 $events | Export-Csv -LiteralPath $filteredCsv -NoTypeInformation
                 Write-Output "Captured $($events.Count) app events in the Windows loader trace"
+                Remove-Item -LiteralPath $recording -Force
               } else {
                 Write-Warning 'Process Monitor trace export did not produce a CSV file'
               }
@@ -706,6 +708,33 @@ jobs:
                 'Executable was not present.' | Add-Content -LiteralPath $diagnostics
               }
             }
+
+            $winsock = Join-Path $env:WINDIR 'System32\ws2_32.dll'
+            "===== $winsock exports (ordinals 115-116) =====" |
+              Add-Content -LiteralPath $diagnostics
+            if (Test-Path -LiteralPath $winsock -PathType Leaf) {
+              & $dumpbin.FullName /exports $winsock 2>&1 |
+                Where-Object {
+                  $_ -match 'Ordinal|WSAStartup|WSACleanup|^\s*115\s|^\s*116\s'
+                } |
+                Add-Content -LiteralPath $diagnostics
+            } else {
+              'System ws2_32.dll was not present.' |
+                Add-Content -LiteralPath $diagnostics
+            }
+
+            '===== Windows loader debugger tools =====' |
+              Add-Content -LiteralPath $diagnostics
+            $debuggerDirectory = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Debuggers\x64'
+            foreach ($toolName in @('cdb.exe', 'gflags.exe')) {
+              $toolPath = Join-Path $debuggerDirectory $toolName
+              if (Test-Path -LiteralPath $toolPath -PathType Leaf) {
+                $toolPath | Add-Content -LiteralPath $diagnostics
+              } else {
+                "$toolName was not installed at the Windows SDK debugger path." |
+                  Add-Content -LiteralPath $diagnostics
+              }
+            }
           }
 
           Get-Content -LiteralPath $diagnostics
@@ -719,7 +748,6 @@ jobs:
             ${{ runner.temp }}/tauri-r02-windows-resource.json
             ${{ runner.temp }}/tauri-r02-windows-events.txt
             ${{ runner.temp }}/tauri-r02-windows-pe-imports.txt
-            ${{ runner.temp }}/tauri-r02-windows-loader.pml
             ${{ runner.temp }}/tauri-r02-windows-loader-apps.csv
           if-no-files-found: warn
           retention-days: 30
