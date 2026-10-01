@@ -44,16 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetch,
     resetForServerTransition,
   } = useAuthSession();
-  const currentServerIdRef = useRef<string | null | undefined>(undefined);
-  if (currentServerIdRef.current === undefined) {
-    currentServerIdRef.current = getCurrentServerId();
+  const currentServerIdRef = useRef<{ value: string | null } | null>(null);
+  if (currentServerIdRef.current === null) {
+    currentServerIdRef.current = { value: getCurrentServerId() };
   }
+  const currentServerId = currentServerIdRef.current;
 
   useEffect(() => {
     const handleServerChange = () => {
       const nextServerId = getCurrentServerId();
-      if (nextServerId === currentServerIdRef.current) return;
-      currentServerIdRef.current = nextServerId;
+      if (nextServerId === currentServerId.value) return;
+      currentServerId.value = nextServerId;
 
       const nextServer = getCurrentServer();
       clearAuthRuntime({
