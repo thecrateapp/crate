@@ -543,7 +543,44 @@ jobs:
           # Run beside the installed app so the probe resolves the same bundled runtime DLLs.
           $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
           $application = Join-Path $installDirectory 'http_resource_probe.exe'
+          $bundledApplication = Join-Path $installDirectory 'crate-desktop.exe'
           Copy-Item -LiteralPath $example -Destination $application -Force
+
+          $manifestTool = Get-ChildItem `
+            -LiteralPath (Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin') `
+            -Filter mt.exe `
+            -Recurse `
+            -File `
+            -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\mt\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $manifestTool) {
+            throw 'Windows SDK manifest tool (mt.exe) was not found'
+          }
+
+          $manifest = Join-Path $env:RUNNER_TEMP 'crate-desktop.manifest'
+          $manifestSidecar = "$bundledApplication.manifest"
+          if (Test-Path -LiteralPath $manifestSidecar -PathType Leaf) {
+            Copy-Item `
+              -LiteralPath $manifestSidecar `
+              -Destination "$application.manifest" `
+              -Force
+          } else {
+            & $manifestTool `
+              "-inputresource:$bundledApplication;#1" `
+              "-out:$manifest"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not extract the installed app manifest (mt.exe exited with $LASTEXITCODE)"
+            }
+            & $manifestTool `
+              -manifest $manifest `
+              "-outputresource:$application;#1"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not apply the installed app manifest to the probe (mt.exe exited with $LASTEXITCODE)"
+            }
+          }
+          Write-Output 'Applied the installed Crate app manifest to the HTTP resource probe'
 
           $procmon = $env:CRATE_PROCMON_PATH
           $traceStarted = $false
@@ -647,8 +684,8 @@ jobs:
               if (Test-Path -LiteralPath $loaderSnaps -PathType Leaf) {
                 Select-String `
                   -Path $loaderSnaps `
-                  -Pattern 'STATUS_ENTRYPOINT_NOT_FOUND|0xc0000139|entry point|procedure|ordinal|failed|not found|unable to|unable to load|snapping' `
-                  -Context 3, 2 |
+                  -Pattern 'STATUS_ENTRYPOINT_NOT_FOUND|0xc0000139|ERROR:|WARNING: Procedure|could not be located' `
+                  -Context 2, 2 |
                   ForEach-Object { $_.ToString() } |
                   Set-Content -LiteralPath $filteredLoaderSnaps
               }
