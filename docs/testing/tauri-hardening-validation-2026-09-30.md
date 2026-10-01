@@ -597,3 +597,14 @@ The PR review initially showed skipped Android/backend/desktop jobs because PR #
 The same revision's active PR checks passed: frontend tests and Chromium appearance, React Doctor, the Python security scan, and PR Agent Review. PR-triggered backend quality, test shards, coverage, Android, iOS, and desktop matrix were skipped because the PR is a draft. These are pending PR activation, not failures.
 
 The captured raw samples validate against the capture schema and match the successful run. Its aggregate `minMs` summary fields have a known q=0 bug from that source revision; this validation record derives minima directly from the raw samples. The percentile helper was corrected afterward and has a regression test. This hosted synthetic probe does not replace real download cadence, installed-player, minimum-Windows-version, or user-library acceptance.
+
+### Exact-head CI and corrected Windows measurement — `995eb81d`
+
+The percentile fix, its regression test, and the validation updates are committed as `995eb81d5704afbda90f5036e1eb506085b4c3cb` on `feat/tauri-desktop-app`.
+
+- The exact-head [Build Desktop Apps run `36935505561`](https://github.com/thecrateapp/crate/actions/runs/36935505561) passed on macOS, Linux, and Windows. Windows also completed the offline probe with all summaries matching their raw samples, passed the NSIS install/launch smoke, and passed the HTTP resource probe.
+- The exact-head [Build Android run `36934939763`](https://github.com/thecrateapp/crate/actions/runs/36934939763) passed `build-apk`, including Listen typecheck/lint, mobile contracts, secure configuration, Capacitor bundle/budget, and Android lint/tests. Signed release APK/AAB creation remains tag-only and was skipped on this branch dispatch.
+- PR-triggered [Frontend Tests run `36933934877`](https://github.com/thecrateapp/crate/actions/runs/36933934877), [React Doctor run `36933934692`](https://github.com/thecrateapp/crate/actions/runs/36933934692), [Backend Tests security scan run `36933934790`](https://github.com/thecrateapp/crate/actions/runs/36933934790), and [PR Agent Review run `36933932400`](https://github.com/thecrateapp/crate/actions/runs/36933932400) passed.
+- The PR-triggered desktop matrix, Android job, iOS simulator, backend quality, test shards, and coverage show **skipped** because PR #259 is still a draft; none of them are failed. The manual desktop and Android runs above exercised those platform build paths on this exact SHA. Backend quality and test shards did not run on this SHA, and no backend code changed in this follow-up.
+
+This closes the current desktop matrix and Windows synthetic R03–R05 workflow failures. It does not close real download cadence, installed-player acceptance, signed/notarized release, minimum-OS hosts, or the other release gates listed above.

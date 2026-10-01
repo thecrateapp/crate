@@ -87,6 +87,16 @@ Two simultaneous 1,000-file callers returned all 2,000 valid assets in 551.4/557
 
 The raw capture is [`tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json`](measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json). Its raw samples pass the capture validator, but the aggregate `minMs` fields in that original JSON are wrong: the old q=0 percentile calculation selected the last sorted sample. The min values above were recalculated from raw samples; the percentile implementation and regression test have since been fixed. This is a synthetic hosted runner workload, not real download cadence or installed-player acceptance, and it does not set a cross-platform fallback threshold.
 
+### Corrected exact-head Windows Server 2025 revalidation — 2026-10-01
+
+After correcting the q=0 percentile calculation, [Build Desktop Apps run `36935505561`](https://github.com/thecrateapp/crate/actions/runs/36935505561) passed macOS, Linux, and Windows on source SHA `995eb81d5704afbda90f5036e1eb506085b4c3cb`. The same Windows Server 2025/WebView2 probe passed all R03–R05 capture assertions. Unlike the preceding capture, all 16 reported min/median/max summaries match their underlying samples.
+
+The 5,000-entry hydration pass took 78.8/80.3/80.9 ms (min/median/max), with warm hydration below 1 ms. Verification validated every asset: 100 entries took 38.2/38.8/50.8 ms, 1,000 took 283.0/322.4/365.6 ms, and 5,000 took 1,503.7/1,527.1/3,140.6 ms. Seeding the 5,000-file fixture took 9.16 s and is excluded from these verification durations. Two 1,000-file callers returned all 2,000 assets in 563.6/573.3/573.7 ms concurrent, versus 587.4/592.9/597.9 ms sequential.
+
+Same-turn bursts persisted all entries with one durable write each: 100 mutations took 36.4/36.5/37.4 ms, 1,000 took 103.7/104.4/134.8 ms, and 5,000 took 2,968.5/2,969.3/2,974.2 ms. The paired case (1,000 mutations, 500 writes at concurrency two) took 15.76/16.57/16.58 s; median per-write p50/p95 were 31.5/38.7 ms, with a 104.4 ms maximum sample. The serial control wrote 100 snapshots in 2.85/2.94/2.96 s.
+
+The corrected raw report is [`tauri-r03-r05-offline-windows-2026-10-01-run-36935505561.json`](measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36935505561.json). These remain synthetic hosted-runner measurements; the 5,000-entry verification outlier and burst tests do not model ordinary downloads or set a fallback policy.
+
 ## R07 — visualizer
 
 Three automatic visible runs each lasted 30 seconds. The canvas was 720×720 CSS pixels at DPR 2 and rendered at 1,024×1,024 pixels, consistent with the configured buffer cap. All runs reported WebGL 2.0. Frame intervals were:
