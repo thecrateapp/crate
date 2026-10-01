@@ -152,6 +152,28 @@ and directional rather than a stable latency claim. The loopback measurements
 remain the evidence for actual keep-alive reuse. Raw values are in
 [`tauri-r01-api-hosted-2026-10-01.json`](measurements/tauri-r01-api-hosted-2026-10-01.json).
 
+#### macOS local loopback revalidation — 2026-10-01
+
+Repeated the corrected release microbenchmark at branch revision `b1accd90` on
+macOS 27.0.1 ARM64. The local fixture sets `TCP_NODELAY`, writes response
+headers and body together, and returns 16 KiB. Values are total / p50 / p95;
+connection counts exclude the shared client's warmup connection.
+
+| Concurrency | Requests | Fresh total / p50 / p95 | Shared total / p50 / p95 | Connections fresh / shared |
+| ----------: | -------: | ----------------------: | -----------------------: | -------------------------: |
+|           1 |      100 |    50 ms / 207 / 327 µs |        4 ms / 37 / 47 µs |                    100 / 0 |
+|           1 |     1000 |     133 ms / 69 / 93 µs |       35 ms / 29 / 35 µs |                  1,000 / 0 |
+|           1 |     5000 |     625 ms / 69 / 83 µs |      174 ms / 28 / 34 µs |                  5,000 / 0 |
+|           8 |      100 |    11 ms / 199 / 245 µs |       1 ms / 78 / 154 µs |                    100 / 7 |
+|           8 |     1000 |   107 ms / 189 / 222 µs |      13 ms / 82 / 102 µs |                  1,000 / 7 |
+|           8 |     5000 |   579 ms / 221 / 356 µs |      78 ms / 84 / 148 µs |                  5,000 / 7 |
+
+The shared client finished sooner in all six local cases and reused the
+keep-alive connections. This reinforces the decision to retain the shared
+client; it is still a synthetic loopback result, not a production API latency
+or installed-player RSS claim. Raw output is in
+[`tauri-r01-loopback-macos-2026-10-01.txt`](measurements/tauri-r01-loopback-macos-2026-10-01.txt).
+
 ### R03 — Offline index hydration and file verification
 
 Three repetitions per size loaded profile indexes containing 100, 1,000, and 5,000 entries. The first pass used a new profile cache but the OS file cache was not cold; the immediately repeated same-process pass was below 1 ms at every size. Median first-pass hydration was 11 ms, 94 ms, and 456 ms. Each first profile load invoked `reconcile_offline_media` once; the warm cache pass invoked no Rust command. The timing includes metadata parsing and locator hydration, but the instrumentation did not count every `plugin-fs` read IPC.
