@@ -537,6 +537,8 @@ jobs:
           $recording = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader.pml'
           $csv = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader.csv'
           $filteredCsv = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader-apps.csv'
+          $loaderSnaps = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader-snaps.txt'
+          $filteredLoaderSnaps = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader-snaps-filtered.txt'
           $example = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
           # Run beside the installed app so the probe resolves the same bundled runtime DLLs.
           $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
@@ -611,6 +613,49 @@ jobs:
           }
 
           if ($probeExitCode -ne 0) {
+            $debuggerDirectory = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Debuggers\x64'
+            $cdb = Join-Path $debuggerDirectory 'cdb.exe'
+            $gflags = Join-Path $debuggerDirectory 'gflags.exe'
+            $imageName = Split-Path -Leaf $application
+
+            if ((Test-Path -LiteralPath $cdb -PathType Leaf) -and
+                (Test-Path -LiteralPath $gflags -PathType Leaf)) {
+              $loaderSnapsEnabled = $false
+              try {
+                & $gflags /i $imageName +sls | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                  throw "GFlags exited with $LASTEXITCODE while enabling loader snaps"
+                }
+                $loaderSnapsEnabled = $true
+
+                $debugger = Start-Process `
+                  -FilePath $cdb `
+                  -ArgumentList @('-g', '-G', '-logo', $loaderSnaps, $application) `
+                  -PassThru
+                if (-not $debugger.WaitForExit(30000)) {
+                  Stop-Process -Id $debugger.Id -Force -ErrorAction SilentlyContinue
+                  Write-Warning 'CDB did not finish the loader trace within 30 seconds'
+                }
+              } catch {
+                Write-Warning "Windows loader snaps could not be captured: $($_.Exception.Message)"
+              } finally {
+                if ($loaderSnapsEnabled) {
+                  & $gflags /i $imageName -sls | Out-Null
+                }
+              }
+
+              if (Test-Path -LiteralPath $loaderSnaps -PathType Leaf) {
+                Select-String `
+                  -Path $loaderSnaps `
+                  -Pattern 'STATUS_ENTRYPOINT_NOT_FOUND|0xc0000139|entry point|procedure|ordinal|failed|not found|unable to|unable to load|snapping' `
+                  -Context 3, 2 |
+                  ForEach-Object { $_.ToString() } |
+                  Set-Content -LiteralPath $filteredLoaderSnaps
+              }
+            } else {
+              Write-Warning 'CDB or GFlags was unavailable; skipping Windows loader snaps'
+            }
+
             exit $probeExitCode
           }
 
@@ -749,6 +794,7 @@ jobs:
             ${{ runner.temp }}/tauri-r02-windows-events.txt
             ${{ runner.temp }}/tauri-r02-windows-pe-imports.txt
             ${{ runner.temp }}/tauri-r02-windows-loader-apps.csv
+            ${{ runner.temp }}/tauri-r02-windows-loader-snaps-filtered.txt
           if-no-files-found: warn
           retention-days: 30
 
