@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { expectRequestRejection } from "./expect-request-rejection";
 
 type ProbeFailure = { scenario: string; iteration: number; error: string };
 
@@ -113,9 +114,10 @@ async function run(): Promise<void> {
       );
     });
     await runScenario(origin, "connection-refused", async () => {
-      const response = await tauriFetch(refusedOrigin);
-      await response.text();
-      throw new Error("connection-refused request unexpectedly succeeded");
+      await expectRequestRejection(
+        tauriFetch(refusedOrigin),
+        "connection-refused request unexpectedly succeeded",
+      );
     });
     await runScenario(origin, "bodyless-204", async () => {
       const response = await tauriFetch(`${origin}/empty`);
