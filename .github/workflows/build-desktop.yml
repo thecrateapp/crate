@@ -488,6 +488,10 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Test Windows HTTP probe environment isolation
+        if: runner.os == 'Windows'
+        run: python app/listen-desktop/scripts/http-resource-probe/test_run_windows_probe.py
+
       - name: Build Windows HTTP resource probe frontend
         if: runner.os == 'Windows'
         run: npm run --workspace=app/listen-desktop build:http-resource-probe

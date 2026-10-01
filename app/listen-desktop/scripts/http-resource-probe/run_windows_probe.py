@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import urllib.parse
+from collections.abc import Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -170,6 +171,42 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def build_probe_environment(
+    source_environment: Mapping[str, str],
+    *,
+    path_separator: str = os.pathsep,
+) -> tuple[dict[str, str], list[str]]:
+    environment = dict(source_environment)
+    python_location = next(
+        (
+            value
+            for key, value in source_environment.items()
+            if key.casefold() == "pythonlocation"
+        ),
+        None,
+    )
+    removed_python_paths: list[str] = []
+    if python_location:
+        normalized_root = python_location.rstrip("\\/").casefold()
+        path_entries = environment.get("PATH", "").split(path_separator)
+        retained_path_entries: list[str] = []
+        for entry in path_entries:
+            normalized_entry = entry.rstrip("\\/").casefold()
+            if normalized_entry == normalized_root or normalized_entry.startswith(
+                (normalized_root + "\\", normalized_root + "/")
+            ):
+                removed_python_paths.append(entry)
+            else:
+                retained_path_entries.append(entry)
+        environment["PATH"] = path_separator.join(retained_path_entries)
+
+    for key in list(environment):
+        if key.casefold().startswith("python"):
+            environment.pop(key, None)
+
+    return environment, removed_python_paths
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable", required=True, type=Path)
@@ -219,11 +256,12 @@ def main() -> int:
     }
     process: subprocess.Popen[str] | None = None
     try:
-        environment = os.environ.copy()
+        environment, removed_python_paths = build_probe_environment(os.environ)
         environment["CRATE_HTTP_RESOURCE_PROBE_ORIGIN"] = result["fixtureOrigin"]
         environment["CRATE_HTTP_RESOURCE_PROBE_REFUSED_ORIGIN"] = result[
             "refusedOrigin"
         ]
+        result["pythonPathEntriesRemoved"] = removed_python_paths
         process = subprocess.Popen(
             [str(executable)],
             cwd=executable.parent,
