@@ -149,6 +149,12 @@ One uninterrupted visible 30-second run reported frame-interval p50/p95/max of 1
 
 The process CPU/RSS samplers started after the clean cycle and overlapped those interrupted cycles, so this capture does not provide valid per-process CPU/RSS for the DPR-2 run. The earlier DPR-1 three-run capture remains the CPU/RSS evidence. An installed-player integration check and clean repeated HiDPI runs remain open.
 
+## Production player path relevant to R08
+
+Tauri desktop runs the production `Gapless5` engine with both HTML5 audio and WebAudio enabled. It begins the HTML5 stream while fetching the same track into an `ArrayBuffer`, decodes the full track with `AudioContext.decodeAudioData`, then promotes playback to an `AudioBufferSourceNode` and pauses the HTML5 element. Desktop sets `loadLimit` to two tracks so the adjacent track can be ready for gapless playback; when crossfade is enabled, track transitions can overlap. The setup and limit are in [`gapless-player.ts`](../../app/listen/src/lib/gapless-player.ts), and the fetch/decode/promotion path is in [`gapless5.js`](../../app/listen/src/lib/gapless5/gapless5.js).
+
+The synthetic probes use the same browser decode API and retain two full-length buffers, so they provide evidence about the PCM cost and WebView retention at that buffer count. They bypass the production queue scheduler, simultaneous HTML5 stream, natural track transition, and crossfade. Their RSS peaks therefore do not establish the real player's peak or release behavior; R08 still needs an installed-player run that captures active playback, adjacent preload, transition, and post-transition release.
+
 ## macOS development WebView memory measurement
 
 The probe was run in a fresh `crate-desktop` process on the host above. It fetched two local FLAC fixtures over loopback, decoded them sequentially with `AudioContext.decodeAudioData`, kept both `AudioBuffer`s for 90 seconds, then cleared the references and closed the context. The fixture page made no Crate API requests.
