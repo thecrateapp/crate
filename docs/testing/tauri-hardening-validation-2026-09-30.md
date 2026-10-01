@@ -629,3 +629,18 @@ pull-request check conclusions. Exact minimum-OS installations, signed release
 upgrades, OAuth on the deployed callback and all three desktop OSes, installed
 Now Playing/artwork behavior, and real-player RSS/offline acceptance remain
 open.
+
+### Focused offline-transfer audit — macOS 27.0.1 arm64, `2c06f777`
+
+The F13/F14 transfer and cleanup suites passed on the current source: Rust
+`cargo test --lib offline_storage::tests` passed 13/13, and the Listen Vitest
+files `offline-native-assets.test.ts` plus `offline-tauri-transfer.test.ts`
+passed 14/14. This covers interrupted promotion recovery, orphan cleanup,
+stalled-response cancellation, idle/total deadlines, and frontend cleanup when
+a profile is cancelled.
+
+R08 remains partial on this host. The expected `test-music` directory is absent
+from the checkout and `rg --files` found no local audio fixtures, so no real
+track RSS run was attempted. Synthetic WAV measurements do not close the
+real-player acceptance gate; it still needs a nominated local long-track
+fixture and playback/race measurements.
