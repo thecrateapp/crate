@@ -401,6 +401,9 @@ jobs:
           if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
             throw "Installed desktop executable is missing: $application"
           }
+          if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+            throw "NSIS uninstaller is missing: $uninstaller"
+          }
 
           $app = $null
           try {
@@ -417,6 +420,7 @@ jobs:
             if ($app.MainWindowHandle -eq 0) {
               throw 'Installed app did not create its main window within 20 seconds'
             }
+            Write-Output "Installed app created its main window (HWND $($app.MainWindowHandle))"
           }
           finally {
             if ($null -ne $app -and -not $app.HasExited) {
@@ -426,16 +430,18 @@ jobs:
               }
             }
 
-            if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
-              $remove = Start-Process `
-                -FilePath $uninstaller `
-                -ArgumentList '/S' `
-                -Wait `
-                -PassThru
-              if ($remove.ExitCode -ne 0) {
-                throw "Windows NSIS uninstaller exited with $($remove.ExitCode)"
-              }
+            $remove = Start-Process `
+              -FilePath $uninstaller `
+              -ArgumentList '/S' `
+              -Wait `
+              -PassThru
+            if ($remove.ExitCode -ne 0) {
+              throw "Windows NSIS uninstaller exited with $($remove.ExitCode)"
             }
+            if (Test-Path -LiteralPath $application -PathType Leaf) {
+              throw "NSIS uninstaller left the application executable behind: $application"
+            }
+            Write-Output 'Windows silent install, launch, and uninstall smoke passed'
           }
 
       - name: Generate macOS dSYMs
