@@ -545,6 +545,53 @@ jobs:
             $events | Format-List TimeCreated, Id, ProviderName, Message
           }
 
+      - name: Capture Windows HTTP resource probe PE imports
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $diagnostics = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-pe-imports.txt'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (Test-Path -LiteralPath $vswhere -PathType Leaf) {
+            $visualStudio = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          } else {
+            $visualStudio = $null
+          }
+
+          $dumpbin = $null
+          if ($visualStudio) {
+            $dumpbin = Get-ChildItem `
+              -LiteralPath (Join-Path $visualStudio 'VC\Tools\MSVC') `
+              -Filter 'dumpbin.exe' `
+              -Recurse `
+              -File `
+              -ErrorAction SilentlyContinue |
+              Sort-Object -Property FullName -Descending |
+              Select-Object -First 1
+          }
+
+          if ($null -eq $dumpbin) {
+            'dumpbin.exe was not available on this runner.' |
+              Set-Content -LiteralPath $diagnostics
+          } else {
+            $applications = @(
+              'app/listen-desktop/src-tauri/target/release/crate-desktop.exe',
+              'app/listen-desktop/src-tauri/target/release/http_resource_probe.exe'
+            )
+            foreach ($application in $applications) {
+              "===== $application =====" | Add-Content -LiteralPath $diagnostics
+              if (Test-Path -LiteralPath $application -PathType Leaf) {
+                & $dumpbin.FullName /headers $application 2>&1 |
+                  Add-Content -LiteralPath $diagnostics
+                & $dumpbin.FullName /imports $application 2>&1 |
+                  Add-Content -LiteralPath $diagnostics
+              } else {
+                'Executable was not present.' | Add-Content -LiteralPath $diagnostics
+              }
+            }
+          }
+
+          Get-Content -LiteralPath $diagnostics
+
       - name: Upload Windows HTTP resource probe
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v7
@@ -553,6 +600,7 @@ jobs:
           path: |
             ${{ runner.temp }}/tauri-r02-windows-resource.json
             ${{ runner.temp }}/tauri-r02-windows-events.txt
+            ${{ runner.temp }}/tauri-r02-windows-pe-imports.txt
           if-no-files-found: warn
           retention-days: 30
 
