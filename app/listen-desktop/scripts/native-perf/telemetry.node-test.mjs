@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { installNativePerfTelemetry } from "./telemetry.js";
+import {
+  installNativePerfTelemetry,
+  writeTextFileWithTelemetry,
+} from "./telemetry.js";
 
 function makeStats() {
   return {
@@ -11,45 +14,53 @@ function makeStats() {
   };
 }
 
-test("records successful offline index .next writes at the Tauri IPC boundary", async () => {
+test("records successful offline index .next writes", async () => {
   const forwarded = [];
-  const internals = {
-    async invoke(...args) {
-      forwarded.push(args);
-      return "written";
-    },
+  const target = {};
+  const writeTextFile = async (...args) => {
+    forwarded.push(args);
+    return "written";
   };
-  const originalInvoke = internals.invoke;
   const stats = makeStats();
   let clock = 20;
-  const restore = installNativePerfTelemetry(stats, internals, () => clock++);
+  const restore = installNativePerfTelemetry(stats, target);
 
-  const payload = new TextEncoder().encode('{"asset":"r05"}');
-  const result = await internals.invoke("plugin:fs|write_text_file", payload, {
-    headers: {
-      path: "offline-meta%5Coffline-assets-r05.next",
-    },
-  });
+  const payload = '{"asset":"r05"}';
+  const result = await writeTextFileWithTelemetry(
+    writeTextFile,
+    "offline-meta/offline-assets-r05.next",
+    payload,
+    { baseDir: "AppLocalData" },
+    target,
+    () => clock++,
+  );
 
   assert.equal(result, "written");
   assert.equal(forwarded.length, 1);
   assert.equal(stats.indexWriteCalls, 1);
-  assert.equal(stats.indexWriteBytes, payload.byteLength);
+  assert.equal(
+    stats.indexWriteBytes,
+    new TextEncoder().encode(payload).byteLength,
+  );
   assert.deepEqual(stats.indexWriteDurationsMs, [1]);
 
   restore();
-  assert.equal(internals.invoke, originalInvoke);
+  assert.equal(target.__crateNativePerfRecordWrite, undefined);
 });
 
-test("ignores unrelated filesystem writes and other Tauri commands", async () => {
+test("ignores unrelated filesystem writes", async () => {
   const stats = makeStats();
-  const internals = { invoke: async () => undefined };
-  const restore = installNativePerfTelemetry(stats, internals, () => 1);
+  const target = {};
+  const restore = installNativePerfTelemetry(stats, target);
 
-  await internals.invoke("plugin:fs|write_text_file", new Uint8Array([1]), {
-    headers: { path: "offline-meta%5Coffline-index-profile.next" },
-  });
-  await internals.invoke("verify_offline_media_assets", [], {});
+  await writeTextFileWithTelemetry(
+    async () => undefined,
+    "offline-meta/offline-index-profile.next",
+    "{}",
+    {},
+    target,
+    () => 1,
+  );
 
   assert.equal(stats.indexWriteCalls, 0);
   assert.equal(stats.indexWriteBytes, 0);
@@ -59,17 +70,21 @@ test("ignores unrelated filesystem writes and other Tauri commands", async () =>
 
 test("does not count failed durable writes", async () => {
   const stats = makeStats();
-  const internals = {
-    invoke: async () => {
-      throw new Error("disk full");
-    },
+  const target = {};
+  const restore = installNativePerfTelemetry(stats, target);
+  const writeTextFile = async () => {
+    throw new Error("disk full");
   };
-  const restore = installNativePerfTelemetry(stats, internals, () => 1);
 
   await assert.rejects(
-    internals.invoke("plugin:fs|write_text_file", new Uint8Array([1]), {
-      headers: { path: "offline-meta%5Coffline-assets-profile.next" },
-    }),
+    writeTextFileWithTelemetry(
+      writeTextFile,
+      "offline-meta/offline-assets-profile.next",
+      "{}",
+      {},
+      target,
+      () => 1,
+    ),
     /disk full/,
   );
 

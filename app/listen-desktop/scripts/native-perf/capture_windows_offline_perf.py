@@ -386,9 +386,12 @@ def capture(output_dir: Path, revision: str, timeout_seconds: int) -> Path:
             "npm run --workspace=app/listen-desktop tauri:dev -- "
             f'--config "{config_path}"'
         )
+        tauri_environment = os.environ.copy()
+        tauri_environment["CRATE_NATIVE_PERF_TELEMETRY"] = "1"
         tauri = subprocess.Popen(
             command,
             cwd=ROOT,
+            env=tauri_environment,
             shell=True,
             stdout=tauri_log,
             stderr=subprocess.STDOUT,

@@ -20,17 +20,21 @@ python3 app/listen-desktop/scripts/audio-rss/fixture_server.py \
 From the repository root, launch the measurement-only window:
 
 ```bash
-npm run --workspace=app/listen-desktop tauri:dev -- \
+CRATE_NATIVE_PERF_TELEMETRY=1 npm run --workspace=app/listen-desktop tauri:dev -- \
   --config scripts/native-perf/tauri.config.json
 ```
 
+In PowerShell, set `$env:CRATE_NATIVE_PERF_TELEMETRY = "1"` before running the
+same npm command.
+
 The probe seeds only its isolated `app.cratemusic.crate.desktop.native-perf-bench20260930` app-local directory, measures metadata hydration, checks 100/1,000/5,000 files through `verifyNativeOfflineAssets`, compares sequential and concurrent verification callers, and records durable index write counts/bytes for serial and coalesced mutations. It posts hydration phase progress events and a final results event to the JSONL path above. It removes its `offline-media` and `offline-meta` directories when finished.
 
-Index write telemetry wraps the Tauri `plugin:fs|write_text_file` IPC inside
-the probe page. It counts only successful writes to the offline asset index's
-`.next` file and records the UTF-8 payload size plus command duration. This
-observer is installed only by the measurement page; production filesystem
-code is unchanged.
+Set `CRATE_NATIVE_PERF_TELEMETRY=1` when running the probe locally. This
+enables a measurement-only Vite shim around `@tauri-apps/plugin-fs` that counts
+successful writes to the offline asset index's `.next` file and records the
+UTF-8 payload size plus duration. The shim is disabled for normal app builds
+and does not modify Tauri's read-only IPC bridge. The Windows workflow enables
+it only for the capture subprocess.
 
 To collect the same synthetic R03–R05 workload on a Windows WebView2 runner,
 dispatch `Build Desktop Apps` with `measure_windows_offline_perf=true`. The

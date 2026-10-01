@@ -1,13 +1,7 @@
-const WRITE_TEXT_FILE_COMMAND = "plugin:fs|write_text_file";
-
-function offlineIndexWritePath(command, options) {
-  if (command !== WRITE_TEXT_FILE_COMMAND) return null;
-  const encodedPath = options?.headers?.path;
-  if (typeof encodedPath !== "string") return null;
-
-  let path = encodedPath;
+function offlineIndexWritePath(path) {
+  if (typeof path !== "string") return null;
   try {
-    path = decodeURIComponent(encodedPath);
+    path = decodeURIComponent(path);
   } catch {
     // Keep the encoded form so a malformed path cannot disable measurement.
   }
@@ -24,30 +18,41 @@ function byteLength(data) {
   return 0;
 }
 
-export function installNativePerfTelemetry(
-  stats,
-  internals = window.__TAURI_INTERNALS__,
+export async function writeTextFileWithTelemetry(
+  writeTextFile,
+  path,
+  data,
+  options,
+  target = window,
   now = () => performance.now(),
 ) {
-  if (!internals || typeof internals.invoke !== "function") {
-    throw new Error("Tauri invoke bridge is unavailable for write telemetry");
+  const startedAt = now();
+  const result = await writeTextFile(path, data, options);
+  try {
+    target.__crateNativePerfRecordWrite?.(
+      path,
+      data,
+      Math.max(0, now() - startedAt),
+    );
+  } catch {
+    // Benchmark instrumentation must not change filesystem operation results.
   }
+  return result;
+}
 
-  const originalInvoke = internals.invoke;
-  const observedInvoke = async function (command, args, options) {
-    const path = offlineIndexWritePath(command, options);
-    const startedAt = path ? now() : 0;
-    const result = await originalInvoke.call(this, command, args, options);
-    if (path) {
-      stats.indexWriteCalls += 1;
-      stats.indexWriteBytes += byteLength(args);
-      stats.indexWriteDurationsMs.push(Math.max(0, now() - startedAt));
-    }
-    return result;
+export function installNativePerfTelemetry(stats, target = window) {
+  const originalObserver = target.__crateNativePerfRecordWrite;
+  const observer = (path, data, durationMs) => {
+    if (!offlineIndexWritePath(path)) return;
+    stats.indexWriteCalls += 1;
+    stats.indexWriteBytes += byteLength(data);
+    stats.indexWriteDurationsMs.push(Math.max(0, durationMs));
   };
-
-  internals.invoke = observedInvoke;
+  target.__crateNativePerfRecordWrite = observer;
   return () => {
-    if (internals.invoke === observedInvoke) internals.invoke = originalInvoke;
+    if (target.__crateNativePerfRecordWrite !== observer) return;
+    if (originalObserver === undefined)
+      delete target.__crateNativePerfRecordWrite;
+    else target.__crateNativePerfRecordWrite = originalObserver;
   };
 }
