@@ -48,10 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (currentServerIdRef.current === null) {
     currentServerIdRef.current = { value: getCurrentServerId() };
   }
-  const currentServerId = currentServerIdRef.current;
 
   useEffect(() => {
     const handleServerChange = () => {
+      const currentServerId = currentServerIdRef.current;
+      if (currentServerId === null) return;
       const nextServerId = getCurrentServerId();
       if (nextServerId === currentServerId.value) return;
       currentServerId.value = nextServerId;
