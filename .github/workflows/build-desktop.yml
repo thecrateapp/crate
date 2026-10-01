@@ -592,9 +592,13 @@ jobs:
             'dumpbin.exe was not available on this runner.' |
               Set-Content -LiteralPath $diagnostics
           } else {
+            $probe = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
+            if (-not (Test-Path -LiteralPath $probe -PathType Leaf)) {
+              throw "Windows HTTP resource probe executable was not present for PE diagnostics: $probe"
+            }
             $applications = @(
               'app/listen-desktop/src-tauri/target/release/crate-desktop.exe',
-              'app/listen-desktop/src-tauri/target/release/http_resource_probe.exe'
+              $probe
             )
             foreach ($application in $applications) {
               "===== $application =====" | Add-Content -LiteralPath $diagnostics
