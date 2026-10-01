@@ -344,13 +344,13 @@ The review documents identify C03, C06, and C07, but do not define C01, C02, C04
 | C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; Linux Debian 12 container launch passed; workflow 36803358214 installed the Windows NSIS bundle on `windows-latest`, observed its main window, ran the silent uninstaller, and verified that it removed the app executable. Windows 10 1803 and upgrade acceptance remain open. |
 | C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                                                                                                                                                                                                         |
 | C04 | Native OAuth handoff                      | 87 focused backend tests pass on the current branch, and Google login succeeded on macOS; the updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                                                                                                                            |
-| C05 | Linux package ABI/WebKit compatibility    | Partial: Debian 12 with GLIBC 2.36 and WebKitGTK 2.50.6 launched; exact WebKitGTK 2.40 floor and normal desktop install remain open.                                                                                                                                                                                                        |
+| C05 | Linux package ABI/WebKit compatibility    | Fail: the release `.deb` exits at startup on WebKitGTK/JSC 2.40.3 because Wry imports `webkit_cookie_manager_get_all_cookies_finish`, introduced in WebKitGTK 2.42. The published 2.40 floor must be reconciled with the binary.                                                                                                            |
 | C06 | Desktop CI builds and artifact checks     | Pass for application source revision `a587a15b` on macOS ARM64/Intel, Windows, and Linux in workflow 36803358214 at branch revision `cf8dcb27`; the run also passed the Windows install, launch, and uninstall smoke. Linux GLIBC_2.34 and artifact checks passed.                                                                          |
 | C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                                                                                                                                                                                                         |
 
 ## Other native gates still pending
 
-The installed release matrix remains open for macOS 11 and Intel, Windows 10 1803/WebView2, and Linux/WebKitGTK 2.40. Windows CI now installs the NSIS bundle, creates its main window, and verifies uninstaller cleanup on `windows-latest`; the supported-floor install/upgrade, real-player RSS, and media-control checks remain open. Linux now has a real GNOME Wayland launch and MPRIS smoke, but still needs route and installed-player inspection, offline flows, X11, WebKitGTK 2.40, and upgrade from the previous package. Provider credentials, media-system behavior, signed artifacts, and the remaining native acceptance scenarios are not covered by this report. A green CI build does not substitute for those runs.
+The installed release matrix remains open for macOS 11 and Intel, Windows 10 1803/WebView2, and the Linux support floor. Windows CI now installs the NSIS bundle, creates its main window, and verifies uninstaller cleanup on `windows-latest`; the supported-floor install/upgrade, real-player RSS, and media-control checks remain open. Linux now has a real GNOME Wayland launch and MPRIS smoke, but still needs route and installed-player inspection, offline flows, X11, a resolved WebKitGTK floor, and upgrade from the previous package. Provider credentials, media-system behavior, signed artifacts, and the remaining native acceptance scenarios are not covered by this report. A green CI build does not substitute for those runs.
 
 ## Finding implementation crosswalk — F01–F20
 
@@ -380,6 +380,18 @@ The fixes below are present in the current branch and their regression suites ar
 | F20     | Release versions are resolved before packaging and inspected in platform artifact metadata; `desktop-version.node-test.mjs` covers version propagation and artifact verification, and the three-OS workflow passed on the code-equivalent revision. |
 
 ## Follow-up validation — 2026-10-01
+
+### Linux WebKitGTK minimum runtime check
+
+The Linux `.deb` from [Build Desktop Apps workflow `36807020863`](https://github.com/thecrateapp/crate/actions/runs/36807020863), built from source revision `ac4a8c97b85c124d7ac1ccfb89fe0123ed3a187e`, was installed in an ephemeral Debian 12 amd64 container under OrbStack's x86_64 emulation. JavaScriptCoreGTK and WebKitGTK were both pinned to `2.40.3-2~deb12u2`; the app was started under a private D-Bus session and Xvfb with software rendering. The process exited before opening a window:
+
+```text
+crate-desktop: symbol lookup error: crate-desktop: undefined symbol: webkit_cookie_manager_get_all_cookies_finish
+```
+
+The API is available since WebKitGTK 2.42 according to the [WebKitGTK API reference](https://webkitgtk.org/reference/webkit2gtk/2.42.2/method.CookieManager.get_all_cookies_finish.html). Source inspection locates this import in Wry 0.57's WebKitGTK cookie enumeration implementation, which is wired into Tauri's runtime cookie getter. The app's direct `webkit2gtk` dependency enables `v2_40`, but that feature does not remove Wry's unconditional import. The `.deb` SHA-256 was `46e8edc536009c7795cbd9e0a2d3b0f656492f642b8f3ed38d6fc2850a7c178a`.
+
+This disproves the currently published 2.40 minimum for the release artifact. C05 remains failed until either the package minimum moves to 2.42 and is tested there, or Wry's Linux cookie implementation is changed so the binary can load on 2.40 while preserving the supported app behavior. This Xvfb run does not validate a normal Wayland or X11 desktop session.
 
 The performance and OAuth validation snapshot was updated against branch revision `cf8dcb271ed0dc465304107ebdd1f6a6ded9f711`. Application code remains at source revision `a587a15b`; commits `5db156a9`, `f8a32779`, and `cf8dcb27` add and harden the Windows install, launch, and uninstall smoke in the desktop CI workflow.
 
