@@ -97,7 +97,31 @@ The corrected local fixture shows that pooling reuses keep-alive connections and
 | macOS              |           8 |    1,000 |       254 ms / 400 / 700 µs |     23 ms / 143 / 172 µs |                  1,000 / 7 |
 | macOS              |           8 |    5,000 |   1,442 ms / 447 / 1,002 µs |    217 ms / 173 / 706 µs |                  5,000 / 7 |
 
-On each runner and request size, the shared client accepted zero new connections after warmup at concurrency one and seven at concurrency eight, while a fresh client opened one connection per request. Shared-client totals were lower in all six cases on each OS. This confirms keep-alive reuse in the fixture and supports keeping the shared client. It does not measure TLS, proxy behavior, Crate API routes, CPU/RSS, cancellation, or installed-app traffic; those R01 acceptance checks remain open. See the exact [workflow run](https://github.com/thecrateapp/crate/actions/runs/36781473125) for the raw runner output.
+On each runner and request size, the shared client accepted zero new connections after warmup at concurrency one and seven at concurrency eight, while a fresh client opened one connection per request. Shared-client totals were lower in all six cases on each OS. This confirms keep-alive reuse in the fixture and supports keeping the shared client. See the exact [workflow run](https://github.com/thecrateapp/crate/actions/runs/36781473125) for the raw runner output.
+
+#### macOS HTTPS API sample — 2026-10-01
+
+The same Tauri reqwest client was then measured against the production read-only
+`GET /api/setup/status` route on `api.lespedants.org`. The route returns HTTP
+200 and counts users; it does not mutate state. The Mac17,2 host ran a release
+build of the example at source revision `3570c6c4`. Each mode ran 25 measured
+requests at concurrency 1 and 8, plus one warmup per mode/concurrency. Including
+one preflight request, the run sent 105 GETs. The remote server does not expose
+per-client accepted-connection counts, so this comparison records timings only.
+
+| Concurrency | Client | Cold request | Total for 25 |      p50 |      p95 |
+| ----------: | ------ | -----------: | -----------: | -------: | -------: |
+|           1 | Fresh  |      95.4 ms |      2.287 s |  88.7 ms | 108.1 ms |
+|           1 | Shared |      94.9 ms |      1.719 s |  68.8 ms |  72.8 ms |
+|           8 | Fresh  |      84.6 ms |       470 ms | 114.7 ms | 132.3 ms |
+|           8 | Shared |      93.9 ms |       360 ms |  83.8 ms | 104.4 ms |
+
+The shared client was faster in this single sample at both concurrency levels,
+including lower p50/p95. The loopback fixture separately confirms actual
+keep-alive reuse. Treat the remote result as directional: it is one short run
+through the production proxy and an unauthenticated status route, not an SLA or
+a representative authenticated player request. Raw measurements are in
+[`tauri-r01-api-macos-2026-10-01.json`](measurements/tauri-r01-api-macos-2026-10-01.json).
 
 ### R03 — Offline index hydration and file verification
 
@@ -328,7 +352,7 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 
 | ID                                       | Decision                                                                                                                                                                                                                                                                                                                                            | Remaining evidence or work                                                                                                                                                                     |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R01 — shared HTTP transport              | Keep the shared reqwest client. The corrected loopback probe shows connection reuse and lower total time on all three hosted OS runners and the local Mac.                                                                                                                                                                                          | Measure TLS/API traffic, cancellation, CPU/RSS, and installed-app resource use before claiming production gains.                                                                               |
+| R01 — shared HTTP transport              | Keep the shared reqwest client. The loopback probe confirms connection reuse on all three hosted OS runners and the local Mac; the Mac HTTPS read-only API sample also had lower total and p50/p95 latency with the shared client.                                                                                                                  | Repeat the HTTPS/API sample on Windows and Linux; measure cancellation, CPU/RSS, and installed-app traffic before claiming full production impact.                                             |
 | R02 — HTTP resource lifetime             | Keep the cleanup changes. Mac development and packaged soaks, the Linux release-mode probe on WebKitGTK 2.40.3, and the Windows release-mode probe returned the resource table to baseline for all 150 requests per run. The 20-second Linux sample peaked at 197 MiB for Crate, 299 MiB for WebKitWebProcess, and 57 MiB for WebKitNetworkProcess. | Windows evidence is from a Windows Server 2025 hosted runner, not the Windows 10 1803 floor. Linux used Debian 12 under Xvfb, not a normal desktop session or a package-manager-installed app. |
 | R03 — offline hydration and verification | Keep cached hydration and batched verification; the synthetic Mac measurements are bounded and warm-cache hydration is below 1 ms.                                                                                                                                                                                                                  | Linux synthetic evidence is in the agent report; measure Windows and real library/download workloads.                                                                                          |
 | R04 — verification concurrency           | Keep the current global limit of eight. Concurrent Mac callers showed no material throughput reason to change it.                                                                                                                                                                                                                                   | Confirm contention under real concurrent downloads on Windows/Linux.                                                                                                                           |
