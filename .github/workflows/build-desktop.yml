@@ -402,6 +402,15 @@ jobs:
         if: runner.os == 'Linux'
         run: node app/listen-desktop/scripts/verify-linux-glibc.mjs app/listen-desktop/src-tauri/target/release/crate-desktop 2.36
 
+      - name: Verify Linux WebKitGTK 2.40 symbol compatibility
+        if: runner.os == 'Linux'
+        run: |
+          binary=app/listen-desktop/src-tauri/target/release/crate-desktop
+          if nm -D --undefined-only "$binary" | grep -E ' U[[:space:]]+webkit_cookie_manager_get_all_cookies(_finish)?(@|$)'; then
+            echo 'The desktop binary imports a WebKitGTK cookie API newer than the 2.40 support floor' >&2
+            exit 1
+          fi
+
       - name: Verify desktop artifact versions
         if: runner.os != 'macOS'
         run: >-

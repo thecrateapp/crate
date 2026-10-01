@@ -1,2 +1,5 @@
 # Keep the vendored OpenSubsonic contract byte-for-byte aligned with upstream.
 app/tests/contracts/opensubsonic/openapi/
+
+# Keep the vendored Wry source aligned with its upstream release.
+app/listen-desktop/src-tauri/vendor/wry/

@@ -65,3 +65,5 @@ debug = "line-tables-only"
 
 [patch.crates-io]
 tauri-plugin-http = { path = "vendor/tauri-plugin-http" }
+# Keep the Linux binary loadable on the supported WebKitGTK 2.40 floor.
+wry = { path = "vendor/wry" }
