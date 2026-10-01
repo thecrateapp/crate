@@ -1,0 +1,64 @@
+{
+  "status": "passed",
+  "headSha": "79258d93c8bc5bf239d05b03971a7b2f807265f0",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "C:\\Users\\runneradmin\\AppData\\Local\\Crate\\http_resource_probe.exe",
+  "executableSha256": "7b461f30fd297aa9992e6df71c969f07664bfaef0296aec2cd409384170c80ed",
+  "workingDirectory": "D:\\a\\crate\\crate",
+  "fixtureOrigin": "http://127.0.0.1:56804",
+  "refusedOrigin": "http://127.0.0.1:56805",
+  "iterationsPerScenario": 25,
+  "scenarios": [
+    "consumed-200",
+    "consumed-500",
+    "connection-refused",
+    "bodyless-204",
+    "abort-before-headers",
+    "cancel-after-first-chunk"
+  ],
+  "pythonPathEntriesRemoved": [
+    "C:\\hostedtoolcache\\windows\\Python\\3.13.15\\x64\\Scripts",
+    "C:\\hostedtoolcache\\windows\\Python\\3.13.15\\x64"
+  ],
+  "report": {
+    "passed": true,
+    "iterationsPerScenario": 25,
+    "resourceBaseline": 0,
+    "failures": [],
+    "completedScenarioCounts": {
+      "consumed-200": 25,
+      "consumed-500": 25,
+      "connection-refused": 25,
+      "bodyless-204": 25,
+      "abort-before-headers": 25,
+      "cancel-after-first-chunk": 25
+    },
+    "scenarios": [
+      "consumed-200",
+      "consumed-500",
+      "connection-refused",
+      "bodyless-204",
+      "abort-before-headers",
+      "cancel-after-first-chunk"
+    ]
+  },
+  "returnCode": 0,
+  "requestHits": {
+    "/ok": 25,
+    "/release/consumed-200": 1,
+    "/error": 25,
+    "/release/consumed-500": 1,
+    "/release/connection-refused": 1,
+    "/empty": 25,
+    "/release/bodyless-204": 1,
+    "/wait/delayed-started": 25,
+    "/delayed": 25,
+    "/release/abort-before-headers": 1,
+    "/stream": 25,
+    "/release/cancel-after-first-chunk": 1,
+    "/result": 1
+  },
+  "pathFailures": {},
+  "frontendDiagnostics": "page-load:Started:http://tauri.localhost/\npage-load:Finished:http://tauri.localhost/\nnative-eval-submitted\nnative-early-diagnostics-installed\nfrontend-bootstrap-loaded\nfrontend-module-loaded\nprobe-run-started\nmodule-script-loaded:http://tauri.localhost/assets/index-Bf4u0ydY.js\ndocument-state:{\"href\":\"http://tauri.localhost/\",\"readyState\":\"complete\",\"title\":\"Crate HTTP resource probe\",\"hasStatusElement\":true,\"status\":\"Running HTTP resource probe\u2026\",\"scripts\":[{\"src\":\"http://tauri.localhost/assets/index-Bf4u0ydY.js\",\"type\":\"module\",\"readyState\":null},{\"src\":\"http://tauri.localhost/probe-diagnostics.js\",\"type\":\"\",\"readyState\":null}],\"resources\":[\"http://tauri.localhost/assets/index-Bf4u0ydY.js\",\"http://tauri.localhost/probe-diagnostics.js\"]}\nnative-eval-bridge-available\nfixture-origin-received\nscript-fetch:{\"src\":\"http://tauri.localhost/assets/index-Bf4u0ydY.js\",\"status\":200,\"contentType\":\"text/javascript\",\"bytes\":6361,\"preview\":\"(function(){let e=document.createElement(`link`).relList;if(e&&e.supports&&e.supports(`modulepreload`))return;for(let e \"}\nscript-fetch:{\"src\":\"http://tauri.localhost/probe-diagnostics.js\",\"status\":200,\"contentType\":\"text/javascript\",\"bytes\":1021,\"preview\":\"(() => {\\r\\n  const invoke = window.__TAURI_INTERNALS__?.invoke;\\r\\n  const record = (message) => {\\r\\n    if (typeof invoke !\"}\n"
+}
