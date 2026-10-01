@@ -57,6 +57,12 @@ concurrency 1 and 8. The remote run reports latency only because the server does
 not expose per-client accepted-connection counts. Keep production traffic low;
 this sample is diagnostic, not an SLA or a load test.
 
+To collect the same sample from GitHub's Linux, Windows, and macOS runners, run
+the `Build Desktop Apps` workflow manually with `measure_r01_api=true`. The
+opt-in step runs only for that manual dispatch; pull-request and push builds
+continue to use the local fixture only. It sends 104 read-only requests per OS
+runner; the workflow does not add a preflight request.
+
 ## Run the visualizer frame probe
 
 Start the loopback event receiver, then launch the isolated visualizer window:

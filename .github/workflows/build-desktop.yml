@@ -30,6 +30,11 @@ on:
         type: boolean
         required: false
         default: false
+      measure_r01_api:
+        description: "Run a low-volume R01 HTTPS sample against the read-only Crate API"
+        type: boolean
+        required: false
+        default: false
 
 defaults:
   run:
@@ -257,6 +262,12 @@ jobs:
         run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
 
       - name: Measure pooled HTTP reuse (diagnostic)
+        run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
+
+      - name: Measure pooled HTTP reuse against API (diagnostic)
+        if: github.event_name == 'workflow_dispatch' && inputs.measure_r01_api
+        env:
+          CRATE_R01_API_URL: https://api.lespedants.org/api/setup/status
         run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
 
       - name: Clear stale desktop bundles
