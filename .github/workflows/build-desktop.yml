@@ -522,12 +522,37 @@ jobs:
             --executable $application `
             --output $results
 
+      - name: Capture Windows HTTP resource probe application events
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $diagnostics = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-events.txt'
+          $events = Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'
+            StartTime = [DateTime]::UtcNow.AddMinutes(-30)
+          } -ErrorAction SilentlyContinue |
+            Where-Object {
+              $_.ProviderName -in @('Application Error', 'Windows Error Reporting', 'SideBySide') -and
+              $_.Message -match 'http_resource_probe|crate-desktop'
+            } |
+            Select-Object -First 20 TimeCreated, Id, ProviderName, Message
+          if ($null -eq $events) {
+            'No matching Windows Application events were recorded.' |
+              Set-Content -LiteralPath $diagnostics
+          } else {
+            $events | Format-List * | Out-String |
+              Set-Content -LiteralPath $diagnostics
+            $events | Format-List TimeCreated, Id, ProviderName, Message
+          }
+
       - name: Upload Windows HTTP resource probe
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v7
         with:
           name: tauri-r02-windows-resource-${{ github.run_id }}
-          path: ${{ runner.temp }}/tauri-r02-windows-resource.json
+          path: |
+            ${{ runner.temp }}/tauri-r02-windows-resource.json
+            ${{ runner.temp }}/tauri-r02-windows-events.txt
           if-no-files-found: warn
           retention-days: 30
 
