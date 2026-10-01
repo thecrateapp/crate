@@ -44,7 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetch,
     resetForServerTransition,
   } = useAuthSession();
-  const currentServerIdRef = useRef(getCurrentServerId());
+  const currentServerIdRef = useRef<string | null | undefined>(undefined);
+  if (currentServerIdRef.current === undefined) {
+    currentServerIdRef.current = getCurrentServerId();
+  }
 
   useEffect(() => {
     const handleServerChange = () => {

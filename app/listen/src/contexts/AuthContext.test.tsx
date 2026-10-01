@@ -200,6 +200,34 @@ describe("AuthProvider", () => {
     expect(primeOfflineRuntimeProfileMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not reread the current server id on unrelated provider rerenders", async () => {
+    apiMock.mockResolvedValueOnce(null);
+
+    const view = render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("anon")).toBeTruthy();
+    getCurrentServerIdMock.mockClear();
+
+    view.rerender(
+      <MemoryRouter>
+        <AuthProvider>
+          <div>
+            <span>unrelated update</span>
+            <AuthProbe />
+          </div>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(getCurrentServerIdMock).not.toHaveBeenCalled();
+  });
+
   it("persists an offline identity only after the server verifies the user", async () => {
     const server = {
       id: "server-a",
