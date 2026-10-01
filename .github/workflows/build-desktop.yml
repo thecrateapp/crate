@@ -546,12 +546,25 @@ jobs:
           $procmon = $env:CRATE_PROCMON_PATH
           $traceStarted = $false
           if ($procmon -and (Test-Path -LiteralPath $procmon -PathType Leaf)) {
-            & $procmon -accepteula -backingfile $recording -quiet -minimized
-            if ($LASTEXITCODE -eq 0) {
-              $traceStarted = $true
-              Start-Sleep -Milliseconds 750
-            } else {
-              Write-Warning "Process Monitor did not start (exit $LASTEXITCODE); running probe without a trace"
+            try {
+              $monitor = Start-Process `
+                -FilePath $procmon `
+                -ArgumentList @(
+                  '/AcceptEula',
+                  '/BackingFile',
+                  $recording,
+                  '/Quiet',
+                  '/Minimized'
+                ) `
+                -PassThru
+              Start-Sleep -Seconds 2
+              $traceStarted = -not $monitor.HasExited -or
+                (Test-Path -LiteralPath $recording -PathType Leaf)
+              if (-not $traceStarted) {
+                Write-Warning 'Process Monitor exited without starting a trace; running probe without capture'
+              }
+            } catch {
+              Write-Warning "Process Monitor could not start: $($_.Exception.Message)"
             }
           } else {
             Write-Warning 'Process Monitor was unavailable; running probe without a loader trace'
@@ -563,22 +576,24 @@ jobs:
           $probeExitCode = $LASTEXITCODE
 
           if ($traceStarted) {
-            & $procmon -terminate -quiet
-            if ($LASTEXITCODE -ne 0) {
-              Write-Warning "Process Monitor did not terminate cleanly (exit $LASTEXITCODE)"
+            try {
+              Start-Process `
+                -FilePath $procmon `
+                -ArgumentList @('/Terminate', '/Quiet') `
+                -Wait
+            } catch {
+              Write-Warning "Process Monitor could not terminate cleanly: $($_.Exception.Message)"
             }
             Wait-Process -Name Procmon64 -Timeout 10 -ErrorAction SilentlyContinue
             Start-Sleep -Milliseconds 500
 
             if (Test-Path -LiteralPath $recording -PathType Leaf) {
-              $conversion = Start-Process `
+              Start-Process `
                 -FilePath $procmon `
                 -ArgumentList @('/NoConnect', '/OpenLog', $recording, '/SaveAs', $csv) `
                 -Wait `
-                -PassThru `
                 -NoNewWindow
-              if ($conversion.ExitCode -eq 0 -and
-                  (Test-Path -LiteralPath $csv -PathType Leaf)) {
+              if (Test-Path -LiteralPath $csv -PathType Leaf) {
                 $events = Import-Csv -LiteralPath $csv |
                   Where-Object {
                     $_.'Process Name' -in @('crate-desktop.exe', 'http_resource_probe.exe')
@@ -586,7 +601,7 @@ jobs:
                 $events | Export-Csv -LiteralPath $filteredCsv -NoTypeInformation
                 Write-Output "Captured $($events.Count) app events in the Windows loader trace"
               } else {
-                Write-Warning "Process Monitor trace export failed (exit $($conversion.ExitCode))"
+                Write-Warning 'Process Monitor trace export did not produce a CSV file'
               }
             } else {
               Write-Warning 'Process Monitor did not produce a loader trace file'
