@@ -2,12 +2,14 @@
 
 import argparse
 import json
+import mimetypes
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 TRACK_NAME = re.compile(r"^[A-Za-z0-9_-]+$")
+AUDIO_MIME_TYPES = {".flac": "audio/flac", ".wav": "audio/wav"}
 
 
 def parse_track(value: str) -> tuple[str, Path]:
@@ -73,7 +75,10 @@ def make_handler(
                 self.send_error(404, "unknown fixture")
                 return
             self.send_response(200)
-            self.send_header("Content-Type", "audio/flac")
+            content_type = AUDIO_MIME_TYPES.get(path.suffix.lower())
+            if content_type is None:
+                content_type = mimetypes.guess_type(path.name)[0]
+            self.send_header("Content-Type", content_type or "application/octet-stream")
             self.send_header("Content-Length", str(path.stat().st_size))
             self.end_headers()
             if include_body:

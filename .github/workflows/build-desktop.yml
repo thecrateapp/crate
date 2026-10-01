@@ -24,6 +24,12 @@ on:
       - "package-lock.json"
       - ".github/workflows/build-desktop.yml"
   workflow_dispatch:
+    inputs:
+      measure_windows_audio_rss:
+        description: "Measure decoded-audio RSS in a Windows WebView2 process group"
+        type: boolean
+        required: false
+        default: false
 
 defaults:
   run:
@@ -360,6 +366,37 @@ jobs:
           else
             npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
           fi
+
+      - name: Setup Python for Windows RSS capture
+        if: runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Windows RSS capture dependency
+        if: runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check psutil==7.2.2
+
+      - name: Measure Windows WebView2 audio RSS
+        if: runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        shell: pwsh
+        run: |
+          $results = Join-Path $env:RUNNER_TEMP 'crate-audio-rss-results'
+          $fixtures = Join-Path $env:RUNNER_TEMP 'crate-audio-rss-fixtures'
+          python app/listen-desktop/scripts/audio-rss/capture_windows_audio_rss.py `
+            --output-dir $results `
+            --fixture-dir $fixtures `
+            --runs 3
+
+      - name: Upload Windows WebView2 audio RSS capture
+        if: always() && runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-audio-rss-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/crate-audio-rss-results
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Verify Linux glibc compatibility
         if: runner.os == 'Linux'

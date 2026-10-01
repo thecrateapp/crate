@@ -52,3 +52,17 @@ done
 On Windows, use Task Manager’s Details tab and add **Memory (active private working set)** and **Commit size** columns. Capture `crate-desktop.exe` and its `msedgewebview2.exe` child processes through decode, hold, and release. Record the process IDs and avoid including WebView2 processes owned by other applications.
 
 These instructions capture development WebViews. Acceptance for an OS still requires repeating the probe in that OS and recording the installed release package separately.
+
+## Automated Windows capture
+
+The desktop workflow can capture a Windows/WebView2 development run when manually dispatched with `measure_windows_audio_rss=true`:
+
+```bash
+gh workflow run build-desktop.yml \
+  --ref feat/tauri-desktop-app \
+  -f measure_windows_audio_rss=true
+```
+
+The Windows runner generates two local stereo PCM WAV fixtures matching the 20.34- and 16.53-minute durations used by the earlier captures. It opens three fresh Tauri development processes, retains both decoded buffers for 90 seconds, releases them, and samples the app plus its WebView2 descendants every 250 ms through 60 seconds after release. The result artifact contains raw samples, probe events, and per-phase RSS and private-commit summaries. Process-group RSS sums may count shared pages more than once.
+
+This is a repeatable WebView2 data point, not an installed-release or real-player measurement. It does not validate the Windows 10 1803 support floor. Keep those acceptance checks separate when deciding whether long tracks need a fallback.
