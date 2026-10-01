@@ -373,6 +373,71 @@ jobs:
           "$CRATE_DESKTOP_VERSION"
           "$CRATE_DESKTOP_MSI_COMPATIBLE"
 
+      - name: Install and launch Windows bundle smoke
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem `
+            'app/listen-desktop/src-tauri/target/release/bundle/nsis' `
+            -Filter '*-setup.exe' -File |
+            Select-Object -First 1
+          if ($null -eq $installer) {
+            throw 'Windows NSIS installer was not produced'
+          }
+
+          $install = Start-Process `
+            -FilePath $installer.FullName `
+            -ArgumentList '/S' `
+            -Wait `
+            -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Windows NSIS installer exited with $($install.ExitCode)"
+          }
+
+          $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
+          $application = Join-Path $installDirectory 'crate-desktop.exe'
+          $uninstaller = Join-Path $installDirectory 'uninstall.exe'
+          if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
+            throw "Installed desktop executable is missing: $application"
+          }
+
+          $app = $null
+          try {
+            $app = Start-Process -FilePath $application -PassThru
+            $deadline = [DateTime]::UtcNow.AddSeconds(20)
+            do {
+              Start-Sleep -Milliseconds 500
+              $app.Refresh()
+              if ($app.HasExited) {
+                throw "Installed app exited with $($app.ExitCode)"
+              }
+            } while ($app.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $deadline)
+
+            if ($app.MainWindowHandle -eq 0) {
+              throw 'Installed app did not create its main window within 20 seconds'
+            }
+          }
+          finally {
+            if ($null -ne $app -and -not $app.HasExited) {
+              $app.CloseMainWindow() | Out-Null
+              if (-not $app.WaitForExit(5000)) {
+                Stop-Process -Id $app.Id -Force
+              }
+            }
+
+            if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
+              $remove = Start-Process `
+                -FilePath $uninstaller `
+                -ArgumentList '/S' `
+                -Wait `
+                -PassThru
+              if ($remove.ExitCode -ne 0) {
+                throw "Windows NSIS uninstaller exited with $($remove.ExitCode)"
+              }
+            }
+          }
+
       - name: Generate macOS dSYMs
         if: runner.os == 'macOS' && github.event_name == 'push'
         run: |
