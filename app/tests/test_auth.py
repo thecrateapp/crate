@@ -1087,6 +1087,59 @@ class TestOAuthCallback:
         )
         mock_last_login.assert_called_once_with(legacy_user["id"])
 
+    def test_google_link_callback_does_not_store_provider_refresh_token(self):
+        from crate.api.auth import oauth_callback
+
+        target_user = {
+            "id": 7,
+            "email": "listener@example.com",
+            "role": "user",
+            "username": "listener",
+            "name": "Listener",
+            "google_id": "google-sub-123",
+        }
+        provider_profile = {
+            "id": "google-sub-123",
+            "email": "listener@example.com",
+            "name": "Listener",
+            "refresh_token": "google-refresh-token",
+        }
+
+        with (
+            patch("crate.api.auth._enforce_login_rate_limit"),
+            patch("crate.api.auth._clear_failed_login"),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "https://listen.example.com/settings",
+                    "mode": "link",
+                    "user_id": target_user["id"],
+                    "verifier": "verifier",
+                },
+            ),
+            patch("crate.api.auth._google_userinfo", return_value=provider_profile),
+            patch("crate.api.auth.get_user_by_external_identity", return_value=None),
+            patch("crate.api.auth.get_user_by_google_id", return_value=None),
+            patch("crate.api.auth.get_user_by_id", return_value=target_user),
+            patch("crate.api.auth._validate_return_to", return_value="/settings"),
+            patch("crate.api.auth.upsert_user_external_identity") as upsert_identity,
+        ):
+            response = _run(
+                oauth_callback(self._request(), "google", code="code", state="state")
+            )
+
+        assert response.headers["location"] == "/settings"
+        upsert_identity.assert_called_once_with(
+            target_user["id"],
+            "google",
+            external_user_id="google-sub-123",
+            external_username="listener@example.com",
+            status="linked",
+            last_error=None,
+            metadata={"email": "listener@example.com"},
+        )
+
     def test_native_callback_without_pkce_never_issues_tokens_for_spoofed_web_app(
         self,
     ):
