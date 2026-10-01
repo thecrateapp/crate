@@ -26,6 +26,21 @@ npm run --workspace=app/listen-desktop tauri:dev -- \
 
 The probe seeds only its isolated `app.cratemusic.crate.desktop.native-perf-bench20260930` app-local directory, measures metadata hydration, checks 100/1,000/5,000 files through `verifyNativeOfflineAssets`, compares sequential and concurrent verification callers, and records durable index write counts/bytes for serial and coalesced mutations. It posts hydration phase progress events and a final results event to the JSONL path above. It removes its `offline-media` and `offline-meta` directories when finished.
 
+Index write telemetry wraps the Tauri `plugin:fs|write_text_file` IPC inside
+the probe page. It counts only successful writes to the offline asset index's
+`.next` file and records the UTF-8 payload size plus command duration. This
+observer is installed only by the measurement page; production filesystem
+code is unchanged.
+
+To collect the same synthetic R03–R05 workload on a Windows WebView2 runner,
+dispatch `Build Desktop Apps` with `measure_windows_offline_perf=true`. The
+optional Windows-only step launches this probe with a unique app identifier,
+checks all expected hydration, verification, and durable-write counts, and
+uploads raw JSON plus logs as `desktop-native-offline-performance-windows-*`.
+It does not run in pull-request or push builds and does not contact the Crate
+API. The Windows capture is still a synthetic runner result; it does not
+replace a real library or download-cadence measurement.
+
 For index writes it also compares a single same-turn burst with 1,000 mutations arriving in pairs, matching the offline download scheduler's current concurrency of two. The burst is a stress ceiling; it does not represent the ordinary completion cadence of real network downloads.
 
 ## Run the HTTP client pool probe

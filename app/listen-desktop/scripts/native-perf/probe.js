@@ -6,6 +6,7 @@ import {
   remove,
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
+import { installNativePerfTelemetry } from "./telemetry.js";
 
 const resultsElement = document.querySelector("#results");
 const reportPort = new URLSearchParams(location.search).get("port") ?? "18766";
@@ -74,19 +75,7 @@ function installInvokeProbe() {
       if (isVerify) stats.activeVerifyCommands -= 1;
     }
   };
-  window.__crateNativePerfObserver = (event) => {
-    if (
-      event?.operation !== "write" ||
-      !event.path?.includes("offline-assets-")
-    ) {
-      return;
-    }
-    stats.indexWriteCalls += 1;
-    stats.indexWriteBytes += event.byteLength ?? 0;
-    stats.indexWriteDurationsMs.push(event.elapsedMs ?? 0);
-  };
   return () => {
-    delete window.__crateNativePerfObserver;
     delete window.__crateTauriInvoke;
   };
 }
@@ -438,6 +427,7 @@ async function cleanup() {
 
 async function run() {
   const restoreInvoke = installInvokeProbe();
+  const restoreTelemetry = installNativePerfTelemetry(stats);
   const report = {
     event: "native-performance-results",
     revision: new URLSearchParams(location.search).get("revision"),
@@ -447,8 +437,9 @@ async function run() {
   try {
     await appLocalDataDir();
     const storage = await import("../../../listen/src/lib/offline-storage.ts");
-    const offlineNative =
-      await import("../../../listen/src/lib/offline-native.ts");
+    const offlineNative = await import(
+      "../../../listen/src/lib/offline-native.ts"
+    );
     report.hydration = await measureHydration(storage, {
       revision: report.revision,
     });
@@ -472,6 +463,7 @@ async function run() {
     document.title = "Tauri native performance probe: failed";
   } finally {
     await cleanup();
+    restoreTelemetry();
     restoreInvoke();
   }
 }

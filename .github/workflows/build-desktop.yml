@@ -35,6 +35,11 @@ on:
         type: boolean
         required: false
         default: false
+      measure_windows_offline_perf:
+        description: "Measure offline index hydration, verification, and writes on Windows"
+        type: boolean
+        required: false
+        default: false
 
 defaults:
   run:
@@ -261,6 +266,9 @@ jobs:
       - name: Test desktop native layer
         run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
 
+      - name: Test native performance write telemetry
+        run: node --test app/listen-desktop/scripts/native-perf/telemetry.node-test.mjs
+
       - name: Measure pooled HTTP reuse (diagnostic)
         run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
 
@@ -382,10 +390,39 @@ jobs:
           fi
 
       - name: Setup Python for Windows RSS capture
-        if: runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        if: runner.os == 'Windows' && (inputs.measure_windows_audio_rss || inputs.measure_windows_offline_perf)
         uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+
+      - name: Install Windows offline performance test dependency
+        if: runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check pytest
+
+      - name: Test Windows offline performance capture
+        if: runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        shell: pwsh
+        run: python -m pytest app/listen-desktop/scripts/native-perf/test_capture_windows_offline_perf.py
+
+      - name: Measure Windows offline performance
+        if: runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        shell: pwsh
+        timeout-minutes: 40
+        run: |
+          $results = Join-Path $env:RUNNER_TEMP 'crate-native-offline-perf-windows'
+          python app/listen-desktop/scripts/native-perf/capture_windows_offline_perf.py `
+            --output-dir $results `
+            --revision $env:GITHUB_SHA
+
+      - name: Upload Windows offline performance capture
+        if: always() && runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-native-offline-performance-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/crate-native-offline-perf-windows
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Install Windows RSS capture dependency
         if: runner.os == 'Windows' && inputs.measure_windows_audio_rss
