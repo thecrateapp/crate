@@ -495,6 +495,28 @@ jobs:
         if: runner.os == 'Windows'
         run: python app/listen-desktop/scripts/http-resource-probe/test_run_windows_probe.py
 
+      - name: Setup Windows loader trace
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'ProcessMonitor.zip'
+          $directory = Join-Path $env:RUNNER_TEMP 'ProcessMonitor'
+          Invoke-WebRequest `
+            -Uri 'https://download.sysinternals.com/files/ProcessMonitor.zip' `
+            -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $directory -Force
+          $procmon = Join-Path $directory 'Procmon64.exe'
+          if (-not (Test-Path -LiteralPath $procmon -PathType Leaf)) {
+            throw 'Microsoft Process Monitor x64 was missing from the official archive'
+          }
+          $signature = Get-AuthenticodeSignature -FilePath $procmon
+          if ($signature.Status -ne 'Valid' -or
+              $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "Process Monitor signature was not valid Microsoft code: $($signature.Status)"
+          }
+          "CRATE_PROCMON_PATH=$procmon" | Add-Content -LiteralPath $env:GITHUB_ENV
+
       - name: Build Windows HTTP resource probe frontend
         if: runner.os == 'Windows'
         run: npm run --workspace=app/listen-desktop build:http-resource-probe
@@ -510,15 +532,70 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $false
           $results = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-resource.json'
+          $recording = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader.pml'
+          $csv = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader.csv'
+          $filteredCsv = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader-apps.csv'
           $example = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
           # Run beside the installed app so the probe resolves the same bundled runtime DLLs.
           $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
           $application = Join-Path $installDirectory 'http_resource_probe.exe'
           Copy-Item -LiteralPath $example -Destination $application -Force
+
+          $procmon = $env:CRATE_PROCMON_PATH
+          $traceStarted = $false
+          if ($procmon -and (Test-Path -LiteralPath $procmon -PathType Leaf)) {
+            & $procmon -accepteula -backingfile $recording -quiet -minimized
+            if ($LASTEXITCODE -eq 0) {
+              $traceStarted = $true
+              Start-Sleep -Milliseconds 750
+            } else {
+              Write-Warning "Process Monitor did not start (exit $LASTEXITCODE); running probe without a trace"
+            }
+          } else {
+            Write-Warning 'Process Monitor was unavailable; running probe without a loader trace'
+          }
+
           python app/listen-desktop/scripts/http-resource-probe/run_windows_probe.py `
             --executable $application `
             --output $results
+          $probeExitCode = $LASTEXITCODE
+
+          if ($traceStarted) {
+            & $procmon -terminate -quiet
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Process Monitor did not terminate cleanly (exit $LASTEXITCODE)"
+            }
+            Wait-Process -Name Procmon64 -Timeout 10 -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+
+            if (Test-Path -LiteralPath $recording -PathType Leaf) {
+              $conversion = Start-Process `
+                -FilePath $procmon `
+                -ArgumentList @('/NoConnect', '/OpenLog', $recording, '/SaveAs', $csv) `
+                -Wait `
+                -PassThru `
+                -NoNewWindow
+              if ($conversion.ExitCode -eq 0 -and
+                  (Test-Path -LiteralPath $csv -PathType Leaf)) {
+                $events = Import-Csv -LiteralPath $csv |
+                  Where-Object {
+                    $_.'Process Name' -in @('crate-desktop.exe', 'http_resource_probe.exe')
+                  }
+                $events | Export-Csv -LiteralPath $filteredCsv -NoTypeInformation
+                Write-Output "Captured $($events.Count) app events in the Windows loader trace"
+              } else {
+                Write-Warning "Process Monitor trace export failed (exit $($conversion.ExitCode))"
+              }
+            } else {
+              Write-Warning 'Process Monitor did not produce a loader trace file'
+            }
+          }
+
+          if ($probeExitCode -ne 0) {
+            exit $probeExitCode
+          }
 
       - name: Uninstall Windows bundle smoke app
         if: always() && runner.os == 'Windows'
@@ -627,6 +704,8 @@ jobs:
             ${{ runner.temp }}/tauri-r02-windows-resource.json
             ${{ runner.temp }}/tauri-r02-windows-events.txt
             ${{ runner.temp }}/tauri-r02-windows-pe-imports.txt
+            ${{ runner.temp }}/tauri-r02-windows-loader.pml
+            ${{ runner.temp }}/tauri-r02-windows-loader-apps.csv
           if-no-files-found: warn
           retention-days: 30
 
