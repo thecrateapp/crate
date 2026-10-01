@@ -4,6 +4,75 @@ use std::io::Write;
 
 use tauri::{Manager, Webview};
 
+const EARLY_PAGE_DIAGNOSTICS: &str = r#"
+(() => {
+  const pending = (window.__CRATE_PROBE_PENDING_DIAGNOSTICS ||= []);
+  const record = (message) => {
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (typeof invoke === 'function') {
+      void invoke('record_probe_diagnostic', { message }).catch(() => undefined);
+    } else {
+      pending.push(message);
+    }
+  };
+  window.addEventListener('error', (event) => {
+    const target = event.target;
+    const source = target instanceof HTMLScriptElement ? target.src : '';
+    record(`early-window-error:${source || event.message}`);
+  }, true);
+  window.addEventListener('unhandledrejection', (event) => {
+    record(`early-unhandled-rejection:${String(event.reason)}`);
+  });
+  window.addEventListener('securitypolicyviolation', (event) => {
+    record(`csp-violation:${event.effectiveDirective}:${event.blockedURI}`);
+  });
+  record('native-early-diagnostics-installed');
+})();
+"#;
+
+const DOCUMENT_DIAGNOSTICS: &str = r#"
+(() => {
+  const invoke = window.__TAURI_INTERNALS__?.invoke;
+  if (typeof invoke !== 'function') return;
+  const record = (message) => {
+    void invoke('record_probe_diagnostic', { message }).catch(() => undefined);
+  };
+  for (const message of window.__CRATE_PROBE_PENDING_DIAGNOSTICS || []) {
+    record(message);
+  }
+  window.__CRATE_PROBE_PENDING_DIAGNOSTICS = [];
+  const scripts = Array.from(document.scripts, (script) => ({
+    src: script.src,
+    type: script.type,
+    readyState: script.readyState || null,
+  }));
+  const state = {
+    href: location.href,
+    readyState: document.readyState,
+    title: document.title,
+    status: document.querySelector('#status')?.textContent || null,
+    scripts,
+    resources: performance.getEntriesByType('resource').map((entry) => entry.name),
+  };
+  record(`document-state:${JSON.stringify(state)}`);
+  for (const script of scripts) {
+    if (!script.src) continue;
+    void fetch(script.src).then(async (response) => {
+      const body = await response.text();
+      record(`script-fetch:${JSON.stringify({
+        src: script.src,
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+        bytes: body.length,
+        preview: body.slice(0, 120),
+      })}`);
+    }).catch((error) => {
+      record(`script-fetch-error:${script.src}:${String(error)}`);
+    });
+  }
+})();
+"#;
+
 fn write_probe_diagnostic(message: &str) {
     let Some(path) = std::env::var_os("CRATE_HTTP_RESOURCE_PROBE_DIAGNOSTICS") else {
         return;
@@ -64,7 +133,15 @@ fn main() {
                 payload.event(),
                 payload.url()
             ));
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                if let Err(error) = webview.eval(EARLY_PAGE_DIAGNOSTICS) {
+                    write_probe_diagnostic(&format!("early-diagnostics-eval-failed:{error}"));
+                }
+            }
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                if let Err(error) = webview.eval(DOCUMENT_DIAGNOSTICS) {
+                    write_probe_diagnostic(&format!("document-diagnostics-eval-failed:{error}"));
+                }
                 let script = "window.__TAURI_INTERNALS__?.invoke('record_probe_diagnostic', { message: 'native-eval-bridge-available' }).catch(() => undefined);";
                 if let Err(error) = webview.eval(script) {
                     write_probe_diagnostic(&format!("native-eval-failed:{error}"));
