@@ -32,6 +32,18 @@ SCENARIOS = (
 ITERATIONS = 25
 
 
+def describe_exit_code(return_code: int) -> str:
+    unsigned_code = return_code & 0xFFFFFFFF
+    status = {
+        0xC0000135: "STATUS_DLL_NOT_FOUND",
+        0xC0000139: "STATUS_ENTRYPOINT_NOT_FOUND",
+    }.get(unsigned_code)
+    description = f"{return_code} (0x{unsigned_code:08X}"
+    if status:
+        description += f", {status}"
+    return f"{description})"
+
+
 class FixtureState:
     def __init__(self) -> None:
         self.events = {name: threading.Event() for name in SCENARIOS}
@@ -234,7 +246,8 @@ def main() -> int:
                 return_code = process.poll()
                 if return_code is not None:
                     raise RuntimeError(
-                        f"probe exited with {return_code} before reporting"
+                        "probe exited with "
+                        f"{describe_exit_code(return_code)} before reporting"
                     )
         result["report"] = report
 

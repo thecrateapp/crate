@@ -515,7 +515,9 @@ jobs:
         shell: pwsh
         run: |
           $results = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-resource.json'
-          $application = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
+          $example = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
+          $application = 'app/listen-desktop/src-tauri/target/release/http_resource_probe.exe'
+          Copy-Item -LiteralPath $example -Destination $application -Force
           python app/listen-desktop/scripts/http-resource-probe/run_windows_probe.py `
             --executable $application `
             --output $results
