@@ -217,6 +217,8 @@ def main() -> int:
     executable = args.executable.resolve()
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
+    diagnostics_path = output.with_name("tauri-r02-windows-frontend-diagnostics.txt")
+    diagnostics_path.unlink(missing_ok=True)
     if not executable.is_file():
         output.write_text(
             json.dumps(
@@ -262,6 +264,7 @@ def main() -> int:
         environment["CRATE_HTTP_RESOURCE_PROBE_REFUSED_ORIGIN"] = result[
             "refusedOrigin"
         ]
+        environment["CRATE_HTTP_RESOURCE_PROBE_DIAGNOSTICS"] = str(diagnostics_path)
         result["pythonPathEntriesRemoved"] = removed_python_paths
         process = subprocess.Popen(
             [str(executable)],
@@ -354,6 +357,11 @@ def main() -> int:
         server.shutdown()
         server.server_close()
         server_thread.join(timeout=2)
+        if diagnostics_path.is_file():
+            result["frontendDiagnostics"] = diagnostics_path.read_text(
+                encoding="utf-8",
+                errors="replace",
+            )[-10_000:]
         output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
     return return_code

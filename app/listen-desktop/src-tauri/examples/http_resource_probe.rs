@@ -1,6 +1,22 @@
 #![cfg_attr(all(not(debug_assertions), windows), windows_subsystem = "windows")]
 
+use std::io::Write;
+
 use tauri::{Manager, Webview};
+
+fn write_probe_diagnostic(message: &str) {
+    let Some(path) = std::env::var_os("CRATE_HTTP_RESOURCE_PROBE_DIAGNOSTICS") else {
+        return;
+    };
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    else {
+        return;
+    };
+    let _ = writeln!(file, "{message}");
+}
 
 #[tauri::command]
 fn resource_count(webview: Webview) -> usize {
@@ -17,6 +33,11 @@ fn fixture_origin() -> Result<String, String> {
 fn refused_origin() -> Result<String, String> {
     std::env::var("CRATE_HTTP_RESOURCE_PROBE_REFUSED_ORIGIN")
         .map_err(|error| format!("probe refused origin is unavailable: {error}"))
+}
+
+#[tauri::command]
+fn record_probe_diagnostic(message: String) {
+    write_probe_diagnostic(&message);
 }
 
 #[tauri::command]
@@ -37,10 +58,18 @@ fn finish_probe(app: tauri::AppHandle, report: serde_json::Value) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
+        .on_page_load(|_webview, payload| {
+            write_probe_diagnostic(&format!(
+                "page-load:{:?}:{}",
+                payload.event(),
+                payload.url()
+            ));
+        })
         .invoke_handler(tauri::generate_handler![
             resource_count,
             fixture_origin,
             refused_origin,
+            record_probe_diagnostic,
             finish_probe
         ])
         .run(tauri::generate_context!(

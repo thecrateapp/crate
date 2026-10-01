@@ -8,6 +8,18 @@ const iterations = 25;
 const failures: ProbeFailure[] = [];
 const completedScenarioCounts: Record<string, number> = {};
 
+function recordDiagnostic(message: string): void {
+  void invoke("record_probe_diagnostic", { message }).catch(() => undefined);
+}
+
+window.addEventListener("error", (event) => {
+  recordDiagnostic(`window-error:${event.message}`);
+});
+window.addEventListener("unhandledrejection", (event) => {
+  recordDiagnostic(`unhandled-rejection:${String(event.reason)}`);
+});
+recordDiagnostic("frontend-module-loaded");
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -80,7 +92,9 @@ async function runScenario(
 async function run(): Promise<void> {
   let origin = "";
   try {
+    recordDiagnostic("probe-run-started");
     origin = await invoke<string>("fixture_origin");
+    recordDiagnostic("fixture-origin-received");
     const refusedOrigin = await invoke<string>("refused_origin");
     await runScenario(origin, "consumed-200", async () => {
       const response = await tauriFetch(`${origin}/ok`);
@@ -159,6 +173,9 @@ async function run(): Promise<void> {
     assert(posted.ok, "fixture rejected the probe report");
     await invoke("finish_probe", { report });
   } catch (error) {
+    recordDiagnostic(
+      `probe-error:${error instanceof Error ? error.message : String(error)}`,
+    );
     failures.push({
       scenario: "probe-setup",
       iteration: 0,

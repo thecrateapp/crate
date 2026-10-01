@@ -19,6 +19,7 @@ class ProbeEnvironmentTests(unittest.TestCase):
             "Python_ROOT_DIR": python_location,
             "PYTHONPATH": r"C:\python-modules",
             "CRATE_HTTP_RESOURCE_PROBE_ORIGIN": "http://127.0.0.1:1234",
+            "CRATE_HTTP_RESOURCE_PROBE_DIAGNOSTICS": r"C:\temp\probe.txt",
         }
 
         environment, removed_paths = build_probe_environment(
@@ -45,6 +46,10 @@ class ProbeEnvironmentTests(unittest.TestCase):
         self.assertEqual(
             environment["CRATE_HTTP_RESOURCE_PROBE_ORIGIN"],
             "http://127.0.0.1:1234",
+        )
+        self.assertEqual(
+            environment["CRATE_HTTP_RESOURCE_PROBE_DIAGNOSTICS"],
+            r"C:\temp\probe.txt",
         )
 
     def test_keeps_path_when_python_location_is_not_configured(self) -> None:
