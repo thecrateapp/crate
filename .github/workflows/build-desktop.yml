@@ -426,7 +426,10 @@ jobs:
             if ($null -ne $app -and -not $app.HasExited) {
               $app.CloseMainWindow() | Out-Null
               if (-not $app.WaitForExit(5000)) {
-                Stop-Process -Id $app.Id -Force
+                Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+                if (-not $app.WaitForExit(5000)) {
+                  throw 'Installed app could not be stopped before uninstall'
+                }
               }
             }
 
