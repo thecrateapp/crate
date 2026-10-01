@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""Run the isolated Tauri HTTP resource lifetime probe on Windows."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import platform
+import queue
+import socket
+import subprocess
+import sys
+import threading
+import time
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+
+
+SCENARIOS = (
+    "consumed-200",
+    "consumed-500",
+    "connection-refused",
+    "bodyless-204",
+    "abort-before-headers",
+    "cancel-after-first-chunk",
+)
+ITERATIONS = 25
+
+
+class FixtureState:
+    def __init__(self) -> None:
+        self.events = {name: threading.Event() for name in SCENARIOS}
+        self.hits: dict[str, int] = {}
+        self.condition = threading.Condition()
+        self.report: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=1)
+        self.failure: str | None = None
+
+    def record(self, path: str) -> None:
+        with self.condition:
+            self.hits[path] = self.hits.get(path, 0) + 1
+            self.condition.notify_all()
+
+    def wait_for_hit(self, path: str, expected: int, timeout: float) -> bool:
+        deadline = time.monotonic() + timeout
+        with self.condition:
+            while self.hits.get(path, 0) < expected:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self.condition.wait(remaining)
+            return True
+
+
+class FixtureHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    state: FixtureState
+
+    def log_message(self, _format: str, *_args: object) -> None:
+        return
+
+    def end_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        super().end_headers()
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.end_headers()
+
+    def _send(self, status: int, body: bytes) -> None:
+        self.send_response(status)
+        if status != 204:
+            self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if body:
+            self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        path = urlparse(self.path).path
+        self.state.record(path)
+        if path == "/ok":
+            self._send(200, b"resource-body")
+        elif path == "/error":
+            self._send(500, b"server-error")
+        elif path == "/empty":
+            self._send(204, b"")
+        elif path == "/delayed":
+            self.state.events["abort-before-headers"].wait(8)
+            try:
+                self._send(200, b"late-response")
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+        elif path == "/stream":
+            self.send_response(200)
+            self.send_header("Content-Length", "12")
+            self.end_headers()
+            try:
+                self.wfile.write(b"first")
+                self.wfile.flush()
+                self.state.events["cancel-after-first-chunk"].wait(8)
+                self.wfile.write(b" second")
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+        elif path.startswith("/wait/"):
+            name = path.removeprefix("/wait/")
+            query = urllib.parse.parse_qs(urlparse(self.path).query)
+            iteration = int(query.get("iteration", ["1"])[0])
+            if name == "delayed-started":
+                ready = self.state.wait_for_hit("/delayed", iteration, 8)
+            else:
+                event = self.state.events.get(name)
+                ready = event is not None and event.wait(8)
+            if not ready:
+                self._send(408, b"event timeout")
+            else:
+                self._send(200, b"ready")
+        else:
+            self._send(404, b"not found")
+
+    def do_POST(self) -> None:
+        path = urlparse(self.path).path
+        self.state.record(path)
+        body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        if path == "/result":
+            try:
+                self.state.report.put_nowait(json.loads(body))
+            except (json.JSONDecodeError, queue.Full) as error:
+                self.state.failure = f"invalid or duplicate probe report: {error}"
+                self._send(400, b"invalid report")
+                return
+            self._send(200, b"stored")
+            return
+        if path.startswith("/release/"):
+            name = path.removeprefix("/release/")
+            event = self.state.events.get(name)
+            if event is None:
+                self._send(404, b"unknown release event")
+                return
+            event.set()
+            self._send(200, b"released")
+            return
+        self._send(404, b"not found")
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--executable", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--timeout-seconds", type=int, default=90)
+    args = parser.parse_args()
+
+    executable = args.executable.resolve()
+    output = args.output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if not executable.is_file():
+        output.write_text(
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": f"probe executable does not exist: {executable}",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return 1
+    state = FixtureState()
+    fixture_type = type("BoundFixtureHandler", (FixtureHandler,), {"state": state})
+    server = ThreadingHTTPServer(("127.0.0.1", 0), fixture_type)
+    server.daemon_threads = True
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    refused_socket = socket.socket()
+    refused_socket.bind(("127.0.0.1", 0))
+    refused_port = refused_socket.getsockname()[1]
+    refused_socket.close()
+
+    result: dict[str, Any] = {
+        "status": "running",
+        "headSha": os.environ.get("GITHUB_SHA"),
+        "platform": platform.platform(),
+        "python": sys.version,
+        "executable": str(executable),
+        "executableSha256": sha256(executable),
+        "fixtureOrigin": f"http://127.0.0.1:{server.server_port}",
+        "refusedOrigin": f"http://127.0.0.1:{refused_port}",
+        "iterationsPerScenario": ITERATIONS,
+        "scenarios": list(SCENARIOS),
+    }
+    process: subprocess.Popen[str] | None = None
+    try:
+        environment = os.environ.copy()
+        environment["CRATE_HTTP_RESOURCE_PROBE_ORIGIN"] = result["fixtureOrigin"]
+        environment["CRATE_HTTP_RESOURCE_PROBE_REFUSED_ORIGIN"] = result[
+            "refusedOrigin"
+        ]
+        process = subprocess.Popen(
+            [str(executable)],
+            cwd=executable.parent,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        deadline = time.monotonic() + args.timeout_seconds
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"probe did not report within {args.timeout_seconds}s"
+                )
+            try:
+                report = state.report.get(timeout=min(remaining, 0.5))
+                break
+            except queue.Empty:
+                return_code = process.poll()
+                if return_code is not None:
+                    raise RuntimeError(
+                        f"probe exited with {return_code} before reporting"
+                    )
+        result["report"] = report
+
+        return_code = process.wait(timeout=15)
+        with state.condition:
+            request_hits = dict(state.hits)
+        expected_paths = {
+            "/ok": ITERATIONS,
+            "/error": ITERATIONS,
+            "/empty": ITERATIONS,
+            "/delayed": ITERATIONS,
+            "/stream": ITERATIONS,
+        }
+        expected_scenarios = {name: ITERATIONS for name in SCENARIOS}
+        scenario_counts = report.get("completedScenarioCounts", {})
+        if scenario_counts != expected_scenarios:
+            result["scenarioCountFailure"] = {
+                "expected": expected_scenarios,
+                "actual": scenario_counts,
+            }
+        path_failures = {
+            path: {"expected": expected, "actual": request_hits.get(path, 0)}
+            for path, expected in expected_paths.items()
+            if request_hits.get(path, 0) != expected
+        }
+        result.update(
+            {
+                "status": "passed"
+                if report.get("passed")
+                and return_code == 0
+                and not path_failures
+                and scenario_counts == expected_scenarios
+                else "failed",
+                "returnCode": return_code,
+                "report": report,
+                "requestHits": request_hits,
+                "pathFailures": path_failures,
+            }
+        )
+        if state.failure:
+            result["fixtureFailure"] = state.failure
+            result["status"] = "failed"
+        if process.stdout:
+            result["applicationOutput"] = process.stdout.read()
+        if result["status"] != "passed":
+            raise RuntimeError(f"Windows resource probe failed: {result}")
+        return 0
+    except Exception as error:  # Persist a report artifact on every failure.
+        result["status"] = "failed"
+        result["error"] = str(error)
+        if process is not None:
+            if process.poll() is None:
+                process.kill()
+            try:
+                result["returnCode"] = process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                result["returnCode"] = None
+            if process.stdout:
+                result["applicationOutput"] = process.stdout.read()
+        with state.condition:
+            result["requestHits"] = dict(state.hits)
+        return_code = 1
+    finally:
+        for event in state.events.values():
+            event.set()
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=2)
+        output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+    return return_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -493,6 +493,42 @@ jobs:
             Write-Output 'Windows silent install, launch, and uninstall smoke passed'
           }
 
+      - name: Setup Python for Windows HTTP resource probe
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Build Windows HTTP resource probe frontend
+        if: runner.os == 'Windows'
+        run: npm run --workspace=app/listen-desktop build:http-resource-probe
+
+      - name: Build Windows HTTP resource probe app
+        if: runner.os == 'Windows'
+        run: >-
+          cargo build --locked --release --features tauri/custom-protocol
+          --manifest-path app/listen-desktop/src-tauri/Cargo.toml
+          --example http_resource_probe
+
+      - name: Run Windows HTTP resource probe
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $results = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-resource.json'
+          $application = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
+          python app/listen-desktop/scripts/http-resource-probe/run_windows_probe.py `
+            --executable $application `
+            --output $results
+
+      - name: Upload Windows HTTP resource probe
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tauri-r02-windows-resource-${{ github.run_id }}
+          path: ${{ runner.temp }}/tauri-r02-windows-resource.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Generate macOS dSYMs
         if: runner.os == 'macOS' && github.event_name == 'push'
         run: |
