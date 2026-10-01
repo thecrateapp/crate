@@ -2,15 +2,21 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus } from "@crate/ui/icons";
+import { toast } from "sonner";
 
 import { CrateCard } from "@/components/CrateCard";
 import { CrateEditor } from "@/components/CrateEditor";
+import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
+import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
-import type { CrateSummary } from "@/pages/crates-types";
+import { albumCoverApiUrl } from "@/lib/library-routes";
+import { toPlayableTrack } from "@/lib/playable-track";
+import type { CratePlaybackTrack, CrateSummary } from "@/pages/crates-types";
 
 export function Crates() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { playAll, setRepeatMode } = usePlayerActions();
   const {
     data: crates,
     loading,
@@ -19,6 +25,50 @@ export function Crates() {
   } = useApi<CrateSummary[]>("/api/me/crates");
   const [selectedCrateId, setSelectedCrateId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  async function playCrate(crate: CrateSummary) {
+    try {
+      const playback = await api<CratePlaybackTrack[]>(
+        `/api/crates/${crate.id}/playback`,
+      );
+      const tracks: Track[] = playback.map((track) =>
+        toPlayableTrack(
+          {
+            id: track.local_track_id ?? track.global_track_uid,
+            globalTrackUid: track.global_track_uid,
+            globalAlbumUid: track.global_album_uid,
+            globalArtistUid: track.global_artist_uid,
+            entity_uid: track.local_track_entity_uid,
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration: track.duration,
+            libraryTrackId: track.local_track_id,
+          },
+          {
+            cover: albumCoverApiUrl(
+              {
+                globalAlbumUid: track.global_album_uid,
+                albumName: track.album,
+                artistName: track.artist,
+              },
+              { size: 512 },
+            ),
+          },
+        ),
+      );
+      if (tracks.length === 0) return;
+      setRepeatMode(crate.loop_enabled ? "all" : "off");
+      playAll(tracks, 0, {
+        type: "crate",
+        name: crate.name,
+        id: crate.id,
+        href: `/crate/${crate.id}`,
+      });
+    } catch {
+      toast.error(t("library.crates.playFailed"));
+    }
+  }
 
   if (selectedCrateId || creating) {
     return (
@@ -73,6 +123,7 @@ export function Crates() {
               crate={crate}
               onOpen={() => navigate(`/crate/${crate.id}`)}
               onEdit={() => setSelectedCrateId(crate.id)}
+              onPlay={() => void playCrate(crate)}
             />
           ))}
         </div>

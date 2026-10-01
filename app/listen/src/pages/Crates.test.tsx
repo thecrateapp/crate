@@ -44,8 +44,13 @@ function ownedCrate(name: string, access: "owner" | "collaborator") {
     description: "",
     visibility: "private",
     is_collaborative: true,
+    is_ordered: true,
+    sort_direction: "asc" as const,
+    loop_enabled: false,
     access,
     album_count: 0,
+    track_count: 0,
+    albums: [],
     first_album: null,
     created_at: "2026-09-17T00:00:00Z",
     updated_at: "2026-09-17T00:00:00Z",
@@ -98,7 +103,9 @@ describe("Collection Crates", () => {
     expect(
       screen.getByRole("button", { name: "Open Year-end records" }),
     ).toBeVisible();
-    expect(screen.getByText("Tour picks")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Open Tour picks" }),
+    ).toBeVisible();
   });
 
   it("opens the Crate detail page from the collection card", () => {
@@ -110,6 +117,75 @@ describe("Collection Crates", () => {
     );
 
     expect(navigate).toHaveBeenCalledWith(`/crate/${crateId}`);
+  });
+
+  it("plays the complete Crate from its card", async () => {
+    const albumUid = "c43211c0-554a-45c2-ae2d-86cf1fae1d69";
+    const playAll = vi.fn();
+    const setRepeatMode = vi.fn();
+    mocks.crates = [
+      {
+        ...ownedCrate("Year-end records", "owner"),
+        album_count: 1,
+        loop_enabled: true,
+        albums: [
+          {
+            global_album_uid: albumUid,
+            position: 0,
+            name: "Jane Doe",
+            artist_name: "Converge",
+            has_cover: true,
+          },
+        ],
+      },
+    ];
+    mocks.api.mockImplementation(async (path: string) => {
+      if (path === `/api/crates/${crateId}/playback`) {
+        return [
+          {
+            global_track_uid: "track-uid",
+            global_album_uid: albumUid,
+            global_artist_uid: "artist-uid",
+            title: "First song",
+            artist: "Converge",
+            album: "Jane Doe",
+            duration: 180,
+          },
+        ];
+      }
+      return { id: crateId };
+    });
+
+    renderWithListenProviders(<Library />, {
+      path: "/collection/:section",
+      route: "/collection/crates",
+      locale: "en",
+      playerActions: { playAll, setRepeatMode },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Play Year-end records" }),
+    );
+
+    await waitFor(() => {
+      expect(api).toHaveBeenCalledWith(`/api/crates/${crateId}/playback`);
+      expect(playAll).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            title: "First song",
+            artist: "Converge",
+            album: "Jane Doe",
+          }),
+        ],
+        0,
+        expect.objectContaining({
+          type: "crate",
+          name: "Year-end records",
+          id: crateId,
+        }),
+      );
+      expect(setRepeatMode).toHaveBeenCalledWith("all");
+    });
   });
 
   it("creates a private Crate with an empty album list", async () => {

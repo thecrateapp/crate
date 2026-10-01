@@ -114,6 +114,7 @@ export function createMockPlayerActions(
     clearQueue: vi.fn(),
     toggleShuffle: vi.fn(),
     cycleRepeat: vi.fn(),
+    setRepeatMode: vi.fn(),
     jumpTo: vi.fn(),
     playNext: vi.fn(),
     addToQueue: vi.fn(),

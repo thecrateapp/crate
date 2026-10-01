@@ -12,12 +12,15 @@ import {
 } from "./social-share-colors";
 import {
   drawEditorialStoryCard,
+  drawCrateStoryCard,
   drawStoryArtworkBackground,
   drawStoryBackground,
   drawStoryBrand,
+  type CrateStoryArtwork,
   STORY_HEIGHT,
   STORY_WIDTH,
 } from "./social-share-story-canvas";
+export { resolveCrateStoryComposition } from "./social-share-story-canvas";
 import { getNativeHttpPlugin, nativeSocialShare } from "./social-share-native";
 import type { SharePayload } from "./social-share";
 
@@ -62,11 +65,28 @@ export async function buildInstagramStoryCard(
       : Promise.resolve(null),
     loadOptionalCanvasImage(CRATE_LOGO_URL, "logo"),
   ]);
+  const crateArtworks =
+    payload.kind === "crate"
+      ? await Promise.all(
+          (payload.crateAlbums ?? [])
+            .slice(0, 4)
+            .map((album, index) =>
+              album.imageUrl
+                ? loadOptionalCanvasImage(
+                    album.imageUrl,
+                    `crate album ${index + 1}`,
+                  )
+                : Promise.resolve(null),
+            ),
+        )
+      : [];
   try {
-    if (artwork) {
+    const backgroundArtwork =
+      crateArtworks.find(Boolean)?.image ?? artwork?.image;
+    if (backgroundArtwork) {
       drawStoryArtworkBackground(
         ctx,
-        artwork.image,
+        backgroundArtwork,
         canvas.width,
         canvas.height,
         colors,
@@ -76,13 +96,32 @@ export async function buildInstagramStoryCard(
     }
 
     drawStoryBrand(ctx, logo?.image ?? null, colors);
-    drawEditorialStoryCard(
-      ctx,
-      payload,
-      artwork?.image ?? null,
-      logo?.image ?? null,
-      colors,
-    );
+    if (payload.kind === "crate") {
+      drawCrateStoryCard(
+        ctx,
+        payload,
+        crateArtworks.flatMap((value, index): CrateStoryArtwork[] =>
+          value
+            ? [
+                {
+                  image: value.image,
+                  position: payload.crateAlbums?.[index]?.position ?? index,
+                },
+              ]
+            : [],
+        ),
+        logo?.image ?? null,
+        colors,
+      );
+    } else {
+      drawEditorialStoryCard(
+        ctx,
+        payload,
+        artwork?.image ?? null,
+        logo?.image ?? null,
+        colors,
+      );
+    }
 
     const encodeStartedAt = performance.now();
     const blob = await canvasToJpegBlob(canvas);
@@ -94,6 +133,7 @@ export async function buildInstagramStoryCard(
     return dataUrl;
   } finally {
     artwork?.release();
+    crateArtworks.forEach((value) => value?.release());
     logo?.release();
   }
 }

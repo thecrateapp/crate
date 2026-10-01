@@ -297,5 +297,34 @@ export function usePlayerQueueStateActions({
     shuffleRef,
   ]);
 
-  return { clearQueue, toggleShuffle, cycleRepeat };
+  const setRepeatMode = useCallback(
+    (nextMode: RepeatMode) => {
+      if (jamQueueLockedRef.current) return;
+      setRepeatState((previousMode) => {
+        if (previousMode === nextMode) return previousMode;
+        if (isCustomCastSessionActive()) {
+          void syncCustomCastQueue({
+            queue: queueRef.current,
+            currentIndex: currentIndexRef.current,
+            repeatMode: nextMode,
+            shuffle: shuffleRef.current,
+          }).then((result) => {
+            if (!result.ok) {
+              console.error("[cast] failed to set repeat:", result.message);
+            }
+          });
+        } else if (shouldUseAndroidNativePlayer()) {
+          void nativeEngine
+            .setRepeat(toEngineRepeatMode(nextMode))
+            .catch((error) => {
+              console.error("[native-player] failed to set repeat:", error);
+            });
+        }
+        return nextMode;
+      });
+    },
+    [currentIndexRef, jamQueueLockedRef, queueRef, setRepeatState, shuffleRef],
+  );
+
+  return { clearQueue, toggleShuffle, cycleRepeat, setRepeatMode };
 }

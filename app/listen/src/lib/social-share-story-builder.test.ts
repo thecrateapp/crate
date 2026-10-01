@@ -11,7 +11,10 @@ vi.mock("@/lib/api", () => ({
   resolveMaybeApiAssetUrl: (src: string) => src,
 }));
 
-import { resolveArtworkAuthHeaders } from "@/lib/social-share-story-builder";
+import {
+  resolveArtworkAuthHeaders,
+  resolveCrateStoryComposition,
+} from "@/lib/social-share-story-builder";
 
 describe("resolveArtworkAuthHeaders", () => {
   afterEach(() => {
@@ -55,5 +58,29 @@ describe("resolveArtworkAuthHeaders", () => {
       resolveArtworkAuthHeaders("https://attacker.example/api/cover.jpg"),
     ).toBeUndefined();
     expect(getApiAuthHeadersMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveCrateStoryComposition", () => {
+  it("uses the ranked stack for ordered Crates", () => {
+    expect(
+      resolveCrateStoryComposition({
+        kind: "crate",
+        title: "Best of 2026",
+        url: "/crate/1",
+        crateIsOrdered: true,
+      }),
+    ).toBe("ranked-stack");
+  });
+
+  it("uses the editorial hero for unordered Crates", () => {
+    expect(
+      resolveCrateStoryComposition({
+        kind: "crate",
+        title: "Road trip records",
+        url: "/crate/2",
+        crateIsOrdered: false,
+      }),
+    ).toBe("hero-editorial");
   });
 });

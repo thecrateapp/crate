@@ -196,8 +196,8 @@ export function usePlayerQueueActions({
     playbackDeliveryPolicy,
   });
 
-  const { clearQueue, toggleShuffle, cycleRepeat } = usePlayerQueueStateActions(
-    {
+  const { clearQueue, toggleShuffle, cycleRepeat, setRepeatMode } =
+    usePlayerQueueStateActions({
       queueRef,
       currentIndexRef,
       currentTimeRef,
@@ -227,8 +227,7 @@ export function usePlayerQueueActions({
       pushToEngine,
       silenceGaplessEngine,
       stopNativeEngineIfAvailable,
-    },
-  );
+    });
 
   const {
     pause,
@@ -304,6 +303,7 @@ export function usePlayerQueueActions({
     clearQueue,
     toggleShuffle,
     cycleRepeat,
+    setRepeatMode,
     jumpTo,
     playNext,
     addToQueue,

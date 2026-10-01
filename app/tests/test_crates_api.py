@@ -151,7 +151,12 @@ def _seed_playback_track(album_uid: str, title: str, *, available: bool = True) 
 def test_create_defaults_private_and_requires_authentication(pg_db, crate_api_client):
     response = crate_api_client.post(
         "/api/crates",
-        json={"name": "Year-end records"},
+        json={
+            "name": "Year-end records",
+            "is_ordered": False,
+            "sort_direction": "desc",
+            "loop_enabled": True,
+        },
         headers=_headers(1),
     )
     assert response.status_code == 201
@@ -160,6 +165,9 @@ def test_create_defaults_private_and_requires_authentication(pg_db, crate_api_cl
     detail = crate_api_client.get(f"/api/crates/{crate_id}", headers=_headers(1))
     assert detail.status_code == 200
     assert detail.json()["visibility"] == "private"
+    assert detail.json()["is_ordered"] is False
+    assert detail.json()["sort_direction"] == "desc"
+    assert detail.json()["loop_enabled"] is True
     assert detail.json()["albums"] == []
 
     listing = crate_api_client.get("/api/me/crates", headers=_headers(1))
@@ -168,7 +176,7 @@ def test_create_defaults_private_and_requires_authentication(pg_db, crate_api_cl
     alias_listing = crate_api_client.get("/api/crates", headers=_headers(1))
     assert alias_listing.status_code == 200
     assert [crate["id"] for crate in alias_listing.json()] == [crate_id]
-    assert crate_api_client.get(f"/api/crates/{crate_id}").status_code == 401
+    assert crate_api_client.get(f"/api/crates/{crate_id}").status_code == 404
     assert (
         crate_api_client.post(
             "/api/crates", json={"name": "   "}, headers=_headers(1)
@@ -177,11 +185,43 @@ def test_create_defaults_private_and_requires_authentication(pg_db, crate_api_cl
     )
 
 
+def test_public_crate_detail_is_readable_without_authentication(
+    pg_db, crate_api_client
+):
+    from crate.db.repositories.crates import create_crate, update_crate
+
+    crate_id = create_crate(owner_id=1, name="Public records")
+    assert update_crate(crate_id, visibility="public", actor_id=1)
+
+    response = crate_api_client.get(f"/api/crates/{crate_id}")
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Public records"
+    assert response.json()["access"] == "public"
+
+
+def test_crate_presentation_settings_can_be_updated(pg_db, crate_api_client):
+    crate_id = _create_crate()
+
+    response = crate_api_client.put(
+        f"/api/crates/{crate_id}",
+        json={"is_ordered": False, "sort_direction": "desc", "loop_enabled": True},
+        headers=_headers(1),
+    )
+
+    assert response.status_code == 200
+    detail = crate_api_client.get(f"/api/crates/{crate_id}", headers=_headers(1))
+    assert detail.json()["is_ordered"] is False
+    assert detail.json()["sort_direction"] == "desc"
+    assert detail.json()["loop_enabled"] is True
+
+
 def test_crate_detail_uses_accessible_crate_query(monkeypatch):
+    from types import SimpleNamespace
+
     from crate.api import crates as crate_routes
 
     calls: list[tuple[str, int]] = []
-    monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
     monkeypatch.setattr(
         crate_routes,
         "get_crate_for_user",
@@ -192,7 +232,8 @@ def test_crate_detail_uses_accessible_crate_query(monkeypatch):
     )
 
     crate_id = uuid4()
-    result = crate_routes.get_one(None, crate_id)
+    request = SimpleNamespace(state=SimpleNamespace(user={"id": 1}))
+    result = crate_routes.get_one(request, crate_id)
 
     assert result["access"] == "owner"
     assert calls == [(str(crate_id), 1)]

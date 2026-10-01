@@ -147,6 +147,9 @@ interface CrateDraft {
   visibility: CrateDetail["visibility"];
   collaborative: boolean;
   collaborationSaved: boolean;
+  isOrdered: boolean;
+  sortDirection: "asc" | "desc";
+  loopEnabled: boolean;
   albums: CrateAlbum[];
 }
 
@@ -161,6 +164,9 @@ function createCrateDraft(crate: CrateDetail): CrateDraft {
     visibility: crate.visibility,
     collaborative: crate.is_collaborative,
     collaborationSaved: crate.is_collaborative,
+    isOrdered: crate.is_ordered,
+    sortDirection: crate.sort_direction,
+    loopEnabled: crate.loop_enabled,
     albums: crate.albums,
   };
 }
@@ -201,6 +207,9 @@ function CrateEditorForm({
     visibility,
     collaborative,
     collaborationSaved,
+    isOrdered,
+    sortDirection,
+    loopEnabled,
     albums,
   } = draft;
   const [saving, setSaving] = useState(false);
@@ -223,6 +232,9 @@ function CrateEditorForm({
         name: trimmedName,
         description: description.trim(),
         ...(isOwner ? { visibility, is_collaborative: collaborative } : {}),
+        is_ordered: isOrdered,
+        sort_direction: sortDirection,
+        loop_enabled: loopEnabled,
       });
       if (isOwner) updateDraft({ collaborationSaved: collaborative });
       toast.success(t("library.crates.saved"));
@@ -395,6 +407,50 @@ function CrateEditorForm({
             </label>
           </div>
         )}
+
+        <div className="grid gap-4 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4 sm:grid-cols-2">
+          <label className="flex min-h-11 items-center gap-3 rounded-lg bg-text-primary/[0.035] px-3 py-2 text-sm text-text-primary">
+            <input
+              type="checkbox"
+              aria-label={t("library.crates.ordered")}
+              checked={isOrdered}
+              onChange={(event) =>
+                updateDraft({ isOrdered: event.target.checked })
+              }
+              className="size-4 accent-primary"
+            />
+            {t("library.crates.ordered")}
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
+            {t("library.crates.sortDirection")}
+            <select
+              aria-label={t("library.crates.sortDirection")}
+              value={sortDirection}
+              disabled={!isOrdered}
+              onChange={(event) =>
+                updateDraft({
+                  sortDirection: event.target.value as "asc" | "desc",
+                })
+              }
+              className="h-11 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none focus:border-accent-action/60 disabled:opacity-50"
+            >
+              <option value="asc">{t("library.crates.ascending")}</option>
+              <option value="desc">{t("library.crates.descending")}</option>
+            </select>
+          </label>
+          <label className="flex min-h-11 items-center gap-3 rounded-lg bg-text-primary/[0.035] px-3 py-2 text-sm text-text-primary sm:col-span-2">
+            <input
+              type="checkbox"
+              aria-label={t("library.crates.loopPlayback")}
+              checked={loopEnabled}
+              onChange={(event) =>
+                updateDraft({ loopEnabled: event.target.checked })
+              }
+              className="size-4 accent-primary"
+            />
+            {t("library.crates.loopPlayback")}
+          </label>
+        </div>
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <SecondaryButton onClick={onBack}>

@@ -64,6 +64,7 @@ export interface PlayerActionsValue {
   clearQueue: () => void;
   toggleShuffle: () => void;
   cycleRepeat: () => void;
+  setRepeatMode: (mode: RepeatMode) => void;
   jumpTo: (index: number) => void;
   playNext: (track: Track) => void;
   addToQueue: (track: Track) => void;
