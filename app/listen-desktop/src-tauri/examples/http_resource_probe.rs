@@ -1,3 +1,5 @@
+#![cfg_attr(all(not(debug_assertions), windows), windows_subsystem = "windows")]
+
 use tauri::{Manager, Webview};
 
 #[tauri::command]
