@@ -29,6 +29,9 @@ def test_crate_list_summaries_include_album_count_and_first_album(pg_db):
 
     for crates in (get_crates_for_user(1), get_public_crates_for_user(1)):
         assert len(crates) == 1
+        assert crates[0]["is_ordered"] is True
+        assert crates[0]["sort_direction"] == "asc"
+        assert crates[0]["loop_enabled"] is False
         assert crates[0]["album_count"] == 2
         assert crates[0]["first_album"] == {
             "global_album_uid": first_album,
@@ -39,6 +42,38 @@ def test_crate_list_summaries_include_album_count_and_first_album(pg_db):
             "has_cover": False,
             "artwork_source_json": {},
         }
+
+
+def test_crate_presentation_settings_round_trip(pg_db):
+    from crate.db.queries.crates import get_crate
+    from crate.db.repositories.crates import create_crate, update_crate
+
+    crate_id = create_crate(
+        owner_id=1,
+        name="Reverse order",
+        is_ordered=False,
+        sort_direction="desc",
+        loop_enabled=True,
+    )
+    crate = get_crate(crate_id)
+
+    assert crate is not None
+    assert crate["is_ordered"] is False
+    assert crate["sort_direction"] == "desc"
+    assert crate["loop_enabled"] is True
+
+    assert update_crate(
+        crate_id,
+        is_ordered=True,
+        sort_direction="asc",
+        loop_enabled=False,
+        actor_id=1,
+    )
+    updated = get_crate(crate_id)
+    assert updated is not None
+    assert updated["is_ordered"] is True
+    assert updated["sort_direction"] == "asc"
+    assert updated["loop_enabled"] is False
 
 
 def _create_user(email: str) -> int:
@@ -582,6 +617,34 @@ def test_crate_playback_tracks_follow_crate_and_disc_track_order(pg_db):
         first_disc_one_track_two,
         first_disc_two,
         second_album_track,
+    ]
+
+
+def test_crate_playback_tracks_honor_descending_order(pg_db):
+    from crate.db.queries.crates import get_crate_playback_tracks
+    from crate.db.repositories.crates import add_crate_album, create_crate
+
+    crate_id = create_crate(
+        owner_id=1,
+        name="Descending playback",
+        sort_direction="desc",
+    )
+    first_album = _seed_global_album("First album")
+    second_album = _seed_global_album("Second album")
+    first_track = _seed_global_track(
+        first_album, "First", disc_number=1, track_number=1
+    )
+    second_track = _seed_global_track(
+        second_album, "Second", disc_number=1, track_number=1
+    )
+    add_crate_album(crate_id, first_album, added_by=1)
+    add_crate_album(crate_id, second_album, added_by=1)
+
+    tracks = get_crate_playback_tracks(crate_id)
+
+    assert [track["global_track_uid"] for track in tracks] == [
+        second_track,
+        first_track,
     ]
 
 

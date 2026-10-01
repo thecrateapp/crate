@@ -40,8 +40,12 @@ function crate(access: "public" | "owner" | "collaborator" = "public") {
     description: "Our favorite albums this year.",
     visibility: "public" as const,
     is_collaborative: true,
+    is_ordered: true,
+    sort_direction: "asc" as const,
+    loop_enabled: false,
     access,
     album_count: 2,
+    track_count: 2,
     first_album: null,
     albums: [
       {
@@ -64,16 +68,21 @@ function crate(access: "public" | "owner" | "collaborator" = "public") {
   };
 }
 
-function renderCrate(playerActions?: Partial<PlayerActionsValue>) {
+function renderCrate(
+  playerActions?: Partial<PlayerActionsValue>,
+  auth?: { user?: null },
+) {
   return renderWithListenProviders(<Crate />, {
     path: "/crate/:crateId",
     route: `/crate/${crateId}`,
     playerActions,
+    auth,
   });
 }
 
 describe("Crate page", () => {
   beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", undefined);
     mocks.detail = crate();
     mocks.error = null;
     mocks.playback = [
@@ -96,7 +105,12 @@ describe("Crate page", () => {
     ];
     mocks.shuffleArray.mockClear();
     mocks.useApi.mockImplementation((path: string | null) => ({
-      data: path?.endsWith("/playback") ? mocks.playback : mocks.detail,
+      data:
+        path === null
+          ? null
+          : path.endsWith("/playback")
+            ? mocks.playback
+            : mocks.detail,
       loading: false,
       error: mocks.error,
       refetch: vi.fn(),
@@ -114,7 +128,7 @@ describe("Crate page", () => {
       screen.getByRole("heading", { name: "Year-end records" }),
     ).toBeVisible();
     expect(screen.getByText("A crate by Jane Doe")).toBeVisible();
-    expect(screen.getByText("Blending")).toBeVisible();
+    expect(screen.getAllByText("Blending").length).toBeGreaterThan(0);
     expect(screen.getByText("A Light for Attracting Attention")).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "Edit Crate" }),
@@ -128,6 +142,12 @@ describe("Crate page", () => {
     ).detail;
     expect(payload.kind).toBe("crate");
     expect(payload.url).toContain(`/share/crate/${crateId}`);
+    expect(payload.crateIsOrdered).toBe(true);
+    expect(payload.crateAlbums).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Blending", position: 0 }),
+      ]),
+    );
     window.removeEventListener(SHARE_REQUEST_EVENT, shareRequest);
   });
 
@@ -160,6 +180,18 @@ describe("Crate page", () => {
     });
   });
 
+  it("applies the Crate loop setting to the player", async () => {
+    const user = userEvent.setup();
+    const playAll = vi.fn();
+    const setRepeatMode = vi.fn();
+    mocks.detail = { ...crate(), loop_enabled: true };
+    renderCrate({ playAll, setRepeatMode });
+
+    await user.click(screen.getByRole("button", { name: "Play" }));
+
+    expect(setRepeatMode).toHaveBeenCalledWith("all");
+  });
+
   it("shuffles the flattened tracks before starting playback", async () => {
     const user = userEvent.setup();
     const playAll = vi.fn();
@@ -182,6 +214,13 @@ describe("Crate page", () => {
     renderCrate();
 
     expect(await screen.findByRole("button", { name: "Play" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Shuffle" })).toBeDisabled();
+  });
+
+  it("keeps public Crate playback read-only for anonymous visitors", () => {
+    renderCrate(undefined, { user: null });
+
+    expect(screen.getByRole("button", { name: "Play" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Shuffle" })).toBeDisabled();
   });
 

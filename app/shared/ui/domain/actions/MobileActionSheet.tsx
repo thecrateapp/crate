@@ -69,9 +69,11 @@ export function MobileActionSheet({
     (target: EventTarget | null) => {
       if (target == null) return false;
       const node = target as Node;
-      return resolvedPanelRef.current
-        ? resolvedPanelRef.current.contains(node)
-        : false;
+      if (resolvedPanelRef.current?.contains(node)) return true;
+      return (
+        target instanceof Element &&
+        Boolean(target.closest("[data-dismissible-layer-boundary]"))
+      );
     },
     [resolvedPanelRef],
   );
@@ -395,6 +397,7 @@ export function MobileActionSheet({
     >
       <div
         ref={resolvedPanelRef}
+        data-dismissible-layer-boundary="true"
         className={cn(
           "listen-glass-panel fixed inset-x-0 overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl",
           isClosing && swipeY === 0

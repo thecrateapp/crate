@@ -102,8 +102,8 @@ const JamInvite = React.lazy(() =>
 const PlaylistInvite = React.lazy(() =>
   import("@/pages/PlaylistInvite").then((m) => ({ default: m.PlaylistInvite })),
 );
-const Crate = React.lazy(() =>
-  import("@/pages/Crate").then((m) => ({ default: m.Crate })),
+const PublicCrate = React.lazy(() =>
+  import("@/pages/PublicCrate").then((m) => ({ default: m.PublicCrate })),
 );
 const CrateInvite = React.lazy(() =>
   import("@/pages/CrateInvite").then((m) => ({ default: m.CrateInvite })),
@@ -120,6 +120,7 @@ function deferred(element: ReactNode) {
 }
 
 export const publicAppRoutes: AppRouteDefinition[] = [
+  { path: "/crate/:crateId", element: deferred(<PublicCrate />) },
   { path: "/server-setup", element: deferred(<ServerSetup />) },
   { path: "/auth/callback", element: deferred(<AuthCallback />) },
   { path: "/login", element: deferred(<Login />) },
@@ -152,7 +153,6 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
     : [{ path: "jam/*", element: <Navigate to="/" replace /> }]),
   { path: "playlist/invite/:token", element: deferred(<PlaylistInvite />) },
   { path: "crate/invite/:token", element: deferred(<CrateInvite />) },
-  { path: "crate/:crateId", element: deferred(<Crate />) },
   { path: "shows", element: <Navigate to="/upcoming" replace /> },
   { path: "upcoming", element: deferred(<Shows />) },
   { path: "paths", element: deferred(<PathsPage />) },

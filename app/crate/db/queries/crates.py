@@ -28,8 +28,23 @@ def get_crate(crate_id: str, *, session: Session | None = None) -> dict | None:
                         c.description,
                         c.visibility,
                         c.is_collaborative,
+                        c.is_ordered,
+                        c.sort_direction,
+                        c.loop_enabled,
                         c.created_at,
                         c.updated_at,
+                        (
+                            SELECT COUNT(*)::integer
+                            FROM crate_albums crate_album_count
+                            WHERE crate_album_count.crate_id = c.id
+                        ) AS album_count,
+                        (
+                            SELECT COUNT(*)::integer
+                            FROM crate_albums crate_album_count
+                            JOIN global_catalog_tracks track_count
+                              ON track_count.global_album_uid = crate_album_count.global_album_uid
+                            WHERE crate_album_count.crate_id = c.id
+                        ) AS track_count,
                         COALESCE(
                             jsonb_agg(
                                 jsonb_build_object(
@@ -89,11 +104,18 @@ def get_crate_playback_tracks(
                         track.disc_number,
                         track.track_number
                     FROM crate_albums crate_album
+                    JOIN crates crate
+                      ON crate.id = crate_album.crate_id
                     JOIN global_catalog_tracks track
                       ON track.global_album_uid = crate_album.global_album_uid
                     WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
                       AND (track.has_local IS TRUE OR track.has_remote IS TRUE)
-                    ORDER BY crate_album.position,
+                    ORDER BY CASE
+                                 WHEN crate.is_ordered IS TRUE
+                                  AND crate.sort_direction = 'desc'
+                                     THEN -crate_album.position
+                                 ELSE crate_album.position
+                             END,
                              COALESCE(track.disc_number, 1),
                              COALESCE(track.track_number, 0),
                              track.canonical_title,
@@ -173,6 +195,9 @@ def _list_crates(
                             c.description,
                             c.visibility,
                             c.is_collaborative,
+                            c.is_ordered,
+                            c.sort_direction,
+                            c.loop_enabled,
                             c.created_at,
                             c.updated_at,
                             CASE
@@ -229,6 +254,36 @@ def _list_crates(
                         JOIN global_catalog_albums album
                           ON album.global_album_uid = ca.global_album_uid
                         ORDER BY ca.crate_id, ca.position, ca.global_album_uid
+                    ),
+                    crate_album_previews AS (
+                        SELECT
+                            ca.crate_id,
+                            jsonb_agg(
+                                jsonb_build_object(
+                                    'global_album_uid', album.global_album_uid::text,
+                                    'position', ca.position,
+                                    'name', album.canonical_name,
+                                    'artist_name', album.artist_name,
+                                    'year', album.year,
+                                    'has_cover', album.has_cover,
+                                    'artwork_source_json', album.artwork_source_json
+                                ) ORDER BY ca.position
+                            ) AS albums
+                        FROM visible_crates visible
+                        JOIN crate_albums ca ON ca.crate_id = visible.id
+                        JOIN global_catalog_albums album
+                          ON album.global_album_uid = ca.global_album_uid
+                        GROUP BY ca.crate_id
+                    ),
+                    crate_track_counts AS (
+                        SELECT
+                            ca.crate_id,
+                            COUNT(track.global_track_uid)::integer AS track_count
+                        FROM visible_crates visible
+                        JOIN crate_albums ca ON ca.crate_id = visible.id
+                        JOIN global_catalog_tracks track
+                          ON track.global_album_uid = ca.global_album_uid
+                        GROUP BY ca.crate_id
                     )
                     SELECT
                         visible.id::text AS id,
@@ -239,16 +294,25 @@ def _list_crates(
                         visible.description,
                         visible.visibility,
                         visible.is_collaborative,
+                        visible.is_ordered,
+                        visible.sort_direction,
+                        visible.loop_enabled,
                         visible.created_at,
                         visible.updated_at,
                         COALESCE(counts.album_count, 0) AS album_count,
                         first_album.first_album,
+                        COALESCE(previews.albums, '[]'::jsonb) AS albums,
+                        COALESCE(track_counts.track_count, 0) AS track_count,
                         visible.access
                     FROM visible_crates visible
                     LEFT JOIN crate_album_counts counts
                       ON counts.crate_id = visible.id
                     LEFT JOIN crate_first_albums first_album
                       ON first_album.crate_id = visible.id
+                    LEFT JOIN crate_album_previews previews
+                      ON previews.crate_id = visible.id
+                    LEFT JOIN crate_track_counts track_counts
+                      ON track_counts.crate_id = visible.id
                     ORDER BY visible.updated_at DESC, visible.id
                     """
                 ),

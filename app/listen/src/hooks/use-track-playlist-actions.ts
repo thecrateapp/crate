@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import type { PlaylistComposerTrack } from "@/components/playlists/PlaylistCreateModal";
 import { useOptionalPlaylistComposer } from "@/contexts/PlaylistComposerContext";
@@ -28,12 +28,21 @@ export function useTrackPlaylistActions() {
   const playlistOptions = playlistComposer?.playlistOptions ?? [];
   const ensurePlaylistOptionsLoaded =
     playlistComposer?.ensurePlaylistOptionsLoaded ?? noop;
+  const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
   const onOpenChange = useCallback(
     (open: boolean) => {
-      if (open) ensurePlaylistOptionsLoaded();
+      if (open) {
+        ensurePlaylistOptionsLoaded();
+      } else {
+        setPlaylistPickerOpen(false);
+      }
     },
     [ensurePlaylistOptionsLoaded],
   );
+  const onTogglePlaylistPicker = useCallback(() => {
+    ensurePlaylistOptionsLoaded();
+    setPlaylistPickerOpen((open) => !open);
+  }, [ensurePlaylistOptionsLoaded]);
 
   const onCreatePlaylist = useCallback(
     (track: TrackMenuData) => {
@@ -57,7 +66,9 @@ export function useTrackPlaylistActions() {
     playlistOptions,
     ensurePlaylistOptionsLoaded,
     onOpenChange,
+    onTogglePlaylistPicker,
     onCreatePlaylist,
     onAddToPlaylist,
+    playlistPickerOpen,
   };
 }

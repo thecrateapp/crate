@@ -3,6 +3,8 @@ import {
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
@@ -212,12 +214,103 @@ function ContextMenuHeaderView({
   return <>{header}</>;
 }
 
+function ContextMenuDisclosure({
+  entry,
+  onClose,
+  desktop,
+}: {
+  entry: Extract<ContextMenuEntry, { type: "disclosure" }>;
+  onClose: () => void;
+  desktop: boolean;
+}) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: 12, top: 12 });
+  const Icon = entry.icon;
+  const Indicator = entry.expanded ? ChevronDown : ChevronRight;
+
+  useLayoutEffect(() => {
+    if (!desktop || !entry.expanded) return;
+
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const margin = 12;
+    const gap = 8;
+    const submenuWidth = 288;
+    const maxLeft = Math.max(margin, window.innerWidth - submenuWidth - margin);
+    const maxTop = Math.max(margin, window.innerHeight - 120);
+    const opensRight =
+      rect.right + gap + submenuWidth <= window.innerWidth - margin;
+    const preferredLeft = opensRight
+      ? rect.right + gap
+      : rect.left - gap - submenuWidth;
+
+    setPosition({
+      left: Math.min(Math.max(margin, preferredLeft), maxLeft),
+      top: Math.min(Math.max(margin, rect.top), maxTop),
+    });
+  }, [desktop, entry.expanded]);
+
+  const submenu = (
+    <div
+      data-dismissible-layer-boundary="true"
+      data-testid={`context-menu-submenu-${entry.key}`}
+      role="menu"
+      className="listen-glass-panel fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl animate-pop-in"
+      style={{ left: position.left, top: position.top }}
+    >
+      <div className="p-1.5">
+        <ContextMenuItems items={entry.items} onClose={onClose} desktop />
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      ref={anchorRef}
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <AppMenuButton
+        role="menuitem"
+        aria-expanded={entry.expanded}
+        disabled={entry.disabled}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!entry.disabled) entry.onToggle();
+        }}
+        className={cn(entry.disabled ? "opacity-50" : undefined)}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-3">
+          {Icon ? (
+            <Icon size={CRATE_ICON_SIZE.md} className="shrink-0" />
+          ) : (
+            <span className="w-[18px] shrink-0" />
+          )}
+          <span className="truncate">{entry.label}</span>
+        </span>
+        <Indicator size={17} className="shrink-0 text-text-primary/45" />
+      </AppMenuButton>
+      {entry.expanded && desktop && typeof document !== "undefined"
+        ? createPortal(submenu, document.body)
+        : null}
+      {!desktop && entry.expanded ? (
+        <div className="space-y-1 px-3 pb-2">
+          <ContextMenuItems items={entry.items} onClose={onClose} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ContextMenuItems({
   items,
   onClose,
+  desktop = false,
 }: {
   items: ContextMenuEntry[];
   onClose: () => void;
+  desktop?: boolean;
 }) {
   const handleSelect = (
     entry: Extract<ContextMenuEntry, { type?: "action" }>,
@@ -253,39 +346,13 @@ function ContextMenuItems({
         const Icon = entry.icon;
 
         if (entry.type === "disclosure") {
-          const Indicator = entry.expanded ? ChevronDown : ChevronRight;
-
           return (
-            <div key={entry.key}>
-              <AppMenuButton
-                role="menuitem"
-                aria-expanded={entry.expanded}
-                disabled={entry.disabled}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!entry.disabled) entry.onToggle();
-                }}
-                className={cn(entry.disabled ? "opacity-50" : undefined)}
-              >
-                <span className="flex min-w-0 flex-1 items-center gap-3">
-                  {Icon ? (
-                    <Icon size={CRATE_ICON_SIZE.md} className="shrink-0" />
-                  ) : (
-                    <span className="w-[18px] shrink-0" />
-                  )}
-                  <span className="truncate">{entry.label}</span>
-                </span>
-                <Indicator
-                  size={17}
-                  className="shrink-0 text-text-primary/45"
-                />
-              </AppMenuButton>
-              {entry.expanded ? (
-                <div className="space-y-1 px-3 pb-2">
-                  <ContextMenuItems items={entry.items} onClose={onClose} />
-                </div>
-              ) : null}
-            </div>
+            <ContextMenuDisclosure
+              key={entry.key}
+              entry={entry}
+              onClose={onClose}
+              desktop={desktop}
+            />
           );
         }
 
@@ -348,14 +415,14 @@ export function ContextMenu({
 
   if (!open || !hasSelectableEntries(items)) return null;
 
-  const content = (
+  const content = (desktop: boolean) => (
     <>
       <ContextMenuHeaderView
         header={header}
         renderMediaImage={renderMediaImage}
       />
       <div className="p-1.5">
-        <ContextMenuItems items={items} onClose={onClose} />
+        <ContextMenuItems items={items} onClose={onClose} desktop={desktop} />
       </div>
     </>
   );
@@ -367,7 +434,7 @@ export function ContextMenu({
           role="menu"
           className="max-h-[calc(100%-5rem)] overflow-y-auto pb-3"
         >
-          {content}
+          {content(false)}
         </div>
       </MobileActionSheet>
     );
@@ -390,7 +457,7 @@ export function ContextMenu({
       )}
       style={style}
     >
-      {content}
+      {content(true)}
     </div>,
     document.body,
   );

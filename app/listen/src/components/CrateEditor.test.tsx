@@ -48,8 +48,12 @@ function crateDetail(name: string): CrateDetail {
     description: "",
     visibility: "private",
     is_collaborative: false,
+    is_ordered: true,
+    sort_direction: "asc",
+    loop_enabled: false,
     access: "owner",
     album_count: 0,
+    track_count: 0,
     first_album: null,
     updated_at: null,
     albums: [],
@@ -92,6 +96,31 @@ describe("CrateEditor", () => {
 
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(
       "Updated from server",
+    );
+  });
+
+  it("saves ordering and loop presentation settings", async () => {
+    renderWithListenProviders(<CrateEditor {...editorProps} />, {
+      locale: "en",
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Ordered Crate" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort direction" }), {
+      target: { value: "desc" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Loop playback" }));
+    fireEvent.submit(
+      screen.getByRole("textbox", { name: "Name" }).closest("form")!,
+    );
+
+    expect(mocks.api).toHaveBeenCalledWith(
+      `/api/crates/${crateId}`,
+      "PUT",
+      expect.objectContaining({
+        is_ordered: false,
+        sort_direction: "desc",
+        loop_enabled: true,
+      }),
     );
   });
 });

@@ -140,6 +140,9 @@ def create(request: Request, body: CreateCrateRequest):
         name=body.name,
         description=body.description,
         is_collaborative=body.is_collaborative,
+        is_ordered=body.is_ordered,
+        sort_direction=body.sort_direction,
+        loop_enabled=body.loop_enabled,
     )
     return {"id": crate_id}
 
@@ -186,8 +189,8 @@ def accept_invite(request: Request, token: str):
     summary="Get a Crate and its ordered albums",
 )
 def get_one(request: Request, crate_id: UUID):
-    user = _require_auth(request)
-    crate, access = get_crate_for_user(str(crate_id), user["id"])
+    user = getattr(getattr(request, "state", None), "user", None)
+    crate, access = get_crate_for_user(str(crate_id), int(user["id"]) if user else None)
     if crate is None:
         raise HTTPException(status_code=404, detail="Crate not found")
     crate["access"] = access
@@ -235,6 +238,9 @@ def update(request: Request, crate_id: UUID, body: UpdateCrateRequest):
             description=body.description,
             visibility=body.visibility,
             is_collaborative=body.is_collaborative,
+            is_ordered=body.is_ordered,
+            sort_direction=body.sort_direction,
+            loop_enabled=body.loop_enabled,
             actor_id=user["id"],
         )
     except CrateNotFoundError as exc:

@@ -45,6 +45,12 @@ describe("PlayerTrackMenu", () => {
 
     await waitFor(() => {
       expect(useApi).toHaveBeenCalledWith("/api/playlists");
+    });
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Añadir a playlist" }),
+    );
+
+    await waitFor(() => {
       expect(
         screen.getByRole("menuitem", { name: "Añadir a Favorites" }),
       ).toBeInTheDocument();

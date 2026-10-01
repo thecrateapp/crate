@@ -15,6 +15,9 @@ class CreateCrateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
     is_collaborative: bool = False
+    is_ordered: bool = True
+    sort_direction: Literal["asc", "desc"] = "asc"
+    loop_enabled: bool = False
 
 
 class UpdateCrateRequest(BaseModel):
@@ -24,6 +27,9 @@ class UpdateCrateRequest(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     visibility: Literal["private", "public"] | None = None
     is_collaborative: bool | None = None
+    is_ordered: bool | None = None
+    sort_direction: Literal["asc", "desc"] | None = None
+    loop_enabled: bool | None = None
 
 
 class AddCrateAlbumRequest(BaseModel):
@@ -65,9 +71,14 @@ class CrateSummaryResponse(BaseModel):
     description: str = ""
     visibility: Literal["private", "public"]
     is_collaborative: bool
+    is_ordered: bool = True
+    sort_direction: Literal["asc", "desc"] = "asc"
+    loop_enabled: bool = False
     access: Literal["owner", "collaborator", "public"] | None = None
     album_count: int = 0
+    track_count: int = 0
     first_album: CrateAlbumResponse | None = None
+    albums: list[CrateAlbumResponse] = Field(default_factory=list)
     created_at: datetime | str | None = None
     updated_at: datetime | str | None = None
 

@@ -12,12 +12,17 @@ import { useTranslation } from "react-i18next";
 
 import { CrateEditor } from "@/components/CrateEditor";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import {
+  CrateCoverFlow,
+  orderAlbums,
+} from "@/components/crates/CrateCoverFlow";
 import { CrateLoader } from "@/components/ui/CrateLoader";
+import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
 import { publicShareUrl } from "@/lib/share-url";
-import { openShareSheet } from "@/lib/social-share";
+import { openShareSheet, type CrateShareAlbum } from "@/lib/social-share";
 import { shuffleArray } from "@/lib/utils";
 import { toPlayableTrack } from "@/lib/playable-track";
 import type { CrateDetail, CratePlaybackTrack } from "@/pages/crates-types";
@@ -29,10 +34,11 @@ export function Crate() {
   const { data, loading, refetch } = useApi<CrateDetail>(
     crateId ? `/api/crates/${crateId}` : null,
   );
+  const { user } = useAuth();
   const { data: playbackData, loading: playbackLoading } = useApi<
     CratePlaybackTrack[]
-  >(crateId ? `/api/crates/${crateId}/playback` : null);
-  const { playAll } = usePlayerActions();
+  >(crateId && user ? `/api/crates/${crateId}/playback` : null);
+  const { playAll, setRepeatMode } = usePlayerActions();
   const [editing, setEditing] = useState(false);
   const canEdit = data?.access === "owner" || data?.access === "collaborator";
   const playerTracks = useMemo<Track[]>(
@@ -65,10 +71,11 @@ export function Crate() {
       ),
     [playbackData],
   );
-  const canPlay = !playbackLoading && playerTracks.length > 0;
+  const canPlay = Boolean(user) && !playbackLoading && playerTracks.length > 0;
 
   function startCratePlayback(tracks: Track[]) {
     if (!data || tracks.length === 0) return;
+    setRepeatMode(data.loop_enabled ? "all" : "off");
     playAll(tracks, 0, {
       type: "crate",
       name: data.name,
@@ -115,7 +122,12 @@ export function Crate() {
 
   const ownerName =
     data.owner_name || data.owner_username || t("people.unknownUser");
-  const firstAlbum = data.albums[0];
+  const orderedAlbums = orderAlbums(
+    data.albums,
+    data.is_ordered,
+    data.sort_direction,
+  );
+  const firstAlbum = orderedAlbums[0];
   const coverUrl = firstAlbum?.has_cover
     ? albumCoverApiUrl(
         {
@@ -135,26 +147,42 @@ export function Crate() {
       subtitle: ownerName,
       imageUrl: coverUrl,
       url: publicShareUrl(`/share/crate/${encodeURIComponent(crate.id)}`),
+      crateAlbums: orderedAlbums.map(
+        (album) =>
+          ({
+            imageUrl: album.has_cover
+              ? albumCoverApiUrl(
+                  {
+                    globalAlbumUid: album.global_album_uid,
+                    albumName: album.name,
+                    artistName: album.artist_name,
+                  },
+                  { size: 768 },
+                )
+              : null,
+            name: album.name,
+            artistName: album.artist_name,
+            position: album.position,
+          }) satisfies CrateShareAlbum,
+      ),
+      crateIsOrdered: crate.is_ordered,
+      crateSortDirection: crate.sort_direction,
+      crateTrackCount: crate.track_count,
     });
   }
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 pb-12">
-      <section className="grid gap-6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.035] p-5 sm:p-7 md:grid-cols-[minmax(200px,300px)_1fr] md:items-center">
-        <div className="aspect-square overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.04]">
-          {coverUrl ? (
-            <CrateImage
-              src={coverUrl}
-              alt={firstAlbum?.name ?? ""}
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center bg-gradient-to-br from-accent-action/15 via-text-primary/[0.03] to-surface-canvas/20 text-accent-action/80">
-              <Disc3 size={64} strokeWidth={1.2} />
-            </div>
-          )}
-        </div>
-
+      <section className="space-y-7 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.035] p-5 sm:p-7">
+        <CrateCoverFlow
+          albums={orderedAlbums}
+          isOrdered={data.is_ordered}
+          sortDirection={data.sort_direction}
+          crateName={data.name}
+          canPlay={canPlay}
+          loopEnabled={data.loop_enabled}
+          onPlay={() => startCratePlayback(playerTracks)}
+        />
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent-action">
             {t("crate.page.kicker", { name: ownerName })}
@@ -169,6 +197,9 @@ export function Crate() {
           ) : null}
           <p className="mt-4 text-sm text-text-muted">
             {t("common.albumCountLabel", { count: data.albums.length })}
+            {data.track_count > 0
+              ? ` · ${t("common.trackCountLabel", { count: data.track_count })}`
+              : ""}
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <button
@@ -224,7 +255,7 @@ export function Crate() {
         </div>
         {data.albums.length > 0 ? (
           <ol className="divide-y divide-text-primary/6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.025]">
-            {data.albums.map((album, index) => {
+            {orderedAlbums.map((album, index) => {
               const albumCover = album.has_cover
                 ? albumCoverApiUrl(
                     {

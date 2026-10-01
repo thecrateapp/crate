@@ -5,6 +5,31 @@ import type { SocialShareColors } from "./social-share-colors";
 export const STORY_WIDTH = 1080;
 export const STORY_HEIGHT = 1920;
 
+export type CrateStoryComposition = "ranked-stack" | "hero-editorial";
+
+export interface CrateStoryArtwork {
+  image: HTMLImageElement;
+  position: number;
+}
+
+export function resolveCrateStoryComposition(
+  payload: SharePayload,
+): CrateStoryComposition {
+  return payload.kind === "crate" && payload.crateIsOrdered
+    ? "ranked-stack"
+    : "hero-editorial";
+}
+
+export function buildCrateStoryMetadata(payload: SharePayload): string {
+  const albumCount = payload.crateAlbums?.length ?? 0;
+  const albumLabel = albumCount === 1 ? "1 album" : `${albumCount} albums`;
+  const trackLabel =
+    payload.crateTrackCount && payload.crateTrackCount > 0
+      ? ` · ${payload.crateTrackCount} tracks`
+      : "";
+  return `${buildInstagramStorySubtitle(payload)} · ${albumLabel}${trackLabel}`;
+}
+
 export function drawStoryArtworkBackground(
   ctx: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -101,6 +126,113 @@ export function drawEditorialStoryCard(
     infoY + 266,
     cardWidth - 144,
     52,
+    2,
+  );
+}
+
+export function drawCrateStoryCard(
+  ctx: CanvasRenderingContext2D,
+  payload: SharePayload,
+  artworks: CrateStoryArtwork[],
+  logo: HTMLImageElement | null,
+  colors: SocialShareColors,
+) {
+  if (resolveCrateStoryComposition(payload) !== "ranked-stack") {
+    drawEditorialStoryCard(
+      ctx,
+      { ...payload, subtitle: buildCrateStoryMetadata(payload) },
+      artworks[0]?.image ?? null,
+      logo,
+      colors,
+    );
+    return;
+  }
+
+  const cardWidth = 840;
+  const cardX = (STORY_WIDTH - cardWidth) / 2;
+  const cardY = 468;
+  const padding = 28;
+  const artSize = cardWidth - padding * 2;
+  const artX = cardX + padding;
+  const artY = cardY + padding;
+  const cardHeight = 1_260;
+
+  ctx.save();
+  ctx.shadowColor = colors.scrimStrong;
+  ctx.shadowBlur = 84;
+  ctx.shadowOffsetY = 42;
+  ctx.fillStyle = colors.cardSurface;
+  roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 18);
+  ctx.fill();
+  ctx.restore();
+
+  const visibleArtworks = artworks.slice(0, 4);
+  const tileSize = Math.min(artSize * 0.58, 390);
+  const gap = 20;
+  const startX = artX + (artSize - tileSize * 2 - gap) / 2;
+  const startY = artY + 48;
+  if (visibleArtworks.length === 0) {
+    drawGeneratedStoryArtwork(ctx, payload, artX, artY, artSize, logo, colors);
+  }
+  visibleArtworks.forEach((artwork, index) => {
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    const x = startX + column * (tileSize + gap);
+    const y = startY + row * (tileSize + gap);
+    ctx.save();
+    roundedRect(ctx, x, y, tileSize, tileSize, 10);
+    ctx.clip();
+    drawCoverImage(ctx, artwork.image, x, y, tileSize, tileSize);
+    ctx.restore();
+
+    ctx.fillStyle = colors.accentGlow;
+    ctx.font = "800 28px Poppins, ui-sans-serif, system-ui";
+    ctx.textAlign = "left";
+    const rank = artwork.position + 1;
+    ctx.fillText(`RANK #${rank}`, x + 18, y + 42);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
+    ctx.font = "800 150px Poppins, ui-sans-serif, system-ui";
+    ctx.textAlign = "right";
+    ctx.fillText(
+      String(rank).padStart(2, "0"),
+      x + tileSize - 16,
+      y + tileSize - 14,
+    );
+  });
+
+  ctx.fillStyle = colors.cardSurface;
+  ctx.fillRect(artX, artY + artSize * 0.8, artSize, 240);
+  ctx.textAlign = "center";
+  ctx.fillStyle = colors.cardInk;
+  ctx.font = "800 64px Poppins, ui-sans-serif, system-ui";
+  drawWrappedText(
+    ctx,
+    payload.title.toUpperCase(),
+    STORY_WIDTH / 2,
+    artY + artSize * 0.86,
+    cardWidth - 128,
+    72,
+    2,
+  );
+  ctx.fillStyle = colors.cardMutedInk;
+  ctx.font = "800 36px Poppins, ui-sans-serif, system-ui";
+  const albumLabel =
+    payload.crateAlbums?.length === 1
+      ? "1 ALBUM"
+      : `${payload.crateAlbums?.length ?? 0} ALBUMS`;
+  const trackLabel =
+    payload.crateTrackCount && payload.crateTrackCount > 0
+      ? ` · ${payload.crateTrackCount} TRACKS`
+      : "";
+  drawWrappedText(
+    ctx,
+    `${albumLabel}${trackLabel} · ${buildInstagramStorySubtitle(
+      payload,
+    ).toUpperCase()}`,
+    STORY_WIDTH / 2,
+    artY + artSize * 0.97,
+    cardWidth - 144,
+    48,
     2,
   );
 }

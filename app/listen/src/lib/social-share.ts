@@ -20,12 +20,23 @@ export type ShareSubjectKind =
   | "crate"
   | "genre";
 
+export interface CrateShareAlbum {
+  imageUrl?: string | null;
+  name: string;
+  artistName: string;
+  position: number;
+}
+
 export interface SharePayload {
   kind: ShareSubjectKind;
   title: string;
   url: string;
   subtitle?: string | null;
   imageUrl?: string | null;
+  crateAlbums?: CrateShareAlbum[];
+  crateIsOrdered?: boolean;
+  crateSortDirection?: "asc" | "desc";
+  crateTrackCount?: number;
 }
 
 export function buildShareText(payload: SharePayload): string {

@@ -314,6 +314,38 @@ describe("ContextMenu", () => {
     expect(onCreatePlaylist).not.toHaveBeenCalled();
   });
 
+  it("renders desktop disclosure children in a lateral submenu", () => {
+    render(
+      <ContextMenu
+        items={[
+          {
+            type: "disclosure",
+            key: "playlist",
+            label: "Add to playlist",
+            expanded: true,
+            onToggle: vi.fn(),
+            items: [
+              {
+                key: "playlist-favorites",
+                label: "Favorites",
+                onSelect: vi.fn(),
+              },
+            ],
+          },
+        ]}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    expect(screen.getByTestId("context-menu-submenu-playlist")).toHaveClass(
+      "fixed",
+      "z-app-context-menu",
+    );
+  });
+
   it("does not close when a disclosure parent is toggled", () => {
     const onClose = vi.fn();
     const onToggle = vi.fn();

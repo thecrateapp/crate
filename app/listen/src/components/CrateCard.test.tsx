@@ -16,14 +16,134 @@ const crate = {
   description: "",
   visibility: "public" as const,
   is_collaborative: false,
+  is_ordered: true,
+  sort_direction: "asc" as const,
+  loop_enabled: false,
   access: "owner" as const,
   album_count: 1,
+  track_count: 4,
   first_album: null,
+  albums: [
+    {
+      global_album_uid: "album-1",
+      position: 0,
+      name: "First record",
+      artist_name: "Listener",
+      year: "2026",
+      has_cover: false,
+    },
+  ],
 };
 
 describe("CrateCard", () => {
   beforeEach(() => {
     openShareSheet.mockReset();
+  });
+
+  it("presents the active album with play and navigation controls", () => {
+    const onPlay = vi.fn();
+    render(
+      <I18nProvider initialLocale="en">
+        <CrateCard
+          crate={{
+            ...crate,
+            album_count: 2,
+            albums: [
+              ...crate.albums,
+              {
+                global_album_uid: "album-2",
+                artist_name: "Listener",
+                year: "2026",
+                has_cover: false,
+                name: "Second record",
+                position: 1,
+              },
+            ],
+          }}
+          onOpen={vi.fn()}
+          onEdit={vi.fn()}
+          onPlay={onPlay}
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText("First record")).toBeVisible();
+    expect(screen.getByText("2 albums · 4 tracks")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Play Year-end records" }),
+    ).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next album" }));
+
+    expect(screen.getByText("Second record")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Play Year-end records" }),
+    );
+    expect(onPlay).toHaveBeenCalledWith(
+      expect.objectContaining({ global_album_uid: "album-2" }),
+    );
+  });
+
+  it("wraps album navigation when loop playback is enabled", () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <CrateCard
+          crate={{
+            ...crate,
+            loop_enabled: true,
+            album_count: 2,
+            albums: [
+              ...crate.albums,
+              {
+                global_album_uid: "album-2",
+                artist_name: "Listener",
+                year: "2026",
+                has_cover: false,
+                name: "Second record",
+                position: 1,
+              },
+            ],
+          }}
+          onOpen={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Next album" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next album" }));
+
+    expect(screen.getByText("First record")).toBeVisible();
+  });
+
+  it("starts on the highest position when ordered descending", () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <CrateCard
+          crate={{
+            ...crate,
+            is_ordered: true,
+            sort_direction: "desc",
+            album_count: 2,
+            albums: [
+              ...crate.albums,
+              {
+                global_album_uid: "album-2",
+                artist_name: "Listener",
+                year: "2026",
+                has_cover: false,
+                name: "Second record",
+                position: 1,
+              },
+            ],
+          }}
+          onOpen={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText("Second record")).toBeVisible();
   });
 
   it("exposes contextual actions alongside the crate card", () => {

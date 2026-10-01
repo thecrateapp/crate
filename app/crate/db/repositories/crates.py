@@ -91,6 +91,9 @@ def create_crate(
     name: str,
     description: str = "",
     is_collaborative: bool = False,
+    is_ordered: bool = True,
+    sort_direction: str = "asc",
+    loop_enabled: bool = False,
     *,
     session: Session | None = None,
 ) -> str:
@@ -98,8 +101,14 @@ def create_crate(
         crate_id = current.execute(
             text(
                 """
-                INSERT INTO crates (owner_id, name, description, is_collaborative)
-                VALUES (:owner_id, :name, :description, :is_collaborative)
+                INSERT INTO crates (
+                    owner_id, name, description, is_collaborative,
+                    is_ordered, sort_direction, loop_enabled
+                )
+                VALUES (
+                    :owner_id, :name, :description, :is_collaborative,
+                    :is_ordered, :sort_direction, :loop_enabled
+                )
                 RETURNING id::text
                 """
             ),
@@ -108,6 +117,9 @@ def create_crate(
                 "name": name,
                 "description": description,
                 "is_collaborative": is_collaborative,
+                "is_ordered": is_ordered,
+                "sort_direction": sort_direction,
+                "loop_enabled": loop_enabled,
             },
         ).scalar_one()
     return str(crate_id)
@@ -120,6 +132,9 @@ def update_crate(
     description: str | None = None,
     visibility: str | None = None,
     is_collaborative: bool | None = None,
+    is_ordered: bool | None = None,
+    sort_direction: str | None = None,
+    loop_enabled: bool | None = None,
     actor_id: int,
     session: Session | None = None,
 ) -> bool:
@@ -130,6 +145,9 @@ def update_crate(
             "description": description,
             "visibility": visibility,
             "is_collaborative": is_collaborative,
+            "is_ordered": is_ordered,
+            "sort_direction": sort_direction,
+            "loop_enabled": loop_enabled,
         }.items()
         if value is not None
     }

@@ -47,6 +47,8 @@ interface UseTrackActionEntriesInput {
   track: TrackMenuData;
   albumCover?: string;
   playlistOptions?: Array<{ id: number; name: string }>;
+  playlistPickerOpen?: boolean;
+  onTogglePlaylistPicker?: () => void;
   onAddToPlaylist?: (
     playlistId: number,
     track: TrackMenuData,
@@ -264,39 +266,44 @@ export function useTrackActionEntries(
     if (input.onCreatePlaylist || (input.playlistOptions?.length ?? 0) > 0) {
       entries.push({ type: "divider", key: "divider-playlists" });
       entries.push({
-        type: "label",
-        key: "playlists-label",
-        label: t("actions.track.playlists"),
+        type: "disclosure",
+        key: "playlist",
+        label: t("playlist.actions.addToPlaylist"),
+        icon: ListMusic,
+        expanded: input.playlistPickerOpen ?? false,
+        onToggle: input.onTogglePlaylistPicker ?? (() => undefined),
+        items: [
+          ...(input.onCreatePlaylist
+            ? [
+                action({
+                  key: "playlist-create",
+                  label: t("actions.track.addToNewPlaylist"),
+                  icon: ListMusic,
+                  onSelect: async () => {
+                    await input.onCreatePlaylist?.(input.track);
+                  },
+                }),
+              ]
+            : []),
+          ...(input.playlistOptions || []).map((playlist) =>
+            action({
+              key: `playlist-${playlist.id}`,
+              label: t("actions.track.addToPlaylist", {
+                name: playlist.name,
+              }),
+              icon: ListMusic,
+              onSelect: async () => {
+                try {
+                  await input.onAddToPlaylist?.(playlist.id, input.track);
+                  toast.success(t("actions.track.toasts.addedToPlaylist"));
+                } catch {
+                  toast.error(t("playlist.toasts.trackAddFailed"));
+                }
+              },
+            }),
+          ),
+        ],
       });
-      if (input.onCreatePlaylist) {
-        entries.push(
-          action({
-            key: "playlist-create",
-            label: t("actions.track.addToNewPlaylist"),
-            icon: ListMusic,
-            onSelect: async () => {
-              await input.onCreatePlaylist?.(input.track);
-            },
-          }),
-        );
-      }
-      for (const playlist of input.playlistOptions || []) {
-        entries.push(
-          action({
-            key: `playlist-${playlist.id}`,
-            label: t("actions.track.addToPlaylist", { name: playlist.name }),
-            icon: ListMusic,
-            onSelect: async () => {
-              try {
-                await input.onAddToPlaylist?.(playlist.id, input.track);
-                toast.success(t("actions.track.toasts.addedToPlaylist"));
-              } catch {
-                toast.error(t("playlist.toasts.trackAddFailed"));
-              }
-            },
-          }),
-        );
-      }
     }
 
     if (
@@ -357,6 +364,8 @@ export function useTrackActionEntries(
     input.onAddToPlaylist,
     input.onCreatePlaylist,
     input.onPlayNowOverride,
+    input.onTogglePlaylistPicker,
+    input.playlistPickerOpen,
     input.playlistOptions,
     input.track,
     liked,

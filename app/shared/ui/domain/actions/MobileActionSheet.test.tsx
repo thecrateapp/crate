@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { createRef } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +101,34 @@ describe("MobileActionSheet", () => {
     );
 
     fireEvent.click(screen.getByTestId("inside"));
+
+    act(() => {
+      vi.advanceTimersByTime(140);
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("does not close for a portal submenu boundary", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(
+      <MobileActionSheet open onClose={onClose}>
+        {createPortal(
+          <button
+            data-dismissible-layer-boundary="true"
+            data-testid="portal-submenu"
+            type="button"
+          >
+            Portal submenu
+          </button>,
+          document.body,
+        )}
+      </MobileActionSheet>,
+    );
+
+    fireEvent.click(screen.getByTestId("portal-submenu"));
 
     act(() => {
       vi.advanceTimersByTime(140);

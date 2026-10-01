@@ -16,9 +16,14 @@ export interface CrateSummary {
   description: string;
   visibility: "private" | "public";
   is_collaborative: boolean;
+  is_ordered: boolean;
+  sort_direction: "asc" | "desc";
+  loop_enabled: boolean;
   access: "owner" | "collaborator" | "public" | null;
   album_count: number;
+  track_count: number;
   first_album: CrateAlbum | null;
+  albums: CrateAlbum[];
   created_at?: string | null;
   updated_at?: string | null;
 }

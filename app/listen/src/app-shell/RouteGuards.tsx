@@ -47,7 +47,9 @@ export function ServerGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(SERVER_STORE_EVENT, sync);
   }, []);
 
-  if (!usesConfigurableServer) return <>{children}</>;
+  if (!usesConfigurableServer) {
+    return <>{children}</>;
+  }
   if (hasServer) return <>{children}</>;
   if (location.pathname === "/server-setup") return <>{children}</>;
   return <Navigate to="/server-setup" replace />;
