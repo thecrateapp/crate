@@ -317,15 +317,15 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 
 The review documents identify C03, C06, and C07, but do not define C01, C02, C04, or C05. The following mapping is inferred for bookkeeping; it must not be read as an original acceptance checklist.
 
-| ID  | Inferred gate                             | Current status                                                                                                                                                                                    |
-| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C01 | Support-floor metadata and declarations   | Partial: exact-head macOS ARM64 and Intel artifacts declare macOS 11.0; Linux packages declare WebKitGTK 2.40+; exact minimum hosts remain untested.                                              |
-| C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; Linux Debian 12 container launch passed. Windows installed launch and upgrade remain open.                                            |
-| C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                                                               |
-| C04 | Native OAuth handoff                      | 87 focused backend tests pass on the current branch, and Google login succeeded on macOS; the updated deployed callback and Apple/Windows/Linux account flows remain unverified.                  |
-| C05 | Linux package ABI/WebKit compatibility    | Partial: Debian 12 with GLIBC 2.36 and WebKitGTK 2.50.6 launched; exact WebKitGTK 2.40 floor and normal desktop install remain open.                                                              |
-| C06 | Desktop CI builds and artifact checks     | Pass on code revision `a587a15b` for macOS ARM64/Intel, Windows, and Linux in workflow 36791161770; current head `33a76927` adds documentation only. Linux GLIBC_2.34 and artifact checks passed. |
-| C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                                                               |
+| ID  | Inferred gate                             | Current status                                                                                                                                                                                                                        |
+| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C01 | Support-floor metadata and declarations   | Partial: exact-head macOS ARM64 and Intel artifacts declare macOS 11.0; Linux packages declare WebKitGTK 2.40+; exact minimum hosts remain untested.                                                                                  |
+| C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; Linux Debian 12 container launch passed. Windows installed launch and upgrade remain open.                                                                                |
+| C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                                                                                                   |
+| C04 | Native OAuth handoff                      | 87 focused backend tests pass on the current branch, and Google login succeeded on macOS; the updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                      |
+| C05 | Linux package ABI/WebKit compatibility    | Partial: Debian 12 with GLIBC 2.36 and WebKitGTK 2.50.6 launched; exact WebKitGTK 2.40 floor and normal desktop install remain open.                                                                                                  |
+| C06 | Desktop CI builds and artifact checks     | Pass for application source revision `a587a15b` on macOS ARM64/Intel, Windows, and Linux in workflow 36791161770; current head `4c6104c4` is documentation-only relative to that source. Linux GLIBC_2.34 and artifact checks passed. |
+| C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                                                                                                   |
 
 ## Other native gates still pending
 
@@ -360,7 +360,7 @@ The fixes below are present in the current branch and their regression suites ar
 
 ## Follow-up validation — 2026-10-01
 
-The validation snapshot was taken against branch revision `33a769276d1c274a1635e08191c46c3bdc7e7b8f`, tracking `origin/feat/tauri-desktop-app`. Changes since source revision `a587a15b` are documentation-only, so the three-OS build result below still covers the current source code.
+The validation snapshot was updated against branch revision `4c6104c4ad05f2e6ee3d24465e4aa147f5484499`, tracking `origin/feat/tauri-desktop-app`. Changes since application source revision `a587a15b` are documentation-only, so the three-OS build result below still covers the current source code.
 
 - OAuth review follow-up: ran from the repository root in the prebuilt `musicdock-worker-test:local` image:
 
@@ -376,7 +376,7 @@ The validation snapshot was taken against branch revision `33a769276d1c274a1635e
 
   It passed **87 tests**, with 49 deselected. Google OAuth exchanges use Google's access token only for `userinfo`; provider refresh tokens are discarded, no provider token is persisted, and unlink does not call Google's revocation API. Crate session refresh JWTs are independent. The finding about loss of a Google refresh token does not describe a current app dependency; do not request offline access until a Google API/revocation use case exists.
 
-- Current PR checks on `33a76927`: Frontend Tests, appearance, React Doctor, security scan, and PR Agent Review passed. PR #259 remains a draft, so Backend quality/test shards/coverage and Android/iOS/desktop pull-request build jobs were skipped. The current backend OAuth subset was run locally in the existing test image; full backend CI did not run on this head.
+- Current PR checks on `4c6104c4`: frontend test, appearance, React Doctor, changed-Python security scan, and PR Agent Review passed. PR #259 remains a draft, so quality, coverage, Android build and desktop pull-request build jobs were skipped. The focused backend OAuth subset was run locally in the existing test image; full backend CI did not run on this head.
 - The manually dispatched Build Desktop Apps workflow `36791161770` passed macOS, Linux, and Windows on the code-equivalent revision `a587a15b`; both macOS tester architectures passed signature verification. This does not test Developer ID notarization or installed upgrades.
 - C04 remains partial: automated OAuth callback/exchange/link coverage and the earlier macOS login are verified; the updated deployed callback and installed OAuth flows on all three desktop operating systems are still open.
 - The macOS host is macOS 27.0.1 on Apple M5, not a support-floor or Intel host. A manual test app is currently running and was left untouched. Minimum-version acceptance, Windows installed checks, real-player RSS, signed release installation, and the remaining Linux/WebKitGTK/X11/upgrade scenarios remain open as described above.
