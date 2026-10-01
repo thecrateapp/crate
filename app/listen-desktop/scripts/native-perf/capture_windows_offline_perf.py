@@ -22,6 +22,7 @@ ROOT = SCRIPT_DIR.parents[3]
 FIXTURE_SERVER = ROOT / "app/listen-desktop/scripts/audio-rss/fixture_server.py"
 REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 ASSET_COUNTS = (100, 1_000, 5_000)
+PROBE_STARTUP_TIMEOUT_SECONDS = 600
 
 
 def make_tauri_config(
@@ -215,6 +216,31 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def _probe_started(events: list[dict[str, Any]]) -> bool:
+    return any(
+        event.get("event") == "native-performance-progress"
+        and event.get("phase") == "probe"
+        and event.get("status") == "started"
+        for event in events
+    )
+
+
+def _latest_progress_summary(events: list[dict[str, Any]]) -> str:
+    progress = next(
+        (
+            event
+            for event in reversed(events)
+            if event.get("event") == "native-performance-progress"
+        ),
+        None,
+    )
+    if progress is None:
+        return "none received"
+    phase = progress.get("phase", "unknown phase")
+    status = progress.get("status", "unknown status")
+    return f"{phase}/{status}"
+
+
 def _wait_for_fixture_server(
     process: subprocess.Popen[Any], port: int, timeout_seconds: float
 ) -> None:
@@ -239,7 +265,9 @@ def _wait_for_fixture_server(
 def _wait_for_measurement(
     process: subprocess.Popen[Any], event_path: Path, timeout_seconds: float
 ) -> dict[str, Any]:
-    deadline = time.monotonic() + timeout_seconds
+    started_at = time.monotonic()
+    deadline = started_at + timeout_seconds
+    startup_deadline = min(deadline, started_at + PROBE_STARTUP_TIMEOUT_SECONDS)
     while time.monotonic() < deadline:
         events = _read_jsonl(event_path)
         reports = [
@@ -249,13 +277,24 @@ def _wait_for_measurement(
         ]
         if reports:
             return reports[-1]
+        latest_progress = _latest_progress_summary(events)
         if process.poll() is not None:
             raise RuntimeError(
                 f"Tauri dev command exited before the probe reported results "
-                f"(exit code {process.returncode})"
+                f"(exit code {process.returncode}; latest progress: "
+                f"{latest_progress})"
+            )
+        if not _probe_started(events) and time.monotonic() >= startup_deadline:
+            raise TimeoutError(
+                "native offline performance probe did not start within "
+                f"{PROBE_STARTUP_TIMEOUT_SECONDS} seconds; latest progress: "
+                f"{latest_progress}"
             )
         time.sleep(0.5)
-    raise TimeoutError("native offline performance probe did not finish in time")
+    raise TimeoutError(
+        "native offline performance probe did not finish in time; latest "
+        f"progress: {_latest_progress_summary(_read_jsonl(event_path))}"
+    )
 
 
 def _terminate_process_tree(process: subprocess.Popen[Any] | None) -> None:

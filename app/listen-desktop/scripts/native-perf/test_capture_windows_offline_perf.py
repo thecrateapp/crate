@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from capture_windows_offline_perf import make_tauri_config, validate_measurement_report
+from capture_windows_offline_perf import (
+    _latest_progress_summary,
+    _probe_started,
+    make_tauri_config,
+    validate_measurement_report,
+)
 
 REVISION = "a" * 40
 
@@ -120,3 +125,35 @@ def test_measurement_validator_rejects_incomplete_file_verification() -> None:
 
     with pytest.raises(ValueError, match="one or more files failed validation"):
         validate_measurement_report(report, REVISION)
+
+
+def test_probe_start_marker_is_detected_before_measurement_results() -> None:
+    events = [
+        {
+            "event": "native-performance-progress",
+            "phase": "probe",
+            "status": "started",
+        }
+    ]
+
+    assert _probe_started(events)
+    assert _latest_progress_summary(events) == "probe/started"
+
+
+def test_latest_progress_reports_the_last_completed_phase() -> None:
+    events = [
+        {
+            "event": "native-performance-progress",
+            "phase": "probe",
+            "status": "started",
+        },
+        {
+            "event": "native-performance-progress",
+            "phase": "index-writes",
+            "status": "started",
+        },
+    ]
+
+    assert _latest_progress_summary(events) == "index-writes/started"
+    assert not _probe_started([])
+    assert _latest_progress_summary([]) == "none received"

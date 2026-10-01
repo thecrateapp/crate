@@ -1,17 +1,15 @@
-import { invoke } from "@tauri-apps/api/core";
-import { BaseDirectory, appLocalDataDir } from "@tauri-apps/api/path";
-import {
-  mkdir,
-  readTextFile,
-  remove,
-  writeTextFile,
-} from "@tauri-apps/plugin-fs";
-import { installNativePerfTelemetry } from "./telemetry.js";
-
 const resultsElement = document.querySelector("#results");
 const reportPort = new URLSearchParams(location.search).get("port") ?? "18766";
 const reportUrl = `http://127.0.0.1:${reportPort}/report`;
-const dataDirectory = BaseDirectory.AppLocalData;
+let invoke;
+let BaseDirectory;
+let appLocalDataDir;
+let mkdir;
+let readTextFile;
+let remove;
+let writeTextFile;
+let installNativePerfTelemetry;
+let dataDirectory;
 const stats = {
   commands: new Map(),
   activeVerifyCommands: 0,
@@ -415,6 +413,7 @@ async function reportProgress(context, phase, status, details = {}) {
 }
 
 async function cleanup() {
+  if (!remove || !dataDirectory) return;
   await remove("offline-media", {
     baseDir: dataDirectory,
     recursive: true,
@@ -426,30 +425,50 @@ async function cleanup() {
 }
 
 async function run() {
-  const restoreInvoke = installInvokeProbe();
-  const restoreTelemetry = installNativePerfTelemetry(stats);
   const report = {
     event: "native-performance-results",
     revision: new URLSearchParams(location.search).get("revision"),
     host: navigator.userAgent,
     startedAt: new Date().toISOString(),
   };
+  let restoreInvoke = () => {};
+  let restoreTelemetry = () => {};
   try {
+    await reportProgress(report, "probe", "started");
+    const [coreApi, pathApi, fsApi, telemetryApi] = await Promise.all([
+      import("@tauri-apps/api/core"),
+      import("@tauri-apps/api/path"),
+      import("@tauri-apps/plugin-fs"),
+      import("./telemetry.js"),
+    ]);
+    invoke = coreApi.invoke;
+    BaseDirectory = fsApi.BaseDirectory;
+    appLocalDataDir = pathApi.appLocalDataDir;
+    ({ mkdir, readTextFile, remove, writeTextFile } = fsApi);
+    installNativePerfTelemetry = telemetryApi.installNativePerfTelemetry;
+    dataDirectory = BaseDirectory.AppLocalData;
+    restoreInvoke = installInvokeProbe();
+    restoreTelemetry = installNativePerfTelemetry(stats);
     await appLocalDataDir();
     const storage = await import("../../../listen/src/lib/offline-storage.ts");
     const offlineNative = await import(
       "../../../listen/src/lib/offline-native.ts"
     );
+    await reportProgress(report, "hydration", "started");
     report.hydration = await measureHydration(storage, {
       revision: report.revision,
     });
+    await reportProgress(report, "verification", "seeding");
     const seeded = await seedVerificationFiles(5_000);
+    await reportProgress(report, "verification", "started", { assets: 5_000 });
     report.verification = await measureVerification(
       offlineNative.verifyNativeOfflineAssets,
       seeded.profileKey,
     );
     report.verification.seedMs = seeded.seedMs;
+    await reportProgress(report, "index-writes", "started");
     report.indexWrites = await measureIndexWrites(storage);
+    await reportProgress(report, "pairwise-index-writes", "started");
     report.pairwiseIndexWrites = await measurePairwiseIndexWrites(storage);
     report.finishedAt = new Date().toISOString();
     await postReport(report);

@@ -819,9 +819,6 @@ jobs:
               Set-Content -LiteralPath $diagnostics
           } else {
             $probe = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
-            if (-not (Test-Path -LiteralPath $probe -PathType Leaf)) {
-              throw "Windows HTTP resource probe executable was not present for PE diagnostics: $probe"
-            }
             $applications = @(
               'app/listen-desktop/src-tauri/target/release/crate-desktop.exe',
               $probe
@@ -834,7 +831,8 @@ jobs:
                 & $dumpbin.FullName /imports $application 2>&1 |
                   Add-Content -LiteralPath $diagnostics
               } else {
-                'Executable was not present.' | Add-Content -LiteralPath $diagnostics
+                'Executable was not built; PE diagnostics are unavailable.' |
+                  Add-Content -LiteralPath $diagnostics
               }
             }
 
