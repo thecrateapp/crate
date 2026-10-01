@@ -453,7 +453,10 @@ jobs:
 
           $app = $null
           try {
-            $app = Start-Process -FilePath $application -PassThru
+            $app = Start-Process `
+              -FilePath $application `
+              -WorkingDirectory $PWD.Path `
+              -PassThru
             $deadline = [DateTime]::UtcNow.AddSeconds(20)
             do {
               Start-Sleep -Milliseconds 500

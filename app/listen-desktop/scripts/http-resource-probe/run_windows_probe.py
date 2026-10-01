@@ -249,6 +249,7 @@ def main() -> int:
         "python": sys.version,
         "executable": str(executable),
         "executableSha256": sha256(executable),
+        "workingDirectory": os.getcwd(),
         "fixtureOrigin": f"http://127.0.0.1:{server.server_port}",
         "refusedOrigin": f"http://127.0.0.1:{refused_port}",
         "iterationsPerScenario": ITERATIONS,
@@ -264,7 +265,6 @@ def main() -> int:
         result["pythonPathEntriesRemoved"] = removed_python_paths
         process = subprocess.Popen(
             [str(executable)],
-            cwd=executable.parent,
             env=environment,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
