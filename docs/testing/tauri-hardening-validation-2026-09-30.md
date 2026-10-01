@@ -589,3 +589,11 @@ The commit is documentation-only; the Tauri application source is unchanged from
 - PR-triggered desktop, Android, backend quality, test shards, and coverage were skipped because the PR is a draft; they were not failures. PR Agent Review run `36917274621` was cancelled at its configured 15-minute limit and produced no new review comments.
 
 These runs close current-HEAD automated build/test evidence for C06 and revalidate web/Capacitor build contracts. They do not close exact-minimum-host, signed/notarized release, upgrade, deployed OAuth, installed Now Playing/artwork, or real-player RSS gates.
+
+### Exact-head Windows offline measurement and desktop matrix — `fdff630d`
+
+The PR review initially showed skipped Android/backend/desktop jobs because PR #259 is still a draft; these were not failed jobs. The manually dispatched [Build Desktop Apps run `36930987123`](https://github.com/thecrateapp/crate/actions/runs/36930987123) completed successfully on macOS, Linux, and Windows at source SHA `fdff630d393f566df7c28b6eb68ec07d84116fba`. On Windows, the offline measurement probe completed, uploaded its report, and the bundle/build diagnostics passed. The raw Windows R03–R05 capture is [`tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json`](measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json); see the [desktop results](tauri-linux-desktop-results-2026-09-30.md#windows-server-2025-synthetic-revalidation--2026-10-01) for recalculated timing summaries.
+
+The same revision's active PR checks passed: frontend tests and Chromium appearance, React Doctor, the Python security scan, and PR Agent Review. PR-triggered backend quality, test shards, coverage, Android, iOS, and desktop matrix were skipped because the PR is a draft. These are pending PR activation, not failures.
+
+The captured raw samples validate against the capture schema and match the successful run. Its aggregate `minMs` summary fields have a known q=0 bug from that source revision; this validation record derives minima directly from the raw samples. The percentile helper was corrected afterward and has a regression test. This hosted synthetic probe does not replace real download cadence, installed-player, minimum-Windows-version, or user-library acceptance.

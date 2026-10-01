@@ -3,3 +3,6 @@ app/tests/contracts/opensubsonic/openapi/
 
 # Keep the vendored Wry source aligned with its upstream release.
 app/listen-desktop/src-tauri/vendor/wry/
+
+# Preserve captured measurement artifacts byte-for-byte.
+docs/testing/measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json

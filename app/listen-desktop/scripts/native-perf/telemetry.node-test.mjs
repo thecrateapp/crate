@@ -5,6 +5,7 @@ import {
   installNativePerfTelemetry,
   writeTextFileWithTelemetry,
 } from "./telemetry.js";
+import { percentile, summarizeTimes } from "./statistics.js";
 
 function makeStats() {
   return {
@@ -13,6 +14,20 @@ function makeStats() {
     indexWriteDurationsMs: [],
   };
 }
+
+test("percentile summary reports the true minimum, median, and maximum", () => {
+  const samples = [19, 11.9, 13.4];
+
+  assert.equal(percentile(samples, 0), 11.9);
+  assert.equal(percentile(samples, 0.5), 13.4);
+  assert.equal(percentile(samples, 1), 19);
+  assert.equal(percentile([], 0.95), null);
+  assert.deepEqual(summarizeTimes(samples), {
+    minMs: 11.9,
+    medianMs: 13.4,
+    maxMs: 19,
+  });
+});
 
 test("records successful offline index .next writes", async () => {
   const forwarded = [];

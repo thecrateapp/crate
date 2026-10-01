@@ -1,3 +1,5 @@
+import { percentile, summarizeTimes } from "./statistics.js";
+
 const resultsElement = document.querySelector("#results");
 const reportPort = new URLSearchParams(location.search).get("port") ?? "18766";
 const reportUrl = `http://127.0.0.1:${reportPort}/report`;
@@ -26,20 +28,6 @@ function resetStats() {
   stats.indexWriteCalls = 0;
   stats.indexWriteBytes = 0;
   stats.indexWriteDurationsMs = [];
-}
-
-function percentile(values, quantile) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.ceil(sorted.length * quantile) - 1] ?? sorted.at(-1);
-}
-
-function summarizeTimes(values) {
-  return {
-    minMs: percentile(values, 0),
-    medianMs: percentile(values, 0.5),
-    maxMs: percentile(values, 1),
-  };
 }
 
 function snapshotStats() {

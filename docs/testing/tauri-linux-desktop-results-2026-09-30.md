@@ -79,6 +79,14 @@ All three 5,000-file verification runs validated all 5,000 files, with a median 
 
 This confirms the hydration stall is fixed on this Linux host and clears R03–R05 for the synthetic workload. It does not replace real offline download, cancellation, upgrade, and playback checks in the installed app. The probe cleaned up its isolated `offline-media` and `offline-meta` directories; no user offline data was touched. Raw progress and results: `/tmp/tauri-native-perf-results-hydration-fix.jsonl`.
 
+### Windows Server 2025 synthetic revalidation — 2026-10-01
+
+The exact-head [Build Desktop Apps run `36930987123`](https://github.com/thecrateapp/crate/actions/runs/36930987123) passed its macOS, Linux, and Windows jobs at source SHA `fdff630d393f566df7c28b6eb68ec07d84116fba`. Its isolated Windows Server 2025/WebView2 probe completed all R03–R05 cases. Hydration of 5,000 entries took 81.3/83.4/83.7 ms (min/median/max); warm hydration was below the displayed 1 ms resolution. Verification validated every file: 100 entries took 30.7/30.8/34.8 ms, 1,000 took 281.3/282.0/289.1 ms, and 5,000 took 1,413.5/1,414.4/1,414.6 ms. Seeding the 5,000-file fixture took 8.61 s and is excluded from verification timings.
+
+Two simultaneous 1,000-file callers returned all 2,000 valid assets in 551.4/557.9/562.8 ms, compared with 552.3/554.0/580.1 ms sequentially. A serial control wrote 100 durable snapshots in 2.87/2.95/3.07 s. Same-turn bursts coalesced 100, 1,000, and 5,000 mutations into one durable write each, taking 36.7/36.9/38.5 ms, 107.6/107.8/141.3 ms, and 2,952.5/2,961.4/2,964.4 ms respectively. The paired case (1,000 mutations, 500 commits at concurrency two) persisted all entries in 15.99/17.03/17.32 s; median per-commit p50/p95 were 33.4/42.1 ms, and the maximum sample was 176.4 ms.
+
+The raw capture is [`tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json`](measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json). Its raw samples pass the capture validator, but the aggregate `minMs` fields in that original JSON are wrong: the old q=0 percentile calculation selected the last sorted sample. The min values above were recalculated from raw samples; the percentile implementation and regression test have since been fixed. This is a synthetic hosted runner workload, not real download cadence or installed-player acceptance, and it does not set a cross-platform fallback threshold.
+
 ## R07 — visualizer
 
 Three automatic visible runs each lasted 30 seconds. The canvas was 720×720 CSS pixels at DPR 2 and rendered at 1,024×1,024 pixels, consistent with the configured buffer cap. All runs reported WebGL 2.0. Frame intervals were:
