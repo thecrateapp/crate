@@ -2267,6 +2267,9 @@ def oauth_callback(
             raise HTTPException(
                 status_code=400, detail="OAuth authorization was denied"
             )
+        # Denied flows have no handoff code, so return directly to the
+        # registered deep link. Successful Tauri logins use the HTTPS
+        # completion page before opening the app.
         redirect_url = _append_query_param(
             callback_url,
             "state",
