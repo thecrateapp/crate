@@ -479,18 +479,7 @@ jobs:
               }
             }
 
-            $remove = Start-Process `
-              -FilePath $uninstaller `
-              -ArgumentList '/S' `
-              -Wait `
-              -PassThru
-            if ($remove.ExitCode -ne 0) {
-              throw "Windows NSIS uninstaller exited with $($remove.ExitCode)"
-            }
-            if (Test-Path -LiteralPath $application -PathType Leaf) {
-              throw "NSIS uninstaller left the application executable behind: $application"
-            }
-            Write-Output 'Windows silent install, launch, and uninstall smoke passed'
+            Write-Output 'Windows silent install and launch smoke passed'
           }
 
       - name: Setup Python for Windows HTTP resource probe
@@ -516,11 +505,37 @@ jobs:
         run: |
           $results = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-resource.json'
           $example = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
-          $application = 'app/listen-desktop/src-tauri/target/release/http_resource_probe.exe'
+          # Run beside the installed app so the probe resolves the same bundled runtime DLLs.
+          $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
+          $application = Join-Path $installDirectory 'http_resource_probe.exe'
           Copy-Item -LiteralPath $example -Destination $application -Force
           python app/listen-desktop/scripts/http-resource-probe/run_windows_probe.py `
             --executable $application `
             --output $results
+
+      - name: Uninstall Windows bundle smoke app
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
+          $application = Join-Path $installDirectory 'crate-desktop.exe'
+          $uninstaller = Join-Path $installDirectory 'uninstall.exe'
+          if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
+            $remove = Start-Process `
+              -FilePath $uninstaller `
+              -ArgumentList '/S' `
+              -Wait `
+              -PassThru
+            if ($remove.ExitCode -ne 0) {
+              throw "Windows NSIS uninstaller exited with $($remove.ExitCode)"
+            }
+            if (Test-Path -LiteralPath $application -PathType Leaf) {
+              throw "NSIS uninstaller left the application executable behind: $application"
+            }
+            Write-Output 'Windows NSIS uninstall smoke passed'
+          } else {
+            Write-Output 'No installed Windows bundle remained to uninstall'
+          }
 
       - name: Capture Windows HTTP resource probe application events
         if: always() && runner.os == 'Windows'
