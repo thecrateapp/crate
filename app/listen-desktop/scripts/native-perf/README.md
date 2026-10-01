@@ -42,6 +42,21 @@ p50/p95, accepted connections, and peak open sockets for 100/1,000/5,000
 requests at concurrency 1 and 8. These numbers isolate connection reuse; they
 do not substitute for a real API/TLS/proxy benchmark or CPU/RSS profiling.
 
+To compare the same Tauri HTTP client against Crate's API over HTTPS, set
+`CRATE_R01_API_URL` to a read-only endpoint. The public setup-status route
+performs a database count but no writes:
+
+```bash
+CRATE_R01_API_URL=https://api.lespedants.org/api/setup/status \
+  cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml \
+  --example http_pool_bench
+```
+
+This sends 25 measured requests plus one warmup for each client mode at
+concurrency 1 and 8. The remote run reports latency only because the server does
+not expose per-client accepted-connection counts. Keep production traffic low;
+this sample is diagnostic, not an SLA or a load test.
+
 ## Run the visualizer frame probe
 
 Start the loopback event receiver, then launch the isolated visualizer window:

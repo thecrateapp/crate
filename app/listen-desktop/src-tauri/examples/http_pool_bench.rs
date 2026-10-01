@@ -28,8 +28,8 @@ struct BenchmarkResult {
     elapsed: Duration,
     p50: Duration,
     p95: Duration,
-    accepted_connections: usize,
-    peak_open_sockets: usize,
+    accepted_connections: Option<usize>,
+    peak_open_sockets: Option<usize>,
 }
 
 async fn run_server() -> io::Result<(String, Arc<ServerMetrics>)> {
@@ -89,7 +89,7 @@ async fn request(
 
 async fn benchmark(
     url: &str,
-    metrics: &ServerMetrics,
+    metrics: Option<&ServerMetrics>,
     requests: usize,
     concurrency: usize,
     shared_client: bool,
@@ -101,7 +101,7 @@ async fn benchmark(
         ClientBuilder::new().build()?
     };
     let cold_request = request(warmup_client, url).await?;
-    if !shared_client {
+    if let Some(metrics) = metrics.filter(|_| !shared_client) {
         for _ in 0..100 {
             if metrics.open.load(Ordering::Relaxed) == 0 {
                 break;
@@ -109,10 +109,12 @@ async fn benchmark(
             tokio::time::sleep(Duration::from_millis(1)).await;
         }
     }
-    metrics.accepted.store(0, Ordering::Relaxed);
-    metrics
-        .peak_open
-        .store(metrics.open.load(Ordering::Relaxed), Ordering::Relaxed);
+    if let Some(metrics) = metrics {
+        metrics.accepted.store(0, Ordering::Relaxed);
+        metrics
+            .peak_open
+            .store(metrics.open.load(Ordering::Relaxed), Ordering::Relaxed);
+    }
 
     let started = Instant::now();
     let mut latencies = Vec::with_capacity(requests);
@@ -142,20 +144,20 @@ async fn benchmark(
         elapsed,
         p50,
         p95,
-        accepted_connections: metrics.accepted.load(Ordering::Relaxed),
-        peak_open_sockets: metrics.peak_open.load(Ordering::Relaxed),
+        accepted_connections: metrics.map(|m| m.accepted.load(Ordering::Relaxed)),
+        peak_open_sockets: metrics.map(|m| m.peak_open.load(Ordering::Relaxed)),
     })
 }
 
 async fn run_case(requests: usize, concurrency: usize) -> Result<(), BenchError> {
     let (url, metrics) = run_server().await?;
-    let fresh = benchmark(&url, &metrics, requests, concurrency, false).await?;
+    let fresh = benchmark(&url, Some(&metrics), requests, concurrency, false).await?;
 
     let (url, metrics) = run_server().await?;
-    let pooled = benchmark(&url, &metrics, requests, concurrency, true).await?;
+    let pooled = benchmark(&url, Some(&metrics), requests, concurrency, true).await?;
 
     println!(
-        "requests={requests} concurrency={concurrency} fresh_client: cold={}us total={}ms p50={}us p95={}us connections={} peak_open_sockets={}",
+        "requests={requests} concurrency={concurrency} fresh_client: cold={}us total={}ms p50={}us p95={}us connections={:?} peak_open_sockets={:?}",
         fresh.cold_request.as_micros(),
         fresh.elapsed.as_millis(),
         fresh.p50.as_micros(),
@@ -164,7 +166,7 @@ async fn run_case(requests: usize, concurrency: usize) -> Result<(), BenchError>
         fresh.peak_open_sockets,
     );
     println!(
-        "requests={requests} concurrency={concurrency} shared_client: cold={}us total={}ms p50={}us p95={}us connections={} peak_open_sockets={}",
+        "requests={requests} concurrency={concurrency} shared_client: cold={}us total={}ms p50={}us p95={}us connections={:?} peak_open_sockets={:?}",
         pooled.cold_request.as_micros(),
         pooled.elapsed.as_millis(),
         pooled.p50.as_micros(),
@@ -175,8 +177,38 @@ async fn run_case(requests: usize, concurrency: usize) -> Result<(), BenchError>
     Ok(())
 }
 
+async fn run_remote_case(url: &str, concurrency: usize) -> Result<(), BenchError> {
+    // Bound production traffic: 25 measured requests plus one warmup per mode.
+    let requests = 25;
+    let fresh = benchmark(url, None, requests, concurrency, false).await?;
+    let pooled = benchmark(url, None, requests, concurrency, true).await?;
+
+    println!(
+        "remote_get requests={requests} concurrency={concurrency} fresh_client: cold={}us total={}ms p50={}us p95={}us",
+        fresh.cold_request.as_micros(),
+        fresh.elapsed.as_millis(),
+        fresh.p50.as_micros(),
+        fresh.p95.as_micros(),
+    );
+    println!(
+        "remote_get requests={requests} concurrency={concurrency} shared_client: cold={}us total={}ms p50={}us p95={}us",
+        pooled.cold_request.as_micros(),
+        pooled.elapsed.as_millis(),
+        pooled.p50.as_micros(),
+        pooled.p95.as_micros(),
+    );
+    Ok(())
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), BenchError> {
+    if let Ok(url) = std::env::var("CRATE_R01_API_URL") {
+        for concurrency in [1, 8] {
+            run_remote_case(&url, concurrency).await?;
+        }
+        return Ok(());
+    }
+
     for concurrency in [1, 8] {
         for requests in [100, 1_000, 5_000] {
             run_case(requests, concurrency).await?;
