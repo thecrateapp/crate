@@ -163,6 +163,27 @@ export function assertAppImagePayload(root) {
     );
   }
 
+  for (const library of [
+    "libwebkit2gtk-4.1.so.0",
+    "libjavascriptcoregtk-4.1.so.0",
+  ]) {
+    const bundledLibrary = path.join(root, "usr/lib", library);
+    if (!fs.existsSync(bundledLibrary)) {
+      throw new Error(
+        `AppImage payload is missing bundled library: ${library}`,
+      );
+    }
+  }
+
+  const bundledProcesses = findArtifacts(path.join(root, "usr/lib"), "");
+  for (const processName of ["WebKitWebProcess", "WebKitNetworkProcess"]) {
+    if (!bundledProcesses.some((file) => path.basename(file) === processName)) {
+      throw new Error(
+        `AppImage payload is missing bundled process: ${processName}`,
+      );
+    }
+  }
+
   const desktopEntries = findArtifacts(
     path.join(root, "usr/share/applications"),
     ".desktop",

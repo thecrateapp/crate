@@ -218,14 +218,32 @@ test("artifact version checks accept canonical SemVer and Windows build suffix",
   );
 });
 
-test("AppImage payload contains its executable and a launchable desktop entry", () => {
+test("AppImage payload contains its executable, WebKit runtime, and desktop entry", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "crate-appimage-test-"));
   const binary = path.join(root, "usr/bin/crate-desktop");
   const desktop = path.join(root, "usr/share/applications/Crate.desktop");
+  const webkitLibrary = path.join(root, "usr/lib/libwebkit2gtk-4.1.so.0");
+  const javascriptCoreLibrary = path.join(
+    root,
+    "usr/lib/libjavascriptcoregtk-4.1.so.0",
+  );
+  const webkitWebProcess = path.join(
+    root,
+    "usr/lib/webkit2gtk-4.1/WebKitWebProcess",
+  );
+  const webkitNetworkProcess = path.join(
+    root,
+    "usr/lib/webkit2gtk-4.1/WebKitNetworkProcess",
+  );
   fs.mkdirSync(path.dirname(binary), { recursive: true });
   fs.mkdirSync(path.dirname(desktop), { recursive: true });
+  fs.mkdirSync(path.dirname(webkitWebProcess), { recursive: true });
   fs.writeFileSync(binary, "test binary");
   fs.chmodSync(binary, 0o755);
+  fs.writeFileSync(webkitLibrary, "test WebKitGTK library");
+  fs.writeFileSync(javascriptCoreLibrary, "test JavaScriptCore library");
+  fs.writeFileSync(webkitWebProcess, "test WebKit web process");
+  fs.writeFileSync(webkitNetworkProcess, "test WebKit network process");
   fs.writeFileSync(
     desktop,
     "[Desktop Entry]\nType=Application\nName=Crate\nExec=crate-desktop %u\n",
@@ -238,6 +256,14 @@ test("AppImage payload contains its executable and a launchable desktop entry", 
 
     fs.writeFileSync(binary, "test binary");
     fs.chmodSync(binary, 0o755);
+    fs.rmSync(webkitLibrary);
+    assert.throws(() => assertAppImagePayload(root), /missing bundled library/);
+
+    fs.writeFileSync(webkitLibrary, "test WebKitGTK library");
+    fs.rmSync(webkitWebProcess);
+    assert.throws(() => assertAppImagePayload(root), /missing bundled process/);
+
+    fs.writeFileSync(webkitWebProcess, "test WebKit web process");
     fs.writeFileSync(desktop, "[Desktop Entry]\nName=Crate\n");
     assert.throws(
       () => assertAppImagePayload(root),
@@ -258,9 +284,13 @@ test(
       artifact,
       [
         "#!/bin/sh",
-        'mkdir -p "$PWD/squashfs-root/usr/bin" "$PWD/squashfs-root/usr/share/applications"',
+        'mkdir -p "$PWD/squashfs-root/usr/bin" "$PWD/squashfs-root/usr/lib/webkit2gtk-4.1" "$PWD/squashfs-root/usr/share/applications"',
         'printf payload > "$PWD/squashfs-root/usr/bin/crate-desktop"',
         'chmod +x "$PWD/squashfs-root/usr/bin/crate-desktop"',
+        'printf payload > "$PWD/squashfs-root/usr/lib/libwebkit2gtk-4.1.so.0"',
+        'printf payload > "$PWD/squashfs-root/usr/lib/libjavascriptcoregtk-4.1.so.0"',
+        'printf payload > "$PWD/squashfs-root/usr/lib/webkit2gtk-4.1/WebKitWebProcess"',
+        'printf payload > "$PWD/squashfs-root/usr/lib/webkit2gtk-4.1/WebKitNetworkProcess"',
         'printf "[Desktop Entry]\\nExec=crate-desktop %%u\\n" > "$PWD/squashfs-root/usr/share/applications/Crate.desktop"',
       ].join("\n"),
     );
