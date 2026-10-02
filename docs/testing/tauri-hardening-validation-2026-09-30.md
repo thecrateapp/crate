@@ -174,6 +174,29 @@ client; it is still a synthetic loopback result, not a production API latency
 or installed-player RSS claim. Raw output is in
 [`tauri-r01-loopback-macos-2026-10-01.txt`](measurements/tauri-r01-loopback-macos-2026-10-01.txt).
 
+#### Local macOS HTTPS revalidation — 2026-10-02
+
+Repeated the production read-only `GET /api/setup/status` probe on Mac17,2
+(macOS 27.0.1, ARM64), at branch revision `e8c8530d`. The Rust source is
+unchanged from `489a6909`. The release example sent 104 GETs: 25 measured
+requests plus one warmup per client mode and concurrency (1 and 8). All
+responses passed `error_for_status`; no preflight request was made. The endpoint
+does not expose connection counts, so this records timings only.
+
+| Concurrency | Client | Cold request | Total for 25 |        p50 |        p95 |
+| ----------: | ------ | -----------: | -----------: | ---------: | ---------: |
+|           1 | Fresh  |   113.000 ms |      2.345 s |  88.740 ms | 103.932 ms |
+|           1 | Shared |    83.049 ms |      1.565 s |  63.610 ms |  66.243 ms |
+|           8 | Fresh  |    85.245 ms |       581 ms | 115.072 ms | 129.606 ms |
+|           8 | Shared |    92.481 ms |       395 ms |  95.549 ms | 106.776 ms |
+
+The shared client had lower total, p50, and p95 at both concurrency levels,
+although its first concurrency-8 request was 7.2 ms slower. This second local
+Mac sample agrees directionally with the 2026-10-01 sample, but remains a short
+unauthenticated endpoint probe rather than representative playback traffic,
+CPU/RSS profiling, or an SLA. Raw output is in
+[`tauri-r01-api-macos-2026-10-02.txt`](measurements/tauri-r01-api-macos-2026-10-02.txt).
+
 ### R03 — Offline index hydration and file verification
 
 Three repetitions per size loaded profile indexes containing 100, 1,000, and 5,000 entries. The first pass used a new profile cache but the OS file cache was not cold; the immediately repeated same-process pass was below 1 ms at every size. Median first-pass hydration was 11 ms, 94 ms, and 456 ms. Each first profile load invoked `reconcile_offline_media` once; the warm cache pass invoked no Rust command. The timing includes metadata parsing and locator hydration, but the instrumentation did not count every `plugin-fs` read IPC.
@@ -431,7 +454,7 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 
 | ID                                       | Decision                                                                                                                                                                                                                                                                                                                                            | Remaining evidence or work                                                                                                                                                                     |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R01 — shared HTTP transport              | Keep the shared reqwest client. Loopback confirms reuse on all three hosted OS runners and the local Mac. One-sample HTTPS/API repeats favored pooling on Linux and Windows; hosted macOS had a concurrency-8 outlier, so remote latency remains directional.                                                                                       | Repeat noisy remote samples before making latency claims; measure cancellation, CPU/RSS, and installed-app traffic before claiming full production impact.                                     |
+| R01 — shared HTTP transport              | Keep the shared reqwest client. Loopback confirms reuse on all three hosted OS runners and the local Mac. The 2026-10-02 local Mac HTTPS sample again favored pooling at concurrency 1 and 8; hosted macOS had a concurrency-8 outlier, so remote latency remains directional.                                                                      | Repeat noisy remote samples before making latency claims; measure cancellation, CPU/RSS, and installed-app traffic before claiming full production impact.                                     |
 | R02 — HTTP resource lifetime             | Keep the cleanup changes. Mac development and packaged soaks, the Linux release-mode probe on WebKitGTK 2.40.3, and the Windows release-mode probe returned the resource table to baseline for all 150 requests per run. The 20-second Linux sample peaked at 197 MiB for Crate, 299 MiB for WebKitWebProcess, and 57 MiB for WebKitNetworkProcess. | Windows evidence is from a Windows Server 2025 hosted runner, not the Windows 10 1803 floor. Linux used Debian 12 under Xvfb, not a normal desktop session or a package-manager-installed app. |
 | R03 — offline hydration and verification | Keep cached hydration and batched verification; the synthetic Mac measurements are bounded and warm-cache hydration is below 1 ms.                                                                                                                                                                                                                  | Linux synthetic evidence is in the agent report; measure Windows and real library/download workloads.                                                                                          |
 | R04 — verification concurrency           | Keep the current global limit of eight. Concurrent Mac callers showed no material throughput reason to change it.                                                                                                                                                                                                                                   | Confirm contention under real concurrent downloads on Windows/Linux.                                                                                                                           |
@@ -449,15 +472,15 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 
 The review documents identify C03, C06, and C07, but do not define C01, C02, C04, or C05. The following mapping is inferred for bookkeeping; it must not be read as an original acceptance checklist.
 
-| ID  | Inferred gate                             | Current status                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C01 | Support-floor metadata and declarations   | Partial: exact-head macOS ARM64 and Intel artifacts declare macOS 11.0; DEB/RPM packages declare host WebKitGTK 2.40+; the tested AppImage bundles WebKitGTK 2.50.4. Exact minimum hosts remain untested.                                                                                                                                                                                                                             |
-| C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; the Linux `.deb` and RPM payloads rendered their server-setup screen under Xvfb with system WebKitGTK/JSC 2.40.3, and the AppImage rendered with bundled WebKitGTK 2.50.4; workflow 36840953428 installed the Windows NSIS bundle on `windows-latest`, observed its main window, and ran the silent uninstaller. Windows 10 1803 and upgrade acceptance remain open.      |
-| C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                                                                                                                                                                                                                                                                                                   |
-| C04 | Native OAuth handoff                      | 87 focused backend tests pass on the current branch, and Google login succeeded on macOS; the updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                                                                                                                                                                                                                      |
-| C05 | Linux package ABI/WebKit compatibility    | Pass for tested artifacts: the `.deb` and RPM payloads from workflow 36815596145, built at `44e69227`, rendered with system WebKitGTK/JavaScriptCoreGTK 2.40.3 loaded by the app and WebKit helpers; that run's AppImage rendered with its bundled WebKitGTK 2.50.4. The Linux CI symbol-compatibility gate also passed. These are x86_64 Debian 12 Xvfb/X11 runtime checks, not a Wayland or minimum-distribution installation test. |
-| C06 | Desktop CI builds and artifact checks     | Pass: [manual matrix 36918291667](https://github.com/thecrateapp/crate/actions/runs/36918291667) passed macOS, Linux, and Windows at docs-only HEAD `79258d93`; app source remains `d8c224aa`. Windows install/launch/uninstall and its 150-request resource probe passed. Linux ABI/WebKitGTK and artifact-version checks passed. Minimum-host acceptance remains open.                                                              |
-| C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                                                                                                                                                                                                                                                                                                   |
+| ID  | Inferred gate                             | Current status                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C01 | Support-floor metadata and declarations   | Partial: exact-head macOS ARM64 and Intel artifacts declare macOS 11.0; exact-head DEB/RPM packages declare host WebKitGTK 2.40+; the AppImage bundles WebKitGTK. Exact minimum hosts remain untested.                                                                                                                                                                                                                   |
+| C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; the exact-head Linux `.deb` rendered its server-setup screen under Xvfb with system WebKitGTK/JSC 2.40.3, and the earlier RPM/AppImage launches remain recorded. Exact-head workflow 36947461225 installed the Windows NSIS bundle, observed its main window, and ran the silent uninstaller. Windows 10 1803 and upgrade acceptance remain open.            |
+| C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                                                                                                                                                                                                                                                                                      |
+| C04 | Native OAuth handoff                      | 87 focused backend tests pass on the current branch, and Google login succeeded on macOS; the updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                                                                                                                                                                                                         |
+| C05 | Linux package ABI/WebKit compatibility    | Pass for tested artifacts: the `.deb` and RPM from `44e69227` rendered with system WebKitGTK/JavaScriptCoreGTK 2.40.3, and the exact-head `.deb` from `e8c8530d` rendered with the same runtime. The earlier AppImage rendered with bundled WebKitGTK 2.50.4, and the current Linux CI symbol gate passed. These are x86_64 Debian 12 Xvfb/X11 checks, not a physical Wayland or minimum-distribution installation test. |
+| C06 | Desktop CI builds and artifact checks     | Pass: exact-head [manual matrix 36947461225](https://github.com/thecrateapp/crate/actions/runs/36947461225) passed macOS, Linux, and Windows at `e8c8530d`, including artifact checks, Windows install/launch/uninstall and its HTTP resource probe. Minimum-host acceptance remains open.                                                                                                                               |
+| C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                                                                                                                                                                                                                                                                                      |
 
 ## Other native gates still pending
 
@@ -537,6 +560,33 @@ The RPM payload was extracted with `rpm2cpio` and launched against the same inst
 The AppImage from the same workflow was extracted with its own runtime and launched under Xvfb. The server-setup screen rendered; `crate-desktop`, `WebKitWebProcess`, and `WebKitNetworkProcess` all mapped WebKitGTK/JavaScriptCoreGTK from the AppImage tree. Calling the bundled library's version function reported WebKitGTK `2.50.4`, so the 2.40 host-runtime floor applies to the `.deb` and RPM, while this AppImage smoke exercised its bundled WebKit stack. AppImage SHA-256: `51ca260721f7651710fdf061cfc4c256a278ad0b12a40895715d758cb891560b`.
 
 These later launches supersede the earlier 2.40.3 startup failure for the release artifact built before `44e69227`; the `.deb` and RPM from `44e69227` loaded and rendered with 2.40.3. C05 passes for those tested Linux artifacts and this Debian 12 x86_64 runtime. The result does not establish a physical Wayland/X11 desktop, another minimum distribution, or installed-player compatibility.
+
+### Exact-head Linux WebKitGTK 2.40.3 launch — `e8c8530d`, 2026-10-02
+
+The Linux `.deb` from exact-head [Build Desktop Apps run
+`36947461225`](https://github.com/thecrateapp/crate/actions/runs/36947461225)
+has SHA-256
+`325cf5da8af3a38c210754ceb9a8cdbb6cbd3b68f4fc1fea5d520e42eab80b08`. Its
+metadata requires `libwebkit2gtk-4.1-0 (>= 2.40.0)`. I installed it in the
+Debian 12 x86_64 WebKitGTK 2.40.3 test container and launched the packaged
+`/usr/bin/crate-desktop` for an eight-second smoke under Xvfb/X11, software
+rendering, and a private D-Bus session with isolated XDG directories. The
+container used `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`; this is a library
+compatibility smoke, not a sandbox or physical desktop test.
+
+The app stayed alive, created a visible Crate window, and rendered the server
+setup screen. `dpkg-query` reported WebKitGTK and JavaScriptCoreGTK
+`2.40.3-2~deb12u2`; `/proc` mappings confirmed the app, WebKit web process, and
+WebKit network process loaded system WebKitGTK, while the web process loaded
+system JavaScriptCoreGTK. The app executable SHA-256 was
+`817b57a0c210fe9ac07b353061bef4579a61e544a4289f770d502c341feb16d3`. The
+captured [startup screenshot](measurements/tauri-c05-linux-deb-webkitgtk2403-2026-10-02.png)
+and [`deb` smoke record](measurements/tauri-c05-linux-deb-webkitgtk2403-2026-10-02.txt)
+preserve the visual and package evidence.
+
+This extends C05 to the exact-head Linux `.deb`. It still does not establish
+launch on a physical Wayland/X11 desktop, on a separate minimum-distribution
+host, or the installed player's offline, audio, or media-control behavior.
 
 ### R02 — Linux release-mode HTTP resource check — 2026-10-01
 
@@ -672,3 +722,18 @@ from the checkout and `rg --files` found no local audio fixtures, so no real
 track RSS run was attempted. Synthetic WAV measurements do not close the
 real-player acceptance gate; it still needs a nominated local long-track
 fixture and playback/race measurements.
+
+### Exact-head cross-platform CI — `e8c8530d`, 2026-10-02
+
+The branch was still a draft, so pull-request-triggered platform jobs were
+skipped. Manual runs on exact head `e8c8530d08862f992ead217eab21b9e3e3c650fb`
+completed successfully:
+
+- [Build Desktop Apps run `36947461225`](https://github.com/thecrateapp/crate/actions/runs/36947461225): Linux, Windows, and macOS passed, including Linux ABI/artifact checks, macOS ARM64 and Intel tester bundles, Windows install/launch/uninstall smoke, and the Windows HTTP resource probe.
+- [Build Android run `36947461063`](https://github.com/thecrateapp/crate/actions/runs/36947461063): Listen typecheck/lint, mobile contracts, Capacitor bundle and budget, Android lint, and Android tests passed. Tag-only signed release outputs were skipped as expected.
+- [Build iOS run `36947460876`](https://github.com/thecrateapp/crate/actions/runs/36947460876): iOS bridge/offline/media-session contracts, Capacitor bundle sync, CocoaPods dependency installation, and simulator build passed.
+
+This confirms exact-head automated build coverage for C06 and revalidates the
+web/Capacitor build paths. It does not replace real Windows 10 1803 or macOS 11
+hosts, normal Linux desktop sessions, signed/notarized release installation,
+upgrades, or installed-player acceptance.
