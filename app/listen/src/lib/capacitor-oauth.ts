@@ -26,6 +26,7 @@ const NATIVE_OAUTH_PENDING_CALLBACK_KEY = "crate.oauth.pending-callback";
 const NATIVE_OAUTH_LINK_PENDING_CALLBACK_KEY =
   "crate.oauth.link.pending-callback";
 const NATIVE_OAUTH_LINK_GENERATION_KEY = "crate.oauth.link.generation";
+const NATIVE_OAUTH_PROVIDER_ERROR_KEY = "crate.oauth.provider-error-pending";
 const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
 const NATIVE_LINK_VALUE_RE = /^[A-Za-z0-9_-]{16,256}$/;
@@ -89,6 +90,26 @@ interface NativeOAuthPendingCallbacks {
 }
 
 let pendingCallbackMutation: Promise<void> = Promise.resolve();
+
+export function storePendingOAuthProviderError(): void {
+  try {
+    sessionStorage.setItem(NATIVE_OAUTH_PROVIDER_ERROR_KEY, "1");
+  } catch {
+    // Reporting OAuth errors must not block native callback handling.
+  }
+}
+
+export function consumePendingOAuthProviderError(): boolean {
+  try {
+    if (sessionStorage.getItem(NATIVE_OAUTH_PROVIDER_ERROR_KEY) !== "1") {
+      return false;
+    }
+    sessionStorage.removeItem(NATIVE_OAUTH_PROVIDER_ERROR_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function decodeOAuthSession(token: string | null): {
   userId: number;

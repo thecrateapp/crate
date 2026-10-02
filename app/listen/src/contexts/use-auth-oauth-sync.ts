@@ -4,7 +4,10 @@ import type { NavigateFunction } from "react-router";
 import { toast } from "sonner";
 
 import type { AuthUser } from "@/contexts/auth-context";
-import { consumePendingOAuthNext } from "@/lib/capacitor";
+import {
+  consumePendingOAuthNext,
+  consumePendingOAuthProviderError,
+} from "@/lib/capacitor";
 
 async function completePendingOAuthFlow(
   next: string | null,
@@ -46,10 +49,14 @@ export function useAuthOAuthSync({
 
   useEffect(() => {
     function handleProviderError() {
+      consumePendingOAuthProviderError();
       toast.error(t("auth.login.connectionError"));
     }
 
     window.addEventListener("crate:oauth-provider-error", handleProviderError);
+    if (consumePendingOAuthProviderError()) {
+      toast.error(t("auth.login.connectionError"));
+    }
     return () => {
       window.removeEventListener(
         "crate:oauth-provider-error",

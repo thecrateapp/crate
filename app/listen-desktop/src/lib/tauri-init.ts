@@ -2,6 +2,7 @@ import {
   consumeOAuthCallbackUrl,
   retryPendingNativeOAuthLinkCallback,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
 } from "@/lib/capacitor-oauth";
 import { recordDevLog } from "@/lib/dev-logs";
 import {
@@ -217,6 +218,7 @@ export function dispatchOAuthCallbackResult(result: {
   }
   if (result.providerError) {
     recordTauriAuthDiagnostic("Native OAuth provider error");
+    storePendingOAuthProviderError();
     window.dispatchEvent(new CustomEvent("crate:oauth-provider-error"));
     return;
   }

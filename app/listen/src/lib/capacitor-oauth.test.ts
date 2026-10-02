@@ -62,9 +62,11 @@ import {
   beginNativeOAuth,
   beginNativeOAuthLink,
   consumeOAuthCallbackUrl,
+  consumePendingOAuthProviderError,
   migrateLegacyTauriOAuthRecords,
   retryPendingNativeOAuthLinkCallback,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
 } from "@/lib/capacitor-oauth";
 
 function tokenFor(userId: number, sessionId: string, expiresAt = 1): string {
@@ -92,6 +94,7 @@ function secureRecord(key: string): string | null {
 describe("desktop (Tauri) native OAuth via secure storage", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     mocks.secureSessionValues.clear();
     mocks.getSecureSessionValue.mockClear();
     mocks.setSecureSessionValue.mockClear();
@@ -106,6 +109,15 @@ describe("desktop (Tauri) native OAuth via secure storage", () => {
     mocks.waitForPendingSecureSessionWrites
       .mockReset()
       .mockResolvedValue(undefined);
+  });
+
+  it("stores native provider errors for one-time display after startup", () => {
+    expect(consumePendingOAuthProviderError()).toBe(false);
+
+    storePendingOAuthProviderError();
+
+    expect(consumePendingOAuthProviderError()).toBe(true);
+    expect(consumePendingOAuthProviderError()).toBe(false);
   });
 
   it("migrates legacy desktop OAuth records only after secure verification", async () => {

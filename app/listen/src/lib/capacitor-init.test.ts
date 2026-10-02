@@ -6,6 +6,7 @@ const {
   consumeOAuthCallbackUrl,
   networkAddListener,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
   statusBarSetStyle,
   pluginImports,
   runtime,
@@ -15,6 +16,7 @@ const {
   consumeOAuthCallbackUrl: vi.fn(),
   networkAddListener: vi.fn(),
   retryPendingNativeOAuthCallback: vi.fn(),
+  storePendingOAuthProviderError: vi.fn(),
   statusBarSetStyle: vi.fn(),
   pluginImports: { app: 0, keyboard: 0, network: 0, statusBar: 0 },
   runtime: { isIosRuntime: false, isNative: true, platform: "android" },
@@ -70,6 +72,7 @@ vi.mock("@capacitor/status-bar", () => {
 vi.mock("@/lib/capacitor-oauth", () => ({
   consumeOAuthCallbackUrl,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -104,6 +107,7 @@ describe("Capacitor initialization", () => {
     retryPendingNativeOAuthCallback
       .mockReset()
       .mockResolvedValue({ handled: false, next: "/" });
+    storePendingOAuthProviderError.mockReset();
     appAddListener.mockResolvedValue({ remove: vi.fn() });
     networkAddListener.mockResolvedValue({ remove: vi.fn() });
   });
@@ -185,6 +189,7 @@ describe("Capacitor initialization", () => {
     });
 
     await vi.waitFor(() => expect(providerError).toHaveBeenCalledOnce());
+    expect(storePendingOAuthProviderError).toHaveBeenCalledOnce();
     expect(authReceived).not.toHaveBeenCalled();
     window.removeEventListener("crate:auth-token-received", authReceived);
     window.removeEventListener("crate:oauth-provider-error", providerError);

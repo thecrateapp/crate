@@ -1,6 +1,7 @@
 import {
   consumeOAuthCallbackUrl,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
 } from "@/lib/capacitor-oauth";
 import { isIosRuntime, isNative, platform } from "@/lib/capacitor-runtime";
 import {
@@ -167,6 +168,7 @@ async function initializeCapacitor(): Promise<string | null> {
 async function consumeOAuthCallbackAndNotify(url: string): Promise<void> {
   const result = await consumeOAuthCallbackUrl(url);
   if (result.handled && result.providerError) {
+    storePendingOAuthProviderError();
     window.dispatchEvent(new CustomEvent("crate:oauth-provider-error"));
     return;
   }
