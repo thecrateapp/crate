@@ -153,6 +153,7 @@ from crate.db.repositories.auth import (
 )
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.repositories.tasks import create_task
+from crate.db.tx import transaction_scope
 from crate.user_avatars import (
     AvatarProxyError,
     AvatarUnavailable,
@@ -2753,21 +2754,27 @@ def _apply_native_oauth_link(handoff: NativeOAuthLinkHandoff) -> None:
             )
 
     try:
-        upsert_user_external_identity(
-            handoff.user_id,
-            handoff.provider,
-            external_user_id=handoff.external_user_id,
-            external_username=handoff.external_username,
-            status="linked",
-            last_error=None,
-            metadata=(
-                {"email": handoff.external_username}
-                if handoff.external_username
-                else {}
-            ),
-        )
-        if handoff.provider == "google" and not user.get("google_id"):
-            update_user(handoff.user_id, google_id=handoff.external_user_id)
+        with transaction_scope() as session:
+            upsert_user_external_identity(
+                handoff.user_id,
+                handoff.provider,
+                external_user_id=handoff.external_user_id,
+                external_username=handoff.external_username,
+                status="linked",
+                last_error=None,
+                metadata=(
+                    {"email": handoff.external_username}
+                    if handoff.external_username
+                    else {}
+                ),
+                session=session,
+            )
+            if handoff.provider == "google" and not user.get("google_id"):
+                update_user(
+                    handoff.user_id,
+                    google_id=handoff.external_user_id,
+                    session=session,
+                )
     except SAIntegrityError as exc:
         _raise_oauth_identity_conflict(handoff.provider, exc)
 

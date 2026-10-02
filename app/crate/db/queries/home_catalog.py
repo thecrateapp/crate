@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from crate.db.tx import read_scope
 
@@ -342,7 +343,7 @@ def get_library_artist_by_id(artist_id: int) -> dict | None:
 
 
 def get_followed_artist_genre_names(
-    names: list[str], limit: int, *, session=None
+    names: list[str], limit: int, *, session: Session | None = None
 ) -> list[str]:
     if not names:
         return []

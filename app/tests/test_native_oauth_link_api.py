@@ -528,6 +528,7 @@ class TestNativeOAuthLinkApi:
             state="s" * 43,
         )
         with (
+            patch("crate.api.auth.transaction_scope") as transaction_scope,
             patch(
                 "crate.api.native_oauth_auth.get_session",
                 return_value=self._active_session(),
@@ -551,6 +552,8 @@ class TestNativeOAuthLinkApi:
 
         assert first == {"ok": True}
         assert second == {"ok": True}
+        session = transaction_scope.return_value.__enter__.return_value
+        transaction_scope.assert_called_once_with()
         upsert_identity.assert_called_once_with(
             7,
             "google",
@@ -559,8 +562,54 @@ class TestNativeOAuthLinkApi:
             status="linked",
             last_error=None,
             metadata={"email": "linked@example.test"},
+            session=session,
         )
-        update_user.assert_called_once_with(7, google_id="google-subject-7")
+        update_user.assert_called_once_with(
+            7, google_id="google-subject-7", session=session
+        )
+
+    def test_google_link_rolls_back_identity_when_legacy_id_update_conflicts(
+        self, pg_db
+    ):
+        from fastapi import HTTPException
+
+        from crate.api.auth import _apply_native_oauth_link
+        from crate.api.native_oauth_link import NativeOAuthLinkHandoff
+
+        target_user = pg_db.create_user("native-oauth-link-target@test.com")
+        conflicting_user = pg_db.create_user(
+            "native-oauth-link-conflict@test.com",
+            google_id="google-subject-raced",
+        )
+        handoff = NativeOAuthLinkHandoff(
+            user_id=target_user["id"],
+            session_id="session-target",
+            provider="google",
+            external_user_id="google-subject-raced",
+            external_username="linked@example.test",
+            app_id="listen-tauri",
+            state="s" * 43,
+            challenge="c" * 43,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        )
+
+        with (
+            patch(
+                "crate.api.native_oauth_auth.native_oauth_link_session_is_valid",
+                return_value=True,
+            ),
+            patch("crate.api.auth.get_user_by_google_id", return_value=None),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            _apply_native_oauth_link(handoff)
+
+        assert exc_info.value.status_code == 409
+        assert pg_db.get_user_external_identity(target_user["id"], "google") is None
+        assert pg_db.get_user_by_id(target_user["id"])["google_id"] is None
+        assert (
+            pg_db.get_user_by_id(conflicting_user["id"])["google_id"]
+            == "google-subject-raced"
+        )
 
     def test_completion_restores_claim_after_temporary_store_failure(self):
         from crate.api import native_oauth_link
