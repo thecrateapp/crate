@@ -879,3 +879,19 @@ and PR desktop matrix were skipped by the draft guards; they were not failures.
 This commit changed validation documents and the Windows RSS record only, so
 the code-equivalent desktop matrix at `a672a99e` remains the latest platform
 build evidence. It does not close installed acceptance gates.
+
+### Current exact-head CI — `94198f48`, 2026-10-02
+
+PR #259 head `94198f48c302bf67895fbc9721563b0c1b805bcf` passed [Frontend
+Tests](https://github.com/thecrateapp/crate/actions/runs/36961211602): the full
+`test` job completed in 9m38 and `appearance-chromium` passed. [React
+Doctor](https://github.com/thecrateapp/crate/actions/runs/36961211550), the
+changed-Python security scan in [Backend
+Tests](https://github.com/thecrateapp/crate/actions/runs/36961211496), and
+[PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36961209185)
+also passed. The PR-triggered desktop matrix, Android `build-apk`, iOS
+simulator, and backend quality/test-shard/coverage jobs were skipped under the
+draft/path guards; none were red. The diff from `c4e3b5d1` to this head contains
+no application or workflow changes, so the exact-head desktop, Android, iOS,
+and full backend evidence at `c4e3b5d1` remains code-equivalent. Minimum-host,
+installed-player, signed-release, and upgrade acceptance remains open.
