@@ -750,17 +750,19 @@ web/Capacitor build paths. It does not replace real Windows 10 1803 or macOS 11
 hosts, normal Linux desktop sessions, signed/notarized release installation,
 upgrades, or installed-player acceptance.
 
-### Exact-head CI revalidation — `aad64913`, 2026-10-02
+### Exact-head CI revalidation — `c4e3b5d1`, 2026-10-02
 
-PR #259 remains a draft, so its Android `build-apk` and backend `quality`, test
-shards, and coverage checks are skipped on the pull-request event. They were
-manually dispatched against the exact current head `aad6491302f26d25c3177270b06ab04e33737b41`:
+PR #259 remains a draft, so its Android `build-apk`, iOS `simulator`, desktop
+matrix, and backend `quality`, test shards, and coverage checks are skipped on
+the pull-request event. They were manually validated on exact HEAD
+`c4e3b5d125900f11389785d236241f2aaa2d1e31`:
 
-- [Backend Tests run `36951073911`](https://github.com/thecrateapp/crate/actions/runs/36951073911): security scan, quality/typecheck/Ruff, all eight test shards, and coverage passed.
-- [Build Android run `36951073924`](https://github.com/thecrateapp/crate/actions/runs/36951073924): Listen typecheck/lint, mobile contracts, Capacitor bundle and budget, Android lint, and Android tests passed. Tag-only signed release outputs were skipped as expected.
-- The PR-triggered [Frontend Tests `36950473869`](https://github.com/thecrateapp/crate/actions/runs/36950473869), appearance, [React Doctor `36950473805`](https://github.com/thecrateapp/crate/actions/runs/36950473805), changed-Python security scan, and [PR Agent Review `36950471196`](https://github.com/thecrateapp/crate/actions/runs/36950471196) passed.
-- The latest three-OS desktop matrix remains the successful exact-source run `36947461225` at `e8c8530d`; the later commits through `aad64913` changed validation documentation only.
+- [Build Desktop Apps run `36951961797`](https://github.com/thecrateapp/crate/actions/runs/36951961797) passed macOS, Linux, and Windows. It built both macOS tester bundles, passed Linux ABI/artifact checks, and on Windows passed NSIS install/window/uninstall plus the packaged HTTP resource probe.
+- [Backend Tests run `36953300234`](https://github.com/thecrateapp/crate/actions/runs/36953300234) passed security, quality/typecheck/Ruff, all eight test shards, and coverage.
+- [Build Android run `36953300457`](https://github.com/thecrateapp/crate/actions/runs/36953300457) passed Listen typecheck/lint, mobile contracts, Capacitor bundle and budget, Android lint, and Android tests. Tag-only signed release outputs were skipped as expected.
+- [Build iOS run `36953300123`](https://github.com/thecrateapp/crate/actions/runs/36953300123) passed bridge contracts, secure configuration, native iOS tests, and simulator build.
+- Current-head PR checks passed: [Frontend Tests `36951781891`](https://github.com/thecrateapp/crate/actions/runs/36951781891) including `test` and `appearance-chromium`, [React Doctor `36951781896`](https://github.com/thecrateapp/crate/actions/runs/36951781896), changed-Python security scan `36951781904`, and [PR Agent Review `36951779630`](https://github.com/thecrateapp/crate/actions/runs/36951779630).
 
-This closes the current-head backend quality/test/coverage and Android CI paths
-for C06 without changing the PR's draft state. It does not close minimum-OS,
-installed-player, signed-release, or upgrade acceptance.
+This closes current-head automated build/test evidence for C06 and revalidates
+the web/Capacitor paths without changing the PR's draft state. It does not close
+minimum-OS, installed-player, signed-release, or upgrade acceptance.
