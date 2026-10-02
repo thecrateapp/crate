@@ -152,6 +152,33 @@ and directional rather than a stable latency claim. The loopback measurements
 remain the evidence for actual keep-alive reuse. Raw values are in
 [`tauri-r01-api-hosted-2026-10-01.json`](measurements/tauri-r01-api-hosted-2026-10-01.json).
 
+#### GitHub-hosted HTTPS repeat — 2026-10-02
+
+The manually dispatched [Build Desktop Apps run 36954986569](https://github.com/thecrateapp/crate/actions/runs/36954986569)
+repeated the same probe on all three hosted OS runners at source revision
+`eb3e4781`. Each runner again sent 104 read-only GETs, and every response passed
+`error_for_status`. Values below use milliseconds in the order cold request /
+total for 25 / p50 / p95.
+
+| Runner  | Concurrency |                  Fresh client |                 Shared client |
+| ------- | ----------: | ----------------------------: | ----------------------------: |
+| Linux   |           1 | 406.7 / 6,454 / 238.3 / 329.2 | 231.3 / 4,642 / 186.4 / 189.9 |
+| Linux   |           8 | 235.6 / 1,062 / 246.4 / 297.6 | 235.0 / 1,219 / 196.2 / 339.0 |
+| Windows |           1 | 552.9 / 8,328 / 189.9 / 553.8 | 531.1 / 3,417 / 137.5 / 140.8 |
+| Windows |           8 | 166.7 / 1,420 / 165.5 / 565.9 | 152.3 / 1,211 / 167.2 / 278.9 |
+| macOS   |           1 | 779.8 / 9,666 / 220.2 / 715.7 | 232.4 / 4,375 / 174.8 / 182.2 |
+| macOS   |           8 | 251.9 / 1,547 / 244.8 / 326.1 | 219.4 / 1,277 / 200.8 / 322.0 |
+
+The shared client improved total elapsed time and p50 on five of six
+OS/concurrency combinations. Linux at concurrency 8 was mixed: shared p50 was
+lower, while its total and p95 were higher; Windows p50 at concurrency 8 was
+1.6 ms higher for the shared client. This repeat removes the earlier
+hosted macOS concurrency-8 regression, but the Linux concurrency-8 sample and
+the spread across cold requests still show substantial remote-run noise. Keep
+the shared client based on confirmed loopback connection reuse; treat hosted
+HTTPS latency as directional. Raw values are in
+[`tauri-r01-api-hosted-2026-10-02-run-36954986569.json`](measurements/tauri-r01-api-hosted-2026-10-02-run-36954986569.json).
+
 #### macOS local loopback revalidation — 2026-10-01
 
 Repeated the corrected release microbenchmark at branch revision `b1accd90` on
@@ -458,7 +485,7 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 
 | ID                                       | Decision                                                                                                                                                                                                                                                                                                                                            | Remaining evidence or work                                                                                                                                                                     |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R01 — shared HTTP transport              | Keep the shared reqwest client. Loopback confirms reuse on all three hosted OS runners and the local Mac. The 2026-10-02 local Mac HTTPS sample again favored pooling at concurrency 1 and 8; hosted macOS had a concurrency-8 outlier, so remote latency remains directional.                                                                      | Repeat noisy remote samples before making latency claims; measure cancellation, CPU/RSS, and installed-app traffic before claiming full production impact.                                     |
+| R01 — shared HTTP transport              | Keep the shared reqwest client; loopback confirms reuse on the three hosted OSes and local Mac. Hosted HTTPS repeats improved shared total and p50 in five of six cases; concurrency-8 samples were mixed for Linux and Windows. Remote latency remains directional.                                                                                | Repeat noisy remote samples before making latency claims; measure cancellation, CPU/RSS, and installed-app traffic before claiming full production impact.                                     |
 | R02 — HTTP resource lifetime             | Keep the cleanup changes. Mac development and packaged soaks, the Linux release-mode probe on WebKitGTK 2.40.3, and the Windows release-mode probe returned the resource table to baseline for all 150 requests per run. The 20-second Linux sample peaked at 197 MiB for Crate, 299 MiB for WebKitWebProcess, and 57 MiB for WebKitNetworkProcess. | Windows evidence is from a Windows Server 2025 hosted runner, not the Windows 10 1803 floor. Linux used Debian 12 under Xvfb, not a normal desktop session or a package-manager-installed app. |
 | R03 — offline hydration and verification | Keep cached hydration and batched verification; the synthetic Mac measurements are bounded and warm-cache hydration is below 1 ms.                                                                                                                                                                                                                  | Linux synthetic evidence is in the agent report; measure Windows and real library/download workloads.                                                                                          |
 | R04 — verification concurrency           | Keep the current global limit of eight. Concurrent Mac callers showed no material throughput reason to change it.                                                                                                                                                                                                                                   | Confirm contention under real concurrent downloads on Windows/Linux.                                                                                                                           |
