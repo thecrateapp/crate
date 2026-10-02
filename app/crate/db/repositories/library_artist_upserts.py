@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import cast
 
 from sqlalchemy import case, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from crate.entity_ids import artist_entity_uid
@@ -124,7 +126,7 @@ def _update_existing_artist(
             updated_at=now,
         )
     )
-    if result.rowcount != 1:
+    if cast(CursorResult, result).rowcount != 1:
         raise RuntimeError("Expected to update one existing artist row")
     upsert_entity_identity_key(
         session,
