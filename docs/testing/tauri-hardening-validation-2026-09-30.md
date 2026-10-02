@@ -1144,3 +1144,36 @@ passed. Those two artifact runs used `6589283b`; the intervening `890e3a95`
 changes are backend-only and do not alter desktop or mobile app sources. The
 PR remains a draft, so its PR-triggered desktop, Android, and full backend jobs
 remain skipped.
+
+### Exact-head review follow-up and CI — `a76780be`, 2026-10-02
+
+The artist upsert now checks that its guarded `UPDATE` affects exactly one row,
+so a selected artist that disappears before the update fails explicitly. The
+first type-check run on `49dec4da` found that SQLAlchemy exposes the result as a
+generic `Result` to Pyright; the row-count read now uses the same explicit
+`CursorResult` cast used by other repositories. This changes only static
+typing; the row-count guard is unchanged. Local validation passed Pyright on
+the repository module with zero errors, Ruff check/format, and both PostgreSQL
+cases in `test_library_artist_upserts.py`.
+
+The manually dispatched [Backend Tests run
+`37068097621`](https://github.com/thecrateapp/crate/actions/runs/37068097621)
+passed on `a76780be`: quality/type check, changed-Python security scan, all
+eight test shards, and coverage. The exact-head [Frontend Tests run
+`37068094675`](https://github.com/thecrateapp/crate/actions/runs/37068094675)
+passed test/build and Chromium appearance. [React Doctor
+`37068094787`](https://github.com/thecrateapp/crate/actions/runs/37068094787),
+[security scan](https://github.com/thecrateapp/crate/actions/runs/37068094686),
+and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/37068093232)
+also passed. PR #259 remains a draft, so its PR-triggered desktop, Android,
+iOS, and full backend checks are skipped. The application sources are
+unchanged from the three-OS [Build Desktop Apps run
+`37064363758`](https://github.com/thecrateapp/crate/actions/runs/37064363758)
+and [Build Android run
+`37064363725`](https://github.com/thecrateapp/crate/actions/runs/37064363725);
+the changes since that build are backend code, tests, and this report.
+
+These CI results do not close the minimum-OS upgrade matrix, Developer ID
+signing/notarization, installed OAuth completion on all operating systems,
+physical Linux Wayland playback/offline checks, native Now Playing delivery,
+or clean real-player memory captures across all three desktop systems.
