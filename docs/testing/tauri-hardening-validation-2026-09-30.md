@@ -1082,5 +1082,24 @@ It now uses `read_scope()` when no caller session is supplied and a
 against the old implementation; after the change, the two scope-contract tests
 and the three existing PostgreSQL integration cases passed (5 total), and Ruff
 check/format passed. These tests ran against the isolated `crate_test` database
-on the local test PostgreSQL service. A fresh full Backend Tests workflow is
-still required after pushing this fix.
+on the local test PostgreSQL service. The exact-head [Backend Tests run
+`37061770694`](https://github.com/thecrateapp/crate/actions/runs/37061770694)
+then passed security, quality, all eight test shards, and coverage on
+`c59f4f1c`.
+
+The exact-head [Frontend Tests run
+`37061759521`](https://github.com/thecrateapp/crate/actions/runs/37061759521)
+passed the full test/build job and Chromium appearance. React Doctor
+(`37061759516`), changed-Python security scan (`37061759274`), and PR Agent
+Review (`37061756680`) also passed. The latest review again raised the Google
+offline-refresh-token concern. It is a false positive:
+`test_public_google_login_uses_identity_scopes_without_offline_access` asserts
+the normal login mode requests only identity scopes, while
+`test_google_userinfo_does_not_expose_provider_refresh_token` and
+`test_google_link_callback_does_not_store_provider_refresh_token` verify that
+provider refresh tokens are not returned or persisted. The callback stores
+Google identity metadata; Crate's own session refresh JWT is independent.
+
+The PR remains draft, so PR-triggered Android APK, iOS simulator, backend
+quality/test shards/coverage, and desktop bundle jobs were skipped. The
+code-equivalent manual desktop matrix and Android build are recorded above.
