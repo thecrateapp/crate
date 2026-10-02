@@ -555,11 +555,11 @@ and [Safari 16.4 release notes](https://developer.apple.com/documentation/safari
 | --- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C01 | Support-floor metadata and declarations   | Partial: exact-head macOS ARM64 and Intel artifacts declare macOS 11.0; Windows 10 1803 is paired with minimum WebView2 111.0.1661.34 and a silent download bootstrapper; exact-head DEB/RPM packages require WebKitGTK 2.40+ and the AppImage bundles WebKitGTK. Exact minimum hosts remain untested.                                                                                                          |
 | C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; the exact-head Linux `.deb` rendered its setup screen under Xvfb with system WebKitGTK/JSC 2.40.3 and the exact-head AppImage rendered with bundled WebKitGTK 2.50.4. Exact-head workflow 36947461225 installed the Windows NSIS bundle, observed its main window, and ran the silent uninstaller. Minimum-host and upgrade acceptance remain open. |
-| C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                                                                                                                                                                                                                                                                             |
+| C03 | macOS Now Playing state                   | Native mapping tests pass. A live macOS debug-app smoke played and paused a track; Control Center delivery, external remote commands, and release-player behavior remain open.                                                                                                                                                                                                                                  |
 | C04 | Native OAuth handoff                      | Backend callback tests pass, and the user confirmed Google login succeeds in the macOS app; the browser remains on Google's page after handoff. The updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                                                                                                                                          |
 | C05 | Linux package ABI/WebKit compatibility    | Pass for tested artifacts: the `.deb` and RPM from `44e69227` rendered with system WebKitGTK/JavaScriptCoreGTK 2.40.3; the exact-head `.deb` from `e8c8530d` rendered with that same runtime, and its AppImage rendered with bundled WebKitGTK 2.50.4. The current Linux CI symbol gate passed. These are x86_64 Debian 12 Xvfb/X11 checks, not a physical Wayland or minimum-distribution installation test.   |
 | C06 | Desktop CI builds and artifact checks     | Pass: exact-head [manual matrix 36957591905](https://github.com/thecrateapp/crate/actions/runs/36957591905) passed macOS, Linux, and Windows at `a672a99e`, including artifact checks, macOS ARM64/Intel bundles, Windows install/launch/uninstall and 150 HTTP-probe requests, plus Linux ABI/WebKitGTK gates. Minimum-host acceptance remains open.                                                           |
-| C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                                                                                                                                                                                                                                                                             |
+| C07 | macOS artwork callback ownership          | Native lifetime regression test passes, and the in-app artwork rendered during the live smoke; delivery through the installed system Now Playing surface remains open.                                                                                                                                                                                                                                          |
 
 ## Other native gates still pending
 
@@ -895,3 +895,31 @@ draft/path guards; none were red. The diff from `c4e3b5d1` to this head contains
 no application or workflow changes, so the exact-head desktop, Android, iOS,
 and full backend evidence at `c4e3b5d1` remains code-equivalent. Minimum-host,
 installed-player, signed-release, and upgrade acceptance remains open.
+
+### Current-head pull-request checks — `fdff74f2`, 2026-10-02
+
+At PR head `fdff74f21947b39cdfeb40395445e6d4695b7020`, Frontend Tests passed
+the full test job and `appearance-chromium` ([run `36962124284`](https://github.com/thecrateapp/crate/actions/runs/36962124284));
+React Doctor ([`36962124302`](https://github.com/thecrateapp/crate/actions/runs/36962124302)),
+the changed-Python security scan ([`36962124268`](https://github.com/thecrateapp/crate/actions/runs/36962124268)),
+and PR Agent Review ([`36962122257`](https://github.com/thecrateapp/crate/actions/runs/36962122257))
+also passed. Android `build-apk`, iOS simulator, the PR desktop matrix, backend
+quality, test shards, and coverage were skipped by the draft/path guards; none
+were failures. From `c4e3b5d1` to this head, the diff contains only validation
+documents and measurement data, so the exact-head full desktop/backend/mobile
+workflow results recorded above remain code-equivalent.
+
+### macOS live playback smoke — 2026-10-02
+
+On the macOS 27.0.1 Apple M5 host, the running `Crate Manual Test` debug bundle
+had the Placebo track “Bionic” loaded with its artwork, FLAC 16/44.1 metadata,
+and a five-minute duration. The Play control changed the accessible state from
+paused to “Now playing” with a Pause control; toggling it again returned the
+app to paused. The app volume was restored to its initial value of 80 after the
+brief smoke. The media-state and artwork callback runtime code in this bundle
+matches the current source; the later macOS-only source difference was a
+timeout adjustment in a Rust test.
+
+This confirms basic playback and in-app artwork rendering for C03/C07. It does
+not verify the macOS Control Center/Now Playing surface, external remote-command
+delivery, or artwork delivery to that surface, so both gates remain partial.
