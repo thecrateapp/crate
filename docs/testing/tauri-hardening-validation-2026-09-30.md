@@ -1018,3 +1018,26 @@ the legacy wrapper. `test_scrobble_lastfm.py` passes 17/17, and the repository
 pre-commit Ruff and formatting hooks pass. The separate Google refresh-token
 finding remains non-applicable: the Google flow requests identity scopes and
 does not persist provider tokens.
+
+### Persistent-review follow-up — `5c3e4ca3`, 2026-10-02
+
+The review found a real compatibility risk in changing invite `join_url` and
+`qr_value` from relative to absolute URLs: older clients may already prepend
+the configured public origin. The API now preserves both legacy fields as
+relative values and adds optional `public_url` for clients that need a fully
+qualified link. The Listen app's `inviteShareUrl` prefers `public_url` and
+falls back to deriving the public URL from the relative `join_url`, preserving
+support for older API responses and custom public path prefixes.
+
+Regression coverage passes for the API and schema contract (4 Python tests),
+and the affected Listen share, jam-session, playlist, and crate tests pass
+(132 Vitest tests). Listen typecheck, ESLint, and production build pass; the
+build retains its existing large-chunk advisory. Ruff, Prettier, and ESLint
+pre-commit hooks pass.
+
+The same review repeated two OAuth concerns that do not match the implementation:
+Google requests identity scopes and does not persist provider refresh tokens;
+the Tauri HTTPS callback handoff is covered by native OAuth tests asserting the
+`https://listen.lespedants.org/auth/callback#desktop=tauri&code=...&state=...`
+completion fragment. These findings do not require code changes. CI and the
+updated persistent review for `5c3e4ca3` must still be checked after pushing.
