@@ -252,7 +252,13 @@ those measurements meet the frame-pacing gate.
 
 The current PR checks showed Android, Desktop Apps, and iOS as `skipped` because
 PR #259 remains a draft; these were not failed jobs. Manual dispatches against
-this exact source revision completed successfully: [Build Android](https://github.com/thecrateapp/crate/actions/runs/36942333262), [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36942333335), and [Build iOS](https://github.com/thecrateapp/crate/actions/runs/36942333179). Desktop passed on Linux, Windows, and macOS. These runs predate the local bloom shader changes above, which are not yet on the remote branch.
+this exact source revision completed successfully: [Build Android](https://github.com/thecrateapp/crate/actions/runs/36942333262), [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36942333335), and [Build iOS](https://github.com/thecrateapp/crate/actions/runs/36942333179). Desktop passed on Linux, Windows, and macOS. These runs predate the bloom shader change; the exact updated source was validated separately below.
+
+### CI confirmation on source revision — `489a69097e17b32a38ab47e0b47d941fba4962bb`
+
+The pull-request event again showed Build Android, Build Desktop Apps, and
+Build iOS as `skipped` because PR #259 is still a draft. Manual dispatches
+against this exact SHA passed: [Build Android](https://github.com/thecrateapp/crate/actions/runs/36944893264), [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36944893226), [Build iOS](https://github.com/thecrateapp/crate/actions/runs/36944893145), and [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36945858611). The backend run passed quality, security, all eight test shards, and coverage. Frontend Tests, React Doctor, and PR Agent Review also passed on the same SHA: [Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36944876922), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36944876872), and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36944875333). Desktop passed on Linux, macOS, and Windows. The CI `skipped` results are draft gating, not failed jobs.
 
 ## Production player path relevant to R08
 

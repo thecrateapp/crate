@@ -83,6 +83,11 @@ host and compare frame-interval p50/p95 and per-process CPU with the recorded
 frame pacing is smooth; a code-level reduction or a macOS result alone does
 not meet that gate.
 
+The candidate is included in source revision
+`489a69097e17b32a38ab47e0b47d941fba4962bb`. Its tests and all CI workflows
+pass, but the visualizer remains hidden on Linux until the host measurement
+shows smooth frame pacing.
+
 Start a loopback receiver and launch the probe from the repository root:
 
 ```bash
