@@ -292,11 +292,30 @@ reducing texture reads from 9 to 5 per pass, or 90 to 50 across the existing
 covered by focused Listen tests. A production Listen build also passes.
 
 This code-level reduction is not evidence that Linux frame pacing is smooth.
-The isolated local probe could not produce a valid visible Mac measurement
-because macOS was locked and the WebView reported `visibilityState=hidden`.
-R07 remains open until the same probe records visible runs on the i9 Wayland
-host and the installed Linux player; keep the Linux visualizer hidden until
-those measurements meet the frame-pacing gate.
+The first isolated local attempt could not produce a valid visible Mac
+measurement because macOS was locked and the WebView reported
+`visibilityState=hidden`; a visible follow-up is recorded below. R07 remains
+open until the same probe records visible runs on the i9 Wayland host and the
+installed Linux player; keep the Linux visualizer hidden until those
+measurements meet the frame-pacing gate.
+
+#### macOS visible follow-up — 2026-10-02, renderer source `489a6909`
+
+After the session was unlocked, the isolated Tauri development WebView ran
+three visible 30-second cycles against the optimized production
+`MusicVisualizer`. WebGL 2 reported Apple GPU; the 688 × 688 CSS canvas rendered
+at 688 × 688 with DPR 1. Frame-interval p50 / p95 / max was 17 / 19 / 191 ms,
+17 / 19 / 21 ms, and 17 / 19 / 22 ms. The first cycle had one 191 ms maximum;
+the later two stayed within 21–22 ms. The first-cycle outlier's cause is
+unknown and is kept in the result rather than excluded. The explicit renderer
+stop check passed: tick count stayed at 5,755 over its two-second observation.
+
+This confirms visible DPR-1 frame pacing and RAF cancellation on this Apple
+GPU with the current renderer. The probe uses a synthetic analyser in a dev
+WebView and does not measure real audio, CPU/RSS, GPU completion, energy, a
+release build, HiDPI, Intel, Windows, or Wayland; it is not a comparison proving
+the bloom optimization's effect. Raw events are in
+[`tauri-r07-macos-visualizer-2026-10-02.jsonl`](measurements/tauri-r07-macos-visualizer-2026-10-02.jsonl).
 
 ### CI status on source revision — `026c3198025e5a3130d90abb16b21d26bec5f8ed`
 
