@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { isCapacitorRuntime, isTauriRuntime } from "@/lib/platform";
 
 interface CrateSecureSessionPlugin {
   get(options: { key: string }): Promise<{ value: string | null }>;
@@ -30,7 +31,10 @@ export class NativeSecureSessionUnavailableError extends Error {
 }
 
 function validateKey(key: string): void {
-  if (!KEY_PATTERN.test(key)) {
+  if (
+    !KEY_PATTERN.test(key) ||
+    new TextEncoder().encode(key).byteLength > 255
+  ) {
     throw new Error("Invalid secure session key");
   }
 }
@@ -41,14 +45,23 @@ function validatePrefix(prefix: string): void {
   }
 }
 
-function ensureNative(): void {
+function ensureNative(): "capacitor" | "tauri" {
+  if (isCapacitorRuntime && Capacitor.isNativePlatform()) return "capacitor";
+  if (isTauriRuntime) return "tauri";
   if (!Capacitor.isNativePlatform()) {
     throw new NativeSecureSessionUnavailableError();
   }
+  return "capacitor";
+}
+
+function tauriInvoke(): NonNullable<Window["__crateTauriInvoke"]> {
+  const invoke = window.__crateTauriInvoke;
+  if (!invoke) throw new NativeSecureSessionUnavailableError();
+  return invoke;
 }
 
 function validateJson(value: string): void {
-  if (!value || value.length > 64 * 1024) {
+  if (!value || new TextEncoder().encode(value).byteLength > 64 * 1024) {
     throw new Error("Invalid secure session value");
   }
   try {
@@ -66,8 +79,11 @@ export async function getSecureSessionValue(
   key: string,
 ): Promise<string | null> {
   validateKey(key);
-  ensureNative();
+  const runtime = ensureNative();
   try {
+    if (runtime === "tauri") {
+      return await tauriInvoke()<string | null>("secure_session_get", { key });
+    }
     return (await plugin.get({ key })).value;
   } catch (error) {
     throw unavailable(error);
@@ -80,8 +96,12 @@ export async function setSecureSessionValue(
 ): Promise<void> {
   validateKey(key);
   validateJson(value);
-  ensureNative();
+  const runtime = ensureNative();
   try {
+    if (runtime === "tauri") {
+      await tauriInvoke()("secure_session_set", { key, value });
+      return;
+    }
     await plugin.set({ key, value });
   } catch (error) {
     throw unavailable(error);
@@ -90,8 +110,12 @@ export async function setSecureSessionValue(
 
 export async function removeSecureSessionValue(key: string): Promise<void> {
   validateKey(key);
-  ensureNative();
+  const runtime = ensureNative();
   try {
+    if (runtime === "tauri") {
+      await tauriInvoke()("secure_session_remove", { key });
+      return;
+    }
     await plugin.remove({ key });
   } catch (error) {
     throw unavailable(error);
@@ -100,7 +124,11 @@ export async function removeSecureSessionValue(key: string): Promise<void> {
 
 export async function listSecureSessionKeys(prefix: string): Promise<string[]> {
   validatePrefix(prefix);
-  ensureNative();
+  if (ensureNative() === "tauri") {
+    throw new NativeSecureSessionUnavailableError(
+      new Error("Tauri secure-session listing is unsupported"),
+    );
+  }
   try {
     const result = await plugin.listKeys({ prefix });
     return result.keys.filter((key) => KEY_PATTERN.test(key));
@@ -113,7 +141,11 @@ export async function clearSecureSessionPrefix(
   prefix: string,
 ): Promise<number> {
   validatePrefix(prefix);
-  ensureNative();
+  if (ensureNative() === "tauri") {
+    throw new NativeSecureSessionUnavailableError(
+      new Error("Tauri secure-session prefix cleanup is unsupported"),
+    );
+  }
   try {
     return (await plugin.clearPrefix({ prefix })).removed;
   } catch (error) {

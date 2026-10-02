@@ -11,18 +11,32 @@ import { App } from "@/App";
 import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
 import { I18nProvider } from "@/i18n";
 import { primeOfflineRuntimeProfile } from "@/lib/offline";
-import { initSentry } from "@/lib/sentry";
+import { isTauriRuntime } from "@/lib/platform";
+import { migrateLegacyTauriLastfmRecord } from "@/lib/native-lastfm-oauth";
+import { migrateLegacyTauriOAuthRecords } from "@/lib/capacitor-oauth";
+import { captureRuntimeError, initSentry } from "@/lib/sentry";
+import { bootstrapNativeSessionStore } from "@/lib/server-store";
+import { renderSecureSessionError } from "@/lib/secure-session-error";
 import {
   getAppliedThemeSkin,
   initializeThemeSkin,
   subscribeThemeSkin,
 } from "@crate/ui/lib/theme-skin";
 
-import { initTauriRuntime } from "./lib/tauri-init";
+import { initTauriRuntime, startTauriOAuthRuntime } from "./lib/tauri-init";
+import { LinuxWindowTitlebar } from "./components/LinuxWindowTitlebar";
+
+const hasLinuxWindowTitlebar =
+  isTauriRuntime &&
+  typeof navigator !== "undefined" &&
+  /\bLinux\b/i.test(navigator.userAgent);
+
+if (hasLinuxWindowTitlebar) {
+  document.documentElement.dataset.crateLinuxWindowChrome = "true";
+}
 
 initTauriRuntime();
 initSentry();
-void primeOfflineRuntimeProfile();
 initializeThemeSkin({
   ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED,
 });
@@ -37,11 +51,33 @@ function ThemeAwareToaster() {
   return <Toaster theme={resolvedMode} position="bottom-center" richColors />;
 }
 
-createRoot(document.getElementById("root")!).render(
-  <HashRouter>
-    <I18nProvider>
-      <App />
-    </I18nProvider>
-    <ThemeAwareToaster />
-  </HashRouter>,
-);
+async function bootstrapDesktopApp(): Promise<void> {
+  const root = document.getElementById("root");
+  if (!root) return;
+  try {
+    await bootstrapNativeSessionStore();
+    await migrateLegacyTauriOAuthRecords();
+    await migrateLegacyTauriLastfmRecord();
+  } catch (error) {
+    void captureRuntimeError(error, "secure_session.bootstrap");
+    renderSecureSessionError(root);
+    return;
+  }
+
+  void primeOfflineRuntimeProfile();
+  startTauriOAuthRuntime();
+  createRoot(root).render(
+    <>
+      {hasLinuxWindowTitlebar && <LinuxWindowTitlebar />}
+      {hasLinuxWindowTitlebar && <div aria-hidden="true" className="h-9" />}
+      <HashRouter useTransitions={hasLinuxWindowTitlebar ? false : undefined}>
+        <I18nProvider>
+          <App />
+        </I18nProvider>
+        <ThemeAwareToaster />
+      </HashRouter>
+    </>,
+  );
+}
+
+void bootstrapDesktopApp();

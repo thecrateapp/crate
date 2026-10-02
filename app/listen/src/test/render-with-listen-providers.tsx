@@ -56,6 +56,8 @@ export function createMockAuthValue(
   return {
     user: createMockAuthUser(),
     loading: false,
+    accessMode: "authenticated",
+    offlineIdentity: null,
     refetch: vi.fn(async () => createMockAuthUser()),
     logout: vi.fn(async () => {}),
     ...overrides,
@@ -165,7 +167,9 @@ export function createMockOfflineValue(
   );
   return {
     supported: true,
+    readOnly: false,
     syncing: false,
+    items: [],
     summary: {
       itemCount: 0,
       readyItemCount: 0,

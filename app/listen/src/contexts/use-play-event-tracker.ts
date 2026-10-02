@@ -60,6 +60,8 @@ function buildSession(
 }
 
 function dispatchPlayEvent(session: PlayEventSession, reason: FlushReason) {
+  if (session.track.offlineOnly) return;
+
   const trackDurationSeconds = session.trackDurationSeconds;
   const playedSeconds = Math.max(0, session.listenedSeconds);
   const ref = toTrackReferencePayload(session.track);

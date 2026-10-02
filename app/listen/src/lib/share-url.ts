@@ -20,3 +20,10 @@ export function publicShareUrl(path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${publicShareOrigin()}${normalizedPath}`;
 }
+
+export function inviteShareUrl(invite: {
+  join_url: string;
+  public_url?: string | null;
+}) {
+  return publicShareUrl(invite.public_url ?? invite.join_url);
+}

@@ -18,7 +18,7 @@ import {
   toTrackReferencePayload,
 } from "@/lib/track-reference";
 import { fetchPlaylistRadio } from "@/lib/radio";
-import { publicShareUrl } from "@/lib/share-url";
+import { inviteShareUrl, publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { shuffleArray } from "@/lib/utils";
 import {
@@ -324,7 +324,7 @@ export function buildPlaylistActions({
 
   async function handleCopyInviteLink() {
     if (!inviteData || typeof window === "undefined") return;
-    const inviteLink = `${window.location.origin}${inviteData.join_url}`;
+    const inviteLink = inviteShareUrl(inviteData);
     try {
       await navigator.clipboard.writeText(inviteLink);
       toast.success(t("playlist.toasts.inviteCopied"));

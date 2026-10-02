@@ -1,6 +1,7 @@
 import { ApiError, createApiClient } from "../../../shared/web/api";
 
 export { ApiError };
+export const AUTH_SESSION_REJECTED_EVENT = "crate:auth-session-rejected";
 import { shouldRedirectToLoginOnUnauthorized } from "@/lib/auth-route-policy";
 import { isTauriRuntime, usesConfigurableServer } from "@/lib/platform";
 import {
@@ -9,6 +10,7 @@ import {
   getServerById,
   migrateLegacyToken,
   seedDefaultServer,
+  type ServerConfig,
 } from "@/lib/server-store";
 import {
   AUTH_TOKEN_EVENT,
@@ -35,6 +37,7 @@ import {
 import { createApiUrlResolver } from "@/lib/api-url-resolver";
 import { createApiAuthTransport } from "@/lib/api-auth-transport";
 import { captureApiError } from "@/lib/sentry";
+import { revokeOfflineIdentityForServer } from "@/lib/offline-identity";
 
 export {
   AUTH_TOKEN_EVENT,
@@ -217,6 +220,26 @@ export function apiForServer<T = unknown>(
   return serverScopedApi<T>(`${server.url}${path}`, method, body);
 }
 
+/** Revoke the captured server session without consulting mutable active-server state. */
+export async function revokeServerSession(
+  server: Pick<ServerConfig, "url" | "token">,
+): Promise<void> {
+  if (!server.token) return;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    await fetch(`${server.url.replace(/\/+$/, "")}/api/auth/logout`, {
+      method: "POST",
+      credentials: "omit",
+      headers: { Authorization: `Bearer ${server.token}` },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const apiAuthTransport = createApiAuthTransport({
   apiBase: getApiBase,
   apiClient: innerApi,
@@ -235,6 +258,15 @@ const apiAuthTransport = createApiAuthTransport({
   setAuthToken,
   setAuthTokens,
   setAuthTokensForServer,
+  onSessionRejected: (serverId) => {
+    if (typeof window === "undefined") return;
+    revokeOfflineIdentityForServer(serverId ?? "web");
+    window.dispatchEvent(
+      new CustomEvent(AUTH_SESSION_REJECTED_EVENT, {
+        detail: { serverId },
+      }),
+    );
+  },
   usesConfigurableServer,
 });
 

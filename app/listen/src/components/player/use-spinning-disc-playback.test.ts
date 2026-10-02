@@ -24,6 +24,7 @@ function createOptions() {
 afterEach(() => {
   setVisibilityState("visible");
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("useSpinningDiscPlayback", () => {
@@ -42,6 +43,51 @@ describe("useSpinningDiscPlayback", () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
 
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+  });
+
+  it("keeps its animation frame running across playback progress updates", () => {
+    const requestAnimationFrame = vi.fn(() => 1);
+    const cancelAnimationFrame = vi.fn();
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+    vi.spyOn(performance, "now").mockReturnValue(1000);
+
+    const { rerender } = renderHook(
+      ({ currentTime }) =>
+        useSpinningDiscPlayback({ ...createOptions(), currentTime }),
+      { initialProps: { currentTime: 5 } },
+    );
+    const scheduledFrames = requestAnimationFrame.mock.calls.length;
+
+    rerender({ currentTime: 5.2 });
+
+    expect(cancelAnimationFrame).not.toHaveBeenCalled();
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(scheduledFrames);
+  });
+
+  it("uses the latest playback time when motion resumes", () => {
+    const requestAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    setVisibilityState("hidden");
+
+    const rotor = document.createElement("div");
+    const { result, rerender } = renderHook(
+      ({ currentTime }) =>
+        useSpinningDiscPlayback({ ...createOptions(), currentTime }),
+      { initialProps: { currentTime: 5 } },
+    );
+    result.current.rotorRef.current = rotor;
+
+    rerender({ currentTime: 12 });
+
+    setVisibilityState("visible");
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(rotor.style.transform).toContain("rotate(1440deg)");
     expect(requestAnimationFrame).toHaveBeenCalledOnce();
   });
 });

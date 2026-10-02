@@ -25,6 +25,7 @@ export type ExtendedPlayerViewState = {
   volume: number;
   canvasRect: VisualizerCanvasRect | null;
   vizCfg: VisualizerConfigState;
+  visualizerAllowed: boolean;
   equalizerEnabled: boolean;
 };
 

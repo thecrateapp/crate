@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -10,7 +11,7 @@ import { QueueTabCurrentTrack } from "./QueueTabCurrentTrack";
 import { QueueTabPastTracks } from "./QueueTabPastTracks";
 import { QueueTabUpcoming } from "./QueueTabUpcoming";
 
-export function QueueTab() {
+export const QueueTab = memo(function QueueTab() {
   const { t } = useTranslation();
   const { isPlaying } = usePlayerState();
   const {
@@ -54,7 +55,7 @@ export function QueueTab() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto pr-1">
+    <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
       {jamQueueLocked ? <JamQueueLockedNotice /> : null}
       <QueueTabPastTracks
         tracks={history}
@@ -86,4 +87,4 @@ export function QueueTab() {
       ) : null}
     </div>
   );
-}
+});

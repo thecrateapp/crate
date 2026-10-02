@@ -24,6 +24,7 @@ const {
   mockSendEvent,
   mockJamConnected,
   mockDndContext,
+  mockPublicShareUrl,
 } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   mockParams: { roomId: undefined as string | undefined },
@@ -43,6 +44,9 @@ const {
         }) => void)
       | null,
   },
+  mockPublicShareUrl: vi.fn((path: string) =>
+    /^https?:\/\//i.test(path) ? path : `https://listen.example.test${path}`,
+  ),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -77,6 +81,12 @@ vi.mock("@/lib/api", () => ({
   isUsableMediaAssetUrl: () => true,
   requiresMediaAccessTicket: () => false,
   resolveMaybeApiAssetUrl: (value: string | null | undefined) => value,
+}));
+
+vi.mock("@/lib/share-url", () => ({
+  publicShareUrl: mockPublicShareUrl,
+  inviteShareUrl: (invite: { join_url: string; public_url?: string | null }) =>
+    mockPublicShareUrl(invite.public_url ?? invite.join_url),
 }));
 
 vi.mock("@/hooks/use-api", () => ({
@@ -924,6 +934,7 @@ describe("JamSession active room - host", () => {
       token: "inv-token",
       join_url: "/jam/invite/inv-token",
       qr_value: "/api/qr?value=...",
+      public_url: "https://music.custom.test/jam/invite/inv-token",
     };
     mockApiCall.mockResolvedValueOnce(invite);
     renderWithListenProviders(<JamSession />);
@@ -941,6 +952,12 @@ describe("JamSession active room - host", () => {
       );
     });
     expect(screen.getByText("Invite to room")).toBeInTheDocument();
+    expect(mockPublicShareUrl).toHaveBeenCalledWith(
+      "https://music.custom.test/jam/invite/inv-token",
+    );
+    expect(
+      screen.getByText("https://music.custom.test/jam/invite/inv-token"),
+    ).toBeInTheDocument();
   });
 
   it("opens metadata modal and saves room profile", async () => {

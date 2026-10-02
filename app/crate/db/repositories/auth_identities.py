@@ -6,7 +6,8 @@ from sqlalchemy import select
 
 from crate.db.orm.user import UserExternalIdentity
 from crate.db.repositories.auth_shared import coerce_datetime, model_to_dict
-from crate.db.tx import optional_scope, read_scope
+from crate.db.repositories.auth_user_admin import update_user
+from crate.db.tx import optional_scope, read_scope, transaction_scope
 
 
 def get_user_external_identity(user_id: int, provider: str) -> dict | None:
@@ -96,6 +97,33 @@ def upsert_user_external_identity(
         return _impl(s)
 
 
+def link_oauth_user_identity(
+    user_id: int,
+    provider: str,
+    *,
+    external_user_id: str,
+    external_username: str | None = None,
+    status: str = "linked",
+    last_error: str | None = None,
+    metadata: dict | None = None,
+    legacy_google_id: str | None = None,
+) -> dict:
+    with transaction_scope() as session:
+        identity = upsert_user_external_identity(
+            user_id,
+            provider,
+            external_user_id=external_user_id,
+            external_username=external_username,
+            status=status,
+            last_error=last_error,
+            metadata=metadata,
+            session=session,
+        )
+        if legacy_google_id is not None:
+            update_user(user_id, google_id=legacy_google_id, session=session)
+    return identity
+
+
 def unlink_user_external_identity(user_id: int, provider: str, *, session=None) -> None:
     def _impl(s) -> None:
         identity = s.execute(
@@ -133,6 +161,7 @@ def unlink_user_external_identity(user_id: int, provider: str, *, session=None) 
 
 __all__ = [
     "get_user_external_identity",
+    "link_oauth_user_identity",
     "list_user_external_identities",
     "unlink_user_external_identity",
     "upsert_user_external_identity",

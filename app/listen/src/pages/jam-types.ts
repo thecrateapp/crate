@@ -88,6 +88,7 @@ export interface JamInvite {
   token: string;
   join_url: string;
   qr_value: string;
+  public_url?: string | null;
   expires_at?: string | null;
 }
 

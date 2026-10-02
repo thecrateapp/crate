@@ -1,8 +1,10 @@
 import { getApiBase } from "@/lib/api";
 import { getStoredAuthUserId } from "@/lib/auth-user-storage";
-import { isNative } from "@/lib/capacitor-runtime";
 import { encodeOfflineProfileIdentity } from "@/lib/offline-store";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
+import { isWebRuntime } from "@/lib/platform";
 import { getOfflineTrackAssetKey } from "@/lib/offline-track-identity";
+import { hasCachedTrackAssets } from "@/lib/offline-assets";
 import {
   hydrateOfflineProfileState,
   setActiveOfflineProfileKey,
@@ -18,6 +20,7 @@ export {
   clearOfflineAssets,
   deleteCachedTrackAsset,
   ensureOfflineStorageBudget,
+  getOfflineAssetsNeedingRefresh,
   hasCachedTrackAsset,
   hasCachedTrackAssets,
   getOfflineNativePlaybackUrl,
@@ -79,12 +82,35 @@ export function deriveOfflineProfileKeyFromStoredUser(
 export function isOfflineSupported(): boolean {
   if (typeof window === "undefined") return false;
   if (!("localStorage" in window)) return false;
-  if (isNative) return true;
+  // Capacitor and Tauri both provide a persistent native filesystem adapter;
+  // browser runtimes need both Cache Storage and a service worker.
+  if (isOfflineNativeRuntime) return true;
   return (
     typeof navigator !== "undefined" &&
     "caches" in window &&
     "serviceWorker" in navigator
   );
+}
+
+export async function hasOfflinePlaybackContent(
+  profileKey: string,
+): Promise<boolean> {
+  const snapshot = await hydrateOfflineProfileState(profileKey);
+  const candidates = Object.values(snapshot.items).flatMap((item) => {
+    const readyKeys = new Set(item.readyAssetKeys ?? []);
+    return item.tracks.filter((track) => {
+      const assetKey = getOfflineTrackAssetKey(track);
+      if (!assetKey) return false;
+      if (item.readyAssetKeys) return readyKeys.has(assetKey);
+      return item.state === "ready";
+    });
+  });
+
+  for (let offset = 0; offset < candidates.length; offset += 16) {
+    const batch = candidates.slice(offset, offset + 16);
+    if ((await hasCachedTrackAssets(profileKey, batch)).size > 0) return true;
+  }
+  return false;
 }
 
 export function buildAssetUsage(
@@ -166,7 +192,11 @@ export function getOfflineActionLabel(state: OfflineItemState): string {
 export async function syncOfflineProfileToServiceWorker(
   profileKey: string | null,
 ): Promise<void> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator))
+  if (
+    !isWebRuntime ||
+    typeof navigator === "undefined" ||
+    !("serviceWorker" in navigator)
+  )
     return;
 
   const payload = { type: "crate:set-offline-profile", profileKey };
@@ -184,7 +214,7 @@ export async function primeOfflineRuntimeProfile(
 ): Promise<void> {
   const profileKey = deriveOfflineProfileKeyFromStoredUser(serverOrigin);
   setActiveOfflineProfileKey(profileKey);
-  if (isNative && profileKey) {
+  if (isOfflineNativeRuntime && profileKey) {
     await hydrateOfflineProfileState(profileKey);
   }
   await syncOfflineProfileToServiceWorker(profileKey);

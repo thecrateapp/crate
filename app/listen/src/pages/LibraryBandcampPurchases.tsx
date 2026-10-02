@@ -14,6 +14,7 @@ export function LibraryBandcampPurchases({
   titleLabel,
   importLabel,
   onImport,
+  onOpenExternal,
 }: {
   purchases: BandcampItem[];
   busyItemId: number | null;
@@ -22,6 +23,7 @@ export function LibraryBandcampPurchases({
   titleLabel: string;
   importLabel: string;
   onImport: (item: BandcampItem) => void;
+  onOpenExternal: (url: string) => void;
 }) {
   return (
     <div className="grid gap-3">
@@ -80,13 +82,7 @@ export function LibraryBandcampPurchases({
             {item.item_url ? (
               <button
                 type="button"
-                onClick={() =>
-                  window.open(
-                    item.item_url || "",
-                    "_blank",
-                    "noopener,noreferrer",
-                  )
-                }
+                onClick={() => onOpenExternal(item.item_url || "")}
                 className="inline-flex min-h-10 items-center rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted"
               >
                 <ExternalLink size={14} />

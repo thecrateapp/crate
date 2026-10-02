@@ -12,6 +12,7 @@ use objc2::{
     class,
     encode::{Encode, Encoding},
     msg_send,
+    rc::Retained,
     runtime::{AnyClass, AnyObject, Imp, Sel},
     sel,
 };
@@ -43,12 +44,10 @@ const MAX_ARTWORK_BYTES: u64 = 20 * 1024 * 1024;
 struct ArtworkCache {
     url: Option<String>,
     artwork: usize,
-    retained_image: usize,
 }
 
 struct LoadedArtwork {
     artwork: *mut AnyObject,
-    retained_image: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -188,6 +187,50 @@ pub fn update_now_playing(payload: &DesktopMediaSessionPayload) {
             if let Some(request) = request {
                 fetch_artwork_async(request);
             }
+        });
+    }
+}
+
+pub fn update_playback_state(is_playing: bool) {
+    if let Some(app) = MEDIA_APP_HANDLE.get() {
+        let app = app.clone();
+        let _ = app.run_on_main_thread(move || unsafe {
+            set_now_playing_playback_state(playback_state_value(is_playing));
+            update_now_playing_numbers(|info| {
+                set_number(
+                    info,
+                    MPNowPlayingInfoPropertyPlaybackRate,
+                    if is_playing { 1.0 } else { 0.0 },
+                );
+            });
+        });
+    }
+}
+
+pub fn update_position(payload: &crate::DesktopMediaPosition) {
+    let payload = payload.clone();
+    if let Some(app) = MEDIA_APP_HANDLE.get() {
+        let app = app.clone();
+        let _ = app.run_on_main_thread(move || unsafe {
+            update_now_playing_numbers(|info| {
+                if payload.duration.is_finite() && payload.duration > 0.0 {
+                    set_number(info, MPMediaItemPropertyPlaybackDuration, payload.duration);
+                }
+                if payload.position.is_finite() && payload.position >= 0.0 {
+                    set_number(
+                        info,
+                        MPNowPlayingInfoPropertyElapsedPlaybackTime,
+                        payload.position,
+                    );
+                }
+                if payload.playback_rate.is_finite() && payload.playback_rate >= 0.0 {
+                    set_number(
+                        info,
+                        MPNowPlayingInfoPropertyPlaybackRate,
+                        payload.playback_rate,
+                    );
+                }
+            });
         });
     }
 }
@@ -408,6 +451,7 @@ unsafe fn set_now_playing_info(payload: &DesktopMediaSessionPayload) {
 
     let Some(title) = non_empty(payload.title.as_deref()) else {
         let _: () = msg_send![center, setNowPlayingInfo: ptr::null_mut::<AnyObject>()];
+        set_now_playing_playback_state(3);
         clear_artwork_cache();
         return;
     };
@@ -447,6 +491,44 @@ unsafe fn set_now_playing_info(payload: &DesktopMediaSessionPayload) {
     }
 
     let _: () = msg_send![center, setNowPlayingInfo: info];
+    set_now_playing_playback_state(playback_state_value(payload.is_playing));
+}
+
+unsafe fn set_now_playing_playback_state(state: isize) {
+    let center: *mut AnyObject = msg_send![class!(MPNowPlayingInfoCenter), defaultCenter];
+    if center.is_null() {
+        return;
+    }
+    let responds: bool = msg_send![center, respondsToSelector: sel!(setPlaybackState:)];
+    if responds {
+        let _: () = msg_send![center, setPlaybackState: state];
+    }
+}
+
+unsafe fn update_now_playing_numbers(update: impl FnOnce(*mut AnyObject)) {
+    let center: *mut AnyObject = msg_send![class!(MPNowPlayingInfoCenter), defaultCenter];
+    if center.is_null() {
+        return;
+    }
+    let current: *mut AnyObject = msg_send![center, nowPlayingInfo];
+    if current.is_null() {
+        return;
+    }
+    let info: *mut AnyObject = msg_send![current, mutableCopy];
+    if info.is_null() {
+        return;
+    }
+    update(info);
+    let _: () = msg_send![center, setNowPlayingInfo: info];
+    let _: () = msg_send![info, release];
+}
+
+fn playback_state_value(is_playing: bool) -> isize {
+    if is_playing {
+        1
+    } else {
+        2
+    }
 }
 
 unsafe fn cached_artwork_for_url(url: &str) -> Option<*mut AnyObject> {
@@ -464,7 +546,6 @@ unsafe fn cache_artwork_bytes(url: &str, bytes: &[u8]) -> Option<*mut AnyObject>
     release_cached_artwork(&mut cache);
     cache.url = Some(url.to_string());
     cache.artwork = loaded.artwork as usize;
-    cache.retained_image = loaded.retained_image;
     Some(loaded.artwork)
 }
 
@@ -475,11 +556,9 @@ unsafe fn load_artwork(bytes: &[u8]) -> Option<LoadedArtwork> {
         return None;
     }
     let image: *mut AnyObject = msg_send![image_alloc, initWithData: &*data];
-    if image.is_null() {
-        return None;
-    }
+    let image = Retained::from_raw(image)?;
 
-    if let Some(artwork) = load_modern_artwork(image) {
+    if let Some(artwork) = load_modern_artwork(image.clone()) {
         return Some(artwork);
     }
 
@@ -504,7 +583,7 @@ unsafe fn set_current_now_playing_artwork(artwork: *mut AnyObject) {
     let _: () = msg_send![info, release];
 }
 
-unsafe fn load_modern_artwork(image: *mut AnyObject) -> Option<LoadedArtwork> {
+unsafe fn load_modern_artwork(image: Retained<AnyObject>) -> Option<LoadedArtwork> {
     let supports_modern_init: bool = msg_send![
         class!(MPMediaItemArtwork),
         instancesRespondToSelector: sel!(initWithBoundsSize:requestHandler:)
@@ -513,52 +592,53 @@ unsafe fn load_modern_artwork(image: *mut AnyObject) -> Option<LoadedArtwork> {
         return None;
     }
 
-    let size: CGSize = msg_send![image, size];
-    let image_for_block = image;
-    let request_handler =
-        block2::RcBlock::new(move |_size: CGSize| -> *mut AnyObject { image_for_block });
+    let size: CGSize = msg_send![Retained::as_ptr(&image), size];
+    // The system may retain this block after the current artwork cache moves
+    // to another track. Capture an owned image so late requests cannot use a
+    // pointer released with the previous cache entry.
+    let request_handler = artwork_request_handler(image.clone());
     let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
     if artwork_alloc.is_null() {
-        let _: () = msg_send![image, release];
         return None;
     }
     let artwork: *mut AnyObject =
         msg_send![artwork_alloc, initWithBoundsSize: size, requestHandler: &*request_handler];
 
     if artwork.is_null() {
-        let _: () = msg_send![image, release];
         None
     } else {
-        Some(LoadedArtwork {
-            artwork,
-            retained_image: image as usize,
-        })
+        Some(LoadedArtwork { artwork })
     }
 }
 
-unsafe fn load_legacy_artwork(image: *mut AnyObject) -> Option<LoadedArtwork> {
+fn artwork_request_handler(
+    image: Retained<AnyObject>,
+) -> block2::RcBlock<dyn Fn(CGSize) -> *mut AnyObject> {
+    block2::RcBlock::new(move |_size: CGSize| -> *mut AnyObject {
+        Retained::as_ptr(&image) as *mut AnyObject
+    })
+}
+
+unsafe fn load_legacy_artwork(image: Retained<AnyObject>) -> Option<LoadedArtwork> {
     let supports_legacy_image_init: bool =
         msg_send![class!(MPMediaItemArtwork), instancesRespondToSelector: sel!(initWithImage:)];
     if !supports_legacy_image_init {
-        let _: () = msg_send![image, release];
         return None;
     }
 
     let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
     if artwork_alloc.is_null() {
-        let _: () = msg_send![image, release];
         return None;
     }
-    let artwork: *mut AnyObject = msg_send![artwork_alloc, initWithImage: image];
-    let _: () = msg_send![image, release];
+    let artwork: *mut AnyObject = msg_send![
+        artwork_alloc,
+        initWithImage: Retained::as_ptr(&image) as *mut AnyObject
+    ];
 
     if artwork.is_null() {
         None
     } else {
-        Some(LoadedArtwork {
-            artwork,
-            retained_image: 0,
-        })
+        Some(LoadedArtwork { artwork })
     }
 }
 
@@ -637,11 +717,6 @@ unsafe fn release_cached_artwork(cache: &mut ArtworkCache) {
         let _: () = msg_send![artwork, release];
         cache.artwork = 0;
     }
-    if cache.retained_image != 0 {
-        let image = cache.retained_image as *mut AnyObject;
-        let _: () = msg_send![image, release];
-        cache.retained_image = 0;
-    }
 }
 
 unsafe fn media_action_imp(function: MediaActionImp) -> Imp {
@@ -706,9 +781,107 @@ mod tests {
     };
 
     use super::{
-        fetch_artwork_bytes_with_timeout, read_bounded, ArtworkFetchQueue, ArtworkRequest,
-        ArtworkRequestState,
+        artwork_request_handler, fetch_artwork_bytes_with_timeout, playback_state_value,
+        read_bounded, set_now_playing_playback_state, ArtworkFetchQueue, ArtworkRequest,
+        ArtworkRequestState, CGSize,
     };
+    use objc2::{
+        class, msg_send,
+        rc::{Retained, Weak},
+        runtime::AnyObject,
+        sel,
+    };
+
+    #[test]
+    fn retained_artwork_request_block_survives_artwork_replacement() {
+        let (previous_artwork, previous_image_weak) = new_test_media_artwork();
+        let (_current_artwork, current_image_weak) = new_test_media_artwork();
+        let previous_image = previous_image_weak.load().unwrap();
+        let current_image = current_image_weak.load().unwrap();
+        assert_ne!(
+            Retained::as_ptr(&previous_image),
+            Retained::as_ptr(&current_image)
+        );
+        let previous_artwork_ptr = Retained::as_ptr(&previous_artwork);
+        let requested_image: *mut AnyObject = unsafe {
+            msg_send![previous_artwork_ptr, imageWithSize: CGSize {
+                width: 32.0,
+                height: 32.0,
+            }]
+        };
+
+        assert_eq!(
+            requested_image as *const AnyObject,
+            Retained::as_ptr(&previous_image)
+        );
+    }
+
+    fn new_test_media_artwork() -> (Retained<AnyObject>, Weak<AnyObject>) {
+        unsafe {
+            let size = CGSize {
+                width: 64.0,
+                height: 64.0,
+            };
+            let image_alloc: *mut AnyObject = msg_send![class!(NSImage), alloc];
+            let image: *mut AnyObject = msg_send![image_alloc, initWithSize: size];
+            let image = Retained::from_raw(image).unwrap();
+            let image_weak = Weak::from_retained(&image);
+            let request_handler = artwork_request_handler(image.clone());
+            let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
+            let artwork: *mut AnyObject = msg_send![
+                artwork_alloc,
+                initWithBoundsSize: size,
+                requestHandler: &*request_handler
+            ];
+            let artwork = Retained::from_raw(artwork).unwrap();
+            drop(request_handler);
+            drop(image);
+
+            (artwork, image_weak)
+        }
+    }
+
+    #[test]
+    fn now_playing_playback_state_maps_to_macos_values() {
+        assert_eq!(playback_state_value(true), 1);
+        assert_eq!(playback_state_value(false), 2);
+    }
+
+    #[test]
+    fn now_playing_playback_state_updates_native_center() {
+        let center: *mut AnyObject =
+            unsafe { msg_send![class!(MPNowPlayingInfoCenter), defaultCenter] };
+        assert!(!center.is_null());
+
+        let supports_playback_state: bool =
+            unsafe { msg_send![center, respondsToSelector: sel!(setPlaybackState:)] };
+        assert!(supports_playback_state);
+
+        let initial_state: isize = unsafe { msg_send![center, playbackState] };
+        let _restore = PlaybackStateRestore {
+            center,
+            state: initial_state,
+        };
+
+        for (state, expected) in [(1, 1), (2, 2), (3, 3)] {
+            unsafe { set_now_playing_playback_state(state) };
+            let actual: isize = unsafe { msg_send![center, playbackState] };
+            assert_eq!(actual, expected);
+        }
+    }
+
+    struct PlaybackStateRestore {
+        center: *mut AnyObject,
+        state: isize,
+    }
+
+    impl Drop for PlaybackStateRestore {
+        fn drop(&mut self) {
+            unsafe {
+                let _: () = msg_send![self.center, setPlaybackState: self.state];
+            }
+        }
+    }
 
     #[test]
     fn artwork_body_reader_rejects_bytes_beyond_the_limit() {
@@ -725,6 +898,7 @@ mod tests {
             "local-artwork",
             b"local-artwork",
             Some("image/jpeg"),
+            None,
         )
         .unwrap()
         .unwrap();
@@ -759,7 +933,7 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let server = thread::spawn(move || {
             let _ = listener.accept();
-            thread::sleep(Duration::from_millis(200));
+            thread::sleep(Duration::from_secs(1));
         });
         let started = Instant::now();
 
@@ -769,7 +943,7 @@ mod tests {
         );
 
         assert_eq!(result, None);
-        assert!(started.elapsed() < Duration::from_millis(175));
+        assert!(started.elapsed() < Duration::from_millis(700));
         server.join().unwrap();
     }
 

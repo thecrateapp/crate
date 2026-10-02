@@ -21,6 +21,7 @@ vi.mock("@/lib/auth-route-policy", async (importOriginal) => {
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: false,
+  usesSecureSessionStore: false,
   isTauriRuntime: false,
   getListenAppId: () => "listen-web",
 }));
@@ -52,11 +53,16 @@ import {
   shouldRedirectToLoginOnUnauthorized,
   ensureFreshAuthToken,
   refreshAuthToken,
+  revokeServerSession,
   apiFetch,
   api,
   AUTH_TOKEN_EVENT,
   ApiError,
 } from "@/lib/api";
+import {
+  getOfflineIdentityForServer,
+  persistVerifiedOfflineIdentity,
+} from "@/lib/offline-identity";
 
 function mockFetchResponse(status: number, body?: unknown): Response {
   const ok = status >= 200 && status < 300;
@@ -113,6 +119,61 @@ describe("apiUrl", () => {
 
   it("preserves query params", () => {
     expect(apiUrl("/api/search?q=test")).toBe("/api/search?q=test");
+  });
+});
+
+describe("revokeServerSession", () => {
+  it("uses the captured server URL and bearer token with a bounded request", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(mockFetchResponse(204));
+
+    await revokeServerSession({
+      url: "https://a.example.test/",
+      token: "token-a",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://a.example.test/api/auth/logout",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "omit",
+        headers: { Authorization: "Bearer token-a" },
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("does not issue a request when the captured server has no token", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await revokeServerSession({
+      url: "https://a.example.test",
+      token: null,
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("authoritative refresh rejection", () => {
+  it("tombstones the local offline identity after the refresh endpoint rejects it", async () => {
+    persistVerifiedOfflineIdentity({
+      serverId: "web",
+      serverUrl: window.location.origin,
+      userId: 42,
+      profileKey: "web-profile-42",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as Response);
+
+    await expect(refreshAuthToken()).resolves.toBe(false);
+
+    expect(
+      getOfflineIdentityForServer("web", window.location.origin),
+    ).toBeNull();
   });
 });
 
@@ -876,9 +937,15 @@ describe("native (configurable server) mode", () => {
     vi.resetModules();
     vi.doMock("@/lib/platform", () => ({
       usesConfigurableServer: true,
+      usesSecureSessionStore: true,
       isTauriRuntime: false,
       isCapacitorRuntime: true,
       getListenAppId: () => "listen-capacitor",
+    }));
+    vi.doMock("@/lib/native-secure-session", () => ({
+      getSecureSessionValue: vi.fn(async () => null),
+      setSecureSessionValue: vi.fn(async () => undefined),
+      removeSecureSessionValue: vi.fn(async () => undefined),
     }));
     vi.doMock("@/lib/listen-device", () => ({
       getListenDeviceFingerprint: () => "fp-native",

@@ -99,6 +99,8 @@ function ExtendedPlayerVisualizerCanvas({
   state,
 }: Pick<ExtendedPlayerArtworkProps, "refs" | "state">) {
   const isVisualizerMode = state.vizCfg.surfaceMode === "visualizer";
+  if (!state.visualizerAllowed) return null;
+
   return (
     <div
       className={cn(

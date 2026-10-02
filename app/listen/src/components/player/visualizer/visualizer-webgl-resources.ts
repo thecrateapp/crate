@@ -14,6 +14,7 @@ import {
   LINE_VERT,
   QUAD_VERT,
 } from "./shaders";
+import type { VisualizerQualityProfile } from "./visualizer-quality";
 
 export class VisualizerWebGLResources {
   readonly canvas: HTMLCanvasElement;
@@ -23,6 +24,9 @@ export class VisualizerWebGLResources {
   readonly line: ShaderProgram;
   readonly blur: ShaderProgram;
   readonly quad: ShaderProgram;
+  readonly blurHorizontalLocation: WebGLUniformLocation | null;
+  blurWidth: number;
+  blurHeight: number;
 
   readonly sphere1: Icosphere;
   readonly sphere2: Icosphere;
@@ -39,12 +43,19 @@ export class VisualizerWebGLResources {
 
   private width: number;
   private height: number;
+  private readonly quality: VisualizerQualityProfile;
 
-  constructor(canvas: HTMLCanvasElement, width: number, height: number) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    width: number,
+    height: number,
+    quality: VisualizerQualityProfile,
+  ) {
     const glCtx = canvas.getContext("webgl2", {
       alpha: true,
       antialias: false,
       preserveDrawingBuffer: false,
+      powerPreference: "high-performance",
     });
     if (!glCtx) throw new Error("WebGL2 not supported");
 
@@ -52,14 +63,32 @@ export class VisualizerWebGLResources {
     this.glCtx = glCtx;
     this.width = width;
     this.height = height;
+    this.quality = quality;
+    this.blurWidth = this.getBlurDimension(width);
+    this.blurHeight = this.getBlurDimension(height);
     setGL(glCtx);
 
     const g = this.glCtx;
-    this.sphere3 = new Icosphere(vec3.fromValues(0, 0, 0), 1.0, 5, g.LINES);
+    this.sphere3 = new Icosphere(
+      vec3.fromValues(0, 0, 0),
+      1.0,
+      quality.innerSphereSubdivisions,
+      g.LINES,
+    );
     this.sphere3.create();
-    this.sphere2 = new Icosphere(vec3.fromValues(0, 0, 0), 1.0, 4, g.LINES);
+    this.sphere2 = new Icosphere(
+      vec3.fromValues(0, 0, 0),
+      1.0,
+      quality.middleSphereSubdivisions,
+      g.LINES,
+    );
     this.sphere2.create();
-    this.sphere1 = new Icosphere(vec3.fromValues(0, 0, 0), 1.0, 3, g.LINES);
+    this.sphere1 = new Icosphere(
+      vec3.fromValues(0, 0, 0),
+      1.0,
+      quality.outerSphereSubdivisions,
+      g.LINES,
+    );
     this.sphere1.create();
     this.ring = new Ring(1, 256, g.LINES);
     this.ring.create();
@@ -86,6 +115,10 @@ export class VisualizerWebGLResources {
       new Shader(g.VERTEX_SHADER, QUAD_VERT),
       new Shader(g.FRAGMENT_SHADER, BLUR_FRAG),
     ]);
+    this.blurHorizontalLocation = g.getUniformLocation(
+      this.blur.prog,
+      "u_Horizontal",
+    );
     this.quad = new ShaderProgram([
       new Shader(g.VERTEX_SHADER, QUAD_VERT),
       new Shader(g.FRAGMENT_SHADER, BLEND_FRAG),
@@ -103,6 +136,8 @@ export class VisualizerWebGLResources {
   resize(width: number, height: number) {
     this.width = width;
     this.height = height;
+    this.blurWidth = this.getBlurDimension(width);
+    this.blurHeight = this.getBlurDimension(height);
 
     const g = this.glCtx;
     this.renderer.setSize(width, height);
@@ -147,8 +182,8 @@ export class VisualizerWebGLResources {
         g.TEXTURE_2D,
         0,
         g.RGBA,
-        width,
-        height,
+        this.blurWidth,
+        this.blurHeight,
         0,
         g.RGBA,
         g.UNSIGNED_BYTE,
@@ -189,7 +224,7 @@ export class VisualizerWebGLResources {
     this.configureTexture(this.colorTex, w, h);
 
     this.brightTex = g.createTexture()!;
-    this.configureTexture(this.brightTex, w, h);
+    this.configureTexture(this.brightTex, w, h, g.LINEAR);
 
     g.bindFramebuffer(g.FRAMEBUFFER, this.fbo);
     g.framebufferTexture2D(
@@ -224,7 +259,12 @@ export class VisualizerWebGLResources {
 
     for (let i = 0; i < 2; i++) {
       g.bindFramebuffer(g.FRAMEBUFFER, this.blurFBOs[i]!);
-      this.configureTexture(this.blurTexs[i]!, w, h);
+      this.configureTexture(
+        this.blurTexs[i]!,
+        this.blurWidth,
+        this.blurHeight,
+        g.LINEAR,
+      );
       g.framebufferTexture2D(
         g.DRAW_FRAMEBUFFER,
         g.COLOR_ATTACHMENT0,
@@ -240,13 +280,15 @@ export class VisualizerWebGLResources {
     texture: WebGLTexture,
     width: number,
     height: number,
+    filter?: GLenum,
   ) {
     const g = this.glCtx;
+    const textureFilter = filter ?? g.NEAREST;
     g.bindTexture(g.TEXTURE_2D, texture);
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_S, g.CLAMP_TO_EDGE);
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_T, g.CLAMP_TO_EDGE);
-    g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, g.NEAREST);
-    g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MAG_FILTER, g.NEAREST);
+    g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, textureFilter);
+    g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MAG_FILTER, textureFilter);
     g.texImage2D(
       g.TEXTURE_2D,
       0,
@@ -257,6 +299,13 @@ export class VisualizerWebGLResources {
       g.RGBA,
       g.UNSIGNED_BYTE,
       null,
+    );
+  }
+
+  private getBlurDimension(dimension: number): number {
+    return Math.max(
+      1,
+      Math.ceil(dimension * this.quality.bloomResolutionScale),
     );
   }
 }

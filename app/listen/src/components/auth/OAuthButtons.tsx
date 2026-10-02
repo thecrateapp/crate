@@ -4,7 +4,9 @@ import { toast } from "sonner";
 
 import { api, getApiBase } from "@/lib/api";
 import { beginNativeOAuth, isNative } from "@/lib/capacitor";
+import { openExternalUrl } from "@/lib/external-links";
 import { isTauriRuntime } from "@/lib/platform";
+import { recordTauriAuthDiagnostic } from "@/lib/tauri-auth-diagnostic";
 import { OAuthButtons as OAuthButtonsBase } from "@crate/ui/domain/auth/OAuthButtons";
 
 interface OAuthButtonsProps {
@@ -12,13 +14,38 @@ interface OAuthButtonsProps {
   inviteToken?: string;
 }
 
-const fetchProviders = () =>
-  api<
-    Record<
-      string,
-      { enabled: boolean; configured: boolean; login_url: string | null }
-    >
-  >("/api/auth/providers");
+const fetchProviders = async () => {
+  try {
+    const providers = await api<
+      Record<
+        string,
+        { enabled: boolean; configured: boolean; login_url: string | null }
+      >
+    >("/api/auth/providers");
+
+    if (isTauriRuntime) {
+      const google = providers.google;
+      const enabled = google?.enabled ?? "missing";
+      const configured = google?.configured ?? "missing";
+      recordTauriAuthDiagnostic(
+        google?.enabled && google?.configured
+          ? "Google OAuth available"
+          : "Google OAuth unavailable",
+        `enabled=${enabled}, configured=${configured}`,
+      );
+    }
+
+    return providers;
+  } catch (error) {
+    if (isTauriRuntime) {
+      recordTauriAuthDiagnostic(
+        "OAuth providers request failed",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+    }
+    throw error;
+  }
+};
 
 function oauthProvider(loginUrl: string): "google" | "apple" {
   return /(?:^|[/?])apple(?:[/?]|$)/i.test(loginUrl) ? "apple" : "google";
@@ -35,23 +62,21 @@ export function OAuthButtons({
       const target = new URL(loginUrl, base);
       if (invite) target.searchParams.set("invite", invite);
       if (isTauriRuntime || isNative) {
-        // Desktop (Tauri) and mobile (Capacitor) both do the PKCE +
-        // one-time-code exchange dance through the cratemusic:// deep
-        // link — Tauri registers that same custom scheme as an OS-level
-        // deep link, so it reaches the app the exact same way. The
-        // @capacitor/browser import resolves to a stub on desktop that
-        // opens the system browser via Tauri's opener plugin instead of
-        // a Capacitor bridge that doesn't exist there.
+        // Desktop (Tauri) and mobile (Capacitor) both use the PKCE +
+        // one-time-code exchange through the cratemusic:// deep link.
         void beginNativeOAuth(
           oauthProvider(target.toString()),
           rt || "/",
           invite,
         )
-          .then((nativeLoginUrl) =>
-            import("@capacitor/browser").then(({ Browser }) =>
-              Browser.open({ url: nativeLoginUrl }),
-            ),
-          )
+          .then(async (nativeLoginUrl) => {
+            if (isTauriRuntime) {
+              await openExternalUrl(nativeLoginUrl);
+              return;
+            }
+            const { Browser } = await import("@capacitor/browser");
+            await Browser.open({ url: nativeLoginUrl });
+          })
           .catch((error) => {
             toast.error(
               error instanceof Error && error.message

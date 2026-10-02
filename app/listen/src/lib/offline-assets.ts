@@ -1,5 +1,6 @@
 import { apiFetch, apiUrl } from "@/lib/api";
-import { isIosBrowser, isNative } from "@/lib/capacitor-runtime";
+import { isIosBrowser } from "@/lib/capacitor-runtime";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
 import {
   getOfflineTrackAssetAliases,
   getOfflineTrackAssetKey,
@@ -15,6 +16,7 @@ import {
   clearNativeOfflineAssets,
   deleteNativeCachedTrackAsset,
   estimateNativeOfflineBytes,
+  getNativeOfflineAssetsNeedingRefresh,
   getNativeOfflinePlaybackUrl,
   hasCachedNativeTrackAssets,
   offlineTrackFromIdentity,
@@ -32,7 +34,7 @@ export async function hasCachedTrackAsset(
   track: OfflineTrackIdentityInput,
   storageId?: string | null,
 ): Promise<boolean> {
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     const found = await hasCachedNativeTrackAssets(profileKey, [
       offlineTrackFromIdentity(track, storageId),
     ]);
@@ -50,7 +52,8 @@ export async function hasCachedTrackAssets(
   tracks: OfflineManifestTrack[],
 ): Promise<Set<string>> {
   if (!tracks.length) return new Set();
-  if (isNative) return hasCachedNativeTrackAssets(profileKey, tracks);
+  if (isOfflineNativeRuntime)
+    return hasCachedNativeTrackAssets(profileKey, tracks);
   const cachedKeys = await Promise.all(
     tracks.map(async (track) => {
       const assetKey = getOfflineTrackAssetKey(track);
@@ -62,6 +65,14 @@ export async function hasCachedTrackAssets(
   return new Set(
     cachedKeys.filter((assetKey): assetKey is string => Boolean(assetKey)),
   );
+}
+
+export async function getOfflineAssetsNeedingRefresh(
+  profileKey: string,
+  tracks: OfflineManifestTrack[],
+): Promise<Set<string>> {
+  if (!isOfflineNativeRuntime || !tracks.length) return new Set();
+  return getNativeOfflineAssetsNeedingRefresh(profileKey, tracks);
 }
 
 function expectedTrackBytes(track: OfflineManifestTrack): number {
@@ -96,7 +107,7 @@ export async function ensureOfflineStorageBudget(
       )
     : await estimateMissingOfflineBytes(profileKey, tracks);
   if (pendingBytes <= 0) return;
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     const currentBytes = await estimateNativeOfflineBytes(profileKey);
     if (
       currentBytes + pendingBytes + OFFLINE_STORAGE_HEADROOM_BYTES >
@@ -133,7 +144,7 @@ export async function cacheTrackAsset(
   if (!assetKey) {
     throw new Error("Offline copy requires entity_uid or storage_id");
   }
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     await cacheNativeTrackAsset(profileKey, track, signal);
     return;
   }
@@ -155,7 +166,7 @@ export async function deleteCachedTrackAsset(
 ): Promise<void> {
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return;
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     await deleteNativeCachedTrackAsset(profileKey, track, storageId);
     return;
   }
@@ -167,7 +178,7 @@ export async function deleteCachedTrackAsset(
 }
 
 export async function clearOfflineAssets(profileKey: string): Promise<void> {
-  if (isNative) {
+  if (isOfflineNativeRuntime) {
     await clearNativeOfflineAssets(profileKey);
     return;
   }

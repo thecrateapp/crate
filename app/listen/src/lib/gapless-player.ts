@@ -85,6 +85,10 @@ let currentAnalyser: AnalyserNode | null = null;
 // playback — the consumer (soft-interruption logic) can use this to
 // decide whether it's worth pausing on an offline event.
 let currentTrackFullyBuffered = false;
+let lastKnownPlaybackPosition: {
+  trackPath: string;
+  positionMs: number;
+} | null = null;
 export function getPlaybackLoadLimit(preferHtml5Audio: boolean): number {
   return preferHtml5Audio
     ? MOBILE_HTML5_TRACK_LIMIT
@@ -127,6 +131,53 @@ export function isPlaybackGestureRequiredError(error: unknown): boolean {
   return (
     candidate.type === "not_allowed" || candidate.name === "NotAllowedError"
   );
+}
+
+function setKnownPlaybackPosition(trackPath: string, positionMs: number): void {
+  if (!trackPath || !Number.isFinite(positionMs)) return;
+  lastKnownPlaybackPosition = {
+    trackPath,
+    positionMs: Math.max(0, positionMs),
+  };
+}
+
+function rememberPlaybackPosition(trackPath: string, positionMs: number): void {
+  if (!trackPath || !Number.isFinite(positionMs)) return;
+  if (
+    positionMs <= 0 &&
+    lastKnownPlaybackPosition?.trackPath === trackPath &&
+    lastKnownPlaybackPosition.positionMs > 0
+  ) {
+    // WebKitGTK can report zero after minimizing even though the paused
+    // player still owns the position. Explicit seek/restart paths use
+    // setKnownPlaybackPosition and are allowed to reset it to zero.
+    return;
+  }
+  setKnownPlaybackPosition(trackPath, positionMs);
+}
+
+function restoreBufferedPlaybackPosition(): number | null {
+  const player = instance;
+  if (!player || tauriPlaybackWasActive || !currentTrackFullyBuffered) {
+    return null;
+  }
+  const trackPath = player.getTrack();
+  const remembered = lastKnownPlaybackPosition;
+  if (
+    !trackPath ||
+    remembered?.trackPath !== trackPath ||
+    remembered.positionMs <= 0
+  ) {
+    return null;
+  }
+
+  const reportedPosition = player.getPosition();
+  if (reportedPosition <= 0) {
+    player.setPosition(remembered.positionMs);
+    setKnownPlaybackPosition(trackPath, remembered.positionMs);
+    return remembered.positionMs;
+  }
+  return reportedPosition;
 }
 
 function setAnalyser(analyser: AnalyserNode | null) {
@@ -201,6 +252,8 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   setEqualizerHost(instance as GaplessOutputInternal);
 
   instance.ontimeupdate = (posMs, trackIndex) => {
+    const trackPath = instance?.getTrack();
+    if (trackPath) rememberPlaybackPosition(trackPath, posMs);
     currentCallbacks.onTimeUpdate?.(posMs, trackIndex);
   };
 
@@ -210,6 +263,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   instance.onplay = (path, analyser) => {
     tauriPlaybackWasActive = true;
+    rememberPlaybackPosition(path, instance?.getPosition() ?? 0);
     // analyser is only emitted when WebAudio is the live source.
     // Presence here means the track's buffer is already decoded in RAM
     // (the "switched" case where onplay replaces onswitchtowebaudio).
@@ -219,12 +273,28 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onpause = (path) => {
+    const reportedPosition = instance?.getPosition() ?? 0;
+    rememberPlaybackPosition(path, reportedPosition);
+    recordDevLog(
+      "audio",
+      "paused position snapshot",
+      {
+        track: redactUrl(path),
+        reportedPosition,
+        rememberedPosition:
+          lastKnownPlaybackPosition?.trackPath === path
+            ? lastKnownPlaybackPosition.positionMs
+            : null,
+      },
+      "info",
+    );
     currentCallbacks.onPause?.(path);
   };
 
   instance.onprev = (from, to) => {
     currentTrackFullyBuffered = false;
     invalidateAnalyser();
+    setKnownPlaybackPosition(to, 0);
     currentCallbacks.onPrev?.(from, to);
   };
 
@@ -234,12 +304,15 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   instance.onfinishedall = () => {
     tauriPlaybackWasActive = false;
+    const trackPath = instance?.getTrack();
+    if (trackPath) setKnownPlaybackPosition(trackPath, 0);
     currentCallbacks.onAllFinished?.();
   };
 
   instance.onnext = (from, to) => {
     currentTrackFullyBuffered = false;
     invalidateAnalyser();
+    setKnownPlaybackPosition(to, 0);
     currentCallbacks.onNext?.(from, to);
   };
 
@@ -262,6 +335,15 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onload = (path, fullyLoaded) => {
+    // Gapless5 reports `fullyLoaded` only after the WebAudio fetch has been
+    // decoded into an AudioBuffer. That can finish after the user pauses,
+    // before the HTML5 → WebAudio promotion fires; keep the RAM-backed state
+    // accurate so a Tauri wake does not rebuild the player and fetch again.
+    const currentTrackBufferReady =
+      fullyLoaded && path === instance?.getTrack();
+    if (currentTrackBufferReady) {
+      currentTrackFullyBuffered = true;
+    }
     const durationMs = getCurrentTrackDuration();
     recordDevLog(
       "gapless",
@@ -269,6 +351,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
       {
         path: redactUrl(path),
         durationMs,
+        currentTrackBufferReady,
       },
       "info",
     );
@@ -285,10 +368,17 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     setAnalyser(analyser);
   };
 
+  instance.onunload = (path) => {
+    if (path === instance?.getTrack()) {
+      currentTrackFullyBuffered = false;
+    }
+  };
+
   return instance;
 }
 
 export function destroyPlayer(): void {
+  playerControls.cancelPendingRecovery();
   stopFade();
   resetEqualizer();
   setEqualizerHost(null);
@@ -308,11 +398,13 @@ export function destroyPlayer(): void {
     }
     instance = null;
     currentAnalyser = null;
+    currentTrackFullyBuffered = false;
     audioRecovery.clearSharedGaplessAudioContext(previousContext);
   }
   setVolumeSink(null);
   tauriPlaybackWasActive = false;
   tauriAudioOutputMayBeStale = false;
+  lastKnownPlaybackPosition = null;
 }
 
 // ── Convenience methods ──────────────────────────────────────────
@@ -322,9 +414,29 @@ export function loadQueue(
   startIndex = 0,
   options: { restartIfSameIndex?: boolean } = {},
 ): void {
+  if (!instance) return;
+  const previousTracks = instance.getTracks();
+  const previousTrackPath = instance.getTrack();
+  const queueChanged =
+    previousTracks.length !== urls.length ||
+    urls.some((url, index) => url !== previousTracks[index]);
+  if (queueChanged || options.restartIfSameIndex) {
+    playerControls.cancelPendingRecovery();
+  }
   loadQueueTracks(instance, urls, startIndex, options, () => {
     currentTrackFullyBuffered = false;
   });
+  const trackPath = instance.getTrack();
+  if (!trackPath) return;
+  if (
+    options.restartIfSameIndex ||
+    queueChanged ||
+    previousTrackPath !== trackPath
+  ) {
+    setKnownPlaybackPosition(trackPath, 0);
+  } else {
+    rememberPlaybackPosition(trackPath, instance.getPosition());
+  }
 }
 
 export function addTrack(url: string): void {
@@ -359,6 +471,8 @@ const audioRecovery = createAudioRecoveryController({
   isTauriDesktopRuntime,
   isPlaybackActive: () => tauriPlaybackWasActive,
   isOutputStale: () => tauriAudioOutputMayBeStale,
+  canReuseCurrentTrackBuffer: () => currentTrackFullyBuffered,
+  restoreBufferedPlaybackPosition,
   markOutputStale: () => {
     tauriAudioOutputMayBeStale = true;
   },
@@ -388,7 +502,13 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   const previousContext = getAudioContext();
   const tracks = previous.getTracks();
   const index = Math.max(0, Math.min(previous.getIndex(), tracks.length - 1));
-  const position = previous.getPosition();
+  const previousTrackPath = previous.getTrack();
+  const reportedPosition = previous.getPosition();
+  const rememberedTrackMatches =
+    lastKnownPlaybackPosition?.trackPath === previousTrackPath;
+  const position = rememberedTrackMatches
+    ? lastKnownPlaybackPosition?.positionMs ?? reportedPosition
+    : reportedPosition;
   const loop = previous.loop;
   const singleMode = previous.singleMode;
   const crossfade = previous.crossfade;
@@ -397,7 +517,16 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   recordDevLog(
     "audio",
     "rebuilding player after audio context loss",
-    { reason, tracks: tracks.length, index, position },
+    {
+      reason,
+      tracks: tracks.length,
+      index,
+      track: redactUrl(previousTrackPath),
+      position,
+      reportedPosition,
+      rememberedPosition: lastKnownPlaybackPosition?.positionMs ?? null,
+      rememberedTrackMatches,
+    },
     "warn",
   );
 
@@ -422,6 +551,16 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
     if (Number.isFinite(position) && position > 0) {
       seekTo(position);
     }
+    recordDevLog(
+      "audio",
+      "restored playback position",
+      {
+        track: redactUrl(nextPlayer.getTrack()),
+        requestedPosition: position,
+        appliedPosition: nextPlayer.getPosition(),
+      },
+      "info",
+    );
   }
   nextPlayer.loop = loop;
   nextPlayer.singleMode = singleMode;
@@ -432,12 +571,37 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
 }
 
 export const play = playerControls.play;
-export const pause = playerControls.pause;
-export const stop = playerControls.stop;
+export const pause = (): void => {
+  const trackPath = instance?.getTrack();
+  if (trackPath) {
+    rememberPlaybackPosition(trackPath, instance?.getPosition() ?? 0);
+  }
+  playerControls.pause();
+};
+export const stop = (): void => {
+  const trackPath = instance?.getTrack();
+  playerControls.stop();
+  if (trackPath) setKnownPlaybackPosition(trackPath, 0);
+};
 export const next = playerControls.next;
 export const prev = playerControls.prev;
-export const gotoTrack = playerControls.gotoTrack;
-export const seekTo = playerControls.seekTo;
+export const gotoTrack = async (
+  indexOrUrl: number | string,
+  forcePlay = false,
+): Promise<void> => {
+  const previousTrackPath = instance?.getTrack();
+  const result = await playerControls.gotoTrack(indexOrUrl, forcePlay);
+  if (result === "cancelled") return;
+  const trackPath = instance?.getTrack();
+  if (trackPath && (trackPath !== previousTrackPath || forcePlay)) {
+    setKnownPlaybackPosition(trackPath, 0);
+  }
+};
+export const seekTo = (positionMs: number): void => {
+  playerControls.seekTo(positionMs);
+  const trackPath = instance?.getTrack();
+  if (trackPath) setKnownPlaybackPosition(trackPath, positionMs);
+};
 export const setVolume = playerControls.setVolume;
 export const setPlaybackRate = playerControls.setPlaybackRate;
 export const getPosition = playerControls.getPosition;

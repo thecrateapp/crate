@@ -66,6 +66,7 @@ vi.mock("@/lib/native-secure-session", () => ({
   setSecureSessionValue,
 }));
 vi.mock("@/lib/server-store", () => ({
+  SERVER_STORE_EVENT: "crate-server-store-change",
   waitForPendingSecureSessionWrites,
   getCurrentServerId: () => "server-a",
   getServers: () => [{ id: "server-a" }],

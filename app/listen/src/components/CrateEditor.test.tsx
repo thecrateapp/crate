@@ -1,4 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,9 +59,10 @@ function crateDetail(name: string): CrateDetail {
 
 describe("CrateEditor", () => {
   beforeEach(() => {
+    mocks.api.mockReset();
     mocks.crate = crateDetail("Original name");
-    mocks.useApi.mockImplementation(() => ({
-      data: mocks.crate,
+    mocks.useApi.mockImplementation((url: string | null) => ({
+      data: url?.endsWith("/members") ? [] : mocks.crate,
       loading: false,
       error: null,
       refetch: vi.fn(),
@@ -93,5 +95,26 @@ describe("CrateEditor", () => {
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(
       "Updated from server",
     );
+  });
+
+  it("preserves an absolute collaboration invite URL returned by the API", async () => {
+    const inviteUrl = "https://listen.example.test/crate/invite/invite-token";
+    mocks.crate = {
+      ...crateDetail("Collaborative Crate"),
+      is_collaborative: true,
+    };
+    mocks.api.mockResolvedValueOnce({ join_url: inviteUrl });
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<CrateEditorHarness />, { locale: "en" });
+    await user.click(
+      screen.getByRole("button", { name: "Create collaboration invite" }),
+    );
+
+    expect(
+      await screen.findByRole("textbox", {
+        name: "Collaboration invite link",
+      }),
+    ).toHaveValue(inviteUrl);
   });
 });

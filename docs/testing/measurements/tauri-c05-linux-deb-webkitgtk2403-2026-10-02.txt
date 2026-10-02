@@ -1,0 +1,19 @@
+branch_revision=e8c8530d08862f992ead217eab21b9e3e3c650fb
+workflow=https://github.com/thecrateapp/crate/actions/runs/36947461225
+artifact=crate-linux-0.1.0.deb
+artifact_sha256=325cf5da8af3a38c210754ceb9a8cdbb6cbd3b68f4fc1fea5d520e42eab80b08
+package=crate 0.1.0 amd64
+package_dependency=libwebkit2gtk-4.1-0 >= 2.40.0
+container=Debian 12 x86_64, OrbStack
+runtime_webkitgtk=2.40.3-2~deb12u2
+runtime_javascriptcoregtk=2.40.3-2~deb12u2
+launch=xvfb-run -a dbus-run-session -- /usr/bin/crate-desktop
+rendering=software, X11/Xvfb, private D-Bus session
+profile=isolated XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, XDG_RUNTIME_DIR
+sandbox=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 (container smoke only)
+duration=8 seconds
+visible_window=true
+rendered=Crate server setup page
+app_executable_sha256=817b57a0c210fe9ac07b353061bef4579a61e544a4289f770d502c341feb16d3
+mapped_libraries=app, WebKitWebProcess, and WebKitNetworkProcess loaded system libwebkit2gtk-4.1.so.0.8.4; WebKitWebProcess loaded system libjavascriptcoregtk-4.1.so.0.3.12
+screenshot=tauri-c05-linux-deb-webkitgtk2403-2026-10-02.png

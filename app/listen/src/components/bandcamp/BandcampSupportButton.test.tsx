@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
 import { I18nProvider } from "@/i18n/I18nProvider";
@@ -18,6 +19,9 @@ vi.mock("@/lib/external-links", () => ({
 
 const mockApi = vi.mocked(api);
 const mockOpenExternalUrl = vi.mocked(openExternalUrl);
+const errorToast = vi.hoisted(() => vi.fn());
+
+vi.mock("sonner", () => ({ toast: { error: errorToast } }));
 
 function renderWithI18n(ui: ReactElement) {
   return render(<I18nProvider initialLocale="en">{ui}</I18nProvider>);
@@ -27,6 +31,7 @@ describe("BandcampSupportButton", () => {
   beforeEach(() => {
     mockApi.mockReset();
     mockOpenExternalUrl.mockReset();
+    vi.mocked(toast.error).mockReset();
   });
 
   it("shows an owned badge instead of a buy CTA for purchased albums", async () => {
@@ -111,6 +116,26 @@ describe("BandcampSupportButton", () => {
     expect(mockOpenExternalUrl).toHaveBeenCalledWith(
       "https://highvis.bandcamp.com",
     );
+  });
+
+  it("shows feedback when the external opener fails", async () => {
+    mockApi.mockResolvedValueOnce({
+      entity_type: "artist",
+      entity_uid: "artist-1",
+      artist_url: "https://highvis.bandcamp.com",
+      user_owned: false,
+      user_downloadable: false,
+      latest_import_status: null,
+    });
+    mockOpenExternalUrl.mockRejectedValueOnce(new Error("opener failed"));
+
+    renderWithI18n(
+      <BandcampSupportButton entityType="artist" entityUid="artist-1" />,
+    );
+
+    await userEvent.click(await screen.findByText("Support on Bandcamp"));
+
+    expect(toast.error).toHaveBeenCalledWith("Could not open external link");
   });
 
   it("falls back to the artist Bandcamp link when an album link is missing", async () => {

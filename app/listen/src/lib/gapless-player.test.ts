@@ -147,6 +147,14 @@ function mkMockInstance(
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 let mock: ReturnType<typeof mkMockInstance>;
 
 beforeEach(() => {
@@ -244,6 +252,30 @@ describe("initPlayer", () => {
     handler?.("/tracks/1/stream", {} as AnalyserNode);
 
     expect(isCurrentTrackFullyBuffered()).toBe(true);
+  });
+
+  it("keeps a decoded current-track buffer available when decode finishes while paused", () => {
+    mock.getTrack.mockReturnValue("/tracks/1/stream");
+    initPlayer();
+
+    const onLoad = (mock as unknown as Record<string, unknown>).onload as
+      | ((path: string, fullyLoaded: boolean) => void)
+      | undefined;
+    onLoad?.("/tracks/1/stream", true);
+
+    expect(isCurrentTrackFullyBuffered()).toBe(true);
+  });
+
+  it("does not mark a decoded adjacent track as the current buffer", () => {
+    mock.getTrack.mockReturnValue("/tracks/1/stream");
+    initPlayer();
+
+    const onLoad = (mock as unknown as Record<string, unknown>).onload as
+      | ((path: string, fullyLoaded: boolean) => void)
+      | undefined;
+    onLoad?.("/tracks/2/stream", true);
+
+    expect(isCurrentTrackFullyBuffered()).toBe(false);
   });
 
   it("wires onpause to callbacks", () => {
@@ -450,6 +482,32 @@ describe("destroyPlayer", () => {
     expect(getPlayer()).toBeNull();
   });
 
+  it("cancels playback waiting on audio recovery", async () => {
+    initPlayer();
+    const resume = createDeferred<void>();
+    let contextState: AudioContextState = "suspended";
+    const context = {
+      get state() {
+        return contextState;
+      },
+      resume: vi.fn(() =>
+        resume.promise.then(() => {
+          contextState = "running";
+        }),
+      ),
+    } as unknown as AudioContext;
+    (mock as unknown as { context: AudioContext }).context = context;
+
+    const pendingPlay = play();
+    await vi.waitFor(() => expect(context.resume).toHaveBeenCalled());
+
+    destroyPlayer();
+    resume.resolve(undefined);
+
+    await expect(pendingPlay).resolves.toBe("cancelled");
+    expect(mock.play).not.toHaveBeenCalled();
+  });
+
   it("is a no-op when no instance exists", () => {
     expect(() => destroyPlayer()).not.toThrow();
   });
@@ -522,6 +580,33 @@ describe("loadQueue", () => {
     expect(mock.addTrack).toHaveBeenNthCalledWith(1, urls[0]);
     expect(mock.addTrack).toHaveBeenNthCalledWith(2, urls[1]);
     expect(mock.gotoTrack).toHaveBeenCalledWith(0);
+  });
+
+  it("cancels pending playback recovery when replacing the queue", async () => {
+    initPlayer();
+    mock.getTracks.mockReturnValue(["/tracks/old.flac"]);
+    const resume = createDeferred<void>();
+    let contextState: AudioContextState = "suspended";
+    const context = {
+      get state() {
+        return contextState;
+      },
+      resume: vi.fn(() =>
+        resume.promise.then(() => {
+          contextState = "running";
+        }),
+      ),
+    } as unknown as AudioContext;
+    (mock as unknown as { context: AudioContext }).context = context;
+
+    const pendingPlay = play();
+    await vi.waitFor(() => expect(context.resume).toHaveBeenCalled());
+
+    loadQueue(["/tracks/new.flac"]);
+    resume.resolve(undefined);
+
+    await expect(pendingPlay).resolves.toBe("cancelled");
+    expect(mock.play).not.toHaveBeenCalled();
   });
 
   it("is a no-op when no instance exists", () => {
@@ -710,7 +795,7 @@ describe("prev", () => {
 describe("gotoTrack", () => {
   it("delegates by index", async () => {
     initPlayer();
-    gotoTrack(3, true);
+    await gotoTrack(3, true);
 
     await vi.waitFor(() => {
       expect(mock.gotoTrack).toHaveBeenCalledWith(3, true);
@@ -914,7 +999,7 @@ describe("setCrossfadeDuration", () => {
 
 describe("fadeOutAndPause", () => {
   it("resolves immediately when no instance exists", async () => {
-    await expect(fadeOutAndPause()).resolves.toBeUndefined();
+    await expect(fadeOutAndPause()).resolves.toBe("applied");
   });
 
   it("fades volume down and pauses", async () => {
@@ -934,7 +1019,7 @@ describe("fadeOutAndPause", () => {
 
 describe("fadeInAndPlay", () => {
   it("resolves immediately when no instance exists", async () => {
-    await expect(fadeInAndPlay()).resolves.toBeUndefined();
+    await expect(fadeInAndPlay()).resolves.toBe("applied");
   });
 
   it("starts at 0, plays, then ramps to lastVolume", async () => {

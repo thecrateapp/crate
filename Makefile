@@ -1022,8 +1022,9 @@ cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact releas
 # ===========================================================================
 
 TAURI_DIR := app/listen-desktop
-TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || gh release view --json tagName --jq .tagName 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
+TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
 TAURI_MACOS_OUTPUT_DIR ?= desktop-artifacts/$(TAURI_RELEASE_VERSION)-macos-testers
+TAURI_MACOS_SIGNING_IDENTITY ?= $(if $(APPLE_SIGNING_IDENTITY),$(APPLE_SIGNING_IDENTITY),-)
 TAURI_MACOS_ARM_APP := $(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app
 TAURI_MACOS_INTEL_APP := $(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Crate.app
 
@@ -1049,19 +1050,27 @@ tauri-build-macos-testers: ## Build ARM + Intel macOS .app ZIPs for manual teste
 		echo "$(RED)macOS tester builds must run on macOS.$(NC)"; \
 		exit 1; \
 	fi
+	@rm -rf "$(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle" "$(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle"
 	@echo "$(YELLOW)Building Crate macOS ARM bundle ($(TAURI_RELEASE_VERSION))$(NC)"
-	@npm run --workspace=$(TAURI_DIR) tauri -- build --target aarch64-apple-darwin --bundles app
+	@APPLE_SIGNING_IDENTITY="$(TAURI_MACOS_SIGNING_IDENTITY)" CRATE_DESKTOP_VERSION="$(TAURI_RELEASE_VERSION)" npm run --workspace=$(TAURI_DIR) tauri -- build --target aarch64-apple-darwin --bundles app
+	@node $(TAURI_DIR)/scripts/verify-desktop-artifact-version.mjs "$(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos" "$(TAURI_RELEASE_VERSION)"
 	@echo "$(YELLOW)Building Crate macOS Intel bundle ($(TAURI_RELEASE_VERSION))$(NC)"
-	@npm run --workspace=$(TAURI_DIR) tauri -- build --target x86_64-apple-darwin --bundles app
+	@APPLE_SIGNING_IDENTITY="$(TAURI_MACOS_SIGNING_IDENTITY)" CRATE_DESKTOP_VERSION="$(TAURI_RELEASE_VERSION)" npm run --workspace=$(TAURI_DIR) tauri -- build --target x86_64-apple-darwin --bundles app
+	@node $(TAURI_DIR)/scripts/verify-desktop-artifact-version.mjs "$(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle/macos" "$(TAURI_RELEASE_VERSION)"
 	@mkdir -p "$(TAURI_MACOS_OUTPUT_DIR)"
 	@arm_binary="$(TAURI_MACOS_ARM_APP)/Contents/MacOS/crate-desktop"; \
 	intel_binary="$(TAURI_MACOS_INTEL_APP)/Contents/MacOS/crate-desktop"; \
 	file "$$arm_binary" | grep -q "arm64" || { echo "$(RED)ARM bundle is not arm64$(NC)"; exit 1; }; \
 	file "$$intel_binary" | grep -q "x86_64" || { echo "$(RED)Intel bundle is not x86_64$(NC)"; exit 1; }
-	@echo "$(YELLOW)Applying minimal ad-hoc macOS signatures$(NC)"
-	@xattr -cr "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_INTEL_APP)" 2>/dev/null || true
-	@codesign --force --deep --sign - "$(TAURI_MACOS_ARM_APP)"
-	@codesign --force --deep --sign - "$(TAURI_MACOS_INTEL_APP)"
+	@for app in "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_INTEL_APP)"; do \
+		if [ "$(TAURI_MACOS_SIGNING_IDENTITY)" = "-" ]; then \
+			signature="$$(codesign -dv --verbose=2 "$$app" 2>&1)"; \
+			printf '%s\n' "$$signature" | grep -q '^Signature=adhoc$$' || { echo "$(RED)Expected an ad-hoc signature for $$app$(NC)"; exit 1; }; \
+		else \
+			signature="$$(codesign -dv --verbose=2 "$$app" 2>&1)"; \
+			printf '%s\n' "$$signature" | grep -F "Authority=$(TAURI_MACOS_SIGNING_IDENTITY)" >/dev/null || { echo "$(RED)Unexpected signing identity for $$app$(NC)"; exit 1; }; \
+		fi; \
+	done
 	@codesign --verify --deep --strict --verbose=2 "$(TAURI_MACOS_ARM_APP)"
 	@codesign --verify --deep --strict --verbose=2 "$(TAURI_MACOS_INTEL_APP)"
 	@ditto -c -k --keepParent "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_OUTPUT_DIR)/Crate-macos-arm64-$(TAURI_RELEASE_VERSION).app.zip"

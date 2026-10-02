@@ -17,6 +17,8 @@ describe("gapless player audio recovery controller", () => {
         isTauriDesktopRuntime: () => false,
         isPlaybackActive: () => true,
         isOutputStale: () => false,
+        canReuseCurrentTrackBuffer: () => false,
+        restoreBufferedPlaybackPosition: () => null,
         markOutputStale: vi.fn(),
         rebuildPlayer: vi.fn(),
         clearOutputStale: vi.fn(),
@@ -33,6 +35,8 @@ describe("gapless player audio recovery controller", () => {
       isTauriDesktopRuntime: () => true,
       isPlaybackActive: () => false,
       isOutputStale: () => true,
+      canReuseCurrentTrackBuffer: () => false,
+      restoreBufferedPlaybackPosition: () => null,
       markOutputStale: vi.fn(),
       rebuildPlayer: vi.fn(),
       clearOutputStale: vi.fn(),
@@ -62,6 +66,8 @@ describe("gapless player audio recovery controller", () => {
       isTauriDesktopRuntime: () => false,
       isPlaybackActive: () => false,
       isOutputStale: () => false,
+      canReuseCurrentTrackBuffer: () => false,
+      restoreBufferedPlaybackPosition: () => null,
       markOutputStale: vi.fn(),
       rebuildPlayer: vi.fn(),
       clearOutputStale: vi.fn(),
@@ -89,6 +95,8 @@ describe("gapless player audio recovery controller", () => {
       isTauriDesktopRuntime: () => true,
       isPlaybackActive: () => true,
       isOutputStale: () => false,
+      canReuseCurrentTrackBuffer: () => false,
+      restoreBufferedPlaybackPosition: () => null,
       markOutputStale: vi.fn(),
       rebuildPlayer,
       clearOutputStale: vi.fn(),
@@ -97,6 +105,49 @@ describe("gapless player audio recovery controller", () => {
     await controller.prepare("webkit-interrupted");
 
     expect(resume).toHaveBeenCalledTimes(1);
+    expect(rebuildPlayer).not.toHaveBeenCalled();
+  });
+
+  it("reuses a decoded track buffer after a stale Tauri output wake", async () => {
+    const createNode = () => ({
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    });
+    const context = {
+      state: "running" as AudioContextState,
+      currentTime: 0,
+      destination: createNode(),
+      createGain: vi.fn(() => ({
+        ...createNode(),
+        gain: { value: 1 },
+      })),
+      createOscillator: vi.fn(() => ({
+        ...createNode(),
+        start: vi.fn(),
+        stop: vi.fn(),
+      })),
+    } as unknown as AudioContext;
+    const rebuildPlayer = vi.fn();
+    const clearOutputStale = vi.fn();
+    const restoreBufferedPlaybackPosition = vi.fn(() => 42_000);
+    const controller = createAudioRecoveryController({
+      getAudioContext: () => context,
+      isTauriDesktopRuntime: () => true,
+      isPlaybackActive: () => false,
+      isOutputStale: () => true,
+      canReuseCurrentTrackBuffer: () => true,
+      restoreBufferedPlaybackPosition,
+      markOutputStale: vi.fn(),
+      rebuildPlayer,
+      clearOutputStale,
+    });
+
+    await controller.prepare("resume", {
+      rebuildIfTauriOutputMayBeStale: true,
+    });
+
+    expect(restoreBufferedPlaybackPosition).toHaveBeenCalledOnce();
+    expect(clearOutputStale).toHaveBeenCalledOnce();
     expect(rebuildPlayer).not.toHaveBeenCalled();
   });
 });

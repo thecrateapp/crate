@@ -82,17 +82,13 @@ fn load_settings(service: &str) -> SentrySettings {
 pub fn init_sentry(service: &str) -> Option<sentry::ClientInitGuard> {
     let settings = load_settings(service);
     let dsn = settings.dsn.as_deref()?.parse().ok()?;
-    let before_send = Arc::new(|mut event: sentry::protocol::Event<'static>| {
-        event.user = None;
-        Some(event)
-    });
     let guard = sentry::init(sentry::ClientOptions {
         dsn: Some(dsn),
         environment: Some(settings.environment.into()),
         release: settings.release.map(Into::into),
         send_default_pii: false,
         traces_sample_rate: settings.trace_sample_rate,
-        before_send: Some(before_send),
+        before_send: Some(Arc::new(scrub_native_event)),
         ..Default::default()
     });
     sentry::configure_scope(|scope| scope.set_tag("service", settings.service));
@@ -103,22 +99,60 @@ pub fn capture_operation_error<E>(error: &E, operation: &str)
 where
     E: Error + ?Sized,
 {
-    let operation = operation.trim();
-    let operation = if operation.is_empty() {
-        "unknown"
-    } else {
-        operation
-    };
+    let operation = safe_operation(operation);
     sentry::with_scope(
         |scope| {
             scope.set_level(Some(sentry::Level::Error));
-            scope.set_fingerprint(Some(&["listen-tauri-native", operation]));
-            scope.set_tag("operation", operation);
+            scope.set_fingerprint(Some(&["listen-tauri-native", operation.as_str()]));
+            scope.set_tag("operation", operation.clone());
         },
         || {
             sentry::capture_error(error);
         },
     );
+}
+
+fn safe_operation(operation: &str) -> String {
+    let operation = operation.trim();
+    if operation.is_empty()
+        || operation.len() > 64
+        || !operation
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+    {
+        return "unknown".to_string();
+    }
+    operation.to_string()
+}
+
+fn scrub_native_event(
+    mut event: sentry::protocol::Event<'static>,
+) -> Option<sentry::protocol::Event<'static>> {
+    event.user = None;
+    event.request = None;
+    event.server_name = None;
+    event.culprit = None;
+    event.transaction = None;
+    event.message = None;
+    event.logentry = None;
+    event.stacktrace = None;
+    event.threads.values.clear();
+    event.breadcrumbs.values.clear();
+    event.contexts.clear();
+    event.extra.clear();
+    event.debug_meta = Default::default();
+    event
+        .tags
+        .retain(|key, _| key == "service" || key == "operation");
+    for exception in event.exception.iter_mut() {
+        exception.ty = "NativeError".to_string();
+        exception.value = Some("native operation failed".to_string());
+        exception.module = None;
+        exception.stacktrace = None;
+        exception.raw_stacktrace = None;
+        exception.mechanism = None;
+    }
+    Some(event)
 }
 
 fn first_non_empty(first: Option<String>, second: Option<String>) -> Option<String> {
@@ -131,7 +165,8 @@ fn first_non_empty(first: Option<String>, second: Option<String>) -> Option<Stri
 mod tests {
     use std::io;
 
-    use super::{capture_operation_error, SentrySettings};
+    use super::{capture_operation_error, safe_operation, scrub_native_event, SentrySettings};
+    use sentry::protocol::{Event, Exception, Request};
 
     #[test]
     fn settings_disable_without_a_dsn() {
@@ -174,5 +209,48 @@ mod tests {
             events[0].tags.get("operation").map(String::as_str),
             Some("deep_link.register")
         );
+    }
+
+    #[test]
+    fn native_events_drop_secrets_urls_paths_and_error_payloads() {
+        let mut event = Event {
+            message: Some("Authorization: Bearer do-not-send".to_string()),
+            request: Some(Request {
+                url: Some(
+                    "https://example.test/path?access_token=do-not-send"
+                        .parse()
+                        .unwrap(),
+                ),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        event
+            .extra
+            .insert("session_key".to_string(), serde_json::json!("do-not-send"));
+        event.exception.values.push(Exception {
+            ty: "OAuthError".to_string(),
+            value: Some("code=do-not-send /Users/diego/private".to_string()),
+            ..Default::default()
+        });
+
+        let scrubbed = scrub_native_event(event).unwrap();
+        let serialized = serde_json::to_string(&scrubbed).unwrap();
+
+        assert!(!serialized.contains("do-not-send"));
+        assert!(!serialized.contains("example.test"));
+        assert!(!serialized.contains("/Users/diego"));
+        assert_eq!(
+            scrubbed.exception[0].value.as_deref(),
+            Some("native operation failed")
+        );
+        assert!(scrubbed.request.is_none());
+    }
+
+    #[test]
+    fn operation_tags_reject_values_that_could_contain_secrets() {
+        assert_eq!(safe_operation("secure_session.get"), "secure_session.get");
+        assert_eq!(safe_operation("secure_session?token=secret"), "unknown");
+        assert_eq!(safe_operation(&"a".repeat(65)), "unknown");
     }
 }

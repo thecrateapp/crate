@@ -133,9 +133,34 @@ vi.mock("@crate/ui/lib/use-escape-key", () => ({
 describe("ExtendedPlayer", () => {
   beforeEach(() => {
     localStorage.removeItem("listen-eq-enabled");
+    delete document.documentElement.dataset.crateLinuxWindowChrome;
     useIsDesktopMock.mockReturnValue(true);
     resolvedArtistMock.value = null;
     navigateMock.mockReset();
+  });
+
+  it("hides the visualizer in the Linux desktop player", () => {
+    document.documentElement.dataset.crateLinuxWindowChrome = "true";
+    const track = createMockTrack({
+      id: "extended-linux-visualizer-track",
+      entityUid: "extended-linux-visualizer-track",
+      title: "Linux visualizer",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(
+      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      },
+    );
+
+    expect(screen.queryByRole("tab", { name: /Visualizer/ })).toBeNull();
+    expect(screen.queryByLabelText("Visualizer settings")).toBeNull();
   });
 
   it("enables the artist badge for a global artist identity", () => {
@@ -180,8 +205,9 @@ describe("ExtendedPlayer", () => {
       artist: "Crate",
     });
 
+    const onClose = vi.fn();
     renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={vi.fn()} />,
+      <ExtendedPlayer open={false} onClose={onClose} />,
       {
         playerActions: createMockPlayerActions({
           currentTrack: track,
@@ -196,6 +222,7 @@ describe("ExtendedPlayer", () => {
       .click(screen.getByRole("button", { name: "Open artist" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/artists/crate");
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("hides the desktop Equalizer access when it is globally disabled", () => {

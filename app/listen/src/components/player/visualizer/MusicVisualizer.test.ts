@@ -32,6 +32,7 @@ function createMockWebGL2Context(): WebGL2RenderingContext {
   // prettier-ignore
   const ctx = {
     LINES: 0x0001, TRIANGLES: 0x0004, DEPTH_TEST: 0x0b71,
+    LINEAR: 0x2601, RENDERER: 0x1f01, VENDOR: 0x1f00,
     VERTEX_SHADER: 0x8b31, FRAGMENT_SHADER: 0x8b30,
     FRAMEBUFFER: 0x8d40, COLOR_ATTACHMENT0: 0x8ce0, COLOR_ATTACHMENT1: 0x8ce1,
     DRAW_FRAMEBUFFER: 0x8ca9, DEPTH_ATTACHMENT: 0x8d00,
@@ -69,6 +70,10 @@ function createMockWebGL2Context(): WebGL2RenderingContext {
       return null;
     },
     getProgramInfoLog: vi.fn(() => ""),
+    getParameter: vi.fn((parameter: number) => `mock-${parameter}`),
+    getContextAttributes: vi.fn(() => ({
+      powerPreference: "high-performance",
+    })),
 
     enable: vi.fn(), useProgram: vi.fn(), viewport: vi.fn(),
     clearColor: vi.fn(), clear: vi.fn(),
@@ -88,7 +93,15 @@ function createMockWebGL2Context(): WebGL2RenderingContext {
 
     drawElements: vi.fn(), activeTexture: vi.fn(),
 
-    getExtension() { return { loseContext: vi.fn() }; },
+    getExtension(name: string) {
+      if (name === "WEBGL_debug_renderer_info") {
+        return {
+          UNMASKED_RENDERER_WEBGL: 0x9246,
+          UNMASKED_VENDOR_WEBGL: 0x9245,
+        };
+      }
+      return { loseContext: vi.fn() };
+    },
   };
 
   return ctx as unknown as WebGL2RenderingContext;
@@ -251,6 +264,95 @@ describe("MusicVisualizer", () => {
       expect(bigCanvas.height).toBe(1024);
     });
 
+    it("uses the same capped CSS-pixel and DPR calculation on resize", () => {
+      vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(2);
+      const retinaCanvas = createTestCanvas(400, 220);
+      const viz = new MusicVisualizer(
+        retinaCanvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+
+      expect([retinaCanvas.width, retinaCanvas.height]).toEqual([800, 440]);
+      (viz as unknown as { setSize: (w: number, h: number) => void }).setSize(
+        500,
+        230,
+      );
+      expect([retinaCanvas.width, retinaCanvas.height]).toEqual([1000, 460]);
+
+      (viz as unknown as { setSize: (w: number, h: number) => void }).setSize(
+        2000,
+        1500,
+      );
+      expect([retinaCanvas.width, retinaCanvas.height]).toEqual([1024, 768]);
+      viz.destroy();
+    });
+
+    it("uses linear sampling on the bloom source and intermediate textures", () => {
+      const viz = new MusicVisualizer(
+        canvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+      const filterCalls = (
+        mockGL.texParameteri as unknown as ReturnType<typeof vi.fn>
+      ).mock.calls as number[][];
+      const linearMinFilters = filterCalls.filter(
+        ([, parameter, value]) => parameter === 0x2801 && value === 0x2601,
+      );
+      const linearMagFilters = filterCalls.filter(
+        ([, parameter, value]) => parameter === 0x2800 && value === 0x2601,
+      );
+
+      expect(linearMinFilters).toHaveLength(3);
+      expect(linearMagFilters).toHaveLength(3);
+      viz.destroy();
+    });
+
+    it("keeps full image quality and requests the high-performance GPU profile on Tauri Linux", () => {
+      const bigCanvas = createTestCanvas(2000, 2000);
+      const viz = new MusicVisualizer(
+        bigCanvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+        "spheres",
+        "tauri-linux",
+      );
+      const resources = (
+        viz as unknown as {
+          resources: {
+            blurWidth: number;
+            blurHeight: number;
+            sphere1: { subdivisions: number };
+            sphere2: { subdivisions: number };
+            sphere3: { subdivisions: number };
+          };
+        }
+      ).resources;
+
+      expect(bigCanvas.width).toBe(1024);
+      expect(bigCanvas.height).toBe(1024);
+      expect([resources.blurWidth, resources.blurHeight]).toEqual([1024, 1024]);
+      expect([
+        resources.sphere3.subdivisions,
+        resources.sphere2.subdivisions,
+        resources.sphere1.subdivisions,
+      ]).toEqual([5, 4, 3]);
+
+      expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledWith(
+        "webgl2",
+        expect.objectContaining({ powerPreference: "high-performance" }),
+      );
+
+      const drawElements = mockGL.drawElements as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      const drawCountBefore = drawElements.mock.calls.length;
+      viz.start();
+      expect(drawElements.mock.calls.length - drawCountBefore).toBe(14);
+      viz.stop();
+    });
+
     it("handles zero-size canvas gracefully", () => {
       const zeroCanvas = createTestCanvas(0, 0);
       expect(
@@ -363,6 +465,20 @@ describe("MusicVisualizer", () => {
       viz.start();
       expect(window.requestAnimationFrame).toHaveBeenCalled();
       viz.stop();
+    });
+
+    it("does not keep a render loop alive for a zero-size canvas", () => {
+      const zeroCanvas = createTestCanvas(0, 0);
+      const viz = new MusicVisualizer(
+        zeroCanvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+
+      viz.start();
+
+      expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+      viz.destroy();
     });
 
     it("start() is idempotent", () => {
@@ -884,6 +1000,38 @@ describe("MusicVisualizer", () => {
       });
 
       flushRafFrame();
+      viz.stop();
+    });
+
+    it("refreshes viewport compensation when both render dimensions stay capped", () => {
+      canvas = createTestCanvas(1200, 1200);
+      canvas.dataset.vizReferenceSize = "1000";
+      const viz = new MusicVisualizer(
+        canvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+
+      viz.start();
+      const initialCompensation = (
+        viz as unknown as { viewportScaleCompensation: number }
+      ).viewportScaleCompensation;
+
+      Object.defineProperty(canvas, "clientWidth", {
+        value: 1600,
+        writable: true,
+      });
+      Object.defineProperty(canvas, "clientHeight", {
+        value: 1600,
+        writable: true,
+      });
+      flushRafFrame();
+
+      const resizedCompensation = (
+        viz as unknown as { viewportScaleCompensation: number }
+      ).viewportScaleCompensation;
+      expect(initialCompensation).toBeCloseTo(1000 / 1200);
+      expect(resizedCompensation).toBeCloseTo(0.7);
       viz.stop();
     });
   });
