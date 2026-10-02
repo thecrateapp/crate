@@ -1177,3 +1177,14 @@ These CI results do not close the minimum-OS upgrade matrix, Developer ID
 signing/notarization, installed OAuth completion on all operating systems,
 physical Linux Wayland playback/offline checks, native Now Playing delivery,
 or clean real-player memory captures across all three desktop systems.
+
+### macOS C07 artwork ownership revalidation — 2026-10-03
+
+On the current branch checkout, the isolated macOS regression
+`cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml --lib macos_media_controls::tests::retained_artwork_request_block_survives_artwork_replacement -- --exact`
+passed 1/1. The test constructs two native `MPMediaItemArtwork` objects and
+verifies that the earlier request handler still returns its owned image after
+the current artwork changes. It does not publish metadata to
+`MPNowPlayingInfoCenter` or verify delivery in Control Center. This revalidates
+the callback-lifetime contract without interacting with the already-running
+manual app; C07's system-surface delivery remains open.
