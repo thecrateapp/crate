@@ -44,8 +44,8 @@ const {
         }) => void)
       | null,
   },
-  mockPublicShareUrl: vi.fn(
-    (path: string) => `https://listen.example.test${path}`,
+  mockPublicShareUrl: vi.fn((path: string) =>
+    /^https?:\/\//i.test(path) ? path : `https://listen.example.test${path}`,
   ),
 }));
 
@@ -85,6 +85,8 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/share-url", () => ({
   publicShareUrl: mockPublicShareUrl,
+  inviteShareUrl: (invite: { join_url: string; public_url?: string | null }) =>
+    mockPublicShareUrl(invite.public_url ?? invite.join_url),
 }));
 
 vi.mock("@/hooks/use-api", () => ({
@@ -932,6 +934,7 @@ describe("JamSession active room - host", () => {
       token: "inv-token",
       join_url: "/jam/invite/inv-token",
       qr_value: "/api/qr?value=...",
+      public_url: "https://music.custom.test/jam/invite/inv-token",
     };
     mockApiCall.mockResolvedValueOnce(invite);
     renderWithListenProviders(<JamSession />);
@@ -949,9 +952,11 @@ describe("JamSession active room - host", () => {
       );
     });
     expect(screen.getByText("Invite to room")).toBeInTheDocument();
-    expect(mockPublicShareUrl).toHaveBeenCalledWith("/jam/invite/inv-token");
+    expect(mockPublicShareUrl).toHaveBeenCalledWith(
+      "https://music.custom.test/jam/invite/inv-token",
+    );
     expect(
-      screen.getByText("https://listen.example.test/jam/invite/inv-token"),
+      screen.getByText("https://music.custom.test/jam/invite/inv-token"),
     ).toBeInTheDocument();
   });
 

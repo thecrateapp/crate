@@ -25,7 +25,7 @@ import { useJamPlaybackEffects } from "@/hooks/use-jam-playback-effects";
 import { useJamSessionLifecycle } from "@/hooks/use-jam-session-lifecycle";
 import { useJamSessionState } from "@/hooks/use-jam-session-state";
 import { useJamWebSocket } from "@/hooks/use-jam-websocket";
-import { publicShareUrl } from "@/lib/share-url";
+import { inviteShareUrl } from "@/lib/share-url";
 import { buildJamRoomViewProps } from "@/hooks/jam-session-view-props";
 import type { JamRoom } from "@/pages/jam-reducer";
 
@@ -453,7 +453,7 @@ export function useJamSessionController() {
     metadataTagsInput,
     setMetadataTagsInput,
     saveRoomMetadata,
-    inviteLink: inviteData ? publicShareUrl(inviteData.join_url) : null,
+    inviteLink: inviteData ? inviteShareUrl(inviteData) : null,
     inviteModalOpen,
     setInviteModalOpen,
     copyInviteLink,

@@ -2,18 +2,18 @@ import os
 from urllib.parse import urlsplit, urlunsplit
 
 
-def public_share_url(path: str) -> str:
-    """Make a share path absolute when the instance has a canonical Listen URL."""
+def public_share_url(path: str) -> str | None:
+    """Build an absolute share URL when the instance has a canonical Listen URL."""
     normalized_path = path if path.startswith("/") else f"/{path}"
     configured_base = os.environ.get("CRATE_PUBLIC_LISTEN_BASE_URL", "").strip()
     if not configured_base:
-        return normalized_path
+        return None
 
     try:
         parsed_base = urlsplit(configured_base)
         parsed_path = urlsplit(normalized_path)
     except ValueError:
-        return normalized_path
+        return None
 
     if (
         parsed_base.scheme not in {"http", "https"}
@@ -25,7 +25,7 @@ def public_share_url(path: str) -> str:
         or parsed_path.scheme
         or parsed_path.netloc
     ):
-        return normalized_path
+        return None
 
     base_path = parsed_base.path.rstrip("/")
     return urlunsplit(

@@ -797,11 +797,12 @@ def create_room_invite(request: Request, room_id: str, body: JamInviteCreateRequ
         expires_in_hours=body.expires_in_hours,
         max_uses=body.max_uses,
     )
-    join_url = public_share_url(f"/jam/invite/{invite['token']}")
+    invite_path = f"/jam/invite/{invite['token']}"
     return {
         **invite,
-        "join_url": join_url,
-        "qr_value": join_url,
+        "join_url": invite_path,
+        "qr_value": invite_path,
+        "public_url": public_share_url(invite_path),
     }
 
 

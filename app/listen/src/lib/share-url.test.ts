@@ -13,7 +13,7 @@ vi.mock("@/lib/platform", () => ({
   },
 }));
 
-import { publicShareUrl } from "@/lib/share-url";
+import { inviteShareUrl, publicShareUrl } from "@/lib/share-url";
 
 describe("publicShareUrl", () => {
   beforeEach(() => {
@@ -60,6 +60,26 @@ describe("publicShareUrl", () => {
         "https://music.custom.test/listen/playlist/invite/token?from=share",
       ),
     ).toBe("https://music.custom.test/listen/playlist/invite/token?from=share");
+  });
+
+  it("prefers the additive public URL while preserving the relative API fields", () => {
+    getApiBaseMock.mockReturnValue("https://api.example.test");
+
+    expect(
+      inviteShareUrl({
+        join_url: "/jam/invite/token",
+        public_url: "https://listen.custom.test/library/jam/invite/token",
+      }),
+    ).toBe("https://listen.custom.test/library/jam/invite/token");
+  });
+
+  it("resolves the legacy relative invite when no public URL is supplied", () => {
+    vi.stubGlobal("window", { location: { origin: "tauri://localhost" } });
+    getApiBaseMock.mockReturnValue("https://api.example.test");
+
+    expect(inviteShareUrl({ join_url: "/jam/invite/token" })).toBe(
+      "https://listen.example.test/jam/invite/token",
+    );
   });
 
   it("uses the current public origin for web shares", () => {

@@ -422,11 +422,12 @@ def invite(request: Request, playlist_id: int, body: PlaylistInviteRequest):
         expires_in_hours=body.expires_in_hours,
         max_uses=body.max_uses,
     )
-    join_url = public_share_url(f"/playlist/invite/{invite_row['token']}")
+    invite_path = f"/playlist/invite/{invite_row['token']}"
     return {
         **invite_row,
-        "join_url": join_url,
-        "qr_value": join_url,
+        "join_url": invite_path,
+        "qr_value": invite_path,
+        "public_url": public_share_url(invite_path),
     }
 
 

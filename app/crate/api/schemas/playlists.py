@@ -193,6 +193,7 @@ class PlaylistInviteResponse(BaseModel):
     created_at: datetime | str | None = None
     join_url: str
     qr_value: str
+    public_url: str | None = None
 
 
 class PlaylistInviteAcceptResponse(OkResponse):
