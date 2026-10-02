@@ -528,7 +528,6 @@ class TestNativeOAuthLinkApi:
             state="s" * 43,
         )
         with (
-            patch("crate.api.auth.transaction_scope") as transaction_scope,
             patch(
                 "crate.api.native_oauth_auth.get_session",
                 return_value=self._active_session(),
@@ -540,8 +539,7 @@ class TestNativeOAuthLinkApi:
             patch("crate.api.auth.get_user_by_external_identity", return_value=None),
             patch("crate.api.auth.get_user_external_identity", return_value=None),
             patch("crate.api.auth.get_user_by_google_id", return_value=None),
-            patch("crate.api.auth.upsert_user_external_identity") as upsert_identity,
-            patch("crate.api.auth.update_user") as update_user,
+            patch("crate.api.auth.link_oauth_user_identity") as link_identity,
         ):
             first = native_oauth_link_complete(
                 self._request(bearer="old-access-token"), body
@@ -552,9 +550,7 @@ class TestNativeOAuthLinkApi:
 
         assert first == {"ok": True}
         assert second == {"ok": True}
-        session = transaction_scope.return_value.__enter__.return_value
-        transaction_scope.assert_called_once_with()
-        upsert_identity.assert_called_once_with(
+        link_identity.assert_called_once_with(
             7,
             "google",
             external_user_id="google-subject-7",
@@ -562,10 +558,7 @@ class TestNativeOAuthLinkApi:
             status="linked",
             last_error=None,
             metadata={"email": "linked@example.test"},
-            session=session,
-        )
-        update_user.assert_called_once_with(
-            7, google_id="google-subject-7", session=session
+            legacy_google_id="google-subject-7",
         )
 
     def test_google_link_rolls_back_identity_when_legacy_id_update_conflicts(

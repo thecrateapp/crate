@@ -151,9 +151,9 @@ from crate.db.repositories.auth import (
     update_user_status,
     upsert_user_external_identity,
 )
+from crate.db.repositories.auth_identities import link_oauth_user_identity
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.repositories.tasks import create_task
-from crate.db.tx import transaction_scope
 from crate.user_avatars import (
     AvatarProxyError,
     AvatarUnavailable,
@@ -2754,27 +2754,24 @@ def _apply_native_oauth_link(handoff: NativeOAuthLinkHandoff) -> None:
             )
 
     try:
-        with transaction_scope() as session:
-            upsert_user_external_identity(
-                handoff.user_id,
-                handoff.provider,
-                external_user_id=handoff.external_user_id,
-                external_username=handoff.external_username,
-                status="linked",
-                last_error=None,
-                metadata=(
-                    {"email": handoff.external_username}
-                    if handoff.external_username
-                    else {}
-                ),
-                session=session,
-            )
-            if handoff.provider == "google" and not user.get("google_id"):
-                update_user(
-                    handoff.user_id,
-                    google_id=handoff.external_user_id,
-                    session=session,
-                )
+        link_oauth_user_identity(
+            handoff.user_id,
+            handoff.provider,
+            external_user_id=handoff.external_user_id,
+            external_username=handoff.external_username,
+            status="linked",
+            last_error=None,
+            metadata=(
+                {"email": handoff.external_username}
+                if handoff.external_username
+                else {}
+            ),
+            legacy_google_id=(
+                handoff.external_user_id
+                if handoff.provider == "google" and not user.get("google_id")
+                else None
+            ),
+        )
     except SAIntegrityError as exc:
         _raise_oauth_identity_conflict(handoff.provider, exc)
 
