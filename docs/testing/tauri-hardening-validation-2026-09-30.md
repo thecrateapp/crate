@@ -1001,3 +1001,20 @@ The current PR run's frontend test and Chromium appearance jobs were still in
 progress at this audit; the security scan, React Doctor, and PR Agent Review
 had passed. Desktop, Android, iOS, and the full backend test jobs were skipped
 by the PR draft guards, not reported as failures.
+
+### Persistent-review follow-up — `7469bf71`, 2026-10-02
+
+The next persistent PR review, updated through `0cdddca0`, correctly identified
+that `auth.getSession` failures had lost the HTTP status and Last.fm error
+details after the strict native path was introduced. Commit `7469bf71` restores
+those diagnostics in `lastfm_get_session_strict`, so both native and legacy
+callers log them once. Provider messages are whitespace-normalized, capped at
+160 characters, and redact the API key, API secret, and auth token; request
+exception text and URLs are not logged.
+
+Regression tests first failed against the old logging and now verify status,
+provider code/message, credential redaction, and the single log record through
+the legacy wrapper. `test_scrobble_lastfm.py` passes 17/17, and the repository
+pre-commit Ruff and formatting hooks pass. The separate Google refresh-token
+finding remains non-applicable: the Google flow requests identity scopes and
+does not persist provider tokens.
