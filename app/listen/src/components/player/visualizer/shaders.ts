@@ -1,3 +1,11 @@
+import {
+  BLOOM_BLUR_GAUSSIAN_WEIGHTS,
+  BLOOM_BLUR_PAIRED_TAPS,
+} from "./visualizer-bloom-kernel";
+
+const glslFloat = (value: number) => value.toFixed(8);
+const [nearBlurTap, farBlurTap] = BLOOM_BLUR_PAIRED_TAPS;
+
 export const LINE_VERT = `#version 300 es
 
 uniform float u_Time;
@@ -202,23 +210,28 @@ out vec4 out_Col;
 
 uniform sampler2D scene;
 uniform bool u_Horizontal;
-float weight[5] = float[] (0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
 
 void main() {
   ivec2 size = textureSize(scene, 0);
   vec2 tex_offset = 1.0 / vec2(size.x, size.y);
-  vec3 result = texture(scene, fs_Pos).rgb * weight[0];
-  if(u_Horizontal) {
-      for(int i = 1; i < 5; ++i) {
-          result += texture(scene, fs_Pos + vec2(tex_offset.x * float(i), 0.0)).rgb * weight[i];
-          result += texture(scene, fs_Pos - vec2(tex_offset.x * float(i), 0.0)).rgb * weight[i];
-      }
-  } else {
-      for(int i = 1; i < 5; ++i) {
-          result += texture(scene, fs_Pos + vec2(0.0, tex_offset.y * float(i))).rgb * weight[i];
-          result += texture(scene, fs_Pos - vec2(0.0, tex_offset.y * float(i))).rgb * weight[i];
-      }
-  }
+  vec2 direction = u_Horizontal
+      ? vec2(tex_offset.x, 0.0)
+      : vec2(0.0, tex_offset.y);
+  vec3 result = texture(scene, fs_Pos).rgb * ${glslFloat(
+    BLOOM_BLUR_GAUSSIAN_WEIGHTS[0],
+  )};
+  result += texture(scene, fs_Pos + direction * ${glslFloat(
+    nearBlurTap!.offset,
+  )}).rgb * ${glslFloat(nearBlurTap!.weight)};
+  result += texture(scene, fs_Pos - direction * ${glslFloat(
+    nearBlurTap!.offset,
+  )}).rgb * ${glslFloat(nearBlurTap!.weight)};
+  result += texture(scene, fs_Pos + direction * ${glslFloat(
+    farBlurTap!.offset,
+  )}).rgb * ${glslFloat(farBlurTap!.weight)};
+  result += texture(scene, fs_Pos - direction * ${glslFloat(
+    farBlurTap!.offset,
+  )}).rgb * ${glslFloat(farBlurTap!.weight)};
   out_Col = vec4(result, 1.0);
 }
 `;

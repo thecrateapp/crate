@@ -288,6 +288,27 @@ describe("MusicVisualizer", () => {
       viz.destroy();
     });
 
+    it("uses linear sampling on the bloom source and intermediate textures", () => {
+      const viz = new MusicVisualizer(
+        canvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+      const filterCalls = (
+        mockGL.texParameteri as unknown as ReturnType<typeof vi.fn>
+      ).mock.calls as number[][];
+      const linearMinFilters = filterCalls.filter(
+        ([, parameter, value]) => parameter === 0x2801 && value === 0x2601,
+      );
+      const linearMagFilters = filterCalls.filter(
+        ([, parameter, value]) => parameter === 0x2800 && value === 0x2601,
+      );
+
+      expect(linearMinFilters).toHaveLength(3);
+      expect(linearMagFilters).toHaveLength(3);
+      viz.destroy();
+    });
+
     it("keeps full image quality and requests the high-performance GPU profile on Tauri Linux", () => {
       const bigCanvas = createTestCanvas(2000, 2000);
       const viz = new MusicVisualizer(

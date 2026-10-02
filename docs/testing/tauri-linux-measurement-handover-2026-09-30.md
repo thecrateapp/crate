@@ -74,6 +74,15 @@ the Crate API, or use a user profile. The 720 × 720 CSS canvas matches the
 square visualizer in the player. The branch also preserves aspect ratio when
 the DPR-scaled buffer reaches its 1,024-pixel cap.
 
+The current R07 candidate pairs adjacent Gaussian bloom taps into fractional
+linear-filtered samples. This reconstructs the original discrete kernel while
+reducing the blur shader from nine texture reads to five per pass (50 instead
+of 90 reads per pixel across ten passes). Re-run the probe on the i9 Wayland
+host and compare frame-interval p50/p95 and per-process CPU with the recorded
+23–24 ms frame median. Keep the Linux visualizer hidden unless the measured
+frame pacing is smooth; a code-level reduction or a macOS result alone does
+not meet that gate.
+
 Start a loopback receiver and launch the probe from the repository root:
 
 ```bash

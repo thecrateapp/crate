@@ -224,7 +224,7 @@ export class VisualizerWebGLResources {
     this.configureTexture(this.colorTex, w, h);
 
     this.brightTex = g.createTexture()!;
-    this.configureTexture(this.brightTex, w, h);
+    this.configureTexture(this.brightTex, w, h, g.LINEAR);
 
     g.bindFramebuffer(g.FRAMEBUFFER, this.fbo);
     g.framebufferTexture2D(
@@ -263,7 +263,7 @@ export class VisualizerWebGLResources {
         this.blurTexs[i]!,
         this.blurWidth,
         this.blurHeight,
-        this.quality.bloomResolutionScale < 1 ? g.LINEAR : g.NEAREST,
+        g.LINEAR,
       );
       g.framebufferTexture2D(
         g.DRAW_FRAMEBUFFER,

@@ -232,6 +232,28 @@ One uninterrupted visible 30-second run reported frame-interval p50/p95/max of 1
 
 The process CPU/RSS samplers started after the clean cycle and overlapped those interrupted cycles, so this capture does not provide valid per-process CPU/RSS for the DPR-2 run. The earlier DPR-1 three-run capture remains the CPU/RSS evidence. An installed-player integration check and clean repeated HiDPI runs remain open.
 
+### Bloom sampling optimization candidate — R07
+
+The bloom shader now groups adjacent symmetric Gaussian taps into fractional
+samples with linear texture filtering. Each paired sample exactly reconstructs
+the two original weights; the blur therefore keeps the same kernel while
+reducing texture reads from 9 to 5 per pass, or 90 to 50 across the existing
+10 passes. The kernel equivalence, texture filters, and shader sample count are
+covered by focused Listen tests. A production Listen build also passes.
+
+This code-level reduction is not evidence that Linux frame pacing is smooth.
+The isolated local probe could not produce a valid visible Mac measurement
+because macOS was locked and the WebView reported `visibilityState=hidden`.
+R07 remains open until the same probe records visible runs on the i9 Wayland
+host and the installed Linux player; keep the Linux visualizer hidden until
+those measurements meet the frame-pacing gate.
+
+### CI status on source revision — `026c3198025e5a3130d90abb16b21d26bec5f8ed`
+
+The current PR checks showed Android, Desktop Apps, and iOS as `skipped` because
+PR #259 remains a draft; these were not failed jobs. Manual dispatches against
+this exact source revision completed successfully: [Build Android](https://github.com/thecrateapp/crate/actions/runs/36942333262), [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36942333335), and [Build iOS](https://github.com/thecrateapp/crate/actions/runs/36942333179). Desktop passed on Linux, Windows, and macOS. These runs predate the local bloom shader changes above, which are not yet on the remote branch.
+
 ## Production player path relevant to R08
 
 Tauri desktop runs the production `Gapless5` engine with both HTML5 audio and WebAudio enabled. It begins the HTML5 stream while fetching the same track into an `ArrayBuffer`, decodes the full track with `AudioContext.decodeAudioData`, then promotes playback to an `AudioBufferSourceNode` and pauses the HTML5 element. Desktop sets `loadLimit` to two tracks so the adjacent track can be ready for gapless playback; when crossfade is enabled, track transitions can overlap. The setup and limit are in [`gapless-player.ts`](../../app/listen/src/lib/gapless-player.ts), and the fetch/decode/promotion path is in [`gapless5.js`](../../app/listen/src/lib/gapless5/gapless5.js).
