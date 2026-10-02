@@ -296,6 +296,32 @@ describe("desktop (Tauri) native OAuth via secure storage", () => {
     expect(secureRecord(`crate.oauth.${state}`)).toBeNull();
   });
 
+  it("clears native login state and surfaces a retryable provider failure", async () => {
+    const state = "e".repeat(32);
+    seedSecureRecord(
+      `crate.oauth.${state}`,
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/library",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic://oauth/callback?state=${state}&error=provider_error`,
+      ),
+    ).resolves.toMatchObject({
+      handled: true,
+      next: "/",
+      providerError: true,
+    });
+
+    expect(mocks.apiForServerMock).not.toHaveBeenCalled();
+    expect(secureRecord(`crate.oauth.${state}`)).toBeNull();
+  });
+
   it("keeps the PKCE verifier when exchange fails transiently", async () => {
     const state = "s".repeat(32);
     const recordKey = `crate.oauth.${state}`;

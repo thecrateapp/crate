@@ -70,6 +70,7 @@ interface OAuthCallbackResult {
   next: string;
   retryable?: true;
   cancelled?: true;
+  providerError?: true;
   operation?: "link";
   provider?: OAuthProvider;
   userId?: number;
@@ -574,7 +575,7 @@ export async function consumeOAuthCallbackUrl(
       return { handled: false, next: "/" };
     }
     if (isNativeLinkCallback) {
-      if (callbackError === "cancelled") {
+      if (callbackError) {
         return exchangeNativeOAuthLinkCallback("", state, true);
       }
       if (!code || !NATIVE_LINK_VALUE_RE.test(code)) {
@@ -592,6 +593,13 @@ export async function consumeOAuthCallbackUrl(
         removePendingNativeOAuthCallback(state),
       ]);
       return { handled: true, next: "/", cancelled: true };
+    }
+    if (callbackError) {
+      await Promise.allSettled([
+        removeNativeOAuthRecord(oauthRecordKey(state)),
+        removePendingNativeOAuthCallback(state),
+      ]);
+      return { handled: true, next: "/", providerError: true };
     }
     if (!code) return { handled: false, next: "/" };
     await writePendingNativeOAuthCallback({

@@ -1,5 +1,7 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { NavigateFunction } from "react-router";
+import { toast } from "sonner";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import { consumePendingOAuthNext } from "@/lib/capacitor";
@@ -22,6 +24,8 @@ export function useAuthOAuthSync({
   navigate: NavigateFunction;
   refetch: () => Promise<AuthUser | null>;
 }) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     function handleTokenReceived() {
       void completePendingOAuthFlow(
@@ -39,6 +43,20 @@ export function useAuthOAuthSync({
       );
     };
   }, [navigate, refetch]);
+
+  useEffect(() => {
+    function handleProviderError() {
+      toast.error(t("auth.login.connectionError"));
+    }
+
+    window.addEventListener("crate:oauth-provider-error", handleProviderError);
+    return () => {
+      window.removeEventListener(
+        "crate:oauth-provider-error",
+        handleProviderError,
+      );
+    };
+  }, [t]);
 
   useEffect(() => {
     void completePendingOAuthFlow(consumePendingOAuthNext(), refetch, navigate);

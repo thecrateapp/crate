@@ -207,11 +207,17 @@ export function dispatchOAuthCallbackResult(result: {
   provider?: string;
   userId?: number;
   cancelled?: true;
+  providerError?: true;
   error?: true;
 }): void {
   if (!result.handled) return;
   if (result.cancelled) {
     recordTauriAuthDiagnostic("Native OAuth login cancelled");
+    return;
+  }
+  if (result.providerError) {
+    recordTauriAuthDiagnostic("Native OAuth provider error");
+    window.dispatchEvent(new CustomEvent("crate:oauth-provider-error"));
     return;
   }
   if (result.operation === "link") {

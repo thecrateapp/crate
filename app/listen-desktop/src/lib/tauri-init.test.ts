@@ -73,6 +73,25 @@ describe("dispatchOAuthCallbackResult", () => {
     expect(authReceived).not.toHaveBeenCalled();
     window.removeEventListener("crate:auth-token-received", authReceived);
   });
+
+  it("surfaces native OAuth provider failures without announcing login success", () => {
+    const authReceived = vi.fn();
+    const providerError = vi.fn();
+    vi.stubGlobal("window", new EventTarget());
+    window.addEventListener("crate:auth-token-received", authReceived);
+    window.addEventListener("crate:oauth-provider-error", providerError);
+
+    dispatchOAuthCallbackResult({
+      handled: true,
+      next: "/",
+      providerError: true,
+    });
+
+    expect(providerError).toHaveBeenCalledOnce();
+    expect(authReceived).not.toHaveBeenCalled();
+    window.removeEventListener("crate:auth-token-received", authReceived);
+    window.removeEventListener("crate:oauth-provider-error", providerError);
+  });
 });
 
 describe("mergeInitialDeepLinkUrls", () => {

@@ -164,6 +164,32 @@ describe("Capacitor initialization", () => {
     window.removeEventListener("crate:auth-token-received", authReceived);
   });
 
+  it("surfaces native OAuth provider failures without announcing login success", async () => {
+    consumeOAuthCallbackUrl.mockResolvedValue({
+      handled: true,
+      next: "/",
+      providerError: true,
+    });
+    const authReceived = vi.fn();
+    const providerError = vi.fn();
+    window.addEventListener("crate:auth-token-received", authReceived);
+    window.addEventListener("crate:oauth-provider-error", providerError);
+    const { initCapacitor } = await import("./capacitor-init");
+    await initCapacitor();
+
+    const urlOpen = appAddListener.mock.calls.find(
+      ([eventName]) => eventName === "appUrlOpen",
+    )?.[1];
+    urlOpen?.({
+      url: "cratemusic://oauth/callback?state=s&error=provider_error",
+    });
+
+    await vi.waitFor(() => expect(providerError).toHaveBeenCalledOnce());
+    expect(authReceived).not.toHaveBeenCalled();
+    window.removeEventListener("crate:auth-token-received", authReceived);
+    window.removeEventListener("crate:oauth-provider-error", providerError);
+  });
+
   it("maps the resolved appearance mode to the native status bar", async () => {
     const { applyNativeColorMode } = await import("./capacitor-init");
 

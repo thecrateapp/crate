@@ -166,6 +166,10 @@ async function initializeCapacitor(): Promise<string | null> {
 
 async function consumeOAuthCallbackAndNotify(url: string): Promise<void> {
   const result = await consumeOAuthCallbackUrl(url);
+  if (result.handled && result.providerError) {
+    window.dispatchEvent(new CustomEvent("crate:oauth-provider-error"));
+    return;
+  }
   if (result.handled && !result.cancelled) {
     window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
   }

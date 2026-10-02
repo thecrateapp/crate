@@ -2275,8 +2275,13 @@ def oauth_callback(
             "state",
             str(parsed_state["native_state"]),
         )
+        callback_error = (
+            "cancelled"
+            if error in {"access_denied", "user_cancelled_authorize"}
+            else "provider_error"
+        )
         return RedirectResponse(
-            url=_append_query_param(redirect_url, "error", "cancelled")
+            url=_append_query_param(redirect_url, "error", callback_error)
         )
     if not code:
         raise HTTPException(status_code=400, detail="Invalid OAuth callback")

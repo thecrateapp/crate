@@ -302,6 +302,37 @@ class TestNativeOAuthLinkApi:
         exchange_provider.assert_not_called()
         issue_handoff.assert_not_called()
 
+    def test_native_link_provider_failure_is_not_reported_as_cancellation(self):
+        from crate.api.auth import oauth_callback
+
+        state = {
+            "provider": "google",
+            "return_to": "cratemusic://oauth/link-callback",
+            "mode": "native_link",
+            "verifier": "provider-verifier",
+            "user_id": 7,
+            "session_id": "session-7",
+            "app_id": "listen-tauri",
+            "native_code_challenge": "c" * 43,
+            "native_state": "s" * 43,
+        }
+        with (
+            patch("crate.api.auth._enforce_login_rate_limit"),
+            patch("crate.api.auth._parse_oauth_state", return_value=state),
+            patch("crate.api.auth._google_userinfo") as exchange_provider,
+        ):
+            response = oauth_callback(
+                self._request(),
+                "google",
+                state="signed-state",
+                error="temporarily_unavailable",
+            )
+
+        assert response.headers["location"].endswith(
+            f"state={'s' * 43}&error=provider_error"
+        )
+        exchange_provider.assert_not_called()
+
     def test_native_login_provider_denial_returns_to_the_app(self):
         from crate.api.auth import oauth_callback
 
@@ -328,6 +359,77 @@ class TestNativeOAuthLinkApi:
                 "google",
                 state="signed-state",
                 error="access_denied",
+            )
+
+        assert response.headers["location"] == (
+            "cratemusic://oauth/callback?state=" + "s" * 43 + "&error=cancelled"
+        )
+        exchange_provider.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "provider_error", ["server_error", "temporarily_unavailable"]
+    )
+    def test_native_login_provider_failure_is_not_reported_as_cancellation(
+        self, provider_error: str
+    ):
+        from crate.api.auth import oauth_callback
+
+        state = {
+            "provider": "google",
+            "return_to": "cratemusic://oauth/callback",
+            "mode": "login",
+            "verifier": "provider-verifier",
+            "app_id": "listen-tauri",
+            "native_code_challenge": "c" * 43,
+            "native_state": "s" * 43,
+        }
+        with (
+            patch("crate.api.auth._enforce_login_rate_limit"),
+            patch("crate.api.auth._parse_oauth_state", return_value=state),
+            patch(
+                "crate.api.native_oauth_auth.native_oauth_exchange_enabled",
+                return_value=True,
+            ),
+            patch("crate.api.auth._google_userinfo") as exchange_provider,
+        ):
+            response = oauth_callback(
+                self._request(),
+                "google",
+                state="signed-state",
+                error=provider_error,
+            )
+
+        assert response.headers["location"].endswith(
+            f"state={'s' * 43}&error=provider_error"
+        )
+        exchange_provider.assert_not_called()
+
+    def test_apple_native_user_cancellation_remains_a_cancellation(self):
+        from crate.api.auth import oauth_callback
+
+        state = {
+            "provider": "apple",
+            "return_to": "cratemusic://oauth/callback",
+            "mode": "login",
+            "verifier": "provider-verifier",
+            "app_id": "listen-tauri",
+            "native_code_challenge": "c" * 43,
+            "native_state": "s" * 43,
+        }
+        with (
+            patch("crate.api.auth._enforce_login_rate_limit"),
+            patch("crate.api.auth._parse_oauth_state", return_value=state),
+            patch(
+                "crate.api.native_oauth_auth.native_oauth_exchange_enabled",
+                return_value=True,
+            ),
+            patch("crate.api.auth._apple_userinfo") as exchange_provider,
+        ):
+            response = oauth_callback(
+                self._request(),
+                "apple",
+                state="signed-state",
+                error="user_cancelled_authorize",
             )
 
         assert response.headers["location"] == (
