@@ -40,6 +40,17 @@ class LastfmAuthenticationError(RuntimeError):
         self.retryable = retryable
 
 
+def _lastfm_message_for_log(message: object, secrets: tuple[str, ...]) -> str:
+    if not isinstance(message, str) or not message.strip():
+        return "unavailable"
+
+    sanitized = re.sub(r"\s+", " ", message[:512]).strip()
+    for secret in secrets:
+        if secret:
+            sanitized = sanitized.replace(secret, "[redacted]")
+    return sanitized[:160] or "unavailable"
+
+
 def lastfm_get_auth_token(api_key: str, api_secret: str) -> str | None:
     """Create a short-lived Last.fm desktop authorization token."""
     if not api_key or not api_secret:
@@ -161,11 +172,7 @@ def lastfm_get_session(
     """Exchange a Last.fm auth token for a session key."""
     try:
         return lastfm_get_session_strict(api_key, api_secret, auth_token)
-    except LastfmAuthenticationError as exc:
-        log.warning(
-            "Last.fm auth.getSession failed: retryable=%s",
-            exc.retryable,
-        )
+    except LastfmAuthenticationError:
         return None
 
 
@@ -174,6 +181,10 @@ def lastfm_get_session_strict(
 ) -> LastfmSession:
     """Exchange a Last.fm auth token and preserve retryable failure details."""
     if not api_key or not api_secret or not auth_token:
+        log.warning(
+            "Last.fm auth.getSession failed: status=not-requested "
+            "error=not-requested message=missing credentials retryable=false"
+        )
         raise LastfmAuthenticationError(retryable=False)
 
     params = {
@@ -187,6 +198,7 @@ def lastfm_get_session_strict(
     ).hexdigest()
     params["format"] = "json"
 
+    resp = None
     try:
         resp = requests.get(LASTFM_API_URL, params=params, timeout=10)
         data = resp.json() if resp.content else {}
@@ -225,10 +237,27 @@ def lastfm_get_session_strict(
                 29,
             }
         )
+        safe_message = _lastfm_message_for_log(
+            data.get("message"), (api_key, api_secret, auth_token)
+        )
+        log.warning(
+            "Last.fm auth.getSession failed: status=%s error=%s "
+            "message=%s retryable=%s",
+            resp.status_code,
+            error_code,
+            safe_message,
+            retryable,
+        )
         raise LastfmAuthenticationError(retryable=retryable)
     except LastfmAuthenticationError:
         raise
     except Exception as exc:
+        log.warning(
+            "Last.fm auth.getSession failed: status=%s error=unknown "
+            "message=unavailable failure_type=%s retryable=true",
+            getattr(resp, "status_code", "unknown"),
+            type(exc).__name__,
+        )
         raise LastfmAuthenticationError(retryable=True) from exc
 
 

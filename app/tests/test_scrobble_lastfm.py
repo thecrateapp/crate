@@ -45,6 +45,68 @@ def test_lastfm_get_session_returns_key_and_username(monkeypatch):
     assert captured["params"]["api_sig"] == expected_signature
 
 
+def test_lastfm_get_session_strict_logs_provider_diagnostics(monkeypatch, caplog):
+    from crate.scrobble import LastfmAuthenticationError, lastfm_get_session_strict
+
+    class Response:
+        status_code = 503
+        content = b"provider error"
+
+        def json(self):
+            return {
+                "error": 14,
+                "message": "temporary provider response\nfor auth-token api-key api-secret",
+            }
+
+    monkeypatch.setattr(
+        "crate.scrobble.requests.get",
+        lambda *_args, **_kwargs: Response(),
+    )
+
+    with (
+        caplog.at_level("WARNING", logger="crate.scrobble"),
+        pytest.raises(LastfmAuthenticationError),
+    ):
+        lastfm_get_session_strict("api-key", "api-secret", "auth-token")
+
+    assert "status=503" in caplog.text
+    assert "error=14" in caplog.text
+    assert "message=temporary provider response for [redacted]" in caplog.text
+    assert "api-key" not in caplog.text
+    assert "api-secret" not in caplog.text
+    assert "auth-token" not in caplog.text
+
+
+def test_lastfm_get_session_logs_one_diagnostic_for_failed_exchange(
+    monkeypatch, caplog
+):
+    from crate.scrobble import lastfm_get_session
+
+    class Response:
+        status_code = 502
+        content = b"provider error"
+
+        def json(self):
+            return {"error": 14, "message": "temporary provider response"}
+
+    monkeypatch.setattr(
+        "crate.scrobble.requests.get",
+        lambda *_args, **_kwargs: Response(),
+    )
+
+    with caplog.at_level("WARNING", logger="crate.scrobble"):
+        assert lastfm_get_session("api-key", "api-secret", "auth-token") is None
+
+    diagnostics = [
+        record
+        for record in caplog.records
+        if "Last.fm auth.getSession failed" in record.getMessage()
+    ]
+    assert len(diagnostics) == 1
+    assert "status=502" in diagnostics[0].getMessage()
+    assert "error=14" in diagnostics[0].getMessage()
+
+
 def test_lastfm_get_auth_token_returns_token_and_signs_request(monkeypatch):
     from crate.scrobble import lastfm_get_auth_token
 
