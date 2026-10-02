@@ -157,6 +157,73 @@ def test_lastfm_get_auth_token_rejects_malformed_response(monkeypatch):
     assert lastfm_get_auth_token("api-key", "api-secret") is None
 
 
+def test_lastfm_get_auth_token_sanitizes_provider_diagnostics(monkeypatch, caplog):
+    from crate.scrobble import lastfm_get_auth_token
+
+    class Response:
+        status_code = 502
+        content = b"provider error"
+
+        def json(self):
+            return {
+                "error": 14,
+                "token": "provider-token",
+                "message": (
+                    "temporary provider response\nfor api-key api-secret provider-token "
+                    + ("detail " * 80)
+                ),
+            }
+
+    monkeypatch.setattr(
+        "crate.scrobble.requests.get",
+        lambda *_args, **_kwargs: Response(),
+    )
+
+    with caplog.at_level("WARNING", logger="crate.scrobble"):
+        assert lastfm_get_auth_token("api-key", "api-secret") is None
+
+    diagnostics = [
+        record
+        for record in caplog.records
+        if "Last.fm auth.getToken failed" in record.getMessage()
+    ]
+    assert len(diagnostics) == 1
+    message = diagnostics[0].getMessage()
+    assert "status=502" in message
+    assert "error=14" in message
+    assert "message=temporary provider response for [redacted]" in message
+    assert len(message.partition("message=")[2]) <= 160
+    assert "api-key" not in caplog.text
+    assert "api-secret" not in caplog.text
+    assert "provider-token" not in caplog.text
+
+
+def test_lastfm_get_auth_token_does_not_log_request_exception_details(
+    monkeypatch, caplog
+):
+    import requests
+
+    from crate.scrobble import lastfm_get_auth_token
+
+    def raise_connection_error(*_args, **_kwargs):
+        raise requests.ConnectionError(
+            "failed https://ws.audioscrobbler.com/2.0/?api_key=api-key"
+            "&api_sig=signature"
+        )
+
+    monkeypatch.setattr("crate.scrobble.requests.get", raise_connection_error)
+
+    with caplog.at_level("WARNING", logger="crate.scrobble"):
+        assert lastfm_get_auth_token("api-key", "api-secret") is None
+
+    assert "failure_type=ConnectionError" in caplog.text
+    assert "api-key" not in caplog.text
+    assert "api_secret" not in caplog.text
+    assert "api-secret" not in caplog.text
+    assert "signature" not in caplog.text
+    assert "audioscrobbler.com" not in caplog.text
+
+
 @pytest.mark.parametrize(
     ("error_code", "retryable"),
     [

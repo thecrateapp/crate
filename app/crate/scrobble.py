@@ -66,17 +66,29 @@ def lastfm_get_auth_token(api_key: str, api_secret: str) -> str | None:
     try:
         response = requests.get(LASTFM_API_URL, params=params, timeout=10)
         data = response.json() if response.content else {}
+        raw_error = data.get("error")
+        safe_error = _lastfm_message_for_log(
+            str(raw_error)
+            if isinstance(raw_error, (int, str)) and not isinstance(raw_error, bool)
+            else None,
+            (api_key, api_secret),
+        )
+        response_token = data.get("token")
+        secrets = (api_key, api_secret) + (
+            (response_token,) if isinstance(response_token, str) else ()
+        )
+        safe_message = _lastfm_message_for_log(data.get("message"), secrets)
         token = data.get("token") if response.status_code == 200 else None
         if isinstance(token, str) and re.fullmatch(r"[a-fA-F0-9]{32}", token):
             return token
         log.warning(
             "Last.fm auth.getToken failed: status=%s error=%s message=%s",
             response.status_code,
-            data.get("error"),
-            data.get("message"),
+            safe_error,
+            safe_message,
         )
-    except Exception:
-        log.warning("Last.fm auth.getToken failed", exc_info=True)
+    except Exception as exc:
+        log.warning("Last.fm auth.getToken failed: failure_type=%s", type(exc).__name__)
     return None
 
 
