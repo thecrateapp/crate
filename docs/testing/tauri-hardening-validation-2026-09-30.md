@@ -530,6 +530,15 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 | R12 — observable errors                  | Keep runtime error reporting and typed secure-storage failures; optional artwork failures stay non-blocking. The 2026-10-01 audit on `d482a739` confirms the inspected Tauri auth/native error reporters scrub payloads before telemetry.                                                                                                           | Re-audit when adding reporters; local OS-registration `stderr` may include filesystem paths, so do not forward it verbatim to telemetry.                                                       |
 | R13 — compatibility and release          | Keep the published support floors and artifact verifiers. CI now passes the current three-OS desktop build; a Debian 12 launch verified GLIBC 2.36 compatibility on an earlier artifact.                                                                                                                                                            | Install on the exact minimum OS/WebView versions; validate signed/notarized release upgrades and supported Linux desktops/codecs.                                                              |
 
+The current desktop production build emits a dynamically imported Sentry chunk
+of 564.7 kB minified / 184.2 kB gzip. Its source map lists modules from replay,
+feedback, and multiple core packages, while `app/listen/src/lib/sentry.ts`
+uses initialization, tracing, scope, error-capture, and user-identification
+APIs. The entrypoint calls `initSentry()` before desktop bootstrap without
+awaiting it, so its cold-start cost has not been measured. Keep telemetry as
+is and profile time to first render before changing imports; verify any
+tree-shaking change across web, Tauri, and Capacitor.
+
 ## Acceptance tracking — C01–C07
 
 The review documents identify C03, C06, and C07, but do not define C01, C02, C04, or C05. The following mapping is inferred for bookkeeping; it must not be read as an original acceptance checklist.
