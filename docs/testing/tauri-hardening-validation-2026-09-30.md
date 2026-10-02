@@ -957,3 +957,28 @@ fresh-process repetitions with phase boundaries for active playback, preload,
 track transition, and buffer release on macOS, Windows, and Linux. The raw
 captures are [`tauri-r08-macos-real-player-rss-2026-10-02.csv`](measurements/tauri-r08-macos-real-player-rss-2026-10-02.csv)
 and [`tauri-r08-macos-real-player-footprint-2026-10-02.json`](measurements/tauri-r08-macos-real-player-footprint-2026-10-02.json).
+
+### Persistent-review recheck — `41b80711`, 2026-10-02
+
+The PR Agent Review workflow completed successfully on this head. Its
+persistent summary repeated the Google refresh-token concern and a possible
+`AttributeError` in `get_followed_artist_genre_names`:
+
+- The Google concern is not a current dependency. The provider request asks
+  only for `openid email profile`; `_google_userinfo` uses the access token for
+  Google's user-info endpoint and returns that profile. The callback persists
+  identity metadata, not provider tokens. The existing tests listed in
+  “Persistent review — Google offline access” verify the request parameters
+  and that provider refresh tokens are not exposed or stored.
+- The `AttributeError` concern is contradicted by the current implementation
+  in [`home_catalog.py`](../../app/crate/db/queries/home_catalog.py): the
+  function enters `optional_scope(session) as s` and uses `s.execute()` for its
+  query. Its caller in [`home_context.py`](../../app/crate/db/home_context.py)
+  passes the current session explicitly. There is no `session.execute()` after
+  the scope variable was renamed, so the reported `None.execute()` path is not
+  present.
+
+The current PR run's frontend test and Chromium appearance jobs were still in
+progress at this audit; the security scan, React Doctor, and PR Agent Review
+had passed. Desktop, Android, iOS, and the full backend test jobs were skipped
+by the PR draft guards, not reported as failures.
