@@ -1103,3 +1103,44 @@ Google identity metadata; Crate's own session refresh JWT is independent.
 The PR remains draft, so PR-triggered Android APK, iOS simulator, backend
 quality/test shards/coverage, and desktop bundle jobs were skipped. The
 code-equivalent manual desktop matrix and Android build are recorded above.
+
+### Persistent-review follow-up — OAuth transaction and artist fallback — 2026-10-02
+
+The review correctly identified that native OAuth linking could commit the
+external identity before a later `users.google_id` uniqueness error. A
+PostgreSQL regression test failed against that implementation and observed the
+orphaned identity row. The operation now lives in
+`db.repositories.auth_identities.link_oauth_user_identity()`, where both writes
+share one transaction; the API maps an integrity conflict only after rollback.
+The database transport-boundary test also caught the initial attempt to open
+that transaction from the API router, so the transaction was moved into the
+repository.
+
+The review's artist-upsert concern is a false positive for the current schema.
+`library_artists.name` is the primary key, while the `id` column is nullable.
+When an existing row has no `id`, the fallback predicate uses the exact
+persisted name selected from that row. A PostgreSQL regression test seeds two
+case-variant names with null IDs, selects one through its `storage_id`, and
+verifies that only that row changes. Sixty focused backend tests, including
+this case, the native OAuth rollback case, and the database-boundary tests,
+passed locally.
+
+The repeated Google refresh-token finding remains a false positive:
+Google login requests identity scopes only, and Crate neither exposes nor
+persists Google's provider refresh token. This is covered by the OAuth tests
+noted above.
+
+On `890e3a95`, the manually dispatched [Backend Tests run
+`37065530450`](https://github.com/thecrateapp/crate/actions/runs/37065530450)
+passed security, quality/type checking, all eight test shards, and coverage.
+The exact-head [Frontend Tests run
+`37065521773`](https://github.com/thecrateapp/crate/actions/runs/37065521773)
+passed tests/build and Chromium appearance. React Doctor and PR Agent Review
+also passed. The exact-head [Build Desktop Apps run
+`37064363758`](https://github.com/thecrateapp/crate/actions/runs/37064363758)
+passed macOS, Linux, and Windows; [Build Android run
+`37064363725`](https://github.com/thecrateapp/crate/actions/runs/37064363725)
+passed. Those two artifact runs used `6589283b`; the intervening `890e3a95`
+changes are backend-only and do not alter desktop or mobile app sources. The
+PR remains a draft, so its PR-triggered desktop, Android, and full backend jobs
+remain skipped.
