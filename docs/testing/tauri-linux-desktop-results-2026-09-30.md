@@ -121,7 +121,7 @@ Two local stereo FLAC tone fixtures were generated in `/tmp`; no library audio w
 | ------------- | ------------------: | ------------: | ----------------------: |
 | track20       | 1,220.4 s (20:20.4) |    17,937,876 |             430,557,120 |
 | track16       |   991.8 s (16:31.8) |    14,789,860 |             349,907,040 |
-| Both retained |           2,212.2 s |    32,727,736 | 780,464,160 (744.1 MiB) |
+| Both retained |           2,212.2 s |    32,727,736 | 780,464,160 (744.3 MiB) |
 
 Both buffers were held for 90 seconds, cleared, and followed for about 109 seconds. The continuous 250 ms sampler began after both buffers were decoded, so it did not capture pre-decode baseline or the earliest peak. It measured a maximum process-group 1,195 MiB RSS / 1,037 MiB PSS; about 109 seconds after release it still measured roughly 1,162 MiB RSS / 1,002 MiB PSS. This is observed retention, not proof of a leak.
 

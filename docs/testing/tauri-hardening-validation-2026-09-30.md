@@ -320,7 +320,7 @@ The synthetic probes use the same browser decode API and retain two full-length 
 
 The probe was run in a fresh `crate-desktop` process on the host above. It fetched two local FLAC fixtures over loopback, decoded them sequentially with `AudioContext.decodeAudioData`, kept both `AudioBuffer`s for 90 seconds, then cleared the references and closed the context. The fixture page made no Crate API requests.
 
-The WebKit `AudioContext` selected 44,100 Hz. The 20.34-minute stereo buffer contained 430,594,752 bytes of Float32 PCM (410.6 MiB); the 16.53-minute buffer contained 349,839,512 bytes (333.6 MiB). Together they retained 780,434,264 bytes (744.1 MiB). The sampler recorded process RSS every 250 ms from before app startup through 15 seconds after release. Its startup interval began before Tauri existed, so only the peak is useful for that phase. Apple `footprint` sampled the Tauri and WebKit process IDs every 500 ms for 125 seconds; its first sample began about 14 seconds after the two buffers were ready, while its per-process peak field covered the process lifetime.
+The WebKit `AudioContext` selected 44,100 Hz. The 20.34-minute stereo buffer contained 430,594,752 bytes of Float32 PCM (410.6 MiB); the 16.53-minute buffer contained 349,839,512 bytes (333.6 MiB). Together they retained 780,434,264 bytes (744.3 MiB). The sampler recorded process RSS every 250 ms from before app startup through 15 seconds after release. Its startup interval began before Tauri existed, so only the peak is useful for that phase. Apple `footprint` sampled the Tauri and WebKit process IDs every 500 ms for 125 seconds; its first sample began about 14 seconds after the two buffers were ready, while its per-process peak field covered the process lifetime.
 
 | Phase                    | Process-group RSS summary                     | WebContent RSS summary         | Additional observation                                                                                                                   |
 | ------------------------ | --------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -355,7 +355,7 @@ Low RSS during the hold and after release did not mean the decoded memory had di
 
 A separate run used the same revision (`df72643d229ad7b47908f183690f5a35294a8ddf`) inside Debian 12 ARM64 on the local OrbStack Linux VM, with WebKitGTK 2.50.6. The VM reports 7.8 GiB RAM and no cgroup memory cap. Tauri ran as a debug build under Xvfb with software rendering and a private D-Bus session; no installed desktop shell, compositor, GPU acceleration, account, or Crate API was involved. This is a Linux/WebKitGTK runtime datapoint, not installed desktop acceptance, and it does not validate the declared WebKitGTK 2.40 minimum.
 
-Two synthetic pink-noise FLAC fixtures were decoded at 44,100 Hz: 20.34 minutes (430,557,120 PCM bytes / 410.6 MiB) and 16.53 minutes (349,907,040 bytes / 333.6 MiB), 780,464,160 bytes total (744.1 MiB). The probe retained both buffers for 90 seconds and then cleared them and closed the AudioContext. A sampler started before Tauri launch and sampled the Tauri process plus its WebKit children every 250 ms for 210 seconds (823 samples). RSS values below are MiB; process-group sums can count shared pages more than once.
+Two synthetic pink-noise FLAC fixtures were decoded at 44,100 Hz: 20.34 minutes (430,557,120 PCM bytes / 410.6 MiB) and 16.53 minutes (349,907,040 bytes / 333.7 MiB), 780,464,160 bytes total (744.3 MiB). The probe retained both buffers for 90 seconds and then cleared them and closed the AudioContext. A sampler started before Tauri launch and sampled the Tauri process plus its WebKit children every 250 ms for 210 seconds (823 samples). RSS values below are MiB; process-group sums can count shared pages more than once.
 
 | Phase                                               | Process-group RSS min / median / max | WebContent RSS min / median / max |
 | --------------------------------------------------- | ------------------------------------ | --------------------------------- |
@@ -373,7 +373,7 @@ The macOS release WebView selected 48 kHz while both Linux runs selected 44.1 kH
 
 A measurement-specific Linux release `.deb` was built from the same revision as `crate-rss-linux` version `2.7.4`, architecture `arm64`, then installed with `dpkg -i` in the Debian 12 ARM64 container. Its package metadata declares `libwebkit2gtk-4.1-0 (>= 2.40.0)`; the runtime used WebKitGTK 2.50.6. The package opened successfully under Xvfb with software rendering and a private D-Bus session. This exercises the bundled release binary and WebKitGTK, but not a normal desktop shell/compositor or the declared 2.40 floor.
 
-It decoded the same fixtures at 44,100 Hz and retained 744.1 MiB PCM for 90 seconds. The sampler started before launch and captured the app and its WebKit children every 250 ms for 210 seconds (824 samples), including 106.0 seconds after release. RSS values are MiB; process-group sums can count shared pages more than once.
+It decoded the same fixtures at 44,100 Hz and retained 744.3 MiB PCM for 90 seconds. The sampler started before launch and captured the app and its WebKit children every 250 ms for 210 seconds (824 samples), including 106.0 seconds after release. RSS values are MiB; process-group sums can count shared pages more than once.
 
 | Phase                                               | Process-group RSS min / median / max | WebContent RSS min / median / max |
 | --------------------------------------------------- | ------------------------------------ | --------------------------------- |
@@ -390,7 +390,7 @@ Unlike macOS, the Linux WebContent RSS remained near 899 MiB more than 100 secon
 
 The opt-in Windows RSS probe ran in [Build Desktop Apps workflow 36807020863](https://github.com/thecrateapp/crate/actions/runs/36807020863), using probe source revision `ac4a8c97b85c124d7ac1ccfb89fe0123ed3a187e`. The hosted machine was `Windows-2025Server-10.0.26100-SP0` (AMD64, 4 vCPU, 16 GiB RAM). This is a Tauri development WebView2 run, not an installed release or the supported Windows 10 version 1803 floor.
 
-Each of three runs decoded two synthetic stereo WAV fixtures at 44,100 Hz: 20.34 minutes (430,557,120 PCM bytes / 410.6 MiB) and 16.53 minutes (349,907,040 bytes / 333.6 MiB), 780,464,160 bytes total (744.1 MiB). The page held both buffers for 90 seconds, cleared references, closed the AudioContext, and sampled the Tauri process group and WebView2 processes every 250 ms for 60 seconds after release. Table entries are the median of the three run medians / the largest of the three run maxima, in MiB. The process-group RSS may count shared pages more than once; private commit is reported separately.
+Each of three runs decoded two synthetic stereo WAV fixtures at 44,100 Hz: 20.34 minutes (430,557,120 PCM bytes / 410.6 MiB) and 16.53 minutes (349,907,040 bytes / 333.7 MiB), 780,464,160 bytes total (744.3 MiB). The page held both buffers for 90 seconds, cleared references, closed the AudioContext, and sampled the Tauri process group and WebView2 processes every 250 ms for 60 seconds after release. Table entries are the median of the three run medians / the largest of the three run maxima, in MiB. The process-group RSS may count shared pages more than once; private commit is reported separately.
 
 | Phase                       | Process-group RSS median / max | WebView2 RSS median / max | Process-group private commit median / max | WebView2 private commit median / max |
 | --------------------------- | -----------------------------: | ------------------------: | ----------------------------------------: | -----------------------------------: |
@@ -400,6 +400,37 @@ Each of three runs decoded two synthetic stereo WAV fixtures at 44,100 Hz: 20.34
 | 30–60 seconds after release |              1,071.5 / 1,099.5 |         1,039.5 / 1,062.3 |                             866.6 / 869.3 |                        861.5 / 864.1 |
 
 The decode/startup sampling window varied substantially across repetitions, so its medians are not comparable. The observed startup peaks were 1,690.4 MiB process-group RSS, 1,649.9 MiB WebView2 RSS, and 1,850.6 MiB process-group private commit (1,845.2 MiB for WebView2). After release, RSS remained around 1.0–1.1 GiB through the measured minute and private commit around 860–881 MiB. This is high retention in a synthetic development probe, not proof of a leak. The capture does not exercise the real player, an installed package, Windows 10 1803, long-track overlap/gapless playback, or a longer soak; it cannot establish a fallback threshold.
+
+## Windows WebView2 RSS repeat — 2026-10-02
+
+The current-head [Build Desktop Apps run 36957591905](https://github.com/thecrateapp/crate/actions/runs/36957591905)
+repeated the Windows probe at application source revision `a672a99e` on a
+`Windows-2025Server-10.0.26100-SP0` AMD64 runner with 4 vCPUs and 16 GiB RAM.
+Three fresh Tauri development processes each decoded the same two synthetic
+stereo WAV fixtures at 44,100 Hz (430,557,120 and 349,907,040 PCM bytes,
+780,464,160 bytes / 744.3 MiB total), held them for 90 seconds, then sampled
+for 60 seconds after release. At each phase, the table gives the median of the
+three run medians / largest of the three run maxima, in MiB.
+
+| Phase                      | Process-group RSS |      WebView2 RSS | Process-group private commit | WebView2 private commit |
+| -------------------------- | ----------------: | ----------------: | ---------------------------: | ----------------------: |
+| 90-second buffer hold      | 1,103.9 / 1,477.0 | 1,063.3 / 1,436.0 |              870.9 / 1,246.5 |         865.5 / 1,241.1 |
+| 0–60 seconds after release | 1,085.1 / 1,123.6 | 1,045.0 / 1,081.9 |                865.9 / 878.2 |           860.7 / 873.1 |
+
+The decode/startup samples reached 1,842.9 MiB process-group RSS and 1,803.0
+MiB WebView2 RSS; process-group and WebView2 private-commit maxima were 1,849.6
+and 1,844.2 MiB. The phase's median depends on when the first sample lands, so
+use the maximum only as an observed peak. At the end of the one-minute
+post-release window, private commit remained around 861–869 MiB across runs,
+and RSS remained high. This is a repeatable synthetic WebView2 retention
+observation, not proof of a leak or the real player's peak. The probe still
+does not cover the Windows 10 1803 floor, an installed release, actual player
+transitions, overlap, or a longer soak; keep the current behavior and do not
+derive a memory fallback threshold from this capture. The compact per-run
+summary is [`tauri-r08-windows-audio-rss-2026-10-02-run-36957591905.json`](measurements/tauri-r08-windows-audio-rss-2026-10-02-run-36957591905.json);
+the [workflow run](https://github.com/thecrateapp/crate/actions/runs/36957591905)
+retains raw 250 ms process samples and event logs in its
+`desktop-audio-rss-windows-36957591905` artifact.
 
 ## Linux release artifact compatibility regression — 2026-09-30
 
@@ -492,7 +523,7 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 | R05 — offline index writes               | Keep the atomic JSON snapshot and same-turn batching; do not add a journal based on synthetic data alone.                                                                                                                                                                                                                                           | Measure real completion cadence and write latency on Windows/Linux before changing storage format.                                                                                             |
 | R06 — media session diffs                | Resolved in the frontend/native command bridge; metadata/artwork are separated from playback state and position, with 21 focused tests passing.                                                                                                                                                                                                     | Test OS media controls during real playback and remote commands.                                                                                                                               |
 | R07 — visualizer and power               | Keep the visualizer hidden in Tauri Linux until it meets the user's smoothness requirement; web and Capacitor retain it. Mac synthetic runs are near 60 Hz.                                                                                                                                                                                         | Release/HiDPI measurements on Windows and ordinary Linux desktops; do not infer energy use from RAF alone.                                                                                     |
-| R08 — decoded-audio memory               | Keep current long-track behavior pending per-OS evidence, as requested. Synthetic Mac, Linux, and Windows captures show different post-release retention.                                                                                                                                                                                           | Measure installed builds and real-player overlap/gapless and long-track behavior on all OS, including supported floors; decide a budget/fallback from those captures.                          |
+| R08 — decoded-audio memory               | Keep current behavior pending real-player evidence. The current Windows WebView2 repeat held 744.3 MiB PCM: process-group RSS was 1.08 GiB during hold and 1.06 GiB after 60 seconds; private commit stayed near 866 MiB. Synthetic retention does not establish a player leak or fallback threshold.                                               | Measure installed builds and real-player overlap/gapless and long-track behavior on all OS, including supported floors; decide a budget/fallback from those captures.                          |
 | R09 — runtime capability boundaries      | Keep explicit `isTauriRuntime`/`isCapacitorRuntime` checks; do not broaden global `isNative`, which selects Capacitor plugins. Defer a capability-facade refactor until it removes demonstrated duplication.                                                                                                                                        | Revisit when a concrete cross-runtime defect or measurable maintenance cost appears.                                                                                                           |
 | R10 — server/session transitions         | Keep the F05/F06 transition fixes and their regression coverage. Defer a broad transition orchestrator extraction; current evidence does not establish one safe shared ordering for every auth/offline flow.                                                                                                                                        | Add a focused design only if new transition bugs or duplicated behavior recur.                                                                                                                 |
 | R11 — permissions and secrets            | Keep Tauri sessions in the OS credential vault and keep key access behind allowlisted Rust commands. Do not add a wider upload scope; no upload-plugin permission appears in the current Tauri capability list.                                                                                                                                     | Verify macOS keychain prompting on the signed release identity and exercise Windows/Linux vault behavior on installed builds.                                                                  |
@@ -503,14 +534,22 @@ The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, 
 
 The review documents identify C03, C06, and C07, but do not define C01, C02, C04, or C05. The following mapping is inferred for bookkeeping; it must not be read as an original acceptance checklist.
 
+The agreed macOS 11 Big Sur floor is compatible with the frontend's declared
+browser floor when the OS has Safari 16.4: Tailwind CSS 4 requires Safari 16.4
+for core functionality, and Apple's Safari 16.4 release notes list Big Sur as
+a supported OS. This establishes that the floor is feasible, not that Crate's
+WKWebView has been exercised on a minimum-version host. See the official
+[Tailwind compatibility requirements](https://tailwindcss.com/docs/compatibility)
+and [Safari 16.4 release notes](https://developer.apple.com/documentation/safari-release-notes/safari-16_4-release-notes).
+
 | ID  | Inferred gate                             | Current status                                                                                                                                                                                                                                                                                                                                                                                                  |
 | --- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C01 | Support-floor metadata and declarations   | Partial: exact-head macOS ARM64 and Intel artifacts declare macOS 11.0; Windows 10 1803 is paired with minimum WebView2 111.0.1661.34 and a silent download bootstrapper; exact-head DEB/RPM packages require WebKitGTK 2.40+ and the AppImage bundles WebKitGTK. Exact minimum hosts remain untested.                                                                                                          |
 | C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; the exact-head Linux `.deb` rendered its setup screen under Xvfb with system WebKitGTK/JSC 2.40.3 and the exact-head AppImage rendered with bundled WebKitGTK 2.50.4. Exact-head workflow 36947461225 installed the Windows NSIS bundle, observed its main window, and ran the silent uninstaller. Minimum-host and upgrade acceptance remain open. |
 | C03 | macOS Now Playing state                   | Native state mapping/test passes; installed controls and real playback remain open.                                                                                                                                                                                                                                                                                                                             |
-| C04 | Native OAuth handoff                      | 87 focused backend tests pass on the current branch, and Google login succeeded on macOS; the updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                                                                                                                                                                                                |
+| C04 | Native OAuth handoff                      | Backend callback tests pass, and the user confirmed Google login succeeds in the macOS app; the browser remains on Google's page after handoff. The updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                                                                                                                                          |
 | C05 | Linux package ABI/WebKit compatibility    | Pass for tested artifacts: the `.deb` and RPM from `44e69227` rendered with system WebKitGTK/JavaScriptCoreGTK 2.40.3; the exact-head `.deb` from `e8c8530d` rendered with that same runtime, and its AppImage rendered with bundled WebKitGTK 2.50.4. The current Linux CI symbol gate passed. These are x86_64 Debian 12 Xvfb/X11 checks, not a physical Wayland or minimum-distribution installation test.   |
-| C06 | Desktop CI builds and artifact checks     | Pass: exact-head [manual matrix 36947461225](https://github.com/thecrateapp/crate/actions/runs/36947461225) passed macOS, Linux, and Windows at `e8c8530d`, including artifact checks, Windows install/launch/uninstall and its HTTP resource probe. Minimum-host acceptance remains open.                                                                                                                      |
+| C06 | Desktop CI builds and artifact checks     | Pass: exact-head [manual matrix 36957591905](https://github.com/thecrateapp/crate/actions/runs/36957591905) passed macOS, Linux, and Windows at `a672a99e`, including artifact checks, macOS ARM64/Intel bundles, Windows install/launch/uninstall and 150 HTTP-probe requests, plus Linux ABI/WebKitGTK gates. Minimum-host acceptance remains open.                                                           |
 | C07 | macOS artwork callback ownership          | Native lifetime regression test passes; installed Now Playing artwork remains open.                                                                                                                                                                                                                                                                                                                             |
 
 ## Other native gates still pending
@@ -797,3 +836,24 @@ the pull-request event. They were manually validated on exact HEAD
 This closes current-head automated build/test evidence for C06 and revalidates
 the web/Capacitor paths without changing the PR's draft state. It does not close
 minimum-OS, installed-player, signed-release, or upgrade acceptance.
+
+### Current exact-head matrix and Windows RSS repeat — `a672a99e`, 2026-10-02
+
+The [Build Desktop Apps run `36957591905`](https://github.com/thecrateapp/crate/actions/runs/36957591905)
+passed on exact HEAD `a672a99e368655d1f0833f3d2e560e2a688898c7` for macOS,
+Linux, and Windows. It passed macOS ARM64/Intel tester builds, Linux
+GLIBC/WebKitGTK/artifact checks, and Windows artifact verification,
+installation, launch, uninstallation, and the packaged HTTP resource probe
+(25 iterations each across six scenarios; zero resource baseline and no
+failures). The same Windows runner completed the new three-run WebView2 audio
+RSS capture recorded above.
+
+At that head, pull-request Frontend Tests (`36956826872`), appearance
+(`36956826872`), React Doctor (`36956826845`), changed-Python security scan
+(`36956826830`), and PR Agent Review (`36956824205`) passed. Android, iOS, and
+backend quality/test-shard/coverage checks were skipped because this commit
+only changed documentation and the PR remains a draft; they were not failed.
+The code source is unchanged from the full platform/backend/Android/iOS
+validation at `c4e3b5d1` above. This closes exact-head C06 automated evidence,
+not installed support-floor hosts, signed upgrades, real-player behavior, or
+the Mac interactive gates.
