@@ -1052,3 +1052,35 @@ The native desktop build matrix, Android APK, iOS simulator, backend quality,
 test shards, and coverage were skipped because the PR remained draft. The
 PR-Agent log also says it pruned the very large PR diff, so its passing result
 does not represent a full review of every changed file.
+
+### Current desktop matrix and persistent-review follow-up — 2026-10-02
+
+The manually dispatched [Build Desktop Apps run `37059089945`](https://github.com/thecrateapp/crate/actions/runs/37059089945)
+passed all three OS jobs at source `731cc8c2`, including the Windows packaged
+install/launch/uninstall smoke and HTTP resource probe. The app source is
+unchanged between that revision and `0c7c0bc1`; the intervening commit only
+updated a test mock. [Build Android run `37059090184`](https://github.com/thecrateapp/crate/actions/runs/37059090184)
+also passed on `731cc8c2`.
+
+At `0c7c0bc1`, the PR Frontend Tests run `37060210259` passed its full test
+and Chromium appearance jobs. React Doctor (`37060210230`), changed-Python
+security scan (`37060210373`), and PR Agent Review (`37060206355`) passed. The
+PR remains draft, so backend quality/test shards/coverage, Android APK, iOS
+simulator, and PR-triggered desktop jobs were skipped. The PR-Agent log again
+pruned the large diff; its green result is not a complete line-by-line review.
+
+That review repeated two observations. The claimed missing successful Tauri
+OAuth redirect test is a false positive: `test_native_oauth_completion_redirect_uses_tauri_fragment`
+asserts the exact HTTPS origin, path, and fragment; `AuthCallback.test.tsx`
+asserts the fragment is removed from browser history and is converted to the
+app deep link. The callback code does not log the URL or handoff values.
+
+The query-scope observation was valid. `get_followed_artist_genre_names()` is
+read-only, but `optional_scope(None)` opened and committed a write transaction.
+It now uses `read_scope()` when no caller session is supplied and a
+`nullcontext()` to reuse a provided session. Its regression test first failed
+against the old implementation; after the change, the two scope-contract tests
+and the three existing PostgreSQL integration cases passed (5 total), and Ruff
+check/format passed. These tests ran against the isolated `crate_test` database
+on the local test PostgreSQL service. A fresh full Backend Tests workflow is
+still required after pushing this fix.

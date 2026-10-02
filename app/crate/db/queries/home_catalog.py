@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from sqlalchemy import text
 
-from crate.db.tx import optional_scope, read_scope
+from crate.db.tx import read_scope
 
 
 def get_recent_global_artist_rows(limit: int = 10) -> list[dict]:
@@ -344,7 +346,8 @@ def get_followed_artist_genre_names(
 ) -> list[str]:
     if not names:
         return []
-    with optional_scope(session) as s:
+    scope = read_scope() if session is None else nullcontext(session)
+    with scope as s:
         rows = (
             s.execute(
                 text(
@@ -367,8 +370,8 @@ def get_followed_artist_genre_names(
 
 
 __all__ = [
-    "get_artist_genres_map",
     "get_artist_genre_profiles_map",
+    "get_artist_genres_map",
     "get_followed_artist_genre_names",
     "get_home_hero_rows",
     "get_library_artist_by_id",
