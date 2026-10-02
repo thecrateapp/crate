@@ -923,3 +923,37 @@ timeout adjustment in a Rust test.
 This confirms basic playback and in-app artwork rendering for C03/C07. It does
 not verify the macOS Control Center/Now Playing surface, external remote-command
 delivery, or artwork delivery to that surface, so both gates remain partial.
+
+### R08 — macOS real-player long-track capture (partial) — 2026-10-02
+
+On the same Mac17,2 / macOS 27.0.1 host, the already-running `Crate Manual
+Test` debug bundle played a real library track reported as 17:23, FLAC
+24-bit/88.2 kHz, with another 17:45 track next in its queue. The bundle's
+exact source revision was not independently established, and this was not a
+fresh launch or installed release. The app was paused by the end of capture;
+the exact active-versus-paused boundary is unknown, so these are partial
+real-player observations rather than a continuous active-playback soak.
+
+The 120-second `ps` capture sampled four processes at nominal 250 ms intervals
+(390 samples per process). RSS min / median / max was 24.0 / 32.9 / 56.2 MiB
+for `crate-desktop`, 20.0 / 28.5 / 149.9 MiB for WebKit WebContent, 18.7 /
+21.1 / 44.3 MiB for WebKit GPU, and 5.6 / 7.6 / 9.8 MiB for WebKit Networking.
+The sum of these process RSS values was 69.8 / 93.0 / 230.5 MiB; this sum may
+count shared pages more than once.
+
+An overlapping 90-second Apple `footprint` capture produced 181 samples. Its
+WebContent `phys_footprint` was 1,498.8 / 1,500.9 / 1,588.6 MiB (min / median
+/ max), while the process-group reported total footprint was 1,764.1 / 1,766.1
+/ 1,862.7 MiB and swapped pages were 1,455.3 / 1,547.1 / 1,575.7 MiB. The
+WebContent lifetime `phys_footprint_peak` was 2,856 MiB; this peak predates
+the capture and cannot be attributed to this playback. The host had 16 GiB
+RAM and system-wide swap was already heavily used when checked after capture;
+there is no before-test system baseline to attribute that pressure to Crate.
+
+The contrast between low `ps` RSS and high native footprint / swapped pages is
+a serious memory-pressure signal, but it does not prove a leak or establish a
+fallback threshold. Keep current audio behavior while collecting clean,
+fresh-process repetitions with phase boundaries for active playback, preload,
+track transition, and buffer release on macOS, Windows, and Linux. The raw
+captures are [`tauri-r08-macos-real-player-rss-2026-10-02.csv`](measurements/tauri-r08-macos-real-player-rss-2026-10-02.csv)
+and [`tauri-r08-macos-real-player-footprint-2026-10-02.json`](measurements/tauri-r08-macos-real-player-footprint-2026-10-02.json).
