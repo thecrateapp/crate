@@ -1039,5 +1039,16 @@ The same review repeated two OAuth concerns that do not match the implementation
 Google requests identity scopes and does not persist provider refresh tokens;
 the Tauri HTTPS callback handoff is covered by native OAuth tests asserting the
 `https://listen.lespedants.org/auth/callback#desktop=tauri&code=...&state=...`
-completion fragment. These findings do not require code changes. CI and the
-updated persistent review for `5c3e4ca3` must still be checked after pushing.
+completion fragment. These findings do not require code changes.
+
+After pushing `5c54089f`, PR run [`37054557995`](https://github.com/thecrateapp/crate/actions/runs/37054557995)
+passed the full frontend test job in 6m54s, including Listen tests/build and
+desktop typecheck/tests; Chromium appearance also passed. React Doctor,
+changed-Python security scan, and PR Agent Review passed in runs
+[`37054557936`](https://github.com/thecrateapp/crate/actions/runs/37054557936),
+[`37054558161`](https://github.com/thecrateapp/crate/actions/runs/37054558161),
+and [`37054553772`](https://github.com/thecrateapp/crate/actions/runs/37054553772).
+The native desktop build matrix, Android APK, iOS simulator, backend quality,
+test shards, and coverage were skipped because the PR remained draft. The
+PR-Agent log also says it pruned the very large PR diff, so its passing result
+does not represent a full review of every changed file.
