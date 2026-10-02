@@ -7,6 +7,7 @@ const {
   apiMock,
   clearQueueMock,
   consumePendingOAuthNextMock,
+  consumePendingOAuthProviderErrorMock,
   getApiBaseMock,
   getAuthTokenExpiresAtMock,
   getAuthTokenMock,
@@ -29,6 +30,7 @@ const {
   apiMock: vi.fn(),
   clearQueueMock: vi.fn(),
   consumePendingOAuthNextMock: vi.fn<() => string | null>(() => null),
+  consumePendingOAuthProviderErrorMock: vi.fn(() => false),
   getApiBaseMock: vi.fn(() => ""),
   getAuthTokenExpiresAtMock: vi.fn<() => string | null>(() => null),
   getAuthTokenMock: vi.fn<() => string | null>(() => null),
@@ -92,6 +94,7 @@ vi.mock("@/lib/server-store", () => ({
 
 vi.mock("@/lib/capacitor", () => ({
   consumePendingOAuthNext: consumePendingOAuthNextMock,
+  consumePendingOAuthProviderError: consumePendingOAuthProviderErrorMock,
 }));
 
 vi.mock("@/lib/offline", () => ({
@@ -137,6 +140,8 @@ describe("AuthProvider", () => {
     clearQueueMock.mockReset();
     consumePendingOAuthNextMock.mockReset();
     consumePendingOAuthNextMock.mockReturnValue(null);
+    consumePendingOAuthProviderErrorMock.mockReset();
+    consumePendingOAuthProviderErrorMock.mockReturnValue(false);
     getApiBaseMock.mockReset();
     getApiBaseMock.mockReturnValue("");
     getCurrentServerIdMock.mockReset();
