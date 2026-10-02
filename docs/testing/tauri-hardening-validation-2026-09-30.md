@@ -749,3 +749,18 @@ This confirms exact-head automated build coverage for C06 and revalidates the
 web/Capacitor build paths. It does not replace real Windows 10 1803 or macOS 11
 hosts, normal Linux desktop sessions, signed/notarized release installation,
 upgrades, or installed-player acceptance.
+
+### Exact-head CI revalidation — `aad64913`, 2026-10-02
+
+PR #259 remains a draft, so its Android `build-apk` and backend `quality`, test
+shards, and coverage checks are skipped on the pull-request event. They were
+manually dispatched against the exact current head `aad6491302f26d25c3177270b06ab04e33737b41`:
+
+- [Backend Tests run `36951073911`](https://github.com/thecrateapp/crate/actions/runs/36951073911): security scan, quality/typecheck/Ruff, all eight test shards, and coverage passed.
+- [Build Android run `36951073924`](https://github.com/thecrateapp/crate/actions/runs/36951073924): Listen typecheck/lint, mobile contracts, Capacitor bundle and budget, Android lint, and Android tests passed. Tag-only signed release outputs were skipped as expected.
+- The PR-triggered [Frontend Tests `36950473869`](https://github.com/thecrateapp/crate/actions/runs/36950473869), appearance, [React Doctor `36950473805`](https://github.com/thecrateapp/crate/actions/runs/36950473805), changed-Python security scan, and [PR Agent Review `36950471196`](https://github.com/thecrateapp/crate/actions/runs/36950471196) passed.
+- The latest three-OS desktop matrix remains the successful exact-source run `36947461225` at `e8c8530d`; the later commits through `aad64913` changed validation documentation only.
+
+This closes the current-head backend quality/test/coverage and Android CI paths
+for C06 without changing the PR's draft state. It does not close minimum-OS,
+installed-player, signed-release, or upgrade acceptance.
